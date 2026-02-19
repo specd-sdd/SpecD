@@ -1,129 +1,173 @@
 import { describe, it, expect } from 'vitest'
-import { mergeSpecs } from '../../../src/domain/services/delta-merger.js'
+import { mergeSpecs, type DeltaConfig } from '../../../src/domain/services/delta-merger.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 
 const path = SpecPath.parse('auth/oauth')
 
+const reqConfig: DeltaConfig = {
+  section: 'Requirements',
+  pattern: '### Requirement: {name}',
+}
+
+const scenarioConfig: DeltaConfig = {
+  section: 'Scenarios',
+  pattern: '### Scenario: {name}',
+}
+
 function makeSpec(content: string): Spec {
   return new Spec(path, content)
 }
 
+const baseSpec = makeSpec(
+  '## Requirements\n\n' +
+  '### Requirement: Token expiry\nTokens must expire after 24h\n\n' +
+  '### Requirement: Refresh tokens\nRefresh tokens must be stored encrypted',
+)
+
 describe('mergeSpecs', () => {
-  describe('empty delta', () => {
-    it('returns base spec unchanged when delta has no sections', () => {
-      const base = makeSpec('## Requirements\nreq one\n\n## Constraints\nconstraint one')
+  describe('no delta', () => {
+    it('returns base spec unchanged when delta has no matching sections', () => {
       const delta = makeSpec('')
-      const result = mergeSpecs(base, delta)
-      expect(result.section('Requirements')).toBe('req one')
-      expect(result.section('Constraints')).toBe('constraint one')
+      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      expect(result.section('Requirements')).toBe(baseSpec.section('Requirements'))
     })
 
     it('preserves the base path', () => {
-      const base = makeSpec('## Requirements\ncontent')
-      const delta = makeSpec('')
-      const result = mergeSpecs(base, delta)
+      const result = mergeSpecs(baseSpec, makeSpec(''), [reqConfig])
       expect(result.path.equals(path)).toBe(true)
+    })
+
+    it('preserves sections not covered by any deltaConfig', () => {
+      const base = makeSpec('## Requirements\ncontent\n\n## Overview\noverview content')
+      const delta = makeSpec('## ADDED Requirements\n### Requirement: New\nnew req')
+      const result = mergeSpecs(base, delta, [reqConfig])
+      expect(result.section('Overview')).toBe('overview content')
     })
   })
 
   describe('ADDED', () => {
-    it('adds a new section not present in base', () => {
-      const base = makeSpec('## Requirements\nreq one')
-      const delta = makeSpec('## ADDED\n### Scenarios\nscenario one')
-      const result = mergeSpecs(base, delta)
-      expect(result.section('Scenarios')).toBe('scenario one')
-      expect(result.section('Requirements')).toBe('req one')
+    it('adds a new block to an existing section', () => {
+      const delta = makeSpec(
+        '## ADDED Requirements\n### Requirement: Token rotation\nTokens must be rotated every 24h',
+      )
+      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      expect(result.section('Requirements')).toContain('### Requirement: Token rotation')
+      expect(result.section('Requirements')).toContain('Tokens must be rotated every 24h')
     })
 
-    it('adds multiple new sections', () => {
-      const base = makeSpec('## Requirements\nreq one')
-      const delta = makeSpec('## ADDED\n### Scenarios\nscenario one\n### Examples\nexample one')
-      const result = mergeSpecs(base, delta)
-      expect(result.section('Scenarios')).toBe('scenario one')
-      expect(result.section('Examples')).toBe('example one')
+    it('preserves existing blocks when adding', () => {
+      const delta = makeSpec(
+        '## ADDED Requirements\n### Requirement: Token rotation\nnew content',
+      )
+      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      expect(result.section('Requirements')).toContain('### Requirement: Token expiry')
+      expect(result.section('Requirements')).toContain('### Requirement: Refresh tokens')
     })
 
-    it('adds a section even if base is empty', () => {
-      const base = makeSpec('')
-      const delta = makeSpec('## ADDED\n### Requirements\nnew req')
-      const result = mergeSpecs(base, delta)
-      expect(result.section('Requirements')).toBe('new req')
+    it('creates the section if it does not exist in base', () => {
+      const base = makeSpec('## Overview\nsome overview')
+      const delta = makeSpec(
+        '## ADDED Requirements\n### Requirement: First req\ncontent',
+      )
+      const result = mergeSpecs(base, delta, [reqConfig])
+      expect(result.section('Requirements')).toContain('### Requirement: First req')
     })
   })
 
   describe('MODIFIED', () => {
-    it('replaces an existing section', () => {
-      const base = makeSpec('## Requirements\nold content')
-      const delta = makeSpec('## MODIFIED\n### Requirements\nnew content')
-      const result = mergeSpecs(base, delta)
-      expect(result.section('Requirements')).toBe('new content')
+    it('replaces an existing block', () => {
+      const delta = makeSpec(
+        '## MODIFIED Requirements\n### Requirement: Token expiry\nTokens must expire after 1h',
+      )
+      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      expect(result.section('Requirements')).toContain('Tokens must expire after 1h')
+      expect(result.section('Requirements')).not.toContain('Tokens must expire after 24h')
     })
 
-    it('replaces multiple sections', () => {
-      const base = makeSpec('## Requirements\nold req\n\n## Constraints\nold constraint')
-      const delta = makeSpec('## MODIFIED\n### Requirements\nnew req\n### Constraints\nnew constraint')
-      const result = mergeSpecs(base, delta)
-      expect(result.section('Requirements')).toBe('new req')
-      expect(result.section('Constraints')).toBe('new constraint')
+    it('preserves blocks not mentioned in MODIFIED', () => {
+      const delta = makeSpec(
+        '## MODIFIED Requirements\n### Requirement: Token expiry\nnew content',
+      )
+      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      expect(result.section('Requirements')).toContain('### Requirement: Refresh tokens')
     })
 
-    it('preserves sections not mentioned in MODIFIED', () => {
-      const base = makeSpec('## Requirements\nreq\n\n## Constraints\nconstraint')
-      const delta = makeSpec('## MODIFIED\n### Requirements\nnew req')
-      const result = mergeSpecs(base, delta)
-      expect(result.section('Constraints')).toBe('constraint')
-    })
-
-    it('adds section if it does not exist in base (upsert behaviour)', () => {
-      const base = makeSpec('## Requirements\nreq')
-      const delta = makeSpec('## MODIFIED\n### Constraints\nnew constraint')
-      const result = mergeSpecs(base, delta)
-      expect(result.section('Constraints')).toBe('new constraint')
+    it('adds block if it does not exist in base (upsert)', () => {
+      const delta = makeSpec(
+        '## MODIFIED Requirements\n### Requirement: Brand new\ncontent',
+      )
+      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      expect(result.section('Requirements')).toContain('### Requirement: Brand new')
     })
   })
 
   describe('REMOVED', () => {
-    it('removes an existing section', () => {
-      const base = makeSpec('## Requirements\nreq\n\n## Deprecated\nold stuff')
-      const delta = makeSpec('## REMOVED\n### Deprecated')
-      const result = mergeSpecs(base, delta)
-      expect(result.section('Deprecated')).toBeNull()
-      expect(result.section('Requirements')).toBe('req')
+    it('removes an existing block', () => {
+      const delta = makeSpec('## REMOVED Requirements\n### Requirement: Token expiry')
+      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      expect(result.section('Requirements')).not.toContain('### Requirement: Token expiry')
     })
 
-    it('removes multiple sections', () => {
-      const base = makeSpec('## Requirements\nreq\n\n## Old\nold\n\n## Deprecated\ndep')
-      const delta = makeSpec('## REMOVED\n### Old\n### Deprecated')
-      const result = mergeSpecs(base, delta)
-      expect(result.section('Old')).toBeNull()
-      expect(result.section('Deprecated')).toBeNull()
-      expect(result.section('Requirements')).toBe('req')
+    it('preserves other blocks when removing', () => {
+      const delta = makeSpec('## REMOVED Requirements\n### Requirement: Token expiry')
+      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      expect(result.section('Requirements')).toContain('### Requirement: Refresh tokens')
     })
 
-    it('silently ignores removing a section that does not exist', () => {
-      const base = makeSpec('## Requirements\nreq')
-      const delta = makeSpec('## REMOVED\n### NonExistent')
-      expect(() => mergeSpecs(base, delta)).not.toThrow()
-      const result = mergeSpecs(base, delta)
-      expect(result.section('Requirements')).toBe('req')
+    it('silently ignores removing a block that does not exist', () => {
+      const delta = makeSpec('## REMOVED Requirements\n### Requirement: Non existent')
+      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).not.toThrow()
+    })
+
+    it('removes the section entirely when all blocks are removed', () => {
+      const base = makeSpec('## Requirements\n### Requirement: Only one\ncontent')
+      const delta = makeSpec('## REMOVED Requirements\n### Requirement: Only one')
+      const result = mergeSpecs(base, delta, [reqConfig])
+      expect(result.section('Requirements')).toBeNull()
     })
   })
 
   describe('combined operations', () => {
-    it('applies ADDED, MODIFIED, and REMOVED together', () => {
+    it('applies ADDED, MODIFIED, and REMOVED in the same delta', () => {
+      const delta = makeSpec(
+        '## ADDED Requirements\n### Requirement: Token rotation\nnew requirement\n\n' +
+        '## MODIFIED Requirements\n### Requirement: Token expiry\nupdated: expire after 1h\n\n' +
+        '## REMOVED Requirements\n### Requirement: Refresh tokens',
+      )
+      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      const section = result.section('Requirements')
+
+      expect(section).toContain('### Requirement: Token rotation')
+      expect(section).toContain('updated: expire after 1h')
+      expect(section).not.toContain('Tokens must expire after 24h')
+      expect(section).not.toContain('### Requirement: Refresh tokens')
+    })
+  })
+
+  describe('multiple DeltaConfigs', () => {
+    it('processes independent delta sections for each config', () => {
       const base = makeSpec(
-        '## Requirements\nold req\n\n## Constraints\nconstraint\n\n## Deprecated\nold stuff',
+        '## Requirements\n### Requirement: Auth\ncontent\n\n' +
+        '## Scenarios\n### Scenario: Login\ncontent',
       )
       const delta = makeSpec(
-        '## ADDED\n### Scenarios\nscenario one\n\n## MODIFIED\n### Requirements\nnew req\n\n## REMOVED\n### Deprecated',
+        '## ADDED Requirements\n### Requirement: Logout\nnew req\n\n' +
+        '## MODIFIED Scenarios\n### Scenario: Login\nupdated scenario',
       )
-      const result = mergeSpecs(base, delta)
+      const result = mergeSpecs(base, delta, [reqConfig, scenarioConfig])
 
-      expect(result.section('Requirements')).toBe('new req')
-      expect(result.section('Constraints')).toBe('constraint')
-      expect(result.section('Scenarios')).toBe('scenario one')
-      expect(result.section('Deprecated')).toBeNull()
+      expect(result.section('Requirements')).toContain('### Requirement: Logout')
+      expect(result.section('Scenarios')).toContain('updated scenario')
+    })
+
+    it('skips configs for which the delta has no matching sections', () => {
+      const base = makeSpec('## Requirements\n### Requirement: Auth\ncontent')
+      const delta = makeSpec('## ADDED Requirements\n### Requirement: Logout\nnew req')
+      const result = mergeSpecs(base, delta, [reqConfig, scenarioConfig])
+
+      expect(result.section('Requirements')).toContain('### Requirement: Logout')
+      expect(result.section('Scenarios')).toBeNull()
     })
   })
 })
