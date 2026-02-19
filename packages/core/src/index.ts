@@ -1,1 +1,1 @@
-// @specd/core
+export * from './domain/index.js'
