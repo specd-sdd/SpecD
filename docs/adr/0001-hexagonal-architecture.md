@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-specd needs to expose the same core functionality through multiple delivery mechanisms: a CLI, an MCP server, and agent plugins. A CLI-first design (as in OpenSpec) tangles business logic with I/O, making it impossible to reuse logic across adapters without significant duplication. The core domain would also be untestable without a real filesystem.
+specd needs to expose the same core functionality through multiple delivery mechanisms: a CLI, an MCP server, and agent plugins. A CLI-first design tangles business logic with I/O, making it impossible to reuse logic across adapters without significant duplication. The core domain would also be untestable without a real filesystem.
 
 ## Decision
 Adopt Hexagonal Architecture. `@specd/core` contains the domain and application layers with zero I/O dependencies. All external concerns (filesystem, git, process execution, network) are pushed behind port interfaces. CLI, MCP server, and plugins are adapters that translate between their delivery mechanism and the core use cases.
