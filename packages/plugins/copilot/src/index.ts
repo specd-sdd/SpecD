@@ -1,0 +1,1 @@
+// @specd/plugin-copilot

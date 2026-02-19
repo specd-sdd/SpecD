@@ -1,0 +1,18 @@
+{
+  "name": "@specd/cli",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "specd": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --clean",
+    "dev": "tsup src/index.ts --format esm --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@specd/core": "workspace:*"
+  }
+}

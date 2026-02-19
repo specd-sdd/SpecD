@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.turbo/
+
+# Runtime state (specd tool — plans, plugins, hooks state)
+.specd/
+
+# Claude Code
+.claude/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
