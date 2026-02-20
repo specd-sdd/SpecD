@@ -8,6 +8,27 @@
  * - Validating and constructing paths via their own static factory methods
  * - Guaranteeing that `segments` is always non-empty
  * - Implementing `_withSegments` to produce new instances of the concrete type
+ *
+ * @example
+ * ```ts
+ * class ArchivePath extends DomainPath {
+ *   private constructor(segments: readonly string[]) { super(segments) }
+ *
+ *   protected _withSegments(segments: readonly string[]): this {
+ *     return new ArchivePath(segments) as this
+ *   }
+ *
+ *   static parse(path: string): ArchivePath {
+ *     // validate and construct...
+ *     return new ArchivePath(path.split('/'))
+ *   }
+ * }
+ *
+ * const p = ArchivePath.parse('2024/my-feature')
+ * p.leaf           // → "my-feature"
+ * p.parent         // → ArchivePath("2024")
+ * p.child('v2')    // → ArchivePath("2024/my-feature/v2")
+ * ```
  */
 export abstract class DomainPath {
   /** The validated, non-empty sequence of path segments. */
