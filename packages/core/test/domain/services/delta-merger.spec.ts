@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mergeSpecs, type DeltaConfig } from '../../../src/domain/services/delta-merger.js'
+import { DeltaConflictError } from '../../../src/domain/errors/delta-conflict-error.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 
@@ -168,6 +169,117 @@ describe('mergeSpecs', () => {
 
       expect(result.section('Requirements')).toContain('### Requirement: Logout')
       expect(result.section('Scenarios')).toBeNull()
+    })
+  })
+
+  describe('RENAMED', () => {
+    it('renames an existing block', () => {
+      const delta = makeSpec(
+        '## RENAMED Requirements\n\nFROM: ### Requirement: Token expiry\nTO:   ### Requirement: Token lifetime',
+      )
+      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      expect(result.section('Requirements')).toContain('### Requirement: Token lifetime')
+      expect(result.section('Requirements')).not.toContain('### Requirement: Token expiry')
+    })
+
+    it('preserves block content after rename', () => {
+      const delta = makeSpec(
+        '## RENAMED Requirements\n\nFROM: ### Requirement: Token expiry\nTO:   ### Requirement: Token lifetime',
+      )
+      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      expect(result.section('Requirements')).toContain('Tokens must expire after 24h')
+    })
+
+    it('silently ignores renaming a block that does not exist', () => {
+      const delta = makeSpec(
+        '## RENAMED Requirements\n\nFROM: ### Requirement: Non existent\nTO:   ### Requirement: New name',
+      )
+      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).not.toThrow()
+    })
+
+    it('subsequent MODIFIED uses the new name after RENAMED', () => {
+      const delta = makeSpec(
+        '## RENAMED Requirements\n\nFROM: ### Requirement: Token expiry\nTO:   ### Requirement: Token lifetime\n\n' +
+        '## MODIFIED Requirements\n### Requirement: Token lifetime\nupdated content',
+      )
+      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      expect(result.section('Requirements')).toContain('updated content')
+    })
+  })
+
+  describe('custom deltaOperations', () => {
+    it('uses custom keywords when provided', () => {
+      const delta = makeSpec(
+        '## AÑADIDO Requirements\n### Requirement: Token rotation\nnew content',
+      )
+      const result = mergeSpecs(baseSpec, delta, [reqConfig], {
+        added: 'AÑADIDO', modified: 'MODIFICADO', removed: 'ELIMINADO',
+        renamed: 'RENOMBRADO', from: 'DE', to: 'A',
+      })
+      expect(result.section('Requirements')).toContain('### Requirement: Token rotation')
+    })
+
+    it('ignores default keyword sections when custom keywords are provided', () => {
+      const delta = makeSpec(
+        '## ADDED Requirements\n### Requirement: Token rotation\nnew content',
+      )
+      const result = mergeSpecs(baseSpec, delta, [reqConfig], {
+        added: 'AÑADIDO', modified: 'MODIFICADO', removed: 'ELIMINADO',
+        renamed: 'RENOMBRADO', from: 'DE', to: 'A',
+      })
+      expect(result.section('Requirements')).not.toContain('### Requirement: Token rotation')
+    })
+  })
+
+  describe('conflict detection', () => {
+    it('throws DeltaConflictError when same block is in MODIFIED and REMOVED', () => {
+      const delta = makeSpec(
+        '## MODIFIED Requirements\n### Requirement: Token expiry\nnew content\n\n' +
+        '## REMOVED Requirements\n### Requirement: Token expiry',
+      )
+      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).toThrow(DeltaConflictError)
+    })
+
+    it('throws DeltaConflictError when same block is in MODIFIED and ADDED', () => {
+      const delta = makeSpec(
+        '## MODIFIED Requirements\n### Requirement: Token expiry\nnew content\n\n' +
+        '## ADDED Requirements\n### Requirement: Token expiry\nnew content',
+      )
+      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).toThrow(DeltaConflictError)
+    })
+
+    it('throws DeltaConflictError when same block is in ADDED and REMOVED', () => {
+      const delta = makeSpec(
+        '## ADDED Requirements\n### Requirement: New req\nnew content\n\n' +
+        '## REMOVED Requirements\n### Requirement: New req',
+      )
+      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).toThrow(DeltaConflictError)
+    })
+
+    it('throws DeltaConflictError when MODIFIED references FROM name after RENAMED', () => {
+      const delta = makeSpec(
+        '## RENAMED Requirements\n\nFROM: ### Requirement: Token expiry\nTO:   ### Requirement: Token lifetime\n\n' +
+        '## MODIFIED Requirements\n### Requirement: Token expiry\nshould use new name',
+      )
+      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).toThrow(DeltaConflictError)
+    })
+
+    it('throws DeltaConflictError when ADDED uses a TO name from RENAMED', () => {
+      const delta = makeSpec(
+        '## RENAMED Requirements\n\nFROM: ### Requirement: Token expiry\nTO:   ### Requirement: Token lifetime\n\n' +
+        '## ADDED Requirements\n### Requirement: Token lifetime\nnew content',
+      )
+      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).toThrow(DeltaConflictError)
+    })
+
+    it('does not mutate base spec when conflict is detected', () => {
+      const originalContent = baseSpec.content
+      const delta = makeSpec(
+        '## MODIFIED Requirements\n### Requirement: Token expiry\nnew\n\n' +
+        '## REMOVED Requirements\n### Requirement: Token expiry',
+      )
+      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).toThrow(DeltaConflictError)
+      expect(baseSpec.content).toBe(originalContent)
     })
   })
 })
