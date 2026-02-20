@@ -1,24 +1,23 @@
 import { InvalidSpecPathError } from '../errors/invalid-spec-path-error.js'
+import { DomainPath } from './domain-path.js'
 
 /**
  * An immutable, validated path identifying a spec within the repository.
  *
- * Paths are slash-separated sequences of segments (e.g. `auth/oauth`).
+ * Paths are slash-separated sequences of segments (e.g. `"auth/oauth"`).
  * Leading/trailing slashes and empty segments are normalized away.
  * Segments must not be `.`, `..`, or contain reserved filesystem characters.
  *
  * Use `SpecPath.parse(string)` or `SpecPath.fromSegments(string[])` to construct.
  */
-export class SpecPath {
-  private readonly _segments: readonly string[]
-
+export class SpecPath extends DomainPath {
   /**
    * Internal constructor — use `SpecPath.parse` or `SpecPath.fromSegments` instead.
    *
    * @param segments - Pre-validated, non-empty array of path segments
    */
   private constructor(segments: readonly string[]) {
-    this._segments = segments
+    super(segments)
   }
 
   /**
@@ -60,11 +59,6 @@ export class SpecPath {
     return new SpecPath(segments)
   }
 
-  /** The individual path segments (e.g. `["auth", "oauth"]`). */
-  get segments(): readonly string[] {
-    return this._segments
-  }
-
   /**
    * The parent path, or `null` if this is a top-level path.
    *
@@ -73,13 +67,6 @@ export class SpecPath {
   get parent(): SpecPath | null {
     if (this._segments.length <= 1) return null
     return new SpecPath(this._segments.slice(0, -1))
-  }
-
-  /** The last segment of the path (e.g. `"oauth"` for `auth/oauth`). */
-  get leaf(): string {
-    const last = this._segments[this._segments.length - 1]
-    // segments is guaranteed non-empty by constructor
-    return last as string
   }
 
   /**
@@ -102,24 +89,5 @@ export class SpecPath {
   isAncestorOf(other: SpecPath): boolean {
     if (other._segments.length <= this._segments.length) return false
     return this._segments.every((s, i) => s === other._segments[i])
-  }
-
-  /**
-   * Returns whether this path is equal to `other`.
-   *
-   * @param other - The path to compare against
-   * @returns `true` if both paths resolve to the same string representation
-   */
-  equals(other: SpecPath): boolean {
-    return this.toString() === other.toString()
-  }
-
-  /**
-   * Returns the slash-separated string representation (e.g. `"auth/oauth"`).
-   *
-   * @returns The path as a string
-   */
-  toString(): string {
-    return this._segments.join('/')
   }
 }
