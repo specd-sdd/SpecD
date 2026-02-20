@@ -59,12 +59,9 @@ export interface ChangeProps {
  * or REMOVED operations), it must be approved before it can be archived.
  */
 export class Change {
-  /** Unique name identifying this change. */
-  readonly name: string
-  /** The spec path scope this change operates within. */
-  readonly scope: SpecPath
-  /** Timestamp when the change was created. */
-  readonly createdAt: Date
+  private readonly _name: string
+  private readonly _scope: SpecPath
+  private readonly _createdAt: Date
   private _state: ChangeState
   private _artifacts: Map<string, Artifact>
   private _approval: ApprovalRecord | undefined
@@ -75,12 +72,27 @@ export class Change {
    * @param props - Change construction properties
    */
   constructor(props: ChangeProps) {
-    this.name = props.name
-    this.scope = props.scope
-    this.createdAt = props.createdAt ?? new Date()
+    this._name = props.name
+    this._scope = props.scope
+    this._createdAt = props.createdAt ?? new Date()
     this._state = props.state ?? 'drafting'
     this._artifacts = props.artifacts ?? new Map<string, Artifact>()
     this._approval = props.approval
+  }
+
+  /** Unique name identifying this change. */
+  get name(): string {
+    return this._name
+  }
+
+  /** The spec path scope this change operates within. */
+  get scope(): SpecPath {
+    return this._scope
+  }
+
+  /** Timestamp when the change was created. */
+  get createdAt(): Date {
+    return this._createdAt
   }
 
   /** The current lifecycle state of this change. */
@@ -175,7 +187,7 @@ export class Change {
    */
   assertArchivable(): void {
     if (this._state === 'pending-approval') {
-      throw new ApprovalRequiredError(this.name)
+      throw new ApprovalRequiredError(this._name)
     }
     if (!this.isArchivable) {
       throw new InvalidStateTransitionError(this._state, 'archivable')

@@ -22,14 +22,10 @@ export interface DeltaProps {
  * explicit approval before the change is archived.
  */
 export class Delta {
-  /** The spec path this delta targets. */
-  readonly specPath: SpecPath
-  /** Block names added to the spec. */
-  readonly added: readonly string[]
-  /** Block names modified in the spec. */
-  readonly modified: readonly string[]
-  /** Block names removed from the spec. */
-  readonly removed: readonly string[]
+  private readonly _specPath: SpecPath
+  private readonly _added: readonly string[]
+  private readonly _modified: readonly string[]
+  private readonly _removed: readonly string[]
 
   /**
    * Creates a new `Delta` from the given properties.
@@ -37,10 +33,30 @@ export class Delta {
    * @param props - Delta construction properties
    */
   constructor(props: DeltaProps) {
-    this.specPath = props.specPath
-    this.added = props.added
-    this.modified = props.modified
-    this.removed = props.removed
+    this._specPath = props.specPath
+    this._added = props.added
+    this._modified = props.modified
+    this._removed = props.removed
+  }
+
+  /** The spec path this delta targets. */
+  get specPath(): SpecPath {
+    return this._specPath
+  }
+
+  /** Block names added to the spec. */
+  get added(): readonly string[] {
+    return this._added
+  }
+
+  /** Block names modified in the spec. */
+  get modified(): readonly string[] {
+    return this._modified
+  }
+
+  /** Block names removed from the spec. */
+  get removed(): readonly string[] {
+    return this._removed
   }
 
   /**
@@ -51,7 +67,7 @@ export class Delta {
    * @returns `true` if the delta has any modified or removed blocks
    */
   isStructural(): boolean {
-    return this.modified.length > 0 || this.removed.length > 0
+    return this._modified.length > 0 || this._removed.length > 0
   }
 
   /**
@@ -60,6 +76,6 @@ export class Delta {
    * @returns `true` if added, modified, and removed are all empty
    */
   isEmpty(): boolean {
-    return this.added.length === 0 && this.modified.length === 0 && this.removed.length === 0
+    return this._added.length === 0 && this._modified.length === 0 && this._removed.length === 0
   }
 }

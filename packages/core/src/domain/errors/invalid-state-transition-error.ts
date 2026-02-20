@@ -5,8 +5,10 @@ import { SpecdError } from './specd-error.js'
  * by the change lifecycle defined in `ChangeState`.
  */
 export class InvalidStateTransitionError extends SpecdError {
-  /** @inheritdoc */
-  readonly code = 'INVALID_STATE_TRANSITION'
+  /** Machine-readable error code for programmatic handling. */
+  override get code(): string {
+    return 'INVALID_STATE_TRANSITION'
+  }
 
   /**
    * Creates a new `InvalidStateTransitionError` for the given transition attempt.

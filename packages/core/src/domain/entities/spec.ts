@@ -7,10 +7,8 @@ import { SpecPath } from '../value-objects/spec-path.js'
  * Instances are immutable — `mergeSpecs` produces a new `Spec` rather than mutating.
  */
 export class Spec {
-  /** The path identifying this spec in the repository. */
-  readonly path: SpecPath
-  /** The raw Markdown content of the spec. */
-  readonly content: string
+  private readonly _path: SpecPath
+  private readonly _content: string
 
   /**
    * Creates a new `Spec` with the given path and content.
@@ -19,8 +17,18 @@ export class Spec {
    * @param content - The raw Markdown content
    */
   constructor(path: SpecPath, content: string) {
-    this.path = path
-    this.content = content
+    this._path = path
+    this._content = content
+  }
+
+  /** The path identifying this spec in the repository. */
+  get path(): SpecPath {
+    return this._path
+  }
+
+  /** The raw Markdown content of the spec. */
+  get content(): string {
+    return this._content
   }
 
   /**
@@ -33,7 +41,7 @@ export class Spec {
    */
   sections(): Map<string, string> {
     const result = new Map<string, string>()
-    const lines = this.content.split('\n')
+    const lines = this._content.split('\n')
 
     let currentHeading: string | null = null
     let currentLines: string[] = []

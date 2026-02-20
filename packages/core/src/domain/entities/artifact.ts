@@ -25,14 +25,10 @@ export interface ArtifactProps {
  * while unvalidated or dependencies are incomplete, `complete` after `markComplete`.
  */
 export class Artifact {
-  /** The artifact type identifier (matches the schema's `artifacts[].id`). */
-  readonly type: string
-  /** Path to the artifact file relative to the change directory. */
-  readonly path: string
-  /** Whether this artifact is optional in the schema. */
-  readonly optional: boolean
-  /** Artifact type IDs that must be complete before this one can be validated. */
-  readonly requires: readonly string[]
+  private readonly _type: string
+  private readonly _path: string
+  private readonly _optional: boolean
+  private readonly _requires: readonly string[]
   private _status: ArtifactStatus
   private _validatedHash: string | undefined
 
@@ -42,12 +38,32 @@ export class Artifact {
    * @param props - Artifact construction properties
    */
   constructor(props: ArtifactProps) {
-    this.type = props.type
-    this.path = props.path
-    this.optional = props.optional ?? false
-    this.requires = props.requires ?? []
+    this._type = props.type
+    this._path = props.path
+    this._optional = props.optional ?? false
+    this._requires = props.requires ?? []
     this._status = props.status ?? 'missing'
     this._validatedHash = props.validatedHash
+  }
+
+  /** The artifact type identifier (matches the schema's `artifacts[].id`). */
+  get type(): string {
+    return this._type
+  }
+
+  /** Path to the artifact file relative to the change directory. */
+  get path(): string {
+    return this._path
+  }
+
+  /** Whether this artifact is optional in the schema. */
+  get optional(): boolean {
+    return this._optional
+  }
+
+  /** Artifact type IDs that must be complete before this one can be validated. */
+  get requires(): readonly string[] {
+    return this._requires
   }
 
   /** The current validation status of this artifact. */

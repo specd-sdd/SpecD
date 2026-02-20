@@ -5,8 +5,12 @@
  * for programmatic handling by CLI and MCP adapters.
  */
 export abstract class SpecdError extends Error {
-  /** Machine-readable error code used for programmatic handling. */
-  abstract readonly code: string
+  /**
+   * Machine-readable error code used for programmatic handling.
+   *
+   * @returns The error code string
+   */
+  abstract get code(): string
 
   /**
    * Creates a new `SpecdError` with the given message.

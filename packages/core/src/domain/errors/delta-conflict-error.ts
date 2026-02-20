@@ -6,8 +6,10 @@ import { SpecdError } from './specd-error.js'
  * referenced again in MODIFIED).
  */
 export class DeltaConflictError extends SpecdError {
-  /** @inheritdoc */
-  readonly code = 'DELTA_CONFLICT'
+  /** Machine-readable error code for programmatic handling. */
+  override get code(): string {
+    return 'DELTA_CONFLICT'
+  }
 
   /**
    * Creates a new `DeltaConflictError` with a description of the conflict.

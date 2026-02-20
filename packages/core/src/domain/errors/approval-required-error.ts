@@ -5,8 +5,10 @@ import { SpecdError } from './specd-error.js'
  * modifications but has not yet been approved.
  */
 export class ApprovalRequiredError extends SpecdError {
-  /** @inheritdoc */
-  readonly code = 'APPROVAL_REQUIRED'
+  /** Machine-readable error code for programmatic handling. */
+  override get code(): string {
+    return 'APPROVAL_REQUIRED'
+  }
 
   /**
    * Creates a new `ApprovalRequiredError` for the given change.
