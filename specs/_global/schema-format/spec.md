@@ -61,7 +61,7 @@ These labels appear as prefixes in delta section headings: `## {added} Requireme
 Each entry in `artifacts` must include:
 
 - `id` (string, required) — unique identifier within the schema, e.g. `proposal`, `specs`, `design`, `tasks`
-- `generates` (string or glob, required) — file path(s) the artifact produces, e.g. `proposal.md` or `specs/**/spec.md`
+- `generates` (string or glob, required) — path pattern for the artifact's files **relative to the change directory**, e.g. `proposal.md` or `specs/**/spec.md`. When creating a new artifact file within a change, the filename is derived from the last literal segment of the glob (e.g. `spec.md` from `specs/**/spec.md`); if the last segment is a wildcard, the filename falls back to the template filename. The final location of these files in the project repo after syncing is configured separately and may differ (e.g. `especificaciones/auth/login/spec.md` for a change file at `changes/my-change/specs/auth/login/spec.md`)
 - `description` (string, optional) — human-readable summary for tooling
 - `template` (string, optional) — path to a template file, relative to the schema directory; see Requirement: Template resolution
 - `instruction` (string, optional) — AI instruction text injected by `CompileContext`
@@ -70,6 +70,18 @@ Each entry in `artifacts` must include:
 - `deltaValidations` (array, optional) — structural validation rules for delta files; see Requirement: Delta validations
 - `validations` (array, optional) — structural validation rules for the base spec; see Requirement: Validation rules
 - `contextSections` (array, optional) — sections of existing specs to inject into the AI context; see Requirement: Context sections
+
+#### Scenario: Filename derived from glob literal segment
+- **WHEN** an artifact declares `generates: "specs/**/spec.md"` and a new file is created within the change
+- **THEN** the file is named `spec.md`; the subdirectory path (e.g. `auth/login/`) is chosen by the user
+
+#### Scenario: Filename derived from template when glob segment is a wildcard
+- **WHEN** an artifact declares `generates: "specs/**/*.md"` and `template: "templates/spec.md"`
+- **THEN** the file is named `spec.md`, taken from the template filename
+
+#### Scenario: Change file path differs from synced repo path
+- **WHEN** a change contains `changes/my-change/specs/auth/login/spec.md` and the project syncs to `especificaciones/`
+- **THEN** the file is copied to `especificaciones/auth/login/spec.md`; `generates` does not control the sync destination
 
 #### Scenario: Artifact with no requirements
 - **WHEN** an artifact omits `requires`
