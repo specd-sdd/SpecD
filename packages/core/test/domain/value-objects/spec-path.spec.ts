@@ -6,13 +6,11 @@ describe('SpecPath', () => {
   describe('parse', () => {
     it('parses a single segment', () => {
       const p = SpecPath.parse('auth')
-      expect(p.segments).toEqual(['auth'])
       expect(p.toString()).toBe('auth')
     })
 
     it('parses multiple segments', () => {
       const p = SpecPath.parse('auth/oauth/tokens')
-      expect(p.segments).toEqual(['auth', 'oauth', 'tokens'])
       expect(p.toString()).toBe('auth/oauth/tokens')
     })
 
@@ -117,6 +115,13 @@ describe('SpecPath', () => {
       expect(SpecPath.parse('auth').isAncestorOf(SpecPath.parse('authentication/oauth'))).toBe(
         false,
       )
+    })
+  })
+
+  describe('toFsPath', () => {
+    it('joins segments with the given separator', () => {
+      expect(SpecPath.parse('auth/oauth').toFsPath('/')).toBe('auth/oauth')
+      expect(SpecPath.parse('auth/oauth').toFsPath('\\')).toBe('auth\\oauth')
     })
   })
 
