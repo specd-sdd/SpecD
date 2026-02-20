@@ -90,6 +90,39 @@ for consistency with other port interfaces.
 - **WHEN** a commit uses `!` but has no `BREAKING CHANGE:` footer
 - **THEN** it must be rejected — the footer is required to explain the breaking change
 
+### Requirement: Commit body format
+
+Commit bodies are optional and used only when the subject line and diff cannot fully explain the change. When a body is present it must follow a consistent structure.
+
+- Use setext-style section headers (`===` for primary, `---` for secondary) — never ATX headers (`###`), which conflict with git comment syntax
+- Wrap all technical terms in backticks: filenames (`spec.md`), symbols (`mergeSpecs`), types (`DeltaConfig`), commands (`pnpm test`)
+- Limit body lines to 100 characters
+- Include at minimum a `Context` and `Changes` section when a body is present; add `Impact` or `Breaking` when they add value
+
+```
+feat(core): add RENAMED operation to mergeSpecs
+
+Context:
+========
+`mergeSpecs` previously supported ADDED, MODIFIED, and REMOVED operations
+but not RENAMED. Delta files that rename a block had no way to express the
+old-to-new name mapping, forcing a REMOVED + ADDED pair that loses history.
+
+Changes:
+--------
+- Add `renamed` keyword to `DeltaConfig` and `OperationKeywords`
+- Implement RENAMED resolution as the first pass before other operations
+- Add conflict detection for FROM/TO name collisions
+```
+
+#### Scenario: Body not needed
+- **WHEN** a commit reads `fix(cli): correct typo in error message`
+- **THEN** no body is needed — the change is self-explanatory from the subject and diff
+
+#### Scenario: ATX header in body
+- **WHEN** a commit body uses `### Context` as a section header
+- **THEN** it must be changed to setext style — ATX headers conflict with git comment markers
+
 ## Constraints
 
 - Every commit message must match: `^(feat|fix|refactor|test|docs|chore|perf|build)(\(.+\))?: .+`
