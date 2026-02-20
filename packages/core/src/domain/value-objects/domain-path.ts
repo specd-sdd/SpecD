@@ -26,8 +26,14 @@ export abstract class DomainPath {
   /**
    * Creates a new instance of the concrete subtype wrapping the given segments.
    *
-   * Used internally by `parent` and `child` to return the correct concrete type.
-   * Implementations must not re-validate — segments are already trusted.
+   * This method exists because `parent` and `child` need to return the same
+   * concrete type as the receiver (e.g. `SpecPath.parent` must return a
+   * `SpecPath`, not a `DomainPath`), but the base class cannot call a subclass
+   * constructor directly — those constructors are private by design.
+   *
+   * Each subclass implements this as a one-liner that calls its own private
+   * constructor. Implementations must NOT re-validate the segments — they are
+   * already trusted (they come from the current instance or from `parse`).
    *
    * @param segments - Pre-validated, non-empty array of path segments
    * @returns A new instance of the concrete subtype
