@@ -159,6 +159,9 @@ export function mergeSpecs(
 - Every ADR must include a `## Spec` section linking to the spec(s) that capture its constraints
 - Specs that have associated ADRs include a `## ADRs` section linking to them — omitted if none exist
 - No documentation outside `docs/` except `README.md`, `AGENTS.md`, `CLAUDE.md`
+- A spec's `## ADRs` section lists only the ADRs that _produced_ that spec — they are historical provenance, not dependencies
+- A spec may only depend on other specs (`## Spec Dependencies`), never on ADRs directly
+- If an ADR's decision needs to be enforced as a constraint, it must first be captured in a spec; that spec is then what other specs depend on
 
 ## Spec Dependencies
 
