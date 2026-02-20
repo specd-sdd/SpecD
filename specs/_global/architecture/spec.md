@@ -11,10 +11,12 @@ specd uses Hexagonal Architecture (Ports & Adapters) combined with Domain-Driven
 Any package containing business logic must be organized in three layers: `domain`, `application`, and `infrastructure`. Each layer has strict import rules — inner layers never import from outer layers. Currently `@specd/core` is the only such package; any future package with domain logic must follow the same structure.
 
 #### Scenario: Domain imports from infrastructure
+
 - **WHEN** a file in `domain/` imports from `infrastructure/`
 - **THEN** the TypeScript compiler must reject the import
 
 #### Scenario: Application imports infrastructure directly
+
 - **WHEN** a use case imports a concrete adapter instead of the port interface
 - **THEN** the TypeScript compiler must reject the import
 
@@ -23,6 +25,7 @@ Any package containing business logic must be organized in three layers: `domain
 The `domain` layer has zero I/O dependencies. No `fs`, no `net`, no `child_process`, no external HTTP. It depends only on the TypeScript standard library and other domain types. This applies to every package's `domain/` layer.
 
 #### Scenario: Domain imports node:fs
+
 - **WHEN** a file in `domain/` imports `node:fs` or any I/O module
 - **THEN** the TypeScript compiler must reject the import
 
@@ -31,6 +34,7 @@ The `domain` layer has zero I/O dependencies. No `fs`, no `net`, no `child_proce
 The `application` layer (use cases and application services) interacts with the outside world exclusively through port interfaces defined in `application/ports/`. It never imports infrastructure adapters directly. This applies to every package's `application/` layer.
 
 #### Scenario: Use case receives port via constructor
+
 - **WHEN** a use case needs to read specs
 - **THEN** it receives a `SpecRepository` port via its constructor, not a concrete `FsSpecRepository`
 
@@ -39,6 +43,7 @@ The `application` layer (use cases and application services) interacts with the 
 Domain entities enforce their own invariants and state machine transitions. Invalid state transitions throw typed domain errors. Use cases do not duplicate invariant checks that belong to the entity. This applies to any domain entity defined in any package.
 
 #### Scenario: Invalid state transition
+
 - **WHEN** a use case attempts an invalid state transition on a domain entity
 - **THEN** the entity throws a typed `SpecdError` subclass before any side effect occurs
 
@@ -47,6 +52,7 @@ Domain entities enforce their own invariants and state machine transitions. Inva
 Domain operations that are stateless and have no I/O are implemented as plain exported functions in `domain/services/`, not as classes. This applies to any package with a `domain/` layer.
 
 #### Scenario: Domain service is a function
+
 - **WHEN** a developer adds a stateless domain operation to any package
 - **THEN** it is exported as a plain function, not as a class with methods
 
@@ -55,6 +61,7 @@ Domain operations that are stateless and have no I/O are implemented as plain ex
 Dependencies are wired manually at the application entry point of each package. No IoC container. Use case constructors receive their port implementations as arguments.
 
 #### Scenario: Use case wired at entry point
+
 - **WHEN** any package boots (CLI, MCP, or future entry points)
 - **THEN** it constructs use cases manually, passing concrete adapters to each constructor
 
@@ -63,6 +70,7 @@ Dependencies are wired manually at the application entry point of each package. 
 Packages that serve as delivery mechanisms (`@specd/cli`, `@specd/mcp`, `@specd/plugin-*`) contain no business logic. They translate between their delivery mechanism and use cases. Any new adapter package must follow the same rule.
 
 #### Scenario: Adapter package contains business logic
+
 - **WHEN** a command, tool, or plugin implements domain logic instead of delegating to a use case
 - **THEN** the logic must be moved to the appropriate core package
 
@@ -71,6 +79,7 @@ Packages that serve as delivery mechanisms (`@specd/cli`, `@specd/mcp`, `@specd/
 Package dependency direction is strictly one-way: `plugin-*` → `skills` → `core`. `cli` → `core`. `mcp` → `core`. `schema-*` has no dependencies on other specd packages. Any new package must fit into this directed graph without introducing cycles.
 
 #### Scenario: Cycle introduced by new package
+
 - **WHEN** a new package declares a `workspace:*` dependency that creates a cycle
 - **THEN** pnpm must reject it
 

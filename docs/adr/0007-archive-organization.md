@@ -1,18 +1,22 @@
 # ADR-0007: Archive Organization — Configurable Pattern, Index with Glob Fallback
 
 ## Status
+
 Accepted
 
 ## Context
+
 A naive archive implementation stores all archived changes in a single flat directory. A project active for several years with multiple developers can accumulate hundreds or thousands of entries in that directory, making it difficult to navigate and slow to list.
 
 Several approaches were considered for organizing the archive:
+
 - Fixed subdirectory structure (e.g. always by year/month) — inflexible, forces all teams into one convention
 - Scope-based subdirectories — `auth/oauth` → nesting in the archive; discarded because SpecPath segments use `/` as separator, creating ambiguous slugs on all platforms and potential collisions between scopes with different structures (e.g. `auth/oauth-login` and `auth-oauth/login` both slug to `auth-oauth-login`)
 - Sequential numeric prefix — discarded because developers working on the same branch can create changes concurrently and would collide on the same number
 - Configurable pattern with date variables — flexible, collision-safe, human-readable
 
 For lookup, two approaches were considered:
+
 - Recursive glob only — simple, no extra state, but O(n) on every lookup
 - Flat index only — O(1) lookups, but fragile if the index goes out of sync
 - Index with glob fallback + reindex command — resilient: fast path for the common case, self-healing on inconsistency
@@ -28,6 +32,7 @@ The archive `fs` adapter exposes a `pattern` configuration field in `specd.yaml`
 `reindex()` is declared on the `ArchiveRepository` port, not on the `fs` adapter. The CLI calls the port; it has no knowledge of the underlying storage mechanism. The `fs` adapter implements `reindex()` by globbing all `manifest.json` files under the archive root, sorting by `archivedAt`, and writing a clean `index.jsonl` in chronological order. Future adapters implement it according to their own storage — a database adapter rebuilds query indexes, a remote adapter may be a no-op.
 
 ## Consequences
+
 - Teams can choose flat (default), by-year, by-month, or by-day organization without forking specd
 - The archive remains navigable at any scale
 - `{{change.scope}}` is not available in patterns — scope-based grouping must be achieved through change naming conventions

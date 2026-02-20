@@ -28,20 +28,22 @@ export interface DeltaConfig {
 }
 
 export interface OperationKeywords {
-  readonly added:    string
+  readonly added: string
   readonly modified: string
-  readonly removed:  string
-  readonly renamed:  string
-  readonly from:     string
-  readonly to:       string
+  readonly removed: string
+  readonly renamed: string
+  readonly from: string
+  readonly to: string
 }
 ```
 
 #### Scenario: deltaOperations omitted
+
 - **WHEN** `mergeSpecs` is called without `deltaOperations`
 - **THEN** it uses the specd defaults: `ADDED`, `MODIFIED`, `REMOVED`, `RENAMED`, `FROM`, `TO`
 
 #### Scenario: deltaOperations provided
+
 - **WHEN** `mergeSpecs` is called with `deltaOperations.added: "AÑADIDO"`
 - **THEN** it parses `## AÑADIDO Requirements` sections from the delta, not `## ADDED Requirements`
 
@@ -50,6 +52,7 @@ export interface OperationKeywords {
 Operations are applied in fixed order — **RENAMED → REMOVED → MODIFIED → ADDED** — across all `deltaConfigs`. Each config is processed independently. See `specs/_global/schema-format/spec.md` — Requirement: Delta merge operations for the full behavioral contract.
 
 #### Scenario: RENAMED resolved before MODIFIED
+
 - **WHEN** a delta renames block `Old` to `New` and also modifies `New`
 - **THEN** RENAMED runs first, then MODIFIED applies to the already-renamed block using `New`
 
@@ -58,6 +61,7 @@ Operations are applied in fixed order — **RENAMED → REMOVED → MODIFIED →
 `mergeSpecs` must run conflict detection before applying any changes. If any conflict is found, it must throw a `DeltaConflictError` without modifying the base spec. See `specs/_global/schema-format/spec.md` — Requirement: Delta conflict detection for the full list of conflict conditions.
 
 #### Scenario: Conflict throws before any mutation
+
 - **WHEN** the delta contains a conflict (e.g. same block in both MODIFIED and REMOVED)
 - **THEN** `mergeSpecs` throws `DeltaConflictError` and the returned spec is never produced
 
@@ -66,6 +70,7 @@ Operations are applied in fixed order — **RENAMED → REMOVED → MODIFIED →
 `mergeSpecs` must be a pure function — it must not mutate `base` or `delta`, it must not perform any I/O, and calling it twice with the same inputs must produce equal outputs.
 
 #### Scenario: Base spec unchanged
+
 - **WHEN** `mergeSpecs(base, delta, configs)` is called
 - **THEN** `base.content` is unchanged after the call
 

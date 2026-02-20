@@ -42,12 +42,9 @@ describe('SpecPath', () => {
       expect(() => SpecPath.parse('auth/../oauth')).toThrow(InvalidSpecPathError)
     })
 
-    it.each(['\\', ':', '*', '?', '"', '<', '>', '|'])(
-      'throws on invalid character %s',
-      (char) => {
-        expect(() => SpecPath.parse(`auth${char}oauth`)).toThrow(InvalidSpecPathError)
-      },
-    )
+    it.each(['\\', ':', '*', '?', '"', '<', '>', '|'])('throws on invalid character %s', (char) => {
+      expect(() => SpecPath.parse(`auth${char}oauth`)).toThrow(InvalidSpecPathError)
+    })
   })
 
   describe('fromSegments', () => {
@@ -117,7 +114,9 @@ describe('SpecPath', () => {
     })
 
     it('returns false for a partial segment match', () => {
-      expect(SpecPath.parse('auth').isAncestorOf(SpecPath.parse('authentication/oauth'))).toBe(false)
+      expect(SpecPath.parse('auth').isAncestorOf(SpecPath.parse('authentication/oauth'))).toBe(
+        false,
+      )
     })
   })
 

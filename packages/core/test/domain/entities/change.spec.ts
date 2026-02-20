@@ -7,11 +7,17 @@ import { ApprovalRequiredError } from '../../../src/domain/errors/approval-requi
 
 const scope = SpecPath.parse('auth/oauth')
 
-function makeChange(state?: import('../../../src/domain/value-objects/change-state.js').ChangeState) {
+function makeChange(
+  state?: import('../../../src/domain/value-objects/change-state.js').ChangeState,
+) {
   return new Change({ name: 'add-oauth-login', scope, state })
 }
 
-function makeArtifact(type: string, status: import('../../../src/domain/value-objects/artifact-status.js').ArtifactStatus, requires: string[] = []) {
+function makeArtifact(
+  type: string,
+  status: import('../../../src/domain/value-objects/artifact-status.js').ArtifactStatus,
+  requires: string[] = [],
+) {
   return new Artifact({ type, path: `changes/foo/${type}.md`, status, requires })
 }
 
@@ -82,14 +88,18 @@ describe('Change', () => {
 
     it('stores structural changes in approval record', () => {
       const c = makeChange('pending-approval')
-      const changes = [{ spec: 'auth/spec.md', type: 'MODIFIED' as const, requirement: 'Token expiry' }]
+      const changes = [
+        { spec: 'auth/spec.md', type: 'MODIFIED' as const, requirement: 'Token expiry' },
+      ]
       c.approve('Approved', 'alice@example.com', changes)
       expect(c.approval?.structuralChanges).toEqual(changes)
     })
 
     it('throws when not in pending-approval state', () => {
       const c = makeChange('done')
-      expect(() => c.approve('reason', 'alice@example.com', [])).toThrow(InvalidStateTransitionError)
+      expect(() => c.approve('reason', 'alice@example.com', [])).toThrow(
+        InvalidStateTransitionError,
+      )
     })
   })
 
@@ -105,7 +115,14 @@ describe('Change', () => {
     })
 
     it('throws InvalidStateTransitionError for other non-archivable states', () => {
-      for (const state of ['drafting', 'designing', 'ready', 'implementing', 'done', 'approved'] as const) {
+      for (const state of [
+        'drafting',
+        'designing',
+        'ready',
+        'implementing',
+        'done',
+        'approved',
+      ] as const) {
         const c = makeChange(state)
         expect(() => c.assertArchivable()).toThrow(InvalidStateTransitionError)
       }
@@ -118,7 +135,15 @@ describe('Change', () => {
     })
 
     it('returns false for all other states', () => {
-      for (const state of ['drafting', 'designing', 'ready', 'implementing', 'done', 'pending-approval', 'approved'] as const) {
+      for (const state of [
+        'drafting',
+        'designing',
+        'ready',
+        'implementing',
+        'done',
+        'pending-approval',
+        'approved',
+      ] as const) {
         expect(makeChange(state).isArchivable).toBe(false)
       }
     })

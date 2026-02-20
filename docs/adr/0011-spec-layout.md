@@ -1,6 +1,7 @@
 # ADR-0011: Spec Layout — Global vs Package-Scoped
 
 ## Status
+
 Accepted
 
 ## Context

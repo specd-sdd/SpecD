@@ -1,6 +1,7 @@
 # ADR-0010: Schema Format Design
 
 ## Status
+
 Accepted
 
 ## Context
