@@ -1,3 +1,5 @@
+import { join } from 'node:path'
+
 /**
  * Abstract base for immutable, validated domain path value objects.
  *
@@ -144,11 +146,31 @@ export abstract class DomainPath {
    * use as a map key, but NOT for filesystem operations on Windows.
    *
    * Infrastructure adapters that need a real filesystem path must use
-   * `path.join(...domainPath.segments)` instead of this method.
+   * {@link toFsPath} instead of this method.
    *
    * @returns The canonical path string
    */
   toString(): string {
     return this._segments.join('/')
+  }
+
+  /**
+   * Returns a native filesystem path suitable for disk operations.
+   *
+   * Uses `node:path`'s `join` so the separator is correct on every platform
+   * (`/` on POSIX, `\` on Windows). Use this method — not {@link toString} —
+   * whenever you need to pass the path to `fs.*` calls or other OS APIs.
+   *
+   * @example
+   * ```ts
+   * // In an infrastructure adapter:
+   * const fullPath = path.resolve(root, specPath.toFsPath())
+   * await fs.readFile(fullPath, 'utf8')
+   * ```
+   *
+   * @returns The OS-native path string
+   */
+  toFsPath(): string {
+    return join(...this._segments)
   }
 }
