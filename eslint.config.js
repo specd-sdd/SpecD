@@ -37,6 +37,26 @@ export default tseslint.config(
           message: 'Default exports are forbidden. Use named exports.',
         },
       ],
+    },
+  },
+
+  // Domain layer — no public class fields (architecture/spec.md: expose behaviour, not structure)
+  {
+    files: ['packages/*/src/domain/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ExportDefaultDeclaration',
+          message: 'Default exports are forbidden. Use named exports.',
+        },
+        {
+          selector:
+            'PropertyDefinition:not([accessibility="private"]):not([accessibility="protected"])',
+          message:
+            'Domain value objects must not expose public fields. Use methods or getters instead.',
+        },
+      ],
 
       // Kebab-case filenames for source files
       'unicorn/filename-case': ['error', { case: 'kebabCase' }],

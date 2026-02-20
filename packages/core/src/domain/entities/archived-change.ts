@@ -26,18 +26,12 @@ export interface ArchivedChangeProps {
  * Once created, an `ArchivedChange` is never mutated.
  */
 export class ArchivedChange {
-  /** The original change name. */
-  readonly name: string
-  /** The name used for the archive directory. */
-  readonly archivedName: string
-  /** The scope under which the change's specs lived. */
-  readonly scope: SpecPath
-  /** Timestamp when the change was archived. */
-  readonly archivedAt: Date
-  /** Artifact type IDs that were present when the change was archived. */
-  readonly artifacts: readonly string[]
-  /** Approval record, or `undefined` for non-structural changes. */
-  readonly approval: ApprovalRecord | undefined
+  private readonly _name: string
+  private readonly _archivedName: string
+  private readonly _scope: SpecPath
+  private readonly _archivedAt: Date
+  private readonly _artifacts: readonly string[]
+  private readonly _approval: ApprovalRecord | undefined
 
   /**
    * Creates a new `ArchivedChange` from the given properties.
@@ -45,12 +39,42 @@ export class ArchivedChange {
    * @param props - ArchivedChange construction properties
    */
   constructor(props: ArchivedChangeProps) {
-    this.name = props.name
-    this.archivedName = props.archivedName
-    this.scope = props.scope
-    this.archivedAt = props.archivedAt
-    this.artifacts = props.artifacts
-    this.approval = props.approval
+    this._name = props.name
+    this._archivedName = props.archivedName
+    this._scope = props.scope
+    this._archivedAt = props.archivedAt
+    this._artifacts = props.artifacts
+    this._approval = props.approval
+  }
+
+  /** The original change name. */
+  get name(): string {
+    return this._name
+  }
+
+  /** The name used for the archive directory. */
+  get archivedName(): string {
+    return this._archivedName
+  }
+
+  /** The scope under which the change's specs lived. */
+  get scope(): SpecPath {
+    return this._scope
+  }
+
+  /** Timestamp when the change was archived. */
+  get archivedAt(): Date {
+    return this._archivedAt
+  }
+
+  /** Artifact type IDs that were present when the change was archived. */
+  get artifacts(): readonly string[] {
+    return this._artifacts
+  }
+
+  /** Approval record, or `undefined` for non-structural changes. */
+  get approval(): ApprovalRecord | undefined {
+    return this._approval
   }
 
   /**
@@ -60,6 +84,6 @@ export class ArchivedChange {
    * @returns `true` if an approval record is present
    */
   get wasStructural(): boolean {
-    return this.approval !== undefined
+    return this._approval !== undefined
   }
 }
