@@ -78,7 +78,4 @@ Snapshot tests are forbidden. Assertions must be explicit and readable without a
 ## Spec Dependencies
 
 - [`specs/_global/architecture/spec.md`](../architecture/spec.md) — layer boundaries determine what is unit-testable vs integration-testable
-
-## ADRs
-
-- [ADR-0003: ESM Only](../../../docs/adr/0003-esm-only.md) — ESM-first environment is the primary reason Vitest is used over Jest
+- [`specs/_global/conventions/spec.md`](../conventions/spec.md) — ESM-only constraint is the reason Vitest is used over Jest
