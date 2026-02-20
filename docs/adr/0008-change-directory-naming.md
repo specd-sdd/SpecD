@@ -31,4 +31,4 @@ The timestamp prefix is a **filesystem convention only**. It is never stored in 
 
 ## Spec
 
-- [`specs/_global/storage/spec.md`](../../specs/_global/storage/spec.md)
+- [`specs/core/storage/spec.md`](../../specs/core/storage/spec.md)

@@ -35,4 +35,4 @@ Additionally, artifacts can declare dependencies on other artifacts via `require
 
 ## Spec
 
-- [`specs/_global/storage/spec.md`](../../specs/_global/storage/spec.md)
+- [`specs/core/storage/spec.md`](../../specs/core/storage/spec.md)

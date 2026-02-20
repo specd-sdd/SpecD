@@ -36,4 +36,4 @@ The archive `fs` adapter exposes a `pattern` configuration field in `specd.yaml`
 
 ## Spec
 
-- [`specs/_global/storage/spec.md`](../../specs/_global/storage/spec.md)
+- [`specs/core/storage/spec.md`](../../specs/core/storage/spec.md)
