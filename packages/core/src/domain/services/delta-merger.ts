@@ -1,68 +1,94 @@
 import { Spec } from '../entities/spec.js'
+import { DeltaConflictError } from '../errors/delta-conflict-error.js'
 
-/**
- * Configuration for one delta section, sourced from the active schema.
- * An artifact can have multiple delta configs (e.g. Requirements + Scenarios).
- */
 export interface DeltaConfig {
-  /** Section name in the base spec, e.g. "Requirements" */
   readonly section: string
-  /** Block header pattern, e.g. "### Requirement: {name}" */
   readonly pattern: string
+}
+
+export interface OperationKeywords {
+  readonly added:    string
+  readonly modified: string
+  readonly removed:  string
+  readonly renamed:  string
+  readonly from:     string
+  readonly to:       string
+}
+
+const DEFAULT_OPERATIONS: OperationKeywords = {
+  added:    'ADDED',
+  modified: 'MODIFIED',
+  removed:  'REMOVED',
+  renamed:  'RENAMED',
+  from:     'FROM',
+  to:       'TO',
 }
 
 /**
  * Merges a delta spec into a base spec using the schema's delta configuration.
  *
- * Delta spec format — for each DeltaConfig with section "Requirements":
+ * Apply order per section: RENAMED → REMOVED → MODIFIED → ADDED
+ * Conflict detection runs before any mutations are applied.
  *
- *   ## ADDED Requirements
- *   ### Requirement: New requirement name
- *   Content of new requirement...
- *
- *   ## MODIFIED Requirements
- *   ### Requirement: Existing requirement name
- *   Replacement content...
- *
- *   ## REMOVED Requirements
- *   ### Requirement: Requirement name to remove
- *
- * ADDED: blocks are appended to the section in base.
- * MODIFIED: blocks replace matching blocks in the section in base.
- * REMOVED: blocks are deleted from the section in base.
- *
- * Sections and blocks in base not mentioned in delta are preserved unchanged.
- * Multiple DeltaConfigs are applied independently (e.g. Requirements and Scenarios).
+ * See specs/core/delta-merger/spec.md and specs/_global/schema-format/spec.md
+ * for the full behavioral contract.
  */
-export function mergeSpecs(base: Spec, delta: Spec, deltaConfigs: readonly DeltaConfig[]): Spec {
+export function mergeSpecs(
+  base: Spec,
+  delta: Spec,
+  deltaConfigs: readonly DeltaConfig[],
+  deltaOperations?: OperationKeywords,
+): Spec {
+  const ops = { ...DEFAULT_OPERATIONS, ...deltaOperations }
   const deltaSections = delta.sections()
   const result = new Map(base.sections())
 
   for (const config of deltaConfigs) {
     const { section, pattern } = config
 
-    const addedContent = deltaSections.get(`ADDED ${section}`) ?? ''
-    const modifiedContent = deltaSections.get(`MODIFIED ${section}`) ?? ''
-    const removedContent = deltaSections.get(`REMOVED ${section}`) ?? ''
+    const renamedContent  = deltaSections.get(`${ops.renamed} ${section}`)  ?? ''
+    const removedContent  = deltaSections.get(`${ops.removed} ${section}`)  ?? ''
+    const modifiedContent = deltaSections.get(`${ops.modified} ${section}`) ?? ''
+    const addedContent    = deltaSections.get(`${ops.added} ${section}`)    ?? ''
 
     const hasDeltas =
-      addedContent.trim() !== '' ||
+      renamedContent.trim()  !== '' ||
+      removedContent.trim()  !== '' ||
       modifiedContent.trim() !== '' ||
-      removedContent.trim() !== ''
+      addedContent.trim()    !== ''
 
     if (!hasDeltas) continue
 
+    const renamedPairs  = parseRenamedPairs(renamedContent, pattern, ops)
+    const removedNames  = [...parseBlocks(removedContent, pattern).keys()]
+    const modifiedBlocks = parseBlocks(modifiedContent, pattern)
+    const addedBlocks    = parseBlocks(addedContent, pattern)
+
+    detectConflicts(section, renamedPairs, removedNames, modifiedBlocks, addedBlocks)
+
     const baseBlocks = parseBlocks(result.get(section) ?? '', pattern)
 
-    for (const [name, content] of parseBlocks(modifiedContent, pattern)) {
-      baseBlocks.set(name, content)
+    // 1. RENAMED
+    for (const { from, to } of renamedPairs) {
+      const content = baseBlocks.get(from)
+      if (content !== undefined) {
+        baseBlocks.delete(from)
+        baseBlocks.set(to, content)
+      }
     }
 
-    for (const name of parseBlocks(removedContent, pattern).keys()) {
+    // 2. REMOVED
+    for (const name of removedNames) {
       baseBlocks.delete(name)
     }
 
-    for (const [name, content] of parseBlocks(addedContent, pattern)) {
+    // 3. MODIFIED (upsert)
+    for (const [name, content] of modifiedBlocks) {
+      baseBlocks.set(name, content)
+    }
+
+    // 4. ADDED
+    for (const [name, content] of addedBlocks) {
       baseBlocks.set(name, content)
     }
 
@@ -75,6 +101,75 @@ export function mergeSpecs(base: Spec, delta: Spec, deltaConfigs: readonly Delta
 
   return new Spec(base.path, sectionsToContent(result))
 }
+
+// --- Conflict detection ---
+
+interface RenamedPair {
+  from: string
+  to:   string
+}
+
+function detectConflicts(
+  section: string,
+  renamedPairs: readonly RenamedPair[],
+  removedNames: readonly string[],
+  modifiedBlocks: ReadonlyMap<string, string>,
+  addedBlocks: ReadonlyMap<string, string>,
+): void {
+  const fromNames = new Set(renamedPairs.map((p) => p.from))
+  const toNames   = new Set(renamedPairs.map((p) => p.to))
+
+  // Duplicate FROM or TO within RENAMED
+  if (fromNames.size !== renamedPairs.length) {
+    throw new DeltaConflictError(`[${section}] Duplicate FROM name in RENAMED`)
+  }
+  if (toNames.size !== renamedPairs.length) {
+    throw new DeltaConflictError(`[${section}] Duplicate TO name in RENAMED`)
+  }
+
+  // Duplicate names within each operation
+  assertNoDuplicates(section, 'MODIFIED', [...modifiedBlocks.keys()])
+  assertNoDuplicates(section, 'REMOVED',  removedNames)
+  assertNoDuplicates(section, 'ADDED',    [...addedBlocks.keys()])
+
+  // Cross-operation conflicts
+  for (const name of modifiedBlocks.keys()) {
+    if (removedNames.includes(name)) {
+      throw new DeltaConflictError(`[${section}] '${name}' appears in both MODIFIED and REMOVED`)
+    }
+    if (addedBlocks.has(name)) {
+      throw new DeltaConflictError(`[${section}] '${name}' appears in both MODIFIED and ADDED`)
+    }
+    if (fromNames.has(name)) {
+      throw new DeltaConflictError(
+        `[${section}] MODIFIED references '${name}' which is a FROM in RENAMED — use the TO name instead`,
+      )
+    }
+  }
+
+  for (const name of addedBlocks.keys()) {
+    if (removedNames.includes(name)) {
+      throw new DeltaConflictError(`[${section}] '${name}' appears in both ADDED and REMOVED`)
+    }
+    if (toNames.has(name)) {
+      throw new DeltaConflictError(
+        `[${section}] ADDED uses '${name}' which is already taken by a RENAMED TO`,
+      )
+    }
+  }
+}
+
+function assertNoDuplicates(section: string, op: string, names: readonly string[]): void {
+  const seen = new Set<string>()
+  for (const name of names) {
+    if (seen.has(name)) {
+      throw new DeltaConflictError(`[${section}] Duplicate block '${name}' in ${op}`)
+    }
+    seen.add(name)
+  }
+}
+
+// --- Parsing helpers ---
 
 function patternToRegex(pattern: string): RegExp {
   const parts = pattern.split('{name}')
@@ -109,6 +204,46 @@ function parseBlocks(content: string, pattern: string): Map<string, string> {
 
   return result
 }
+
+function parseRenamedPairs(
+  content: string,
+  pattern: string,
+  ops: OperationKeywords,
+): RenamedPair[] {
+  const pairs: RenamedPair[] = []
+  const regex = patternToRegex(pattern)
+  const lines = content.split('\n').map((l) => l.trim()).filter((l) => l !== '')
+
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    if (line === undefined) { i++; continue }
+
+    const fromPrefix = `${ops.from}:`
+    const toPrefix   = `${ops.to}:`
+
+    if (line.startsWith(fromPrefix)) {
+      const fromHeader = line.slice(fromPrefix.length).trim()
+      const fromMatch  = regex.exec(fromHeader)
+      const nextLine   = lines[i + 1]
+
+      if (fromMatch?.[1] !== undefined && nextLine !== undefined && nextLine.startsWith(toPrefix)) {
+        const toHeader = nextLine.slice(toPrefix.length).trim()
+        const toMatch  = regex.exec(toHeader)
+        if (toMatch?.[1] !== undefined) {
+          pairs.push({ from: fromMatch[1], to: toMatch[1] })
+          i += 2
+          continue
+        }
+      }
+    }
+    i++
+  }
+
+  return pairs
+}
+
+// --- Serialisation helpers ---
 
 function blocksToContent(blocks: Map<string, string>, pattern: string): string {
   const parts: string[] = []
