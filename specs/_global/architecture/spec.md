@@ -47,6 +47,20 @@ Domain entities enforce their own invariants and state machine transitions. Inva
 - **WHEN** a use case attempts an invalid state transition on a domain entity
 - **THEN** the entity throws a typed `SpecdError` subclass before any side effect occurs
 
+### Requirement: Domain value objects expose behaviour, not structure
+
+Domain value objects expose operations and computed properties via methods and getters. Internal representation (e.g. raw segment arrays, backing fields) must not be accessible from outside the class hierarchy. This applies to all value objects in any package's `domain/` layer.
+
+#### Scenario: Value object exposes internal array
+
+- **WHEN** a value object in `domain/` has a `public` getter that returns its internal backing field directly
+- **THEN** it must be replaced with a method or getter that exposes only the behaviour the caller needs
+
+#### Scenario: Infrastructure adapter accesses internal segments
+
+- **WHEN** an infrastructure adapter needs a filesystem path from a domain path object
+- **THEN** it must call `domainPath.toFsPath(sep)` — it must not access a `segments` property
+
 ### Requirement: Pure functions for stateless domain services
 
 Domain operations that are stateless and have no I/O are implemented as plain exported functions in `domain/services/`, not as classes. This applies to any package with a `domain/` layer.
