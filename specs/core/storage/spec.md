@@ -107,7 +107,7 @@ The `fs` archive adapter must support a configurable `pattern` field in `specd.y
 
 ## Spec Dependencies
 
-_none — this is a global constraint spec_
+- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — infrastructure layer constraints
 
 ## ADRs
 
