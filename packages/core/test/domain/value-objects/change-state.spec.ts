@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { isValidTransition, VALID_TRANSITIONS, type ChangeState } from '../../../src/domain/value-objects/change-state.js'
+import {
+  isValidTransition,
+  VALID_TRANSITIONS,
+  type ChangeState,
+} from '../../../src/domain/value-objects/change-state.js'
 
 describe('ChangeState', () => {
   describe('isValidTransition', () => {
@@ -12,17 +16,20 @@ describe('ChangeState', () => {
       ['done', 'archivable'],
       ['pending-approval', 'approved'],
       ['approved', 'archivable'],
-    ] as [ChangeState, ChangeState][])(
-      'allows %s → %s',
-      (from, to) => {
-        expect(isValidTransition(from, to)).toBe(true)
-      },
-    )
+    ] as [ChangeState, ChangeState][])('allows %s → %s', (from, to) => {
+      expect(isValidTransition(from, to)).toBe(true)
+    })
 
     it('rejects archivable → anything (terminal state)', () => {
       const allStates: ChangeState[] = [
-        'drafting', 'designing', 'ready', 'implementing',
-        'done', 'pending-approval', 'approved', 'archivable',
+        'drafting',
+        'designing',
+        'ready',
+        'implementing',
+        'done',
+        'pending-approval',
+        'approved',
+        'archivable',
       ]
       for (const to of allStates) {
         expect(isValidTransition('archivable', to)).toBe(false)
@@ -43,8 +50,14 @@ describe('ChangeState', () => {
 
     it('rejects self-transitions', () => {
       const allStates: ChangeState[] = [
-        'drafting', 'designing', 'ready', 'implementing',
-        'done', 'pending-approval', 'approved', 'archivable',
+        'drafting',
+        'designing',
+        'ready',
+        'implementing',
+        'done',
+        'pending-approval',
+        'approved',
+        'archivable',
       ]
       for (const state of allStates) {
         expect(isValidTransition(state, state)).toBe(false)
@@ -55,8 +68,14 @@ describe('ChangeState', () => {
   describe('VALID_TRANSITIONS', () => {
     it('covers all states', () => {
       const allStates: ChangeState[] = [
-        'drafting', 'designing', 'ready', 'implementing',
-        'done', 'pending-approval', 'approved', 'archivable',
+        'drafting',
+        'designing',
+        'ready',
+        'implementing',
+        'done',
+        'pending-approval',
+        'approved',
+        'archivable',
       ]
       for (const state of allStates) {
         expect(VALID_TRANSITIONS).toHaveProperty(state)

@@ -1,9 +1,11 @@
 # ADR-0009: Artifact Status Derivation — Hash-Based, Not Stored
 
 ## Status
+
 Accepted
 
 ## Context
+
 Each artifact in a change has a lifecycle status: `missing`, `in-progress`, or `complete`. This status needs to reflect the current state of the file on disk, not just what was last written to a manifest.
 
 Two approaches were considered for managing status:
@@ -27,6 +29,7 @@ Additionally, artifacts can declare dependencies on other artifacts via `require
 `markComplete(hash: string)` is the only mutating method on `Artifact`. It is called exclusively by the `ValidateSpec` use case after successful structural validation. There is no `markInProgress()` — that status is derived, not set.
 
 ## Consequences
+
 - Out-of-band file edits (human, another agent, any tool) are automatically detected on next load — no explicit drift notification required
 - The manifest is minimal — one hash per artifact, nothing else for status
 - `ValidateSpec` is the single gate for `complete` status — no other path can mark an artifact complete

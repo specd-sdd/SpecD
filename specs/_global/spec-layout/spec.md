@@ -11,10 +11,12 @@ specd specs are co-located with the code they describe. Each package has its own
 Specs that apply to all packages — architecture, coding conventions, commit format, testing rules, storage design — live under `specs/_global/<topic>/spec.md`. Any spec in `_global/` is a binding constraint on every package in the monorepo.
 
 #### Scenario: Global constraint applies to all packages
+
 - **WHEN** a requirement is defined in `specs/_global/`
 - **THEN** it binds all packages in the monorepo without exception
 
 #### Scenario: Package-specific concern is not global
+
 - **WHEN** a requirement only concerns a single package's internals
 - **THEN** it must not be placed in `specs/_global/`
 
@@ -23,10 +25,12 @@ Specs that apply to all packages — architecture, coding conventions, commit fo
 Specs that describe the internals of a specific package live under `specs/<package>/`, where `<package>` is the short package name (e.g. `core`, `cli`, `mcp`, `schema-std`). These specs are not binding on other packages.
 
 #### Scenario: Core use case spec
+
 - **WHEN** a spec describes a use case implemented in `@specd/core`
 - **THEN** it lives at `specs/core/<topic>/spec.md`
 
 #### Scenario: CLI command spec
+
 - **WHEN** a spec describes a command implemented in `@specd/cli`
 - **THEN** it lives at `specs/cli/<topic>/spec.md`
 
@@ -35,10 +39,12 @@ Specs that describe the internals of a specific package live under `specs/<packa
 Each spec lives in its own named subdirectory and is always named `spec.md`. The subdirectory name is kebab-case and describes the topic concisely.
 
 #### Scenario: Correct spec path
+
 - **WHEN** a spec covers delta merging in `@specd/core`
 - **THEN** the file is at `specs/core/delta-merger/spec.md`
 
 #### Scenario: Incorrect co-location
+
 - **WHEN** a spec file is placed directly in `specs/core/spec.md` with no subdirectory
 - **THEN** it does not conform to this layout and must be moved
 
@@ -60,7 +66,8 @@ Every `spec.md` file must follow this structure. Sections marked _optional_ may 
 <!-- Requirement description using SHALL/MUST for normative statements. -->
 
 #### Scenario: <Name>
-- **GIVEN** <precondition>  <!-- optional -->
+
+- **GIVEN** <precondition> <!-- optional -->
 - **WHEN** <condition>
 - **THEN** <expected outcome>
 
@@ -88,18 +95,22 @@ Every `spec.md` file must follow this structure. Sections marked _optional_ may 
 `## Overview`, `## Requirements`, and `## Spec Dependencies` are mandatory. `## Constraints`, `## Examples`, and `## ADRs` are included when they add value.
 
 #### Scenario: Mandatory sections present
+
 - **WHEN** a spec file contains `## Overview`, `## Requirements`, and `## Spec Dependencies`
 - **THEN** it conforms to the minimum required structure
 
 #### Scenario: Optional section omitted
+
 - **WHEN** a spec has no architectural decisions to reference
 - **THEN** `## ADRs` may be omitted entirely
 
 #### Scenario: Constraints section used
+
 - **WHEN** there are hard rules that complement the requirements (e.g. format constraints, uniqueness rules)
 - **THEN** they are listed as bullets under `## Constraints`, not embedded inside requirement text
 
 #### Scenario: Examples section used
+
 - **WHEN** a spec benefits from concrete examples (YAML, CLI output, code snippets)
 - **THEN** they are placed under `## Examples` so `contextSections` can inject them selectively into AI context
 
@@ -108,10 +119,12 @@ Every `spec.md` file must follow this structure. Sections marked _optional_ may 
 Every spec must include a `## Spec Dependencies` section listing other specs it depends on or that provide context for it. If there are none, the section must say `_none_`.
 
 #### Scenario: Global spec with no dependencies
+
 - **WHEN** a spec in `specs/_global/` has no dependencies on other specs
 - **THEN** its `## Spec Dependencies` section reads `_none — this is a global constraint spec_`
 
 #### Scenario: Package spec referencing global constraints
+
 - **WHEN** a spec in `specs/core/` is constrained by global architecture rules
 - **THEN** it lists `specs/_global/architecture/spec.md` in its `## Spec Dependencies` section
 

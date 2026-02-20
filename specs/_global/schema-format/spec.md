@@ -21,10 +21,12 @@ A schema file must be a valid YAML document with the following top-level fields:
 - `workflow` (array, optional) — skill definitions with prerequisite gates and lifecycle hooks; see Requirement: Workflow
 
 #### Scenario: Minimal valid schema
+
 - **WHEN** a schema file contains `name`, `version`, and at least one artifact
 - **THEN** `SchemaRegistry.resolve()` must return the parsed schema without error
 
 #### Scenario: Missing required field
+
 - **WHEN** a schema file is missing `name` or `version`
 - **THEN** `SchemaRegistry.resolve()` must throw a validation error
 
@@ -34,25 +36,28 @@ A schema file must be a valid YAML document with the following top-level fields:
 
 ```yaml
 deltaOperations:
-  added:    "ADDED"    # default
-  modified: "MODIFIED" # default
-  removed:  "REMOVED"  # default
-  renamed:  "RENAMED"  # default
-  from:     "FROM"     # default — used inside RENAMED sections
-  to:       "TO"       # default — used inside RENAMED sections
+  added: 'ADDED' # default
+  modified: 'MODIFIED' # default
+  removed: 'REMOVED' # default
+  renamed: 'RENAMED' # default
+  from: 'FROM' # default — used inside RENAMED sections
+  to: 'TO' # default — used inside RENAMED sections
 ```
 
 These labels appear as prefixes in delta section headings: `## {added} Requirements`, `## {modified} Requirements`, `## {removed} Requirements`, `## {renamed} Requirements`. The `from` and `to` labels are used as line prefixes inside RENAMED sections: `{from}: ### Requirement: Old name` / `{to}: ### Requirement: New name`. `mergeSpecs` and `ValidateSpec` read all keywords from the resolved schema — they do not hardcode the default strings.
 
 #### Scenario: Custom operation keywords
+
 - **WHEN** a schema defines `deltaOperations.added: "AÑADIDO"`
 - **THEN** delta files using `## AÑADIDO Requirements` are processed correctly by `mergeSpecs`
 
 #### Scenario: Partial override
+
 - **WHEN** a schema defines only `deltaOperations.added` and omits the rest
 - **THEN** the omitted keys fall back to their specd defaults
 
 #### Scenario: Default keywords
+
 - **WHEN** a schema omits `deltaOperations` entirely
 - **THEN** `mergeSpecs` uses `ADDED`, `MODIFIED`, `REMOVED`, and `RENAMED`
 
@@ -72,26 +77,32 @@ Each entry in `artifacts` must include:
 - `contextSections` (array, optional) — sections of existing specs to inject into the AI context; see Requirement: Context sections
 
 #### Scenario: Filename derived from glob literal segment
+
 - **WHEN** an artifact declares `generates: "specs/**/spec.md"` and a new file is created within the change
 - **THEN** the file is named `spec.md`; the subdirectory path (e.g. `auth/login/`) is chosen by the user
 
 #### Scenario: Filename derived from template when glob segment is a wildcard
+
 - **WHEN** an artifact declares `generates: "specs/**/*.md"` and `template: "templates/spec.md"`
 - **THEN** the file is named `spec.md`, taken from the template filename
 
 #### Scenario: Change file path differs from synced repo path
+
 - **WHEN** a change contains `changes/my-change/specs/auth/login/spec.md` and the project syncs to `especificaciones/`
 - **THEN** the file is copied to `especificaciones/auth/login/spec.md`; `generates` does not control the sync destination
 
 #### Scenario: Artifact with no requirements
+
 - **WHEN** an artifact omits `requires`
 - **THEN** its effective status depends only on its own validated hash
 
 #### Scenario: Artifact with dependency chain
+
 - **WHEN** artifact B declares `requires: [a]` and artifact A is `in-progress`
 - **THEN** `Change.effectiveStatus('b')` must return `in-progress`
 
 #### Scenario: Circular dependency in artifact graph
+
 - **WHEN** artifact A declares `requires: [b]` and artifact B declares `requires: [a]`
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` identifying the cycle
 
@@ -110,14 +121,17 @@ specd/schemas/spec-driven/
 ```
 
 #### Scenario: Template loaded at resolve time
+
 - **WHEN** an artifact declares `template: templates/proposal.md` and the file exists in the schema directory
 - **THEN** `SchemaRegistry.resolve()` returns the artifact with the template content populated
 
 #### Scenario: Template file not found
+
 - **WHEN** an artifact declares a `template` path that does not exist relative to the schema directory
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
 #### Scenario: No template declared
+
 - **WHEN** an artifact omits `template`
 - **THEN** no template content is provided for that artifact; scaffolding falls back to an empty file
 
@@ -133,6 +147,7 @@ Delta sections in a delta spec file use the format `## {added} {section}`, `## {
 `mergeSpecs(base, delta, deltaConfigs, deltaOperations)` applies all delta configs in the order they appear. Each config is processed independently against its own section.
 
 #### Scenario: Multiple delta configs
+
 - **WHEN** an artifact declares multiple entries in `deltas`
 - **THEN** each entry is processed independently against its own section
 
@@ -146,7 +161,7 @@ Delta sections in a delta spec file use the format `## {added} {section}`, `## {
 ## RENAMED Requirements
 
 FROM: ### Requirement: Old name
-TO:   ### Requirement: New name
+TO: ### Requirement: New name
 ```
 
 Where `RENAMED`, `FROM`, and `TO` are the schema's resolved `deltaOperations.renamed`, `deltaOperations.from`, and `deltaOperations.to` values respectively.
@@ -162,26 +177,32 @@ The block is found by its `FROM` name, its header line is rewritten to the `TO` 
 If the section does not exist in the base spec, it is created. If all blocks in a section are removed, the section itself is removed from the merged spec.
 
 #### Scenario: RENAMED operation
+
 - **WHEN** a delta spec contains a RENAMED section with `FROM: ### Requirement: Old` / `TO: ### Requirement: New`
 - **THEN** the block is found by `Old`, its header is rewritten to `New`, and subsequent MODIFIED/REMOVED operations must use `New`
 
 #### Scenario: REMOVED operation
+
 - **WHEN** a delta spec contains a REMOVED section with `### Requirement: X`
 - **THEN** block `X` is deleted from the base spec; if it does not exist, the removal is silently ignored
 
 #### Scenario: MODIFIED operation
+
 - **WHEN** a delta spec contains a MODIFIED section with a full `### Requirement: X` block
 - **THEN** the block replaces the existing block; if the block does not exist, it is inserted
 
 #### Scenario: ADDED operation
+
 - **WHEN** a delta spec contains an ADDED section with `### Requirement: X` blocks
 - **THEN** those blocks are appended to the section after all existing blocks
 
 #### Scenario: Section created when missing
+
 - **WHEN** the base spec has no `## Requirements` section and the delta adds blocks to it
 - **THEN** the section is created in the merged spec
 
 #### Scenario: Section removed when empty
+
 - **WHEN** all blocks in a section are removed by the delta
 - **THEN** the section itself is removed from the merged spec
 
@@ -200,10 +221,12 @@ If the section does not exist in the base spec, it is created. If all blocks in 
 - An ADDED block uses a name that is a `TO` in RENAMED (the name is already taken by the renamed block)
 
 #### Scenario: Conflict in same section
+
 - **WHEN** a delta spec lists the same requirement name in both MODIFIED and REMOVED
 - **THEN** `mergeSpecs` must throw a conflict error before applying any changes
 
 #### Scenario: MODIFIED references old name after RENAMED
+
 - **WHEN** a delta spec renames `Old` to `New` and also has a MODIFIED block for `Old`
 - **THEN** `mergeSpecs` must throw a conflict error (MODIFIED must use `New`)
 
@@ -220,26 +243,32 @@ When `eachBlock` is set, blocks within the named section are identified using th
 If `eachBlock` names a section that has no entry in `deltas[]`, `ValidateSpec` must report a configuration error — block boundaries cannot be determined without the block pattern.
 
 #### Scenario: Pattern with {name} placeholder
+
 - **WHEN** a rule has `pattern: "### Requirement: {name}"`
 - **THEN** it matches any line of the form `### Requirement: <anything>`
 
 #### Scenario: Regex pattern
+
 - **WHEN** a rule has `pattern: "SHALL|MUST"`
 - **THEN** it matches any occurrence of `SHALL` or `MUST` anywhere in the target content
 
 #### Scenario: Literal pattern fallback
+
 - **WHEN** a rule has a pattern that is not valid regex and contains no `{name}`
 - **THEN** it is matched as a literal substring
 
 #### Scenario: Pattern check inside nested sub-section
+
 - **WHEN** a rule has `eachBlock: Decisions` and `pattern: "HAS TO"`, the block pattern is `### Decision: {name}`, and a block contains `#### New Decision: Redis` with `The system HAS TO use Redis` inside it
 - **THEN** the pattern `"HAS TO"` matches because the check runs against the full block content including nested sub-sections at any depth
 
 #### Scenario: Sub-section with name placeholder
+
 - **WHEN** a rule has `eachBlock: Decisions` and `pattern: "#### New Decision: {name}"`, and a `### Decision: X` block contains `#### New Decision: Redis`
 - **THEN** the pattern matches within that block; a block with no `#### New Decision: ` line fails
 
 #### Scenario: eachBlock section not in deltas
+
 - **WHEN** a rule has `eachBlock: "Decisions"` but `deltas[]` has no entry with `section: "Decisions"`
 - **THEN** `ValidateSpec` must report a configuration error
 
@@ -262,44 +291,50 @@ Full structural validation is expressed as three explicit rules:
 
 ```yaml
 # 1. The ## ADDED Requirements section must exist
-- pattern: "## ADDED Requirements"
+- pattern: '## ADDED Requirements'
   required: true
 
 # 2. It must contain at least one requirement block
-- pattern: "### Requirement: {name}"
+- pattern: '### Requirement: {name}'
   required: true
-  scope: "ADDED Requirements"
+  scope: 'ADDED Requirements'
 
 # 3. Each requirement block must contain a scenario
-- pattern: "#### Scenario: {name}"
+- pattern: '#### Scenario: {name}'
   required: true
-  scope: "ADDED Requirements"
-  eachBlock: "### Requirement: {name}"
+  scope: 'ADDED Requirements'
+  eachBlock: '### Requirement: {name}'
 ```
 
 The section name in `scope` uses the schema's resolved operation keywords. If `deltaOperations.added` is `"AÑADIDO"`, the section name is `"AÑADIDO Requirements"`.
 
 #### Scenario: Section missing with required true
+
 - **WHEN** a rule has `scope: "ADDED Requirements"` and `required: true` and the section does not exist
 - **THEN** `ValidateSpec` must report an error — the pattern was not found
 
 #### Scenario: Section missing with required false
+
 - **WHEN** a rule has `scope: "ADDED Requirements"` and `required: false` and the section does not exist
 - **THEN** `ValidateSpec` must report a warning — the pattern was not found
 
 #### Scenario: Per-block check passes vacuously
+
 - **WHEN** a rule has `eachBlock: "### Requirement: {name}"` and no blocks match that pattern
 - **THEN** the rule passes regardless of `required` — there is nothing to validate
 
 #### Scenario: Per-block check fails on missing pattern
+
 - **WHEN** a rule has `eachBlock: "### Requirement: {name}"` and one block does not contain the pattern
 - **THEN** `ValidateSpec` must report an error or warning based on `required`, identifying which block is missing the pattern
 
 #### Scenario: scope section does not exist with eachBlock
+
 - **WHEN** a rule has `scope: "ADDED Requirements"` and `eachBlock: "### Requirement: {name}"` and the section does not exist in the delta file
 - **THEN** the rule passes vacuously — the section has no blocks to iterate; use a separate file-level rule to enforce section existence
 
 #### Scenario: Custom keywords in scope
+
 - **WHEN** the schema defines `deltaOperations.added: "AÑADIDO"` and a rule has `scope: "AÑADIDO Requirements"`
 - **THEN** the check is run against the `## AÑADIDO Requirements` section of the delta file
 
@@ -320,42 +355,48 @@ Full structural validation is expressed as three explicit rules:
 
 ```yaml
 # 1. The ## Requirements section must exist
-- pattern: "## Requirements"
+- pattern: '## Requirements'
   required: true
 
 # 2. It must contain at least one requirement block
-- pattern: "### Requirement: {name}"
+- pattern: '### Requirement: {name}'
   required: true
   scope: Requirements
 
 # 3. Each requirement block must contain a scenario
-- pattern: "#### Scenario: {name}"
+- pattern: '#### Scenario: {name}'
   required: true
   scope: Requirements
-  eachBlock: "### Requirement: {name}"
+  eachBlock: '### Requirement: {name}'
 ```
 
 #### Scenario: File-level required pattern
+
 - **WHEN** a rule has `required: true` and no `scope` or `eachBlock`
 - **THEN** `ValidateSpec` must report an error if the pattern is not found anywhere in the file
 
 #### Scenario: Section missing with required true
+
 - **WHEN** a rule has `scope: Requirements` and `required: true` and the section does not exist
 - **THEN** `ValidateSpec` must report an error — the pattern was not found
 
 #### Scenario: Section missing with required false
+
 - **WHEN** a rule has `scope: Requirements` and `required: false` and the section does not exist
 - **THEN** `ValidateSpec` must report a warning — the pattern was not found
 
 #### Scenario: Per-block passes vacuously with no blocks
+
 - **WHEN** a rule has `eachBlock: "### Requirement: {name}"` and no blocks match
 - **THEN** the rule passes regardless of `required` — there is nothing to validate
 
 #### Scenario: Per-block fails on missing pattern
+
 - **WHEN** a rule has `eachBlock: "### Requirement: {name}"` and one block does not contain the pattern
 - **THEN** `ValidateSpec` must report an error or warning based on `required`, identifying which block is missing the pattern
 
 #### Scenario: scope section does not exist with eachBlock
+
 - **WHEN** a rule has `scope: Requirements` and `eachBlock: "### Requirement: {name}"` and the section does not exist in the spec
 - **THEN** the rule passes vacuously — the section has no blocks to iterate; use a separate file-level rule to enforce section existence
 
@@ -368,18 +409,22 @@ Any spec file touched by a delta — whether created via an `added` operation or
 A spec created by an `added` operation also requires approval: someone must take ownership of the new spec, even if ownership is granted by the same person who submitted the change.
 
 #### Scenario: New spec requires approval
+
 - **WHEN** a delta creates a new spec via an `added` operation
 - **THEN** that spec path must be approved before archiving
 
 #### Scenario: Modified spec requires approval
+
 - **WHEN** a delta modifies, removes blocks from, or renames blocks in an existing spec
 - **THEN** that spec path must be approved before archiving
 
 #### Scenario: All specs approved
+
 - **WHEN** every spec path touched by the change has been approved
 - **THEN** `specd archive` proceeds without an approval error
 
 #### Scenario: Partially approved
+
 - **WHEN** at least one touched spec path has not been approved
 - **THEN** `specd archive` must refuse and report which spec paths are pending approval
 
@@ -391,14 +436,17 @@ A spec created by an `added` operation also requires approval: someone must take
 - `contextTitle` (string, optional) — title used for this section in the compiled context block; if omitted, `name` is used as the title
 
 #### Scenario: Section injected
+
 - **WHEN** an artifact has a `contextSections` entry and the spec contains that section
 - **THEN** `CompileContext` includes the section content in the compiled context under the given `contextTitle`
 
 #### Scenario: contextTitle omitted
+
 - **WHEN** a `contextSections` entry has no `contextTitle`
 - **THEN** `CompileContext` uses `name` as the context section title
 
 #### Scenario: Section not present in spec
+
 - **WHEN** the spec does not contain the named section
 - **THEN** `CompileContext` skips that entry without error
 
@@ -407,6 +455,7 @@ A spec created by an `added` operation also requires approval: someone must take
 `requiredSpecArtifacts` is an array of artifact IDs. Every change validated by `ValidateSpec` must have all listed artifacts present (not `missing`) before validation can succeed.
 
 #### Scenario: Missing required artifact
+
 - **WHEN** a change is missing an artifact listed in `requiredSpecArtifacts`
 - **THEN** `ValidateSpec` must report a validation error
 
@@ -419,6 +468,7 @@ A spec created by an `added` operation also requires approval: someone must take
 - `hooks` (object, optional) — lifecycle hooks for this skill; each key is `pre` or `post`, each value is an array of `instruction:` or `run:` hook entries
 
 Every hook entry is either:
+
 - `{ instruction: string }` — AI prompt injected into the compiled context for this skill
 - `{ run: string }` — shell command executed at the lifecycle point; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`
 
@@ -448,7 +498,7 @@ workflow:
     requires: [specs, tasks]
     hooks:
       pre:
-        - run: "pnpm test"
+        - run: 'pnpm test'
         - instruction: |
             Review the delta specs before confirming the archive.
       post:
@@ -466,38 +516,46 @@ workflow:
   - skill: archive
     hooks:
       post:
-        - run: "pnpm run notify-team"
+        - run: 'pnpm run notify-team'
 ```
 
 #### Scenario: Pre hook failure aborts skill
+
 - **WHEN** a `pre` `run:` hook exits with a non-zero code
 - **THEN** the skill is aborted, the user is informed of the failure, and the skill offers to attempt to fix the problem before retrying
 
 #### Scenario: Post hook failure prompts user
+
 - **WHEN** a `post` `run:` hook exits with a non-zero code
 - **THEN** the user is prompted to choose whether to continue with remaining hooks or stop; the completed skill operation is not rolled back
 
 #### Scenario: Skill with unsatisfied prerequisites
+
 - **WHEN** a skill's `requires` lists an artifact that is not `complete`
 - **THEN** `CompileContext` must report that the skill is blocked and which artifacts are incomplete
 
 #### Scenario: Skill with no prerequisites
+
 - **WHEN** a skill has an empty or omitted `requires`
 - **THEN** the skill is always available regardless of artifact state
 
 #### Scenario: Apply scans required artifacts for tasks
+
 - **WHEN** the `apply` skill has `requires: [tasks]` and `tasks.md` contains markdown checkboxes
 - **THEN** the apply skill reads pending tasks from `tasks.md` and surfaces them in the compiled context
 
 #### Scenario: Tasks spread across multiple artifacts
+
 - **WHEN** the `apply` skill has `requires: [tasks, specs]`
 - **THEN** the apply skill scans both artifacts for checkboxes and aggregates them
 
 #### Scenario: Schema and project hooks merged
+
 - **WHEN** both the schema and `specd.yaml` define `workflow` entries for the same skill
 - **THEN** schema hooks fire first, followed by project hooks, within the same `pre`/`post` event
 
 #### Scenario: Project-level entry adds a new hook
+
 - **WHEN** `specd.yaml` defines a `workflow` entry for a skill with no hooks in the schema
 - **THEN** the project hooks are appended without error
 
@@ -509,18 +567,20 @@ workflow:
 # specd.yaml
 artifactRules:
   specs:
-    - "All requirements must reference the relevant RFC number"
+    - 'All requirements must reference the relevant RFC number'
   design:
-    - "Architecture decisions must note which ADR they relate to"
+    - 'Architecture decisions must note which ADR they relate to'
 ```
 
 Rule keys are validated against the active schema's artifact IDs on load. Unknown keys produce a warning but do not prevent startup. Rules are additive — they extend the schema's instruction, not replace it.
 
 #### Scenario: Rules injected into compiled context
+
 - **WHEN** `specd.yaml` defines artifactRules for artifact `specs`
 - **THEN** `CompileContext` includes those artifactRules in the compiled instruction block for the `specs` artifact, clearly marked as constraints the agent must follow but not copy into its output
 
 #### Scenario: Unknown artifact ID in artifactRules
+
 - **WHEN** `specd.yaml` defines artifactRules for an artifact ID not present in the active schema
 - **THEN** `SchemaRegistry` emits a warning at load time and ignores those artifactRules
 
@@ -539,18 +599,21 @@ The project-local schemas path is declared in `specd.yaml`:
 ```yaml
 # specd.yaml
 schemas:
-  path: specd/schemas   # default; relative to project root
+  path: specd/schemas # default; relative to project root
 ```
 
 #### Scenario: Project-local override takes precedence
+
 - **WHEN** a schema with the same name exists both locally and in node_modules
 - **THEN** the project-local version is used
 
 #### Scenario: Configured schemas path is respected
+
 - **WHEN** `specd.yaml` sets `schemas.path` to a non-default value
 - **THEN** `SchemaRegistry` searches that path instead of the default
 
 #### Scenario: Schema not found
+
 - **WHEN** no file matches in any search location
 - **THEN** `SchemaRegistry.resolve()` must throw `SchemaNotFoundError`
 
@@ -559,22 +622,27 @@ schemas:
 `SchemaRegistry.resolve()` must validate the parsed YAML against the schema structure before returning it. Unknown top-level fields must be ignored (forward compatibility). Missing required fields and structural duplicates must produce a `SchemaValidationError`.
 
 #### Scenario: Unknown field ignored
+
 - **WHEN** a schema file includes a top-level field not in the current spec
 - **THEN** the schema loads successfully and the unknown field is ignored
 
 #### Scenario: Duplicate artifact ID
+
 - **WHEN** a schema file declares two artifacts with the same `id`
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
 #### Scenario: Duplicate delta section
+
 - **WHEN** an artifact declares two `deltas` entries with the same `section`
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
 #### Scenario: Duplicate workflow skill
+
 - **WHEN** the `workflow` array contains two entries with the same `skill` name
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
 #### Scenario: Unknown artifact ID in requires
+
 - **WHEN** an artifact declares `requires: [unknown-id]` and no artifact with that ID exists in the schema
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
@@ -622,49 +690,49 @@ artifacts:
     requires: []
 
   - id: specs
-    generates: "specs/**/spec.md"
+    generates: 'specs/**/spec.md'
     description: Detailed specifications defining what the system should do
     template: templates/spec.md
     requires:
       - proposal
     deltas:
       - section: Requirements
-        pattern: "### Requirement: {name}"
+        pattern: '### Requirement: {name}'
     deltaValidations:
       # ADDED and MODIFIED requirement blocks must each contain a scenario
-      - pattern: "#### Scenario: {name}"
+      - pattern: '#### Scenario: {name}'
         required: true
-        scope: "ADDED Requirements"
-        eachBlock: "### Requirement: {name}"
-      - pattern: "#### Scenario: {name}"
+        scope: 'ADDED Requirements'
+        eachBlock: '### Requirement: {name}'
+      - pattern: '#### Scenario: {name}'
         required: true
-        scope: "MODIFIED Requirements"
-        eachBlock: "### Requirement: {name}"
+        scope: 'MODIFIED Requirements'
+        eachBlock: '### Requirement: {name}'
       # ADDED and MODIFIED requirement blocks must use normative language
-      - pattern: "SHALL|MUST"
+      - pattern: 'SHALL|MUST'
         required: true
-        scope: "ADDED Requirements"
-        eachBlock: "### Requirement: {name}"
-      - pattern: "SHALL|MUST"
+        scope: 'ADDED Requirements'
+        eachBlock: '### Requirement: {name}'
+      - pattern: 'SHALL|MUST'
         required: true
-        scope: "MODIFIED Requirements"
-        eachBlock: "### Requirement: {name}"
+        scope: 'MODIFIED Requirements'
+        eachBlock: '### Requirement: {name}'
     validations:
-      - pattern: "## Purpose"
+      - pattern: '## Purpose'
         required: true
-      - pattern: "## Requirements"
+      - pattern: '## Requirements'
         required: true
-      - pattern: "### Requirement: {name}"
-        required: true
-        scope: Requirements
-      - pattern: "#### Scenario: {name}"
+      - pattern: '### Requirement: {name}'
         required: true
         scope: Requirements
-        eachBlock: "### Requirement: {name}"
-      - pattern: "SHALL|MUST"
+      - pattern: '#### Scenario: {name}'
         required: true
         scope: Requirements
-        eachBlock: "### Requirement: {name}"
+        eachBlock: '### Requirement: {name}'
+      - pattern: 'SHALL|MUST'
+        required: true
+        scope: Requirements
+        eachBlock: '### Requirement: {name}'
     instruction: |
       Create specification files defining WHAT the system should do.
 
