@@ -35,6 +35,14 @@ export abstract class DomainPath {
    * constructor. Implementations must NOT re-validate the segments — they are
    * already trusted (they come from the current instance or from `parse`).
    *
+   * @example
+   * ```ts
+   * // In SpecPath:
+   * protected _withSegments(segments: readonly string[]): this {
+   *   return new SpecPath(segments) as this
+   * }
+   * ```
+   *
    * @param segments - Pre-validated, non-empty array of path segments
    * @returns A new instance of the concrete subtype
    */
