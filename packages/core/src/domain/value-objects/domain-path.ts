@@ -2,12 +2,12 @@
  * Abstract base for immutable, validated domain path value objects.
  *
  * Stores a non-empty sequence of path segments and provides the common
- * read operations shared by all concrete path types (`SpecPath`, etc.).
+ * navigation and comparison operations shared by all concrete path types.
  *
  * Subclasses are responsible for:
  * - Validating and constructing paths via their own static factory methods
- * - Guaranteeing that the `segments` array is always non-empty
- * - Throwing domain-specific errors for invalid input
+ * - Guaranteeing that `segments` is always non-empty
+ * - Implementing `_withSegments` to produce new instances of the concrete type
  */
 export abstract class DomainPath {
   /** The validated, non-empty sequence of path segments. */
@@ -22,6 +22,17 @@ export abstract class DomainPath {
   protected constructor(segments: readonly string[]) {
     this._segments = segments
   }
+
+  /**
+   * Creates a new instance of the concrete subtype wrapping the given segments.
+   *
+   * Used internally by `parent` and `child` to return the correct concrete type.
+   * Implementations must not re-validate — segments are already trusted.
+   *
+   * @param segments - Pre-validated, non-empty array of path segments
+   * @returns A new instance of the concrete subtype
+   */
+  protected abstract _withSegments(segments: readonly string[]): this
 
   /** The individual path segments (e.g. `["auth", "oauth"]`). */
   get segments(): readonly string[] {
@@ -39,10 +50,49 @@ export abstract class DomainPath {
   }
 
   /**
+   * The parent path, or `null` if this is a top-level (single-segment) path.
+   *
+   * Returns the same concrete type as the receiver.
+   *
+   * @example `SpecPath.parse("auth/oauth").parent` → `SpecPath("auth")`
+   */
+  get parent(): this | null {
+    if (this._segments.length <= 1) return null
+    return this._withSegments(this._segments.slice(0, -1))
+  }
+
+  /**
+   * Returns a new path with `segment` appended.
+   *
+   * The base implementation does not validate the segment — subclasses that
+   * enforce segment constraints (e.g. `SpecPath`) should override this method
+   * and apply their own validation before delegating to `_withSegments`.
+   *
+   * @param segment - The segment to append
+   * @returns A new path one level deeper, of the same concrete type
+   */
+  child(segment: string): this {
+    return this._withSegments([...this._segments, segment])
+  }
+
+  /**
+   * Returns whether this path is a strict ancestor of `other`.
+   *
+   * A path is an ancestor of `other` if `other` starts with all of this
+   * path's segments and has at least one additional segment.
+   *
+   * @param other - The path to test against
+   * @returns `true` if `other` starts with this path and has more segments
+   */
+  isAncestorOf(other: DomainPath): boolean {
+    if (other._segments.length <= this._segments.length) return false
+    return this._segments.every((s, i) => s === other._segments[i])
+  }
+
+  /**
    * Returns whether this path is structurally equal to `other`.
    *
-   * Equality is determined by string representation, so two paths are equal
-   * if and only if they resolve to the same slash-separated string.
+   * Equality is determined by string representation.
    *
    * @param other - The path to compare against
    * @returns `true` if both paths have the same string representation

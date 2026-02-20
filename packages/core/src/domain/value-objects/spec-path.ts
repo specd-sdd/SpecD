@@ -21,6 +21,18 @@ export class SpecPath extends DomainPath {
   }
 
   /**
+   * Creates a new `SpecPath` from pre-validated segments without re-running validation.
+   *
+   * Used by `_withSegments` to satisfy the `DomainPath` contract.
+   *
+   * @param segments - Pre-validated, non-empty array of path segments
+   * @returns A new `SpecPath` wrapping the segments
+   */
+  protected _withSegments(segments: readonly string[]): this {
+    return new SpecPath(segments) as this
+  }
+
+  /**
    * Parses and validates a slash-separated path string into a `SpecPath`.
    *
    * @param path - The path string to parse (e.g. `"auth/oauth"`)
@@ -60,34 +72,14 @@ export class SpecPath extends DomainPath {
   }
 
   /**
-   * The parent path, or `null` if this is a top-level path.
-   *
-   * @example `SpecPath.parse("auth/oauth").parent` → `SpecPath("auth")`
-   */
-  get parent(): SpecPath | null {
-    if (this._segments.length <= 1) return null
-    return new SpecPath(this._segments.slice(0, -1))
-  }
-
-  /**
-   * Returns a new `SpecPath` with `segment` appended as a child.
+   * Returns a new `SpecPath` with `segment` appended, running full validation
+   * on the resulting path.
    *
    * @param segment - The child segment to append
    * @returns A new `SpecPath` one level deeper
    * @throws {InvalidSpecPathError} If the segment is invalid
    */
-  child(segment: string): SpecPath {
-    return SpecPath.parse(`${this.toString()}/${segment}`)
-  }
-
-  /**
-   * Returns whether this path is a strict ancestor of `other`.
-   *
-   * @param other - The path to test against
-   * @returns `true` if `other` starts with this path and has more segments
-   */
-  isAncestorOf(other: SpecPath): boolean {
-    if (other._segments.length <= this._segments.length) return false
-    return this._segments.every((s, i) => s === other._segments[i])
+  override child(segment: string): this {
+    return SpecPath.parse(`${this.toString()}/${segment}`) as this
   }
 }
