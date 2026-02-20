@@ -71,6 +71,30 @@ The description uses the imperative mood, present tense: "add", "fix", "remove" 
 - **WHEN** a commit message reads `fix(cli): handle missing file.`
 - **THEN** it must be rejected — description must not end with a period
 
+### Requirement: Commit granularity
+
+Each commit must represent a single coherent change. Unrelated modifications must never be combined into one commit, even if they were made in the same session. The guiding question is: can this commit be reverted or cherry-picked without affecting anything else?
+
+Group changes by the smallest meaningful unit — a single fix, a single feature addition, a single refactor, a documentation update for one spec. When a session produces changes across multiple files for different reasons, they must be staged and committed separately.
+
+```
+# Good — each commit has a single reason to exist
+docs(root): add scenarios to architecture spec
+fix(core): correct delta merge order in mergeSpecs
+test(core): add RENAMED operation test cases
+
+# Bad — unrelated changes bundled together
+docs(root): update specs and fix delta merger and add tests
+```
+
+#### Scenario: Unrelated changes in one commit
+- **WHEN** a commit touches a spec file for documentation reasons and a source file for a bug fix
+- **THEN** they must be split into two separate commits — one `docs`, one `fix`
+
+#### Scenario: Multiple files, single concern
+- **WHEN** a refactor touches five files but all for the same reason
+- **THEN** a single commit is correct — the grouping criterion is the reason, not the file count
+
 ### Requirement: Breaking changes
 
 Breaking changes are marked with `!` after the type/scope and explained in the footer:
