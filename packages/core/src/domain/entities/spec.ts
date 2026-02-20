@@ -1,14 +1,36 @@
 import { SpecPath } from '../value-objects/spec-path.js'
 
+/**
+ * A parsed spec document, identified by its path and holding its raw Markdown content.
+ *
+ * Provides section-level access to the content via `sections()` and `section()`.
+ * Instances are immutable — `mergeSpecs` produces a new `Spec` rather than mutating.
+ */
 export class Spec {
+  /** The path identifying this spec in the repository. */
   readonly path: SpecPath
+  /** The raw Markdown content of the spec. */
   readonly content: string
 
+  /**
+   * Creates a new `Spec` with the given path and content.
+   *
+   * @param path - The path identifying this spec
+   * @param content - The raw Markdown content
+   */
   constructor(path: SpecPath, content: string) {
     this.path = path
     this.content = content
   }
 
+  /**
+   * Parses the content into a map of `## Section Name` → section body.
+   *
+   * Only level-2 headings (`##`) are treated as section delimiters.
+   * The body of each section is trimmed of leading/trailing whitespace.
+   *
+   * @returns A `Map` from section name to trimmed section content
+   */
   sections(): Map<string, string> {
     const result = new Map<string, string>()
     const lines = this.content.split('\n')
@@ -36,6 +58,12 @@ export class Spec {
     return result
   }
 
+  /**
+   * Returns the body of a single section by name, or `null` if not present.
+   *
+   * @param name - The section heading text (without the `## ` prefix)
+   * @returns The trimmed section body, or `null` if the section does not exist
+   */
   section(name: string): string | null {
     return this.sections().get(name) ?? null
   }
