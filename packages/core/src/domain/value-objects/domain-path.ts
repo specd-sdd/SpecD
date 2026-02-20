@@ -137,9 +137,16 @@ export abstract class DomainPath {
   }
 
   /**
-   * Returns the slash-separated string representation (e.g. `"auth/oauth"`).
+   * Returns the canonical slash-separated representation (e.g. `"auth/oauth"`).
    *
-   * @returns The path as a string
+   * This is the domain identity of the path — always `'/'`-separated regardless
+   * of the host operating system. It is suitable for serialisation, display, and
+   * use as a map key, but NOT for filesystem operations on Windows.
+   *
+   * Infrastructure adapters that need a real filesystem path must use
+   * `path.join(...domainPath.segments)` instead of this method.
+   *
+   * @returns The canonical path string
    */
   toString(): string {
     return this._segments.join('/')
