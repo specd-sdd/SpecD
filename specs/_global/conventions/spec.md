@@ -74,6 +74,15 @@ All domain and application errors extend `SpecdError` (defined in `@specd/core`)
 - **WHEN** domain or application code throws `new Error('something')`
 - **THEN** it must be replaced with a typed `SpecdError` subclass
 
+### Requirement: Private backing fields use underscore prefix
+
+Private fields that back a public getter must be named with a leading underscore (e.g. `_name` for a `get name()` getter). This avoids the infinite recursion that would occur if both the field and the getter shared the same name and `this.name` resolved to the getter instead of the field.
+
+#### Scenario: Private backing field without underscore
+
+- **WHEN** a private field backs a public getter and both share the same name
+- **THEN** it must be renamed with a leading underscore to prevent recursive getter calls
+
 ### Requirement: Immutability preference
 
 Prefer `readonly` arrays and properties on domain value objects and entities where mutation is not required. Use `as const` for literal configuration objects.
