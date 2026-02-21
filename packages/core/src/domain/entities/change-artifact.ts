@@ -1,13 +1,13 @@
 import { type ArtifactStatus } from '../value-objects/artifact-status.js'
 
 /**
- * Construction properties for an `Artifact`.
+ * Construction properties for a {@link ChangeArtifact}.
  */
-export interface ArtifactProps {
+export interface ChangeArtifactProps {
   /** The artifact type identifier (e.g. `"proposal"`, `"specs"`, `"tasks"`). */
   type: string
-  /** Path to the artifact file relative to the change directory. */
-  path: string
+  /** The artifact filename (e.g. `"proposal.md"`). */
+  filename: string
   /** Whether the artifact is optional in the schema. Defaults to `false`. */
   optional?: boolean
   /** Artifact type IDs that must be `complete` before this one can be validated. */
@@ -21,25 +21,29 @@ export interface ArtifactProps {
 /**
  * Represents a single artifact file within a change (e.g. `proposal.md`, `spec.md`).
  *
+ * Tracks validation state for the artifact: whether it exists, whether it has
+ * been validated, and what hash was recorded at last validation. Content is not
+ * held in memory — it is loaded on demand by the repository port when needed.
+ *
  * Status is derived, not stored: `missing` until the file exists, `in-progress`
  * while unvalidated or dependencies are incomplete, `complete` after `markComplete`.
  */
-export class Artifact {
+export class ChangeArtifact {
   private readonly _type: string
-  private readonly _path: string
+  private readonly _filename: string
   private readonly _optional: boolean
   private readonly _requires: readonly string[]
   private _status: ArtifactStatus
   private _validatedHash: string | undefined
 
   /**
-   * Creates a new `Artifact` from the given properties.
+   * Creates a new `ChangeArtifact` from the given properties.
    *
    * @param props - Artifact construction properties
    */
-  constructor(props: ArtifactProps) {
+  constructor(props: ChangeArtifactProps) {
     this._type = props.type
-    this._path = props.path
+    this._filename = props.filename
     this._optional = props.optional ?? false
     this._requires = props.requires ?? []
     this._status = props.status ?? 'missing'
@@ -51,9 +55,9 @@ export class Artifact {
     return this._type
   }
 
-  /** Path to the artifact file relative to the change directory. */
-  get path(): string {
-    return this._path
+  /** The artifact filename (e.g. `"proposal.md"`). */
+  get filename(): string {
+    return this._filename
   }
 
   /** Whether this artifact is optional in the schema. */

@@ -29,21 +29,7 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/explicit-module-boundary-types': 'error',
 
-      // Named exports only
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: 'ExportDefaultDeclaration',
-          message: 'Default exports are forbidden. Use named exports.',
-        },
-      ],
-    },
-  },
-
-  // Domain layer — no public class fields (architecture/spec.md: expose behaviour, not structure)
-  {
-    files: ['packages/*/src/domain/**/*.ts'],
-    rules: {
+      // Named exports only + no public class fields (architecture/spec.md)
       'no-restricted-syntax': [
         'error',
         {
@@ -53,11 +39,16 @@ export default tseslint.config(
         {
           selector:
             'PropertyDefinition:not([accessibility="private"]):not([accessibility="protected"])',
-          message:
-            'Domain value objects must not expose public fields. Use methods or getters instead.',
+          message: 'Classes must not expose public fields. Use methods or getters instead.',
         },
       ],
+    },
+  },
 
+  // Domain layer — no public class fields (architecture/spec.md: expose behaviour, not structure)
+  {
+    files: ['packages/*/src/domain/**/*.ts'],
+    rules: {
       // Kebab-case filenames for source files
       'unicorn/filename-case': ['error', { case: 'kebabCase' }],
 

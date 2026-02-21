@@ -1,4 +1,4 @@
-import { Spec } from '../entities/spec.js'
+import { SpecArtifact } from '../value-objects/spec-artifact.js'
 import { DeltaConflictError } from '../errors/delta-conflict-error.js'
 
 /**
@@ -62,19 +62,19 @@ const DEFAULT_OPERATIONS: OperationKeywords = {
  * See `specs/core/delta-merger/spec.md` and `specs/_global/schema-format/spec.md`
  * for the full behavioral contract.
  *
- * @param base - The original spec to merge into
- * @param delta - The spec containing the delta operations
+ * @param base - The original artifact to merge into
+ * @param delta - The artifact containing the delta operations
  * @param deltaConfigs - Per-section merge configuration from the schema
  * @param deltaOperations - Optional custom operation keywords (defaults to ADDED/MODIFIED/REMOVED/RENAMED/FROM/TO)
- * @returns A new `Spec` with all delta operations applied; the base spec is never mutated
+ * @returns A new `SpecArtifact` with all delta operations applied; the base artifact is never mutated
  * @throws {DeltaConflictError} When conflicting operations are detected in the delta
  */
 export function mergeSpecs(
-  base: Spec,
-  delta: Spec,
+  base: SpecArtifact,
+  delta: SpecArtifact,
   deltaConfigs: readonly DeltaConfig[],
   deltaOperations?: OperationKeywords,
-): Spec {
+): SpecArtifact {
   const ops = { ...DEFAULT_OPERATIONS, ...deltaOperations }
   const deltaSections = delta.sections()
   const result = new Map(base.sections())
@@ -135,7 +135,7 @@ export function mergeSpecs(
     }
   }
 
-  return new Spec(base.path, sectionsToContent(result))
+  return new SpecArtifact(base.filename, sectionsToContent(result))
 }
 
 // --- Conflict detection ---

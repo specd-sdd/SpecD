@@ -1,5 +1,5 @@
 export { Change, type ChangeProps, type ApprovalRecord, type StructuralChange } from './change.js'
 export { Spec } from './spec.js'
-export { Artifact, type ArtifactProps } from './artifact.js'
+export { ChangeArtifact, type ChangeArtifactProps } from './change-artifact.js'
 export { Delta, type DeltaProps } from './delta.js'
 export { ArchivedChange, type ArchivedChangeProps } from './archived-change.js'

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
-import { Artifact } from '../../../src/domain/entities/artifact.js'
+import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { ApprovalRequiredError } from '../../../src/domain/errors/approval-required-error.js'
@@ -18,7 +18,7 @@ function makeArtifact(
   status: import('../../../src/domain/value-objects/artifact-status.js').ArtifactStatus,
   requires: string[] = [],
 ) {
-  return new Artifact({ type, path: `changes/foo/${type}.md`, status, requires })
+  return new ChangeArtifact({ type, filename: `${type}.md`, status, requires })
 }
 
 describe('Change', () => {

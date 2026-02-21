@@ -1,78 +1,56 @@
 import { SpecPath } from '../value-objects/spec-path.js'
 
 /**
- * A parsed spec document, identified by its path and holding its raw Markdown content.
+ * Metadata for a spec directory.
  *
- * Provides section-level access to the content via `sections()` and `section()`.
- * Instances are immutable — `mergeSpecs` produces a new `Spec` rather than mutating.
+ * A spec is a directory identified by a scope and a name ({@link SpecPath}).
+ * It contains one or more artifact files (e.g. `spec.md`, `proposal.md`).
+ * This entity holds only metadata — artifact content is loaded on demand
+ * via `SpecRepository.artifact()`.
  */
 export class Spec {
-  private readonly _path: SpecPath
-  private readonly _content: string
+  private readonly _scope: string
+  private readonly _name: SpecPath
+  private readonly _filenames: readonly string[]
 
   /**
-   * Creates a new `Spec` with the given path and content.
+   * Creates a new `Spec` with the given scope, name, and artifact filenames.
    *
-   * @param path - The path identifying this spec
-   * @param content - The raw Markdown content
+   * @param scope - The scope name from `specd.yaml` (e.g. `"billing"`, `"default"`)
+   * @param name - The spec path within the scope's specs directory (e.g. `auth/oauth`)
+   * @param filenames - The artifact filenames present in this spec directory
    */
-  constructor(path: SpecPath, content: string) {
-    this._path = path
-    this._content = content
+  constructor(scope: string, name: SpecPath, filenames: readonly string[]) {
+    this._scope = scope
+    this._name = name
+    this._filenames = filenames
   }
 
-  /** The path identifying this spec in the repository. */
-  get path(): SpecPath {
-    return this._path
-  }
-
-  /** The raw Markdown content of the spec. */
-  get content(): string {
-    return this._content
+  /** The scope name this spec belongs to (from `specd.yaml`). */
+  get scope(): string {
+    return this._scope
   }
 
   /**
-   * Parses the content into a map of `## Section Name` → section body.
-   *
-   * Only level-2 headings (`##`) are treated as section delimiters.
-   * The body of each section is trimmed of leading/trailing whitespace.
-   *
-   * @returns A `Map` from section name to trimmed section content
+   * The spec identity path within the scope's specs directory.
+   * For example, `auth/oauth` or `billing/payments`.
    */
-  sections(): Map<string, string> {
-    const result = new Map<string, string>()
-    const lines = this._content.split('\n')
+  get name(): SpecPath {
+    return this._name
+  }
 
-    let currentHeading: string | null = null
-    let currentLines: string[] = []
-
-    for (const line of lines) {
-      const match = /^##\s+(.+)$/.exec(line)
-      if (match?.[1] !== undefined) {
-        if (currentHeading !== null) {
-          result.set(currentHeading, currentLines.join('\n').trim())
-        }
-        currentHeading = match[1].trim()
-        currentLines = []
-      } else if (currentHeading !== null) {
-        currentLines.push(line)
-      }
-    }
-
-    if (currentHeading !== null) {
-      result.set(currentHeading, currentLines.join('\n').trim())
-    }
-
-    return result
+  /** The artifact filenames present in this spec directory (e.g. `["spec.md", "proposal.md"]`). */
+  get filenames(): readonly string[] {
+    return this._filenames
   }
 
   /**
-   * Returns the body of a single section by name, or `null` if not present.
+   * Returns whether this spec has an artifact with the given filename.
    *
-   * @param name - The section heading text (without the `## ` prefix)
-   * @returns The trimmed section body, or `null` if the section does not exist
+   * @param filename - The filename to check (e.g. `"spec.md"`)
+   * @returns `true` if the artifact exists in this spec directory
    */
-  section(name: string): string | null {
-    return this.sections().get(name) ?? null
+  hasArtifact(filename: string): boolean {
+    return this._filenames.includes(filename)
   }
 }

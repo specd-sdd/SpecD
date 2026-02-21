@@ -3,7 +3,7 @@ import { type ArtifactStatus } from '../value-objects/artifact-status.js'
 import { SpecPath } from '../value-objects/spec-path.js'
 import { InvalidStateTransitionError } from '../errors/invalid-state-transition-error.js'
 import { ApprovalRequiredError } from '../errors/approval-required-error.js'
-import { type Artifact } from './artifact.js'
+import { type ChangeArtifact } from './change-artifact.js'
 
 /**
  * Describes a single structural change detected in a spec during delta validation.
@@ -43,7 +43,7 @@ export interface ChangeProps {
   /** Initial lifecycle state. Defaults to `"drafting"`. */
   state?: ChangeState
   /** Pre-loaded artifact map. Defaults to an empty map. */
-  artifacts?: Map<string, Artifact>
+  artifacts?: Map<string, ChangeArtifact>
   /** Pre-loaded approval record. */
   approval?: ApprovalRecord
   /** Creation timestamp. Defaults to `new Date()`. */
@@ -54,7 +54,7 @@ export interface ChangeProps {
  * The central domain entity representing an in-progress spec change.
  *
  * A `Change` moves through a lifecycle (`ChangeState`) from `drafting` to
- * `archivable`. It owns a set of `Artifact` files that must be validated
+ * `archivable`. It owns a set of `ChangeArtifact` files that must be validated
  * before archiving. If the change touches structural spec sections (MODIFIED
  * or REMOVED operations), it must be approved before it can be archived.
  */
@@ -63,7 +63,7 @@ export class Change {
   private readonly _scope: SpecPath
   private readonly _createdAt: Date
   private _state: ChangeState
-  private _artifacts: Map<string, Artifact>
+  private _artifacts: Map<string, ChangeArtifact>
   private _approval: ApprovalRecord | undefined
 
   /**
@@ -76,7 +76,7 @@ export class Change {
     this._scope = props.scope
     this._createdAt = props.createdAt ?? new Date()
     this._state = props.state ?? 'drafting'
-    this._artifacts = props.artifacts ?? new Map<string, Artifact>()
+    this._artifacts = props.artifacts ?? new Map<string, ChangeArtifact>()
     this._approval = props.approval
   }
 
@@ -101,7 +101,7 @@ export class Change {
   }
 
   /** All artifacts currently attached to this change, keyed by type. */
-  get artifacts(): ReadonlyMap<string, Artifact> {
+  get artifacts(): ReadonlyMap<string, ChangeArtifact> {
     return this._artifacts
   }
 
@@ -199,7 +199,7 @@ export class Change {
    *
    * @param artifact - The artifact to attach
    */
-  setArtifact(artifact: Artifact): void {
+  setArtifact(artifact: ChangeArtifact): void {
     this._artifacts.set(artifact.type, artifact)
   }
 
@@ -209,7 +209,7 @@ export class Change {
    * @param type - The artifact type ID to look up
    * @returns The artifact, or `null` if not found
    */
-  getArtifact(type: string): Artifact | null {
+  getArtifact(type: string): ChangeArtifact | null {
     return this._artifacts.get(type) ?? null
   }
 }
