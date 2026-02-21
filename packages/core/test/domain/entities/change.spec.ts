@@ -10,7 +10,7 @@ const scope = SpecPath.parse('auth/oauth')
 function makeChange(
   state?: import('../../../src/domain/value-objects/change-state.js').ChangeState,
 ) {
-  return new Change({ name: 'add-oauth-login', scope, state })
+  return new Change({ name: 'add-oauth-login', scope, ...(state !== undefined ? { state } : {}) })
 }
 
 function makeArtifact(
