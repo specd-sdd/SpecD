@@ -3,3 +3,4 @@ export { InvalidStateTransitionError } from './invalid-state-transition-error.js
 export { ApprovalRequiredError } from './approval-required-error.js'
 export { InvalidSpecPathError } from './invalid-spec-path-error.js'
 export { DeltaConflictError } from './delta-conflict-error.js'
+export { ArtifactConflictError } from './artifact-conflict-error.js'

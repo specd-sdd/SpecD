@@ -61,6 +61,22 @@ Domain value objects expose operations and computed properties via methods and g
 - **WHEN** an infrastructure adapter needs a filesystem path from a domain path object
 - **THEN** it must call `domainPath.toFsPath(sep)` — it must not access a `segments` property
 
+### Requirement: Ports with shared construction are abstract classes
+
+When a port has constructor arguments that are invariant across all implementations (e.g. `scope`, `ownership`, `isExternal`), it is defined as an `abstract class` rather than an `interface`. The abstract class sets those fields in its constructor and exposes them as methods. All storage operations are declared `abstract`. This lets the TypeScript compiler enforce both the construction contract and the method contract without relying on ESLint or convention.
+
+All methods on port abstract classes — including the shared ones from the base — are explicit methods, never property signatures.
+
+#### Scenario: Port has shared construction arguments
+
+- **WHEN** every possible implementation of a port receives the same set of constructor arguments
+- **THEN** the port is an `abstract class` with those arguments in its constructor, not an `interface`
+
+#### Scenario: Port declares a property instead of a method
+
+- **WHEN** a port class declares `readonly scope: string` instead of `scope(): string`
+- **THEN** it must be changed to the method form
+
 ### Requirement: Pure functions for stateless domain services
 
 Domain operations that are stateless and have no I/O are implemented as plain exported functions in `domain/services/`, not as classes. This applies to any package with a `domain/` layer.
@@ -104,6 +120,8 @@ Package dependency direction is strictly one-way: `plugin-*` → `skills` → `c
 - Use cases receive all dependencies via constructor — no module-level singletons, in any package
 - Domain entities must throw typed errors (subclasses of `SpecdError`) for invalid operations
 - Stateless domain operations must be plain functions, not classes
+- Ports with invariant constructor arguments are `abstract class`, not `interface`
+- All port methods are explicit methods — no property signatures
 - No package may introduce a circular `workspace:*` dependency
 
 ## Spec Dependencies

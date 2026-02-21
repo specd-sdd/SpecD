@@ -1,10 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mergeSpecs, type DeltaConfig } from '../../../src/domain/services/delta-merger.js'
 import { DeltaConflictError } from '../../../src/domain/errors/delta-conflict-error.js'
-import { Spec } from '../../../src/domain/entities/spec.js'
-import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
-
-const path = SpecPath.parse('auth/oauth')
+import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 
 const reqConfig: DeltaConfig = {
   section: 'Requirements',
@@ -16,11 +13,11 @@ const scenarioConfig: DeltaConfig = {
   pattern: '### Scenario: {name}',
 }
 
-function makeSpec(content: string): Spec {
-  return new Spec(path, content)
+function makeArtifact(content: string): SpecArtifact {
+  return new SpecArtifact('spec.md', content)
 }
 
-const baseSpec = makeSpec(
+const baseArtifact = makeArtifact(
   '## Requirements\n\n' +
     '### Requirement: Token expiry\nTokens must expire after 24h\n\n' +
     '### Requirement: Refresh tokens\nRefresh tokens must be stored encrypted',
@@ -29,19 +26,19 @@ const baseSpec = makeSpec(
 describe('mergeSpecs', () => {
   describe('no delta', () => {
     it('returns base spec unchanged when delta has no matching sections', () => {
-      const delta = makeSpec('')
-      const result = mergeSpecs(baseSpec, delta, [reqConfig])
-      expect(result.section('Requirements')).toBe(baseSpec.section('Requirements'))
+      const delta = makeArtifact('')
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig])
+      expect(result.section('Requirements')).toBe(baseArtifact.section('Requirements'))
     })
 
-    it('preserves the base path', () => {
-      const result = mergeSpecs(baseSpec, makeSpec(''), [reqConfig])
-      expect(result.path.equals(path)).toBe(true)
+    it('preserves the base filename', () => {
+      const result = mergeSpecs(baseArtifact, makeArtifact(''), [reqConfig])
+      expect(result.filename).toBe(baseArtifact.filename)
     })
 
     it('preserves sections not covered by any deltaConfig', () => {
-      const base = makeSpec('## Requirements\ncontent\n\n## Overview\noverview content')
-      const delta = makeSpec('## ADDED Requirements\n### Requirement: New\nnew req')
+      const base = makeArtifact('## Requirements\ncontent\n\n## Overview\noverview content')
+      const delta = makeArtifact('## ADDED Requirements\n### Requirement: New\nnew req')
       const result = mergeSpecs(base, delta, [reqConfig])
       expect(result.section('Overview')).toBe('overview content')
     })
@@ -49,24 +46,26 @@ describe('mergeSpecs', () => {
 
   describe('ADDED', () => {
     it('adds a new block to an existing section', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## ADDED Requirements\n### Requirement: Token rotation\nTokens must be rotated every 24h',
       )
-      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig])
       expect(result.section('Requirements')).toContain('### Requirement: Token rotation')
       expect(result.section('Requirements')).toContain('Tokens must be rotated every 24h')
     })
 
     it('preserves existing blocks when adding', () => {
-      const delta = makeSpec('## ADDED Requirements\n### Requirement: Token rotation\nnew content')
-      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      const delta = makeArtifact(
+        '## ADDED Requirements\n### Requirement: Token rotation\nnew content',
+      )
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig])
       expect(result.section('Requirements')).toContain('### Requirement: Token expiry')
       expect(result.section('Requirements')).toContain('### Requirement: Refresh tokens')
     })
 
     it('creates the section if it does not exist in base', () => {
-      const base = makeSpec('## Overview\nsome overview')
-      const delta = makeSpec('## ADDED Requirements\n### Requirement: First req\ncontent')
+      const base = makeArtifact('## Overview\nsome overview')
+      const delta = makeArtifact('## ADDED Requirements\n### Requirement: First req\ncontent')
       const result = mergeSpecs(base, delta, [reqConfig])
       expect(result.section('Requirements')).toContain('### Requirement: First req')
     })
@@ -74,48 +73,50 @@ describe('mergeSpecs', () => {
 
   describe('MODIFIED', () => {
     it('replaces an existing block', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## MODIFIED Requirements\n### Requirement: Token expiry\nTokens must expire after 1h',
       )
-      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig])
       expect(result.section('Requirements')).toContain('Tokens must expire after 1h')
       expect(result.section('Requirements')).not.toContain('Tokens must expire after 24h')
     })
 
     it('preserves blocks not mentioned in MODIFIED', () => {
-      const delta = makeSpec('## MODIFIED Requirements\n### Requirement: Token expiry\nnew content')
-      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      const delta = makeArtifact(
+        '## MODIFIED Requirements\n### Requirement: Token expiry\nnew content',
+      )
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig])
       expect(result.section('Requirements')).toContain('### Requirement: Refresh tokens')
     })
 
     it('adds block if it does not exist in base (upsert)', () => {
-      const delta = makeSpec('## MODIFIED Requirements\n### Requirement: Brand new\ncontent')
-      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      const delta = makeArtifact('## MODIFIED Requirements\n### Requirement: Brand new\ncontent')
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig])
       expect(result.section('Requirements')).toContain('### Requirement: Brand new')
     })
   })
 
   describe('REMOVED', () => {
     it('removes an existing block', () => {
-      const delta = makeSpec('## REMOVED Requirements\n### Requirement: Token expiry')
-      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      const delta = makeArtifact('## REMOVED Requirements\n### Requirement: Token expiry')
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig])
       expect(result.section('Requirements')).not.toContain('### Requirement: Token expiry')
     })
 
     it('preserves other blocks when removing', () => {
-      const delta = makeSpec('## REMOVED Requirements\n### Requirement: Token expiry')
-      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      const delta = makeArtifact('## REMOVED Requirements\n### Requirement: Token expiry')
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig])
       expect(result.section('Requirements')).toContain('### Requirement: Refresh tokens')
     })
 
     it('silently ignores removing a block that does not exist', () => {
-      const delta = makeSpec('## REMOVED Requirements\n### Requirement: Non existent')
-      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).not.toThrow()
+      const delta = makeArtifact('## REMOVED Requirements\n### Requirement: Non existent')
+      expect(() => mergeSpecs(baseArtifact, delta, [reqConfig])).not.toThrow()
     })
 
     it('removes the section entirely when all blocks are removed', () => {
-      const base = makeSpec('## Requirements\n### Requirement: Only one\ncontent')
-      const delta = makeSpec('## REMOVED Requirements\n### Requirement: Only one')
+      const base = makeArtifact('## Requirements\n### Requirement: Only one\ncontent')
+      const delta = makeArtifact('## REMOVED Requirements\n### Requirement: Only one')
       const result = mergeSpecs(base, delta, [reqConfig])
       expect(result.section('Requirements')).toBeNull()
     })
@@ -123,12 +124,12 @@ describe('mergeSpecs', () => {
 
   describe('combined operations', () => {
     it('applies ADDED, MODIFIED, and REMOVED in the same delta', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## ADDED Requirements\n### Requirement: Token rotation\nnew requirement\n\n' +
           '## MODIFIED Requirements\n### Requirement: Token expiry\nupdated: expire after 1h\n\n' +
           '## REMOVED Requirements\n### Requirement: Refresh tokens',
       )
-      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig])
       const section = result.section('Requirements')
 
       expect(section).toContain('### Requirement: Token rotation')
@@ -140,11 +141,11 @@ describe('mergeSpecs', () => {
 
   describe('multiple DeltaConfigs', () => {
     it('processes independent delta sections for each config', () => {
-      const base = makeSpec(
+      const base = makeArtifact(
         '## Requirements\n### Requirement: Auth\ncontent\n\n' +
           '## Scenarios\n### Scenario: Login\ncontent',
       )
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## ADDED Requirements\n### Requirement: Logout\nnew req\n\n' +
           '## MODIFIED Scenarios\n### Scenario: Login\nupdated scenario',
       )
@@ -155,8 +156,8 @@ describe('mergeSpecs', () => {
     })
 
     it('skips configs for which the delta has no matching sections', () => {
-      const base = makeSpec('## Requirements\n### Requirement: Auth\ncontent')
-      const delta = makeSpec('## ADDED Requirements\n### Requirement: Logout\nnew req')
+      const base = makeArtifact('## Requirements\n### Requirement: Auth\ncontent')
+      const delta = makeArtifact('## ADDED Requirements\n### Requirement: Logout\nnew req')
       const result = mergeSpecs(base, delta, [reqConfig, scenarioConfig])
 
       expect(result.section('Requirements')).toContain('### Requirement: Logout')
@@ -166,45 +167,45 @@ describe('mergeSpecs', () => {
 
   describe('RENAMED', () => {
     it('renames an existing block', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## RENAMED Requirements\n\nFROM: ### Requirement: Token expiry\nTO:   ### Requirement: Token lifetime',
       )
-      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig])
       expect(result.section('Requirements')).toContain('### Requirement: Token lifetime')
       expect(result.section('Requirements')).not.toContain('### Requirement: Token expiry')
     })
 
     it('preserves block content after rename', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## RENAMED Requirements\n\nFROM: ### Requirement: Token expiry\nTO:   ### Requirement: Token lifetime',
       )
-      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig])
       expect(result.section('Requirements')).toContain('Tokens must expire after 24h')
     })
 
     it('silently ignores renaming a block that does not exist', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## RENAMED Requirements\n\nFROM: ### Requirement: Non existent\nTO:   ### Requirement: New name',
       )
-      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).not.toThrow()
+      expect(() => mergeSpecs(baseArtifact, delta, [reqConfig])).not.toThrow()
     })
 
     it('subsequent MODIFIED uses the new name after RENAMED', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## RENAMED Requirements\n\nFROM: ### Requirement: Token expiry\nTO:   ### Requirement: Token lifetime\n\n' +
           '## MODIFIED Requirements\n### Requirement: Token lifetime\nupdated content',
       )
-      const result = mergeSpecs(baseSpec, delta, [reqConfig])
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig])
       expect(result.section('Requirements')).toContain('updated content')
     })
   })
 
   describe('custom deltaOperations', () => {
     it('uses custom keywords when provided', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## AÑADIDO Requirements\n### Requirement: Token rotation\nnew content',
       )
-      const result = mergeSpecs(baseSpec, delta, [reqConfig], {
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig], {
         added: 'AÑADIDO',
         modified: 'MODIFICADO',
         removed: 'ELIMINADO',
@@ -216,8 +217,10 @@ describe('mergeSpecs', () => {
     })
 
     it('ignores default keyword sections when custom keywords are provided', () => {
-      const delta = makeSpec('## ADDED Requirements\n### Requirement: Token rotation\nnew content')
-      const result = mergeSpecs(baseSpec, delta, [reqConfig], {
+      const delta = makeArtifact(
+        '## ADDED Requirements\n### Requirement: Token rotation\nnew content',
+      )
+      const result = mergeSpecs(baseArtifact, delta, [reqConfig], {
         added: 'AÑADIDO',
         modified: 'MODIFICADO',
         removed: 'ELIMINADO',
@@ -231,53 +234,53 @@ describe('mergeSpecs', () => {
 
   describe('conflict detection', () => {
     it('throws DeltaConflictError when same block is in MODIFIED and REMOVED', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## MODIFIED Requirements\n### Requirement: Token expiry\nnew content\n\n' +
           '## REMOVED Requirements\n### Requirement: Token expiry',
       )
-      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).toThrow(DeltaConflictError)
+      expect(() => mergeSpecs(baseArtifact, delta, [reqConfig])).toThrow(DeltaConflictError)
     })
 
     it('throws DeltaConflictError when same block is in MODIFIED and ADDED', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## MODIFIED Requirements\n### Requirement: Token expiry\nnew content\n\n' +
           '## ADDED Requirements\n### Requirement: Token expiry\nnew content',
       )
-      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).toThrow(DeltaConflictError)
+      expect(() => mergeSpecs(baseArtifact, delta, [reqConfig])).toThrow(DeltaConflictError)
     })
 
     it('throws DeltaConflictError when same block is in ADDED and REMOVED', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## ADDED Requirements\n### Requirement: New req\nnew content\n\n' +
           '## REMOVED Requirements\n### Requirement: New req',
       )
-      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).toThrow(DeltaConflictError)
+      expect(() => mergeSpecs(baseArtifact, delta, [reqConfig])).toThrow(DeltaConflictError)
     })
 
     it('throws DeltaConflictError when MODIFIED references FROM name after RENAMED', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## RENAMED Requirements\n\nFROM: ### Requirement: Token expiry\nTO:   ### Requirement: Token lifetime\n\n' +
           '## MODIFIED Requirements\n### Requirement: Token expiry\nshould use new name',
       )
-      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).toThrow(DeltaConflictError)
+      expect(() => mergeSpecs(baseArtifact, delta, [reqConfig])).toThrow(DeltaConflictError)
     })
 
     it('throws DeltaConflictError when ADDED uses a TO name from RENAMED', () => {
-      const delta = makeSpec(
+      const delta = makeArtifact(
         '## RENAMED Requirements\n\nFROM: ### Requirement: Token expiry\nTO:   ### Requirement: Token lifetime\n\n' +
           '## ADDED Requirements\n### Requirement: Token lifetime\nnew content',
       )
-      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).toThrow(DeltaConflictError)
+      expect(() => mergeSpecs(baseArtifact, delta, [reqConfig])).toThrow(DeltaConflictError)
     })
 
     it('does not mutate base spec when conflict is detected', () => {
-      const originalContent = baseSpec.content
-      const delta = makeSpec(
+      const originalContent = baseArtifact.content
+      const delta = makeArtifact(
         '## MODIFIED Requirements\n### Requirement: Token expiry\nnew\n\n' +
           '## REMOVED Requirements\n### Requirement: Token expiry',
       )
-      expect(() => mergeSpecs(baseSpec, delta, [reqConfig])).toThrow(DeltaConflictError)
-      expect(baseSpec.content).toBe(originalContent)
+      expect(() => mergeSpecs(baseArtifact, delta, [reqConfig])).toThrow(DeltaConflictError)
+      expect(baseArtifact.content).toBe(originalContent)
     })
   })
 })
