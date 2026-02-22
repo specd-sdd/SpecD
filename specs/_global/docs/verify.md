@@ -13,8 +13,18 @@
 
 #### Scenario: ADR missing required section
 
-- **WHEN** an ADR file is missing `## Context`, `## Decision`, or `## Consequences`
+- **WHEN** an ADR file is missing `## Context and Problem Statement`, `## Decision Outcome`, or `## Spec`
 - **THEN** the review must reject it as malformed
+
+#### Scenario: ADR missing Confirmation
+
+- **WHEN** an ADR's `## Decision Outcome` section has no `### Confirmation` sub-section
+- **THEN** the review must reject it as malformed
+
+#### Scenario: ADR with real alternatives omits Considered Options
+
+- **WHEN** an ADR describes a decision where multiple options were genuinely evaluated
+- **THEN** it must include `## Considered Options` and at least one entry per option evaluated
 
 ### Requirement: ADR numbering
 

@@ -2,22 +2,56 @@
 
 ## Status
 
-Accepted
+Accepted — 2026-02-19
 
-## Context
+## Context and Problem Statement
 
 Use cases depend on port interfaces (`SpecRepository`, `HookRunner`, etc.) that must be swappable for testing and for future adapter implementations. IoC containers (tsyringe, inversify) provide automatic wiring but require decorators, `reflect-metadata`, and add a non-trivial dependency with its own learning curve. For a tool with a small number of use cases and a single entry point, this overhead is not justified.
 
-## Decision
+## Decision Drivers
+
+- Dependencies must be swappable — use cases receive ports, not concrete implementations
+- Simplicity: no decorators, no `reflect-metadata`, no additional runtime dependencies
+- Wiring must be explicit and easy to follow for any contributor
+
+## Considered Options
+
+- IoC container (tsyringe or inversify) — automatic constructor injection via decorators
+- Manual DI — dependencies wired explicitly at the application entry point
+
+## Decision Outcome
+
+Chosen option: "Manual DI", because the number of use cases and entry points is small enough that explicit wiring is simpler than the overhead an IoC container introduces.
 
 Dependencies are wired manually at the application entry point. The CLI entry point reads `specd.yaml`, constructs the appropriate infrastructure adapters, and passes them into use case constructors. No IoC container, no decorators, no `reflect-metadata`.
 
-## Consequences
+### Consequences
 
-- Wiring code is explicit and easy to follow for any contributor
-- Adding a new use case requires adding a few lines to the entry point wiring — no container registration
-- If the number of use cases grows significantly, a simple factory pattern can be introduced without changing the use case code
-- No additional runtime dependencies
+- Good: Wiring code is explicit and easy to follow for any contributor
+- Good: No additional runtime dependencies
+- Good: Adding a new use case requires adding a few lines to the entry point — no container registration ceremony
+- Good: If the number of use cases grows significantly, a simple factory pattern can be introduced without changing the use case code
+- Bad: As the number of use cases grows, the entry point wiring block grows in proportion
+
+### Confirmation
+
+`package.json` files across the monorepo contain no references to `tsyringe`, `inversify`, `reflect-metadata`, or `@injectable`/`@inject` decorator packages. No source files use `reflect-metadata` or the `@Injectable` / `@Inject` decorator pattern. This is verified by a `grep` check in CI.
+
+## Pros and Cons of the Options
+
+### IoC container (tsyringe / inversify)
+
+- Good: Wiring is automatic — add a decorator and the container resolves the dependency graph
+- Bad: Requires `experimentalDecorators` and `emitDecoratorMetadata`, which conflict with ESM and strict TypeScript settings
+- Bad: `reflect-metadata` must be imported at the process entry point — a global side-effect
+- Bad: Adds a runtime dependency and a learning curve for contributors unfamiliar with the container
+
+### Manual DI
+
+- Good: Fully explicit — the wiring is plain TypeScript code any contributor can read and trace
+- Good: No decorators, no reflection, no additional dependencies
+- Good: Fully compatible with strict TypeScript and ESM
+- Bad: Entry point grows linearly with the number of use cases; may need a factory helper if it becomes unwieldy
 
 ## Spec
 

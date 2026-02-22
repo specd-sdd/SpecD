@@ -2,23 +2,30 @@
 
 ## Status
 
-Accepted
+Accepted — 2026-02-20
 
-## Context
+## Context and Problem Statement
 
-specd needs a schema system that defines the artifact workflow for a project (what artifacts exist, how they relate, how they are validated, how their sections are merged). The schema format must satisfy several constraints:
+specd needs a schema system that defines the artifact workflow for a project (what artifacts exist, how they relate, how they are validated, how their sections are merged). The schema format must satisfy several constraints: artifact instructions must be schema-defined and agent-agnostic; delta merging must be schema-driven with no hardcoded section names or keywords; structural validation rules must be declared in the schema, not in specd's core code; `CompileContext` must be able to inject relevant sections of existing specs with roles defined by the schema; and third-party schemas must be distributable as npm packages with project-local and user-level overrides.
 
-1. **Agent-agnostic instructions** — each artifact carries an `instruction` field that the AI reads; it must be schema-defined, not hardcoded in specd.
-2. **Schema-driven delta merging** — the `mergeSpecs` function must not hardcode section names, block header patterns, or operation keywords; these come from the schema's `deltas[]` config and `deltaOperations` field.
-3. **Structural validation** — `ValidateSpec` must evaluate rules defined in the schema, not in specd's core code. This applies to both base spec files (`validations[]`) and delta files (`deltaValidations[]`).
-4. **Injectable context** — `CompileContext` must be able to include relevant sections of existing specs in the AI context, with section names and roles defined by the schema.
-5. **Extensibility** — third-party schemas must be installable as npm packages; project-local and user-level overrides must be supported.
+## Decision Drivers
 
-A spec-driven schema format (with `deltas[]`, `validations[]`, `changeVerify`, `apply`) was evaluated as the baseline.
+- Agent-agnostic instructions — each artifact carries an `instruction` field that the AI reads; it must be schema-defined, not hardcoded in specd
+- Schema-driven delta merging — `mergeSpecs` must not hardcode section names, block header patterns, or operation keywords; these come from the schema
+- Structural validation — `ValidateSpec` must evaluate rules defined in the schema, not in specd's core code
+- Injectable context — `CompileContext` must inject relevant sections of existing specs with section names and roles defined by the schema
+- Extensibility — third-party schemas must be installable as npm packages; project-local and user-level overrides must be supported
 
-## Decision
+## Considered Options
 
-specd adopts a schema format directly derived from the evaluated baseline, with the following key decisions:
+- **Spec-driven baseline format** — `deltas[]`, `validations[]`, `changeVerify`, `apply` keys; evaluated as the starting point
+- **Adopted format** — derives directly from the baseline with configurable operation keywords, `deltaValidations[]` replacing `changeVerify`, `contextSections[]` for injectable context, `workflow` replacing `apply`, and three-level schema resolution
+
+## Decision Outcome
+
+Chosen option: "Adopted format derived from the spec-driven baseline", because it resolves the baseline's inflexibilities — hardcoded operation keywords, conflated validation and approval concerns, missing context injection, and a fixed resolution path — while preserving its core structure.
+
+The nine key decisions are as follows:
 
 ### 1. Operation keywords are configurable at schema level
 
@@ -34,7 +41,7 @@ Operations are applied in this fixed sequence. RENAMED is resolved first so that
 
 ### 3. `deltaValidations[]` replaces `changeVerify`; approval is per-spec
 
-The evaluated baseline's `changeVerify` field hardcoded which artifact held requirements/scenarios and what patterns identified them, in order to validate delta structure and trigger approval. This conflates two concerns and prevents schema customization.
+The baseline's `changeVerify` field hardcoded which artifact held requirements/scenarios and what patterns identified them, in order to validate delta structure and trigger approval. This conflates two concerns and prevents schema customization.
 
 specd replaces `changeVerify` with two independent mechanisms:
 
@@ -43,9 +50,9 @@ specd replaces `changeVerify` with two independent mechanisms:
 
 This separation means `deltaValidations[]` is purely structural, and the approval requirement applies uniformly to all operations regardless of schema.
 
-### 4. `sections[]` added for injectable context
+### 4. `contextSections[]` added for injectable context
 
-The evaluated baseline has no mechanism for injecting existing spec content into AI context. specd adds a `contextSections[]` array on each artifact. Every entry declares a section name to extract and an optional `contextTitle` for the compiled context block. `CompileContext` injects all declared sections — there is no opt-in flag; presence in the array means injection. This avoids sending full spec file content to the AI while still providing relevant context.
+The baseline has no mechanism for injecting existing spec content into AI context. specd adds a `contextSections[]` array on each artifact. Every entry declares a section name to extract and an optional `contextTitle` for the compiled context block. `CompileContext` injects all declared sections — there is no opt-in flag; presence in the array means injection. This avoids sending full spec file content to the AI while still providing relevant context.
 
 ### 5. Three-level schema resolution
 
@@ -79,20 +86,22 @@ Teams often need to add project-specific constraints to artifact generation (e.g
 
 This avoids the schema fork problem — the team picks a community schema and adds project-specific constraints locally. Rules are validated against the active schema's artifact IDs on load (unknown IDs produce a warning, not an error). Rules are `instruction:`-only; `run:` hooks are not supported here.
 
-## Consequences
+### Consequences
 
-- `mergeSpecs` must accept `deltaConfigs: DeltaConfig[]`, `deltaOperations: OperationKeywords`, and perform conflict detection before applying any changes — the current implementation hardcodes defaults and applies operations without conflict checks; both must be updated
-- `mergeSpecs` apply order is fixed: RENAMED → REMOVED → MODIFIED → ADDED
-- `ValidateSpec` must read `artifact.validations[]` and `artifact.deltaValidations[]` from the schema; `deltaValidations[]` supports `scope`, `eachBlock`, and uses the schema's resolved `deltaOperations` keywords
-- `ValidateSpec` must enforce `schema.requiredSpecArtifacts`: if any listed artifact ID is absent from the change, validation must fail with an error
-- `ValidateSpec` must track which spec paths are touched by a delta and record them as requiring approval in the change manifest
-- `ApproveChange` must become per-spec: `specd approve <spec-path>` records approval for a single spec path within the current change
-- `ArchiveChange` must verify that all touched spec paths have been approved before proceeding
-- `CompileContext` must read `artifact.contextSections[]` and `schema.workflow[]` from the schema; skill availability is gated by `workflow[].requires`; skills that work through task lists scan their required artifacts for checkboxes — no `tracks` pointer needed
-- `CompileContext` must read `specd.yaml` `artifactRules` and inject them as a distinct constraints block in the compiled output; unknown artifact IDs emit a warning at load time
-- `SchemaRegistry` must validate schemas on load, support three resolution locations, and read template files at load time — missing template files, duplicate artifact IDs, duplicate delta sections, duplicate workflow skill names, and unknown artifact IDs in `requires` are all `SchemaValidationError`
-- Third-party schemas can be distributed as npm packages named `@specd/schema-<name>`; template files are bundled alongside `schema.yaml` and distributed as part of the package
-- The standard schema ships in `@specd/schema-std` (spec-driven workflow) and `@specd/schema-openspec` (compatibility bridge)
+- Good: `mergeSpecs` and `ValidateSpec` are fully schema-driven with no hardcoded section names, patterns, or keywords
+- Good: teams can localize operation keywords without forking specd
+- Good: `deltaValidations[]` and per-spec approval are cleanly separated concerns
+- Good: `contextSections[]` enables targeted context injection without sending full file content to the AI
+- Good: three-level schema resolution supports community schemas, user overrides, and project overrides in a consistent pattern
+- Good: templates ship as first-class files with editor support, versioned alongside the schema
+- Good: `artifactRules` lets teams extend any community schema without forking it
+- Bad: `mergeSpecs` must be updated — the current implementation hardcodes defaults and applies operations without conflict checks; both must be changed
+- Bad: `ApproveChange` must become per-spec rather than per-change, requiring a manifest format update
+- Bad: `SchemaRegistry` load-time validation adds startup cost proportional to the number of referenced template files
+
+### Confirmation
+
+`specs/_global/schema-format/verify.md` scenarios serve as acceptance tests for the format. `mergeSpecs` unit tests verify schema-driven section resolution, configurable operation keywords, fixed apply order (RENAMED → REMOVED → MODIFIED → ADDED), and conflict detection before any mutation. `ValidateSpec` unit tests verify `validations[]`, `deltaValidations[]` (all three modes: file-level, `scope`, `eachBlock`), and that `deltaValidations[]` section names use the schema's resolved `deltaOperations` keywords.
 
 ## Spec
 

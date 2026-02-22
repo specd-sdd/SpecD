@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted
+Accepted — 2026-02-22
 
-## Context
+## Context and Problem Statement
 
 The original design used the term "scope" for two distinct concepts:
 
@@ -18,13 +18,23 @@ Additionally, "scope" already appears in two other unrelated contexts in the sam
 
 This created three different meanings for the same word within a single config file, and made the domain model harder to reason about.
 
-The concept being named is not merely a namespace prefix. Each entry declares a full context: a spec directory (`path`), an implementation directory (`codeRoot`), a local schema directory (`schemasPath`), and an ownership relationship. That is closer to a _workspace_ — a distinct unit of work with its own directory layout and context — than to a _scope_, which implies only a namespace boundary.
+## Decision Drivers
 
-The term "workspace" is also familiar from monorepo tooling (pnpm workspaces, yarn workspaces), which matches the primary use case: a monorepo or coordinator repo where each logical unit has its own paths.
+- "scope" is ambiguous in at least three different contexts within the same config file, creating confusion for contributors and agents.
+- The concept being named reflects more than a namespace boundary: each entry declares a spec directory (`path`), an implementation directory (`codeRoot`), a local schema directory (`schemasPath`), and an ownership relationship.
+- "workspace" is familiar from monorepo tooling (pnpm workspaces, yarn workspaces), which matches the primary use case.
 
-## Decision
+## Considered Options
 
-Use **`workspaces`** as the canonical term for the config section and domain concept.
+- **Keep "scope"** — no rename; accept the ambiguity.
+- **Use "workspace"** — rename the config section and domain concept to `workspaces`.
+- **Use "project"** — rename to `projects` to reflect the idea of a self-contained unit.
+
+## Decision Outcome
+
+Chosen option: "Use 'workspace'", because it unambiguously names a full context unit with its own directory layout, and is already familiar from monorepo tooling.
+
+Use **`workspaces`** as the canonical term for the config section and domain concept:
 
 - `specd.yaml` declares `workspaces:` (not `scopes:`).
 - `default` is the reserved workspace name for the local project workspace.
@@ -36,12 +46,18 @@ Use **`workspaces`** as the canonical term for the config section and domain con
 
 `ValidationRule.scope` retains its name — it refers to a section within a spec file, which is a different concept unrelated to workspaces.
 
-## Consequences
+Keeping "scope" would leave three different meanings for the same word in a single config file. Using "project" would be confusing since the whole `specd.yaml` already represents a project.
 
-- The config file is unambiguous: `workspaces` is distinct from npm scope notation and from validation rule section scopes.
-- The domain model is clearer: a workspace is not just a namespace prefix but a full context unit with its own paths.
-- Monorepo users will recognise the concept immediately from existing tooling.
-- The rename is a breaking change for any code already written against the old `scope` API — all occurrences in `@specd/core` have been updated in the same commit.
+### Consequences
+
+- Good: The config file is unambiguous — `workspaces` is distinct from npm scope notation and from validation rule section scopes.
+- Good: The domain model is clearer: a workspace is not just a namespace prefix but a full context unit with its own paths.
+- Good: Monorepo users will recognise the concept immediately from existing tooling.
+- Bad: The rename is a breaking change for any code already written against the old `scope` API — all occurrences in `@specd/core` have been updated in the same commit.
+
+### Confirmation
+
+Absence of `scope` (as workspace concept) in all source files and specs confirms the rename is complete. `ValidationRule.scope` is intentionally retained with its own meaning and is not subject to this constraint.
 
 ## Spec
 
