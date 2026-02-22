@@ -112,12 +112,51 @@ The `fs` archive adapter must support a configurable `pattern` field in `specd.y
 - **WHEN** a change is archived on January 5th
 - **THEN** `{{month}}` resolves to `"01"` and `{{day}}` resolves to `"05"`
 
+### Requirement: Schema version recorded in change manifest
+
+The change manifest must record the name and version of the schema that was active when the change was created. This allows specd to detect if the active schema has changed since the change was opened.
+
+```jsonc
+// manifest.json (excerpt)
+{
+  "schema": {
+    "name": "@specd/schema-std",
+    "version": 2,
+  },
+}
+```
+
+`schema.name` is the value of the `schema` field from `specd.yaml` at creation time. `schema.version` is the `version` integer from the schema's `schema.yaml`. Both are written once at change creation and never updated.
+
+When a change is loaded and the active schema's name or version differs from what is recorded in the manifest, specd must emit a warning. The change remains usable — the warning is advisory, not a hard error. Archiving a change with a schema version mismatch must still be possible; the warning surfaces the mismatch so the user can decide whether to proceed.
+
+#### Scenario: Schema unchanged
+
+- **WHEN** a change is loaded and its manifest schema matches the active schema name and version
+- **THEN** no warning is emitted
+
+#### Scenario: Schema version bumped
+
+- **WHEN** a change is loaded and the active schema has a higher version than recorded in the manifest
+- **THEN** specd emits a warning indicating the schema has changed since the change was created and the user should review whether the change artifacts are still compatible
+
+#### Scenario: Schema name changed
+
+- **WHEN** a change is loaded and the active schema name differs from the one recorded in the manifest
+- **THEN** specd emits a warning indicating the change was created under a different schema
+
+#### Scenario: Archiving with schema mismatch
+
+- **WHEN** `specd archive` is run on a change with a schema version mismatch
+- **THEN** the warning is shown and the user is asked to confirm before proceeding; archiving is not blocked
+
 ## Constraints
 
 - Manifest files must be written atomically (write to temp file, then rename) to prevent partial reads
 - `FsChangeRepository` must not store `ArtifactStatus` in the manifest — only `validatedHash`
 - Archive index entries must use forward slashes as path separators regardless of host OS
 - The timestamp in a change directory name must be derived from `change.createdAt`, not from the system clock at write time
+- The `schema` field in the change manifest is written once at creation and must never be updated by subsequent operations
 
 ## Spec Dependencies
 
