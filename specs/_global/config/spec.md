@@ -68,22 +68,24 @@ When the CLI is invoked with `--config path/to/specd.yaml`, that file is used ex
 
 ### Requirement: Schema reference
 
-`specd.yaml` must declare a `schema` field naming the schema that governs this project. The field is required — specd cannot start without it.
+`specd.yaml` must declare a `schema` field naming the schema that governs this project. Only one schema is active per project at a time — per-scope schema selection is not supported. The field is required.
 
 ```yaml
-schema: "@specd/schema-std"   # npm-distributed schema
+schema: "@specd/schema-std"   # npm-scoped package
 # or:
-schema: "my-team-schema"       # project-local or user-global schema
+schema: "my-team-schema"       # project-local or user-global name
 ```
 
-The value is a plain name — no version pinning, no path. Version selection is handled by npm or by placing a specific version in the project-local schemas directory. `SchemaRegistry.resolve()` receives the name verbatim and applies the three-level lookup defined in `specs/_global/schema-format/spec.md`.
+The value is a plain name with no version specifier and no path. npm scoped package notation (`@scope/name`) is valid and refers to the npm package at that name — `@scope/` here is the npm package scope, unrelated to specd's scope concept. Version selection is handled by npm (via `package.json`) or by placing a specific version of the schema in the project-local schemas directory. `SchemaRegistry.resolve()` receives the name verbatim and applies the three-level lookup defined in `specs/_global/schema-format/spec.md`.
 
-Schema resolution happens eagerly at startup, before any command is executed. A schema that cannot be resolved or fails structural validation causes specd to exit immediately. This ensures that all commands operate against a valid, fully-parsed schema.
+**Resolution timing:** schema resolution happens at command dispatch time, immediately before the command body executes. Commands that do not require the schema — such as `--help`, `--version`, `init`, `config validate`, and `plugin` subcommands — skip resolution entirely. The MCP server resolves the schema at server startup, not per-request.
 
-#### Scenario: npm-distributed schema
+**Error types:** both `ConfigValidationError` (malformed `specd.yaml`) and `SchemaNotFoundError` / `SchemaValidationError` (resolution failures) are domain errors defined in `@specd/core` and extend `SpecdError`. They are distinct types with distinct messages and exit codes — config errors indicate a problem with `specd.yaml` itself; schema errors indicate a problem with the referenced schema.
+
+#### Scenario: npm-scoped schema
 
 - **WHEN** `schema: "@specd/schema-std"` is declared and the package is installed
-- **THEN** `SchemaRegistry.resolve("@specd/schema-std")` finds it under `node_modules/` and returns the parsed schema
+- **THEN** `SchemaRegistry.resolve("@specd/schema-std")` finds it at `node_modules/@specd/schema-std/schema.yaml` and returns the parsed schema
 
 #### Scenario: Project-local schema
 
@@ -93,17 +95,27 @@ Schema resolution happens eagerly at startup, before any command is executed. A 
 #### Scenario: Schema not found
 
 - **WHEN** the declared schema name matches nothing in any lookup level
-- **THEN** specd exits with a `SchemaNotFoundError` listing the name and the locations that were searched
+- **THEN** specd exits with `SchemaNotFoundError` listing the name and the locations searched
 
 #### Scenario: Schema fails validation
 
 - **WHEN** the schema file is found but contains structural errors (e.g. missing `name`, circular `requires`)
-- **THEN** specd exits with a `SchemaValidationError` describing the problem before any command runs
+- **THEN** specd exits with `SchemaValidationError` describing the problem; the command does not run
 
 #### Scenario: Schema field missing
 
 - **WHEN** `specd.yaml` does not include a `schema` field
-- **THEN** specd exits with a validation error on startup
+- **THEN** specd exits with `ConfigValidationError` on startup
+
+#### Scenario: Schema-independent command skips resolution
+
+- **WHEN** `specd --help` or `specd init` is run
+- **THEN** `SchemaRegistry.resolve()` is not called; the command runs regardless of whether the schema is valid or even declared
+
+#### Scenario: MCP server resolves at startup
+
+- **WHEN** the MCP server starts
+- **THEN** the schema is resolved once at arrange time; subsequent requests use the cached schema without re-reading disk
 
 ### Requirement: Schema lookup path
 
