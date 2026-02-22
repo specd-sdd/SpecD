@@ -8,17 +8,33 @@
 
 ### Requirement: Config file location and format
 
-`specd.yaml` must be a valid YAML file located at the root of the git repository (the directory containing `.git/`). specd discovers it by walking up from the current working directory until it finds `specd.yaml` or reaches the filesystem root. If no `specd.yaml` is found, the CLI must exit with a clear error.
+`specd.yaml` must be a valid YAML file. specd discovers it using the following strategy, in order:
 
-#### Scenario: Config found
+1. **`--config` flag** — if the CLI is invoked with `--config path/to/specd.yaml`, that path is used directly; no discovery takes place.
+2. **Walk up from CWD, bounded by the git repo root** — specd walks up from the current working directory, checking each directory for `specd.yaml`. The walk stops at the git repo root (the nearest ancestor directory containing `.git/`). If no `specd.yaml` is found before or at the repo root, specd exits with an error.
+3. **CWD only, when not inside a git repo** — if no `.git/` ancestor exists (e.g. the user is running specd from outside any repository, as in a coordinator script), specd checks only the current working directory and stops there. It does not walk further up.
 
-- **WHEN** the user runs any specd command from inside a git repository containing `specd.yaml`
-- **THEN** specd uses that file, regardless of the current working directory depth
+The search never goes above the git repo root. This prevents accidentally picking up a `specd.yaml` from a parent repository in nested or sibling monorepo layouts.
 
-#### Scenario: Config not found
+#### Scenario: Config found inside repo
 
-- **WHEN** the user runs any specd command and no `specd.yaml` exists in the repository
+- **WHEN** the user runs any specd command from inside a git repository containing `specd.yaml` at the repo root
+- **THEN** specd uses that file, regardless of the current working directory depth within the repo
+
+#### Scenario: Config not found inside repo
+
+- **WHEN** the user runs any specd command inside a git repository and no `specd.yaml` exists between the CWD and the repo root
 - **THEN** specd exits with an error explaining that `specd.yaml` was not found and pointing to `specd init`
+
+#### Scenario: Invoked outside a git repo
+
+- **WHEN** the user runs specd from a directory that is not inside any git repository
+- **THEN** specd checks only the current working directory for `specd.yaml` and exits with an error if not found there
+
+#### Scenario: Explicit config flag
+
+- **WHEN** `specd --config /path/to/specd.yaml <command>` is invoked
+- **THEN** specd uses the specified file and skips all discovery logic
 
 ### Requirement: Schema reference
 
