@@ -21,31 +21,70 @@ No documentation lives outside `docs/` except `README.md` at the project root an
 
 ### Requirement: ADR format
 
-Every Architecture Decision Record follows this structure:
+Every Architecture Decision Record follows the [MADR](https://adr.github.io/madr/) format (Markdown Architectural Decision Records), adapted with a project-specific `## Spec` section.
+
+**Required sections** — always present:
+
+- `# ADR-NNNN: Title`
+- `## Status` — `Accepted | Proposed | Deprecated | Superseded by [ADR-NNNN](NNNN-title.md)` with date (`YYYY-MM-DD`)
+- `## Context and Problem Statement` — the problem in prose; may be framed as a question
+- `## Decision Outcome` — the chosen option, stated clearly; includes `### Consequences` and `### Confirmation` sub-sections
+- `## Spec` — links to the spec(s) that capture constraints derived from this decision
+
+**Optional sections** — included only when they add value:
+
+- `## Decision Drivers` — bulleted forces or concerns that shaped the choice; omit for obvious decisions
+- `## Considered Options` — list of alternatives evaluated; omit if there was only one viable option
+- `## Pros and Cons of the Options` — detailed analysis per option; only included when `## Considered Options` is present and trade-offs need elaboration
+
+`### Confirmation` states how compliance with this decision can be verified — through tests, linting rules, CI checks, or structural invariants. It is always present inside `## Decision Outcome`.
 
 ```markdown
 # ADR-NNNN: Title
 
 ## Status
 
-Accepted | Proposed | Deprecated | Superseded by [ADR-NNNN](NNNN-title.md)
+Accepted — YYYY-MM-DD
 
-## Context
+## Context and Problem Statement
 
-Why this decision was needed — the forces at play, the problem being solved.
+Why this decision was needed.
 
-## Decision
+## Decision Drivers
 
-What was decided, stated clearly and without ambiguity.
+- Force or concern that shaped the choice
 
-## Consequences
+## Considered Options
 
-What becomes easier, what becomes harder, what constraints this imposes going forward.
+- Option A
+- Option B
+
+## Decision Outcome
+
+Chosen option: "Option A", because ...
+
+### Consequences
+
+- Good: ...
+- Bad: ...
+
+### Confirmation
+
+How compliance is verified — linting rules, tests, structural checks.
+
+## Pros and Cons of the Options
+
+### Option A
+
+- Good: ...
+- Bad: ...
+
+### Option B
+
+- Good: ...
+- Bad: ...
 
 ## Spec
-
-Links to the spec(s) that capture the constraints derived from this decision. If this ADR
-created a new spec, link to it. If it reinforced an existing one, link to that.
 
 - [`specs/path/to/spec.md`](../../specs/path/to/spec.md)
 ```

@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted
+Accepted — 2026-02-20
 
-## Context
+## Context and Problem Statement
 
 specd uses specs to define requirements and constraints for its own development (dogfooding). As the codebase grows, specs accumulate for different concerns: cross-cutting constraints (architecture, conventions, commits), package-internal implementation details (use cases, domain services), and schema definitions.
 
@@ -13,37 +13,34 @@ Without a clear convention, two problems arise:
 1. **Scope confusion** — a spec describing a `@specd/core` use case could end up in `specs/_global/`, making it appear as a constraint on all packages when it only applies to one.
 2. **Discovery** — contributors and agents cannot reliably find which specs are binding on a given package without knowing the layout convention.
 
-Two layouts were considered:
+## Considered Options
 
-**Flat** — all specs under `specs/<topic>/spec.md` with no package scoping. Simple, but conflates cross-cutting constraints with package internals. A spec for `ValidateSpec` would sit next to architecture rules, implying equal scope.
+- **Flat layout** — all specs under `specs/<topic>/spec.md` with no package scoping.
+- **Scoped by package** — `specs/_global/` for cross-cutting constraints, `specs/<package>/` for package-internal specs.
 
-**Scoped by package** — `specs/_global/` for cross-cutting constraints, `specs/<package>/` for package-internal specs. Clear scope signal from the directory alone. Consistent with how source code is scoped by package.
+## Decision Outcome
 
-## Decision
+Chosen option: "Scoped by package", because the directory path alone signals the spec's audience without requiring the reader to open the file.
 
 Specs are scoped by their audience:
 
 - `specs/_global/<topic>/spec.md` — binding on **all** packages in the monorepo. Reserved for cross-cutting concerns: architecture, coding conventions, commit format, testing rules, storage design, schema format.
 - `specs/<package>/<topic>/spec.md` — binding only on that package. `<package>` is the short package name: `core`, `cli`, `mcp`, `skills`, `schema-std`, `schema-openspec`.
 
-Every spec file is named `spec.md` and lives in a named kebab-case subdirectory. A spec in `specs/<package>/` does not constrain any other package.
+Every spec file is named `spec.md` and lives in a named kebab-case subdirectory. A spec in `specs/<package>/` does not constrain any other package. All `spec.md` files follow a standard structure (mandatory sections: `## Overview`, `## Requirements`, `## Spec Dependencies`; optional sections: `## Constraints`, `## Examples`, `## ADRs`) to enable consistent tooling. `## Overview` serves as a human and machine-readable summary for listing and context injection. `## Spec Dependencies` makes the dependency graph between specs explicit and traversable. Scenarios use WHEN/THEN format; GIVEN is optional and used when the precondition is not obvious from the requirement context.
 
-### Standard spec file structure
+The flat layout is simple but conflates cross-cutting constraints with package internals — a spec for `ValidateSpec` would sit next to architecture rules, implying equal scope.
 
-All `spec.md` files follow a standard structure to enable consistent tooling (listing, context injection, validation). Mandatory sections: `## Overview`, `## Requirements`, `## Spec Dependencies`. Optional sections: `## Constraints`, `## Examples`, `## ADRs`.
+### Consequences
 
-`## Overview` is mandatory — it serves as a human and machine-readable summary for listing and context injection. `## Spec Dependencies` is mandatory — it makes the dependency graph between specs explicit and traversable.
+- Good: Agents and contributors can determine a spec's scope from its path alone — no need to read the spec to know if it applies.
+- Good: `specs/_global/` stays focused on constraints that genuinely apply everywhere; it does not grow with every new package feature.
+- Good: Package-internal specs (`specs/core/`, `specs/cli/`, etc.) can be written and evolved without risk of accidentally constraining unrelated packages.
+- Good: Pending specs for `@specd/core` (`delta-merger`, `snapshot-hasher`, `validate-spec`, `compile-context`, `archive-change`) live under `specs/core/`.
 
-Scenarios use WHEN/THEN format. GIVEN is optional and used when the precondition is not obvious from the requirement context — expected to be more common in CLI and MCP specs than in domain specs.
+### Confirmation
 
-The structure is consistent across all specs in the monorepo, enabling uniform tooling regardless of which package a spec belongs to.
-
-## Consequences
-
-- Agents and contributors can determine a spec's scope from its path alone — no need to read the spec to know if it applies
-- `specs/_global/` stays focused on constraints that genuinely apply everywhere; it does not grow with every new package feature
-- Package-internal specs (`specs/core/`, `specs/cli/`, etc.) can be written and evolved without risk of accidentally constraining unrelated packages
-- Pending specs for `@specd/core` (`delta-merger`, `snapshot-hasher`, `validate-spec`, `compile-context`, `archive-change`) live under `specs/core/`
+`specs/_global/spec-layout/spec.md` defines this convention in full. `specd validate` checks that every spec directory contains all required artifact files.
 
 ## Spec
 
