@@ -9,8 +9,8 @@ export interface ArchivedChangeProps {
   name: string
   /** The name used for the archive directory (may differ from `name`). */
   archivedName: string
-  /** The scope under which the change's specs lived. */
-  scope: SpecPath
+  /** The workspace under which the change's specs lived. */
+  workspace: SpecPath
   /** Timestamp when the change was archived. */
   archivedAt: Date
   /** Artifact type IDs that were present when the change was archived. */
@@ -28,7 +28,7 @@ export interface ArchivedChangeProps {
 export class ArchivedChange {
   private readonly _name: string
   private readonly _archivedName: string
-  private readonly _scope: SpecPath
+  private readonly _workspace: SpecPath
   private readonly _archivedAt: Date
   private readonly _artifacts: readonly string[]
   private readonly _approval: ApprovalRecord | undefined
@@ -41,7 +41,7 @@ export class ArchivedChange {
   constructor(props: ArchivedChangeProps) {
     this._name = props.name
     this._archivedName = props.archivedName
-    this._scope = props.scope
+    this._workspace = props.workspace
     this._archivedAt = props.archivedAt
     this._artifacts = props.artifacts
     this._approval = props.approval
@@ -57,9 +57,9 @@ export class ArchivedChange {
     return this._archivedName
   }
 
-  /** The scope under which the change's specs lived. */
-  get scope(): SpecPath {
-    return this._scope
+  /** The workspace under which the change's specs lived. */
+  get workspace(): SpecPath {
+    return this._workspace
   }
 
   /** Timestamp when the change was archived. */

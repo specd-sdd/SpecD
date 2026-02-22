@@ -71,12 +71,12 @@ export class HookResult {
  * (e.g. `pre-explore`).
  */
 export interface HookVariables {
-  /** Active change context, present when a change is in scope. */
+  /** Active change context, present when a change is active. */
   readonly change?: {
     /** The change's kebab-case name (e.g. `"add-oauth-login"`). */
     readonly name: string
-    /** The scope the change belongs to (e.g. `"auth"`). */
-    readonly scope: string
+    /** The workspace the change belongs to (e.g. `"auth"`). */
+    readonly workspace: string
     /** Absolute filesystem path to the change directory. */
     readonly path: string
   }

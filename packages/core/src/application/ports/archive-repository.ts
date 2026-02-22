@@ -7,9 +7,9 @@ export { type RepositoryConfig as ArchiveRepositoryConfig }
 export type { ApprovalRequiredError }
 
 /**
- * Port for archiving and querying archived changes within a single scope.
+ * Port for archiving and querying archived changes within a single workspace.
  *
- * Extends {@link Repository} — `scope()`, `ownership()`, and `isExternal()`
+ * Extends {@link Repository} — `workspace()`, `ownership()`, and `isExternal()`
  * are set at construction time. The archive is append-only: once a change is
  * archived it is never mutated. An `index.jsonl` file at the archive root
  * provides O(1) appends and fast lookup without scanning the filesystem.
@@ -19,7 +19,7 @@ export type { ApprovalRequiredError }
  */
 export abstract class ArchiveRepository extends Repository {
   /**
-   * @param config - Scope, ownership, and locality configuration
+   * @param config - Workspace, ownership, and locality configuration
    */
   constructor(config: RepositoryConfig) {
     super(config)
@@ -51,7 +51,7 @@ export abstract class ArchiveRepository extends Repository {
   abstract archive(change: Change, options?: { force?: boolean }): Promise<ArchivedChange>
 
   /**
-   * Lists all archived changes in this scope in chronological order (oldest first).
+   * Lists all archived changes in this workspace in chronological order (oldest first).
    *
    * Streams `index.jsonl` from the start, deduplicating by name so that the
    * last entry wins in case of duplicates introduced by manual recovery.

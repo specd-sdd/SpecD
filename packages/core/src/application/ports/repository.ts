@@ -2,8 +2,8 @@
  * Construction properties shared by all repository implementations.
  */
 export interface RepositoryConfig {
-  /** The scope name from `specd.yaml` (e.g. `"billing"`, `"default"`). */
-  readonly scope: string
+  /** The workspace name from `specd.yaml` (e.g. `"billing"`, `"default"`). */
+  readonly workspace: string
   /**
    * The ownership level of this repository.
    *
@@ -26,30 +26,30 @@ export interface RepositoryConfig {
  * Base class for all repository ports.
  *
  * Encapsulates the three invariants shared by every repository implementation:
- * scope, ownership, and locality. Subclasses declare their storage operations
+ * workspace, ownership, and locality. Subclasses declare their storage operations
  * as `abstract` methods.
  */
 export abstract class Repository {
-  private readonly _scope: string
+  private readonly _workspace: string
   private readonly _ownership: 'owned' | 'shared' | 'readOnly'
   private readonly _isExternal: boolean
 
   /**
-   * @param config - Scope, ownership, and locality configuration for this repository
+   * @param config - Workspace, ownership, and locality configuration for this repository
    */
   constructor(config: RepositoryConfig) {
-    this._scope = config.scope
+    this._workspace = config.workspace
     this._ownership = config.ownership
     this._isExternal = config.isExternal
   }
 
   /**
-   * Returns the scope name this repository is bound to.
+   * Returns the workspace name this repository is bound to.
    *
-   * @returns The scope name (e.g. `"billing"`, `"default"`)
+   * @returns The workspace name (e.g. `"billing"`, `"default"`)
    */
-  scope(): string {
-    return this._scope
+  workspace(): string {
+    return this._workspace
   }
 
   /**

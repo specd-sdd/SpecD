@@ -3,36 +3,36 @@ import { SpecPath } from '../value-objects/spec-path.js'
 /**
  * Metadata for a spec directory.
  *
- * A spec is a directory identified by a scope and a name ({@link SpecPath}).
+ * A spec is a directory identified by a workspace and a name ({@link SpecPath}).
  * It contains one or more artifact files (e.g. `spec.md`, `proposal.md`).
  * This entity holds only metadata — artifact content is loaded on demand
  * via `SpecRepository.artifact()`.
  */
 export class Spec {
-  private readonly _scope: string
+  private readonly _workspace: string
   private readonly _name: SpecPath
   private readonly _filenames: readonly string[]
 
   /**
-   * Creates a new `Spec` with the given scope, name, and artifact filenames.
+   * Creates a new `Spec` with the given workspace, name, and artifact filenames.
    *
-   * @param scope - The scope name from `specd.yaml` (e.g. `"billing"`, `"default"`)
-   * @param name - The spec path within the scope's specs directory (e.g. `auth/oauth`)
+   * @param workspace - The workspace name from `specd.yaml` (e.g. `"billing"`, `"default"`)
+   * @param name - The spec path within the workspace's specs directory (e.g. `auth/oauth`)
    * @param filenames - The artifact filenames present in this spec directory
    */
-  constructor(scope: string, name: SpecPath, filenames: readonly string[]) {
-    this._scope = scope
+  constructor(workspace: string, name: SpecPath, filenames: readonly string[]) {
+    this._workspace = workspace
     this._name = name
     this._filenames = filenames
   }
 
-  /** The scope name this spec belongs to (from `specd.yaml`). */
-  get scope(): string {
-    return this._scope
+  /** The workspace name this spec belongs to (from `specd.yaml`). */
+  get workspace(): string {
+    return this._workspace
   }
 
   /**
-   * The spec identity path within the scope's specs directory.
+   * The spec identity path within the workspace's specs directory.
    * For example, `auth/oauth` or `billing/payments`.
    */
   get name(): SpecPath {
