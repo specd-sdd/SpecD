@@ -83,6 +83,35 @@ Private fields that back a public getter must be named with a leading underscore
 - **WHEN** a private field backs a public getter and both share the same name
 - **THEN** it must be renamed with a leading underscore to prevent recursive getter calls
 
+### Requirement: Lazy loading — metadata before content
+
+When a collection of resources must be loaded, the initial load returns lightweight metadata objects (references, identifiers, display fields) without reading file content or parsing heavy structures. Full content is fetched explicitly and on demand.
+
+This pattern applies across the codebase:
+
+- **Repositories** — `list()` returns metadata objects (`Spec`, `Change`, `ArchivedChange`) without artifact file content; content is loaded via a separate `artifact()` call.
+- **`SchemaRegistry`** — `list()` returns `SchemaEntry` objects (ref, name, source) without parsing `schema.yaml`; the full `Schema` is loaded via `resolve()`.
+- **Any future collection port** — `list()` or `search()` returns a reference/metadata type; a `get()` or `load()` call fetches the full resource.
+
+The metadata type must carry enough information to be useful standalone (for display, filtering, selection) and must include the reference or identifier needed to fetch the full resource.
+
+Content is never pre-loaded speculatively. If a use case needs the full resource, it calls the explicit load method.
+
+#### Scenario: Repository list does not load content
+
+- **WHEN** `SpecRepository.list()` is called
+- **THEN** it returns `Spec` objects with filenames but no artifact content; no file reads beyond directory listing occur
+
+#### Scenario: SchemaRegistry list does not parse schemas
+
+- **WHEN** `SchemaRegistry.list()` is called
+- **THEN** it returns `SchemaEntry` objects without reading or validating any `schema.yaml` file
+
+#### Scenario: Full resource loaded on demand
+
+- **WHEN** a caller needs the content of a specific artifact
+- **THEN** it calls `SpecRepository.artifact(spec, filename)` explicitly, not `list()`
+
 ### Requirement: Immutability preference
 
 Prefer `readonly` arrays and properties on domain value objects and entities where mutation is not required. Use `as const` for literal configuration objects.
@@ -100,6 +129,7 @@ Prefer `readonly` arrays and properties on domain value objects and entities whe
 - All source files must be `kebab-case.ts`
 - Errors thrown by domain or application code must extend `SpecdError`
 - Public API functions must have explicit return type annotations
+- Collection methods (`list`, `search`) return metadata/reference types only — no content pre-loading; content is fetched via explicit `get`/`artifact`/`resolve` calls
 
 ## Spec Dependencies
 
