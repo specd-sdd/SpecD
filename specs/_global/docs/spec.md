@@ -19,11 +19,6 @@ docs/
 
 No documentation lives outside `docs/` except `README.md` at the project root and `AGENTS.md` / `CLAUDE.md` for agent instructions.
 
-#### Scenario: Doc placed outside docs/
-
-- **WHEN** a documentation file is created outside `docs/` (excluding `README.md`, `AGENTS.md`, `CLAUDE.md`)
-- **THEN** it must be moved to the appropriate subdirectory under `docs/`
-
 ### Requirement: ADR format
 
 Every Architecture Decision Record follows this structure:
@@ -55,60 +50,25 @@ created a new spec, link to it. If it reinforced an existing one, link to that.
 - [`specs/path/to/spec.md`](../../specs/path/to/spec.md)
 ```
 
-#### Scenario: ADR missing required section
-
-- **WHEN** an ADR file is missing `## Context`, `## Decision`, or `## Consequences`
-- **THEN** the review must reject it as malformed
-
 ### Requirement: ADR numbering
 
 ADRs are numbered sequentially starting at `0001`. The filename matches the number and a kebab-case title: `0001-hexagonal-architecture.md`. Numbers are never reused — deprecated or superseded ADRs keep their number and update their status.
-
-#### Scenario: Duplicate ADR number
-
-- **WHEN** a new ADR is created with a number already used by an existing ADR
-- **THEN** it must be renumbered to the next available number
-
-#### Scenario: Superseded ADR
-
-- **WHEN** a decision is reversed or replaced by a new ADR
-- **THEN** the old ADR updates its status to `Superseded by [ADR-NNNN]` and keeps its number
 
 ### Requirement: ADR creation
 
 An ADR is created for every significant architectural or design decision. Significant means: it affects multiple packages, it constrains future development, or it was a non-obvious choice between real alternatives. Implementation details that follow naturally from prior ADRs do not need their own ADR.
 
-#### Scenario: Significant decision without ADR
-
-- **WHEN** a decision affects multiple packages or constrains future development
-- **THEN** an ADR must be created before or alongside the implementing code
-
 ### Requirement: CLI documentation
 
 Every `specd` command has a corresponding doc file in `docs/cli/` describing its purpose, flags, examples, and exit codes.
-
-#### Scenario: New command without docs
-
-- **WHEN** a new `specd` command is added to `@specd/cli`
-- **THEN** a corresponding `docs/cli/<command>.md` file must be created in the same change
 
 ### Requirement: MCP documentation
 
 Every MCP tool and resource exposed by `@specd/mcp` has a corresponding entry in `docs/mcp/` describing its input schema, output schema, and example usage.
 
-#### Scenario: New MCP tool without docs
-
-- **WHEN** a new tool is added to `@specd/mcp`
-- **THEN** a corresponding entry in `docs/mcp/` must be created in the same change
-
 ### Requirement: Core documentation
 
 Public types, ports, and use cases in `@specd/core` are documented in `docs/core/` with their purpose, contracts, and usage examples.
-
-#### Scenario: New public port without docs
-
-- **WHEN** a new port interface is added to `@specd/core/application/ports/`
-- **THEN** a corresponding entry in `docs/core/` must be created in the same change
 
 ### Requirement: JSDoc on all symbols
 
@@ -139,16 +99,6 @@ export function mergeSpecs(
   deltaOperations?: OperationKeywords,
 ): Spec
 ```
-
-#### Scenario: Exported function without JSDoc
-
-- **WHEN** an exported function in `@specd/core` has no JSDoc block comment
-- **THEN** the linter must report an error
-
-#### Scenario: Internal helper without JSDoc
-
-- **WHEN** a non-exported helper function has no JSDoc
-- **THEN** the linter must not report an error
 
 ## Constraints
 
