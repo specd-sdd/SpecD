@@ -13,6 +13,7 @@ import { type WorkflowStep } from './workflow-step.js'
  */
 export class Schema {
   private readonly _name: string
+  private readonly _version: number
   private readonly _artifacts: readonly ArtifactType[]
   private readonly _artifactIndex: ReadonlyMap<string, ArtifactType>
   private readonly _workflow: readonly WorkflowStep[]
@@ -24,6 +25,7 @@ export class Schema {
    * Creates a fully-resolved schema instance.
    *
    * @param name - The resolved schema name (e.g. `"@specd/schema-std"`, `"my-team-schema"`)
+   * @param version - The schema version integer, monotonically increasing
    * @param artifacts - Artifact type definitions in schema-declared order
    * @param workflow - Workflow step configurations in schema-declared order
    * @param deltaOperations - Operation keywords for delta section recognition
@@ -31,12 +33,14 @@ export class Schema {
    */
   constructor(
     name: string,
+    version: number,
     artifacts: readonly ArtifactType[],
     workflow: readonly WorkflowStep[],
     deltaOperations: OperationKeywords,
     requiredSpecArtifacts: readonly string[],
   ) {
     this._name = name
+    this._version = version
     this._artifacts = artifacts
     this._artifactIndex = new Map(artifacts.map((a) => [a.id(), a]))
     this._workflow = workflow
@@ -53,6 +57,17 @@ export class Schema {
    */
   name(): string {
     return this._name
+  }
+
+  /**
+   * The schema version integer from `schema.yaml`. Monotonically increasing.
+   * Recorded in the change manifest at creation time so specd can detect
+   * schema upgrades that occurred after a change was opened.
+   *
+   * @returns The schema version
+   */
+  version(): number {
+    return this._version
   }
 
   /**

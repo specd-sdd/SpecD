@@ -3,18 +3,45 @@ import { type Schema } from '../../domain/value-objects/schema.js'
 export type { Schema }
 
 /**
- * Port for resolving schemas by name.
+ * A discovered schema entry returned by {@link SchemaRegistry.list}.
  *
- * Implementations perform a three-level lookup in priority order:
+ * Contains enough metadata for display and selection without loading the full
+ * schema. Pass `ref` directly to {@link SchemaRegistry.resolve} to get the
+ * complete {@link Schema}.
+ */
+export interface SchemaEntry {
+  /**
+   * The full reference string — pass this to `resolve()` to load the schema.
+   * Examples: `"@specd/schema-std"`, `"#spec-driven"`, `"#billing:my-schema"`.
+   */
+  readonly ref: string
+
+  /**
+   * The schema name as it appears in its directory or package, without prefix
+   * or workspace qualifier. Suitable for display.
+   * Examples: `"schema-std"`, `"spec-driven"`, `"my-billing-schema"`.
+   */
+  readonly name: string
+
+  /** Where this schema was discovered. */
+  readonly source: 'npm' | 'workspace'
+
+  /**
+   * The workspace whose `schemasPath` contains this schema.
+   * Present only when `source` is `"workspace"`.
+   */
+  readonly workspace?: string
+}
+
+/**
+ * Port for discovering and resolving schemas.
  *
- * 1. `specd/schemas/<name>/schema.yaml` — project-local (version-controlled)
- * 2. `~/.local/share/specd/schemas/<name>/` — user-level override
- * 3. `node_modules/@specd/schema-<name>/` — npm-distributed package
+ * Resolution is prefix-driven — no implicit multi-level fallback:
  *
- * This allows teams to version-control customised schemas in the repository,
- * override them per-machine without publishing, or rely on a community
- * package. The CLI command `specd schema fork <source> <name>` copies any
- * schema to project-local for customisation.
+ * - `@scope/name` — npm package; loaded from `node_modules/@scope/name/schema.yaml`
+ * - `#workspace:name` — workspace-qualified; loaded from `workspaceSchemasPaths.get(workspace)/<name>/schema.yaml`
+ * - `#name` or bare name — equivalent to `#default:name`
+ * - relative or absolute path — loaded directly from that path
  *
  * Unlike the repository ports, `SchemaRegistry` has no invariant constructor
  * arguments shared across all implementations, so it is declared as an
@@ -22,15 +49,31 @@ export type { Schema }
  */
 export interface SchemaRegistry {
   /**
-   * Resolves a schema by name and returns the fully-parsed {@link Schema}.
+   * Resolves a schema reference and returns the fully-parsed {@link Schema}.
    *
-   * Searches the three lookup levels in priority order and returns the first
-   * match. Returns `null` if no schema with the given name is found at any
-   * level.
+   * The `ref` value is the `schema` field from `specd.yaml` verbatim.
+   * `workspaceSchemasPaths` is a map of workspace name → resolved `schemasPath`
+   * for that workspace, derived from config by the application layer. Returns
+   * `null` if the resolved file does not exist; the caller is responsible for
+   * converting a `null` result to `SchemaNotFoundError`.
    *
-   * @param name - The schema name as declared in `specd.yaml`
-   *   (e.g. `"@specd/schema-std"`, `"my-team-schema"`)
-   * @returns The resolved schema, or `null` if not found
+   * @param ref - The schema reference as declared in `specd.yaml`
+   *   (e.g. `"@specd/schema-std"`, `"#billing:my-schema"`, `"spec-driven"`, `"./custom/schema.yaml"`)
+   * @param workspaceSchemasPaths - Map of workspace name to its resolved `schemasPath`
+   * @returns The resolved schema, or `null` if the file was not found
    */
-  resolve(name: string): Promise<Schema | null>
+  resolve(ref: string, workspaceSchemasPaths: ReadonlyMap<string, string>): Promise<Schema | null>
+
+  /**
+   * Lists all schemas discoverable from the given workspace schema paths and
+   * installed npm packages. Does not load or validate schema file contents —
+   * use `resolve()` to get a fully-parsed {@link Schema}.
+   *
+   * Results are grouped by source: workspace entries first (in workspace
+   * declaration order), npm entries last.
+   *
+   * @param workspaceSchemasPaths - Map of workspace name to its resolved `schemasPath`
+   * @returns All discoverable schema entries
+   */
+  list(workspaceSchemasPaths: ReadonlyMap<string, string>): Promise<SchemaEntry[]>
 }
