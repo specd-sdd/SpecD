@@ -2,55 +2,30 @@
 
 ## Overview
 
-specd specs are co-located with the code they describe. Each package has its own `specs/` directory at the monorepo root, scoped to that package. Global constraints that apply to all packages live under `specs/_global/`. Spec files are always named `spec.md` and live in a named subdirectory.
+specd specs are organised by scope and live under `specs/` at the monorepo root. Global constraints that apply to all packages live under `specs/_global/`; package-internal specs live under `specs/<package>/`. Every spec subdirectory contains two files: `spec.md` (requirements and design) and `verify.md` (WHEN/THEN scenarios).
 
 ## Requirements
 
 ### Requirement: Global specs for cross-cutting constraints
 
-Specs that apply to all packages — architecture, coding conventions, commit format, testing rules, storage design — live under `specs/_global/<topic>/spec.md`. Any spec in `_global/` is a binding constraint on every package in the monorepo.
-
-#### Scenario: Global constraint applies to all packages
-
-- **WHEN** a requirement is defined in `specs/_global/`
-- **THEN** it binds all packages in the monorepo without exception
-
-#### Scenario: Package-specific concern is not global
-
-- **WHEN** a requirement only concerns a single package's internals
-- **THEN** it must not be placed in `specs/_global/`
+Specs that apply to all packages — architecture, coding conventions, commit format, testing rules, storage design — live under `specs/_global/<topic>/`. Any spec in `_global/` is a binding constraint on every package in the monorepo.
 
 ### Requirement: Package specs for package-internal concerns
 
 Specs that describe the internals of a specific package live under `specs/<package>/`, where `<package>` is the short package name (e.g. `core`, `cli`, `mcp`, `schema-std`). These specs are not binding on other packages.
 
-#### Scenario: Core use case spec
-
-- **WHEN** a spec describes a use case implemented in `@specd/core`
-- **THEN** it lives at `specs/core/<topic>/spec.md`
-
-#### Scenario: CLI command spec
-
-- **WHEN** a spec describes a command implemented in `@specd/cli`
-- **THEN** it lives at `specs/cli/<topic>/spec.md`
-
 ### Requirement: Spec file naming
 
-Each spec lives in its own named subdirectory and is always named `spec.md`. The subdirectory name is kebab-case and describes the topic concisely.
+Each spec lives in its own named subdirectory and contains two files: `spec.md` and `verify.md`. The subdirectory name is kebab-case and describes the topic concisely.
 
-#### Scenario: Correct spec path
+- `spec.md` — what the system does: requirements, constraints, examples, rationale
+- `verify.md` — how to confirm it works: WHEN/THEN scenarios
 
-- **WHEN** a spec covers delta merging in `@specd/core`
-- **THEN** the file is at `specs/core/delta-merger/spec.md`
+The two files are always paired. `spec.md` contains no WHEN/THEN scenarios; `verify.md` contains no requirement prose.
 
-#### Scenario: Incorrect co-location
+### Requirement: spec.md structure
 
-- **WHEN** a spec file is placed directly in `specs/core/spec.md` with no subdirectory
-- **THEN** it does not conform to this layout and must be moved
-
-### Requirement: Standard spec file structure
-
-Every `spec.md` file must follow this structure. Sections marked _optional_ may be omitted if not applicable; all other sections are required.
+Every `spec.md` must follow this structure. Sections marked _optional_ may be omitted if not applicable; all other sections are required.
 
 ```markdown
 # <Title>
@@ -63,18 +38,13 @@ Every `spec.md` file must follow this structure. Sections marked _optional_ may 
 
 ### Requirement: <Name>
 
-<!-- Requirement description using SHALL/MUST for normative statements. -->
-
-#### Scenario: <Name>
-
-- **GIVEN** <precondition> <!-- optional -->
-- **WHEN** <condition>
-- **THEN** <expected outcome>
+<!-- Requirement description using SHALL/MUST for normative statements.
+     No WHEN/THEN scenarios here — those go in verify.md. -->
 
 ## Constraints
 
-<!-- Bullet list of hard rules that ValidateSpec or SchemaRegistry enforce.
-     Omit this section if there are no constraints beyond the requirements. -->
+<!-- Bullet list of hard rules that apply across all requirements.
+     Omit if there are no constraints beyond the requirements. -->
 
 ## Examples
 
@@ -89,50 +59,42 @@ Every `spec.md` file must follow this structure. Sections marked _optional_ may 
 ## ADRs
 
 <!-- Links to ADRs that motivated or constrain this spec.
-     If none, write: _none_ -->
+     If none, omit this section. -->
 ```
 
-`## Overview`, `## Requirements`, and `## Spec Dependencies` are mandatory. `## Constraints`, `## Examples`, and `## ADRs` are included when they add value.
+`## Overview`, `## Requirements`, and `## Spec Dependencies` are mandatory. All other sections are included when they add value.
 
-#### Scenario: Mandatory sections present
+### Requirement: verify.md structure
 
-- **WHEN** a spec file contains `## Overview`, `## Requirements`, and `## Spec Dependencies`
-- **THEN** it conforms to the minimum required structure
+Every `verify.md` must follow this structure. Scenarios are grouped under requirement headings using the same `### Requirement: <name>` pattern as `spec.md` — this is required for the delta merger to correlate scenarios with their requirement when changes are applied.
 
-#### Scenario: Optional section omitted
+```markdown
+# Verification: <Title>
 
-- **WHEN** a spec has no architectural decisions to reference
-- **THEN** `## ADRs` may be omitted entirely
+## Requirements
 
-#### Scenario: Constraints section used
+### Requirement: <Name>
 
-- **WHEN** there are hard rules that complement the requirements (e.g. format constraints, uniqueness rules)
-- **THEN** they are listed as bullets under `## Constraints`, not embedded inside requirement text
+#### Scenario: <Name>
 
-#### Scenario: Examples section used
+- **GIVEN** <precondition> <!-- optional; use when precondition is not obvious -->
+- **WHEN** <condition>
+- **THEN** <expected outcome>
+- **AND** <additional assertion> <!-- optional -->
+```
 
-- **WHEN** a spec benefits from concrete examples (YAML, CLI output, code snippets)
-- **THEN** they are placed under `## Examples` so `contextSections` can inject them selectively into AI context
+Only scenarios that add information beyond what the requirement prose already states are included. Scenarios that merely restate the obvious happy path are omitted.
 
 ### Requirement: Spec Dependencies section
 
-Every spec must include a `## Spec Dependencies` section listing other specs it depends on or that provide context for it. If there are none, the section must say `_none_`.
-
-#### Scenario: Global spec with no dependencies
-
-- **WHEN** a spec in `specs/_global/` has no dependencies on other specs
-- **THEN** its `## Spec Dependencies` section reads `_none — this is a global constraint spec_`
-
-#### Scenario: Package spec referencing global constraints
-
-- **WHEN** a spec in `specs/core/` is constrained by global architecture rules
-- **THEN** it lists `specs/_global/architecture/spec.md` in its `## Spec Dependencies` section
+Every `spec.md` must include a `## Spec Dependencies` section listing other specs it depends on or that provide context for it. If there are none, the section must say `_none_`. Global specs with no dependencies use the form `_none — this is a global constraint spec_`.
 
 ## Constraints
 
 - `specs/_global/` is for cross-cutting constraints only — not for any single package's implementation details
-- Package spec directories use the short package name: `core`, `cli`, `mcp`, `mcp`, `skills`, `schema-std`, `schema-openspec`
-- Spec files are always named `spec.md`, never `README.md` or any other name
+- Package spec directories use the short package name: `core`, `cli`, `mcp`, `skills`, `schema-std`, `schema-openspec`
+- Every spec subdirectory contains exactly two files: `spec.md` and `verify.md`
+- `spec.md` contains no WHEN/THEN scenarios; `verify.md` contains no requirement prose
 - Subdirectory names are kebab-case
 - A spec in `specs/<package>/` is not binding on any other package
 
