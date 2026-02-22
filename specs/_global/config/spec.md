@@ -2,7 +2,7 @@
 
 ## Overview
 
-`specd.yaml` is the single project-level configuration file for specd. It declares which schema governs the project, where specs and changes are stored, which external spec sources are available, per-scope code root overrides, project-level workflow hooks, per-artifact constraints, and installed plugins. Every tool in the specd ecosystem reads this file — the CLI, MCP server, and plugins all derive their wiring from it.
+`specd.yaml` is the single project-level configuration file for specd. It declares which schema governs the project, how specs are organised across workspaces, where changes and archives are stored, project-level workflow hooks, per-artifact constraints, and installed plugins. Every tool in the specd ecosystem reads this file — the CLI, MCP server, and plugins all derive their wiring from it.
 
 ## Requirements
 
@@ -11,30 +11,10 @@
 `specd.yaml` must be a valid YAML file. specd discovers it using the following strategy, in order:
 
 1. **`--config` flag** — if the CLI is invoked with `--config path/to/specd.yaml`, that path is used directly; no discovery takes place.
-2. **Walk up from CWD, bounded by the git repo root** — specd walks up from the current working directory, checking each directory for `specd.yaml`. The walk stops at the git repo root (the nearest ancestor directory containing `.git/`). If no `specd.yaml` is found before or at the repo root, specd exits with an error.
+2. **Walk up from CWD, bounded by the git repo root** — specd walks up from the current working directory, checking each directory for `specd.yaml`. The walk stops at the **first match** (nearest to CWD) or at the git repo root (the nearest ancestor directory containing `.git/`), whichever comes first. If no `specd.yaml` is found before or at the repo root, specd exits with an error.
 3. **CWD only, when not inside a git repo** — if no `.git/` ancestor exists (e.g. the user is running specd from outside any repository, as in a coordinator script), specd checks only the current working directory and stops there. It does not walk further up.
 
-The search never goes above the git repo root. This prevents accidentally picking up a `specd.yaml` from a parent repository in nested or sibling monorepo layouts.
-
-#### Scenario: Config found inside repo
-
-- **WHEN** the user runs any specd command from inside a git repository containing `specd.yaml` at the repo root
-- **THEN** specd uses that file, regardless of the current working directory depth within the repo
-
-#### Scenario: Config not found inside repo
-
-- **WHEN** the user runs any specd command inside a git repository and no `specd.yaml` exists between the CWD and the repo root
-- **THEN** specd exits with an error explaining that `specd.yaml` was not found and pointing to `specd init`
-
-#### Scenario: Invoked outside a git repo
-
-- **WHEN** the user runs specd from a directory that is not inside any git repository
-- **THEN** specd checks only the current working directory for `specd.yaml` and exits with an error if not found there
-
-#### Scenario: Explicit config flag bypasses local override
-
-- **WHEN** `specd --config /path/to/specd.yaml <command>` is invoked
-- **THEN** specd uses the specified file exactly as-is — discovery and `specd.local.yaml` lookup are both skipped
+The search never goes above the git repo root. This prevents accidentally picking up a `specd.yaml` from a parent repository in nested or sibling monorepo layouts. In a monorepo where each package has its own `specd.yaml`, the package-level file is used when running specd from within that package — the root-level file is not considered.
 
 ### Requirement: Local config override
 
@@ -46,266 +26,132 @@ The typical workflow for local customisation is: copy `specd.yaml` to `specd.loc
 
 When the CLI is invoked with `--config path/to/specd.yaml`, that file is used exactly as specified — no `specd.local.yaml` lookup takes place. This allows testing with the shared config without the local override interfering.
 
-#### Scenario: Local file takes full precedence
-
-- **WHEN** `specd.local.yaml` exists alongside `specd.yaml`
-- **THEN** specd loads only `specd.local.yaml`; `specd.yaml` is ignored entirely
-
-#### Scenario: Local file absent
-
-- **WHEN** no `specd.local.yaml` exists alongside `specd.yaml`
-- **THEN** specd loads `specd.yaml` as normal; no error is emitted
-
-#### Scenario: Local file not committed
-
-- **WHEN** `specd init` is run
-- **THEN** `specd.local.yaml` is added to `.gitignore` if not already present
-
-#### Scenario: Local file must be valid standalone
-
-- **WHEN** `specd.local.yaml` is present but missing required fields (e.g. `schema`)
-- **THEN** specd exits with a validation error — partial configs are not supported
-
 ### Requirement: Schema reference
 
-`specd.yaml` must declare a `schema` field naming the schema that governs this project. Only one schema is active per project at a time — per-scope schema selection is not supported. The field is required.
+`specd.yaml` must declare a `schema` field identifying the schema that governs this project. Only one schema is active per project at a time — per-workspace schema selection is not supported. The field is required.
+
+The value uses a prefix convention to make the resolution strategy explicit:
 
 ```yaml
-schema: "@specd/schema-std"   # npm-scoped package
-# or:
-schema: "my-team-schema"       # project-local or user-global name
+schema: "@specd/schema-std"            # npm package — starts with @
+schema: "#spec-driven"                 # default workspace's schemasPath (same as bare name)
+schema: "spec-driven"                  # bare name — resolved from default workspace's schemasPath
+schema: "#billing:my-billing-schema"   # named workspace's schemasPath
+schema: "./schemas/custom/schema.yaml" # direct path — relative to specd.yaml location
+schema: "/absolute/path/schema.yaml"   # direct absolute path
 ```
 
-The value is a plain name with no version specifier and no path. npm scoped package notation (`@scope/name`) is valid and refers to the npm package at that name — `@scope/` here is the npm package scope, unrelated to specd's scope concept. Version selection is handled by npm (via `package.json`) or by placing a specific version of the schema in the project-local schemas directory. `SchemaRegistry.resolve()` receives the name verbatim and applies the three-level lookup defined in `specs/_global/schema-format/spec.md`.
+- **`@scope/name`** — an npm package. The schema file is loaded from `node_modules/@scope/name/schema.yaml`. Version selection is handled by npm via `package.json`.
+- **`#workspace:name`** — a named schema resolved from a specific workspace's `schemas` section. `#billing:my-schema` loads from `workspaces.billing.schemas.fs.path/my-schema/schema.yaml`.
+- **`#name` or bare name** — equivalent to `#default:name`. Resolved from the `default` workspace's `schemas` section.
+- **Relative or absolute path** — a direct path to a `schema.yaml` file. Relative paths are resolved from the directory containing `specd.yaml`.
 
-**Resolution timing:** schema resolution happens at command dispatch time, immediately before the command body executes. Commands that do not require the schema — such as `--help`, `--version`, `init`, `config validate`, and `plugin` subcommands — skip resolution entirely. The MCP server resolves the schema at server startup, not per-request.
+There is no implicit multi-level fallback — the prefix determines exactly where specd looks. `SchemaRegistry.resolve()` receives the full value from `specd.yaml` and dispatches based on the prefix.
+
+**Resolution timing:** schema resolution happens at command dispatch time, immediately before the command body executes. Commands that do not require the schema — such as `--help`, `--version`, `init`, `config validate`, and `plugin` subcommands — skip resolution entirely.
 
 **Error types:** both `ConfigValidationError` (malformed `specd.yaml`) and `SchemaNotFoundError` / `SchemaValidationError` (resolution failures) are domain errors defined in `@specd/core` and extend `SpecdError`. They are distinct types with distinct messages and exit codes — config errors indicate a problem with `specd.yaml` itself; schema errors indicate a problem with the referenced schema.
 
-#### Scenario: npm-scoped schema
+### Requirement: Workspaces
 
-- **WHEN** `schema: "@specd/schema-std"` is declared and the package is installed
-- **THEN** `SchemaRegistry.resolve("@specd/schema-std")` finds it at `node_modules/@specd/schema-std/schema.yaml` and returns the parsed schema
+`specd.yaml` must declare at least one workspace under the `workspaces` key. Each workspace defines where its specs live, where the implementation code lives, where its local schemas are stored, and the ownership relationship the project has with those specs.
 
-#### Scenario: Project-local schema
-
-- **WHEN** `schema: "my-team-schema"` is declared and `specd/schemas/my-team-schema/schema.yaml` exists
-- **THEN** the project-local version is used and takes precedence over any npm-installed version with the same name
-
-#### Scenario: Schema not found
-
-- **WHEN** the declared schema name matches nothing in any lookup level
-- **THEN** specd exits with `SchemaNotFoundError` listing the name and the locations searched
-
-#### Scenario: Schema fails validation
-
-- **WHEN** the schema file is found but contains structural errors (e.g. missing `name`, circular `requires`)
-- **THEN** specd exits with `SchemaValidationError` describing the problem; the command does not run
-
-#### Scenario: Schema field missing
-
-- **WHEN** `specd.yaml` does not include a `schema` field
-- **THEN** specd exits with `ConfigValidationError` on startup
-
-#### Scenario: Schema-independent command skips resolution
-
-- **WHEN** `specd --help` or `specd init` is run
-- **THEN** `SchemaRegistry.resolve()` is not called; the command runs regardless of whether the schema is valid or even declared
-
-#### Scenario: MCP server resolves at startup
-
-- **WHEN** the MCP server starts
-- **THEN** the schema is resolved once at arrange time; subsequent requests use the cached schema without re-reading disk
-
-### Requirement: Schema lookup path
-
-`specd.yaml` may include a `schemas` section configuring the project-local directory for schema files. This controls only the first lookup level; user-global and npm lookup levels are fixed and require no configuration.
+`default` is a reserved workspace name that identifies the local project workspace. Every config must contain a `default` workspace. `specd init` creates it automatically if no `workspaces` section is present.
 
 ```yaml
-schemas:
-  path: specd/schemas # default; relative to specd.yaml location
+workspaces:
+  default: # required — the local project workspace
+    specs: # where this workspace's spec files live (required)
+      adapter: fs # storage adapter (required; only "fs" in v1)
+      fs:
+        path: specs/
+    schemas: # where named local schemas live (optional)
+      adapter: fs
+      fs:
+        path: specd/schemas # default: specd/schemas (relative to specd.yaml)
+    codeRoot: ./ # where implementation code lives (default: project root)
+    ownership: owned # owned | shared | readOnly (default: owned)
+
+  billing: # additional workspace
+    specs:
+      adapter: fs
+      fs:
+        path: ../billing/specd/specs
+    schemas:
+      adapter: fs
+      fs:
+        path: ../billing/dev/schemas
+    codeRoot: ../billing
+    ownership: readOnly # default for non-default workspaces
 ```
 
-When omitted, `specd/schemas` is used as the default. If the configured directory does not exist, that lookup level is silently skipped — it is not an error. Only when none of the three levels yields a match does resolution fail.
+**`specs`** (required) — declares where this workspace's spec files live. Has its own `adapter` and adapter-specific config block. Only `"fs"` is supported in v1.
 
-#### Scenario: Default path used
+**`specs.fs.path`** (required for `fs` adapter) — directory where spec files live. Relative paths are resolved from the directory containing `specd.yaml`. May point outside the project repo root, in which case `RepositoryConfig.isExternal` is set to `true` by the application layer.
 
-- **WHEN** `schemas` is omitted from `specd.yaml`
-- **THEN** `SchemaRegistry` searches `specd/schemas/<name>/schema.yaml` as the project-local level
+**`schemas`** (optional) — declares where named local schemas for this workspace are stored. Has its own `adapter` and adapter-specific config block, independent of `specs`. Used when the `schema` field references `#workspace:name` or a bare/hash-prefixed name targeting this workspace.
 
-#### Scenario: Custom path
+- For the `default` workspace, if omitted, defaults to `adapter: fs` with `fs.path: specd/schemas`.
+- For non-`default` workspaces, if omitted, the workspace has no local schemas — any schema reference targeting it (e.g. `#billing:name`) will produce a `SchemaNotFoundError`.
 
-- **WHEN** `schemas.path: team/schemas` is set
-- **THEN** `SchemaRegistry` searches `team/schemas/<name>/schema.yaml` as the project-local level
+**`codeRoot`** — directory where the implementation code for this workspace lives. Used by `CompileContext` to tell the agent where to write code.
 
-#### Scenario: Configured directory does not exist
+- For the `default` workspace, defaults to the project root (the directory containing `specd.yaml`).
+- For non-`default` workspaces, `codeRoot` is required — there is no sensible default since the implementation code lives in an external location.
 
-- **WHEN** `schemas.path` points to a directory that does not exist on disk
-- **THEN** the project-local lookup level yields no results and resolution continues to the next level; no error is emitted
+**`ownership`** — the relationship this project has with specs in the workspace:
+
+- `owned` — the project owns these specs; changes are freely proposed (default for `default`)
+- `shared` — the project co-owns these specs; changes may require coordination
+- `readOnly` — the project reads but does not modify these specs (default for non-`default` workspaces)
+
+**`isExternal`** is not declared in config — it is inferred by the application layer from whether the resolved `specs.fs.path` is outside the project repo root.
+
+Workspace names must be unique and must match `/^[a-z][a-z0-9-]*$/`. The name `default` is reserved.
 
 ### Requirement: Storage configuration
 
-`specd.yaml` must include a `storage` section with sub-keys for `specs`, `changes`, and `archive`. Each sub-key declares the storage adapter and its configuration for that data type.
+`specd.yaml` must include a `storage` section with sub-keys for `changes` and `archive`. These paths are global — a project has one changes directory and one archive directory regardless of workspaces.
 
 ```yaml
 storage:
-  specs:
-    adapter: fs
-    path: specd/specs
-
   changes:
     adapter: fs
-    path: specd/changes
+    fs:
+      path: specd/changes
 
   archive:
     adapter: fs
-    path: specd/archive
-    pattern: '{{change.archivedName}}' # optional; default: "{{change.archivedName}}"
+    fs:
+      path: specd/archive
+      pattern: '{{change.archivedName}}' # optional; default: "{{change.archivedName}}"
 ```
 
-`adapter` and `path` are required per sub-key. Unknown adapter values must produce a validation error.
+`adapter` is required per sub-key; adapter-specific fields are nested under the adapter key (`fs:`). Unknown adapter values must produce a validation error. Relative paths are resolved from the directory containing `specd.yaml` and must remain within the project repo root.
 
-#### Scenario: Default storage layout
+### Requirement: Template variables
 
-- **WHEN** `specd.yaml` uses the paths shown above
-- **THEN** specs are at `specd/specs/`, active changes at `specd/changes/`, and archived changes at `specd/archive/`
+Several fields in `specd.yaml` support template variable interpolation using `{{variable}}` syntax. Template variables are resolved at runtime by the application layer before the value is used.
 
-#### Scenario: Unknown adapter
+The following variables are available in **`storage.archive.fs.pattern`**:
 
-- **WHEN** `storage.specs.adapter` is set to an unrecognised value (e.g. `"s3"`)
-- **THEN** specd exits with a validation error listing supported adapters
+| Variable                  | Value                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `{{change.name}}`         | The change's slug name (e.g. `add-auth-flow`)                                                           |
+| `{{change.archivedName}}` | The change's full archived directory name (e.g. `2024-01-15-add-auth-flow`) — the default pattern value |
+| `{{change.workspace}}`    | The primary workspace of the change                                                                     |
+| `{{year}}`                | Four-digit current year (e.g. `2024`)                                                                   |
+| `{{date}}`                | ISO date at archive time (e.g. `2024-01-15`)                                                            |
 
-### Requirement: Schema lookup path
+The following variables are available in **`workflow` hook `run` commands**:
 
-`specd.yaml` may include a `schemas` section to set the project-local directory where schema files are searched before user-global and npm locations.
+| Variable               | Value                                                           |
+| ---------------------- | --------------------------------------------------------------- |
+| `{{change.name}}`      | The change's slug name                                          |
+| `{{change.workspace}}` | The primary workspace of the change                             |
+| `{{codeRoot}}`         | The resolved absolute path to the active workspace's `codeRoot` |
 
-```yaml
-schemas:
-  path: specd/schemas # default; relative to project root
-```
-
-When omitted, the default is `specd/schemas`. See `specs/_global/schema-format/spec.md` for the full three-level resolution order.
-
-#### Scenario: Custom schema path
-
-- **WHEN** `schemas.path` is set to `team/schemas`
-- **THEN** `SchemaRegistry.resolve()` searches `team/schemas/<name>/schema.yaml` first
-
-### Requirement: External scopes
-
-`specd.yaml` may declare external spec sources under `externalScopes`. Each key is an alias that becomes the namespace prefix for all `SpecPath` values originating from that source. Aliases must be unique and must not collide with any local scope prefix.
-
-```yaml
-externalScopes:
-  auth-lib: # alias = SpecPath namespace prefix
-    path: ../auth-lib/specs # path to the external specs directory
-    ownership: readOnly # readOnly | shared | owned (default: readOnly)
-    codeRoot: ../auth-lib # where the implementation code lives (default: path)
-
-  shared:
-    path: ../company-shared/specs
-    # ownership defaults to readOnly
-    # codeRoot defaults to path value
-```
-
-A spec at `../auth-lib/specs/oauth/spec.md` is addressable as `auth-lib/oauth` from within the project. The alias is always the first segment.
-
-`ownership` for external scopes defaults to `readOnly`. Setting it to `shared` or `owned` signals that the project can propose changes upstream — tooling may use this to unlock additional approval flows.
-
-`codeRoot` for an external scope identifies where the implementation code for those specs lives. When absent, it defaults to the resolved `path` value (the spec directory itself, which is likely wrong for most cases — prefer declaring it explicitly).
-
-#### Scenario: External scope referenced
-
-- **WHEN** `externalScopes: { auth-lib: { path: ../auth-lib/specs } }` is declared
-- **THEN** `SpecRepository` for the `auth-lib` scope is instantiated with `isExternal: true`, `ownership: readOnly`, and the resolved path
-- **AND** specs from that source are addressable as `auth-lib/<original-path>`
-
-#### Scenario: Alias collision with local scope
-
-- **WHEN** an `externalScopes` alias matches the first segment of a local spec path (e.g. alias `auth` and local spec at `specd/specs/auth/oauth/spec.md`)
-- **THEN** specd must exit with a validation error identifying the collision
-
-#### Scenario: Duplicate alias
-
-- **WHEN** two entries in `externalScopes` use the same alias key
-- **THEN** YAML parsing produces only one entry (last wins), which is a configuration mistake; `specd validate-config` must warn about this pattern
-
-### Requirement: Local scope overrides
-
-`specd.yaml` may include a `scopes` section to override `codeRoot` and `ownership` for local scope prefixes. Each key is the first segment of a `SpecPath` that identifies the scope.
-
-```yaml
-scopes:
-  auth:
-    codeRoot: ../auth-service/src # where code for auth specs lives
-    ownership: owned # default for local scopes
-
-  payments:
-    codeRoot: ../payments-service/src
-```
-
-When a scope has no entry in `scopes`, it inherits the project-level `codeRoot` and `ownership: owned`.
-
-`RepositoryConfig.isExternal` is always `false` for scopes declared here. `isExternal: true` is exclusively for `externalScopes`.
-
-#### Scenario: Coordinator pattern
-
-- **WHEN** a coordinator repository declares scopes with different `codeRoot` values
-- **THEN** `specd ctx` includes the applicable `codeRoot` in the compiled instruction block so the agent knows where to write implementation code
-
-#### Scenario: Scope with no override
-
-- **WHEN** a spec path begins with a segment not listed in `scopes`
-- **THEN** the scope inherits `codeRoot: <project root>` and `ownership: owned`
-
-### Requirement: Project-level code root
-
-`specd.yaml` may declare a top-level `codeRoot` as the default for all scopes not overridden in `scopes` or `externalScopes`.
-
-```yaml
-codeRoot: ./ # default; relative to specd.yaml location
-```
-
-When omitted, `codeRoot` defaults to the git repository root (the directory containing `specd.yaml`).
-
-#### Scenario: Default code root
-
-- **WHEN** `codeRoot` is not set in `specd.yaml` and a scope has no override
-- **THEN** the code root for that scope is the repository root
-
-#### Scenario: Explicit global code root
-
-- **WHEN** `codeRoot: ./src` is set at the top level
-- **THEN** all scopes without a specific override use `./src` as their code root
-
-### Requirement: Path resolution
-
-All relative paths in `specd.yaml` — including `storage.specs.path`, `externalScopes[*].path`, `scopes[*].codeRoot`, and `codeRoot` — are resolved relative to the directory containing `specd.yaml` (the repository root). Absolute paths are accepted only when `allowExternalPaths: true` is set on the relevant section.
-
-```yaml
-storage:
-  specs:
-    adapter: fs
-    path: specd/specs
-    allowExternalPaths: false # default
-```
-
-`allowExternalPaths` defaults to `false`. When `false`, paths that resolve outside the repository root are rejected with a validation error. External scope paths (`externalScopes[*].path`) always require `allowExternalPaths: true` on the `externalScopes` section, or are allowed unconditionally (since external scopes are explicitly declared to be outside the repo).
-
-#### Scenario: Relative path within repo
-
-- **WHEN** `storage.specs.path: specd/specs` is set
-- **THEN** the resolved path is `<repo-root>/specd/specs`
-
-#### Scenario: Path outside repo without flag
-
-- **WHEN** `storage.changes.path: ../shared-changes` is set without `allowExternalPaths: true`
-- **THEN** specd must exit with a validation error
-
-#### Scenario: External scope path always allowed
-
-- **WHEN** `externalScopes.auth-lib.path: ../auth-lib/specs` points outside the repo
-- **THEN** it is allowed without requiring `allowExternalPaths` — the `externalScopes` declaration itself is the explicit opt-in
+Unknown variables in a template are left as-is and a warning is emitted.
 
 ### Requirement: Workflow additions
 
@@ -325,21 +171,6 @@ workflow:
             Prefer editing existing files over creating new ones.
 ```
 
-#### Scenario: Project hook appended
-
-- **WHEN** both the schema and `specd.yaml` define hooks for `archive.post`
-- **THEN** schema hooks fire first, project hooks second, within the same lifecycle point
-
-#### Scenario: requires in project workflow entry
-
-- **WHEN** a project-level workflow entry includes a `requires` field
-- **THEN** specd must reject it with a validation error on startup
-
-#### Scenario: Hook for skill not in schema
-
-- **WHEN** a project-level workflow entry names a skill not declared in the schema's workflow
-- **THEN** the hooks are registered for that skill; they fire if the skill is ever invoked, and a warning is emitted at startup
-
 ### Requirement: Project-level artifact rules
 
 `specd.yaml` may include an `artifactRules` section to add per-artifact constraints without forking the schema. Keys are artifact IDs; values are arrays of constraint strings. `CompileContext` injects them as a distinct block in the compiled instruction, after the schema's instruction.
@@ -355,16 +186,6 @@ artifactRules:
 
 Keys are validated against the active schema's artifact IDs at startup. Unknown keys emit a warning but do not prevent startup.
 
-#### Scenario: Rules injected
-
-- **WHEN** `artifactRules.specs` is set
-- **THEN** `CompileContext` includes those strings in the compiled context for the `specs` artifact as constraints the agent must follow
-
-#### Scenario: Unknown artifact ID
-
-- **WHEN** `artifactRules` contains a key not matching any artifact ID in the active schema
-- **THEN** specd emits a warning at startup and ignores those rules
-
 ### Requirement: Plugin declarations
 
 `specd.yaml` may include a `plugins` section declaring which agent-integration plugins are installed. Each entry must include `name`; `options` is plugin-specific and optional.
@@ -379,55 +200,77 @@ plugins:
 
 Plugin declarations are used by `specd init`, `specd plugin add`, and `specd update` to install and maintain the plugin's skill files and hooks in the project. They do not affect schema resolution, storage, or context compilation.
 
-#### Scenario: Plugin installed
-
-- **WHEN** `plugins: [{ name: "@specd/plugin-claude" }]` is declared
-- **THEN** `specd update` ensures the plugin's skill files and hook configuration are up to date
-
 ### Requirement: Startup validation
 
-specd must validate `specd.yaml` before executing any command. Validation must catch: missing `schema`, unknown storage adapters, duplicate external scope aliases, `requires` in project workflow entries, and paths outside the repo without `allowExternalPaths`. Warnings (not errors) are emitted for: unknown `artifactRules` keys, and project workflow entries for skills not in the schema.
-
-#### Scenario: Invalid config blocks startup
-
-- **WHEN** `specd.yaml` has a validation error (e.g. missing `schema`, unknown adapter)
-- **THEN** specd exits immediately with a descriptive error before executing the requested command
-
-#### Scenario: Warning does not block startup
-
-- **WHEN** `specd.yaml` has an `artifactRules` key for an unknown artifact
-- **THEN** a warning is printed but the command proceeds normally
+specd must validate `specd.yaml` before executing any command. Validation must catch: missing `schema`, missing `storage` section, missing `changes` or `archive` sub-key under `storage`, missing `default` workspace, missing `specs` section in any workspace, missing `codeRoot` in any non-`default` workspace, missing `adapter` in any `specs`, `schemas`, or storage section, unknown adapter values, required adapter-specific fields missing (e.g. `fs.path` absent when `adapter: fs`), `requires` in project workflow entries, and storage paths outside the repo root. Warnings (not errors) are emitted for: unknown `artifactRules` keys, duplicate workspace names, and project workflow entries for skills not in the schema.
 
 ## Constraints
 
 - `schema` is required — specd cannot start without a schema reference
+- `workspaces.default` is required — every config must have a `default` workspace; `specd init` creates it
 - `specd.local.yaml` is always `.gitignored`; `specd init` must add it automatically
 - When `specd.local.yaml` is present it is the sole active config — `specd.yaml` is not read
 - `specd.local.yaml` must be a complete, valid config on its own; partial overrides are not supported
-- `externalScopes` aliases must be unique within the file and must not match the first segment of any local spec path
 - `requires` is not valid in project-level `workflow` entries
-- Relative paths resolve from the `specd.yaml` directory; paths outside the repo root require `allowExternalPaths: true` (external scope paths are unconditionally allowed)
+- Workspace names must match `/^[a-z][a-z0-9-]*$/`; `default` is reserved for the local project workspace
 - `ownership` values are limited to `readOnly`, `shared`, and `owned`
-- Local scopes (`scopes`) always have `isExternal: false`; external scopes (`externalScopes`) always have `isExternal: true`
-- `codeRoot` for external scopes should be declared explicitly — the default (the spec path) is rarely the correct code location
+- `isExternal` is not declared — it is inferred by the application layer from whether the resolved `specs.fs.path` is outside the project repo root
+- Every workspace must declare a `specs` section; `codeRoot` is required for non-`default` workspaces
+- `schemas` is optional: for the `default` workspace it defaults to `adapter: fs` / `fs.path: specd/schemas`; for non-`default` workspaces, omitting it means no local schemas — schema references targeting that workspace produce `SchemaNotFoundError`
+- `adapter` is required in every `specs`, `schemas`, and storage section; adapter-specific fields are nested under the adapter key
+- `storage` section is required and must contain both `changes` and `archive` sub-keys
+- All relative paths resolve from the `specd.yaml` directory; storage paths (`fs.path` in `changes` and `archive`) must remain within the repo root
 
 ## Examples
 
-### Single-repo project (minimal config)
+### Single-repo project (minimal)
 
 ```yaml
 schema: '@specd/schema-std'
 
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/
+
 storage:
-  specs:
-    adapter: fs
-    path: specd/specs
   changes:
     adapter: fs
-    path: specd/changes
+    fs:
+      path: specd/changes
   archive:
     adapter: fs
-    path: specd/archive
+    fs:
+      path: specd/archive
+```
+
+### Single-repo project with local schema
+
+```yaml
+schema: 'spec-driven' # resolves from default.schemas.fs.path (specd/schemas/spec-driven/schema.yaml)
+
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/
+    schemas:
+      adapter: fs
+      fs:
+        path: specd/schemas
+
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: specd/changes
+  archive:
+    adapter: fs
+    fs:
+      path: specd/archive
 ```
 
 ### Coordinator repo managing multiple service repos
@@ -435,25 +278,48 @@ storage:
 ```yaml
 schema: '@specd/schema-std'
 
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/
+    codeRoot: ./
+
+  auth:
+    specs:
+      adapter: fs
+      fs:
+        path: ../auth-service/specd/specs
+    codeRoot: ../auth-service
+    ownership: owned
+
+  payments:
+    specs:
+      adapter: fs
+      fs:
+        path: ../payments-service/specd/specs
+    codeRoot: ../payments-service
+    ownership: owned
+
+  platform:
+    specs:
+      adapter: fs
+      fs:
+        path: ../platform-repo/specd/specs
+    codeRoot: ../platform-repo
+    ownership: readOnly
+
 storage:
-  specs:
-    adapter: fs
-    path: specd/specs
   changes:
     adapter: fs
-    path: specd/changes
+    fs:
+      path: specd/changes
   archive:
     adapter: fs
-    path: specd/archive
-    pattern: '{{year}}/{{change.archivedName}}'
-
-scopes:
-  auth:
-    codeRoot: ../auth-service
-  payments:
-    codeRoot: ../payments-service
-  notifications:
-    codeRoot: ../notifications-service
+    fs:
+      path: specd/archive
+      pattern: '{{year}}/{{change.archivedName}}'
 
 workflow:
   - skill: archive
@@ -462,26 +328,39 @@ workflow:
         - run: 'git -C {{codeRoot}} checkout -b specd/{{change.name}}'
 ```
 
-### Project consuming external specs (read-only)
+### Project with workspace-specific schema
 
 ```yaml
-schema: '@specd/schema-std'
+schema: '#billing:billing-schema' # ../billing/dev/schemas/billing-schema/schema.yaml
+
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/
+
+  billing:
+    specs:
+      adapter: fs
+      fs:
+        path: ../billing/specd/specs
+    schemas:
+      adapter: fs
+      fs:
+        path: ../billing/dev/schemas
+    codeRoot: ../billing
+    ownership: readOnly
 
 storage:
-  specs:
-    adapter: fs
-    path: specd/specs
   changes:
     adapter: fs
-    path: specd/changes
+    fs:
+      path: specd/changes
   archive:
     adapter: fs
-    path: specd/archive
-
-externalScopes:
-  platform:
-    path: ../platform-repo/specs
-    codeRoot: ../platform-repo
+    fs:
+      path: specd/archive
 
 artifactRules:
   specs:
@@ -496,4 +375,6 @@ artifactRules:
 
 ## ADRs
 
-_none_
+- [ADR-0012: Configuration File Strategy](../../../docs/adr/0012-config-file-strategy.md)
+- [ADR-0013: Workspaces, Not Scopes](../../../docs/adr/0013-workspaces-not-scopes.md)
+- [ADR-0014: Single Changes and Archive Storage Per Project](../../../docs/adr/0014-single-storage-per-project.md)
