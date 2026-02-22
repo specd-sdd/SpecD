@@ -6,12 +6,12 @@ import { Repository, type RepositoryConfig } from './repository.js'
 export { type RepositoryConfig as ChangeRepositoryConfig }
 
 /**
- * Port for reading and writing changes within a single scope.
+ * Port for reading and writing changes within a single workspace.
  *
- * Extends {@link Repository} — `scope()`, `ownership()`, and `isExternal()`
- * are set at construction time. A change always belongs to the scope it was
- * created in; use cases that coordinate across scopes receive one instance
- * per scope.
+ * Extends {@link Repository} — `workspace()`, `ownership()`, and `isExternal()`
+ * are set at construction time. A change always belongs to the workspace it was
+ * created in; use cases that coordinate across workspaces receive one instance
+ * per workspace.
  *
  * `list` and `get` return {@link Change} objects with artifact state
  * (status, validatedHash) but without artifact content. Content is loaded
@@ -21,7 +21,7 @@ export { type RepositoryConfig as ChangeRepositoryConfig }
  */
 export abstract class ChangeRepository extends Repository {
   /**
-   * @param config - Scope, ownership, and locality configuration
+   * @param config - Workspace, ownership, and locality configuration
    */
   constructor(config: RepositoryConfig) {
     super(config)
@@ -41,11 +41,11 @@ export abstract class ChangeRepository extends Repository {
   abstract get(name: string): Promise<Change | null>
 
   /**
-   * Lists all changes in this scope, sorted by creation order.
+   * Lists all changes in this workspace, sorted by creation order.
    *
    * Returns {@link Change} objects with artifact state but without content.
    *
-   * @returns All changes in this scope, oldest first
+   * @returns All changes in this workspace, oldest first
    */
   abstract list(): Promise<Change[]>
 

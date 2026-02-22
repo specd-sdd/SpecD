@@ -38,8 +38,8 @@ export interface ApprovalRecord {
 export interface ChangeProps {
   /** Unique name identifying the change. */
   name: string
-  /** The spec path scope this change operates within. */
-  scope: SpecPath
+  /** The workspace this change operates within. */
+  workspace: SpecPath
   /** Initial lifecycle state. Defaults to `"drafting"`. */
   state?: ChangeState
   /** Pre-loaded artifact map. Defaults to an empty map. */
@@ -60,7 +60,7 @@ export interface ChangeProps {
  */
 export class Change {
   private readonly _name: string
-  private readonly _scope: SpecPath
+  private readonly _workspace: SpecPath
   private readonly _createdAt: Date
   private _state: ChangeState
   private _artifacts: Map<string, ChangeArtifact>
@@ -73,7 +73,7 @@ export class Change {
    */
   constructor(props: ChangeProps) {
     this._name = props.name
-    this._scope = props.scope
+    this._workspace = props.workspace
     this._createdAt = props.createdAt ?? new Date()
     this._state = props.state ?? 'drafting'
     this._artifacts = props.artifacts ?? new Map<string, ChangeArtifact>()
@@ -85,9 +85,9 @@ export class Change {
     return this._name
   }
 
-  /** The spec path scope this change operates within. */
-  get scope(): SpecPath {
-    return this._scope
+  /** The workspace this change operates within. */
+  get workspace(): SpecPath {
+    return this._workspace
   }
 
   /** Timestamp when the change was created. */

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 
-const scope = SpecPath.parse('auth/oauth')
+const workspace = SpecPath.parse('auth/oauth')
 const archivedAt = new Date('2026-02-19T14:30:00Z')
 
 describe('ArchivedChange', () => {
@@ -11,14 +11,14 @@ describe('ArchivedChange', () => {
       const ac = new ArchivedChange({
         name: 'add-oauth-login',
         archivedName: '20260219-143022-add-oauth-login',
-        scope,
+        workspace,
         archivedAt,
         artifacts: ['proposal', 'design', 'tasks'],
       })
 
       expect(ac.name).toBe('add-oauth-login')
       expect(ac.archivedName).toBe('20260219-143022-add-oauth-login')
-      expect(ac.scope.equals(scope)).toBe(true)
+      expect(ac.workspace.equals(workspace)).toBe(true)
       expect(ac.archivedAt).toBe(archivedAt)
       expect(ac.artifacts).toEqual(['proposal', 'design', 'tasks'])
     })
@@ -27,7 +27,7 @@ describe('ArchivedChange', () => {
       const ac = new ArchivedChange({
         name: 'add-oauth-login',
         archivedName: '20260219-143022-add-oauth-login',
-        scope,
+        workspace,
         archivedAt,
         artifacts: [],
       })
@@ -44,7 +44,7 @@ describe('ArchivedChange', () => {
       const ac = new ArchivedChange({
         name: 'add-oauth-login',
         archivedName: '20260219-143022-add-oauth-login',
-        scope,
+        workspace,
         archivedAt,
         artifacts: [],
         approval,
@@ -58,7 +58,7 @@ describe('ArchivedChange', () => {
       const ac = new ArchivedChange({
         name: 'add-oauth-login',
         archivedName: '20260219-143022-add-oauth-login',
-        scope,
+        workspace,
         archivedAt,
         artifacts: [],
       })
@@ -69,7 +69,7 @@ describe('ArchivedChange', () => {
       const ac = new ArchivedChange({
         name: 'add-oauth-login',
         archivedName: '20260219-143022-add-oauth-login',
-        scope,
+        workspace,
         archivedAt,
         artifacts: [],
         approval: {

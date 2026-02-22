@@ -6,11 +6,11 @@ import { Repository, type RepositoryConfig } from './repository.js'
 export { type RepositoryConfig as SpecRepositoryConfig }
 
 /**
- * Port for reading and writing specs within a single scope.
+ * Port for reading and writing specs within a single workspace.
  *
- * Extends {@link Repository} — `scope()`, `ownership()`, and `isExternal()` are
- * set at construction time and cannot change. Use cases that need multiple scopes
- * receive a separate instance per scope.
+ * Extends {@link Repository} — `workspace()`, `ownership()`, and `isExternal()` are
+ * set at construction time and cannot change. Use cases that need multiple workspaces
+ * receive a separate instance per workspace.
  *
  * `list` and `get` return lightweight {@link Spec} metadata — no artifact content
  * is loaded. Content is fetched explicitly via `artifact()`. Write operations
@@ -18,7 +18,7 @@ export { type RepositoryConfig as SpecRepositoryConfig }
  */
 export abstract class SpecRepository extends Repository {
   /**
-   * @param config - Scope, ownership, and locality configuration
+   * @param config - Workspace, ownership, and locality configuration
    */
   constructor(config: RepositoryConfig) {
     super(config)
@@ -27,13 +27,13 @@ export abstract class SpecRepository extends Repository {
   /**
    * Returns the spec metadata for the given name, or `null` if not found.
    *
-   * @param name - The spec identity path within this scope (e.g. `auth/oauth`)
+   * @param name - The spec identity path within this workspace (e.g. `auth/oauth`)
    * @returns The spec metadata, or `null` if no such spec exists
    */
   abstract get(name: SpecPath): Promise<Spec | null>
 
   /**
-   * Lists all spec metadata in this scope, optionally filtered by a path prefix.
+   * Lists all spec metadata in this workspace, optionally filtered by a path prefix.
    *
    * Returns lightweight {@link Spec} objects — no artifact content is loaded.
    *

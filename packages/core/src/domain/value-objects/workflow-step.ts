@@ -10,7 +10,7 @@ export type HookEntry =
       readonly type: 'run'
       /**
        * The shell command to execute. May contain template variables:
-       * `{{change.name}}`, `{{change.scope}}`, `{{change.path}}`,
+       * `{{change.name}}`, `{{change.workspace}}`, `{{change.path}}`,
        * `{{project.root}}`.
        */
       readonly command: string

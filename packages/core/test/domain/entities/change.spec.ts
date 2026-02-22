@@ -5,12 +5,16 @@ import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { ApprovalRequiredError } from '../../../src/domain/errors/approval-required-error.js'
 
-const scope = SpecPath.parse('auth/oauth')
+const workspace = SpecPath.parse('auth/oauth')
 
 function makeChange(
   state?: import('../../../src/domain/value-objects/change-state.js').ChangeState,
 ) {
-  return new Change({ name: 'add-oauth-login', scope, ...(state !== undefined ? { state } : {}) })
+  return new Change({
+    name: 'add-oauth-login',
+    workspace,
+    ...(state !== undefined ? { state } : {}),
+  })
 }
 
 function makeArtifact(
