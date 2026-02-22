@@ -31,10 +31,10 @@ The search never goes above the git repo root. This prevents accidentally pickin
 - **WHEN** the user runs specd from a directory that is not inside any git repository
 - **THEN** specd checks only the current working directory for `specd.yaml` and exits with an error if not found there
 
-#### Scenario: Explicit config flag
+#### Scenario: Explicit config flag bypasses local override
 
 - **WHEN** `specd --config /path/to/specd.yaml <command>` is invoked
-- **THEN** specd uses the specified file and skips all discovery logic
+- **THEN** specd uses the specified file exactly as-is — discovery and `specd.local.yaml` lookup are both skipped
 
 ### Requirement: Local config override
 
@@ -44,7 +44,7 @@ The file is optional — its absence is normal. `specd init` must add `specd.loc
 
 The typical workflow for local customisation is: copy `specd.yaml` to `specd.local.yaml`, then edit the copy. This keeps the mental model simple — there is always exactly one active config file.
 
-When the CLI is invoked with `--config path/to/specd.yaml`, specd looks for `specd.local.yaml` in the same directory as the specified file and uses it if present.
+When the CLI is invoked with `--config path/to/specd.yaml`, that file is used exactly as specified — no `specd.local.yaml` lookup takes place. This allows testing with the shared config without the local override interfering.
 
 #### Scenario: Local file takes full precedence
 
