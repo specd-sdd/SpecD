@@ -68,25 +68,68 @@ When the CLI is invoked with `--config path/to/specd.yaml`, specd looks for `spe
 
 ### Requirement: Schema reference
 
-`specd.yaml` must declare a `schema` field that names the schema governing this project. The value is passed to `SchemaRegistry.resolve()` at startup.
+`specd.yaml` must declare a `schema` field naming the schema that governs this project. The field is required — specd cannot start without it.
 
 ```yaml
-schema: "@specd/schema-std"
-# or a project-local schema:
-schema: "my-team-schema"
+schema: "@specd/schema-std"   # npm-distributed schema
+# or:
+schema: "my-team-schema"       # project-local or user-global schema
 ```
 
-`schema` is required. If absent, specd must exit with a validation error.
+The value is a plain name — no version pinning, no path. Version selection is handled by npm or by placing a specific version in the project-local schemas directory. `SchemaRegistry.resolve()` receives the name verbatim and applies the three-level lookup defined in `specs/_global/schema-format/spec.md`.
 
-#### Scenario: Schema resolved
+Schema resolution happens eagerly at startup, before any command is executed. A schema that cannot be resolved or fails structural validation causes specd to exit immediately. This ensures that all commands operate against a valid, fully-parsed schema.
 
-- **WHEN** `schema: "@specd/schema-std"` is declared
-- **THEN** `SchemaRegistry.resolve("@specd/schema-std")` is called and the schema governs all artifact and workflow behavior
+#### Scenario: npm-distributed schema
+
+- **WHEN** `schema: "@specd/schema-std"` is declared and the package is installed
+- **THEN** `SchemaRegistry.resolve("@specd/schema-std")` finds it under `node_modules/` and returns the parsed schema
+
+#### Scenario: Project-local schema
+
+- **WHEN** `schema: "my-team-schema"` is declared and `specd/schemas/my-team-schema/schema.yaml` exists
+- **THEN** the project-local version is used and takes precedence over any npm-installed version with the same name
+
+#### Scenario: Schema not found
+
+- **WHEN** the declared schema name matches nothing in any lookup level
+- **THEN** specd exits with a `SchemaNotFoundError` listing the name and the locations that were searched
+
+#### Scenario: Schema fails validation
+
+- **WHEN** the schema file is found but contains structural errors (e.g. missing `name`, circular `requires`)
+- **THEN** specd exits with a `SchemaValidationError` describing the problem before any command runs
 
 #### Scenario: Schema field missing
 
 - **WHEN** `specd.yaml` does not include a `schema` field
 - **THEN** specd exits with a validation error on startup
+
+### Requirement: Schema lookup path
+
+`specd.yaml` may include a `schemas` section configuring the project-local directory for schema files. This controls only the first lookup level; user-global and npm lookup levels are fixed and require no configuration.
+
+```yaml
+schemas:
+  path: specd/schemas # default; relative to specd.yaml location
+```
+
+When omitted, `specd/schemas` is used as the default. If the configured directory does not exist, that lookup level is silently skipped — it is not an error. Only when none of the three levels yields a match does resolution fail.
+
+#### Scenario: Default path used
+
+- **WHEN** `schemas` is omitted from `specd.yaml`
+- **THEN** `SchemaRegistry` searches `specd/schemas/<name>/schema.yaml` as the project-local level
+
+#### Scenario: Custom path
+
+- **WHEN** `schemas.path: team/schemas` is set
+- **THEN** `SchemaRegistry` searches `team/schemas/<name>/schema.yaml` as the project-local level
+
+#### Scenario: Configured directory does not exist
+
+- **WHEN** `schemas.path` points to a directory that does not exist on disk
+- **THEN** the project-local lookup level yields no results and resolution continues to the next level; no error is emitted
 
 ### Requirement: Storage configuration
 
