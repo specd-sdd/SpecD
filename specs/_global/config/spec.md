@@ -36,6 +36,40 @@ The search never goes above the git repo root. This prevents accidentally pickin
 - **WHEN** `specd --config /path/to/specd.yaml <command>` is invoked
 - **THEN** specd uses the specified file and skips all discovery logic
 
+### Requirement: Local config override
+
+Alongside `specd.yaml`, developers may place a `specd.local.yaml` file in the same directory to override settings for their local environment. The file is optional — its absence is normal and expected in most checkouts. `specd init` must add `specd.local.yaml` to the project's `.gitignore` so it is never committed.
+
+specd loads `specd.local.yaml` after `specd.yaml` and merges it on top using the following rules:
+
+- **Objects** are deep-merged recursively. A `storage.specs.path` override in the local file replaces only that path, leaving the rest of `storage` intact.
+- **Arrays** at any key are replaced entirely by the local value. There is no element-level merging for arrays — if `workflow` appears in the local file, it replaces the `workflow` array from `specd.yaml` in full.
+- **Scalar values** (strings, booleans, numbers) are replaced by the local value.
+
+Any field valid in `specd.yaml` is also valid in `specd.local.yaml`. There are no restricted keys — developers may override `schema`, storage paths, `externalScopes`, `codeRoot`, `workflow`, `artifactRules`, and `plugins` as needed. Validation runs against the merged result, not each file independently.
+
+When the CLI is invoked with `--config path/to/specd.yaml`, specd looks for a local override at `specd.local.yaml` in the same directory as the specified file.
+
+#### Scenario: Local path override
+
+- **WHEN** `specd.local.yaml` sets `storage.changes.path: /tmp/specd-changes`
+- **THEN** the merged config uses `/tmp/specd-changes` for changes; all other `storage` keys come from `specd.yaml`
+
+#### Scenario: Local workflow replacement
+
+- **WHEN** `specd.local.yaml` contains a `workflow` array
+- **THEN** the entire `workflow` from `specd.yaml` is replaced by the local array; the local file's hooks are the only project-level hooks applied
+
+#### Scenario: Local file absent
+
+- **WHEN** no `specd.local.yaml` exists alongside `specd.yaml`
+- **THEN** specd loads and uses `specd.yaml` as-is; no error is emitted
+
+#### Scenario: Local file not committed
+
+- **WHEN** `specd init` is run
+- **THEN** `specd.local.yaml` is added to `.gitignore` if not already present
+
 ### Requirement: Schema reference
 
 `specd.yaml` must declare a `schema` field that names the schema governing this project. The value is passed to `SchemaRegistry.resolve()` at startup.
@@ -316,6 +350,9 @@ specd must validate `specd.yaml` before executing any command. Validation must c
 ## Constraints
 
 - `schema` is required — specd cannot start without a schema reference
+- `specd.local.yaml` is always `.gitignored`; `specd init` must add it automatically
+- Array keys in `specd.local.yaml` replace their counterparts entirely — there is no element-level array merging
+- Validation runs against the merged config, not each file in isolation
 - `externalScopes` aliases must be unique within the file and must not match the first segment of any local spec path
 - `requires` is not valid in project-level `workflow` entries
 - Relative paths resolve from the `specd.yaml` directory; paths outside the repo root require `allowExternalPaths: true` (external scope paths are unconditionally allowed)
