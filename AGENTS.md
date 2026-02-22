@@ -22,13 +22,21 @@ specd/
 │       ├── copilot/       # @specd/plugin-copilot
 │       └── codex/         # @specd/plugin-codex
 ├── specs/
-│   └── _global/           # Global constraints — apply to ALL packages
-│       ├── architecture/spec.md
-│       ├── conventions/spec.md
-│       ├── commits/spec.md
-│       └── testing/spec.md
+│   ├── _global/           # Global constraints — apply to ALL packages
+│   │   ├── architecture/  # spec.md + verify.md
+│   │   ├── conventions/   # spec.md + verify.md
+│   │   ├── commits/       # spec.md + verify.md
+│   │   ├── testing/       # spec.md + verify.md
+│   │   ├── docs/          # spec.md + verify.md
+│   │   ├── eslint/        # spec.md + verify.md
+│   │   ├── spec-layout/   # spec.md + verify.md
+│   │   ├── schema-format/ # spec.md + verify.md — schema YAML structure
+│   │   └── config/        # spec.md + verify.md — specd.yaml structure
+│   └── core/              # Package specs for @specd/core
 └── .specd/
-    └── PROPOSAL.md        # Full design proposal
+    ├── INITIAL-PROPOSAL.md  # Full design proposal and rationale
+    ├── PLAN.md              # Implementation plan
+    └── WORKSPACE-DESIGN.md  # Workspace design notes
 ```
 
 ---
@@ -42,45 +50,17 @@ Before writing any code, you MUST read the following specs in full. They are bin
 - [`specs/_global/commits/spec.md`](specs/_global/commits/spec.md)
 - [`specs/_global/testing/spec.md`](specs/_global/testing/spec.md)
 - [`specs/_global/docs/spec.md`](specs/_global/docs/spec.md)
+- [`specs/_global/eslint/spec.md`](specs/_global/eslint/spec.md)
+- [`specs/_global/spec-layout/spec.md`](specs/_global/spec-layout/spec.md)
 
----
+**Contextual reads** — read these when working on the relevant area:
 
-## Architecture Constraints
+- [`specs/_global/schema-format/spec.md`](specs/_global/schema-format/spec.md) — when working on schema loading, parsing, or validation
+- [`specs/_global/config/spec.md`](specs/_global/config/spec.md) — when working on config loading, resolution, or validation
 
-- `@specd/core` has three layers: `domain/`, `application/`, `infrastructure/`
-- `domain/` must not import from `application/` or `infrastructure/`
-- `application/` must not import from `infrastructure/`
-- Use cases receive all dependencies via constructor — no module-level singletons
-- Domain entities enforce their own state transitions and throw typed `SpecdError` subclasses
-- Stateless domain operations are plain exported functions, not classes
-- `@specd/cli`, `@specd/mcp`, `@specd/plugin-*` are adapters — no business logic
+Each `spec.md` has a paired `verify.md` in the same directory with WHEN/THEN scenarios. Read it if you need to verify expected behaviour or understand edge cases for a requirement.
 
-## Code Conventions
-
-- `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true` — always
-- No default exports — named exports only
-- No `any` — use `unknown` and narrow with type guards
-- Source files: `kebab-case.ts`
-- Test files: `test/<mirrors src path>/name.spec.ts` — never co-located with source
-
-## Commit Conventions
-
-Format: `<type>(<scope>): <description>`
-
-- Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `build`
-- Scope: short package name (`core`, `cli`, `mcp`, `skills`, `schema-std`, `root`)
-- Imperative mood: "add", "fix", "remove" — not "added", "fixes"
-- No trailing period
-- No `Co-Authored-By` footer unless explicitly requested
-
-## Testing
-
-- Vitest only — no Jest
-- Test files in `test/` directory mirroring `src/` structure
-- Unit tests: mock all ports — no real filesystem or network
-- Port mocks must fully implement the port interface (unused methods throw `new Error('not implemented')`)
-- Integration tests use `os.tmpdir()` with a unique subfolder, cleaned up after each test
-- No snapshot tests
+**Package specs:** before working on a specific package, also read `specs/<package>/` if it exists (e.g. `specs/core/` when working on `@specd/core`). These are binding for that package.
 
 ---
 
