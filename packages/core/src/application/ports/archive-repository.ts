@@ -1,10 +1,10 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
-import { type ApprovalRequiredError } from '../../domain/errors/approval-required-error.js'
+import { type InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { Repository, type RepositoryConfig } from './repository.js'
 
 export { type RepositoryConfig as ArchiveRepositoryConfig }
-export type { ApprovalRequiredError }
+export type { InvalidStateTransitionError }
 
 /**
  * Port for archiving and querying archived changes within a single workspace.
@@ -29,13 +29,13 @@ export abstract class ArchiveRepository extends Repository {
    * Moves the change directory to the archive, creates the `ArchivedChange`
    * record, persists its manifest, and appends an entry to `index.jsonl`.
    *
-   * As a safety guard, the repository verifies that all required specs in the
-   * change have been approved before proceeding. This check is intentionally
+   * As a safety guard, the repository verifies that the change is in
+   * `archivable` state before proceeding. This check is intentionally
    * redundant — the `ArchiveChange` use case performs the same validation
    * first. The guard exists to prevent accidental archival if the repository
    * is called directly without going through the use case.
    *
-   * Pass `{ force: true }` to bypass the approval check (e.g. for recovery
+   * Pass `{ force: true }` to bypass the state check (e.g. for recovery
    * or administrative operations).
    *
    * The destination path is computed from the archive pattern configured at
@@ -44,9 +44,9 @@ export abstract class ArchiveRepository extends Repository {
    *
    * @param change - The change to archive
    * @param options - Archive options
-   * @param options.force - When `true`, skip the approval check and archive unconditionally
+   * @param options.force - When `true`, skip the state check and archive unconditionally
    * @returns The created `ArchivedChange` record
-   * @throws {ApprovalRequiredError} When the change has unapproved specs and `force` is not set
+   * @throws {InvalidStateTransitionError} When the change is not in `archivable` state and `force` is not set
    */
   abstract archive(change: Change, options?: { force?: boolean }): Promise<ArchivedChange>
 

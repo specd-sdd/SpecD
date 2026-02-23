@@ -23,7 +23,7 @@ describe('ArchivedChange', () => {
       expect(ac.artifacts).toEqual(['proposal', 'design', 'tasks'])
     })
 
-    it('defaults approval to undefined', () => {
+    it('stores an empty artifacts array', () => {
       const ac = new ArchivedChange({
         name: 'add-oauth-login',
         archivedName: '20260219-143022-add-oauth-login',
@@ -31,55 +31,7 @@ describe('ArchivedChange', () => {
         archivedAt,
         artifacts: [],
       })
-      expect(ac.approval).toBeUndefined()
-    })
-
-    it('stores approval record when provided', () => {
-      const approval = {
-        reason: 'Approved for migration',
-        approvedBy: 'alice@example.com',
-        approvedAt: new Date(),
-        structuralChanges: [],
-      }
-      const ac = new ArchivedChange({
-        name: 'add-oauth-login',
-        archivedName: '20260219-143022-add-oauth-login',
-        workspace,
-        archivedAt,
-        artifacts: [],
-        approval,
-      })
-      expect(ac.approval).toBe(approval)
-    })
-  })
-
-  describe('wasStructural', () => {
-    it('returns false when no approval record', () => {
-      const ac = new ArchivedChange({
-        name: 'add-oauth-login',
-        archivedName: '20260219-143022-add-oauth-login',
-        workspace,
-        archivedAt,
-        artifacts: [],
-      })
-      expect(ac.wasStructural).toBe(false)
-    })
-
-    it('returns true when approval record is present', () => {
-      const ac = new ArchivedChange({
-        name: 'add-oauth-login',
-        archivedName: '20260219-143022-add-oauth-login',
-        workspace,
-        archivedAt,
-        artifacts: [],
-        approval: {
-          reason: 'Approved',
-          approvedBy: 'alice@example.com',
-          approvedAt: new Date(),
-          structuralChanges: [],
-        },
-      })
-      expect(ac.wasStructural).toBe(true)
+      expect(ac.artifacts).toHaveLength(0)
     })
   })
 })
