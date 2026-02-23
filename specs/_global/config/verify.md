@@ -135,6 +135,11 @@
 - **WHEN** `specd.yaml` declares a `workspaces` section but omits `default`
 - **THEN** specd exits with a `ConfigValidationError`
 
+#### Scenario: Missing codeRoot in non-default workspace
+
+- **WHEN** a non-`default` workspace entry omits `codeRoot`
+- **THEN** specd exits with a `ConfigValidationError` at startup
+
 ### Requirement: Storage configuration
 
 #### Scenario: Default storage layout
