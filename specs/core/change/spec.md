@@ -98,7 +98,13 @@ A change may be moved between storage locations without affecting its internal s
 
 - **Draft** (`changes/` → `drafts/`) — shelves the change. The change retains its lifecycle state and all records. Can be performed at any point before archiving.
 - **Restore** (`drafts/` → `changes/`) — recovers a drafted change. It resumes from its preserved state.
-- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Requires a mandatory `reason` string. Cannot be undone.
+- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Requires a `DiscardRecord` with:
+  - **`reason`** — mandatory human-provided explanation
+  - **`discardedBy`** — git identity (name + email) of the person discarding
+  - **`discardedAt`** — timestamp
+  - **`supersededBy`** — optional list of change names that replace this one
+
+  The `DiscardRecord` is stored in the manifest. Cannot be undone.
 
 ## Constraints
 
@@ -112,7 +118,7 @@ A change may be moved between storage locations without affecting its internal s
 - When `approvals.spec: true`, spec approval is required before `implementing`
 - When `approvals.signoff: true`, sign-off is always required before `archivable`, regardless of change content
 - Approval records are never modified; invalidated records are retained as history marked superseded
-- Discarding a change requires a mandatory reason and is irreversible
+- Discarding a change requires a `DiscardRecord` with mandatory `reason` and `discardedBy`; it is irreversible
 
 ## Spec Dependencies
 
