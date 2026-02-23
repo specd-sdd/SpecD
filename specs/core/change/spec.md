@@ -27,9 +27,9 @@ Workspace IDs in the list must be validated against `specd.yaml` at creation tim
 A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.implementation`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:
 
 ```
-drafting → designing → ready ──────────────────────────────────────── → implementing → done ───────────────────────── → archivable
-                             ╌→ pending-spec-approval → spec-approved ┘               ╌→ pending-approval → approved ┘
-                               (if approvals.spec: true)                                (if approvals.implementation: true)
+drafting → designing → ready ──────────────────────────────────────── → implementing → done ──────────────────── → archivable
+                             ╌→ pending-spec-approval → spec-approved ┘               ╌→ pending-signoff → signed-off ┘
+                               (if approvals.spec: true)                                (if approvals.signoff: true)
 ```
 
 | State                   | Meaning                                                                             |
@@ -41,8 +41,8 @@ drafting → designing → ready ───────────────�
 | `spec-approved`         | Spec has been approved; implementation may begin                                    |
 | `implementing`          | Code is being written against the spec                                              |
 | `done`                  | Implementation is complete                                                          |
-| `pending-approval`      | Waiting for human approval of the implementation before the change may be archived  |
-| `approved`              | Implementation has been approved; the change may be archived                        |
+| `pending-signoff`       | Waiting for human sign-off on the completed work before archiving                   |
+| `signed-off`            | Work has been signed off; the change may be archived                                |
 | `archivable`            | Terminal state; the change may be moved to the archive                              |
 
 Only the transitions shown above are valid. Any attempt to transition to a state not reachable from the current state throws `InvalidStateTransitionError`. `archivable` is terminal — no further transitions are possible.
@@ -53,11 +53,11 @@ When `approvals.spec: true`, the transition from `ready` to `implementing` is bl
 
 When `approvals.spec: false` (default), `ready → implementing` is a free transition. The `pending-spec-approval` and `spec-approved` states are unreachable.
 
-### Requirement: Implementation approval gate
+### Requirement: Signoff gate
 
-When `approvals.implementation: true`, the transition from `done` to `archivable` is always blocked — regardless of whether the change contains only new specs, modifications, or removals. The change must transition to `pending-approval`, receive an explicit `ApprovalRecord`, and transition through `approved → archivable`.
+When `approvals.signoff: true`, the transition from `done` to `archivable` is always blocked — regardless of whether the change contains only new specs, modifications, or removals. The change must transition to `pending-signoff`, receive an explicit sign-off record (approver identity, reason, timestamp), and transition through `signed-off → archivable`.
 
-When `approvals.implementation: false` (default), `done → archivable` is a free transition. Attempting to archive a change that is not in `archivable` state throws `ApprovalRequiredError`.
+When `approvals.signoff: false` (default), `done → archivable` is a free transition. Attempting to archive a change that is not in `archivable` state throws `SignoffRequiredError`.
 
 ### Requirement: Artifacts
 
@@ -113,7 +113,7 @@ The change manifest records the name and version of the schema that was active w
 - `archivable` is the only state from which a change may be archived
 - Both approval gates default to `false` — teams opt in via `approvals` in `specd.yaml`
 - When `approvals.spec: true`, spec approval is required before `implementing`
-- When `approvals.implementation: true`, implementation approval is always required before `archivable`, regardless of change content
+- When `approvals.signoff: true`, sign-off is always required before `archivable`, regardless of change content
 - Each approval record is written once and never updated; a change carries at most two records (one per gate)
 - The schema name and version recorded at creation are never updated by subsequent operations
 

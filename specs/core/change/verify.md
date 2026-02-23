@@ -70,27 +70,27 @@
 - **WHEN** `approvals.spec: true` and a Change in `pending-spec-approval` receives approval
 - **THEN** it transitions to `spec-approved` and then to `implementing`
 
-### Requirement: Implementation approval gate
+### Requirement: Signoff gate
 
 #### Scenario: Gate disabled — free transition to archivable
 
-- **WHEN** `approvals.implementation: false` (default) and a Change is in `done` state
+- **WHEN** `approvals.signoff: false` (default) and a Change is in `done` state
 - **THEN** it transitions directly to `archivable` regardless of change content
 
 #### Scenario: Gate enabled — always blocked at done
 
-- **WHEN** `approvals.implementation: true` and a Change is in `done` state
-- **THEN** it transitions to `pending-approval`, not `archivable` — regardless of whether changes are additions, modifications, or removals
+- **WHEN** `approvals.signoff: true` and a Change is in `done` state
+- **THEN** it transitions to `pending-signoff`, not `archivable` — regardless of whether changes are additions, modifications, or removals
 
-#### Scenario: Gate enabled — archivable after approval
+#### Scenario: Gate enabled — archivable after signoff
 
-- **WHEN** `approvals.implementation: true` and a Change in `pending-approval` receives approval
-- **THEN** it transitions to `approved` and then to `archivable`
+- **WHEN** `approvals.signoff: true` and a Change in `pending-signoff` receives sign-off
+- **THEN** it transitions to `signed-off` and then to `archivable`
 
-#### Scenario: Archive without approval throws
+#### Scenario: Archive without signoff throws
 
-- **WHEN** a Change is not in `archivable` state and archiving is attempted
-- **THEN** `ApprovalRequiredError` is thrown
+- **WHEN** `approvals.signoff: true` and a Change is not in `archivable` state and archiving is attempted
+- **THEN** `SignoffRequiredError` is thrown
 
 ### Requirement: Artifacts
 
@@ -138,10 +138,10 @@
 
 ### Requirement: Approval records
 
-#### Scenario: Post-implementation approval recorded once
+#### Scenario: Sign-off recorded once
 
-- **WHEN** a Change in `pending-approval` is approved with a reason and approver identity
-- **THEN** an `ApprovalRecord` is written to the manifest and the change transitions to `approved`
+- **WHEN** a Change in `pending-signoff` is signed off with a reason and approver identity
+- **THEN** a sign-off record is written to the manifest and the change transitions to `signed-off`
 
 #### Scenario: Pre-implementation approval recorded once
 
@@ -153,10 +153,10 @@
 - **WHEN** a Change already has an `ApprovalRecord` for a gate
 - **THEN** no subsequent operation may overwrite or modify it
 
-#### Scenario: Two independent approval records
+#### Scenario: Two independent records
 
 - **WHEN** both gates are enabled and a Change passes through both approval flows
-- **THEN** the manifest contains two distinct `ApprovalRecord` entries — one for spec approval, one for structural change approval
+- **THEN** the manifest contains two distinct records — one spec approval record, one sign-off record
 
 ### Requirement: Schema version
 
