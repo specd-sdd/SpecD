@@ -96,7 +96,13 @@ The change manifest records the name and version of the schema that was active w
 
 A change may be moved between storage locations without affecting its internal state:
 
-- **Draft** (`changes/` → `drafts/`) — shelves the change. The change retains its lifecycle state and all records. Can be performed at any point before archiving.
+- **Draft** (`changes/` → `drafts/`) — shelves the change. The change retains its lifecycle state and all records. Requires a `DraftRecord` with:
+  - **`draftedBy`** — mandatory git identity (name + email) of the person shelving
+  - **`draftedAt`** — timestamp
+  - **`reason`** — optional explanation
+
+  Can be performed at any point before archiving.
+
 - **Restore** (`drafts/` → `changes/`) — recovers a drafted change. It resumes from its preserved state.
 - **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Requires a `DiscardRecord` with:
   - **`reason`** — mandatory human-provided explanation

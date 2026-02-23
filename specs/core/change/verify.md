@@ -175,10 +175,15 @@
 
 ### Requirement: Drafting and discarding
 
+#### Scenario: Draft requires identity
+
+- **WHEN** a Change is drafted without providing a `draftedBy` identity
+- **THEN** the operation fails with a validation error
+
 #### Scenario: Draft moves change out of active changes
 
-- **WHEN** a Change in `implementing` state is drafted
-- **THEN** it is moved to `drafts/`, retains its `implementing` state, and no longer appears in the active changes list
+- **WHEN** a Change in `implementing` state is drafted with a valid identity
+- **THEN** a `DraftRecord` is written to the manifest, the change is moved to `drafts/`, retains its `implementing` state, and no longer appears in the active changes list
 
 #### Scenario: Restore recovers a drafted change
 
