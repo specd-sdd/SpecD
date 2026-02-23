@@ -53,49 +53,44 @@
 - **WHEN** a Change in `archivable` state is transitioned to any other state
 - **THEN** `InvalidStateTransitionError` is thrown
 
-### Requirement: Pre-implementation approval gate
+### Requirement: Spec approval gate
 
 #### Scenario: Gate disabled — free transition to implementing
 
-- **WHEN** `approvals.preImplementation: false` (default) and a Change is in `ready` state
+- **WHEN** `approvals.spec: false` (default) and a Change is in `ready` state
 - **THEN** it transitions directly to `implementing` with no approval required
 
 #### Scenario: Gate enabled — blocked until spec approved
 
-- **WHEN** `approvals.preImplementation: true` and a Change is in `ready` state
+- **WHEN** `approvals.spec: true` and a Change is in `ready` state
 - **THEN** it transitions to `pending-spec-approval`, not `implementing`
 
 #### Scenario: Gate enabled — implementing reachable after approval
 
-- **WHEN** `approvals.preImplementation: true` and a Change in `pending-spec-approval` receives approval
+- **WHEN** `approvals.spec: true` and a Change in `pending-spec-approval` receives approval
 - **THEN** it transitions to `spec-approved` and then to `implementing`
 
-### Requirement: Transition to archivable
+### Requirement: Implementation approval gate
 
-#### Scenario: Structural gate disabled — always direct to archivable
+#### Scenario: Gate disabled — free transition to archivable
 
-- **WHEN** `approvals.structuralChanges: false` (default) and a Change in `done` has structural modifications
-- **THEN** it transitions directly to `archivable` regardless of structural content
+- **WHEN** `approvals.implementation: false` (default) and a Change is in `done` state
+- **THEN** it transitions directly to `archivable` regardless of change content
 
-#### Scenario: Structural gate enabled — no structural changes, direct to archivable
+#### Scenario: Gate enabled — always blocked at done
 
-- **WHEN** `approvals.structuralChanges: true` and a Change in `done` has no structural modifications
-- **THEN** it transitions directly to `archivable`
+- **WHEN** `approvals.implementation: true` and a Change is in `done` state
+- **THEN** it transitions to `pending-approval`, not `archivable` — regardless of whether changes are additions, modifications, or removals
 
-#### Scenario: Structural gate enabled — structural changes require approval
+#### Scenario: Gate enabled — archivable after approval
 
-- **WHEN** `approvals.structuralChanges: true` and a Change in `done` has at least one structural modification
-- **THEN** it transitions to `pending-approval`, not `archivable`
+- **WHEN** `approvals.implementation: true` and a Change in `pending-approval` receives approval
+- **THEN** it transitions to `approved` and then to `archivable`
 
 #### Scenario: Archive without approval throws
 
-- **WHEN** a Change in `pending-approval` state is archived
+- **WHEN** a Change is not in `archivable` state and archiving is attempted
 - **THEN** `ApprovalRequiredError` is thrown
-
-#### Scenario: ADDED operations do not require approval
-
-- **WHEN** `approvals.structuralChanges: true` and a Change in `done` has only ADDED delta operations
-- **THEN** it transitions directly to `archivable`
 
 ### Requirement: Artifacts
 
