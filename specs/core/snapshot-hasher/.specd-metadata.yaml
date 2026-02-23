@@ -1,0 +1,17 @@
+title: Snapshot Hasher
+description: >
+  Specifies the hashFiles pure domain service that computes SHA-256 content
+  hashes for a set of files, enabling drift detection when file content
+  changes after a validation pass.
+keywords:
+  - sha256
+  - integrity
+  - checksums
+  - drift-detection
+  - pure-functions
+  - domain-services
+dependsOn:
+  - specs/_global/architecture/
+contentHashes:
+  spec.md: 'sha256:9a61e6453994faa05f9ac901fa43be47ca1b15d2b87764f59f1a04b96dd07f83'
+  verify.md: 'sha256:6b20ea953f6b51ed6ab7fb0dcafe409d5d6f8517c215bddaf9a5e0b933414065'

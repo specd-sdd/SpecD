@@ -1,0 +1,19 @@
+title: Testing Conventions
+description: >
+  Defines the testing strategy for the specd monorepo — unit tests with
+  mocked ports for domain and application layers, integration tests for
+  infrastructure adapters — using Vitest with co-located test files mirroring
+  the source tree.
+keywords:
+  - vitest
+  - unit-testing
+  - integration-testing
+  - code-quality
+  - test-isolation
+  - mocking
+dependsOn:
+  - specs/_global/architecture/
+  - specs/_global/conventions/
+contentHashes:
+  spec.md: 'sha256:2f2ce1056c8d8fa6d4316bf37f8749643a45078dcd1287c442d9ede502ddc63d'
+  verify.md: 'sha256:7cdbf5af7e93cf8c770b7aed3c03672a2eec07b09e1c0466bd8f5ac3bb63c57e'

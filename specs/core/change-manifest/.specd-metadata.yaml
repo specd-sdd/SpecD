@@ -1,0 +1,19 @@
+title: Change Manifest
+description: >
+  Defines the manifest.json file format that persists the full state of a
+  Change — top-level fields, JSON serialization of all event types, schema
+  version behavior, and the atomic write requirement.
+keywords:
+  - serialization
+  - json
+  - event-sourcing
+  - filesystem
+  - atomic-write
+  - integrity
+dependsOn:
+  - specs/core/change/
+  - specs/core/storage/
+  - specs/core/spec-metadata/
+contentHashes:
+  spec.md: 'sha256:7a96702d09c83e58e84780fb264bfea11ba88a140d2bd385080720654c37299b'
+  verify.md: 'sha256:8a3d2a9a8c7b6c60e5ea86b09a4e52263df7b846efc6d3cf025de64ce40b958e'

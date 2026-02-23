@@ -1,0 +1,19 @@
+title: Delta Merger
+description: >
+  Specifies the mergeSpecs pure function that applies a delta spec to a base
+  spec using schema-driven block-level operations, producing a merged result
+  or raising a conflict error when operations are incompatible.
+keywords:
+  - merge
+  - diff
+  - conflict
+  - pure-functions
+  - functional
+  - schema-driven
+  - domain-services
+dependsOn:
+  - specs/core/schema-format/
+  - specs/_global/architecture/
+contentHashes:
+  spec.md: 'sha256:0abb0567ee6aab05f6d0b06703b17c1009f5a9d60efbca3f0b927bee45427e4b'
+  verify.md: 'sha256:5b362bfa911c892c694113ea4a0ed5f67b0c075b09aa6b8df5eaccf449f659bc'

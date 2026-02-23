@@ -1,0 +1,20 @@
+title: Storage
+description: >
+  Defines the port interfaces for specd's storage layer — change repository,
+  archive repository, and schema registry — along with filesystem layout,
+  directory naming conventions, atomic writes, and archive index structure.
+keywords:
+  - filesystem
+  - fs
+  - port-adapter
+  - naming-convention
+  - atomic-write
+  - archive
+  - hexagonal
+dependsOn:
+  - specs/_global/architecture/
+  - specs/core/change/
+  - specs/core/change-manifest/
+contentHashes:
+  spec.md: 'sha256:dfe75047764c70b8a831cd41ffe1626c1248cb56b4fb50dfa2db724ad8097813'
+  verify.md: 'sha256:db8c968e9a4909f0142c44fb0d1ff464abe10009c462a4e86948e688b0c57343'

@@ -1,0 +1,17 @@
+title: Coding Conventions
+description: >
+  TypeScript coding conventions for the specd monorepo — ESM-only, strict
+  types, file naming, import rules, and forbidden patterns — that apply to
+  all packages.
+keywords:
+  - typescript
+  - esm
+  - modules
+  - naming-convention
+  - strict
+  - code-style
+  - type-safety
+dependsOn: []
+contentHashes:
+  spec.md: 'sha256:5a0bec459066c950f50c89b014d5335b1db0cca5d686ca542ea650aff29a9884'
+  verify.md: 'sha256:9dd5bb3432b73ff956f4900cf1ce64301e1ea79430c1ea633546b3ac61b15c99'
