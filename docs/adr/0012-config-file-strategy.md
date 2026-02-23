@@ -52,4 +52,4 @@ A global user config (`~/.specd/`) is intentionally not part of v1. A global fil
 
 ### Spec
 
-- [`specs/_global/config/spec.md`](../../specs/_global/config/spec.md)
+- [`specs/core/config/spec.md`](../../specs/core/config/spec.md)

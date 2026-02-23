@@ -250,8 +250,9 @@ Keys are validated against the active schema's artifact IDs at startup. Unknown 
 2. Workspace-level include patterns from each active workspace (in workspace declaration order, then pattern order within each workspace)
 3. Project-level exclude patterns — always applied
 4. Workspace-level exclude patterns from each active workspace (same order as step 2)
+5. All specs reachable via `dependsOn` traversal — starting from the change's `contextSpecIds`, following `dependsOn` links in each spec's `.specd-metadata.yaml` transitively until no new specs are found. These specs are **not subject to exclude rules from steps 3 or 4** — a declared dependency is always included regardless of project or workspace excludes.
 
-Specs matched by earlier patterns take priority if the context must be truncated. A spec matched by multiple include patterns appears only once, at the position of the first matching pattern.
+Specs matched by earlier patterns take priority if the context must be truncated. A spec matched by multiple include patterns appears only once, at the position of the first matching pattern. Specs added in step 5 that were already included in steps 1–4 also appear only once (at their earlier position). See [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
 
 ```yaml
 # always in context — global constraints regardless of change scope
@@ -522,9 +523,10 @@ artifactRules:
 
 ## Spec Dependencies
 
-- [`specs/_global/schema-format/spec.md`](../schema-format/spec.md) — schema structure and resolution order
-- [`specs/_global/architecture/spec.md`](../architecture/spec.md) — port and adapter design
-- [`specs/core/storage/spec.md`](../../core/storage/spec.md) — storage adapter behavior
+- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — schema structure and resolution order
+- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port and adapter design
+- [`specs/core/storage/spec.md`](../storage/spec.md) — storage adapter behavior
+- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal in step 5
 
 ## ADRs
 

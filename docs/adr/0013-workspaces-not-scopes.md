@@ -67,4 +67,4 @@ Absence of `scope` (as workspace concept) in all source files and specs confirms
 
 ### Spec
 
-- [`specs/_global/config/spec.md`](../../specs/_global/config/spec.md)
+- [`specs/core/config/spec.md`](../../specs/core/config/spec.md)
