@@ -24,9 +24,13 @@ No documentation lives outside `docs/` except `README.md` at the project root an
 Every Architecture Decision Record follows the [MADR](https://adr.github.io/madr/) format (Markdown Architectural Decision Records) verbatim, with one project-specific addition: a `### Spec` sub-section inside `## More Information` linking to the spec(s) that capture constraints derived from this decision.
 
 ```markdown
-| status                                                                          | date       | decision-makers                        | consulted                                                      | informed                                             |
-| ------------------------------------------------------------------------------- | ---------- | -------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
-| {proposed \| rejected \| accepted \| deprecated \| … \| superseded by ADR-0123} | YYYY-MM-DD | list everyone involved in the decision | list everyone whose opinions are sought; two-way communication | list everyone kept up-to-date; one-way communication |
+---
+status: '{proposed | rejected | accepted | deprecated | … | superseded by ADR-0123}'
+date: YYYY-MM-DD
+decision-makers: list everyone involved in the decision
+consulted: list everyone whose opinions are sought; two-way communication
+informed: list everyone kept up-to-date; one-way communication
+---
 
 # {short title, representative of solved problem and found solution}
 

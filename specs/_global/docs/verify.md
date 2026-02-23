@@ -26,9 +26,9 @@
 - **WHEN** an ADR describes a decision where multiple options were genuinely evaluated
 - **THEN** it must include `## Considered Options` and at least one entry per option evaluated
 
-#### Scenario: ADR missing metadata table
+#### Scenario: ADR missing frontmatter
 
-- **WHEN** an ADR file has no metadata table with `status` and `date` columns before the title
+- **WHEN** an ADR file has no YAML frontmatter block with `status` and `date` fields before the title
 - **THEN** the review must reject it as malformed
 
 ### Requirement: ADR numbering
