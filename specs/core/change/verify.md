@@ -53,16 +53,38 @@
 - **WHEN** a Change in `archivable` state is transitioned to any other state
 - **THEN** `InvalidStateTransitionError` is thrown
 
+### Requirement: Pre-implementation approval gate
+
+#### Scenario: Gate disabled — free transition to implementing
+
+- **WHEN** `approvals.preImplementation: false` (default) and a Change is in `ready` state
+- **THEN** it transitions directly to `implementing` with no approval required
+
+#### Scenario: Gate enabled — blocked until spec approved
+
+- **WHEN** `approvals.preImplementation: true` and a Change is in `ready` state
+- **THEN** it transitions to `pending-spec-approval`, not `implementing`
+
+#### Scenario: Gate enabled — implementing reachable after approval
+
+- **WHEN** `approvals.preImplementation: true` and a Change in `pending-spec-approval` receives approval
+- **THEN** it transitions to `spec-approved` and then to `implementing`
+
 ### Requirement: Transition to archivable
 
-#### Scenario: No structural changes — direct to archivable
+#### Scenario: Structural gate disabled — always direct to archivable
 
-- **WHEN** a Change in `done` state has no structural modifications
+- **WHEN** `approvals.structuralChanges: false` (default) and a Change in `done` has structural modifications
+- **THEN** it transitions directly to `archivable` regardless of structural content
+
+#### Scenario: Structural gate enabled — no structural changes, direct to archivable
+
+- **WHEN** `approvals.structuralChanges: true` and a Change in `done` has no structural modifications
 - **THEN** it transitions directly to `archivable`
 
-#### Scenario: Structural changes — requires approval path
+#### Scenario: Structural gate enabled — structural changes require approval
 
-- **WHEN** a Change in `done` state has at least one structural modification (MODIFIED or REMOVED)
+- **WHEN** `approvals.structuralChanges: true` and a Change in `done` has at least one structural modification
 - **THEN** it transitions to `pending-approval`, not `archivable`
 
 #### Scenario: Archive without approval throws
@@ -72,7 +94,7 @@
 
 #### Scenario: ADDED operations do not require approval
 
-- **WHEN** a Change in `done` state has only ADDED delta operations and no MODIFIED or REMOVED operations
+- **WHEN** `approvals.structuralChanges: true` and a Change in `done` has only ADDED delta operations
 - **THEN** it transitions directly to `archivable`
 
 ### Requirement: Artifacts
@@ -119,17 +141,27 @@
 - **WHEN** a delta merger detects only ADDED operations
 - **THEN** no structural change entries are added
 
-### Requirement: Approval
+### Requirement: Approval records
 
-#### Scenario: Approval recorded once
+#### Scenario: Post-implementation approval recorded once
 
 - **WHEN** a Change in `pending-approval` is approved with a reason and approver identity
 - **THEN** an `ApprovalRecord` is written to the manifest and the change transitions to `approved`
 
-#### Scenario: Approval record not modified
+#### Scenario: Pre-implementation approval recorded once
 
-- **WHEN** a Change already has an `ApprovalRecord`
+- **WHEN** a Change in `pending-spec-approval` is approved with a reason and approver identity
+- **THEN** an `ApprovalRecord` is written to the manifest and the change transitions to `spec-approved`
+
+#### Scenario: Approval records not modified
+
+- **WHEN** a Change already has an `ApprovalRecord` for a gate
 - **THEN** no subsequent operation may overwrite or modify it
+
+#### Scenario: Two independent approval records
+
+- **WHEN** both gates are enabled and a Change passes through both approval flows
+- **THEN** the manifest contains two distinct `ApprovalRecord` entries — one for spec approval, one for structural change approval
 
 ### Requirement: Schema version
 

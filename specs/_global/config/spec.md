@@ -277,6 +277,22 @@ References to unknown workspace qualifiers produce a warning at startup but do n
 
 `specd config validate` additionally warns when a pattern (include or exclude, at any level) matches no specs on disk at validation time. This is not a runtime error — specs may not exist yet — but the warning helps catch typos early.
 
+### Requirement: Approvals
+
+`specd.yaml` may include an `approvals` section to configure which lifecycle gates require explicit human approval. Both gates are disabled by default — teams opt in to the level of governance they need.
+
+```yaml
+approvals:
+  preImplementation: false # require approval before implementing (default: false)
+  structuralChanges: false # require approval for MODIFIED/REMOVED operations (default: false)
+```
+
+**`preImplementation`** — when `true`, a change in `ready` state cannot transition directly to `implementing`. It must first enter `pending-spec-approval` and receive an explicit approval (with approver identity, reason, and timestamp) before transitioning to `spec-approved` and then to `implementing`. When `false` (default), `ready → implementing` is a free transition.
+
+**`structuralChanges`** — when `true`, a change in `done` state that contains structural modifications (MODIFIED or REMOVED delta operations) cannot transition directly to `archivable`. It must enter `pending-approval`, receive explicit approval, and transition through `approved → archivable`. When `false` (default), `done → archivable` is always a free transition regardless of structural content.
+
+Both flags are independent — any combination is valid.
+
 ### Requirement: Plugin declarations
 
 `specd.yaml` may include a `plugins` section declaring which agent-integration plugins are installed. Each entry must include `name`; `options` is plugin-specific and optional.
