@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-19 | specd maintainer | -         | -        |
+
 # ADR-0007: Archive Organization — Configurable Pattern, Index with Glob Fallback
-
-## Status
-
-Accepted — 2026-02-19
 
 ## Context and Problem Statement
 
@@ -39,16 +39,18 @@ The archive `fs` adapter exposes a `pattern` configuration field in `specd.yaml`
 
 ### Consequences
 
-- Good: teams can choose flat (default), by-year, by-month, or by-day organization without forking specd
-- Good: the archive remains navigable at any scale
-- Good: the index provides fast lookups; inconsistency is recoverable via `specd storage reindex`
-- Bad: `{{change.scope}}` is not available in patterns — scope-based grouping must be achieved through change naming conventions
-- Bad: `FsArchiveRepository` has slightly more complexity than a naive implementation, but the behavior is fully deterministic and testable
+- Good, because teams can choose flat (default), by-year, by-month, or by-day organization without forking specd
+- Good, because the archive remains navigable at any scale
+- Good, because the index provides fast lookups; inconsistency is recoverable via `specd storage reindex`
+- Bad, because `{{change.scope}}` is not available in patterns — scope-based grouping must be achieved through change naming conventions
+- Bad, because `FsArchiveRepository` has slightly more complexity than a naive implementation, but the behavior is fully deterministic and testable
 
 ### Confirmation
 
 `FsArchiveRepository` unit tests verify: configurable pattern variables produce the correct directory paths, `get()` uses index-first lookup, a scan miss triggers the glob fallback and appends the recovered entry to the index, and `reindex()` reconstructs `index.jsonl` in chronological order from a glob of manifest files.
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/core/storage/spec.md`](../../specs/core/storage/spec.md)

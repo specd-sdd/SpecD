@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-22 | specd maintainer | -         | -        |
+
 # ADR-0012: Configuration File Strategy — specd.yaml + specd.local.yaml
-
-## Status
-
-Accepted — 2026-02-22
 
 ## Context and Problem Statement
 
@@ -33,17 +33,19 @@ A global user config (`~/.specd/`) is intentionally not part of v1. A global fil
 
 ### Consequences
 
-- Good: Project configuration is always in version control — contributors can reproduce the exact setup by cloning.
-- Good: Local overrides are per-project, not per-machine-global — a developer can have different local configs for different projects.
-- Good: No merge logic is needed — `specd.local.yaml` is authoritative when present; the implementation reads one file.
-- Good: `specd --config path/to/specd.yaml` bypasses local override entirely — useful for CI and for testing the shared config without local interference.
-- Bad: The `.gitignore` entry for `specd.local.yaml` must be maintained by `specd init` and `specd update`; if it is missing, the local file could accidentally be committed.
-- Bad: User-level preferences are deferred to a future ADR.
+- Good, because project configuration is always in version control — contributors can reproduce the exact setup by cloning.
+- Good, because local overrides are per-project, not per-machine-global — a developer can have different local configs for different projects.
+- Good, because no merge logic is needed — `specd.local.yaml` is authoritative when present; the implementation reads one file.
+- Good, because `specd --config path/to/specd.yaml` bypasses local override entirely — useful for CI and for testing the shared config without local interference.
+- Bad, because the `.gitignore` entry for `specd.local.yaml` must be maintained by `specd init` and `specd update`; if it is missing, the local file could accidentally be committed.
+- Bad, because user-level preferences are deferred to a future ADR.
 
 ### Confirmation
 
 `specd` validates `specd.yaml` (or `specd.local.yaml` when present) before executing any command. `specd init` adds `specd.local.yaml` to `.gitignore` automatically.
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/_global/config/spec.md`](../../specs/_global/config/spec.md)

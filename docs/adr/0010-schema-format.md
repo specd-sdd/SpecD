@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-20 | specd maintainer | -         | -        |
+
 # ADR-0010: Schema Format Design
-
-## Status
-
-Accepted — 2026-02-20
 
 ## Context and Problem Statement
 
@@ -88,21 +88,23 @@ This avoids the schema fork problem — the team picks a community schema and ad
 
 ### Consequences
 
-- Good: `mergeSpecs` and `ValidateSpec` are fully schema-driven with no hardcoded section names, patterns, or keywords
-- Good: teams can localize operation keywords without forking specd
-- Good: `deltaValidations[]` and per-spec approval are cleanly separated concerns
-- Good: `contextSections[]` enables targeted context injection without sending full file content to the AI
-- Good: three-level schema resolution supports community schemas, user overrides, and project overrides in a consistent pattern
-- Good: templates ship as first-class files with editor support, versioned alongside the schema
-- Good: `artifactRules` lets teams extend any community schema without forking it
-- Bad: `mergeSpecs` must be updated — the current implementation hardcodes defaults and applies operations without conflict checks; both must be changed
-- Bad: `ApproveChange` must become per-spec rather than per-change, requiring a manifest format update
-- Bad: `SchemaRegistry` load-time validation adds startup cost proportional to the number of referenced template files
+- Good, because `mergeSpecs` and `ValidateSpec` are fully schema-driven with no hardcoded section names, patterns, or keywords
+- Good, because teams can localize operation keywords without forking specd
+- Good, because `deltaValidations[]` and per-spec approval are cleanly separated concerns
+- Good, because `contextSections[]` enables targeted context injection without sending full file content to the AI
+- Good, because three-level schema resolution supports community schemas, user overrides, and project overrides in a consistent pattern
+- Good, because templates ship as first-class files with editor support, versioned alongside the schema
+- Good, because `artifactRules` lets teams extend any community schema without forking it
+- Bad, because `mergeSpecs` must be updated — the current implementation hardcodes defaults and applies operations without conflict checks; both must be changed
+- Bad, because `ApproveChange` must become per-spec rather than per-change, requiring a manifest format update
+- Bad, because `SchemaRegistry` load-time validation adds startup cost proportional to the number of referenced template files
 
 ### Confirmation
 
 `specs/_global/schema-format/verify.md` scenarios serve as acceptance tests for the format. `mergeSpecs` unit tests verify schema-driven section resolution, configurable operation keywords, fixed apply order (RENAMED → REMOVED → MODIFIED → ADDED), and conflict detection before any mutation. `ValidateSpec` unit tests verify `validations[]`, `deltaValidations[]` (all three modes: file-level, `scope`, `eachBlock`), and that `deltaValidations[]` section names use the schema's resolved `deltaOperations` keywords.
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/_global/schema-format/spec.md`](../../specs/_global/schema-format/spec.md)

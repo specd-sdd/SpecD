@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-19 | specd maintainer | -         | -        |
+
 # ADR-0001: Hexagonal Architecture (Ports & Adapters)
-
-## Status
-
-Accepted — 2026-02-19
 
 ## Context and Problem Statement
 
@@ -22,16 +22,18 @@ Chosen option: "Hexagonal Architecture (Ports & Adapters)", because it isolates 
 
 ### Consequences
 
-- Good: `@specd/core` can be used as a standalone SDK
-- Good: All use cases are unit-testable with mocked ports — no filesystem required
-- Good: Adding new delivery mechanisms requires no changes to core
-- Good: The infrastructure adapters (`FsSpecRepository`, etc.) live inside `@specd/core/infrastructure` — the separation is logical (layers), not physical (packages)
-- Bad: More initial structure compared to a simple CLI-first approach
+- Good, because `@specd/core` can be used as a standalone SDK
+- Good, because all use cases are unit-testable with mocked ports — no filesystem required
+- Good, because adding new delivery mechanisms requires no changes to core
+- Good, because the infrastructure adapters (`FsSpecRepository`, etc.) live inside `@specd/core/infrastructure` — the separation is logical (layers), not physical (packages)
+- Bad, because there is more initial structure compared to a simple CLI-first approach
 
 ### Confirmation
 
 ESLint `no-restricted-imports` rules in `@specd/core` enforce that `domain/` does not import from `application/` or `infrastructure/`, and `application/` does not import from `infrastructure/`. CI fails if these boundaries are violated.
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/_global/architecture/spec.md`](../../specs/_global/architecture/spec.md)

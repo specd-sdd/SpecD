@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-19 | specd maintainer | -         | -        |
+
 # ADR-0002: pnpm Workspaces + Turborepo
-
-## Status
-
-Accepted — 2026-02-19
 
 ## Context and Problem Statement
 
@@ -29,11 +29,11 @@ pnpm handles dependency hoisting, workspace linking (`workspace:*`), and lockfil
 
 ### Consequences
 
-- Good: Each package builds independently and can be published at its own version
-- Good: Cross-package TypeScript references are resolved via workspace symlinks
-- Good: Turborepo cache prevents redundant rebuilds — only changed packages and their dependents rebuild
-- Bad: `turbo.json` must be kept up to date as new tasks are added
-- Bad: pnpm version must be pinned via `packageManager` field in root `package.json` to prevent lockfile drift
+- Good, because each package builds independently and can be published at its own version
+- Good, because cross-package TypeScript references are resolved via workspace symlinks
+- Good, because Turborepo cache prevents redundant rebuilds — only changed packages and their dependents rebuild
+- Bad, because `turbo.json` must be kept up to date as new tasks are added
+- Bad, because pnpm version must be pinned via `packageManager` field in root `package.json` to prevent lockfile drift
 
 ### Confirmation
 
@@ -43,23 +43,25 @@ pnpm handles dependency hoisting, workspace linking (`workspace:*`), and lockfil
 
 ### Single package
 
-- Good: Zero workspace overhead
-- Bad: All packages must be published together at the same version
-- Bad: No clear boundary enforcement between packages
+- Good, because there is zero workspace overhead
+- Bad, because all packages must be published together at the same version
+- Bad, because there is no clear boundary enforcement between packages
 
 ### Multi-repo
 
-- Good: Complete autonomy per package
-- Bad: Cross-package changes require coordinated PRs across multiple repositories
-- Bad: No shared tooling — each repo duplicates ESLint/TypeScript/Vitest configuration
+- Good, because there is complete autonomy per package
+- Bad, because cross-package changes require coordinated PRs across multiple repositories
+- Bad, because there is no shared tooling — each repo duplicates ESLint/TypeScript/Vitest configuration
 
 ### pnpm workspaces + Turborepo
 
-- Good: Independent versioning with a single development checkout
-- Good: Workspace symlinks give live cross-package type checking
-- Good: Turborepo caching keeps CI fast as the package count grows
-- Bad: Slightly more initial setup than a single-package repo
+- Good, because it provides independent versioning with a single development checkout
+- Good, because workspace symlinks give live cross-package type checking
+- Good, because Turborepo caching keeps CI fast as the package count grows
+- Bad, because there is slightly more initial setup than a single-package repo
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/_global/conventions/spec.md`](../../specs/_global/conventions/spec.md)

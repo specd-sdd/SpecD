@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-19 | specd maintainer | -         | -        |
+
 # ADR-0006: Filesystem-Only Storage Adapter in v1
-
-## Status
-
-Accepted — 2026-02-19
 
 ## Context and Problem Statement
 
@@ -16,15 +16,17 @@ All four storage ports are implemented with `FsSpecRepository`, `FsChangeReposit
 
 ### Consequences
 
-- Good: v1 is simpler to implement and test
-- Good: port interfaces are validated against one real implementation before being considered stable
-- Good: the `allowExternalPaths` guardrail in the fs adapter mitigates the main risk of filesystem-based storage (paths escaping the project root)
-- Bad: teams requiring shared or remote storage must wait for a future release
+- Good, because v1 is simpler to implement and test
+- Good, because port interfaces are validated against one real implementation before being considered stable
+- Good, because the `allowExternalPaths` guardrail in the fs adapter mitigates the main risk of filesystem-based storage (paths escaping the project root)
+- Bad, because teams requiring shared or remote storage must wait for a future release
 
 ### Confirmation
 
 Compliance is verified structurally: `@specd/core/infrastructure/` must contain only an `fs/` subdirectory. Any non-fs adapter implementation (e.g. `db/`, `remote/`) appearing in that directory signals a violation of this ADR.
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/_global/architecture/spec.md`](../../specs/_global/architecture/spec.md)

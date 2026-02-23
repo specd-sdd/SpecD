@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-19 | specd maintainer | -         | -        |
+
 # ADR-0005: Manual Dependency Injection
-
-## Status
-
-Accepted — 2026-02-19
 
 ## Context and Problem Statement
 
@@ -27,11 +27,11 @@ Dependencies are wired manually at the application entry point. The CLI entry po
 
 ### Consequences
 
-- Good: Wiring code is explicit and easy to follow for any contributor
-- Good: No additional runtime dependencies
-- Good: Adding a new use case requires adding a few lines to the entry point — no container registration ceremony
-- Good: If the number of use cases grows significantly, a simple factory pattern can be introduced without changing the use case code
-- Bad: As the number of use cases grows, the entry point wiring block grows in proportion
+- Good, because wiring code is explicit and easy to follow for any contributor
+- Good, because there are no additional runtime dependencies
+- Good, because adding a new use case requires adding a few lines to the entry point — no container registration ceremony
+- Good, because if the number of use cases grows significantly, a simple factory pattern can be introduced without changing the use case code
+- Bad, because as the number of use cases grows, the entry point wiring block grows in proportion
 
 ### Confirmation
 
@@ -41,18 +41,20 @@ Dependencies are wired manually at the application entry point. The CLI entry po
 
 ### IoC container (tsyringe / inversify)
 
-- Good: Wiring is automatic — add a decorator and the container resolves the dependency graph
-- Bad: Requires `experimentalDecorators` and `emitDecoratorMetadata`, which conflict with ESM and strict TypeScript settings
-- Bad: `reflect-metadata` must be imported at the process entry point — a global side-effect
-- Bad: Adds a runtime dependency and a learning curve for contributors unfamiliar with the container
+- Good, because wiring is automatic — add a decorator and the container resolves the dependency graph
+- Bad, because it requires `experimentalDecorators` and `emitDecoratorMetadata`, which conflict with ESM and strict TypeScript settings
+- Bad, because `reflect-metadata` must be imported at the process entry point — a global side-effect
+- Bad, because it adds a runtime dependency and a learning curve for contributors unfamiliar with the container
 
 ### Manual DI
 
-- Good: Fully explicit — the wiring is plain TypeScript code any contributor can read and trace
-- Good: No decorators, no reflection, no additional dependencies
-- Good: Fully compatible with strict TypeScript and ESM
-- Bad: Entry point grows linearly with the number of use cases; may need a factory helper if it becomes unwieldy
+- Good, because it is fully explicit — the wiring is plain TypeScript code any contributor can read and trace
+- Good, because there are no decorators, no reflection, no additional dependencies
+- Good, because it is fully compatible with strict TypeScript and ESM
+- Bad, because the entry point grows linearly with the number of use cases; may need a factory helper if it becomes unwieldy
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/_global/architecture/spec.md`](../../specs/_global/architecture/spec.md)

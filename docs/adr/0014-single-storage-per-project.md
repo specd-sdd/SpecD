@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-22 | specd maintainer | -         | -        |
+
 # ADR-0014: Single Changes and Archive Storage Per Project
-
-## Status
-
-Accepted — 2026-02-22
 
 ## Context and Problem Statement
 
@@ -31,15 +31,17 @@ Per-workspace storage would either force artificial change boundaries (splitting
 
 ### Consequences
 
-- Good: A change can freely reference specs from any number of workspaces without storage fragmentation.
-- Good: The operational footprint (where to find in-progress and completed work) is always a single known location.
-- Good: In coordinator repo setups, changes and archives live in the coordinator — which is the correct place, since the coordinator is the entity doing the work.
-- Bad: If a future requirement genuinely needs per-workspace change tracking, that would be a new design decision with a new ADR.
+- Good, because a change can freely reference specs from any number of workspaces without storage fragmentation.
+- Good, because the operational footprint (where to find in-progress and completed work) is always a single known location.
+- Good, because in coordinator repo setups, changes and archives live in the coordinator — which is the correct place, since the coordinator is the entity doing the work.
+- Bad, because if a future requirement genuinely needs per-workspace change tracking, that would be a new design decision with a new ADR.
 
 ### Confirmation
 
 `specd.yaml` schema validation enforces `storage` as a top-level section, not nested under workspaces. Any `specd.yaml` with per-workspace `changes` or `archive` fields fails validation on load.
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/_global/config/spec.md`](../../specs/_global/config/spec.md)
