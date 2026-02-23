@@ -80,7 +80,7 @@ Effective status cascades: an artifact is `in-progress` if any artifact in its `
 
 The change manifest contains an **append-only `history` array** of typed events. Every significant operation appends one or more events. Events are never modified or removed.
 
-The **current lifecycle state** of a Change is derived entirely from its history: the `to` field of the most recent `transitioned` event. If no `transitioned` event exists, the state is `drafting`. No separate state snapshot is stored. The JSON serialization of these events in `manifest.json` is defined in [`specs/core/storage/spec.md` — Requirement: Change manifest format](../storage/spec.md).
+The **current lifecycle state** of a Change is derived entirely from its history: the `to` field of the most recent `transitioned` event. If no `transitioned` event exists, the state is `drafting`. No separate state snapshot is stored. The JSON serialization of these events in `manifest.json` is defined in [`specs/core/change-manifest/spec.md` — Requirement: Manifest structure](../change-manifest/spec.md).
 
 The **current draft/active status** is derived from history: if the most recent `drafted` or `restored` event is of type `drafted`, the change is currently shelved in `drafts/`; otherwise it is active in `changes/`.
 
@@ -153,6 +153,7 @@ A change may be moved between storage locations without affecting its lifecycle 
 
 - [`specs/core/config/spec.md`](../config/spec.md) — workspace IDs, active workspace semantics, approval gates config, storage locations
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — artifact type declarations, dependency graph, `preHashCleanup`
-- [`specs/core/storage/spec.md`](../storage/spec.md) — manifest format and persistence
+- [`specs/core/change-manifest/spec.md`](../change-manifest/spec.md) — manifest format and JSON serialization of events
+- [`specs/core/storage/spec.md`](../storage/spec.md) — persistence mechanics, directory naming
 - [`specs/core/delta-merger/spec.md`](../delta-merger/spec.md) — delta operations
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal
