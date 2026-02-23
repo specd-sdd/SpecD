@@ -2,6 +2,12 @@
 
 > Temporary working document. Final location TBD.
 
+## Execution notes
+
+- This agent **requires Write tool permission** to create or update `.specd-metadata.yaml`.
+- When launched as a background subagent via the Task tool, Write access is not granted by default and the agent will stop at Step 5 without writing anything.
+- **Preferred invocation**: run in foreground (no `run_in_background`) so the permission prompt is shown to the user, or run directly in the main conversation using the agent instructions manually.
+
 ## Purpose
 
 Generate or update the `.specd-metadata.yaml` file for a spec directory. This file records human-readable metadata (`title`, `description`, `keywords`) and machine-readable dependency information (`dependsOn`, `contentHashes`) for a spec.
