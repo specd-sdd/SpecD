@@ -252,6 +252,16 @@
 - **WHEN** inside `billing`, `contextExcludeSpecs: ['drafts/*']` is declared and `billing` is active
 - **THEN** `billing:drafts/*` specs are excluded from context
 
+#### Scenario: Direct include path selects only that spec
+
+- **WHEN** `contextIncludeSpecs: ['auth/login']` is declared and both `auth/login` and `auth/register` exist in the `default` workspace
+- **THEN** `CompileContext` includes `auth/login` and does not include `auth/register`
+
+#### Scenario: Direct exclude path removes only that spec
+
+- **WHEN** `contextIncludeSpecs: ['auth/*']` and `contextExcludeSpecs: ['auth/login']` are declared and both `auth/login` and `auth/register` exist
+- **THEN** `CompileContext` includes `auth/register` but not `auth/login`
+
 #### Scenario: Non-existent spec path silently skipped
 
 - **WHEN** `contextIncludeSpecs: ['auth/does-not-exist']` is declared and no such spec exists on disk
