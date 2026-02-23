@@ -363,6 +363,12 @@ storage:
       path: specd/archive
       pattern: '{{year}}/{{change.archivedName}}'
 
+contextIncludeSpecs:
+  - 'default:*' # coordinator's own specs first
+  - 'auth:*' # auth service specs
+  - 'payments:*' # payments service specs
+  # platform is readOnly — omitted from context unless explicitly needed
+
 workflow:
   - skill: archive
     hooks:
@@ -403,6 +409,10 @@ storage:
     adapter: fs
     fs:
       path: specd/archive
+
+contextIncludeSpecs:
+  - 'default:*' # local specs first
+  - 'billing:*' # billing workspace specs
 
 artifactRules:
   specs:
