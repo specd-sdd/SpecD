@@ -203,7 +203,7 @@ Keys are validated against the active schema's artifact IDs at startup. Unknown 
 - **Project level** (top-level in `specd.yaml`) — patterns are always applied, regardless of which workspaces the current change touches. Use this for specs that must always be in context: global constraints, cross-cutting architecture specs, shared external specs.
 - **Workspace level** (inside a workspace entry) — patterns are applied only when that workspace is active in the current change. Use this for specs that are relevant only when working within that workspace.
 
-**A workspace is considered active if at least one spec belonging to that workspace participates in the current change set.** Workspace membership is determined by the spec's location within the workspace's `specs.fs.path` — not by the CWD, not by `codeRoot`, and not by any user selection. A change that touches specs in both `default` and `billing` activates both workspaces simultaneously.
+**A workspace is considered active if at least one of its specs is listed in the current change's metadata.** When a change is created or updated, the set of specs it contains is recorded in its metadata file. `CompileContext` reads that list and resolves each spec's workspace by matching its path against the declared `specs.fs.path` entries — not by scanning the filesystem at compile time, not by CWD, not by `codeRoot`. A change whose metadata lists specs from both `default` and `billing` activates both workspaces simultaneously.
 
 **Pattern syntax:**
 
