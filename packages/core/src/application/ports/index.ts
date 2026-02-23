@@ -1,0 +1,7 @@
+export { Repository, type RepositoryConfig } from './repository.js'
+export { SpecRepository, type SpecRepositoryConfig } from './spec-repository.js'
+export { ChangeRepository, type ChangeRepositoryConfig } from './change-repository.js'
+export { ArchiveRepository, type ArchiveRepositoryConfig } from './archive-repository.js'
+export { type SchemaRegistry, type SchemaEntry, type Schema } from './schema-registry.js'
+export { type HookRunner, type HookResult, type HookVariables } from './hook-runner.js'
+export { type GitAdapter } from './git-adapter.js'
