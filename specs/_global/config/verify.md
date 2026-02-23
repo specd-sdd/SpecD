@@ -197,50 +197,60 @@
 
 ### Requirement: Context spec selection
 
-#### Scenario: Default include is all default workspace specs
+#### Scenario: Project-level patterns always apply
 
-- **WHEN** `contextIncludeSpecs` is omitted from `specd.yaml`
-- **THEN** `CompileContext` includes all specs from the `default` workspace, as if `contextIncludeSpecs: ['default:*']` were declared
+- **WHEN** project-level `contextIncludeSpecs: ['shared:_global/*']` is declared and the current change only touches the `default` workspace
+- **THEN** `CompileContext` still includes `shared:_global/*` specs — project-level patterns are not filtered by change scope
 
-#### Scenario: Bare wildcard includes all workspaces
+#### Scenario: Workspace-level patterns only apply when workspace is active
 
-- **WHEN** `contextIncludeSpecs: ['*']` is declared
-- **THEN** `CompileContext` includes specs from all workspaces
+- **WHEN** `billing` workspace declares `contextIncludeSpecs: ['*']` and the current change touches only `default` specs
+- **THEN** `CompileContext` does not include billing specs — the `billing` workspace is not active
 
-#### Scenario: Workspace-qualified wildcard
+#### Scenario: Workspace-level patterns apply when workspace is active
 
-- **WHEN** `contextIncludeSpecs: ['billing:*']` is declared
-- **THEN** `CompileContext` includes all specs from the `billing` workspace and no others
+- **WHEN** `billing` workspace declares `contextIncludeSpecs: ['*']` and the current change touches a `billing` spec
+- **THEN** `CompileContext` includes all `billing` workspace specs
 
-#### Scenario: Path prefix wildcard
+#### Scenario: Qualifier omitted at workspace level resolves to that workspace
 
-- **WHEN** `contextIncludeSpecs: ['_global/*']` is declared
-- **THEN** `CompileContext` includes all specs whose path starts with `_global/` in the default workspace
+- **WHEN** inside `billing` workspace, `contextIncludeSpecs: ['payments/*']` is declared
+- **THEN** `CompileContext` resolves it as `billing:payments/*`, not `default:payments/*`
 
-#### Scenario: Exact spec path without workspace qualifier
+#### Scenario: Default project-level include is all default workspace specs
 
-- **WHEN** `contextIncludeSpecs: ['auth/login']` is declared
-- **THEN** `CompileContext` includes only the `auth/login` spec from the `default` workspace
+- **WHEN** project-level `contextIncludeSpecs` is omitted
+- **THEN** `CompileContext` behaves as if `contextIncludeSpecs: ['default:*']` were declared at project level
 
-#### Scenario: Exact spec path with workspace qualifier
+#### Scenario: Resolution order — project-level before workspace-level
 
-- **WHEN** `contextIncludeSpecs: ['billing:payments/checkout']` is declared
-- **THEN** `CompileContext` includes only the `payments/checkout` spec from the `billing` workspace
+- **WHEN** project-level includes `shared:_global/*` and `default` workspace includes `['*']`, and the change is active in `default`
+- **THEN** `shared:_global/*` specs appear first in context, followed by `default:*` specs
 
-#### Scenario: Include order determines context priority
+#### Scenario: Workspace declaration order determines workspace-level priority
 
-- **WHEN** `contextIncludeSpecs: ['_global/*', 'billing:*']` is declared
-- **THEN** `CompileContext` places all `_global/*` specs before `billing:*` specs in the compiled context, and if truncation is needed the `billing:*` specs are dropped first
+- **WHEN** `default` and `billing` both declare `contextIncludeSpecs: ['*']` and the change touches both, and `default` is declared first in `specd.yaml`
+- **THEN** `default` specs appear before `billing` specs in context
 
 #### Scenario: Spec matched by multiple patterns appears once
 
-- **WHEN** `contextIncludeSpecs: ['_global/*', 'default:*']` is declared and `_global/architecture` exists in the default workspace
-- **THEN** `_global/architecture` appears once in the compiled context, at the position determined by `_global/*` (the first matching pattern)
+- **WHEN** project-level includes `shared:_global/*` and `default` workspace includes `['shared:_global/architecture']`, and both match the same spec
+- **THEN** the spec appears once, at the position determined by the project-level pattern (first match)
 
-#### Scenario: Exclude removes from include set
+#### Scenario: Project-level exclude always applied
 
-- **WHEN** `contextIncludeSpecs: ['default:*']` and `contextExcludeSpecs: ['default:drafts/*']` are declared
-- **THEN** `CompileContext` includes all default workspace specs except those under `drafts/`
+- **WHEN** project-level `contextExcludeSpecs: ['default:drafts/*']` is declared and the change only touches `billing`
+- **THEN** `drafts/*` specs are still excluded from context even though `default` is not the active workspace
+
+#### Scenario: Workspace-level exclude only applied when workspace is active
+
+- **WHEN** `billing` workspace declares `contextExcludeSpecs: ['drafts/*']` and the change only touches `default`
+- **THEN** the billing exclude is not applied — `billing` is not active
+
+#### Scenario: Workspace-level exclude qualifier resolves to that workspace
+
+- **WHEN** inside `billing`, `contextExcludeSpecs: ['drafts/*']` is declared and `billing` is active
+- **THEN** `billing:drafts/*` specs are excluded from context
 
 #### Scenario: Non-existent spec path silently skipped
 

@@ -107,6 +107,10 @@ workspaces:
 
 **`isExternal`** is not declared in config — it is inferred by the application layer from whether the resolved `specs.fs.path` is outside the project repo root.
 
+**`contextIncludeSpecs`** (optional) — workspace-level context spec patterns. Loaded only when this workspace is active in the current change. Patterns follow the same syntax as the project-level field, with one difference: omitting the workspace qualifier means _this workspace_ (not `default`). So `['*']` means all specs in this workspace; `['auth/*']` means specs under `auth/` in this workspace.
+
+**`contextExcludeSpecs`** (optional) — workspace-level exclusion patterns. Applied only when this workspace is active in the current change. Same qualifier semantics as `contextIncludeSpecs` at workspace level.
+
 Workspace names must be unique and must match `/^[a-z][a-z0-9-]*$/`. The name `default` is reserved.
 
 ### Requirement: Storage configuration
@@ -188,38 +192,80 @@ Keys are validated against the active schema's artifact IDs at startup. Unknown 
 
 ### Requirement: Context spec selection
 
-`specd.yaml` may include `contextIncludeSpecs` and `contextExcludeSpecs` arrays to control which specs are always injected into the compiled LLM context by `CompileContext`.
+`contextIncludeSpecs` and `contextExcludeSpecs` can be declared at two levels with different semantics:
+
+- **Project level** (top-level in `specd.yaml`) — patterns are always applied, regardless of which workspaces the current change touches. Use this for specs that must always be in context: global constraints, cross-cutting architecture specs, shared external specs.
+- **Workspace level** (inside a workspace entry) — patterns are applied only when that workspace is active in the current change (i.e. the change touches at least one spec in that workspace). Use this for specs that are relevant only when working within that workspace.
 
 **Pattern syntax:**
 
-| Pattern               | Meaning                                                             |
-| --------------------- | ------------------------------------------------------------------- |
-| `*`                   | All specs in all workspaces                                         |
-| `workspace:*`         | All specs in the named workspace                                    |
-| `prefix/*`            | All specs whose path starts with `prefix/` in the default workspace |
-| `workspace:prefix/*`  | All specs whose path starts with `prefix/` in the named workspace   |
-| `path/name`           | Exact spec path in the default workspace                            |
-| `workspace:path/name` | Exact spec path in the named workspace                              |
+| Pattern               | Meaning                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| `*`                   | All specs in all workspaces                                                           |
+| `workspace:*`         | All specs in the named workspace                                                      |
+| `prefix/*`            | All specs whose path starts with `prefix/` — qualifier resolves per level (see below) |
+| `workspace:prefix/*`  | All specs whose path starts with `prefix/` in the named workspace                     |
+| `path/name`           | Exact spec — qualifier resolves per level (see below)                                 |
+| `workspace:path/name` | Exact spec path in the named workspace                                                |
 
-`*` may only appear in three positions: alone (`*`), as the sole suffix after `workspace:` (`billing:*`), or as the sole suffix after a path prefix ending in `/` (`_global/*`). It may not appear in the middle of a path segment or in any other position. Omitting the workspace qualifier is equivalent to `default:`.
+`*` may only appear in three positions: alone (`*`), as the sole suffix after `workspace:` (`billing:*`), or as the sole suffix after a path prefix ending in `/` (`_global/*`). It may not appear in the middle of a path segment or in any other position.
+
+**Qualifier resolution by level:**
+
+- At project level, omitting the workspace qualifier is equivalent to `default:`.
+- At workspace level, omitting the workspace qualifier means _this workspace_ — e.g. inside `billing:`, `['auth/*']` means `billing:auth/*` and `['*']` means all specs in `billing`.
 
 **Defaults:**
 
-- `contextIncludeSpecs`: `['default:*']` — all specs in the default workspace
-- `contextExcludeSpecs`: `[]` — nothing excluded
+- Project-level `contextIncludeSpecs`: `['default:*']`
+- Project-level `contextExcludeSpecs`: `[]`
+- Workspace-level `contextIncludeSpecs`: `[]`
+- Workspace-level `contextExcludeSpecs`: `[]`
 
-**Resolution:** `CompileContext` processes include patterns in declaration order — specs matched by earlier patterns appear first in the compiled context and take priority if the context must be truncated. Specs matched by multiple patterns appear only once, at the position of the first matching pattern. Exclude patterns are then applied as a set subtraction; their order does not affect which specs are excluded.
+**Resolution order:** `CompileContext` builds the context spec set in this sequence:
+
+1. Project-level include patterns (in declaration order) — always applied
+2. Workspace-level include patterns from each active workspace (in workspace declaration order, then pattern order within each workspace)
+3. Project-level exclude patterns — always applied
+4. Workspace-level exclude patterns from each active workspace (same order as step 2)
+
+Specs matched by earlier patterns take priority if the context must be truncated. A spec matched by multiple include patterns appears only once, at the position of the first matching pattern.
 
 ```yaml
+# always in context — global constraints regardless of change scope
 contextIncludeSpecs:
-  - '_global/*' # all global constraint specs (default workspace)
-  - 'billing:*' # all billing workspace specs
-  - 'auth/login' # specific spec from default workspace
-contextExcludeSpecs:
-  - 'default:drafts/*' # exclude drafts from default workspace
+  - 'shared:_global/*'
+
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/
+    contextIncludeSpecs:
+      - '*' # all default specs, when default is active
+
+  billing:
+    specs:
+      adapter: fs
+      fs:
+        path: ../billing/specd/specs
+    codeRoot: ../billing
+    contextIncludeSpecs:
+      - '*' # all billing specs, when billing is active
+    contextExcludeSpecs:
+      - 'drafts/*' # exclude billing drafts (resolves to billing:drafts/*)
+
+  shared:
+    specs:
+      adapter: fs
+      fs:
+        path: ../shared/specs
+    ownership: readOnly
+    # no workspace-level context — project-level shared:_global/* covers it
 ```
 
-References to unknown workspaces produce a warning at startup but do not prevent startup. References to non-existent spec paths are silently skipped at context-compilation time — the spec may not exist yet. Invalid pattern syntax (e.g. `*` in the middle of a path segment) is an error caught at startup.
+References to unknown workspaces produce a warning at startup but do not prevent startup. References to non-existent spec paths are silently skipped at context-compilation time. Invalid pattern syntax is an error caught at startup.
 
 ### Requirement: Plugin declarations
 
@@ -255,12 +301,12 @@ specd must validate `specd.yaml` before executing any command. Validation must c
 - `adapter` is required in every `specs`, `schemas`, and storage section; adapter-specific fields are nested under the adapter key
 - `storage` section is required and must contain both `changes` and `archive` sub-keys
 - All relative paths resolve from the `specd.yaml` directory; storage paths (`fs.path` in `changes` and `archive`) must remain within the repo root
-- `contextIncludeSpecs` defaults to `['default:*']`; `contextExcludeSpecs` defaults to `[]`
-- Include pattern order determines the order specs appear in the compiled context and their truncation priority — earlier patterns have higher priority
+- Project-level `contextIncludeSpecs` defaults to `['default:*']`; project-level `contextExcludeSpecs` defaults to `[]`; workspace-level both default to `[]`
+- Project-level patterns are always applied; workspace-level patterns are applied only when that workspace is active in the current change
+- At project level, omitting the workspace qualifier is equivalent to `default:`; at workspace level, omitting it means the declaring workspace
+- Include pattern order (project-level first, then active workspace declaration order) determines context order and truncation priority
 - A spec matched by multiple include patterns appears once, at the position of the first matching pattern
-- Exclude pattern order does not affect which specs are excluded
 - `*` in a pattern may only appear alone, as `workspace:*`, or as a path suffix `prefix/*` — any other position is a startup error
-- Omitting the workspace qualifier in a pattern is equivalent to `default:`
 - Unknown workspace qualifiers in patterns produce a warning, not an error; missing spec paths are silently skipped at compile time
 
 ## Examples
@@ -351,6 +397,7 @@ workspaces:
         path: ../platform-repo/specd/specs
     codeRoot: ../platform-repo
     ownership: readOnly
+    # no contextIncludeSpecs — platform is readOnly, not loaded automatically
 
 storage:
   changes:
@@ -363,11 +410,9 @@ storage:
       path: specd/archive
       pattern: '{{year}}/{{change.archivedName}}'
 
-contextIncludeSpecs:
-  - 'default:*' # coordinator's own specs first
-  - 'auth:*' # auth service specs
-  - 'payments:*' # payments service specs
-  # platform is readOnly — omitted from context unless explicitly needed
+# workspace-level: each workspace loads its own specs when active
+# default, auth, payments would each declare contextIncludeSpecs: ['*']
+# (omitted here for brevity — see Context spec selection requirement)
 
 workflow:
   - skill: archive
@@ -399,6 +444,8 @@ workspaces:
         path: ../billing/dev/schemas
     codeRoot: ../billing
     ownership: readOnly
+    contextIncludeSpecs:
+      - '*' # all billing specs, when billing is active
 
 storage:
   changes:
@@ -409,10 +456,6 @@ storage:
     adapter: fs
     fs:
       path: specd/archive
-
-contextIncludeSpecs:
-  - 'default:*' # local specs first
-  - 'billing:*' # billing workspace specs
 
 artifactRules:
   specs:
