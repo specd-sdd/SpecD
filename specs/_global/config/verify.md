@@ -227,6 +227,16 @@
 - **WHEN** `contextIncludeSpecs: ['billing:payments/checkout']` is declared
 - **THEN** `CompileContext` includes only the `payments/checkout` spec from the `billing` workspace
 
+#### Scenario: Include order determines context priority
+
+- **WHEN** `contextIncludeSpecs: ['_global/*', 'billing:*']` is declared
+- **THEN** `CompileContext` places all `_global/*` specs before `billing:*` specs in the compiled context, and if truncation is needed the `billing:*` specs are dropped first
+
+#### Scenario: Spec matched by multiple patterns appears once
+
+- **WHEN** `contextIncludeSpecs: ['_global/*', 'default:*']` is declared and `_global/architecture` exists in the default workspace
+- **THEN** `_global/architecture` appears once in the compiled context, at the position determined by `_global/*` (the first matching pattern)
+
 #### Scenario: Exclude removes from include set
 
 - **WHEN** `contextIncludeSpecs: ['default:*']` and `contextExcludeSpecs: ['default:drafts/*']` are declared
