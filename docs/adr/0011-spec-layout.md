@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-20 | specd maintainer | -         | -        |
+
 # ADR-0011: Spec Layout — Global vs Package-Scoped
-
-## Status
-
-Accepted — 2026-02-20
 
 ## Context and Problem Statement
 
@@ -33,15 +33,17 @@ The flat layout is simple but conflates cross-cutting constraints with package i
 
 ### Consequences
 
-- Good: Agents and contributors can determine a spec's scope from its path alone — no need to read the spec to know if it applies.
-- Good: `specs/_global/` stays focused on constraints that genuinely apply everywhere; it does not grow with every new package feature.
-- Good: Package-internal specs (`specs/core/`, `specs/cli/`, etc.) can be written and evolved without risk of accidentally constraining unrelated packages.
-- Good: Pending specs for `@specd/core` (`delta-merger`, `snapshot-hasher`, `validate-spec`, `compile-context`, `archive-change`) live under `specs/core/`.
+- Good, because agents and contributors can determine a spec's scope from its path alone — no need to read the spec to know if it applies.
+- Good, because `specs/_global/` stays focused on constraints that genuinely apply everywhere; it does not grow with every new package feature.
+- Good, because package-internal specs (`specs/core/`, `specs/cli/`, etc.) can be written and evolved without risk of accidentally constraining unrelated packages.
+- Good, because pending specs for `@specd/core` (`delta-merger`, `snapshot-hasher`, `validate-spec`, `compile-context`, `archive-change`) live under `specs/core/`.
 
 ### Confirmation
 
 `specs/_global/spec-layout/spec.md` defines this convention in full. `specd validate` checks that every spec directory contains all required artifact files.
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/_global/spec-layout/spec.md`](../../specs/_global/spec-layout/spec.md)

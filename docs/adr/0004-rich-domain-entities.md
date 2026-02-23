@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-19 | specd maintainer | -         | -        |
+
 # ADR-0004: Rich Domain Entities
-
-## Status
-
-Accepted — 2026-02-19
 
 ## Context and Problem Statement
 
@@ -27,11 +27,11 @@ Domain entities are rich — they own their invariants and state machine transit
 
 ### Consequences
 
-- Good: Invalid state transitions are impossible to bypass — the entity is the single enforcement point
-- Good: Use cases are thinner and easier to read
-- Good: New use cases cannot accidentally bypass invariants
-- Bad: Entity methods must be unit-tested thoroughly since they are the invariant source of truth
-- Bad: Entities must not have I/O dependencies — all data they need must be passed as arguments
+- Good, because invalid state transitions are impossible to bypass — the entity is the single enforcement point
+- Good, because use cases are thinner and easier to read
+- Good, because new use cases cannot accidentally bypass invariants
+- Bad, because entity methods must be unit-tested thoroughly since they are the invariant source of truth
+- Bad, because entities must not have I/O dependencies — all data they need must be passed as arguments
 
 ### Confirmation
 
@@ -41,18 +41,20 @@ Entity unit tests in `packages/core/test/domain/` cover all valid state transiti
 
 ### Anemic domain model
 
-- Good: Entities are simple data containers with no logic to test
-- Bad: Transition guards must be duplicated across every use case that performs a transition
-- Bad: A new use case can accidentally skip a guard and leave an entity in an invalid state
-- Bad: The set of valid transitions is implicit — scattered across multiple files
+- Good, because entities are simple data containers with no logic to test
+- Bad, because transition guards must be duplicated across every use case that performs a transition
+- Bad, because a new use case can accidentally skip a guard and leave an entity in an invalid state
+- Bad, because the set of valid transitions is implicit — scattered across multiple files
 
 ### Rich domain entities
 
-- Good: All invariants live in one place — the entity class
-- Good: Typed errors make invalid transitions visible and catchable at the call site
-- Good: Transition logic is testable in isolation without constructing full use-case infrastructure
-- Bad: Entities require more upfront design to keep them free of I/O dependencies
+- Good, because all invariants live in one place — the entity class
+- Good, because typed errors make invalid transitions visible and catchable at the call site
+- Good, because transition logic is testable in isolation without constructing full use-case infrastructure
+- Bad, because entities require more upfront design to keep them free of I/O dependencies
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/_global/architecture/spec.md`](../../specs/_global/architecture/spec.md)

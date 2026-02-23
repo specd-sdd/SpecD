@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-22 | specd maintainer | -         | -        |
+
 # ADR-0013: Workspaces, Not Scopes
-
-## Status
-
-Accepted — 2026-02-22
 
 ## Context and Problem Statement
 
@@ -50,15 +50,17 @@ Keeping "scope" would leave three different meanings for the same word in a sing
 
 ### Consequences
 
-- Good: The config file is unambiguous — `workspaces` is distinct from npm scope notation and from validation rule section scopes.
-- Good: The domain model is clearer: a workspace is not just a namespace prefix but a full context unit with its own paths.
-- Good: Monorepo users will recognise the concept immediately from existing tooling.
-- Bad: The rename is a breaking change for any code already written against the old `scope` API — all occurrences in `@specd/core` have been updated in the same commit.
+- Good, because the config file is unambiguous — `workspaces` is distinct from npm scope notation and from validation rule section scopes.
+- Good, because the domain model is clearer: a workspace is not just a namespace prefix but a full context unit with its own paths.
+- Good, because monorepo users will recognise the concept immediately from existing tooling.
+- Bad, because the rename is a breaking change for any code already written against the old `scope` API — all occurrences in `@specd/core` have been updated in the same commit.
 
 ### Confirmation
 
 Absence of `scope` (as workspace concept) in all source files and specs confirms the rename is complete. `ValidationRule.scope` is intentionally retained with its own meaning and is not subject to this constraint.
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/_global/config/spec.md`](../../specs/_global/config/spec.md)

@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-19 | specd maintainer | -         | -        |
+
 # ADR-0009: Artifact Status Derivation — Hash-Based, Not Stored
-
-## Status
-
-Accepted — 2026-02-19
 
 ## Context and Problem Statement
 
@@ -29,16 +29,18 @@ Chosen option: "Derived status via `validatedHash`", because it makes out-of-ban
 
 ### Consequences
 
-- Good: out-of-band file edits (human, another agent, any tool) are automatically detected on next load — no explicit drift notification required
-- Good: the manifest is minimal — one hash per artifact, nothing else for status
-- Good: `ValidateSpec` is the single gate for `complete` status — no other path can mark an artifact complete
-- Good: modifying an upstream artifact automatically invalidates all downstream artifacts that depended on it via the dependency cascade
-- Bad: `FsChangeRepository` must hash artifact files on every load; this is a filesystem read per artifact, acceptable for the typical change size (3–6 artifacts)
+- Good, because out-of-band file edits (human, another agent, any tool) are automatically detected on next load — no explicit drift notification required
+- Good, because the manifest is minimal — one hash per artifact, nothing else for status
+- Good, because `ValidateSpec` is the single gate for `complete` status — no other path can mark an artifact complete
+- Good, because modifying an upstream artifact automatically invalidates all downstream artifacts that depended on it via the dependency cascade
+- Bad, because `FsChangeRepository` must hash artifact files on every load; this is a filesystem read per artifact, acceptable for the typical change size (3–6 artifacts)
 
 ### Confirmation
 
 `Change.effectiveStatus()` unit tests verify hash-based status derivation for all three states and confirm that a non-`complete` dependency downgrades an otherwise-complete artifact to `in-progress`. `FsChangeRepository` integration tests verify that an out-of-band file edit causes the artifact to return `in-progress` on the next load, and that the dependency cascade propagates correctly across the full artifact graph.
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/core/storage/spec.md`](../../specs/core/storage/spec.md)

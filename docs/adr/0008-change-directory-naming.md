@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-19 | specd maintainer | -         | -        |
+
 # ADR-0008: Change Directory Naming — Timestamp Prefix
-
-## Status
-
-Accepted — 2026-02-19
 
 ## Context and Problem Statement
 
@@ -31,15 +31,17 @@ The timestamp prefix is a **filesystem convention only**. It is never stored in 
 
 ### Consequences
 
-- Good: change directories are visually ordered chronologically in any file browser, `ls`, or git status output
-- Good: no coordination mechanism required — the timestamp is local and per-second precision is sufficient
-- Good: the domain model and CLI remain clean — no prefix leaks through the abstraction boundary
-- Bad: `FsChangeRepository.get()` requires a glob rather than a direct path lookup, which is a negligible cost
+- Good, because change directories are visually ordered chronologically in any file browser, `ls`, or git status output
+- Good, because no coordination mechanism required — the timestamp is local and per-second precision is sufficient
+- Good, because the domain model and CLI remain clean — no prefix leaks through the abstraction boundary
+- Bad, because `FsChangeRepository.get()` requires a glob rather than a direct path lookup, which is a negligible cost
 
 ### Confirmation
 
 `FsChangeRepository` unit tests verify: directory names are written with the `YYYYMMDD-HHmmss-` prefix derived from `change.createdAt`, `get()` resolves the correct directory via glob without requiring the caller to supply the prefix, and `list()` returns entries in chronological order matching directory sort order.
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/core/storage/spec.md`](../../specs/core/storage/spec.md)

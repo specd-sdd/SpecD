@@ -21,73 +21,78 @@ No documentation lives outside `docs/` except `README.md` at the project root an
 
 ### Requirement: ADR format
 
-Every Architecture Decision Record follows the [MADR](https://adr.github.io/madr/) format (Markdown Architectural Decision Records), adapted with a project-specific `## Spec` section.
-
-**Required sections** — always present:
-
-- `# ADR-NNNN: Title`
-- `## Status` — `Accepted | Proposed | Deprecated | Superseded by [ADR-NNNN](NNNN-title.md)` with date (`YYYY-MM-DD`)
-- `## Context and Problem Statement` — the problem in prose; may be framed as a question
-- `## Decision Outcome` — the chosen option, stated clearly; includes `### Consequences` and `### Confirmation` sub-sections
-- `## Spec` — links to the spec(s) that capture constraints derived from this decision
-
-**Optional sections** — included only when they add value:
-
-- `## Decision Drivers` — bulleted forces or concerns that shaped the choice; omit for obvious decisions
-- `## Considered Options` — list of alternatives evaluated; omit if there was only one viable option
-- `## Pros and Cons of the Options` — detailed analysis per option; only included when `## Considered Options` is present and trade-offs need elaboration
-
-`### Confirmation` states how compliance with this decision can be verified — through tests, linting rules, CI checks, or structural invariants. It is always present inside `## Decision Outcome`.
+Every Architecture Decision Record follows the [MADR](https://adr.github.io/madr/) format (Markdown Architectural Decision Records) verbatim, with one project-specific addition: a `### Spec` sub-section inside `## More Information` linking to the spec(s) that capture constraints derived from this decision.
 
 ```markdown
-# ADR-NNNN: Title
+| status                                                                          | date       | decision-makers                        | consulted                                                      | informed                                             |
+| ------------------------------------------------------------------------------- | ---------- | -------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
+| {proposed \| rejected \| accepted \| deprecated \| … \| superseded by ADR-0123} | YYYY-MM-DD | list everyone involved in the decision | list everyone whose opinions are sought; two-way communication | list everyone kept up-to-date; one-way communication |
 
-## Status
-
-Accepted — YYYY-MM-DD
+# {short title, representative of solved problem and found solution}
 
 ## Context and Problem Statement
 
-Why this decision was needed.
+{Describe the context and problem statement, e.g., in free form using two to three sentences or in the form of an illustrative story. You may want to articulate the problem in form of a question and add links to collaboration boards or issue management systems.}
 
 ## Decision Drivers
 
-- Force or concern that shaped the choice
+- {decision driver 1, e.g., a force, facing concern, …}
+- {decision driver 2, e.g., a force, facing concern, …}
+- …
 
 ## Considered Options
 
-- Option A
-- Option B
+- {title of option 1}
+- {title of option 2}
+- {title of option 3}
+- …
 
 ## Decision Outcome
 
-Chosen option: "Option A", because ...
+Chosen option: "{title of option 1}", because {justification. e.g., only option, which meets k.o. criterion decision driver | which resolves force {force} | … | comes out best (see below)}.
 
 ### Consequences
 
-- Good: ...
-- Bad: ...
+- Good, because {positive consequence, e.g., improvement of one or more desired qualities, …}
+- Bad, because {negative consequence, e.g., compromising one or more desired qualities, …}
+- …
 
 ### Confirmation
 
-How compliance is verified — linting rules, tests, structural checks.
+{Describe how the implementation / compliance of the ADR can/will be confirmed. Is there any automated or manual fitness function? If so, list it and explain how it is applied.}
 
 ## Pros and Cons of the Options
 
-### Option A
+### {title of option 1}
 
-- Good: ...
-- Bad: ...
+{example | description | pointer to more information | …}
 
-### Option B
+- Good, because {argument a}
+- Good, because {argument b}
+- Neutral, because {argument c}
+- Bad, because {argument d}
+- …
 
-- Good: ...
-- Bad: ...
+### {title of other option}
 
-## Spec
+{example | description | pointer to more information | …}
+
+- Good, because {argument a}
+- Good, because {argument b}
+- Neutral, because {argument c}
+- Bad, because {argument d}
+- …
+
+## More Information
+
+{You might want to provide additional evidence/confidence for the decision outcome here and/or document the team agreement on the decision and/or define when/how this decision should be realized and if/when it should be re-visited.}
+
+### Spec
 
 - [`specs/path/to/spec.md`](../../specs/path/to/spec.md)
 ```
+
+`## Decision Drivers`, `## Considered Options`, `## Pros and Cons of the Options`, and `## More Information` are optional — omit them when they add no value. `### Confirmation` inside `## Decision Outcome` is always present. `### Spec` inside `## More Information` is always present.
 
 ### Requirement: ADR numbering
 
@@ -145,7 +150,7 @@ export function mergeSpecs(
 - ADR filenames must match the pattern `NNNN-kebab-case-title.md`
 - ADR numbers are sequential and never reused
 - Every significant architectural decision must have an ADR
-- Every ADR must include a `## Spec` section linking to the spec(s) that capture its constraints
+- Every ADR must include a `### Spec` sub-section inside `## More Information` linking to the spec(s) that capture its constraints
 - Specs that have associated ADRs include a `## ADRs` section linking to them — omitted if none exist
 - No documentation outside `docs/` except `README.md`, `AGENTS.md`, `CLAUDE.md`
 - A spec's `## ADRs` section lists only the ADRs that _produced_ that spec — they are historical provenance, not dependencies

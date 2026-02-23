@@ -1,8 +1,8 @@
+| status   | date       | decision-makers  | consulted | informed |
+| -------- | ---------- | ---------------- | --------- | -------- |
+| accepted | 2026-02-19 | specd maintainer | -         | -        |
+
 # ADR-0003: ESM Only
-
-## Status
-
-Accepted — 2026-02-19
 
 ## Context and Problem Statement
 
@@ -27,12 +27,12 @@ All packages use `"type": "module"` and `NodeNext` module resolution. No CJS out
 
 ### Consequences
 
-- Good: No `require()` interop issues within the monorepo
-- Good: Simpler build configuration — one output format, one set of entry points
-- Good: Compatible with ESM-native dependencies without workarounds
-- Bad: Consumers must use ESM — this is acceptable given the Node.js >= 20 requirement
-- Bad: Dynamic `require()` patterns are not available; `import()` must be used instead
-- Bad: Some older tooling that does not support ESM may not work without workarounds
+- Good, because there are no `require()` interop issues within the monorepo
+- Good, because build configuration is simpler — one output format, one set of entry points
+- Good, because it is compatible with ESM-native dependencies without workarounds
+- Bad, because consumers must use ESM — this is acceptable given the Node.js >= 20 requirement
+- Bad, because dynamic `require()` patterns are not available; `import()` must be used instead
+- Bad, because some older tooling that does not support ESM may not work without workarounds
 
 ### Confirmation
 
@@ -42,18 +42,20 @@ All `package.json` files in `packages/` contain `"type": "module"`. The root Typ
 
 ### Dual CJS/ESM output
 
-- Good: Maximum consumer compatibility, including older Node.js versions and bundlers
-- Bad: Doubles dist size and build time
-- Bad: Subtle differences between CJS and ESM module evaluation can cause hard-to-debug issues
-- Bad: `package.json` `exports` map becomes complex to maintain correctly
+- Good, because it provides maximum consumer compatibility, including older Node.js versions and bundlers
+- Bad, because it doubles dist size and build time
+- Bad, because subtle differences between CJS and ESM module evaluation can cause hard-to-debug issues
+- Bad, because the `package.json` `exports` map becomes complex to maintain correctly
 
 ### ESM-only
 
-- Good: Simple, single-format output
-- Good: No interop edge cases within the monorepo
-- Good: Aligns with the direction of the Node.js ecosystem
-- Bad: Incompatible with consumers that cannot use ESM (legacy environments)
+- Good, because it produces simple, single-format output
+- Good, because there are no interop edge cases within the monorepo
+- Good, because it aligns with the direction of the Node.js ecosystem
+- Bad, because it is incompatible with consumers that cannot use ESM (legacy environments)
 
-## Spec
+## More Information
+
+### Spec
 
 - [`specs/_global/conventions/spec.md`](../../specs/_global/conventions/spec.md)
