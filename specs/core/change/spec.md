@@ -24,34 +24,44 @@ Workspace IDs in the list must be validated against `specd.yaml` at creation tim
 
 ### Requirement: Lifecycle
 
-A Change progresses through the following states:
+A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.preImplementation` and `approvals.structuralChanges`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:
 
 ```
-drafting → designing → ready → implementing → done ──────────────────→ archivable
-                                                   └→ pending-approval → approved ┘
+drafting → designing → ready ──────────────────────────────────────── → implementing → done ───────────────────────── → archivable
+                             ╌→ pending-spec-approval → spec-approved ┘               ╌→ pending-approval → approved ┘
+                               (if approvals.preImplementation: true)                   (if approvals.structuralChanges: true
+                                                                                            AND structural changes present)
 ```
 
-| State              | Meaning                                                                                     |
-| ------------------ | ------------------------------------------------------------------------------------------- |
-| `drafting`         | Initial state; the change has been created but no design work has started                   |
-| `designing`        | The agent is elaborating the spec content                                                   |
-| `ready`            | The spec is signed off; implementation may begin                                            |
-| `implementing`     | Code is being written against the spec                                                      |
-| `done`             | Implementation is complete                                                                  |
-| `pending-approval` | The change contains structural modifications (MODIFIED/REMOVED) that require human sign-off |
-| `approved`         | A human has reviewed and approved the structural changes                                    |
-| `archivable`       | Terminal state; the change may be moved to the archive                                      |
+| State                   | Meaning                                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------------------- |
+| `drafting`              | Initial state; the change has been created but no design work has started                   |
+| `designing`             | The agent is elaborating the spec content                                                   |
+| `ready`                 | The spec is complete; awaiting implementation (or spec approval if gate is enabled)         |
+| `pending-spec-approval` | Waiting for human approval of the spec before implementation may begin                      |
+| `spec-approved`         | Spec has been approved; implementation may begin                                            |
+| `implementing`          | Code is being written against the spec                                                      |
+| `done`                  | Implementation is complete                                                                  |
+| `pending-approval`      | The change contains structural modifications (MODIFIED/REMOVED) that require human sign-off |
+| `approved`              | A human has reviewed and approved the structural changes                                    |
+| `archivable`            | Terminal state; the change may be moved to the archive                                      |
 
 Only the transitions shown above are valid. Any attempt to transition to a state not reachable from the current state throws `InvalidStateTransitionError`. `archivable` is terminal — no further transitions are possible.
+
+### Requirement: Pre-implementation approval gate
+
+When `approvals.preImplementation: true`, the transition from `ready` to `implementing` is blocked. The change must first transition to `pending-spec-approval`, receive an explicit `ApprovalRecord` (approver identity, reason, timestamp), and then transition to `spec-approved` before `implementing` becomes reachable.
+
+When `approvals.preImplementation: false` (default), `ready → implementing` is a free transition. The `pending-spec-approval` and `spec-approved` states are unreachable.
 
 ### Requirement: Transition to archivable
 
 From `done`, the change transitions to:
 
-- `archivable` directly — when the change contains no structural modifications (no MODIFIED or REMOVED delta operations)
-- `pending-approval` — when at least one structural modification is present
+- `archivable` directly — when `approvals.structuralChanges: false` (default), or when no structural modifications are present
+- `pending-approval` — when `approvals.structuralChanges: true` AND at least one structural modification is present
 
-A change in `pending-approval` must be approved by a human before it can transition to `approved` and then to `archivable`. Attempting to archive a change that is not in `archivable` state throws `ApprovalRequiredError`.
+When `approvals.structuralChanges: false`, `done → archivable` is always a free transition regardless of structural content. When `approvals.structuralChanges: true`, a change in `pending-approval` must receive explicit approval before transitioning to `approved → archivable`. Attempting to archive a change that is not in `archivable` state throws `ApprovalRequiredError`.
 
 ### Requirement: Artifacts
 
@@ -82,16 +92,16 @@ ADDED operations are not structural — they do not require approval.
 
 The structural change list is built by the delta merger as specs are modified. It is stored in the manifest and read back at load time. The presence of any structural change is what triggers the `pending-approval` branch when transitioning from `done`.
 
-### Requirement: Approval
+### Requirement: Approval records
 
-Approval is recorded as a single `ApprovalRecord` on the Change:
+Each approval gate produces its own `ApprovalRecord`, stored independently on the Change:
 
 - **`reason`** — human-provided rationale
 - **`approvedBy`** — git identity (name + email) of the approver
 - **`approvedAt`** — timestamp of approval
-- **`structuralChanges`** — the list of structural changes that were reviewed
+- **`structuralChanges`** — the list of structural changes reviewed (only present on the post-implementation record)
 
-An approval record is written once and never modified. After approval the change transitions to `approved` and then immediately to `archivable`.
+A Change may carry zero, one, or two approval records — one per gate, only if that gate was enabled and triggered. Each record is written once and never modified.
 
 ### Requirement: Schema version
 
@@ -105,8 +115,10 @@ The change manifest records the name and version of the schema that was active w
 - `ArtifactStatus` is never persisted — always derived at load time
 - `Artifact.markComplete(hash)` may only be called from `ValidateSpec`
 - `archivable` is the only state from which a change may be archived
-- Structural changes (MODIFIED/REMOVED) require approval before the change becomes `archivable`
-- The approval record is written once and never updated
+- Both approval gates default to `false` — teams opt in via `approvals` in `specd.yaml`
+- When `approvals.structuralChanges: true`, structural changes (MODIFIED/REMOVED) require approval before `archivable`
+- When `approvals.preImplementation: true`, spec approval is required before `implementing`
+- Each approval record is written once and never updated; a change carries at most two records (one per gate)
 - The schema name and version recorded at creation are never updated by subsequent operations
 
 ## Spec Dependencies
