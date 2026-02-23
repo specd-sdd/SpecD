@@ -199,14 +199,14 @@ Keys are validated against the active schema's artifact IDs at startup. Unknown 
 
 **Pattern syntax:**
 
-| Pattern               | Meaning                                                                               |
-| --------------------- | ------------------------------------------------------------------------------------- |
-| `*`                   | All specs in all workspaces                                                           |
-| `workspace:*`         | All specs in the named workspace                                                      |
-| `prefix/*`            | All specs whose path starts with `prefix/` — qualifier resolves per level (see below) |
-| `workspace:prefix/*`  | All specs whose path starts with `prefix/` in the named workspace                     |
-| `path/name`           | Exact spec — qualifier resolves per level (see below)                                 |
-| `workspace:path/name` | Exact spec path in the named workspace                                                |
+| Pattern               | Meaning at project level                         | Meaning at workspace level                       |
+| --------------------- | ------------------------------------------------ | ------------------------------------------------ |
+| `*`                   | All specs in all workspaces                      | All specs in this workspace (= `{self}:*`)       |
+| `workspace:*`         | All specs in the named workspace                 | All specs in the named workspace                 |
+| `prefix/*`            | All specs under `prefix/` in `default`           | All specs under `prefix/` in this workspace      |
+| `workspace:prefix/*`  | All specs under `prefix/` in the named workspace | All specs under `prefix/` in the named workspace |
+| `path/name`           | Exact spec in `default`                          | Exact spec in this workspace                     |
+| `workspace:path/name` | Exact spec path in the named workspace           | Exact spec path in the named workspace           |
 
 `*` may only appear in three positions: alone (`*`), as the sole suffix after `workspace:` (`billing:*`), or as the sole suffix after a path prefix ending in `/` (`_global/*`). It may not appear in the middle of a path segment or in any other position.
 
@@ -418,8 +418,7 @@ workspaces:
       fs:
         path: ../platform-repo/specd/specs
     codeRoot: ../platform-repo
-    ownership: readOnly
-    # no contextIncludeSpecs — platform is readOnly, not loaded automatically
+    ownership: readOnly # specs are readable but not modifiable; loads by default when active
 
 storage:
   changes:
@@ -465,8 +464,6 @@ workspaces:
         path: ../billing/dev/schemas
     codeRoot: ../billing
     ownership: readOnly
-    contextIncludeSpecs:
-      - '*' # all billing specs, when billing is active
 
 storage:
   changes:
