@@ -195,6 +195,58 @@
 - **WHEN** `plugins: [{ name: "@specd/plugin-claude" }]` is declared
 - **THEN** `specd update` ensures the plugin's skill files and hook configuration are up to date
 
+### Requirement: Context spec selection
+
+#### Scenario: Default include is all default workspace specs
+
+- **WHEN** `contextIncludeSpecs` is omitted from `specd.yaml`
+- **THEN** `CompileContext` includes all specs from the `default` workspace, as if `contextIncludeSpecs: ['default:*']` were declared
+
+#### Scenario: Bare wildcard includes all workspaces
+
+- **WHEN** `contextIncludeSpecs: ['*']` is declared
+- **THEN** `CompileContext` includes specs from all workspaces
+
+#### Scenario: Workspace-qualified wildcard
+
+- **WHEN** `contextIncludeSpecs: ['billing:*']` is declared
+- **THEN** `CompileContext` includes all specs from the `billing` workspace and no others
+
+#### Scenario: Path prefix wildcard
+
+- **WHEN** `contextIncludeSpecs: ['_global/*']` is declared
+- **THEN** `CompileContext` includes all specs whose path starts with `_global/` in the default workspace
+
+#### Scenario: Exact spec path without workspace qualifier
+
+- **WHEN** `contextIncludeSpecs: ['auth/login']` is declared
+- **THEN** `CompileContext` includes only the `auth/login` spec from the `default` workspace
+
+#### Scenario: Exact spec path with workspace qualifier
+
+- **WHEN** `contextIncludeSpecs: ['billing:payments/checkout']` is declared
+- **THEN** `CompileContext` includes only the `payments/checkout` spec from the `billing` workspace
+
+#### Scenario: Exclude removes from include set
+
+- **WHEN** `contextIncludeSpecs: ['default:*']` and `contextExcludeSpecs: ['default:drafts/*']` are declared
+- **THEN** `CompileContext` includes all default workspace specs except those under `drafts/`
+
+#### Scenario: Non-existent spec path silently skipped
+
+- **WHEN** `contextIncludeSpecs: ['auth/does-not-exist']` is declared and no such spec exists on disk
+- **THEN** `CompileContext` produces no error — the missing path is silently skipped
+
+#### Scenario: Unknown workspace qualifier warns
+
+- **WHEN** `contextIncludeSpecs: ['unknown-workspace:*']` is declared and no workspace named `unknown-workspace` exists
+- **THEN** specd emits a warning at startup but does not exit
+
+#### Scenario: Invalid pattern syntax is a startup error
+
+- **WHEN** `contextIncludeSpecs: ['auth/*/login']` is declared (`*` in the middle of a path segment)
+- **THEN** specd exits with a config validation error at startup
+
 ### Requirement: Startup validation
 
 #### Scenario: Invalid config blocks startup

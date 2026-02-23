@@ -186,6 +186,41 @@ artifactRules:
 
 Keys are validated against the active schema's artifact IDs at startup. Unknown keys emit a warning but do not prevent startup.
 
+### Requirement: Context spec selection
+
+`specd.yaml` may include `contextIncludeSpecs` and `contextExcludeSpecs` arrays to control which specs are always injected into the compiled LLM context by `CompileContext`.
+
+**Pattern syntax:**
+
+| Pattern               | Meaning                                                             |
+| --------------------- | ------------------------------------------------------------------- |
+| `*`                   | All specs in all workspaces                                         |
+| `workspace:*`         | All specs in the named workspace                                    |
+| `prefix/*`            | All specs whose path starts with `prefix/` in the default workspace |
+| `workspace:prefix/*`  | All specs whose path starts with `prefix/` in the named workspace   |
+| `path/name`           | Exact spec path in the default workspace                            |
+| `workspace:path/name` | Exact spec path in the named workspace                              |
+
+`*` may only appear in three positions: alone (`*`), as the sole suffix after `workspace:` (`billing:*`), or as the sole suffix after a path prefix ending in `/` (`_global/*`). It may not appear in the middle of a path segment or in any other position. Omitting the workspace qualifier is equivalent to `default:`.
+
+**Defaults:**
+
+- `contextIncludeSpecs`: `['default:*']` — all specs in the default workspace
+- `contextExcludeSpecs`: `[]` — nothing excluded
+
+**Resolution:** `CompileContext` builds the context spec set by taking the union of all specs matched by the include patterns, then subtracting all specs matched by the exclude patterns. Order within each list does not affect the result.
+
+```yaml
+contextIncludeSpecs:
+  - '_global/*' # all global constraint specs (default workspace)
+  - 'billing:*' # all billing workspace specs
+  - 'auth/login' # specific spec from default workspace
+contextExcludeSpecs:
+  - 'default:drafts/*' # exclude drafts from default workspace
+```
+
+References to unknown workspaces produce a warning at startup but do not prevent startup. References to non-existent spec paths are silently skipped at context-compilation time — the spec may not exist yet. Invalid pattern syntax (e.g. `*` in the middle of a path segment) is an error caught at startup.
+
 ### Requirement: Plugin declarations
 
 `specd.yaml` may include a `plugins` section declaring which agent-integration plugins are installed. Each entry must include `name`; `options` is plugin-specific and optional.
@@ -202,7 +237,7 @@ Plugin declarations are used by `specd init`, `specd plugin add`, and `specd upd
 
 ### Requirement: Startup validation
 
-specd must validate `specd.yaml` before executing any command. Validation must catch: missing `schema`, missing `storage` section, missing `changes` or `archive` sub-key under `storage`, missing `default` workspace, missing `specs` section in any workspace, missing `codeRoot` in any non-`default` workspace, missing `adapter` in any `specs`, `schemas`, or storage section, unknown adapter values, required adapter-specific fields missing (e.g. `fs.path` absent when `adapter: fs`), `requires` in project workflow entries, and storage paths outside the repo root. Warnings (not errors) are emitted for: unknown `artifactRules` keys, duplicate workspace names, and project workflow entries for skills not in the schema.
+specd must validate `specd.yaml` before executing any command. Validation must catch: missing `schema`, missing `storage` section, missing `changes` or `archive` sub-key under `storage`, missing `default` workspace, missing `specs` section in any workspace, missing `codeRoot` in any non-`default` workspace, missing `adapter` in any `specs`, `schemas`, or storage section, unknown adapter values, required adapter-specific fields missing (e.g. `fs.path` absent when `adapter: fs`), `requires` in project workflow entries, storage paths outside the repo root, and invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax. Warnings (not errors) are emitted for: unknown `artifactRules` keys, duplicate workspace names, project workflow entries for skills not in the schema, and unknown workspace qualifiers in context spec patterns.
 
 ## Constraints
 
@@ -220,6 +255,10 @@ specd must validate `specd.yaml` before executing any command. Validation must c
 - `adapter` is required in every `specs`, `schemas`, and storage section; adapter-specific fields are nested under the adapter key
 - `storage` section is required and must contain both `changes` and `archive` sub-keys
 - All relative paths resolve from the `specd.yaml` directory; storage paths (`fs.path` in `changes` and `archive`) must remain within the repo root
+- `contextIncludeSpecs` defaults to `['default:*']`; `contextExcludeSpecs` defaults to `[]`
+- `*` in a pattern may only appear alone, as `workspace:*`, or as a path suffix `prefix/*` — any other position is a startup error
+- Omitting the workspace qualifier in a pattern is equivalent to `default:`
+- Unknown workspace qualifiers in patterns produce a warning, not an error; missing spec paths are silently skipped at compile time
 
 ## Examples
 
