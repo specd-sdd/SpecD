@@ -143,7 +143,7 @@
 - **WHEN** a Change in `pending-signoff` is signed off with a reason and approver identity
 - **THEN** a sign-off record is written to the manifest and the change transitions to `signed-off`
 
-#### Scenario: Pre-implementation approval recorded once
+#### Scenario: Spec approval recorded once
 
 - **WHEN** a Change in `pending-spec-approval` is approved with a reason and approver identity
 - **THEN** an `ApprovalRecord` is written to the manifest and the change transitions to `spec-approved`
