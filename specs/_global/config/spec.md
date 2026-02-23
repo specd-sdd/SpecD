@@ -208,7 +208,7 @@ Keys are validated against the active schema's artifact IDs at startup. Unknown 
 - `contextIncludeSpecs`: `['default:*']` — all specs in the default workspace
 - `contextExcludeSpecs`: `[]` — nothing excluded
 
-**Resolution:** `CompileContext` builds the context spec set by taking the union of all specs matched by the include patterns, then subtracting all specs matched by the exclude patterns. Order within each list does not affect the result.
+**Resolution:** `CompileContext` processes include patterns in declaration order — specs matched by earlier patterns appear first in the compiled context and take priority if the context must be truncated. Specs matched by multiple patterns appear only once, at the position of the first matching pattern. Exclude patterns are then applied as a set subtraction; their order does not affect which specs are excluded.
 
 ```yaml
 contextIncludeSpecs:
@@ -256,6 +256,9 @@ specd must validate `specd.yaml` before executing any command. Validation must c
 - `storage` section is required and must contain both `changes` and `archive` sub-keys
 - All relative paths resolve from the `specd.yaml` directory; storage paths (`fs.path` in `changes` and `archive`) must remain within the repo root
 - `contextIncludeSpecs` defaults to `['default:*']`; `contextExcludeSpecs` defaults to `[]`
+- Include pattern order determines the order specs appear in the compiled context and their truncation priority — earlier patterns have higher priority
+- A spec matched by multiple include patterns appears once, at the position of the first matching pattern
+- Exclude pattern order does not affect which specs are excluded
 - `*` in a pattern may only appear alone, as `workspace:*`, or as a path suffix `prefix/*` — any other position is a startup error
 - Omitting the workspace qualifier in a pattern is equivalent to `default:`
 - Unknown workspace qualifiers in patterns produce a warning, not an error; missing spec paths are silently skipped at compile time
