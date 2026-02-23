@@ -9,7 +9,7 @@
 - **WHEN** a Change is created with name `add-auth-flow`
 - **THEN** the name cannot be changed by any subsequent operation
 
-### Requirement: Workspaces
+### Requirement: Workspaces and specs
 
 #### Scenario: Single workspace change
 
@@ -21,11 +21,6 @@
 - **WHEN** a Change is created with `workspaces: ['default', 'billing']`
 - **THEN** both `default` and `billing` are active and both workspace-level context patterns are applied
 
-#### Scenario: Workspace list immutable after creation
-
-- **WHEN** a Change has been created with `workspaces: ['default']`
-- **THEN** no operation may add or remove workspace IDs from the list
-
 #### Scenario: Empty workspace list rejected at creation
 
 - **WHEN** a Change is created with an empty `workspaces` list
@@ -35,6 +30,16 @@
 
 - **WHEN** a Change is created with `workspaces: ['unknown']` and no workspace named `unknown` exists in `specd.yaml`
 - **THEN** the creation fails with a validation error
+
+#### Scenario: Workspace added after creation
+
+- **WHEN** a Change has `workspaces: ['default']` and `billing` is added to the list
+- **THEN** the workspace list becomes `['default', 'billing']`, all existing approval records are invalidated, and the change rolls back to `designing`
+
+#### Scenario: Spec added after creation
+
+- **WHEN** a new spec path is added to the Change's `specIds`
+- **THEN** all existing approval records are invalidated and the change rolls back to `designing`
 
 ### Requirement: Lifecycle
 
@@ -87,16 +92,16 @@
 - **WHEN** `approvals.signoff: true` and a Change in `pending-signoff` receives sign-off
 - **THEN** it transitions to `signed-off` and then to `archivable`
 
-#### Scenario: Archive without signoff throws
+#### Scenario: Archive from non-archivable state throws
 
-- **WHEN** `approvals.signoff: true` and a Change is not in `archivable` state and archiving is attempted
-- **THEN** `SignoffRequiredError` is thrown
+- **WHEN** archiving is attempted on a Change not in `archivable` state
+- **THEN** `InvalidStateTransitionError` is thrown
 
 ### Requirement: Artifacts
 
 #### Scenario: Status derived — complete
 
-- **WHEN** an artifact's current file hash matches its `validatedHash`
+- **WHEN** the cleaned hash of an artifact's current file matches its `validatedHash`
 - **THEN** `effectiveStatus` returns `complete`
 
 #### Scenario: Status derived — missing
@@ -106,57 +111,55 @@
 
 #### Scenario: Status derived — in-progress
 
-- **WHEN** an artifact's file exists but its hash differs from `validatedHash`
+- **WHEN** an artifact's cleaned file hash differs from `validatedHash`
 - **THEN** `effectiveStatus` returns `in-progress`
+
+#### Scenario: preHashCleanup applied before status comparison
+
+- **WHEN** an artifact has `preHashCleanup` defined and a progress marker changes (e.g. a checkbox is checked)
+- **THEN** `effectiveStatus` remains `complete` — the cleaned hash is unchanged
 
 #### Scenario: Dependency cascade — incomplete dependency
 
 - **WHEN** artifact B requires artifact A, and artifact A is `in-progress`
-- **THEN** `effectiveStatus` for artifact B returns `in-progress` even if B's own hash matches its `validatedHash`
+- **THEN** `effectiveStatus` for artifact B returns `in-progress` even if B's own cleaned hash matches its `validatedHash`
 
 #### Scenario: markComplete only from ValidateSpec
 
 - **WHEN** any code path other than `ValidateSpec` calls `Artifact.markComplete(hash)`
 - **THEN** this is a violation of the domain contract — no other use case may set an artifact to `complete`
 
-### Requirement: Structural changes
-
-#### Scenario: MODIFIED operation recorded as structural
-
-- **WHEN** a delta merger detects a MODIFIED operation on a requirement block
-- **THEN** a structural change entry with `type: MODIFIED` is added to the change
-
-#### Scenario: REMOVED operation recorded as structural
-
-- **WHEN** a delta merger detects a REMOVED operation on a requirement block
-- **THEN** a structural change entry with `type: REMOVED` is added to the change
-
-#### Scenario: ADDED operation not structural
-
-- **WHEN** a delta merger detects only ADDED operations
-- **THEN** no structural change entries are added
-
 ### Requirement: Approval records
 
-#### Scenario: Sign-off recorded once
+#### Scenario: Spec approval recorded
 
-- **WHEN** a Change in `pending-signoff` is signed off with a reason and approver identity
-- **THEN** a sign-off record is written to the manifest and the change transitions to `signed-off`
+- **WHEN** a Change in `pending-spec-approval` is approved
+- **THEN** an approval record with reason, approver identity, timestamp, and all artifact hashes is appended to the spec approval history
 
-#### Scenario: Spec approval recorded once
+#### Scenario: Sign-off recorded
 
-- **WHEN** a Change in `pending-spec-approval` is approved with a reason and approver identity
-- **THEN** an `ApprovalRecord` is written to the manifest and the change transitions to `spec-approved`
+- **WHEN** a Change in `pending-signoff` is signed off
+- **THEN** a sign-off record with reason, approver identity, timestamp, and all artifact hashes is appended to the signoff history
 
-#### Scenario: Approval records not modified
+#### Scenario: Artifact change invalidates approval
 
-- **WHEN** a Change already has an approval record for a gate
-- **THEN** no subsequent operation may overwrite or modify it
+- **WHEN** an artifact's content changes after a spec approval record was written
+- **THEN** the existing approval records are marked superseded, the change rolls back to `designing`
 
-#### Scenario: Two independent records
+#### Scenario: Workspace change invalidates approval
 
-- **WHEN** both gates are enabled and a Change passes through both approval flows
-- **THEN** the manifest contains two distinct records — one spec approval record, one sign-off record
+- **WHEN** a workspace is added to the Change after a spec approval record was written
+- **THEN** the existing approval records are marked superseded, the change rolls back to `designing`
+
+#### Scenario: Multiple approval records in history
+
+- **WHEN** a Change is approved, then modified (invalidating the approval), then approved again
+- **THEN** the approval history contains two records — the first marked superseded, the second active
+
+#### Scenario: Approval records never modified
+
+- **WHEN** a Change already has approval records
+- **THEN** no operation may overwrite or modify existing records — only append new ones
 
 ### Requirement: Schema version
 
@@ -169,3 +172,30 @@
 
 - **WHEN** a Change with a schema version mismatch is in `archivable` state
 - **THEN** archiving proceeds normally — the mismatch warning is advisory only
+
+### Requirement: Drafting and discarding
+
+#### Scenario: Draft moves change out of active changes
+
+- **WHEN** a Change in `implementing` state is drafted
+- **THEN** it is moved to `drafts/`, retains its `implementing` state, and no longer appears in the active changes list
+
+#### Scenario: Restore recovers a drafted change
+
+- **WHEN** a drafted Change is restored
+- **THEN** it is moved back to `changes/` and resumes from its preserved state
+
+#### Scenario: Discard requires a reason
+
+- **WHEN** a Change is discarded without providing a reason
+- **THEN** the operation fails with a validation error
+
+#### Scenario: Discard from drafts
+
+- **WHEN** a drafted Change is discarded with a reason
+- **THEN** it is moved to `discarded/` and cannot be recovered
+
+#### Scenario: Discarded change cannot be restored
+
+- **WHEN** a discard operation is attempted to be reversed
+- **THEN** no operation exists to move a change out of `discarded/`
