@@ -76,9 +76,9 @@ export default tseslint.config(
     },
   },
 
-  // Test files — relax all quality rules
+  // Test files (specs and helpers) — relax all quality rules
   {
-    files: ['packages/*/test/**/*.spec.ts'],
+    files: ['packages/*/test/**/*.ts'],
     rules: {
       'jsdoc/require-jsdoc': 'off',
       'jsdoc/require-description': 'off',
@@ -89,6 +89,8 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
 )
