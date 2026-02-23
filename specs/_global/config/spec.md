@@ -81,7 +81,7 @@ workspaces:
       adapter: fs
       fs:
         path: ../billing/dev/schemas
-    codeRoot: ../billing
+    codeRoot: ../billing # required for non-default workspaces — no default
     ownership: readOnly # default for non-default workspaces
 ```
 
