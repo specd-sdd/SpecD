@@ -222,6 +222,11 @@
 - **WHEN** project-level `contextIncludeSpecs` is omitted
 - **THEN** `CompileContext` behaves as if `contextIncludeSpecs: ['default:*']` were declared at project level
 
+#### Scenario: Default workspace-level include is all specs in that workspace
+
+- **WHEN** a workspace declares no `contextIncludeSpecs` and that workspace is active in the current change
+- **THEN** `CompileContext` includes all specs in that workspace, as if `contextIncludeSpecs: ['*']` were declared
+
 #### Scenario: Resolution order — project-level before workspace-level
 
 - **WHEN** project-level includes `shared:_global/*` and `default` workspace includes `['*']`, and the change is active in `default`

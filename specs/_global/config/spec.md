@@ -219,7 +219,7 @@ Keys are validated against the active schema's artifact IDs at startup. Unknown 
 
 - Project-level `contextIncludeSpecs`: `['default:*']`
 - Project-level `contextExcludeSpecs`: `[]`
-- Workspace-level `contextIncludeSpecs`: `[]`
+- Workspace-level `contextIncludeSpecs`: `['*']` (equivalent to `{workspace-name}:*`)
 - Workspace-level `contextExcludeSpecs`: `[]`
 
 **Resolution order:** `CompileContext` builds the context spec set in this sequence:
@@ -322,7 +322,8 @@ The following conditions emit **warnings** but allow startup to proceed:
 - `adapter` is required in every `specs`, `schemas`, and storage section; adapter-specific fields are nested under the adapter key
 - `storage` section is required and must contain both `changes` and `archive` sub-keys
 - All relative paths resolve from the `specd.yaml` directory; storage paths (`fs.path` in `changes` and `archive`) must remain within the repo root
-- Project-level `contextIncludeSpecs` defaults to `['default:*']`; project-level `contextExcludeSpecs` defaults to `[]`; workspace-level both default to `[]`
+- Project-level `contextIncludeSpecs` defaults to `['default:*']`; project-level `contextExcludeSpecs` defaults to `[]`
+- Workspace-level `contextIncludeSpecs` defaults to `['*']` (all specs in that workspace); workspace-level `contextExcludeSpecs` defaults to `[]`
 - Project-level patterns are always applied; workspace-level patterns are applied only when that workspace is active in the current change
 - At project level, omitting the workspace qualifier is equivalent to `default:`; at workspace level, omitting it means the declaring workspace
 - Include pattern order (project-level first, then active workspace declaration order) determines context order and truncation priority
@@ -431,9 +432,8 @@ storage:
       path: specd/archive
       pattern: '{{year}}/{{change.archivedName}}'
 
-# workspace-level: each workspace loads its own specs when active
-# default, auth, payments would each declare contextIncludeSpecs: ['*']
-# (omitted here for brevity — see Context spec selection requirement)
+# workspace-level contextIncludeSpecs defaults to ['*'] —
+# default, auth, and payments each load all their own specs when active
 
 workflow:
   - skill: archive
