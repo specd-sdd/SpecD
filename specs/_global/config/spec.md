@@ -283,13 +283,13 @@ References to unknown workspace qualifiers produce a warning at startup but do n
 
 ```yaml
 approvals:
-  preImplementation: false # require approval before implementing (default: false)
-  structuralChanges: false # require approval for MODIFIED/REMOVED operations (default: false)
+  spec: false # require approval of the spec before implementation (default: false)
+  implementation: false # require approval of the implementation before archiving (default: false)
 ```
 
-**`preImplementation`** — when `true`, a change in `ready` state cannot transition directly to `implementing`. It must first enter `pending-spec-approval` and receive an explicit approval (with approver identity, reason, and timestamp) before transitioning to `spec-approved` and then to `implementing`. When `false` (default), `ready → implementing` is a free transition.
+**`spec`** — when `true`, a change in `ready` state cannot transition directly to `implementing`. It must first enter `pending-spec-approval` and receive an explicit approval (with approver identity, reason, and timestamp) before transitioning to `spec-approved` and then to `implementing`. When `false` (default), `ready → implementing` is a free transition.
 
-**`structuralChanges`** — when `true`, a change in `done` state that contains structural modifications (MODIFIED or REMOVED delta operations) cannot transition directly to `archivable`. It must enter `pending-approval`, receive explicit approval, and transition through `approved → archivable`. When `false` (default), `done → archivable` is always a free transition regardless of structural content.
+**`implementation`** — when `true`, a change in `done` state cannot transition directly to `archivable`, regardless of whether it contains structural modifications or only additions. It must enter `pending-approval`, receive explicit approval, and transition through `approved → archivable`. The approval record captures what was reviewed — new specs, modified specs, and removed specs alike. When `false` (default), `done → archivable` is a free transition.
 
 Both flags are independent — any combination is valid.
 
