@@ -130,6 +130,16 @@ storage:
     fs:
       path: specd/changes
 
+  drafts:
+    adapter: fs
+    fs:
+      path: specd/drafts
+
+  discarded:
+    adapter: fs
+    fs:
+      path: specd/discarded
+
   archive:
     adapter: fs
     fs:
@@ -137,7 +147,11 @@ storage:
       pattern: '{{change.archivedName}}' # optional; default: "{{change.archivedName}}"
 ```
 
-`adapter` is required per sub-key; adapter-specific fields are nested under the adapter key (`fs:`). Unknown adapter values must produce a validation error. Relative paths are resolved from the directory containing `specd.yaml` and must remain within the project repo root.
+All four sub-keys (`changes`, `drafts`, `discarded`, `archive`) are required. `adapter` is required per sub-key; adapter-specific fields are nested under the adapter key (`fs:`). Unknown adapter values must produce a validation error. Relative paths are resolved from the directory containing `specd.yaml` and must remain within the project repo root.
+
+**`drafts`** — shelved changes that are not ready for active development but may be recovered. A change can be moved from `changes/` to `drafts/` at any point before archiving; it retains its full internal state and can be moved back to `changes/` to continue from where it left off.
+
+**`discarded`** — permanently abandoned changes. A change can be discarded from `changes/` or `drafts/`. A discarded change must include a reason; it cannot be recovered. `specd init` adds `specd/drafts/` and `specd/discarded/` to `.gitignore` by default — local-only directories unless the team opts in.
 
 ### Requirement: Template variables
 

@@ -50,6 +50,7 @@ Each entry in `artifacts` must include:
 - `deltaValidations` (array, optional) — structural validation rules for delta files; see Requirement: Delta validations
 - `validations` (array, optional) — structural validation rules for the base spec; see Requirement: Validation rules
 - `contextSections` (array, optional) — sections of existing specs to inject into the AI context; see Requirement: Context sections
+- `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has a `pattern` (regex string) and a `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons — e.g. normalizing checkbox state in a tasks artifact so that checking a task off does not trigger re-validation or approval invalidation.
 
 ### Requirement: Template resolution
 
