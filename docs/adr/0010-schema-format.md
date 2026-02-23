@@ -105,10 +105,10 @@ This avoids the schema fork problem — the team picks a community schema and ad
 
 ### Confirmation
 
-`specs/_global/schema-format/verify.md` scenarios serve as acceptance tests for the format. `mergeSpecs` unit tests verify schema-driven section resolution, configurable operation keywords, fixed apply order (RENAMED → REMOVED → MODIFIED → ADDED), and conflict detection before any mutation. `ValidateSpec` unit tests verify `validations[]`, `deltaValidations[]` (all three modes: file-level, `scope`, `eachBlock`), and that `deltaValidations[]` section names use the schema's resolved `deltaOperations` keywords.
+`specs/core/schema-format/verify.md` scenarios serve as acceptance tests for the format. `mergeSpecs` unit tests verify schema-driven section resolution, configurable operation keywords, fixed apply order (RENAMED → REMOVED → MODIFIED → ADDED), and conflict detection before any mutation. `ValidateSpec` unit tests verify `validations[]`, `deltaValidations[]` (all three modes: file-level, `scope`, `eachBlock`), and that `deltaValidations[]` section names use the schema's resolved `deltaOperations` keywords.
 
 ## More Information
 
 ### Spec
 
-- [`specs/_global/schema-format/spec.md`](../../specs/_global/schema-format/spec.md)
+- [`specs/core/schema-format/spec.md`](../../specs/core/schema-format/spec.md)

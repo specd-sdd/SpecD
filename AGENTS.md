@@ -55,8 +55,8 @@ Before writing any code, you MUST read the following specs in full. They are bin
 
 **Contextual reads** — read these when working on the relevant area:
 
-- [`specs/_global/schema-format/spec.md`](specs/_global/schema-format/spec.md) — when working on schema loading, parsing, or validation
-- [`specs/_global/config/spec.md`](specs/_global/config/spec.md) — when working on config loading, resolution, or validation
+- [`specs/core/schema-format/spec.md`](specs/core/schema-format/spec.md) — when working on schema loading, parsing, or validation
+- [`specs/core/config/spec.md`](specs/core/config/spec.md) — when working on config loading, resolution, or validation
 
 Each `spec.md` has a paired `verify.md` in the same directory with WHEN/THEN scenarios. Read it if you need to verify expected behaviour or understand edge cases for a requirement.
 
