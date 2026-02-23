@@ -113,6 +113,12 @@ workspaces:
 
 Workspace names must be unique and must match `/^[a-z][a-z0-9-]*$/`. The name `default` is reserved.
 
+**Each project's `specd.yaml` is the sole source of truth for that project's view of its workspaces.** specd never reads the `specd.yaml` of external repos declared as workspaces — paths, schemas, ownership, and all other workspace fields must be explicitly declared in the active config. This means:
+
+- If the `billing` repo has its own `specd.yaml` where it is the `default` (`owned`) workspace, the coordinator that references it as `readOnly` must independently declare those paths and settings. The two configs coexist without awareness of each other.
+- When an external workspace's structure changes (paths, schema, etc.), every project that references it must update its own `specd.yaml` manually — there is no automatic synchronisation.
+- `ownership` is always relative to the declaring project: the same repo can be `owned` in its own config and `readOnly` in a coordinator's config simultaneously. Both are valid and intentional.
+
 ### Requirement: Storage configuration
 
 `specd.yaml` must include a `storage` section with sub-keys for `changes` and `archive`. These paths are global — a project has one changes directory and one archive directory regardless of workspaces.
