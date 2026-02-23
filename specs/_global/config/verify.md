@@ -282,10 +282,25 @@
 - **WHEN** `specd config validate` is run and a pattern in `contextIncludeSpecs` or `contextExcludeSpecs` matches no specs on disk
 - **THEN** specd emits a warning identifying the pattern — the command still exits successfully
 
-#### Scenario: Unknown workspace qualifier warns
+#### Scenario: Unknown workspace qualifier warns at runtime
 
 - **WHEN** `contextIncludeSpecs: ['unknown-workspace:*']` is declared and no workspace named `unknown-workspace` exists
-- **THEN** specd emits a warning at startup but does not exit
+- **THEN** specd emits a warning at startup but does not exit — context compilation proceeds without that pattern
+
+#### Scenario: Unknown workspace qualifier fails config validate
+
+- **WHEN** `specd config validate` is run and a pattern contains a workspace qualifier that does not match any declared workspace
+- **THEN** specd exits with an error — unknown qualifiers are treated as errors in validate to catch typos before they silently drop specs from context
+
+#### Scenario: Workspace becomes active when change touches its specs
+
+- **WHEN** a change contains specs from both the `default` workspace and the `billing` workspace
+- **THEN** both workspaces are considered active and both workspace-level `contextIncludeSpecs` patterns are applied
+
+#### Scenario: Workspace not active when change does not touch its specs
+
+- **WHEN** a change contains only `default` specs and no `billing` specs
+- **THEN** the `billing` workspace is not active and its workspace-level patterns are not applied, regardless of CWD or codeRoot
 
 #### Scenario: Invalid pattern syntax is a startup error
 

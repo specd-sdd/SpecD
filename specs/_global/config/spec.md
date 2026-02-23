@@ -201,7 +201,9 @@ Keys are validated against the active schema's artifact IDs at startup. Unknown 
 `contextIncludeSpecs` and `contextExcludeSpecs` can be declared at two levels with different semantics:
 
 - **Project level** (top-level in `specd.yaml`) — patterns are always applied, regardless of which workspaces the current change touches. Use this for specs that must always be in context: global constraints, cross-cutting architecture specs, shared external specs.
-- **Workspace level** (inside a workspace entry) — patterns are applied only when that workspace is active in the current change (i.e. the change touches at least one spec in that workspace). Use this for specs that are relevant only when working within that workspace.
+- **Workspace level** (inside a workspace entry) — patterns are applied only when that workspace is active in the current change. Use this for specs that are relevant only when working within that workspace.
+
+**A workspace is considered active if at least one spec belonging to that workspace participates in the current change set.** Workspace membership is determined by the spec's location within the workspace's `specs.fs.path` — not by the CWD, not by `codeRoot`, and not by any user selection. A change that touches specs in both `default` and `billing` activates both workspaces simultaneously.
 
 **Pattern syntax:**
 
@@ -271,7 +273,7 @@ workspaces:
     # no workspace-level context — project-level shared:_global/* covers it
 ```
 
-References to unknown workspaces produce a warning at startup but do not prevent startup. References to non-existent spec paths are silently skipped at context-compilation time — this avoids breaking when a spec is temporarily deleted or not yet created. Invalid pattern syntax is an error caught at startup.
+References to unknown workspace qualifiers produce a warning at startup but do not prevent startup — runtime is tolerant to allow working with partial workspace setups. However, `specd config validate` must fail with an error if any unknown workspace qualifier is found: a typo in a qualifier silently excludes specs from context, which is a dangerous silent failure in teams. References to non-existent spec paths are silently skipped at context-compilation time — this avoids breaking when a spec is temporarily deleted or not yet created. Invalid pattern syntax is an error caught at startup.
 
 `specd config validate` additionally warns when a pattern (include or exclude, at any level) matches no specs on disk at validation time. This is not a runtime error — specs may not exist yet — but the warning helps catch typos early.
 
@@ -312,7 +314,7 @@ The following conditions emit **warnings** but allow startup to proceed:
 - Unknown key in `artifactRules` (no matching artifact ID in the active schema)
 - Duplicate workspace names (YAML retains last-wins; warn about the pattern)
 - Project-level workflow entry names a skill not declared in the schema
-- Unknown workspace qualifier in a `contextIncludeSpecs` or `contextExcludeSpecs` pattern
+- Unknown workspace qualifier in a `contextIncludeSpecs` or `contextExcludeSpecs` pattern (runtime only — `specd config validate` treats this as an error)
 
 ## Constraints
 
