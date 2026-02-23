@@ -1,154 +1,443 @@
 import { describe, it, expect } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
-import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
-import { ApprovalRequiredError } from '../../../src/domain/errors/approval-required-error.js'
+import type { GitIdentity, ChangeEvent } from '../../../src/domain/entities/change.js'
+import type { ArtifactStatus } from '../../../src/domain/value-objects/artifact-status.js'
 
-const workspace = SpecPath.parse('auth/oauth')
+const actor: GitIdentity = { name: 'Alice', email: 'alice@example.com' }
+const otherActor: GitIdentity = { name: 'Bob', email: 'bob@example.com' }
 
-function makeChange(
-  state?: import('../../../src/domain/value-objects/change-state.js').ChangeState,
-) {
+function makeChange(history: ChangeEvent[] = []) {
   return new Change({
     name: 'add-oauth-login',
-    workspace,
-    ...(state !== undefined ? { state } : {}),
+    createdAt: new Date('2024-01-01T00:00:00Z'),
+    workspaces: ['default'],
+    specIds: ['auth/login'],
+    history,
   })
 }
 
-function makeArtifact(
-  type: string,
-  status: import('../../../src/domain/value-objects/artifact-status.js').ArtifactStatus,
-  requires: string[] = [],
-) {
+function makeArtifact(type: string, status: ArtifactStatus, requires: string[] = []) {
   return new ChangeArtifact({ type, filename: `${type}.md`, status, requires })
 }
 
 describe('Change', () => {
-  describe('constructor defaults', () => {
-    it('defaults state to drafting', () => {
-      expect(makeChange().state).toBe('drafting')
+  describe('construction', () => {
+    it('stores immutable name and createdAt', () => {
+      const c = makeChange()
+      expect(c.name).toBe('add-oauth-login')
+      expect(c.createdAt).toEqual(new Date('2024-01-01T00:00:00Z'))
+    })
+
+    it('stores workspaces and specIds', () => {
+      const c = makeChange()
+      expect(c.workspaces).toEqual(['default'])
+      expect(c.specIds).toEqual(['auth/login'])
+    })
+
+    it('defaults contextSpecIds to empty array', () => {
+      expect(makeChange().contextSpecIds).toEqual([])
+    })
+
+    it('accepts contextSpecIds', () => {
+      const c = new Change({
+        name: 'x',
+        createdAt: new Date(),
+        workspaces: ['default'],
+        specIds: ['auth/login'],
+        contextSpecIds: ['auth/jwt'],
+        history: [],
+      })
+      expect(c.contextSpecIds).toEqual(['auth/jwt'])
     })
 
     it('defaults artifacts to empty map', () => {
       expect(makeChange().artifacts.size).toBe(0)
     })
 
-    it('defaults approval to undefined', () => {
-      expect(makeChange().approval).toBeUndefined()
+    it('defaults history to empty', () => {
+      expect(makeChange().history).toHaveLength(0)
+    })
+  })
+
+  describe('state (derived from history)', () => {
+    it('returns drafting when history is empty', () => {
+      expect(makeChange().state).toBe('drafting')
     })
 
-    it('sets createdAt', () => {
-      expect(makeChange().createdAt).toBeInstanceOf(Date)
+    it('returns to field of last transitioned event', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      expect(c.state).toBe('designing')
+    })
+
+    it('ignores non-transitioned events when deriving state', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.draft(actor)
+      expect(c.state).toBe('designing')
+    })
+
+    it('returns the most recent transitioned to state', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      expect(c.state).toBe('ready')
     })
   })
 
   describe('transition', () => {
-    it('transitions to a valid next state', () => {
-      const c = makeChange('drafting')
-      c.transition('designing')
+    it('transitions to a valid next state and appends event', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
       expect(c.state).toBe('designing')
+      expect(c.history).toHaveLength(1)
+      const evt = c.history[0]
+      expect(evt?.type).toBe('transitioned')
+      if (evt?.type === 'transitioned') {
+        expect(evt.from).toBe('drafting')
+        expect(evt.to).toBe('designing')
+        expect(evt.by).toBe(actor)
+      }
     })
 
     it('chains multiple valid transitions', () => {
       const c = makeChange()
-      c.transition('designing')
-      c.transition('ready')
-      c.transition('implementing')
-      c.transition('done')
-      c.transition('archivable')
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      c.transition('done', actor)
+      c.transition('archivable', actor)
       expect(c.state).toBe('archivable')
     })
 
     it('throws InvalidStateTransitionError on invalid transition', () => {
-      const c = makeChange('drafting')
-      expect(() => c.transition('ready')).toThrow(InvalidStateTransitionError)
+      const c = makeChange()
+      expect(() => c.transition('ready', actor)).toThrow(InvalidStateTransitionError)
     })
 
     it('throws on backwards transition', () => {
-      const c = makeChange('designing')
-      expect(() => c.transition('drafting')).toThrow(InvalidStateTransitionError)
+      const c = makeChange()
+      c.transition('designing', actor)
+      expect(() => c.transition('drafting', actor)).toThrow(InvalidStateTransitionError)
     })
 
     it('throws on self-transition', () => {
-      const c = makeChange('drafting')
-      expect(() => c.transition('drafting')).toThrow(InvalidStateTransitionError)
+      const c = makeChange()
+      expect(() => c.transition('drafting', actor)).toThrow(InvalidStateTransitionError)
+    })
+
+    it('does not append event when transition throws', () => {
+      const c = makeChange()
+      expect(() => c.transition('archivable', actor)).toThrow()
+      expect(c.history).toHaveLength(0)
     })
   })
 
-  describe('approve', () => {
-    it('transitions to approved and stores approval record', () => {
-      const c = makeChange('pending-approval')
-      c.approve('Security review', 'alice@example.com', [])
-      expect(c.state).toBe('approved')
-      expect(c.approval).toMatchObject({
-        reason: 'Security review',
-        approvedBy: 'alice@example.com',
-        structuralChanges: [],
-      })
-      expect(c.approval?.approvedAt).toBeInstanceOf(Date)
-    })
+  describe('invalidate', () => {
+    it('appends invalidated and transitioned events', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.invalidate('spec-change', actor)
 
-    it('stores structural changes in approval record', () => {
-      const c = makeChange('pending-approval')
-      const changes = [
-        { spec: 'auth/spec.md', type: 'MODIFIED' as const, requirement: 'Token expiry' },
-      ]
-      c.approve('Approved', 'alice@example.com', changes)
-      expect(c.approval?.structuralChanges).toEqual(changes)
-    })
-
-    it('throws when not in pending-approval state', () => {
-      const c = makeChange('done')
-      expect(() => c.approve('reason', 'alice@example.com', [])).toThrow(
-        InvalidStateTransitionError,
-      )
-    })
-  })
-
-  describe('assertArchivable', () => {
-    it('does not throw when in archivable state', () => {
-      const c = makeChange('archivable')
-      expect(() => c.assertArchivable()).not.toThrow()
-    })
-
-    it('throws ApprovalRequiredError when pending-approval', () => {
-      const c = makeChange('pending-approval')
-      expect(() => c.assertArchivable()).toThrow(ApprovalRequiredError)
-    })
-
-    it('throws InvalidStateTransitionError for other non-archivable states', () => {
-      for (const state of [
-        'drafting',
-        'designing',
-        'ready',
-        'implementing',
-        'done',
-        'approved',
-      ] as const) {
-        const c = makeChange(state)
-        expect(() => c.assertArchivable()).toThrow(InvalidStateTransitionError)
+      const history = c.history
+      const last = history[history.length - 1]
+      const secondLast = history[history.length - 2]
+      expect(secondLast?.type).toBe('invalidated')
+      expect(last?.type).toBe('transitioned')
+      if (last?.type === 'transitioned') {
+        expect(last.to).toBe('designing')
       }
+    })
+
+    it('rolls state back to designing', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.invalidate('workspace-change', actor)
+      expect(c.state).toBe('designing')
+    })
+
+    it('records the cause on the invalidated event', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.invalidate('artifact-change', actor)
+
+      const evt = c.history.find((e) => e.type === 'invalidated')
+      expect(evt?.type === 'invalidated' && evt.cause).toBe('artifact-change')
+    })
+
+    it('records the pre-invalidation state as from on the transitioned event', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.invalidate('spec-change', actor)
+
+      const transitioned = [...c.history].reverse().find((e) => e.type === 'transitioned')
+      expect(transitioned?.type === 'transitioned' && transitioned.from).toBe('ready')
+    })
+  })
+
+  describe('recordSpecApproval', () => {
+    it('appends spec-approved event', () => {
+      const c = makeChange()
+      c.recordSpecApproval('LGTM', { proposal: 'sha256:abc' }, actor)
+      const evt = c.history[0]
+      expect(evt?.type).toBe('spec-approved')
+      if (evt?.type === 'spec-approved') {
+        expect(evt.reason).toBe('LGTM')
+        expect(evt.artifactHashes).toEqual({ proposal: 'sha256:abc' })
+        expect(evt.by).toBe(actor)
+      }
+    })
+  })
+
+  describe('recordSignoff', () => {
+    it('appends signed-off event', () => {
+      const c = makeChange()
+      c.recordSignoff('Ship it', { proposal: 'sha256:abc' }, actor)
+      const evt = c.history[0]
+      expect(evt?.type).toBe('signed-off')
+      if (evt?.type === 'signed-off') {
+        expect(evt.reason).toBe('Ship it')
+      }
+    })
+  })
+
+  describe('activeSpecApproval', () => {
+    it('returns undefined when no spec-approved event exists', () => {
+      expect(makeChange().activeSpecApproval).toBeUndefined()
+    })
+
+    it('returns the spec-approved event when present', () => {
+      const c = makeChange()
+      c.recordSpecApproval('LGTM', {}, actor)
+      expect(c.activeSpecApproval).toBeDefined()
+      expect(c.activeSpecApproval?.reason).toBe('LGTM')
+    })
+
+    it('returns undefined after invalidation supersedes approval', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.recordSpecApproval('LGTM', {}, actor)
+      c.invalidate('spec-change', actor)
+      expect(c.activeSpecApproval).toBeUndefined()
+    })
+
+    it('returns new approval after re-approval following invalidation', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.recordSpecApproval('First approval', {}, actor)
+      c.invalidate('spec-change', actor)
+      c.recordSpecApproval('Second approval', {}, otherActor)
+      expect(c.activeSpecApproval?.reason).toBe('Second approval')
+    })
+  })
+
+  describe('activeSignoff', () => {
+    it('returns undefined when no signed-off event exists', () => {
+      expect(makeChange().activeSignoff).toBeUndefined()
+    })
+
+    it('returns the signed-off event when present', () => {
+      const c = makeChange()
+      c.recordSignoff('Ship it', {}, actor)
+      expect(c.activeSignoff?.reason).toBe('Ship it')
+    })
+
+    it('returns undefined after invalidation supersedes signoff', () => {
+      const c = makeChange()
+      c.recordSignoff('Ship it', {}, actor)
+      c.invalidate('artifact-change', actor)
+      expect(c.activeSignoff).toBeUndefined()
+    })
+  })
+
+  describe('isDrafted', () => {
+    it('returns false when no drafted or restored events exist', () => {
+      expect(makeChange().isDrafted).toBe(false)
+    })
+
+    it('returns true after draft()', () => {
+      const c = makeChange()
+      c.draft(actor)
+      expect(c.isDrafted).toBe(true)
+    })
+
+    it('returns false after restore()', () => {
+      const c = makeChange()
+      c.draft(actor)
+      c.restore(actor)
+      expect(c.isDrafted).toBe(false)
+    })
+
+    it('returns true after draft → restore → draft cycle', () => {
+      const c = makeChange()
+      c.draft(actor)
+      c.restore(actor)
+      c.draft(actor, 'parking again')
+      expect(c.isDrafted).toBe(true)
+    })
+  })
+
+  describe('draft', () => {
+    it('appends drafted event with actor', () => {
+      const c = makeChange()
+      c.draft(actor, 'parking for now')
+      const evt = c.history[0]
+      expect(evt?.type).toBe('drafted')
+      if (evt?.type === 'drafted') {
+        expect(evt.reason).toBe('parking for now')
+        expect(evt.by).toBe(actor)
+      }
+    })
+
+    it('appends drafted event without reason when reason not provided', () => {
+      const c = makeChange()
+      c.draft(actor)
+      const evt = c.history[0]
+      expect(evt?.type === 'drafted' && 'reason' in evt).toBe(false)
+    })
+  })
+
+  describe('restore', () => {
+    it('appends restored event', () => {
+      const c = makeChange()
+      c.draft(actor)
+      c.restore(otherActor)
+      const evt = c.history[c.history.length - 1]
+      expect(evt?.type).toBe('restored')
+      expect(evt?.by).toBe(otherActor)
+    })
+  })
+
+  describe('discard', () => {
+    it('appends discarded event with mandatory reason', () => {
+      const c = makeChange()
+      c.discard('no longer needed', actor)
+      const evt = c.history[0]
+      expect(evt?.type).toBe('discarded')
+      if (evt?.type === 'discarded') {
+        expect(evt.reason).toBe('no longer needed')
+        expect(evt.by).toBe(actor)
+      }
+    })
+
+    it('includes supersededBy when provided', () => {
+      const c = makeChange()
+      c.discard('replaced', actor, ['new-oauth-login'])
+      const evt = c.history[0]
+      expect(evt?.type === 'discarded' && evt.supersededBy).toEqual(['new-oauth-login'])
+    })
+
+    it('omits supersededBy when not provided', () => {
+      const c = makeChange()
+      c.discard('replaced', actor)
+      const evt = c.history[0]
+      expect(evt?.type === 'discarded' && 'supersededBy' in evt).toBe(false)
+    })
+  })
+
+  describe('updateWorkspaces', () => {
+    it('updates workspaces and invalidates', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.updateWorkspaces(['default', 'billing'], actor)
+      expect(c.workspaces).toEqual(['default', 'billing'])
+      expect(c.state).toBe('designing')
+      const invalidated = c.history.find((e) => e.type === 'invalidated')
+      expect(invalidated?.type === 'invalidated' && invalidated.cause).toBe('workspace-change')
+    })
+  })
+
+  describe('updateSpecIds', () => {
+    it('updates specIds and invalidates', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.updateSpecIds(['auth/login', 'auth/register'], actor)
+      expect(c.specIds).toEqual(['auth/login', 'auth/register'])
+      expect(c.state).toBe('designing')
+      const invalidated = c.history.find((e) => e.type === 'invalidated')
+      expect(invalidated?.type === 'invalidated' && invalidated.cause).toBe('spec-change')
+    })
+  })
+
+  describe('updateContextSpecIds', () => {
+    it('updates contextSpecIds without appending any event', () => {
+      const c = makeChange()
+      const historyBefore = c.history.length
+      c.updateContextSpecIds(['auth/jwt', 'auth/config'])
+      expect(c.contextSpecIds).toEqual(['auth/jwt', 'auth/config'])
+      expect(c.history).toHaveLength(historyBefore)
     })
   })
 
   describe('isArchivable', () => {
     it('returns true only in archivable state', () => {
-      expect(makeChange('archivable').isArchivable).toBe(true)
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      c.transition('done', actor)
+      c.transition('archivable', actor)
+      expect(c.isArchivable).toBe(true)
     })
 
-    it('returns false for all other states', () => {
+    it('returns false in non-archivable states', () => {
+      for (const history of [
+        [] as ChangeEvent[],
+        [
+          {
+            type: 'transitioned' as const,
+            at: new Date(),
+            by: actor,
+            from: 'drafting' as const,
+            to: 'designing' as const,
+          },
+        ],
+      ]) {
+        const c = makeChange(history)
+        expect(c.isArchivable).toBe(false)
+      }
+    })
+  })
+
+  describe('assertArchivable', () => {
+    it('does not throw when in archivable state', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      c.transition('done', actor)
+      c.transition('archivable', actor)
+      expect(() => c.assertArchivable()).not.toThrow()
+    })
+
+    it('throws InvalidStateTransitionError for non-archivable states', () => {
       for (const state of [
         'drafting',
         'designing',
         'ready',
         'implementing',
         'done',
-        'pending-approval',
-        'approved',
+        'pending-spec-approval',
+        'spec-approved',
+        'pending-signoff',
+        'signed-off',
       ] as const) {
-        expect(makeChange(state).isArchivable).toBe(false)
+        const c = new Change({
+          name: 'x',
+          createdAt: new Date(),
+          workspaces: ['default'],
+          specIds: ['auth/login'],
+          history:
+            state === 'drafting'
+              ? []
+              : [{ type: 'transitioned', at: new Date(), by: actor, from: 'drafting', to: state }],
+        })
+        expect(() => c.assertArchivable()).toThrow(InvalidStateTransitionError)
       }
     })
   })
@@ -162,8 +451,7 @@ describe('Change', () => {
     })
 
     it('returns null for unknown artifact type', () => {
-      const c = makeChange()
-      expect(c.getArtifact('proposal')).toBeNull()
+      expect(makeChange().getArtifact('proposal')).toBeNull()
     })
 
     it('overwrites artifact of same type', () => {
@@ -224,7 +512,6 @@ describe('Change', () => {
     it('returns in-progress when a required artifact is missing', () => {
       const c = makeChange()
       c.setArtifact(makeArtifact('design', 'complete', ['proposal']))
-      // proposal not added to change
       expect(c.effectiveStatus('design')).toBe('in-progress')
     })
   })

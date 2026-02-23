@@ -1,70 +1,136 @@
 import { type ChangeState, isValidTransition } from '../value-objects/change-state.js'
 import { type ArtifactStatus } from '../value-objects/artifact-status.js'
-import { SpecPath } from '../value-objects/spec-path.js'
 import { InvalidStateTransitionError } from '../errors/invalid-state-transition-error.js'
-import { ApprovalRequiredError } from '../errors/approval-required-error.js'
 import { type ChangeArtifact } from './change-artifact.js'
 
-/**
- * Describes a single structural change detected in a spec during delta validation.
- */
-export interface StructuralChange {
-  /** The spec path where the structural change occurred. */
-  readonly spec: string
-  /** Whether the block was modified or removed (both are structural operations). */
-  readonly type: 'MODIFIED' | 'REMOVED'
-  /** The block name (requirement, scenario, etc.) that was structurally changed. */
-  readonly requirement: string
+/** Git identity of the actor performing an operation. */
+export interface GitIdentity {
+  readonly name: string
+  readonly email: string
 }
 
-/**
- * Records that a change has been approved, capturing who approved it,
- * when, and which structural spec changes were reviewed.
- */
-export interface ApprovalRecord {
-  /** Free-text rationale for the approval. */
-  readonly reason: string
-  /** Git identity (name + email) of the approver. */
-  readonly approvedBy: string
-  /** Timestamp when approval was recorded. */
-  readonly approvedAt: Date
-  /** The structural spec modifications that were explicitly reviewed and approved. */
-  readonly structuralChanges: readonly StructuralChange[]
+/** Appended once when the change is first created. */
+export interface CreatedEvent {
+  readonly type: 'created'
+  readonly at: Date
+  readonly by: GitIdentity
+  readonly workspaces: readonly string[]
+  readonly specIds: readonly string[]
+  readonly schemaName: string
+  readonly schemaVersion: number
 }
+
+/** Appended on each lifecycle state transition. */
+export interface TransitionedEvent {
+  readonly type: 'transitioned'
+  readonly at: Date
+  readonly by: GitIdentity
+  readonly from: ChangeState
+  readonly to: ChangeState
+}
+
+/** Appended when the spec approval gate is passed. */
+export interface SpecApprovedEvent {
+  readonly type: 'spec-approved'
+  readonly at: Date
+  readonly by: GitIdentity
+  readonly reason: string
+  readonly artifactHashes: Record<string, string>
+}
+
+/** Appended when the signoff gate is passed. */
+export interface SignedOffEvent {
+  readonly type: 'signed-off'
+  readonly at: Date
+  readonly by: GitIdentity
+  readonly reason: string
+  readonly artifactHashes: Record<string, string>
+}
+
+/** Appended when workspaces, specIds, or artifact content changes, superseding approvals. */
+export interface InvalidatedEvent {
+  readonly type: 'invalidated'
+  readonly at: Date
+  readonly by: GitIdentity
+  readonly cause: 'workspace-change' | 'spec-change' | 'artifact-change'
+}
+
+/** Appended when the change is shelved to `drafts/`. */
+export interface DraftedEvent {
+  readonly type: 'drafted'
+  readonly at: Date
+  readonly by: GitIdentity
+  readonly reason?: string
+}
+
+/** Appended when a drafted change is moved back to `changes/`. */
+export interface RestoredEvent {
+  readonly type: 'restored'
+  readonly at: Date
+  readonly by: GitIdentity
+}
+
+/** Appended when a change is permanently abandoned. */
+export interface DiscardedEvent {
+  readonly type: 'discarded'
+  readonly at: Date
+  readonly by: GitIdentity
+  readonly reason: string
+  readonly supersededBy?: readonly string[]
+}
+
+/** Discriminated union of all change history event types. */
+export type ChangeEvent =
+  | CreatedEvent
+  | TransitionedEvent
+  | SpecApprovedEvent
+  | SignedOffEvent
+  | InvalidatedEvent
+  | DraftedEvent
+  | RestoredEvent
+  | DiscardedEvent
 
 /**
  * Construction properties for a `Change`.
+ *
+ * Mirrors the top-level fields of `manifest.json`. Repositories construct
+ * a `Change` from a persisted manifest; application use cases create a new
+ * `Change` by supplying an initial `history` containing a `created` event.
  */
 export interface ChangeProps {
-  /** Unique name identifying the change. */
+  /** Unique slug name; immutable after creation. */
   name: string
-  /** The workspace this change operates within. */
-  workspace: SpecPath
-  /** Initial lifecycle state. Defaults to `"drafting"`. */
-  state?: ChangeState
-  /** Pre-loaded artifact map. Defaults to an empty map. */
+  /** Timestamp when the change was created; immutable. */
+  createdAt: Date
+  /** Current snapshot of active workspace IDs. */
+  workspaces: string[]
+  /** Current snapshot of spec paths being modified. */
+  specIds: string[]
+  /** Context spec paths; populated at `ready` state; does not trigger invalidation. */
+  contextSpecIds?: string[]
+  /** Append-only event history from which lifecycle state is derived. */
+  history: readonly ChangeEvent[]
+  /** Pre-loaded artifact map; defaults to an empty map. */
   artifacts?: Map<string, ChangeArtifact>
-  /** Pre-loaded approval record. */
-  approval?: ApprovalRecord
-  /** Creation timestamp. Defaults to `new Date()`. */
-  createdAt?: Date
 }
 
 /**
  * The central domain entity representing an in-progress spec change.
  *
- * A `Change` moves through a lifecycle (`ChangeState`) from `drafting` to
- * `archivable`. It owns a set of `ChangeArtifact` files that must be validated
- * before archiving. If the change touches structural spec sections (MODIFIED
- * or REMOVED operations), it must be approved before it can be archived.
+ * Lifecycle state is derived entirely from the `history` — the `to` field
+ * of the most recent `transitioned` event. No `state` snapshot is stored.
+ *
+ * Every significant operation appends one or more events to `history`.
+ * Events are never modified or removed.
  */
 export class Change {
   private readonly _name: string
-  private readonly _workspace: SpecPath
   private readonly _createdAt: Date
-  private _state: ChangeState
+  private _workspaces: string[]
+  private _specIds: string[]
+  private _contextSpecIds: string[]
+  private _history: ChangeEvent[]
   private _artifacts: Map<string, ChangeArtifact>
-  private _approval: ApprovalRecord | undefined
 
   /**
    * Creates a new `Change` from the given properties.
@@ -73,21 +139,17 @@ export class Change {
    */
   constructor(props: ChangeProps) {
     this._name = props.name
-    this._workspace = props.workspace
-    this._createdAt = props.createdAt ?? new Date()
-    this._state = props.state ?? 'drafting'
+    this._createdAt = props.createdAt
+    this._workspaces = [...props.workspaces]
+    this._specIds = [...props.specIds]
+    this._contextSpecIds = [...(props.contextSpecIds ?? [])]
+    this._history = [...props.history]
     this._artifacts = props.artifacts ?? new Map<string, ChangeArtifact>()
-    this._approval = props.approval
   }
 
-  /** Unique name identifying this change. */
+  /** Unique slug name identifying this change. */
   get name(): string {
     return this._name
-  }
-
-  /** The workspace this change operates within. */
-  get workspace(): SpecPath {
-    return this._workspace
   }
 
   /** Timestamp when the change was created. */
@@ -95,9 +157,76 @@ export class Change {
     return this._createdAt
   }
 
-  /** The current lifecycle state of this change. */
+  /** Current snapshot of workspace IDs this change belongs to. */
+  get workspaces(): readonly string[] {
+    return this._workspaces
+  }
+
+  /** Current snapshot of spec paths being created or modified. */
+  get specIds(): readonly string[] {
+    return this._specIds
+  }
+
+  /** Context spec paths that provide context but are not being modified. */
+  get contextSpecIds(): readonly string[] {
+    return this._contextSpecIds
+  }
+
+  /** Read-only view of the append-only event history. */
+  get history(): readonly ChangeEvent[] {
+    return this._history
+  }
+
+  /**
+   * The current lifecycle state, derived from the most recent `transitioned`
+   * event's `to` field. Returns `'drafting'` if no `transitioned` event exists.
+   */
   get state(): ChangeState {
-    return this._state
+    for (let i = this._history.length - 1; i >= 0; i--) {
+      const evt = this._history[i]
+      if (evt !== undefined && evt.type === 'transitioned') return evt.to
+    }
+    return 'drafting'
+  }
+
+  /**
+   * Whether the change is currently shelved in `drafts/`. Derived from
+   * the most recent `drafted` or `restored` event.
+   */
+  get isDrafted(): boolean {
+    for (let i = this._history.length - 1; i >= 0; i--) {
+      const evt = this._history[i]
+      if (evt === undefined) continue
+      if (evt.type === 'drafted') return true
+      if (evt.type === 'restored') return false
+    }
+    return false
+  }
+
+  /**
+   * The active spec approval — the most recent `spec-approved` event that has
+   * not been superseded by a subsequent `invalidated` event, or `undefined`.
+   */
+  get activeSpecApproval(): SpecApprovedEvent | undefined {
+    let last: SpecApprovedEvent | undefined
+    for (const evt of this._history) {
+      if (evt.type === 'spec-approved') last = evt
+      if (evt.type === 'invalidated') last = undefined
+    }
+    return last
+  }
+
+  /**
+   * The active signoff — the most recent `signed-off` event that has not been
+   * superseded by a subsequent `invalidated` event, or `undefined`.
+   */
+  get activeSignoff(): SignedOffEvent | undefined {
+    let last: SignedOffEvent | undefined
+    for (const evt of this._history) {
+      if (evt.type === 'signed-off') last = evt
+      if (evt.type === 'invalidated') last = undefined
+    }
+    return last
   }
 
   /** All artifacts currently attached to this change, keyed by type. */
@@ -105,24 +234,17 @@ export class Change {
     return this._artifacts
   }
 
-  /** The approval record, or `undefined` if not yet approved. */
-  get approval(): ApprovalRecord | undefined {
-    return this._approval
-  }
-
-  /**
-   * Returns whether this change is ready to be archived (`state === "archivable"`).
-   */
+  /** Whether this change is in `archivable` state and may be archived. */
   get isArchivable(): boolean {
-    return this._state === 'archivable'
+    return this.state === 'archivable'
   }
 
   /**
    * Computes the effective artifact status for `type`, cascading through
    * the dependency graph to reflect blocking dependencies.
    *
-   * If any required artifact is not `complete`, this artifact's effective
-   * status is `in-progress` even if the artifact itself is `complete`.
+   * An artifact whose own hash matches its `validatedHash` is still reported
+   * as `in-progress` if any artifact in its `requires` chain is not `complete`.
    *
    * @param type - The artifact type ID to evaluate
    * @returns The effective `ArtifactStatus` after dependency resolution
@@ -140,57 +262,148 @@ export class Change {
   }
 
   /**
-   * Attempts a lifecycle state transition.
+   * Attempts a lifecycle state transition, appending a `transitioned` event.
    *
    * @param to - The target state
+   * @param actor - Git identity of the actor performing the transition
    * @throws {InvalidStateTransitionError} If the transition is not permitted
    */
-  transition(to: ChangeState): void {
-    if (!isValidTransition(this._state, to)) {
-      throw new InvalidStateTransitionError(this._state, to)
+  transition(to: ChangeState, actor: GitIdentity): void {
+    const from = this.state
+    if (!isValidTransition(from, to)) {
+      throw new InvalidStateTransitionError(from, to)
     }
-    this._state = to
+    this._history.push({ type: 'transitioned', from, to, at: new Date(), by: actor })
   }
 
   /**
-   * Records an approval for this change, transitioning its state to `"approved"`.
+   * Records an invalidation, appending an `invalidated` event followed by a
+   * `transitioned` event rolling back to `designing`.
    *
-   * May only be called when the change is in `"pending-approval"` state.
+   * Called when workspaces, specIds, or artifact content changes and supersedes
+   * any active spec approval or signoff.
+   *
+   * @param cause - The reason for invalidation
+   * @param actor - Git identity of the actor triggering the change
+   */
+  invalidate(cause: InvalidatedEvent['cause'], actor: GitIdentity): void {
+    const from = this.state
+    const now = new Date()
+    this._history.push({ type: 'invalidated', cause, at: now, by: actor })
+    this._history.push({ type: 'transitioned', from, to: 'designing', at: now, by: actor })
+  }
+
+  /**
+   * Records that the spec approval gate has been passed.
    *
    * @param reason - Free-text rationale for the approval
-   * @param approvedBy - Git identity of the approver (name + email)
-   * @param structuralChanges - The structural spec modifications being approved
-   * @throws {InvalidStateTransitionError} If the change is not in `"pending-approval"` state
+   * @param artifactHashes - Hashes of the artifacts reviewed during approval
+   * @param actor - Git identity of the approver
    */
-  approve(
+  recordSpecApproval(
     reason: string,
-    approvedBy: string,
-    structuralChanges: readonly StructuralChange[],
+    artifactHashes: Record<string, string>,
+    actor: GitIdentity,
   ): void {
-    if (this._state !== 'pending-approval') {
-      throw new InvalidStateTransitionError(this._state, 'approved')
-    }
-    this._approval = {
-      reason,
-      approvedBy,
-      approvedAt: new Date(),
-      structuralChanges,
-    }
-    this._state = 'approved'
+    this._history.push({ type: 'spec-approved', reason, artifactHashes, at: new Date(), by: actor })
   }
 
   /**
-   * Asserts that this change is in a state that permits archiving.
+   * Records that the signoff gate has been passed.
    *
-   * @throws {ApprovalRequiredError} If the change is in `"pending-approval"` state
-   * @throws {InvalidStateTransitionError} If the change is not in `"archivable"` state
+   * @param reason - Free-text rationale for the sign-off
+   * @param artifactHashes - Hashes of the artifacts reviewed during sign-off
+   * @param actor - Git identity of the approver
+   */
+  recordSignoff(reason: string, artifactHashes: Record<string, string>, actor: GitIdentity): void {
+    this._history.push({ type: 'signed-off', reason, artifactHashes, at: new Date(), by: actor })
+  }
+
+  /**
+   * Shelves this change to `drafts/`, appending a `drafted` event.
+   *
+   * @param actor - Git identity of the person shelving the change
+   * @param reason - Optional explanation for shelving
+   */
+  draft(actor: GitIdentity, reason?: string): void {
+    const event: DraftedEvent =
+      reason !== undefined
+        ? { type: 'drafted', at: new Date(), by: actor, reason }
+        : { type: 'drafted', at: new Date(), by: actor }
+    this._history.push(event)
+  }
+
+  /**
+   * Recovers a drafted change back to `changes/`, appending a `restored` event.
+   *
+   * @param actor - Git identity of the person restoring the change
+   */
+  restore(actor: GitIdentity): void {
+    this._history.push({ type: 'restored', at: new Date(), by: actor })
+  }
+
+  /**
+   * Permanently abandons the change, appending a `discarded` event.
+   *
+   * @param reason - Mandatory explanation for discarding
+   * @param actor - Git identity of the person discarding the change
+   * @param supersededBy - Optional list of change names that replace this one
+   */
+  discard(reason: string, actor: GitIdentity, supersededBy?: readonly string[]): void {
+    const event: DiscardedEvent =
+      supersededBy !== undefined
+        ? { type: 'discarded', reason, at: new Date(), by: actor, supersededBy }
+        : { type: 'discarded', reason, at: new Date(), by: actor }
+    this._history.push(event)
+  }
+
+  /**
+   * Updates the workspace list and appends an invalidation.
+   *
+   * Any modification to workspaces always appends an `invalidated` event
+   * followed by a `transitioned` event rolling back to `designing`.
+   *
+   * @param workspaces - The new workspace IDs
+   * @param actor - Git identity of the actor making the change
+   */
+  updateWorkspaces(workspaces: readonly string[], actor: GitIdentity): void {
+    this._workspaces = [...workspaces]
+    this.invalidate('workspace-change', actor)
+  }
+
+  /**
+   * Updates the spec ID list and appends an invalidation.
+   *
+   * Any modification to specIds always appends an `invalidated` event
+   * followed by a `transitioned` event rolling back to `designing`.
+   *
+   * @param specIds - The new spec paths
+   * @param actor - Git identity of the actor making the change
+   */
+  updateSpecIds(specIds: readonly string[], actor: GitIdentity): void {
+    this._specIds = [...specIds]
+    this.invalidate('spec-change', actor)
+  }
+
+  /**
+   * Updates the context spec IDs without appending any event.
+   *
+   * Modifications to `contextSpecIds` alone do not trigger invalidation.
+   *
+   * @param contextSpecIds - The new context spec paths
+   */
+  updateContextSpecIds(contextSpecIds: readonly string[]): void {
+    this._contextSpecIds = [...contextSpecIds]
+  }
+
+  /**
+   * Asserts that this change is in `archivable` state.
+   *
+   * @throws {InvalidStateTransitionError} If the change is not in `archivable` state
    */
   assertArchivable(): void {
-    if (this._state === 'pending-approval') {
-      throw new ApprovalRequiredError(this._name)
-    }
     if (!this.isArchivable) {
-      throw new InvalidStateTransitionError(this._state, 'archivable')
+      throw new InvalidStateTransitionError(this.state, 'archivable')
     }
   }
 

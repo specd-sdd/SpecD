@@ -7,10 +7,12 @@ export type ChangeState =
   | 'drafting'
   | 'designing'
   | 'ready'
+  | 'pending-spec-approval'
+  | 'spec-approved'
   | 'implementing'
   | 'done'
-  | 'pending-approval'
-  | 'approved'
+  | 'pending-signoff'
+  | 'signed-off'
   | 'archivable'
 
 /**
@@ -18,15 +20,20 @@ export type ChangeState =
  *
  * Each key is a source state; the value is the array of states it may
  * transition to. Transitions not listed here are invalid.
+ *
+ * Both approval gate paths are listed. Use cases enforce which path
+ * is taken based on the active `specd.yaml` configuration.
  */
 export const VALID_TRANSITIONS: Record<ChangeState, readonly ChangeState[]> = {
   drafting: ['designing'],
   designing: ['ready'],
-  ready: ['implementing'],
+  ready: ['implementing', 'pending-spec-approval'],
+  'pending-spec-approval': ['spec-approved'],
+  'spec-approved': ['implementing'],
   implementing: ['done'],
-  done: ['pending-approval', 'archivable'],
-  'pending-approval': ['approved'],
-  approved: ['archivable'],
+  done: ['archivable', 'pending-signoff'],
+  'pending-signoff': ['signed-off'],
+  'signed-off': ['archivable'],
   archivable: [],
 }
 
