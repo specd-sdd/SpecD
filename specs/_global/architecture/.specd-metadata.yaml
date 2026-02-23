@@ -1,0 +1,19 @@
+title: Architecture
+description: >
+  Defines the Hexagonal Architecture (Ports & Adapters) and DDD tactical
+  patterns that all packages with business logic must follow, including layer
+  import rules, rich entities, pure domain services, and manual dependency
+  injection.
+keywords:
+  - hexagonal
+  - ports-and-adapters
+  - ddd
+  - layered-architecture
+  - rich-entities
+  - pure-functions
+  - di
+  - domain-services
+dependsOn: []
+contentHashes:
+  spec.md: 'sha256:dcf5e13d391351d725e30ba38fa4b24fbdefbbe840530521a7b2a9d1343d241d'
+  verify.md: 'sha256:dbbf29057514a748003772a3670aa33c62a8fb2a7e859ec9d9a49d49367cbbff'

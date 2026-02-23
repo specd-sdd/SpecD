@@ -1,0 +1,20 @@
+title: Spec Metadata
+description: >
+  Defines the .specd-metadata.yaml file format for per-spec metadata —
+  title, description, keywords, dependency declarations, and per-artifact
+  content hashes used for staleness detection and context compilation.
+keywords:
+  - yaml
+  - metadata
+  - dependency-graph
+  - integrity
+  - checksums
+  - context-compilation
+  - staleness
+dependsOn:
+  - specs/core/config/
+  - specs/core/change/
+  - specs/core/schema-format/
+contentHashes:
+  spec.md: 'sha256:a5ccc6464b0a3c3947524c43e0cd3aeb7e54c09675ae47f0679f693d9b95c931'
+  verify.md: 'sha256:4f6c5b74513ef740a4769d50cabdba3933e1956300a253ae6165610388daadc3'

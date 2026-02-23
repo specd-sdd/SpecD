@@ -1,0 +1,15 @@
+title: Commit Conventions
+description: >
+  Defines the Conventional Commits format that all commits in the specd
+  monorepo must follow, enabling machine-parseable changelogs and release
+  automation.
+keywords:
+  - conventional-commits
+  - git
+  - changelog
+  - commit-message
+  - release-automation
+dependsOn: []
+contentHashes:
+  spec.md: 'sha256:0660ed94b800922d5db1075a1995230399e2f4d99c24cb38b63eb73989d80cbd'
+  verify.md: 'sha256:8353f0bd3f445bc84ff816668adc1cacd22bb3d5733060829d73ff848c0980f6'

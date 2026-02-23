@@ -1,0 +1,15 @@
+title: Spec Layout
+description: >
+  Defines the directory structure, mandatory sections, and file conventions
+  for all specs in the specd project — both global constraint specs under
+  specs/_global/ and package-internal specs under specs/<package>/.
+keywords:
+  - spec-structure
+  - naming-convention
+  - markdown
+  - documentation
+  - layout
+dependsOn: []
+contentHashes:
+  spec.md: 'sha256:22fcc69911ffedf22970a4ad8ed1b539fc92eb6c5148c1a9d12c04c456a30c3b'
+  verify.md: 'sha256:f4c07c07b9fb4ee6ecfded12e2ab2412079929b13c42295e6515e41ccbb77b4e'

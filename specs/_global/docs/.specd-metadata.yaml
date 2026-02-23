@@ -1,0 +1,16 @@
+title: Documentation Conventions
+description: >
+  Defines where documentation lives, the scope of each subdirectory, and the
+  constraints for writing ADRs, JSDoc comments, and other project documents.
+keywords:
+  - documentation
+  - adr
+  - jsdoc
+  - api
+  - markdown
+  - architecture-decision
+dependsOn:
+  - specs/_global/conventions/
+contentHashes:
+  spec.md: 'sha256:f878defaa38014eda0d78a8a34167e8591d23b62071a2b884c1e76737609d838'
+  verify.md: 'sha256:2bed20f27ce16cffa390fd112ffdc02f1d36ab49c3882c1176c30c328597feb2'

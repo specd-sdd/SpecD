@@ -1,0 +1,24 @@
+title: Change
+description: >
+  Defines the Change domain entity — the central concept in specd representing
+  an in-progress set of spec modifications — including its event-sourcing
+  lifecycle model, approval gates, draft/restore/discard operations, and
+  invariant enforcement.
+keywords:
+  - event-sourcing
+  - state-machine
+  - lifecycle
+  - approval
+  - workflow
+  - domain-entity
+  - artifact
+dependsOn:
+  - specs/core/config/
+  - specs/core/schema-format/
+  - specs/core/change-manifest/
+  - specs/core/storage/
+  - specs/core/delta-merger/
+  - specs/core/spec-metadata/
+contentHashes:
+  spec.md: 'sha256:7d90942c79c38231c1331d4ee304d63d6e52a819831724f981e8add885a12070'
+  verify.md: 'sha256:ad782031f704e71cfd39c23dc6cc84950d41c0b910986927dddbaf4c50019d1c'

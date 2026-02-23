@@ -1,0 +1,17 @@
+title: ESLint Rules
+description: >
+  Specifies the ESLint configuration that enforces coding conventions across
+  all packages, including type-aware rules, jsdoc requirements, and import
+  restrictions.
+keywords:
+  - eslint
+  - linting
+  - code-quality
+  - typescript
+  - type-safety
+  - code-style
+dependsOn:
+  - specs/_global/conventions/
+contentHashes:
+  spec.md: 'sha256:cedd44235fc271069dc7cdcc3aafb501037fa39111b938c388b28b8304ff9ece'
+  verify.md: 'sha256:158f656872560db796e95015fbc18ebd42510dc6944ce64052d8224244859ab6'

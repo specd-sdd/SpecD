@@ -1,0 +1,23 @@
+title: Project Configuration
+description: >
+  Defines the specd.yaml project configuration file format — schema
+  declaration, workspace definitions, storage paths, workflow hooks, artifact
+  overrides, plugin registration, and the five-step context compilation order
+  including dependsOn traversal.
+keywords:
+  - configuration
+  - yaml
+  - workspace
+  - monorepo
+  - schema
+  - validation
+  - context-compilation
+  - dependency-graph
+dependsOn:
+  - specs/core/schema-format/
+  - specs/_global/architecture/
+  - specs/core/storage/
+  - specs/core/spec-metadata/
+contentHashes:
+  spec.md: 'sha256:8f71b86942954b4aaba48fe3f18c9d634f85c459c33391a169caac3e9aa60776'
+  verify.md: 'sha256:be7a8b019bebcbed3c1b22f0613b59594f9b511b0a2b4de0c2e10d09b1d9e490'
