@@ -185,15 +185,25 @@
 - **WHEN** a drafted Change is restored
 - **THEN** it is moved back to `changes/` and resumes from its preserved state
 
-#### Scenario: Discard requires a reason
+#### Scenario: Discard requires reason and identity
 
-- **WHEN** a Change is discarded without providing a reason
+- **WHEN** a Change is discarded without providing a reason or discarding identity
 - **THEN** the operation fails with a validation error
+
+#### Scenario: Discard records who discarded and why
+
+- **WHEN** a Change is discarded with a reason, identity, and optional superseding change names
+- **THEN** a `DiscardRecord` is written to the manifest before the change is moved to `discarded/`
 
 #### Scenario: Discard from drafts
 
-- **WHEN** a drafted Change is discarded with a reason
-- **THEN** it is moved to `discarded/` and cannot be recovered
+- **WHEN** a drafted Change is discarded
+- **THEN** it is moved to `discarded/` with its `DiscardRecord` and cannot be recovered
+
+#### Scenario: Discard with supersededBy
+
+- **WHEN** a Change is discarded with `supersededBy: ['new-auth-flow', 'cleanup-tokens']`
+- **THEN** the `DiscardRecord` stores those names for traceability
 
 #### Scenario: Discarded change cannot be restored
 
