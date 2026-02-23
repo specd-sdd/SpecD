@@ -15,11 +15,12 @@ A Change has a unique, user-defined slug name (e.g. `add-auth-flow`) and a `crea
 A Change declares:
 
 - **`workspaces`** — one or more workspace IDs it belongs to (e.g. `['default', 'billing']`). Workspace IDs reference keys declared in `specd.yaml`. At least one is required.
-- **`specIds`** — one or more spec paths that are part of this change (e.g. `['auth/login', 'billing/invoices']`). At least one is required.
+- **`specIds`** — one or more spec paths being created or modified by this change (e.g. `['auth/login', 'billing/invoices']`). At least one is required.
+- **`contextSpecIds`** — spec paths that provide context for this change but are not being modified. Populated when the change reaches `ready` state by taking the union of `dependsOn` from each spec's `.specd-metadata.yaml` (direct dependencies only). May be empty. Mutable — can be updated manually without triggering approval invalidation.
 
-Both lists are validated against `specd.yaml` and the spec filesystem at creation time. Both are **mutable** after creation — workspaces and specs can be added or removed as the change scope evolves. However, any modification to either list invalidates all existing approval records (see Requirement: Approval records).
+`workspaces` and `specIds` are validated against `specd.yaml` and the spec filesystem at creation time. Both are **mutable** after creation — workspaces and specs can be added or removed as the change scope evolves. Any modification to `workspaces` or `specIds` triggers approval invalidation (see Requirement: History and event sourcing). Modifications to `contextSpecIds` alone do not invalidate approvals — at most a warning is emitted if context specs change after an approval has been recorded.
 
-`CompileContext` reads `workspaces` from the change manifest to determine which workspaces are active — it does not infer this from spec paths at compile time.
+`CompileContext` reads `workspaces` from the change manifest to determine which workspaces are active — it does not infer this from spec paths at compile time. It uses `contextSpecIds` as the starting point for context graph traversal, following `dependsOn` links in each spec's `.specd-metadata.yaml` transitively. See [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
 
 ### Requirement: Lifecycle
 
@@ -48,13 +49,13 @@ Only the transitions shown above are valid. Any attempt to transition to a state
 
 ### Requirement: Spec approval gate
 
-When `approvals.spec: true`, the transition from `ready` to `implementing` is blocked. The change must first transition to `pending-spec-approval`, receive an explicit approval record (approver identity, reason, timestamp, artifact hashes), and then transition to `spec-approved` before `implementing` becomes reachable.
+When `approvals.spec: true`, the transition from `ready` to `implementing` is blocked. The change must first transition to `pending-spec-approval`, receive an explicit approval (approver identity, reason, artifact hashes), and then transition to `spec-approved` before `implementing` becomes reachable.
 
 When `approvals.spec: false` (default), `ready → implementing` is a free transition. The `pending-spec-approval` and `spec-approved` states are unreachable.
 
 ### Requirement: Signoff gate
 
-When `approvals.signoff: true`, the transition from `done` to `archivable` is always blocked — regardless of whether the change contains only new specs, modifications, or removals. The change must transition to `pending-signoff`, receive an explicit sign-off record (approver identity, reason, timestamp, artifact hashes), and transition through `signed-off → archivable`.
+When `approvals.signoff: true`, the transition from `done` to `archivable` is always blocked — regardless of whether the change contains only new specs, modifications, or removals. The change must transition to `pending-signoff`, receive an explicit sign-off (approver identity, reason, artifact hashes), and transition through `signed-off → archivable`.
 
 When `approvals.signoff: false` (default), `done → archivable` is a free transition. Attempting to archive a change that is not in `archivable` state throws `InvalidStateTransitionError`.
 
@@ -75,60 +76,83 @@ Effective status cascades: an artifact is `in-progress` if any artifact in its `
 
 `Artifact.markComplete(hash)` may only be called by the `ValidateSpec` use case. No other code path may set an artifact to `complete`.
 
-### Requirement: Approval records
+### Requirement: History and event sourcing
 
-Each approval gate maintains an **ordered list** of approval records on the Change. A new record is appended each time the gate is passed. Each record captures the state of the change at the moment of approval:
+The change manifest contains an **append-only `history` array** of typed events. Every significant operation appends one or more events. Events are never modified or removed.
 
-- **`reason`** — human-provided rationale
-- **`approvedBy`** — git identity (name + email) of the approver
-- **`approvedAt`** — timestamp of approval
-- **`artifactHashes`** — map of artifact type → cleaned hash for every artifact present at approval time (the complete signature of the change at that moment)
+The **current lifecycle state** of a Change is derived entirely from its history: the `to` field of the most recent `transitioned` event. If no `transitioned` event exists, the state is `drafting`. No separate state snapshot is stored. The JSON serialization of these events in `manifest.json` is defined in [`specs/core/storage/spec.md` — Requirement: Change manifest format](../storage/spec.md).
 
-An approval record is written once and never modified. The list grows if the change goes through the same gate multiple times (e.g. after workspace or artifact changes invalidate a prior approval).
+The **current draft/active status** is derived from history: if the most recent `drafted` or `restored` event is of type `drafted`, the change is currently shelved in `drafts/`; otherwise it is active in `changes/`.
 
-**Invalidation:** any change to the workspace list, spec list, or any artifact content invalidates all existing approval records. Invalidation rolls the change back to `designing`. The invalidated records are retained in the history for audit purposes but are marked as superseded.
+The **active approval** for each gate is the most recent `spec-approved` or `signed-off` event that has not been superseded by a subsequent `invalidated` event.
+
+All events share common fields:
+
+- **`type`** — identifies the event kind
+- **`at`** — ISO 8601 timestamp
+- **`by`** — git identity (`name` + `email`) of the actor, mandatory on all events
+
+Event types:
+
+| Type            | Additional fields                                                 | When appended                                                        |
+| --------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `created`       | `workspaces`, `specIds`, `schemaName`, `schemaVersion`            | Once, when the change is first created                               |
+| `transitioned`  | `from: ChangeState`, `to: ChangeState`                            | Each lifecycle state transition                                      |
+| `spec-approved` | `reason: string`, `artifactHashes: Record<string, string>`        | When the spec approval gate is passed                                |
+| `signed-off`    | `reason: string`, `artifactHashes: Record<string, string>`        | When the signoff gate is passed                                      |
+| `invalidated`   | `cause: 'workspace-change' \| 'spec-change' \| 'artifact-change'` | When workspaces, specIds, or artifacts change, superseding approvals |
+| `drafted`       | `reason?: string`                                                 | When a change is shelved to `drafts/`                                |
+| `restored`      | _(none beyond common fields)_                                     | When a drafted change is moved back to `changes/`                    |
+| `discarded`     | `reason: string`, `supersededBy?: string[]`                       | When a change is permanently abandoned                               |
+
+**Approval invalidation:** when the workspace list, spec list, or any artifact content changes, specd appends an `invalidated` event (with the appropriate `cause`) followed immediately by a `transitioned` event rolling back to `designing`. The invalidated approvals remain in history for audit purposes and are identified as superseded by the presence of the subsequent `invalidated` event.
+
+**Multiple approval cycles:** if a change is approved, then invalidated, then approved again, the history records all events. The active approval is the last `spec-approved` / `signed-off` event with no subsequent `invalidated` event.
 
 ### Requirement: Schema version
 
-The change manifest records the name and version of the schema that was active when the change was created. This allows specd to detect schema drift. If the active schema's name or version differs from the recorded values when the change is loaded, a warning is emitted. The change remains fully usable — the warning is advisory. Archiving with a schema version mismatch is allowed.
+The `created` event records the `schemaName` and `schemaVersion` of the schema active at creation time. When the change is loaded, specd compares these values against the currently active schema. If they differ, a warning is emitted. The change remains fully usable — the warning is advisory. Archiving with a schema version mismatch is allowed.
 
 ### Requirement: Drafting and discarding
 
-A change may be moved between storage locations without affecting its internal state:
+A change may be moved between storage locations without affecting its lifecycle state. All operations are recorded as events in history.
 
-- **Draft** (`changes/` → `drafts/`) — shelves the change. The change retains its lifecycle state and all records. Requires a `DraftRecord` with:
-  - **`draftedBy`** — mandatory git identity (name + email) of the person shelving
-  - **`draftedAt`** — timestamp
+- **Draft** (`changes/` → `drafts/`) — shelves the change. Appends a `drafted` event with:
+  - **`by`** — mandatory git identity (name + email) of the person shelving
+  - **`at`** — timestamp
   - **`reason`** — optional explanation
 
-  Can be performed at any point before archiving.
+  Can be performed at any point before archiving. The change retains its full history and lifecycle state.
 
-- **Restore** (`drafts/` → `changes/`) — recovers a drafted change. It resumes from its preserved state.
-- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Requires a `DiscardRecord` with:
+- **Restore** (`drafts/` → `changes/`) — recovers a drafted change. Appends a `restored` event. The change resumes from its preserved state.
+
+- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Appends a `discarded` event with:
   - **`reason`** — mandatory human-provided explanation
-  - **`discardedBy`** — git identity (name + email) of the person discarding
-  - **`discardedAt`** — timestamp
+  - **`by`** — mandatory git identity (name + email) of the person discarding
+  - **`at`** — timestamp
   - **`supersededBy`** — optional list of change names that replace this one
 
-  The `DiscardRecord` is stored in the manifest. Cannot be undone.
+  Cannot be undone. A change may be drafted and restored multiple times before being discarded; the full cycle is preserved in history.
 
 ## Constraints
 
 - `name` and `createdAt` are set at creation and never changed
 - A Change must have at least one workspace ID and at least one spec ID
-- Any modification to the workspace list, spec list, or any artifact content invalidates all approval records and rolls back to `designing`
+- Current lifecycle state is derived from history (last `transitioned` event); no state snapshot is stored
+- Any modification to the workspace list, spec list, or any artifact content appends an `invalidated` event followed by a `transitioned` event back to `designing`
 - `ArtifactStatus` is never persisted — always derived from cleaned hash vs `validatedHash`
 - `Artifact.markComplete(hash)` may only be called from `ValidateSpec`
 - `archivable` is the only state from which a change may be archived; attempting to archive from any other state throws `InvalidStateTransitionError`
 - Both approval gates default to `false` — teams opt in via `approvals` in `specd.yaml`
 - When `approvals.spec: true`, spec approval is required before `implementing`
 - When `approvals.signoff: true`, sign-off is always required before `archivable`, regardless of change content
-- Approval records are never modified; invalidated records are retained as history marked superseded
-- Discarding a change requires a `DiscardRecord` with mandatory `reason` and `discardedBy`; it is irreversible
+- History events are never modified or deleted; invalidated approvals are identifiable by a subsequent `invalidated` event
+- Discarding a change requires a `discarded` event with mandatory `reason` and `by`; it is irreversible
 
 ## Spec Dependencies
 
-- [`specs/_global/config/spec.md`](../../_global/config/spec.md) — workspace IDs, active workspace semantics, approval gates config, storage locations
-- [`specs/_global/schema-format/spec.md`](../../_global/schema-format/spec.md) — artifact type declarations, dependency graph, `preHashCleanup`
+- [`specs/core/config/spec.md`](../config/spec.md) — workspace IDs, active workspace semantics, approval gates config, storage locations
+- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — artifact type declarations, dependency graph, `preHashCleanup`
 - [`specs/core/storage/spec.md`](../storage/spec.md) — manifest format and persistence
 - [`specs/core/delta-merger/spec.md`](../delta-merger/spec.md) — delta operations
+- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal

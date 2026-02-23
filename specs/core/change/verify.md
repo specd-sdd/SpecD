@@ -34,29 +34,34 @@
 #### Scenario: Workspace added after creation
 
 - **WHEN** a Change has `workspaces: ['default']` and `billing` is added to the list
-- **THEN** the workspace list becomes `['default', 'billing']`, all existing approval records are invalidated, and the change rolls back to `designing`
+- **THEN** the workspace list becomes `['default', 'billing']`, an `invalidated` event with `cause: 'workspace-change'` is appended, a `transitioned` event rolling back to `designing` is appended, and any prior `spec-approved` or `signed-off` events are now superseded
 
 #### Scenario: Spec added after creation
 
 - **WHEN** a new spec path is added to the Change's `specIds`
-- **THEN** all existing approval records are invalidated and the change rolls back to `designing`
+- **THEN** an `invalidated` event with `cause: 'spec-change'` is appended and a `transitioned` event rolling back to `designing` is appended
 
 ### Requirement: Lifecycle
 
 #### Scenario: Valid transition succeeds
 
 - **WHEN** a Change in `drafting` state is transitioned to `designing`
-- **THEN** the state updates to `designing` with no error
+- **THEN** a `transitioned` event with `from: 'drafting'` and `to: 'designing'` is appended and deriving state from history returns `designing`
 
 #### Scenario: Invalid transition throws
 
 - **WHEN** a Change in `drafting` state is transitioned to `archivable`
-- **THEN** `InvalidStateTransitionError` is thrown and the state remains `drafting`
+- **THEN** `InvalidStateTransitionError` is thrown, no event is appended, and the state remains `drafting`
 
 #### Scenario: archivable is terminal
 
 - **WHEN** a Change in `archivable` state is transitioned to any other state
 - **THEN** `InvalidStateTransitionError` is thrown
+
+#### Scenario: State derived from history — no snapshot
+
+- **WHEN** a Change has a history containing two `transitioned` events ending with `to: 'implementing'`
+- **THEN** deriving state from history returns `implementing` without reading any separate state field
 
 ### Requirement: Spec approval gate
 
@@ -73,7 +78,7 @@
 #### Scenario: Gate enabled — implementing reachable after approval
 
 - **WHEN** `approvals.spec: true` and a Change in `pending-spec-approval` receives approval
-- **THEN** it transitions to `spec-approved` and then to `implementing`
+- **THEN** a `spec-approved` event is appended, then a `transitioned` event to `spec-approved` state, then to `implementing`
 
 ### Requirement: Signoff gate
 
@@ -90,7 +95,7 @@
 #### Scenario: Gate enabled — archivable after signoff
 
 - **WHEN** `approvals.signoff: true` and a Change in `pending-signoff` receives sign-off
-- **THEN** it transitions to `signed-off` and then to `archivable`
+- **THEN** a `signed-off` event is appended, then a `transitioned` event to `signed-off` state, then to `archivable`
 
 #### Scenario: Archive from non-archivable state throws
 
@@ -129,43 +134,58 @@
 - **WHEN** any code path other than `ValidateSpec` calls `Artifact.markComplete(hash)`
 - **THEN** this is a violation of the domain contract — no other use case may set an artifact to `complete`
 
-### Requirement: Approval records
+### Requirement: History and event sourcing
 
-#### Scenario: Spec approval recorded
+#### Scenario: History is append-only
 
-- **WHEN** a Change in `pending-spec-approval` is approved
-- **THEN** an approval record with reason, approver identity, timestamp, and all artifact hashes is appended to the spec approval history
+- **WHEN** any operation is performed on a Change
+- **THEN** new events are appended to history; no existing event is modified or removed
 
-#### Scenario: Sign-off recorded
+#### Scenario: State derived from last transitioned event
 
-- **WHEN** a Change in `pending-signoff` is signed off
-- **THEN** a sign-off record with reason, approver identity, timestamp, and all artifact hashes is appended to the signoff history
+- **WHEN** history contains `transitioned` events with `to` values of `designing`, `ready`, `implementing`
+- **THEN** deriving state returns `implementing` (the most recent `to` value)
 
-#### Scenario: Artifact change invalidates approval
+#### Scenario: Draft status derived from history
 
-- **WHEN** an artifact's content changes after a spec approval record was written
-- **THEN** the existing approval records are marked superseded, the change rolls back to `designing`
+- **WHEN** history contains a `drafted` event followed by no `restored` event
+- **THEN** the change is considered currently shelved in `drafts/`
 
-#### Scenario: Workspace change invalidates approval
+#### Scenario: Draft/restore cycle tracked
 
-- **WHEN** a workspace is added to the Change after a spec approval record was written
-- **THEN** the existing approval records are marked superseded, the change rolls back to `designing`
+- **WHEN** a Change is drafted, then restored, then drafted again
+- **THEN** history contains two `drafted` events and one `restored` event, and the change is currently shelved
 
-#### Scenario: Multiple approval records in history
+#### Scenario: Active approval derived from history
 
-- **WHEN** a Change is approved, then modified (invalidating the approval), then approved again
-- **THEN** the approval history contains two records — the first marked superseded, the second active
+- **WHEN** a `spec-approved` event exists in history and no subsequent `invalidated` event exists
+- **THEN** that approval is the active spec approval and its `artifactHashes` represent the current approved signature
 
-#### Scenario: Approval records never modified
+#### Scenario: Approval superseded by subsequent invalidated event
 
-- **WHEN** a Change already has approval records
-- **THEN** no operation may overwrite or modify existing records — only append new ones
+- **WHEN** a `spec-approved` event exists in history followed by an `invalidated` event
+- **THEN** the prior `spec-approved` event is superseded — there is no active spec approval
+
+#### Scenario: Multiple approval cycles in history
+
+- **WHEN** a Change is spec-approved, then invalidated, then spec-approved again
+- **THEN** history contains two `spec-approved` events; the first is superseded by the `invalidated` event; the second is the active approval
+
+#### Scenario: Approval events never modified
+
+- **WHEN** a Change already has `spec-approved` or `signed-off` events in history
+- **THEN** no operation may overwrite or modify those events — only new events are appended
+
+#### Scenario: Artifact change triggers invalidation
+
+- **WHEN** an artifact's `validatedHash` is updated (i.e. its content changed after a prior approval)
+- **THEN** an `invalidated` event with `cause: 'artifact-change'` is appended and a `transitioned` event back to `designing` is appended
 
 ### Requirement: Schema version
 
 #### Scenario: Schema version mismatch warns
 
-- **WHEN** a Change is loaded and the active schema's version differs from the version recorded in the manifest
+- **WHEN** a Change is loaded and the active schema's version differs from the `schemaVersion` recorded in the `created` event
 - **THEN** specd emits a warning but the change remains fully usable
 
 #### Scenario: Schema mismatch does not block archive
@@ -177,38 +197,43 @@
 
 #### Scenario: Draft requires identity
 
-- **WHEN** a Change is drafted without providing a `draftedBy` identity
-- **THEN** the operation fails with a validation error
+- **WHEN** a Change is drafted without providing a `by` identity
+- **THEN** the operation fails with a validation error and no event is appended
 
-#### Scenario: Draft moves change out of active changes
+#### Scenario: Draft appends drafted event
 
 - **WHEN** a Change in `implementing` state is drafted with a valid identity
-- **THEN** a `DraftRecord` is written to the manifest, the change is moved to `drafts/`, retains its `implementing` state, and no longer appears in the active changes list
+- **THEN** a `drafted` event is appended to history, the change is moved to `drafts/`, and it retains its `implementing` lifecycle state
 
-#### Scenario: Restore recovers a drafted change
+#### Scenario: Drafted change no longer appears in active changes
+
+- **WHEN** a Change has a `drafted` event as its most recent `drafted`/`restored` event
+- **THEN** the change is resolved from `drafts/`, not `changes/`
+
+#### Scenario: Restore appends restored event
 
 - **WHEN** a drafted Change is restored
-- **THEN** it is moved back to `changes/` and resumes from its preserved state
+- **THEN** a `restored` event is appended to history, the change is moved back to `changes/`, and it resumes from its preserved lifecycle state
 
 #### Scenario: Discard requires reason and identity
 
-- **WHEN** a Change is discarded without providing a reason or discarding identity
-- **THEN** the operation fails with a validation error
+- **WHEN** a Change is discarded without providing a reason or `by` identity
+- **THEN** the operation fails with a validation error and no event is appended
 
-#### Scenario: Discard records who discarded and why
+#### Scenario: Discard appends discarded event
 
 - **WHEN** a Change is discarded with a reason, identity, and optional superseding change names
-- **THEN** a `DiscardRecord` is written to the manifest before the change is moved to `discarded/`
+- **THEN** a `discarded` event is appended to history and the change is moved to `discarded/`
 
 #### Scenario: Discard from drafts
 
 - **WHEN** a drafted Change is discarded
-- **THEN** it is moved to `discarded/` with its `DiscardRecord` and cannot be recovered
+- **THEN** a `discarded` event is appended, the change is moved to `discarded/`, and it cannot be recovered
 
 #### Scenario: Discard with supersededBy
 
 - **WHEN** a Change is discarded with `supersededBy: ['new-auth-flow', 'cleanup-tokens']`
-- **THEN** the `DiscardRecord` stores those names for traceability
+- **THEN** the `discarded` event stores those names for traceability
 
 #### Scenario: Discarded change cannot be restored
 
