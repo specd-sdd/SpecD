@@ -272,10 +272,15 @@
 - **WHEN** `contextIncludeSpecs: ['auth/*']` and `contextExcludeSpecs: ['auth/login']` are declared and both `auth/login` and `auth/register` exist
 - **THEN** `CompileContext` includes `auth/register` but not `auth/login`
 
-#### Scenario: Non-existent spec path silently skipped
+#### Scenario: Non-existent spec path silently skipped at compile time
 
 - **WHEN** `contextIncludeSpecs: ['auth/does-not-exist']` is declared and no such spec exists on disk
 - **THEN** `CompileContext` produces no error — the missing path is silently skipped
+
+#### Scenario: Unmatched pattern warns in config validate
+
+- **WHEN** `specd config validate` is run and a pattern in `contextIncludeSpecs` or `contextExcludeSpecs` matches no specs on disk
+- **THEN** specd emits a warning identifying the pattern — the command still exits successfully
 
 #### Scenario: Unknown workspace qualifier warns
 
