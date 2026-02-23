@@ -284,12 +284,12 @@ References to unknown workspace qualifiers produce a warning at startup but do n
 ```yaml
 approvals:
   spec: false # require approval of the spec before implementation (default: false)
-  implementation: false # require approval of the implementation before archiving (default: false)
+  signoff: false # require sign-off of the completed work before archiving (default: false)
 ```
 
 **`spec`** — when `true`, a change in `ready` state cannot transition directly to `implementing`. It must first enter `pending-spec-approval` and receive an explicit approval (with approver identity, reason, and timestamp) before transitioning to `spec-approved` and then to `implementing`. When `false` (default), `ready → implementing` is a free transition.
 
-**`implementation`** — when `true`, a change in `done` state cannot transition directly to `archivable`, regardless of whether it contains structural modifications or only additions. It must enter `pending-approval`, receive explicit approval, and transition through `approved → archivable`. The approval record captures what was reviewed — new specs, modified specs, and removed specs alike. When `false` (default), `done → archivable` is a free transition.
+**`signoff`** — when `true`, a change in `done` state cannot transition directly to `archivable`, regardless of whether it contains structural modifications or only additions. It must enter `pending-signoff`, receive explicit sign-off, and transition through `signed-off → archivable`. The sign-off record captures what was reviewed — new specs, modified specs, and removed specs alike. When `false` (default), `done → archivable` is a free transition.
 
 Both flags are independent — any combination is valid.
 
