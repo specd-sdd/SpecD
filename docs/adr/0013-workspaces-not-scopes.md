@@ -1,6 +1,10 @@
-| status   | date       | decision-makers  | consulted | informed |
-| -------- | ---------- | ---------------- | --------- | -------- |
-| accepted | 2026-02-22 | specd maintainer | -         | -        |
+---
+status: accepted
+date: 2026-02-22
+decision-makers: specd maintainer
+consulted: '-'
+informed: '-'
+---
 
 # ADR-0013: Workspaces, Not Scopes
 
