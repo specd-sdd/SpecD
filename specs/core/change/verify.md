@@ -150,7 +150,7 @@
 
 #### Scenario: Approval records not modified
 
-- **WHEN** a Change already has an `ApprovalRecord` for a gate
+- **WHEN** a Change already has an approval record for a gate
 - **THEN** no subsequent operation may overwrite or modify it
 
 #### Scenario: Two independent records

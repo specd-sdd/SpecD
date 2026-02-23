@@ -24,7 +24,7 @@ Workspace IDs in the list must be validated against `specd.yaml` at creation tim
 
 ### Requirement: Lifecycle
 
-A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.implementation`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:
+A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:
 
 ```
 drafting → designing → ready ──────────────────────────────────────── → implementing → done ──────────────────── → archivable
@@ -84,20 +84,20 @@ A Change tracks structural modifications — individual requirement blocks that 
 - **`type`** — `MODIFIED` or `REMOVED`
 - **`requirement`** — the name of the affected requirement block
 
-ADDED operations are not structural — they do not require approval.
+ADDED operations are not structural. The structural change list is informational — it is included in the sign-off record so the reviewer knows what is being signed off, but it does not gate the signoff flow. When `approvals.signoff: true`, sign-off is always required regardless of whether changes are additions, modifications, or removals.
 
-The structural change list is built by the delta merger as specs are modified. It is stored in the manifest and read back at load time. The presence of any structural change is what triggers the `pending-approval` branch when transitioning from `done`.
+The structural change list is built by the delta merger as specs are modified. It is stored in the manifest and read back at load time.
 
 ### Requirement: Approval records
 
-Each approval gate produces its own `ApprovalRecord`, stored independently on the Change:
+Each approval gate produces its own record, stored independently on the Change. Both records share the same structure:
 
 - **`reason`** — human-provided rationale
 - **`approvedBy`** — git identity (name + email) of the approver
 - **`approvedAt`** — timestamp of approval
-- **`structuralChanges`** — the list of structural changes reviewed (only present on the post-implementation record)
+- **`structuralChanges`** — the list of structural changes present at the time of sign-off (only on the sign-off record; absent on the spec approval record)
 
-A Change may carry zero, one, or two approval records — one per gate, only if that gate was enabled and triggered. Each record is written once and never modified.
+A Change may carry zero, one, or two records — one per gate, only if that gate was enabled and triggered. Each record is written once and never modified.
 
 ### Requirement: Schema version
 
