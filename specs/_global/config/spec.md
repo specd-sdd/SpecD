@@ -283,7 +283,28 @@ Plugin declarations are used by `specd init`, `specd plugin add`, and `specd upd
 
 ### Requirement: Startup validation
 
-specd must validate `specd.yaml` before executing any command. Validation must catch: missing `schema`, missing `storage` section, missing `changes` or `archive` sub-key under `storage`, missing `default` workspace, missing `specs` section in any workspace, missing `codeRoot` in any non-`default` workspace, missing `adapter` in any `specs`, `schemas`, or storage section, unknown adapter values, required adapter-specific fields missing (e.g. `fs.path` absent when `adapter: fs`), `requires` in project workflow entries, storage paths outside the repo root, and invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax. Warnings (not errors) are emitted for: unknown `artifactRules` keys, duplicate workspace names, project workflow entries for skills not in the schema, and unknown workspace qualifiers in context spec patterns.
+specd must validate `specd.yaml` before executing any command that requires a config (see Schema reference requirement for which commands skip this). `specd init` is exempt — it creates `specd.yaml` and therefore requires no existing config.
+
+The following conditions are **errors** that abort startup immediately:
+
+- `schema` field is missing
+- `storage` section is missing, or either `changes` or `archive` sub-key is absent
+- `workspaces` section is missing, or no `default` workspace is declared
+- `specs` section is missing in any workspace
+- `codeRoot` is missing in any non-`default` workspace
+- `adapter` is missing in any `specs`, `schemas`, or storage section
+- Unknown adapter value in any `specs`, `schemas`, or storage section
+- Required adapter-specific fields are absent (e.g. `fs.path` missing when `adapter: fs`)
+- `requires` field present in a project-level workflow entry
+- Storage path (`changes.fs.path` or `archive.fs.path`) resolves outside the repo root
+- Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax (e.g. `*` in a disallowed position)
+
+The following conditions emit **warnings** but allow startup to proceed:
+
+- Unknown key in `artifactRules` (no matching artifact ID in the active schema)
+- Duplicate workspace names (YAML retains last-wins; warn about the pattern)
+- Project-level workflow entry names a skill not declared in the schema
+- Unknown workspace qualifier in a `contextIncludeSpecs` or `contextExcludeSpecs` pattern
 
 ## Constraints
 

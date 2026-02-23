@@ -269,12 +269,27 @@
 
 ### Requirement: Startup validation
 
-#### Scenario: Invalid config blocks startup
+#### Scenario: Missing required field blocks startup
 
-- **WHEN** `specd.yaml` has a validation error (e.g. missing `schema`, missing `default` workspace, unknown adapter)
+- **WHEN** `specd.yaml` is missing any required field (e.g. `schema`, `storage`, `default` workspace, `adapter` in a specs section)
 - **THEN** specd exits immediately with a descriptive error before executing the requested command
+
+#### Scenario: Invalid pattern syntax blocks startup
+
+- **WHEN** `contextIncludeSpecs` contains an invalid pattern such as `'auth/*/login'`
+- **THEN** specd exits with a config validation error at startup
+
+#### Scenario: Storage path outside repo root blocks startup
+
+- **WHEN** `storage.changes.fs.path` resolves to a directory outside the project repo root
+- **THEN** specd exits with a config validation error at startup
 
 #### Scenario: Warning does not block startup
 
 - **WHEN** `specd.yaml` has an `artifactRules` key for an unknown artifact
 - **THEN** a warning is printed but the command proceeds normally
+
+#### Scenario: specd init requires no existing config
+
+- **WHEN** `specd init` is run in a directory with no `specd.yaml`
+- **THEN** specd does not attempt to validate a config — it creates one from defaults and exits successfully
