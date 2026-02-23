@@ -8,7 +8,7 @@ A Change is the central domain entity in specd. It represents a discrete, named 
 
 ### Requirement: Identity
 
-A Change has a unique, user-defined slug name (e.g. `add-auth-flow`). The name is set at creation and never changes. It is the primary handle used in all CLI commands and port interfaces. The underlying storage layer may prefix the name with a timestamp for ordering purposes, but that prefix is an infrastructure concern — it does not appear in the domain model.
+A Change has a unique, user-defined slug name (e.g. `add-auth-flow`) and a `createdAt` timestamp recorded at creation time. Both are immutable. The name is the primary handle used in all CLI commands and port interfaces. The `createdAt` timestamp is the source of truth for ordering — the storage layer derives its directory name prefix from it (see storage spec), but that prefix is an infrastructure concern and does not appear in the domain model.
 
 ### Requirement: Workspaces
 
@@ -99,6 +99,7 @@ The change manifest records the name and version of the schema that was active w
 
 ## Constraints
 
+- `name` and `createdAt` are set at creation and never changed
 - A Change must have at least one workspace ID
 - Workspace IDs are validated against `specd.yaml` at creation time and immutable thereafter
 - `ArtifactStatus` is never persisted — always derived at load time
