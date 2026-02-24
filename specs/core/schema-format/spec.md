@@ -16,7 +16,6 @@ A schema file must be a valid YAML document with the following top-level fields:
 - `version` (integer, required) — schema version, monotonically increasing
 - `description` (string, optional) — human-readable summary
 - `deltaOperations` (object, optional) — configurable keyword labels for delta operations; see Requirement: Delta operation keywords
-- `requiredSpecArtifacts` (array of strings, optional) — artifact IDs that must be present in every change
 - `artifacts` (array, required) — one entry per artifact type
 - `workflow` (array, optional) — named phases of the change lifecycle, each with optional artifact prerequisites and hooks; see Requirement: Workflow
 
@@ -41,6 +40,8 @@ These labels appear as prefixes in delta section headings: `## {added} Requireme
 Each entry in `artifacts` must include:
 
 - `id` (string, required) — unique identifier within the schema, e.g. `proposal`, `specs`, `design`, `tasks`
+- `scope` (`spec` | `change`, required) — declares where this artifact lives after the change is archived. `spec` means the artifact file is synced to the `SpecRepository` (e.g. `spec.md`, `verify.md` — files that become part of the project's permanent spec record). `change` means the artifact stays only in the change directory and is never synced (e.g. `proposal.md`, `tasks.md` — working documents used during the change process).
+- `optional` (boolean, optional, default `false`) — when `false`, `ValidateSpec` requires this artifact to be present in the change before validation can pass. When `true`, the artifact may be absent without failing validation; if present, it is validated and (for `scope: spec` artifacts) synced normally. `scope` and `optional` are independent.
 - `generates` (string or glob, required) — path pattern for the artifact's files **relative to the change directory**, e.g. `proposal.md` or `specs/**/spec.md`. When creating a new artifact file within a change, the filename is derived from the last literal segment of the glob (e.g. `spec.md` from `specs/**/spec.md`); if the last segment is a wildcard, the filename falls back to the template filename. The final location of these files in the project repo after syncing is configured separately and may differ (e.g. `especificaciones/auth/login/spec.md` for a change file at `changes/my-change/specs/auth/login/spec.md`)
 - `description` (string, optional) — human-readable summary for tooling
 - `template` (string, optional) — path to a template file, relative to the schema directory; see Requirement: Template resolution
@@ -211,13 +212,15 @@ A spec created by an `added` operation also requires approval: someone must take
 - `name` (string, required) — section heading to extract, e.g. `Requirements`
 - `contextTitle` (string, optional) — title used for this section in the compiled context block; if omitted, `name` is used as the title
 
-### Requirement: requiredSpecArtifacts
+### Requirement: Artifact scope
 
-`requiredSpecArtifacts` is an array of artifact IDs that serves as the single source of truth for what constitutes a complete spec. It has three responsibilities:
+`scope` on an artifact is the single source of truth for what constitutes a complete spec and what files are expected in the spec directory. It has three responsibilities:
 
-1. **Spec directory layout** — the files listed (via each artifact's `generates` field) are the files specd expects to find in every `specs/<name>/` directory. When compiling context for the LLM, specd reads all of them.
-2. **Existing spec validation** — `specd validate` checks that every spec directory in the project contains all required artifact files; missing files are reported as validation errors.
-3. **Change validation** — every change processed by `ValidateSpec` must have all listed artifacts present (not `missing`) before validation can succeed.
+1. **Spec directory layout** — artifacts with `scope: spec` (and `optional: false`) are the files specd expects to find in every `specs/<name>/` directory. When compiling context, specd reads all of them.
+2. **Existing spec validation** — `specd validate` checks that every spec directory in the project contains all non-optional `scope: spec` artifact files; missing files are reported as validation errors.
+3. **Change validation** — `ValidateSpec` requires all non-optional artifacts (regardless of scope) to be present in the change before validation can pass.
+
+`scope: change` artifacts (e.g. `proposal.md`, `tasks.md`) are working documents used during the change process. They are validated in the change but never synced to the `SpecRepository`. `scope: spec` artifacts (e.g. `spec.md`, `verify.md`) are merged or copied into the `SpecRepository` during `ArchiveChange`.
 
 ### Requirement: Workflow
 
@@ -350,6 +353,8 @@ The `verify` artifact in the schema should declare `requires: [spec]` — scenar
 - The `scope` name in `validations[]` and `deltaValidations[]` is case-sensitive and must match the section heading exactly
 - The `{name}` placeholder must appear exactly once in `deltas[].pattern` fields and in `eachBlock` values — these are always block header patterns; validation `pattern` fields may omit `{name}` entirely and use plain regex instead
 - `artifact.id` must match `/^[a-z][a-z0-9-]*$/` (lowercase letters, digits, hyphens; must start with a letter) and must be unique within a schema
+- `artifact.scope` must be `spec` or `change`; it is required and has no default
+- `artifact.optional` defaults to `false`; a non-optional artifact with `scope: spec` must be present in every spec directory and every change
 - `deltas[].section` must be unique within an artifact — duplicate section names in the same `deltas` array are a schema validation error
 - `workflow[].step` must be unique — duplicate step names in the same `workflow` array are a schema validation error
 - `requires` must not contain cycles; circular dependencies in the artifact graph are a schema validation error
@@ -375,12 +380,9 @@ description: Proposal → specs → design → tasks workflow
 #   removed:  "REMOVED"
 #   renamed:  "RENAMED"
 
-requiredSpecArtifacts:
-  - specs
-  - verify
-
 artifacts:
   - id: proposal
+    scope: change
     generates: proposal.md
     description: Initial proposal outlining why the change is needed
     template: templates/proposal.md
@@ -389,6 +391,7 @@ artifacts:
     requires: []
 
   - id: specs
+    scope: spec
     generates: 'specs/**/spec.md'
     description: Detailed specifications defining what the system should do
     template: templates/spec.md
@@ -424,6 +427,7 @@ artifacts:
       Do not include WHEN/THEN scenarios — those go in verify.md.
 
   - id: verify
+    scope: spec
     generates: 'specs/**/verify.md'
     description: Verification scenarios for the spec
     template: templates/verify.md
@@ -448,6 +452,7 @@ artifacts:
       Only include scenarios that add information beyond what the requirement prose already states.
 
   - id: design
+    scope: change
     generates: design.md
     description: Technical design with implementation decisions
     template: templates/design.md
@@ -457,6 +462,7 @@ artifacts:
       Create the design document explaining HOW to implement the change.
 
   - id: tasks
+    scope: change
     generates: tasks.md
     description: Implementation checklist with trackable tasks
     template: templates/tasks.md

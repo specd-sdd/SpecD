@@ -19,7 +19,6 @@ export class Schema {
   private readonly _workflow: readonly WorkflowStep[]
   private readonly _workflowIndex: ReadonlyMap<string, WorkflowStep>
   private readonly _deltaOperations: OperationKeywords
-  private readonly _requiredSpecArtifacts: readonly string[]
 
   /**
    * Creates a fully-resolved schema instance.
@@ -29,7 +28,6 @@ export class Schema {
    * @param artifacts - Artifact type definitions in schema-declared order
    * @param workflow - Workflow step configurations in schema-declared order
    * @param deltaOperations - Operation keywords for delta section recognition
-   * @param requiredSpecArtifacts - Artifact IDs whose spec files must be present before validation
    */
   constructor(
     name: string,
@@ -37,16 +35,14 @@ export class Schema {
     artifacts: readonly ArtifactType[],
     workflow: readonly WorkflowStep[],
     deltaOperations: OperationKeywords,
-    requiredSpecArtifacts: readonly string[],
   ) {
     this._name = name
     this._version = version
     this._artifacts = artifacts
     this._artifactIndex = new Map(artifacts.map((a) => [a.id(), a]))
     this._workflow = workflow
-    this._workflowIndex = new Map(workflow.map((s) => [s.skill, s]))
+    this._workflowIndex = new Map(workflow.map((s) => [s.step, s]))
     this._deltaOperations = deltaOperations
-    this._requiredSpecArtifacts = requiredSpecArtifacts
   }
 
   /**
@@ -106,13 +102,13 @@ export class Schema {
   }
 
   /**
-   * Returns the workflow step for the given `skill`, or `null` if not found.
+   * Returns the workflow step for the given step name, or `null` if not found.
    *
-   * @param skill - The skill name (e.g. `"apply"`, `"archive"`)
+   * @param step - The step name (e.g. `"implementing"`, `"archiving"`)
    * @returns The matching workflow step, or `null`
    */
-  workflowStep(skill: string): WorkflowStep | null {
-    return this._workflowIndex.get(skill) ?? null
+  workflowStep(step: string): WorkflowStep | null {
+    return this._workflowIndex.get(step) ?? null
   }
 
   /**
@@ -124,15 +120,5 @@ export class Schema {
    */
   deltaOperations(): OperationKeywords {
     return this._deltaOperations
-  }
-
-  /**
-   * Artifact IDs whose generated spec files must be present in a change before
-   * validation can succeed. Prevents validation from running on incomplete changes.
-   *
-   * @returns Required spec artifact IDs
-   */
-  requiredSpecArtifacts(): readonly string[] {
-    return this._requiredSpecArtifacts
   }
 }

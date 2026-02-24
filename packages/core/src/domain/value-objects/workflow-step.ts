@@ -23,30 +23,30 @@ export type HookEntry =
     }
 
 /**
- * A single entry in a schema's `workflow[]` array, defining which skill it
- * configures, which artifact IDs must be complete before the skill becomes
- * available, and optional pre/post hook arrays.
+ * A single entry in a schema's `workflow[]` array, defining a named lifecycle
+ * phase, which artifact IDs must be complete before the phase becomes available,
+ * and optional pre/post hook arrays.
  *
  * Schema workflow steps fire first; project-level steps (`specd.yaml`) are
- * matched by `skill` name and appended after.
+ * matched by `step` name and appended after.
  */
 export interface WorkflowStep {
   /**
-   * The skill this step configures (e.g. `"apply"`, `"archive"`, `"verify"`).
+   * The lifecycle step name (e.g. `"designing"`, `"implementing"`, `"archiving"`).
    */
-  readonly skill: string
+  readonly step: string
 
   /**
    * Artifact IDs (from the same schema) that must have status `complete` before
-   * this skill becomes available. Empty array means the skill is always available.
+   * this step becomes available. Empty array means the step is always available.
    */
   readonly requires: readonly string[]
 
-  /** Pre- and post-event hooks for this skill. */
+  /** Pre- and post-event hooks for this step. */
   readonly hooks: {
-    /** Hooks that fire before the skill executes (`pre-<skill>` event). */
+    /** Hooks that fire before the step executes. */
     readonly pre: readonly HookEntry[]
-    /** Hooks that fire after the skill completes (`post-<skill>` event). */
+    /** Hooks that fire after the step completes. */
     readonly post: readonly HookEntry[]
   }
 }

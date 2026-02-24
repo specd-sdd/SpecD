@@ -1,10 +1,19 @@
 import { type DeltaConfig } from '../services/delta-merger.js'
 import { type ValidationRule, type ContextSection } from './validation-rule.js'
 
+/** Where an artifact lives after the change is archived. */
+export type ArtifactScope = 'spec' | 'change'
+
 /** Construction properties for {@link ArtifactType}. */
 export interface ArtifactTypeProps {
   /** Stable identifier for this artifact (e.g. `"specs"`, `"tasks"`). */
   readonly id: string
+  /**
+   * Where this artifact lives after archiving. `"spec"` means the file is
+   * synced to the `SpecRepository` (e.g. `spec.md`, `verify.md`). `"change"`
+   * means it stays only in the change directory (e.g. `proposal.md`, `tasks.md`).
+   */
+  readonly scope: ArtifactScope
   /**
    * Glob pattern for the file(s) this artifact generates
    * (e.g. `"proposal.md"`, `"specs/**\/spec.md"`).
@@ -18,8 +27,8 @@ export interface ArtifactTypeProps {
    */
   readonly requires: readonly string[]
   /**
-   * When `true`, this artifact is not required for archiving to proceed.
-   * Defaults to `false`.
+   * When `true`, this artifact may be absent without failing validation.
+   * When `false` (default), `ValidateSpec` requires it to be present.
    */
   readonly optional?: boolean
   /**
@@ -52,6 +61,7 @@ export interface ArtifactTypeProps {
  */
 export class ArtifactType {
   private readonly _id: string
+  private readonly _scope: ArtifactScope
   private readonly _generates: string
   private readonly _instruction: string
   private readonly _requires: readonly string[]
@@ -68,6 +78,7 @@ export class ArtifactType {
    */
   constructor(props: ArtifactTypeProps) {
     this._id = props.id
+    this._scope = props.scope
     this._generates = props.generates
     this._instruction = props.instruction
     this._requires = props.requires
@@ -87,6 +98,16 @@ export class ArtifactType {
    */
   id(): string {
     return this._id
+  }
+
+  /**
+   * Where this artifact lives after archiving. `"spec"` artifacts are synced
+   * to the `SpecRepository`; `"change"` artifacts remain in the change directory.
+   *
+   * @returns The artifact scope
+   */
+  scope(): ArtifactScope {
+    return this._scope
   }
 
   /**
@@ -119,10 +140,10 @@ export class ArtifactType {
   }
 
   /**
-   * When `true`, this artifact is not required for archiving to proceed.
-   * The change can be archived even if this artifact is still `in-progress`.
+   * When `true`, this artifact may be absent without failing `ValidateSpec`.
+   * When `false`, the artifact must be present in the change.
    *
-   * @returns `true` if the artifact is optional for archiving
+   * @returns `true` if the artifact is optional
    */
   optional(): boolean {
     return this._optional
