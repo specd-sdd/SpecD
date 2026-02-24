@@ -19,5 +19,5 @@ dependsOn:
   - specs/core/storage/
   - specs/core/spec-metadata/
 contentHashes:
-  spec.md: 'sha256:8f71b86942954b4aaba48fe3f18c9d634f85c459c33391a169caac3e9aa60776'
-  verify.md: 'sha256:be7a8b019bebcbed3c1b22f0613b59594f9b511b0a2b4de0c2e10d09b1d9e490'
+  spec.md: 'sha256:3504f5c059f51c5650ce3e1ec9ddd82a1e4a9f6d99a8da6348ca2ed6e07e0f70'
+  verify.md: 'sha256:14e1f7c4e7c972d88a450f82f9113380871497538a1f4e502c2f41181cc4c130'

@@ -14,5 +14,5 @@ keywords:
   - delta
 dependsOn: []
 contentHashes:
-  spec.md: 'sha256:4d311a2373fb32016ca66198602535ecae41e84ef1d45496d21f2b43c1569aef'
-  verify.md: 'sha256:d30eb40e87ac9827a034ab8b82a0b12cdd2d735428d8f0c0b48286b71dd550ba'
+  spec.md: 'sha256:0ad9ee22531d59f94c3da3ba4c333baf8d4f9c98842873ddd9ce24962c4716a9'
+  verify.md: 'sha256:1d1686cc2c7a2dd5cfc70beabcd87cc749f2f50a7e4221178c84724eaf42c65a'
