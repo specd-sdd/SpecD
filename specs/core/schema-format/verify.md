@@ -266,22 +266,32 @@
 - **WHEN** the spec does not contain the named section
 - **THEN** `CompileContext` skips that entry without error
 
-### Requirement: requiredSpecArtifacts
+### Requirement: Artifact scope
 
-#### Scenario: Missing required artifact in change
+#### Scenario: Missing non-optional artifact in change
 
-- **WHEN** a change is missing an artifact listed in `requiredSpecArtifacts`
+- **WHEN** a change is missing an artifact with `optional: false`
 - **THEN** `ValidateSpec` must report a validation error
 
-#### Scenario: Missing required artifact file in spec directory
+#### Scenario: Optional artifact absent from change
 
-- **WHEN** a spec directory at `specs/<name>/` is missing a file corresponding to an artifact in `requiredSpecArtifacts`
+- **WHEN** a change is missing an artifact with `optional: true`
+- **THEN** `ValidateSpec` does not report a validation error for that artifact
+
+#### Scenario: Missing scope:spec artifact file in spec directory
+
+- **WHEN** a spec directory at `specs/<name>/` is missing a file for a non-optional `scope: spec` artifact
 - **THEN** `specd validate` must report that spec as incomplete
 
-#### Scenario: LLM context includes all required artifacts
+#### Scenario: scope:change artifact not present in spec directory
+
+- **WHEN** a `scope: change` artifact (e.g. `proposal.md`) is present in the change
+- **THEN** it is validated but never synced to `specs/<name>/` — it must not appear in spec directory checks
+
+#### Scenario: LLM context includes all scope:spec artifacts
 
 - **WHEN** specd compiles context for a spec
-- **THEN** it reads every file listed in `requiredSpecArtifacts` from the spec directory and includes them all
+- **THEN** it reads every `scope: spec` artifact file from the spec directory and includes them all
 
 ### Requirement: Workflow
 
@@ -400,5 +410,5 @@
 
 #### Scenario: verify.md compiled with spec.md
 
-- **WHEN** specd compiles context for a spec listed in `requiredSpecArtifacts` as both `spec` and `verify`
+- **WHEN** specd compiles context for a spec that has both `spec` and `verify` artifacts with `scope: spec`
 - **THEN** both `spec.md` and `verify.md` are read and included together in the LLM context
