@@ -176,10 +176,10 @@
 - **WHEN** a project-level workflow entry includes a `requires` field
 - **THEN** specd must reject it with a validation error on startup
 
-#### Scenario: Hook for skill not in schema
+#### Scenario: Hook for step not in schema
 
-- **WHEN** a project-level workflow entry names a skill not declared in the schema's workflow
-- **THEN** the hooks are registered for that skill; they fire if the skill is ever invoked, and a warning is emitted at startup
+- **WHEN** a project-level workflow entry names a step not declared in the schema's workflow
+- **THEN** the hooks are registered for that step; they fire if the step is ever invoked, and a warning is emitted at startup
 
 ### Requirement: Project-level artifact rules
 

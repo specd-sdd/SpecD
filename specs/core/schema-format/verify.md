@@ -285,44 +285,44 @@
 
 ### Requirement: Workflow
 
-#### Scenario: Pre hook failure aborts skill
+#### Scenario: Pre hook failure aborts step
 
 - **WHEN** a `pre` `run:` hook exits with a non-zero code
-- **THEN** the skill is aborted, the user is informed of the failure, and the skill offers to attempt to fix the problem before retrying
+- **THEN** the step is aborted, the user is informed of the failure, and the agent offers to attempt to fix the problem before retrying
 
 #### Scenario: Post hook failure prompts user
 
 - **WHEN** a `post` `run:` hook exits with a non-zero code
-- **THEN** the user is prompted to choose whether to continue with remaining hooks or stop; the completed skill operation is not rolled back
+- **THEN** the user is prompted to choose whether to continue with remaining hooks or stop; the completed step operation is not rolled back
 
-#### Scenario: Skill with unsatisfied prerequisites
+#### Scenario: Step with unsatisfied prerequisites
 
-- **WHEN** a skill's `requires` lists an artifact that is not `complete`
-- **THEN** `CompileContext` must report that the skill is blocked and which artifacts are incomplete
+- **WHEN** a step's `requires` lists an artifact that is not `complete`
+- **THEN** `CompileContext` must report that the step is blocked and which artifacts are incomplete
 
-#### Scenario: Skill with no prerequisites
+#### Scenario: Step with no prerequisites
 
-- **WHEN** a skill has an empty or omitted `requires`
-- **THEN** the skill is always available regardless of artifact state
+- **WHEN** a step has an empty or omitted `requires`
+- **THEN** the step is always available regardless of artifact state
 
 #### Scenario: Apply scans required artifacts for tasks
 
-- **WHEN** the `apply` skill has `requires: [tasks]` and `tasks.md` contains markdown checkboxes
-- **THEN** the apply skill reads pending tasks from `tasks.md` and surfaces them in the compiled context
+- **WHEN** the `apply` step has `requires: [tasks]` and `tasks.md` contains markdown checkboxes
+- **THEN** the apply step reads pending tasks from `tasks.md` and surfaces them in the compiled context
 
 #### Scenario: Tasks spread across multiple artifacts
 
-- **WHEN** the `apply` skill has `requires: [tasks, specs]`
-- **THEN** the apply skill scans both artifacts for checkboxes and aggregates them
+- **WHEN** the `apply` step has `requires: [tasks, specs]`
+- **THEN** the apply step scans both artifacts for checkboxes and aggregates them
 
 #### Scenario: Schema and project hooks merged
 
-- **WHEN** both the schema and `specd.yaml` define `workflow` entries for the same skill
+- **WHEN** both the schema and `specd.yaml` define `workflow` entries for the same step
 - **THEN** schema hooks fire first, followed by project hooks, within the same `pre`/`post` event
 
 #### Scenario: Project-level entry adds a new hook
 
-- **WHEN** `specd.yaml` defines a `workflow` entry for a skill with no hooks in the schema
+- **WHEN** `specd.yaml` defines a `workflow` entry for a step with no hooks in the schema
 - **THEN** the project hooks are appended without error
 
 ### Requirement: Project-level artifactRules
@@ -386,9 +386,9 @@
 - **WHEN** an artifact declares two `deltas` entries with the same `section`
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
-#### Scenario: Duplicate workflow skill
+#### Scenario: Duplicate workflow step
 
-- **WHEN** the `workflow` array contains two entries with the same `skill` name
+- **WHEN** the `workflow` array contains two entries with the same `step` name
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
 #### Scenario: Unknown artifact ID in requires

@@ -179,16 +179,16 @@ Unknown variables in a template are left as-is and a warning is emitted.
 
 ### Requirement: Workflow additions
 
-`specd.yaml` may include a `workflow` section to add project-level hooks to skill lifecycle points. Entries are matched to schema workflow entries by `skill` name; schema hooks fire first, then project hooks. `requires` is not valid in project-level workflow entries and must be rejected.
+`specd.yaml` may include a `workflow` section to add project-level hooks to the change lifecycle steps declared in the schema. Entries are matched to schema workflow entries by `step` name; schema hooks fire first, then project hooks. `requires` is not valid in project-level workflow entries and must be rejected.
 
 ```yaml
 workflow:
-  - skill: archive
+  - step: archiving
     hooks:
       post:
         - run: 'pnpm run notify-team'
         - run: 'git checkout -b specd/{{change.name}}'
-  - skill: apply
+  - step: implementing
     hooks:
       pre:
         - instruction: |
@@ -336,7 +336,7 @@ The following conditions are **errors** that abort startup immediately:
 - `adapter` is missing in any `specs`, `schemas`, or storage section
 - Unknown adapter value in any `specs`, `schemas`, or storage section
 - Required adapter-specific fields are absent (e.g. `fs.path` missing when `adapter: fs`)
-- `requires` field present in a project-level workflow entry
+- `requires` field present in a project-level `workflow` entry
 - Storage path (`changes.fs.path` or `archive.fs.path`) resolves outside the repo root
 - Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax (e.g. `*` in a disallowed position)
 
@@ -344,7 +344,7 @@ The following conditions emit **warnings** but allow startup to proceed:
 
 - Unknown key in `artifactRules` (no matching artifact ID in the active schema)
 - Duplicate workspace names (YAML retains last-wins; warn about the pattern)
-- Project-level workflow entry names a skill not declared in the schema
+- Project-level workflow entry names a step not declared in the schema
 - Unknown workspace qualifier in a `contextIncludeSpecs` or `contextExcludeSpecs` pattern (runtime only — `specd config validate` treats this as an error)
 
 ## Constraints
@@ -354,7 +354,7 @@ The following conditions emit **warnings** but allow startup to proceed:
 - `specd.local.yaml` is always `.gitignored`; `specd init` must add it automatically
 - When `specd.local.yaml` is present it is the sole active config — `specd.yaml` is not read
 - `specd.local.yaml` must be a complete, valid config on its own; partial overrides are not supported
-- `requires` is not valid in project-level `workflow` entries
+- `requires` is not valid in project-level `workflow` entries — only `step` and `hooks` are accepted
 - Workspace names must match `/^[a-z][a-z0-9-]*$/`; `default` is reserved for the local project workspace
 - `ownership` values are limited to `readOnly`, `shared`, and `owned`
 - `isExternal` is not declared — it is inferred by the application layer from whether the resolved `specs.fs.path` is outside the project repo root
@@ -476,7 +476,7 @@ storage:
 # default, auth, and payments each load all their own specs when active
 
 workflow:
-  - skill: archive
+  - step: archiving
     hooks:
       post:
         - run: 'git -C {{codeRoot}} checkout -b specd/{{change.name}}'

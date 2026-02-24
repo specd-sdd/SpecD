@@ -18,7 +18,7 @@ A schema file must be a valid YAML document with the following top-level fields:
 - `deltaOperations` (object, optional) — configurable keyword labels for delta operations; see Requirement: Delta operation keywords
 - `requiredSpecArtifacts` (array of strings, optional) — artifact IDs that must be present in every change
 - `artifacts` (array, required) — one entry per artifact type
-- `workflow` (array, optional) — skill definitions with prerequisite gates and lifecycle hooks; see Requirement: Workflow
+- `workflow` (array, optional) — named phases of the change lifecycle, each with optional artifact prerequisites and hooks; see Requirement: Workflow
 
 ### Requirement: Delta operation keywords
 
@@ -206,7 +206,7 @@ A spec created by an `added` operation also requires approval: someone must take
 
 ### Requirement: Context sections
 
-`contextSections` on an artifact declares which sections of that artifact's spec files are relevant context for skills. `CompileContext` uses these declarations to extract and inject the named sections when compiling context for a skill. Each entry must include:
+`contextSections` on an artifact declares which sections of that artifact's spec files are relevant context for workflow steps. `CompileContext` uses these declarations to extract and inject the named sections when compiling context for a step. Each entry must include:
 
 - `name` (string, required) — section heading to extract, e.g. `Requirements`
 - `contextTitle` (string, optional) — title used for this section in the compiled context block; if omitted, `name` is used as the title
@@ -221,28 +221,32 @@ A spec created by an `added` operation also requires approval: someone must take
 
 ### Requirement: Workflow
 
-`workflow` is an array of skill definitions. Each entry declares which artifacts must be `complete` before that skill is available, and optionally defines lifecycle hooks for that skill. Entries must include:
+`workflow` is an array of named lifecycle phase definitions for a change. Each entry describes a distinct phase — such as designing specs, applying changes, verifying work, or archiving — and declares what artifact conditions must be met for that phase to become active, along with any hooks to run at phase boundaries.
 
-- `skill` (string, required) — skill name, e.g. `explore`, `plan`, `apply`, `verify`, `archive`
-- `requires` (array of artifact IDs, optional) — artifacts that must be `complete` before this skill is unlocked; empty or omitted means always available
-- `hooks` (object, optional) — lifecycle hooks for this skill; each key is `pre` or `post`, each value is an array of `instruction:` or `run:` hook entries
+Steps are not limited to AI agent invocations. They may represent human review phases, automated checks, artifact generation, or any recurring activity in the change lifecycle. `CompileContext` uses step definitions to gate context compilation and to inject phase-specific instructions and hooks into the AI context.
+
+> The canonical set of lifecycle step names and their semantics is defined in a dedicated spec (TBD). The schema format only defines the structure of step entries — step naming conventions are out of scope here.
+
+Entries must include:
+
+- `step` (string, required) — step name identifying a phase of the change lifecycle
+- `requires` (array of artifact IDs, optional) — artifacts that must be `complete` before this step is available; empty or omitted means always available
+- `hooks` (object, optional) — hooks for this step's boundaries; each key is `pre` or `post`, each value is an array of `instruction:` or `run:` hook entries
 
 Every hook entry is either:
 
-- `{ instruction: string }` — AI prompt injected into the compiled context for this skill
-- `{ run: string }` — shell command executed at the lifecycle point; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`
+- `{ instruction: string }` — AI context injected when this step is compiled; used to guide agent behaviour during this phase
+- `{ run: string }` — shell command executed at the phase boundary; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`
 
-**`pre` hook failure** — if a `run:` hook exits with a non-zero code, the skill is aborted and the user is informed of the failure. The skill should offer to attempt to fix the problem before retrying — for example, if a test suite fails, the skill offers to investigate and correct the failures.
+**`pre` hook failure** — if a `run:` hook exits with a non-zero code, the step is aborted and the user is informed of the failure. The agent should offer to attempt to fix the problem before retrying — for example, if a test suite fails, the agent offers to investigate and correct the failures.
 
-**`post` hook failure** — the skill has already completed, so the operation is not rolled back. After each failing `run:` hook, the user is prompted to choose: continue with the remaining hooks, or stop.
+**`post` hook failure** — the step has already completed, so the operation is not rolled back. After each failing `run:` hook, the user is prompted to choose: continue with the remaining hooks, or stop.
 
 ```yaml
 workflow:
-  - skill: explore
+  - step: designing # elaborating the spec
     requires: []
-  - skill: plan
-    requires: []
-  - skill: apply
+  - step: implementing # writing code against the spec
     requires: [tasks]
     hooks:
       pre:
@@ -252,9 +256,9 @@ workflow:
       post:
         - instruction: |
             Run the test suite and confirm all scenarios pass.
-  - skill: verify
-    requires: [specs]
-  - skill: archive
+  - step: verifying # validating the work before archiving
+    requires: [verify]
+  - step: archiving # merging deltas and moving to archive
     requires: [specs, tasks]
     hooks:
       pre:
@@ -266,14 +270,14 @@ workflow:
             Summarise what changed in this archive.
 ```
 
-The order of entries in `workflow` is the intended progression of the workflow and is used by tooling to display status. It does not enforce sequential blocking between consecutive skills — each skill is independently gated by its own `requires`.
+The order of entries in `workflow` is the intended progression of the change lifecycle and is used by tooling to display status. It does not enforce sequential blocking between consecutive steps — each step is independently gated by its own `requires`.
 
-`specd.yaml` uses the same `workflow` format to add project-level hooks. Each entry only accepts `skill` and `hooks` — `requires` is not valid in `specd.yaml` workflow entries and must be rejected at load time. Entries are matched by `skill` name; schema hooks fire first, then project hooks, within the same `pre`/`post` event.
+`specd.yaml` uses the same `workflow` format to add project-level hooks. Each entry only accepts `step` and `hooks` — `requires` is not valid in `specd.yaml` workflow entries and must be rejected at load time. Entries are matched by `step` name; schema hooks fire first, then project hooks, within the same `pre`/`post` event.
 
 ```yaml
 # specd.yaml — project-level additions
 workflow:
-  - skill: archive
+  - step: archiving
     hooks:
       post:
         - run: 'pnpm run notify-team'
@@ -338,7 +342,7 @@ The file groups scenarios under `### Requirement: <name>` headings that mirror t
 
 Only scenarios that add information beyond what the requirement prose already states are included. Scenarios that merely restate the happy path from the spec are omitted.
 
-The `verify` artifact in the schema should declare `requires: [spec]` — scenarios are written after the spec is stable. The `workflow.verify` skill should declare `requires: [verify]`.
+The `verify` artifact in the schema should declare `requires: [spec]` — scenarios are written after the spec is stable. The `workflow.verify` step should declare `requires: [verify]`.
 
 ## Constraints
 
@@ -347,15 +351,15 @@ The `verify` artifact in the schema should declare `requires: [spec]` — scenar
 - The `{name}` placeholder must appear exactly once in `deltas[].pattern` fields and in `eachBlock` values — these are always block header patterns; validation `pattern` fields may omit `{name}` entirely and use plain regex instead
 - `artifact.id` must match `/^[a-z][a-z0-9-]*$/` (lowercase letters, digits, hyphens; must start with a letter) and must be unique within a schema
 - `deltas[].section` must be unique within an artifact — duplicate section names in the same `deltas` array are a schema validation error
-- `workflow[].skill` must be unique — duplicate skill names in the same `workflow` array are a schema validation error
+- `workflow[].step` must be unique — duplicate step names in the same `workflow` array are a schema validation error
 - `requires` must not contain cycles; circular dependencies in the artifact graph are a schema validation error
 - `eachBlock` must contain a `{name}` placeholder — it is always a block pattern, never a plain section name
 - `required` on an `eachBlock` rule only applies when a block exists but the pattern is missing; it does not enforce block existence
 - `mergeSpecs` must not hardcode operation keywords; it receives them from the resolved schema's `deltaOperations` field
 - `deltaValidations[].scope` strings must use the schema's resolved operation keywords, not the specd defaults, when the schema overrides them
 - Block order in the merged spec is preserved from the original; ADDED blocks are always appended after existing blocks
-- The order of entries in `workflow` is the intended display order for tooling; it does not enforce sequential blocking between consecutive skills
-- `requires` in `specd.yaml` workflow entries is invalid and must be rejected at load time; only `skill` and `hooks` are accepted
+- The order of entries in `workflow` is the intended display order for tooling; it does not enforce sequential blocking between consecutive steps
+- `requires` in `specd.yaml` workflow entries is invalid and must be rejected at load time; only `step` and `hooks` are accepted
 
 ## Schema Example
 
@@ -463,20 +467,18 @@ artifacts:
       Create the task list breaking down the implementation work.
 
 workflow:
-  - skill: explore
+  - step: designing
     requires: []
-  - skill: plan
-    requires: []
-  - skill: apply
+  - step: implementing
     requires: [tasks]
     hooks:
       pre:
         - instruction: |
             Read pending tasks, work through them one by one,
             mark each complete as you go. Pause if you hit a blocker.
-  - skill: verify
+  - step: verifying
     requires: [verify]
-  - skill: archive
+  - step: archiving
     requires: [specs, tasks]
     hooks:
       pre:
