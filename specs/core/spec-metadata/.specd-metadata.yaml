@@ -16,5 +16,5 @@ dependsOn:
   - specs/core/change/
   - specs/core/schema-format/
 contentHashes:
-  spec.md: 'sha256:a5ccc6464b0a3c3947524c43e0cd3aeb7e54c09675ae47f0679f693d9b95c931'
+  spec.md: 'sha256:4065bc361b0620028c48f8522dd5cbeda2fd7d76157d699cc05f8b14717bf814'
   verify.md: 'sha256:4f6c5b74513ef740a4769d50cabdba3933e1956300a253ae6165610388daadc3'

@@ -15,10 +15,10 @@ export interface ArtifactTypeProps {
    */
   readonly scope: ArtifactScope
   /**
-   * Glob pattern for the file(s) this artifact generates
+   * Glob pattern for the file(s) this artifact output
    * (e.g. `"proposal.md"`, `"specs/**\/spec.md"`).
    */
-  readonly generates: string
+  readonly output: string
   /** The LLM instruction used to generate this artifact. */
   readonly instruction: string
   /**
@@ -62,7 +62,7 @@ export interface ArtifactTypeProps {
 export class ArtifactType {
   private readonly _id: string
   private readonly _scope: ArtifactScope
-  private readonly _generates: string
+  private readonly _output: string
   private readonly _instruction: string
   private readonly _requires: readonly string[]
   private readonly _optional: boolean
@@ -79,7 +79,7 @@ export class ArtifactType {
   constructor(props: ArtifactTypeProps) {
     this._id = props.id
     this._scope = props.scope
-    this._generates = props.generates
+    this._output = props.output
     this._instruction = props.instruction
     this._requires = props.requires
     this._optional = props.optional ?? false
@@ -111,13 +111,13 @@ export class ArtifactType {
   }
 
   /**
-   * Glob pattern for the file(s) this artifact generates
+   * Glob pattern for the file(s) this artifact output
    * (e.g. `"proposal.md"`, `"specs/**\/spec.md"`).
    *
    * @returns The glob pattern for generated files
    */
-  generates(): string {
-    return this._generates
+  output(): string {
+    return this._output
   }
 
   /**

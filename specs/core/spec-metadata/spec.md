@@ -51,7 +51,7 @@ contentHashes:
 
 - **`dependsOn`** (array of strings, optional) — spec paths this spec depends on for context. Each path is relative to the workspace root and may include an optional workspace qualifier (e.g. `billing:payments/invoices`) for cross-workspace dependencies. An unqualified path is resolved within the same workspace as the referencing spec. An empty array or absent field means no declared dependencies.
 
-- **`contentHashes`** (map of filename → hash string, optional) — a SHA-256 hash per `requiredSpecArtifacts` file at the time the metadata was last derived. Keys are the resolved filenames: specd reads `requiredSpecArtifacts` from the active schema, looks up each artifact's `generates` field, and resolves the concrete filename for this spec directory — that resolved filename is the key (e.g. `spec.md`, `verify.md`). Used to detect when any artifact file has changed and the metadata may be stale. A missing entry or absent field is treated as stale for that file.
+- **`contentHashes`** (map of filename → hash string, optional) — a SHA-256 hash per `requiredSpecArtifacts` file at the time the metadata was last derived. Keys are the resolved filenames: specd reads `requiredSpecArtifacts` from the active schema, looks up each artifact's `output` field, and resolves the concrete filename for this spec directory — that resolved filename is the key (e.g. `spec.md`, `verify.md`). Used to detect when any artifact file has changed and the metadata may be stale. A missing entry or absent field is treated as stale for that file.
 
 ### Requirement: LLM authorship
 
@@ -61,7 +61,7 @@ specd does not generate or rewrite `.specd-metadata.yaml` automatically. The age
 
 ### Requirement: Staleness detection
 
-When specd reads a spec's `.specd-metadata.yaml`, it iterates over the active schema's `requiredSpecArtifacts`, resolves the concrete filename for each artifact via its `generates` field, computes the current SHA-256 hash of that file, and compares it against the entry in `contentHashes` keyed by that filename. If any file's hash differs, a resolved filename is missing from `contentHashes`, or `contentHashes` itself is absent, specd emits a warning indicating that the spec has changed since the metadata was last derived and that the agent should review and regenerate `.specd-metadata.yaml`.
+When specd reads a spec's `.specd-metadata.yaml`, it iterates over the active schema's `requiredSpecArtifacts`, resolves the concrete filename for each artifact via its `output` field, computes the current SHA-256 hash of that file, and compares it against the entry in `contentHashes` keyed by that filename. If any file's hash differs, a resolved filename is missing from `contentHashes`, or `contentHashes` itself is absent, specd emits a warning indicating that the spec has changed since the metadata was last derived and that the agent should review and regenerate `.specd-metadata.yaml`.
 
 A missing `contentHashes` field is treated as stale — specd emits the same warning.
 
