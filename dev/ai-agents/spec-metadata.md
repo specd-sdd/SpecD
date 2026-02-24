@@ -1,109 +1,171 @@
-# Agent: Spec Metadata Generator
+# Skill: Spec Metadata Generator
 
 > Temporary working document. Final location TBD.
 
-## Execution notes
+## What this skill does
 
-- This agent **requires Write tool permission** to create or update `.specd-metadata.yaml`.
-- When launched as a background subagent via the Task tool, Write access is not granted by default and the agent will stop at Step 5 without writing anything.
-- **Preferred invocation**: run in foreground (no `run_in_background`) so the permission prompt is shown to the user, or run directly in the main conversation using the agent instructions manually.
-
-## Purpose
-
-Generate or update the `.specd-metadata.yaml` file for a spec directory. This file records human-readable metadata (`title`, `description`, `keywords`) and machine-readable dependency information (`dependsOn`, `contentHashes`) for a spec.
-
-## When to run
-
-- After creating a new spec
-- After substantially revising an existing spec's content
-- When `.specd-metadata.yaml` is stale or missing
-
-## Inputs
-
-- The spec directory path (e.g. `specs/core/change/`)
-- The list of all available specs in the project (for resolving valid `dependsOn` paths)
+Generates or updates the `.specd-metadata.yaml` file for a spec directory by launching a Haiku subagent to do the extraction work.
 
 ## Instructions
 
-### Step 1 — Check if update is needed
+When this skill is invoked:
 
-1. List all files in the spec directory, excluding `.specd-metadata.yaml` itself.
-2. Read the existing `.specd-metadata.yaml` if it exists.
-3. Compute the SHA-256 hash of each file found in step 1.
-4. Compare each hash against the corresponding entry in `contentHashes`.
+1. Ask the user for the spec directory path if not already provided (e.g. `specs/core/change/`).
 
-**If all hashes match → stop. No update needed.**
+2. Launch a subagent using the Task tool with:
+   - `subagent_type: general-purpose`
+   - `model: haiku`
+   - The full prompt below, substituting `<spec-dir>` and `<project-root>` with the actual paths.
 
-If any hash differs, a file has no entry in `contentHashes`, or `.specd-metadata.yaml` does not exist → proceed to Step 2.
+3. The subagent has Write access — it will create or update `.specd-metadata.yaml` directly.
 
-### Step 2 — Read spec content
+## Subagent prompt
 
-Read all files in the spec directory (excluding `.specd-metadata.yaml`).
+```
+You are updating the .specd-metadata.yaml file for the spec directory at <spec-dir>.
 
-### Step 3 — Evaluate each field
+Follow these steps exactly:
 
-For each field, compare the current value in `.specd-metadata.yaml` against what the spec content now warrants. **Only update a field if it needs to change.**
+### Step 0 — Create top-level progress tasks
 
-#### `title`
+Create these tasks using TaskCreate before doing any other work:
+- "Check content hashes" (activeForm: "Checking content hashes")
+- "Read and classify changed files" (activeForm: "Reading changed files")
+- "Extract content" (activeForm: "Extracting rules and scenarios")
+- "Write .specd-metadata.yaml" (activeForm: "Writing metadata")
 
-Derive the appropriate title from the top-level `# Heading` of `spec.md`. If it matches the existing `title` — leave it unchanged.
+Mark each in_progress when you start it and completed when done. Skip = complete immediately.
 
-#### `description`
+### Step 1 — Check what needs updating
 
-Derive a one or two sentence summary of what the spec defines. If the existing `description` still accurately reflects the spec content — leave it unchanged.
+Mark "Check content hashes" in_progress.
 
-#### `keywords`
+1. List all files in <spec-dir>, excluding .specd-metadata.yaml itself.
+2. Read the existing .specd-metadata.yaml if it exists.
+3. Compute SHA-256 hash of each file: shasum -a 256 <file>
+4. Compare each hash against contentHashes in the existing metadata.
 
-Review whether the existing keywords still cover the domain concepts, patterns, and cross-cutting concerns in the spec. Add missing keywords; do not remove existing ones unless they are clearly no longer relevant. If nothing needs to change — leave `keywords` unchanged.
+If all hashes match → mark all tasks completed and stop. No update needed.
 
-Guidelines for keywords:
+For each file note whether its hash changed:
+- Changed → re-extract all fields derived from that file
+- Unchanged → keep existing values, skip re-extraction
 
-- Lowercase, hyphen-separated
-- Capture domain concepts (`lifecycle`, `approval`, `auth`, `storage`)
-- Capture patterns where relevant (`event-sourcing`, `state-machine`, `port-adapter`)
-- **Include related concepts** — if the spec references a concept, also add the broader domain it belongs to (e.g. if the spec mentions `commit` or `branch`, add `git`; if it mentions `hash` or `sha256`, add `integrity`; if it mentions `webhook` or `http`, add `api`)
-- Avoid generic terms (`spec`, `domain`, `core`)
-- 3 to 8 tags total
+Mark "Check content hashes" completed.
 
-#### `dependsOn`
+### Step 2 — Read and classify changed files
 
-Review whether the existing `dependsOn` list still matches the spec's declared dependencies (primarily the `## Spec Dependencies` section). Add paths for new dependencies; do not remove existing ones unless a dependency has been explicitly removed from the spec. If nothing needs to change — leave `dependsOn` unchanged.
+Mark "Read and classify changed files" in_progress.
 
-Guidelines:
+Read only the files whose hash changed. For each, determine its role:
+- rules — requirement definitions, normative prose, constraints, field definitions, state machines
+- scenarios — WHEN/THEN verification scenarios
+- both — contains both
+- ignore — auxiliary content (examples, ADRs, diagrams)
 
-- Include only direct dependencies — specs the agent must understand to work on this one
-- Do not include the spec itself
-- Do not include specs merely mentioned in passing
-- Paths relative to the workspace root; use workspace qualifier only for cross-workspace deps (e.g. `billing:payments/invoices`)
+Mark "Read and classify changed files" completed.
 
-### Step 4 — Update contentHashes
+### Step 3 — Count and create per-item tasks
 
-Always update `contentHashes` with the freshly computed hashes from Step 1, regardless of whether any other field changed. Keys are bare filenames (e.g. `spec.md`, `verify.md`).
+Count named requirements across all rules/both files and named scenarios across all scenarios/both files. Create:
+- "Extract metadata fields" (activeForm: "Extracting title, description, keywords, dependsOn, constraints")
+- One task per requirement: "Requirement: <name>" (activeForm: "Extracting rules for <name>")
+- One task per scenario: "Scenario: <requirement> — <name>" (activeForm: "Extracting scenario <name>")
 
-### Step 5 — Write
+### Step 4 — Extract
 
-Write the updated `.specd-metadata.yaml`. Only fields that were evaluated as needing a change (Steps 3–4) are modified; all other fields retain their previous values exactly.
+Mark "Extract content" in_progress.
+
+**DO NOT write any file during extraction. The Write tool must not be called until the single
+write step below. Only TaskUpdate calls are allowed during extraction.**
+
+#### Metadata fields
+
+Mark "Extract metadata fields" in_progress.
+Extract title, description, keywords, dependsOn, constraints, contentHashes into memory.
+Mark "Extract metadata fields" completed.
+
+#### Rules — one requirement at a time (in memory only)
+
+For each named requirement in rules/both files:
+- Mark its task in_progress
+- Extract every normative statement as a single plain-text sentence. Preserve named functions, APIs,
+  field names, state/enum values, transition graphs, event types and their fields. Strip only
+  explanation and rationale. Structural enumerations (tables, valid state lists, transitions) are
+  normative — include them.
+- Store in memory. Do NOT write to disk.
+- Mark its task completed.
+
+#### Scenarios — all at once (in memory only)
+
+Extract all scenarios from scenarios/both files in one pass. Store in memory. Do NOT write to disk.
+Mark each scenario task in_progress and completed as you process it (for progress visibility only).
+
+#### Single write — only here
+
+Once ALL extraction is complete, call Write exactly once to create .specd-metadata.yaml.tmp with
+the full result (metadata fields + rules + scenarios).
+
+Mark "Extract content" completed.
+
+### Step 5 — Finalize
+
+Mark "Write .specd-metadata.yaml" in_progress.
+
+The .specd-metadata.yaml.tmp is already complete. Preserve fields from unchanged files by merging
+them in: read the existing .specd-metadata.yaml, take any field not present in the tmp file, and
+prepend it. Then rename:
+
+  mv <spec-dir>/.specd-metadata.yaml.tmp <spec-dir>/.specd-metadata.yaml
+
+Mark "Write .specd-metadata.yaml" completed.
+
+## YAML quoting rules
+
+Always quote every string value that appears as a list item or a scalar field value. Use single
+quotes unless the value contains a single quote, in which case use double quotes.
+
+These characters break YAML when unquoted and MUST trigger quoting:
+- `: ` (colon followed by space) anywhere in the string
+- `#` preceded by a space
+- Leading `{`, `[`, `>`, `|`, `!`, `&`, `*`, `?`
+- Strings starting with a digit that look like numbers or dates
+
+When in doubt — quote it. Over-quoting is never a bug; under-quoting breaks the file.
 
 ## Output format
 
-```yaml
 title: <short name>
 description: >
   <one or two sentence summary>
 keywords:
   - <keyword>
-  - <keyword>
 dependsOn:
-  - <spec-path>
   - <spec-path>
 contentHashes:
   spec.md: 'sha256:<hex>'
   verify.md: 'sha256:<hex>'
-```
+rules:
+  - requirement: <requirement name>
+    rules:
+      - <normative statement, plain text>
+constraints:
+  - <constraint statement, plain text>
+scenarios:
+  - requirement: <requirement name>
+    name: <scenario name>
+    given:
+      - <precondition>
+    when:
+      - <condition>
+    then:
+      - <expected outcome>
 
 ## Notes
 
-- If `.specd-metadata.yaml` does not exist, create it with all fields derived from scratch
-- `contentHashes` is always rewritten in Step 4 — never copy values from the previous version
-- When in doubt about a dependency, include it rather than omit it
-- When in doubt about a keyword, include it rather than omit it
+- contentHashes is always rewritten — never copy from previous version
+- When in doubt about a dependency or keyword, include it
+- constraints are invariants — if in doubt, put in rules
+- Omit constraints if no ## Constraints section exists
+- Omit scenarios if no scenarios exist
+```
