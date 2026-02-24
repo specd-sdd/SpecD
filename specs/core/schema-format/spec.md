@@ -42,7 +42,7 @@ Each entry in `artifacts` must include:
 - `id` (string, required) — unique identifier within the schema, e.g. `proposal`, `specs`, `design`, `tasks`
 - `scope` (`spec` | `change`, required) — declares where this artifact lives after the change is archived. `spec` means the artifact file is synced to the `SpecRepository` (e.g. `spec.md`, `verify.md` — files that become part of the project's permanent spec record). `change` means the artifact stays only in the change directory and is never synced (e.g. `proposal.md`, `tasks.md` — working documents used during the change process).
 - `optional` (boolean, optional, default `false`) — when `false`, `ValidateSpec` requires this artifact to be present in the change before validation can pass. When `true`, the artifact may be absent without failing validation; if present, it is validated and (for `scope: spec` artifacts) synced normally. `scope` and `optional` are independent.
-- `generates` (string or glob, required) — path pattern for the artifact's files **relative to the change directory**, e.g. `proposal.md` or `specs/**/spec.md`. When creating a new artifact file within a change, the filename is derived from the last literal segment of the glob (e.g. `spec.md` from `specs/**/spec.md`); if the last segment is a wildcard, the filename falls back to the template filename. The final location of these files in the project repo after syncing is configured separately and may differ (e.g. `especificaciones/auth/login/spec.md` for a change file at `changes/my-change/specs/auth/login/spec.md`)
+- `output` (string or glob, required) — path pattern for the artifact's files **relative to the change directory**, e.g. `proposal.md` or `specs/**/spec.md`. When creating a new artifact file within a change, the filename is derived from the last literal segment of the glob (e.g. `spec.md` from `specs/**/spec.md`); if the last segment is a wildcard, the filename falls back to the template filename. The final location of these files in the project repo after syncing is configured separately and may differ (e.g. `especificaciones/auth/login/spec.md` for a change file at `changes/my-change/specs/auth/login/spec.md`)
 - `description` (string, optional) — human-readable summary for tooling
 - `template` (string, optional) — path to a template file, relative to the schema directory; see Requirement: Template resolution
 - `instruction` (string, optional) — AI instruction text injected by `CompileContext`
@@ -383,7 +383,7 @@ description: Proposal → specs → design → tasks workflow
 artifacts:
   - id: proposal
     scope: change
-    generates: proposal.md
+    output: proposal.md
     description: Initial proposal outlining why the change is needed
     template: templates/proposal.md
     instruction: |
@@ -392,7 +392,7 @@ artifacts:
 
   - id: specs
     scope: spec
-    generates: 'specs/**/spec.md'
+    output: 'specs/**/spec.md'
     description: Detailed specifications defining what the system should do
     template: templates/spec.md
     requires:
@@ -428,7 +428,7 @@ artifacts:
 
   - id: verify
     scope: spec
-    generates: 'specs/**/verify.md'
+    output: 'specs/**/verify.md'
     description: Verification scenarios for the spec
     template: templates/verify.md
     requires:
@@ -453,7 +453,7 @@ artifacts:
 
   - id: design
     scope: change
-    generates: design.md
+    output: design.md
     description: Technical design with implementation decisions
     template: templates/design.md
     requires:
@@ -463,7 +463,7 @@ artifacts:
 
   - id: tasks
     scope: change
-    generates: tasks.md
+    output: tasks.md
     description: Implementation checklist with trackable tasks
     template: templates/tasks.md
     requires:

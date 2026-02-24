@@ -35,18 +35,18 @@
 
 #### Scenario: Filename derived from glob literal segment
 
-- **WHEN** an artifact declares `generates: "specs/**/spec.md"` and a new file is created within the change
+- **WHEN** an artifact declares `output: "specs/**/spec.md"` and a new file is created within the change
 - **THEN** the file is named `spec.md`; the subdirectory path (e.g. `auth/login/`) is chosen by the user
 
 #### Scenario: Filename derived from template when glob segment is a wildcard
 
-- **WHEN** an artifact declares `generates: "specs/**/*.md"` and `template: "templates/spec.md"`
+- **WHEN** an artifact declares `output: "specs/**/*.md"` and `template: "templates/spec.md"`
 - **THEN** the file is named `spec.md`, taken from the template filename
 
 #### Scenario: Change file path differs from synced repo path
 
 - **WHEN** a change contains `changes/my-change/specs/auth/login/spec.md` and the project syncs to `especificaciones/`
-- **THEN** the file is copied to `especificaciones/auth/login/spec.md`; `generates` does not control the sync destination
+- **THEN** the file is copied to `especificaciones/auth/login/spec.md`; `output` does not control the sync destination
 
 #### Scenario: Artifact with no requirements
 
