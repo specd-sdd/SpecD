@@ -83,6 +83,13 @@ write step below. Only TaskUpdate calls are allowed during extraction.**
 
 Mark "Extract metadata fields" in_progress.
 Extract title, description, keywords, dependsOn, constraints, contentHashes into memory.
+
+For `description`: write 2–3 sentences aimed at a reader (human or AI agent) deciding whether
+this spec is relevant to their task. Answer: what does this spec cover, why does it exist in the
+system, and when would you need to read it? Avoid dictionary-style openings ("X is a Y that..."),
+passive constructions ("this spec defines..."), and pure structural descriptions. Write as if
+recommending the spec to a colleague.
+
 Mark "Extract metadata fields" completed.
 
 #### Rules — one requirement at a time (in memory only)
@@ -137,7 +144,7 @@ When in doubt — quote it. Over-quoting is never a bug; under-quoting breaks th
 
 title: <short name>
 description: >
-  <one or two sentence summary>
+  <2–3 sentences: what it covers, why it exists, when you need it — written for discovery, not documentation>
 keywords:
   - <keyword>
 dependsOn:
