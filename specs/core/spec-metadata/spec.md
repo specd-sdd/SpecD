@@ -79,9 +79,9 @@ scenarios:
 
 ### Requirement: LLM authorship
 
-`.specd-metadata.yaml` is written and maintained by the LLM agent. It is produced as part of the spec-writing workflow — when the agent creates or substantially revises a spec, it derives the dependencies by reading the spec content and records them in `.specd-metadata.yaml` along with the current `contentHashes`.
+`.specd-metadata.yaml` is written and maintained by the LLM agent. It is generated once per spec at archive time: when `ArchiveChange` completes, it signals which specs were modified via `staleMetadataSpecPaths`, and the caller (CLI or MCP layer) triggers the extraction agent for each of those specs.
 
-specd does not generate or rewrite `.specd-metadata.yaml` automatically. The agent is responsible for keeping it accurate.
+specd does not generate or rewrite `.specd-metadata.yaml` automatically. The agent is responsible for producing accurate output. After generation, the metadata is stable until the spec is modified again by a subsequent change.
 
 ### Requirement: Staleness detection
 
@@ -93,13 +93,13 @@ Staleness is advisory only. specd does not block any operation because `.specd-m
 
 ### Requirement: Use by CompileContext
 
-`CompileContext` reads `dependsOn` from `.specd-metadata.yaml` when building context for a change. The full resolution order is defined in [`specs/core/config/spec.md`](../config/spec.md) — Requirement: Context spec selection. In summary:
+`CompileContext` reads `.specd-metadata.yaml` for two purposes:
 
-1. Project-level includes and excludes from `specd.yaml` are applied first
-2. Workspace-level includes and excludes (for active workspaces) are applied next
-3. All specs reachable via `dependsOn` traversal are added last — these are not subject to any exclude rules
+1. **Spec collection** — `dependsOn` is followed transitively from `change.contextSpecIds` to discover which specs to include in the context. The full resolution order is defined in [`specs/core/config/spec.md`](../config/spec.md) — Requirement: Context spec selection.
 
-The traversal starts from the `contextSpecIds` recorded in the change manifest and follows `dependsOn` links transitively through `.specd-metadata.yaml` files until no new specs are found. A spec that cannot be resolved (missing file, unknown workspace) is silently skipped with a warning.
+2. **Spec content** — for each spec in the collected context set, if metadata is fresh, `CompileContext` uses `description`, `rules`, `constraints`, and `scenarios` as the compact, machine-optimised representation of that spec. If metadata is absent or stale, `CompileContext` falls back to extracting the sections declared in the artifact's `contextSections[]` and emits a staleness warning.
+
+A spec that cannot be resolved (missing file, unknown workspace) is silently skipped with a warning.
 
 ### Requirement: Version control
 
