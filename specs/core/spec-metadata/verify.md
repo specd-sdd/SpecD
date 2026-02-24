@@ -7,7 +7,7 @@
 #### Scenario: Metadata file present
 
 - **WHEN** a spec directory contains a `.specd-metadata.yaml` file
-- **THEN** specd reads it to obtain `dependsOn` and `contentHash` for that spec
+- **THEN** specd reads it to obtain `dependsOn` and `contentHashes` for that spec
 
 #### Scenario: Metadata file absent
 
@@ -18,8 +18,8 @@
 
 #### Scenario: Valid metadata file with all fields
 
-- **WHEN** `.specd-metadata.yaml` contains `title`, `description`, `dependsOn`, and `contentHash`
-- **THEN** specd parses all four fields; `title` and `description` are available to tooling without reading the spec content
+- **WHEN** `.specd-metadata.yaml` contains `title`, `description`, `keywords`, `dependsOn`, `contentHashes`, `rules`, `constraints`, and `scenarios`
+- **THEN** specd parses all fields; `title`, `description`, and `keywords` are available to tooling without reading the spec content
 
 #### Scenario: Title absent — fallback to path
 
@@ -51,7 +51,7 @@
 #### Scenario: Agent writes metadata after creating spec
 
 - **WHEN** the LLM agent creates a new spec
-- **THEN** it produces a `.specd-metadata.yaml` with the derived `dependsOn` and the current `contentHash` of the spec's requiredSpecArtifacts
+- **THEN** it produces a `.specd-metadata.yaml` with `title`, `description`, `keywords`, `dependsOn`, `contentHashes`, `rules`, `constraints` (if any), and `scenarios` (if any) derived from the spec content
 
 #### Scenario: specd does not overwrite metadata
 
@@ -62,12 +62,12 @@
 
 #### Scenario: Content unchanged — no warning
 
-- **WHEN** the current hash of the spec's requiredSpecArtifacts matches `contentHash` in `.specd-metadata.yaml`
+- **WHEN** the current hash of the spec's requiredSpecArtifacts matches `contentHashes` in `.specd-metadata.yaml`
 - **THEN** no staleness warning is emitted
 
 #### Scenario: Content changed — warning emitted
 
-- **WHEN** a spec's `spec.md` has been modified and its hash no longer matches `contentHash`
+- **WHEN** a spec's `spec.md` has been modified and its hash no longer matches `contentHashes`
 - **THEN** specd emits a warning that the spec metadata may be stale and the agent should regenerate it
 
 #### Scenario: Missing contentHashes — treated as stale
