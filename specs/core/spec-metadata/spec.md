@@ -27,8 +27,9 @@ The `.specd-` prefix namespaces the file as specd-managed, avoiding conflicts wi
 # specs/core/change/.specd-metadata.yaml
 title: Change
 description: >
-  Central domain entity representing a discrete unit of in-progress spec work.
-  Enforces lifecycle transitions, artifact validation, and approval gates.
+  The central domain entity in specd. Read this spec when working on anything that
+  creates, transitions, or archives a unit of spec work — it defines the lifecycle,
+  approval gates, and event history model that everything else depends on.
 dependsOn:
   - core/storage
   - core/delta-merger
@@ -41,11 +42,28 @@ keywords:
 contentHashes:
   spec.md: 'sha256:a3f1c2...'
   verify.md: 'sha256:b7e4d9...'
+rules:
+  - requirement: Lifecycle
+    rules:
+      - 'A Change progresses through states: open → ready → approved → merged.'
+      - 'Only an approved Change may be merged.'
+constraints:
+  - 'A Change must not reference itself in dependsOn.'
+scenarios:
+  - requirement: Lifecycle
+    name: 'Open change cannot be merged'
+    given:
+      - 'a Change in state open'
+    when:
+      - 'merge is attempted'
+    then:
+      - 'an error is returned'
+      - 'the Change remains in state open'
 ```
 
 - **`title`** (string, optional) — short human-readable name for the spec, suitable for display in lists and tooling (e.g. `"Change"`, `"Storage"`, `"Schema Format"`). If absent, tooling falls back to the spec's path.
 
-- **`description`** (string, optional) — one or two sentence summary of what the spec defines. Used by tooling and the LLM to understand the spec's purpose without reading its full content — for example when selecting which specs to include in a context or presenting a list of available specs.
+- **`description`** (string, optional) — 2–3 sentences written for discovery: what does this spec cover, why does it exist in the system, and when would you need to read it? Used by tooling and the LLM to assess relevance without reading the full spec content — for example when selecting which specs to include in a context or presenting a list of available specs. Should not read like a dictionary definition.
 
 - **`keywords`** (array of strings, optional) — topic tags for this spec, used by tooling to find related specs (e.g. `specd spec find --keyword auth`). Should capture domain concepts, patterns, and cross-cutting concerns present in the spec. Lowercase, hyphen-separated.
 
@@ -53,9 +71,15 @@ contentHashes:
 
 - **`contentHashes`** (map of filename → hash string, optional) — a SHA-256 hash per `requiredSpecArtifacts` file at the time the metadata was last derived. Keys are the resolved filenames: specd reads `requiredSpecArtifacts` from the active schema, looks up each artifact's `output` field, and resolves the concrete filename for this spec directory — that resolved filename is the key (e.g. `spec.md`, `verify.md`). Used to detect when any artifact file has changed and the metadata may be stale. A missing entry or absent field is treated as stale for that file.
 
+- **`rules`** (array of objects, optional) — normative statements extracted from the spec, grouped by requirement name. Each entry has a `requirement` key (string) and a `rules` key (array of plain-text sentences). Preserves named functions, APIs, field names, state/enum values, and transition graphs. Omits explanation and rationale. Used by the LLM as a dense summary of requirements without loading the full spec.
+
+- **`constraints`** (array of strings, optional) — hard invariants extracted from the spec's `## Constraints` section. Each entry is a single plain-text sentence. Omitted if the spec has no `## Constraints` section.
+
+- **`scenarios`** (array of objects, optional) — BDD-style verification scenarios extracted from verify files, grouped by requirement name. Each entry has `requirement` (string), `name` (string), `given` (array of strings), `when` (array of strings), and `then` (array of strings). Omitted if the spec has no verification scenarios.
+
 ### Requirement: LLM authorship
 
-`.specd-metadata.yaml` is written and maintained by the LLM agent. It is produced as part of the spec-writing workflow — when the agent creates or substantially revises a spec, it derives the dependencies by reading the spec content and records them in `.specd-metadata.yaml` along with the current `contentHash`.
+`.specd-metadata.yaml` is written and maintained by the LLM agent. It is produced as part of the spec-writing workflow — when the agent creates or substantially revises a spec, it derives the dependencies by reading the spec content and records them in `.specd-metadata.yaml` along with the current `contentHashes`.
 
 specd does not generate or rewrite `.specd-metadata.yaml` automatically. The agent is responsible for keeping it accurate.
 
