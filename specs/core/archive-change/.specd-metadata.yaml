@@ -1,0 +1,218 @@
+title: 'ArchiveChange'
+description: >
+  Application use case that finalises a completed change by merging delta artifacts
+  into project specs, moving the change directory to the archive, and firing pre/post
+  lifecycle hooks. Gated on the `archivable` state and signals which specs need
+  metadata regeneration after sync.
+keywords:
+  - 'archiving'
+  - 'lifecycle'
+  - 'hooks'
+  - 'delta-merger'
+  - 'storage'
+dependsOn:
+  - 'core/change'
+  - 'core/schema-format'
+  - 'core/validate-artifacts'
+  - 'core/delta-merger'
+  - 'core/storage'
+  - 'core/config'
+  - 'core/spec-metadata'
+contentHashes:
+  spec.md: 'sha256:ddee8ab8d0792e751a452fa8803ebee55949cb8eb8555cbde10664328a31dcc6'
+  verify.md: 'sha256:cc092a9faab12766a45611bb2063fac15b1c9f8abcbaaf49ffd652633880655b'
+rules:
+  - requirement: 'Ports and constructor'
+    rules:
+      - '`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `HookRunner`, and `GitAdapter`.'
+      - "`specs` is keyed by workspace name and a change may touch specs in multiple workspaces; `ArchiveChange` looks up the `SpecRepository` for each spec path's workspace before reading the base spec or writing the merged result."
+  - requirement: 'Input'
+    rules:
+      - '`ArchiveChange.execute` receives: `name` (the change name to archive), `schemaRef` (the schema reference string from `specd.yaml`), `workspaceSchemasPaths` (resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`), and `hookVariables` (template variable values available to `run:` hook commands).'
+  - requirement: 'Archivable guard'
+    rules:
+      - 'The first step of `ArchiveChange.execute` must call `change.assertArchivable()`.'
+      - 'If the change is not in `archivable` state, this throws `InvalidStateTransitionError` and the archive is aborted without running any hooks or modifying any files.'
+  - requirement: 'Pre-archive hooks'
+    rules:
+      - "After the archivable guard passes, `ArchiveChange` must run all `run:` hooks declared in the schema's `workflow[archiving].hooks.pre` followed by any project-level `workflow[archiving].hooks.pre` entries, in declaration order."
+      - '`instruction:` hook entries in `pre` are not executed by `ArchiveChange` — they are AI context injected by `CompileContext` at skill compile time, not commands to run.'
+      - 'Only `run:` entries are executed here.'
+      - 'If any pre-archive `run:` hook exits with a non-zero code, `ArchiveChange` must abort immediately and throw `HookFailedError` with the hook command, exit code, and stderr.'
+      - 'No files are modified before a failed pre-archive hook.'
+  - requirement: 'Delta merge and spec sync'
+    rules:
+      - 'After all pre-archive hooks succeed, `ArchiveChange` must merge each delta artifact into the project spec and sync the result to `SpecRepository`.'
+      - 'For each spec path in `change.specIds`: resolve the active schema.'
+      - 'For each artifact in the schema that declares `deltas[]`: load the artifact file from `ChangeRepository` (the delta file in the change directory); if absent or status `skipped` (validatedHash === "__skipped__"), skip.'
+      - 'Load the base spec from `SpecRepository`; if the base does not exist, treat it as an empty spec.'
+      - "Call `mergeSpecs(base, delta, deltaConfigs, deltaOperations)` with `deltaConfigs` from the artifact's `deltas[]` and `deltaOperations` from the schema (or defaults)."
+      - 'Save the merged content to `SpecRepository` via `specs.save(spec, artifact)`.'
+      - 'For each artifact in the schema that does not declare `deltas[]` (new file artifacts): load the artifact content from `ChangeRepository`; if absent or status `skipped` (validatedHash === "__skipped__"), skip.'
+      - 'Save the content to `SpecRepository` (creating the spec and file if necessary).'
+      - '`mergeSpecs` was already run during `ValidateArtifacts` for conflict detection; if `ArchiveChange` encounters a `DeltaConflictError`, it must throw it.'
+  - requirement: 'ArchivedChange construction'
+    rules:
+      - "After syncing all specs, `ArchiveChange` must construct an `ArchivedChange` record with: `name` (the change's slug name), `archivedName` (the full timestamped directory name: `YYYYMMDD-HHmmss-<name>`), `workspace` (the `SpecPath` of the primary workspace, the first entry in `change.workspaces`), `archivedAt` (the current timestamp), and `artifacts` (array of artifact filenames that were synced)."
+      - '`archivedName` is derived from `change.createdAt` (zero-padded), never from wall-clock time at archive execution.'
+      - '`ArchivedChange` has no `approval` field and no `wasStructural` flag — these were removed from the domain model.'
+  - requirement: 'Archive repository call'
+    rules:
+      - '`ArchiveChange` must call `archiveRepository.archive(archivedChange)`.'
+      - 'The `FsArchiveRepository` implementation moves the change directory from its current location (`changes/` or `drafts/`) to the archive directory using the configured pattern, then appends an entry to `index.jsonl`.'
+  - requirement: 'Post-archive hooks'
+    rules:
+      - 'After `archiveRepository.archive()` succeeds, `ArchiveChange` must run all `run:` hooks declared in `workflow[archiving].hooks.post` — schema hooks first, then project-level hooks, in declaration order.'
+      - '`instruction:` post hooks are AI context injected by `CompileContext` and are not executed here.'
+      - 'Post-archive hook failures do not roll back the archive — the change has already been moved and the index updated.'
+      - 'Instead, `ArchiveChange` collects failures and returns them in the result so the CLI can present them to the user.'
+  - requirement: 'Spec metadata refresh signal'
+    rules:
+      - 'After post-archive hooks complete, `ArchiveChange` must collect the set of spec paths that were modified during the delta merge and spec sync step.'
+      - 'These are included in the result so that the caller (CLI or MCP layer) can trigger metadata regeneration for those specs.'
+      - '`ArchiveChange` does not invoke the LLM extraction agent directly — it only signals which specs need refresh.'
+  - requirement: 'Result shape'
+    rules:
+      - '`ArchiveChange.execute` must return a result object.'
+      - 'The result must include: `archivedChange` (the `ArchivedChange` record that was persisted), `postHookFailures` (array of hook commands that failed post-archive, empty on full success), and `staleMetadataSpecPaths` (array of spec paths whose `.specd-metadata.yaml` should be regenerated because their content was modified during this archive).'
+      - '`ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure.'
+      - 'Post-archive failures are returned, not thrown.'
+constraints:
+  - '`change.assertArchivable()` must be called before any hooks or file modifications'
+  - 'Pre-archive hook failures abort the archive and throw — no partial state is written'
+  - 'Post-archive hook failures are returned in the result; the archive is not rolled back'
+  - '`ArchiveChange` must not call `change.invalidate()` or any mutation on the `Change` entity — the change is already at its terminal state'
+  - 'The `archivedName` is always derived from `change.createdAt`, never from wall-clock time at archive execution'
+  - '`ArchiveChange` does not delete the change from `ChangeRepository` — `FsArchiveRepository.archive()` moves the directory as part of the archive operation'
+scenarios:
+  - requirement: 'Archivable guard'
+    name: 'Change not in archivable state'
+    given: []
+    when:
+      - '`ArchiveChange.execute` is called for a change in `done` state'
+    then:
+      - '`change.assertArchivable()` throws `InvalidStateTransitionError`'
+      - 'no hooks are run'
+      - 'no files are modified'
+  - requirement: 'Archivable guard'
+    name: 'Change in archivable state'
+    given:
+      - 'the change is in `archivable` state'
+    when:
+      - '`ArchiveChange.execute` is called'
+    then:
+      - 'the archivable guard passes and execution proceeds to pre-archive hooks'
+  - requirement: 'Pre-archive hooks'
+    name: 'Pre-archive run hook executes before file sync'
+    given:
+      - "the schema declares `workflow.archiving.hooks.pre: [{ run: 'pnpm test' }]`"
+    when:
+      - '`ArchiveChange.execute` is called'
+    then:
+      - '`pnpm test` is executed before any spec files are written'
+  - requirement: 'Pre-archive hooks'
+    name: 'Failing pre-archive hook aborts archive'
+    given:
+      - 'a pre-archive `run:` hook exits with code 1'
+    when:
+      - '`ArchiveChange.execute` is called'
+    then:
+      - '`HookFailedError` is thrown'
+      - 'no spec files are written or modified'
+  - requirement: 'Pre-archive hooks'
+    name: 'instruction entries in pre hooks are not executed'
+    given:
+      - "the schema declares a `workflow.archiving.hooks.pre` entry with `instruction: 'Review delta specs'`"
+    when:
+      - '`ArchiveChange.execute` is called'
+    then:
+      - 'no shell command is run for the instruction entry'
+      - 'execution proceeds to the next hook'
+  - requirement: 'Delta merge and spec sync'
+    name: 'Delta artifact merged into base spec'
+    given:
+      - 'a change artifact contains delta modifications under `## MODIFIED Requirements`'
+      - 'the base spec in `SpecRepository` has a `## Requirements` section with the targeted block'
+    when:
+      - '`ArchiveChange.execute` is called'
+    then:
+      - 'the merged content (with the modification applied) is saved to `SpecRepository`'
+  - requirement: 'Delta merge and spec sync'
+    name: 'New artifact synced directly'
+    given:
+      - 'a change artifact with no `deltas[]` configuration (a new file)'
+    when:
+      - '`ArchiveChange.execute` is called'
+    then:
+      - 'the artifact content is saved as-is to `SpecRepository`'
+  - requirement: 'Delta merge and spec sync'
+    name: 'Optional artifact with missing status — not synced'
+    given:
+      - 'an optional artifact declared in the schema has no file in the change directory and `validatedHash` is `null` (status `missing`)'
+    when:
+      - '`ArchiveChange.execute` is called'
+    then:
+      - 'that artifact is not synced and no entry is created in `SpecRepository`'
+  - requirement: 'Delta merge and spec sync'
+    name: 'Optional artifact with skipped status — not synced'
+    given:
+      - 'an optional artifact has `validatedHash: "__skipped__"` in the manifest (status `skipped`) and no file in the change directory'
+    when:
+      - '`ArchiveChange.execute` is called'
+    then:
+      - 'that artifact is not synced and no entry is created in `SpecRepository`'
+  - requirement: 'Delta merge and spec sync'
+    name: 'Conflict detected at archive time'
+    given:
+      - 'the delta file has a conflict (same block in MODIFIED and REMOVED)'
+    when:
+      - '`ArchiveChange.execute` reaches the merge step'
+    then:
+      - '`DeltaConflictError` is thrown'
+  - requirement: 'ArchivedChange construction'
+    name: 'archivedName derived from createdAt'
+    given:
+      - "a change with `createdAt = 2024-01-15T12:00:00Z` and `name = 'add-auth-flow'`"
+    when:
+      - '`ArchiveChange` constructs the `ArchivedChange`'
+    then:
+      - '`archivedName` is `20240115-120000-add-auth-flow`'
+  - requirement: 'ArchivedChange construction'
+    name: 'ArchivedChange has no approval or wasStructural fields'
+    given: []
+    when:
+      - '`ArchiveChange` constructs the `ArchivedChange`'
+    then:
+      - 'the result has no `approval` field and no `wasStructural` field'
+  - requirement: 'Post-archive hooks'
+    name: 'Post-archive hook runs after archive'
+    given:
+      - 'the schema declares `workflow.archiving.hooks.post: [{ run: ''git commit -m "archive"'' }]`'
+    when:
+      - '`ArchiveChange.execute` succeeds'
+    then:
+      - 'the `run:` command executes after `archiveRepository.archive()` is called'
+  - requirement: 'Post-archive hooks'
+    name: 'Failing post-archive hook does not roll back archive'
+    given:
+      - 'a post-archive `run:` hook exits with code 1'
+    when:
+      - '`ArchiveChange.execute` is called'
+    then:
+      - 'the archive is not rolled back'
+      - "the result's `postHookFailures` includes the failed hook"
+  - requirement: 'Result shape'
+    name: 'Successful archive returns result'
+    given: []
+    when:
+      - '`ArchiveChange.execute` completes successfully'
+    then:
+      - 'the result includes the `ArchivedChange` record'
+      - '`postHookFailures` is empty'
+  - requirement: 'Result shape'
+    name: 'Pre-archive failure throws'
+    given: []
+    when:
+      - 'a pre-archive hook fails'
+    then:
+      - '`ArchiveChange.execute` throws and does not return a result'

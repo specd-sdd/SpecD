@@ -1,0 +1,252 @@
+title: 'ValidateArtifacts'
+description: >
+  Application use case that validates a change's artifact files against the active schema,
+  enforces required artifacts, runs structural and delta validation rules, and marks
+  artifacts complete — the only code path that may call Artifact.markComplete.
+keywords:
+  - 'validation'
+  - 'artifacts'
+  - 'lifecycle'
+  - 'schema'
+  - 'delta-merger'
+  - 'integrity'
+dependsOn:
+  - 'core/change'
+  - 'core/schema-format'
+  - 'core/delta-merger'
+  - 'core/storage'
+contentHashes:
+  spec.md: 'sha256:ae69e7643b93a26c361a14018e5945355dd74d6a228851f0de06debe7fdc48b8'
+  verify.md: 'sha256:50ef118491b2f33ebe3205ebaa27e6367a062d82d15deaa224257ac736316e18'
+rules:
+  - requirement: 'Ports and constructor'
+    rules:
+      - 'ValidateArtifacts receives ChangeRepository, a map of SpecRepository instances keyed by workspace name, SchemaRegistry, and GitAdapter at construction time.'
+      - "When loading a base spec for delta merge preview, ValidateArtifacts looks up the SpecRepository for the spec path's workspace."
+  - requirement: 'Input'
+    rules:
+      - 'ValidateArtifacts.execute receives: name (the change name to validate), specPath (the spec path to validate, must be one of the paths in change.specIds), schemaRef (the schema reference string from specd.yaml), and workspaceSchemasPaths (resolved workspace-to-schemas-path map).'
+      - 'Validating all specs in a change requires calling execute once per spec path.'
+  - requirement: 'Required artifacts check'
+    rules:
+      - 'Before validating structure, ValidateArtifacts must verify that all non-optional artifact IDs are present in the change (status not missing).'
+      - 'Optional artifacts with status skipped (validatedHash === "__skipped__") are considered resolved and do not cause a failure.'
+      - 'If any non-optional artifact is absent, ValidateArtifacts must return a failure result listing the missing artifact IDs.'
+      - 'ValidateArtifacts must not throw — missing required artifacts are a validation failure, not an error.'
+  - requirement: 'Dependency order check'
+    rules:
+      - 'Before validating an artifact, ValidateArtifacts must check that all artifact IDs in its requires list are either complete or skipped (via change.effectiveStatus(type)).'
+      - 'If a required dependency is neither complete nor skipped, validation of the dependent artifact is skipped and reported as a dependency-blocked failure.'
+      - 'A skipped optional artifact satisfies the dependency — it is treated as resolved.'
+      - 'skipped artifacts are not validated — there is no file to check.'
+  - requirement: 'Approval invalidation on content change'
+    rules:
+      - "If the change has an active spec approval (change.activeSpecApproval is defined) and any artifact file's current content hash (after preHashCleanup) differs from the hash recorded in that approval's artifactHashes, ValidateArtifacts must call change.invalidate('artifact-change', actor) before proceeding with validation."
+      - "The same check applies to active signoff (change.activeSignoff): if any artifact's current hash differs from what was recorded in activeSignoff.artifactHashes, change.invalidate('artifact-change', actor) must be called."
+      - 'A single invalidation call is made per execute invocation even if multiple artifacts have changed — the first hash mismatch triggers invalidation and the remaining artifacts are checked against the now-cleared approval state.'
+  - requirement: 'Delta validation'
+    rules:
+      - 'If the schema artifact declares deltaValidations[], ValidateArtifacts must validate the delta file (the artifact file in the change directory) against those rules before attempting any merge.'
+      - 'Each rule is evaluated against the delta file content: if scope is set, the check is restricted to the named delta section; if eachBlock is set, the check runs once per block matching that pattern; required: true (default) means absence is a validation failure; required: false means absence is a warning.'
+      - 'If any delta validation rule with required: true fails, the artifact is not merged or marked complete.'
+      - "If eachBlock references a section that has no entry in the artifact's deltas[], ValidateArtifacts must report a configuration error — block boundaries cannot be determined."
+  - requirement: 'Merge preview and conflict detection'
+    rules:
+      - 'For artifacts that declare deltas[], ValidateArtifacts must load the base spec from SpecRepository using the spec path.'
+      - 'ValidateArtifacts must load the artifact (delta) file from ChangeRepository.'
+      - "ValidateArtifacts must call mergeSpecs(base, delta, deltaConfigs, deltaOperations) where deltaConfigs comes from the schema artifact's deltas[] and deltaOperations from the schema's deltaOperations field (or defaults)."
+      - 'If mergeSpecs throws DeltaConflictError, report it as a validation failure and do not proceed to validations[] or markComplete.'
+      - 'The merged result is used for validations[] checks. The base spec in SpecRepository is not modified — archive (not validate) is the step that writes the merged content to the spec repo.'
+      - 'For artifacts without deltas[] (new files with no merge step), ValidateArtifacts validates the artifact content directly against validations[].'
+  - requirement: 'Structural validation'
+    rules:
+      - "After a successful merge preview (or for non-delta artifacts), ValidateArtifacts runs all rules in the artifact's validations[] against the merged (or direct) content."
+      - 'If scope is set, the check is restricted to the named section; if eachBlock is set, the check runs once per block matching that pattern; required: true (default) means absence is a validation failure; required: false means absence is a warning.'
+      - 'ValidateArtifacts collects all failures and warnings for the artifact before moving on — it does not stop at the first failure.'
+  - requirement: 'Hash computation and markComplete'
+    rules:
+      - 'If all delta validations, conflict detection, and structural validations pass for an artifact, ValidateArtifacts must compute the cleaned hash: apply each preHashCleanup substitution in declaration order to the artifact file content, then compute SHA-256 of the result.'
+      - 'If all delta validations, conflict detection, and structural validations pass for an artifact, ValidateArtifacts must call change.getArtifact(type).markComplete(cleanedHash) on the corresponding ChangeArtifact.'
+      - 'If any validation step fails, markComplete must not be called for that artifact.'
+  - requirement: 'Result shape'
+    rules:
+      - 'ValidateArtifacts.execute must return a result object — it must not throw for validation failures.'
+      - 'The result must include: passed: boolean (true only if all required artifacts are present and all validations pass with no errors), failures: ValidationFailure[] (one entry per failed rule or missing artifact), warnings: ValidationWarning[] (one entry per required: false rule that was absent).'
+      - 'Each ValidationFailure must include the artifact ID, the rule pattern or description, and enough context for the CLI to produce a useful error message.'
+  - requirement: 'Save after validation'
+    rules:
+      - 'After all artifacts have been evaluated, ValidateArtifacts must call changeRepository.save(change) to persist any markComplete calls (updated validatedHash values) and any invalidation events appended to history.'
+      - 'The save must happen even if some artifacts failed — partial progress must be persisted.'
+constraints:
+  - 'ValidateArtifacts is the only code path that may call Artifact.markComplete(hash) — this is a cross-cutting constraint enforced by convention and test coverage'
+  - 'The merged spec is never written to SpecRepository during validate — only during ArchiveChange'
+  - "change.invalidate('artifact-change', actor) is called at most once per execute invocation, even if multiple artifacts have changed"
+  - 'Delta validations run on the delta file (change artifact); structural validations run on the merged (or direct) content'
+  - 'A missing deltaValidations[] entry is not an error; the step is simply skipped'
+  - 'A missing validations[] entry is not an error; the step is simply skipped'
+  - 'preHashCleanup substitutions are applied only for hash computation, never to the actual file content on disk'
+scenarios:
+  - requirement: 'Required artifacts check'
+    name: 'Non-optional artifact missing — failure'
+    given:
+      - 'a schema with a non-optional artifact specs'
+      - 'the change has no file for specs and validatedHash is unset'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'result.passed is false and result.failures lists specs as missing'
+  - requirement: 'Required artifacts check'
+    name: 'Skipped optional artifact does not cause failure'
+    given:
+      - 'a schema with optional: true artifact design'
+      - 'the change has design.validatedHash === "__skipped__"'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'design does not appear in result.failures — skipped optional artifacts are resolved'
+  - requirement: 'Required artifacts check'
+    name: 'Missing optional artifact does not cause failure'
+    given:
+      - 'a schema with optional: true artifact design'
+      - 'the change has no file and no validatedHash for design'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'design does not appear in result.failures — absent optional artifacts are allowed'
+  - requirement: 'Dependency order check'
+    name: 'Dependency complete — validation proceeds'
+    given:
+      - 'artifact specs requires proposal, and proposal is complete'
+    when:
+      - 'ValidateArtifacts.execute is called for specs'
+    then:
+      - 'validation of specs proceeds normally'
+  - requirement: 'Dependency order check'
+    name: 'Dependency skipped — validation proceeds'
+    given:
+      - 'artifact tasks requires design, and design is optional: true with validatedHash === "__skipped__"'
+    when:
+      - 'ValidateArtifacts.execute is called for tasks'
+    then:
+      - 'validation of tasks proceeds — skipped satisfies the dependency'
+  - requirement: 'Dependency order check'
+    name: 'Dependency incomplete — validation blocked'
+    given:
+      - 'artifact specs requires proposal, and proposal is in-progress'
+    when:
+      - 'ValidateArtifacts.execute is called for specs'
+    then:
+      - 'specs is reported as dependency-blocked and markComplete is not called for it'
+  - requirement: 'Dependency order check'
+    name: 'Skipped artifact is not validated'
+    given:
+      - 'artifact design is optional: true with validatedHash === "__skipped__"'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'no delta validation, merge preview, or structural validation is run for design — there is no file to check'
+  - requirement: 'Approval invalidation on content change'
+    name: 'Content changed since approval — invalidation triggered'
+    given:
+      - 'an active spec approval with artifactHashes: { specs: "abc123" }'
+      - 'the current cleaned hash of specs is "xyz789"'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - "change.invalidate('artifact-change', actor) is called before validation proceeds"
+  - requirement: 'Approval invalidation on content change'
+    name: 'Invalidation called at most once per execution'
+    given:
+      - 'two artifacts whose hashes both differ from the active approval'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'change.invalidate is called exactly once — not once per artifact'
+  - requirement: 'Approval invalidation on content change'
+    name: 'No invalidation when hashes match'
+    given:
+      - 'an active spec approval whose artifactHashes match the current cleaned hashes'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'change.invalidate is not called'
+  - requirement: 'Delta validation'
+    name: 'Delta validation failure blocks merge'
+    given:
+      - "an artifact with deltaValidations: [{ scope: 'ADDED Requirements', pattern: 'SHALL|MUST', required: true }]"
+      - "the delta file's ADDED Requirements section contains a block without SHALL or MUST"
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'result.passed is false, the artifact is not merged, and markComplete is not called'
+  - requirement: 'Delta validation'
+    name: 'Delta validation warning does not block merge'
+    given:
+      - 'a required: false delta validation rule that is not satisfied'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'the artifact proceeds to merge and result.warnings includes the unsatisfied rule'
+  - requirement: 'Merge preview and conflict detection'
+    name: 'Delta conflict blocks validation'
+    given:
+      - 'a delta file that renames Old to New and also modifies Old'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'mergeSpecs throws DeltaConflictError, result.passed is false, and markComplete is not called'
+  - requirement: 'Merge preview and conflict detection'
+    name: 'Merge preview does not write to SpecRepository'
+    given:
+      - 'a valid delta that would modify the base spec'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'the base spec file in SpecRepository is unchanged — the merged result is used only for validation'
+  - requirement: 'Merge preview and conflict detection'
+    name: 'Non-delta artifact validated directly'
+    given:
+      - 'an artifact with no deltas[] declared'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'validations[] run against the artifact file content directly, with no merge step'
+  - requirement: 'Hash computation and markComplete'
+    name: 'All validations pass — markComplete called with cleaned hash'
+    given:
+      - 'all validations pass for artifact specs'
+      - 'preHashCleanup normalises checked checkboxes before hashing'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'markComplete is called with the SHA-256 of the cleaned content'
+  - requirement: 'Hash computation and markComplete'
+    name: 'Any validation failure — markComplete not called'
+    given:
+      - 'at least one required: true validation rule fails for an artifact'
+    when:
+      - 'ValidateArtifacts.execute is called'
+    then:
+      - 'markComplete is not called for that artifact'
+  - requirement: 'Result shape'
+    name: 'passed is false when any required artifact is missing'
+    given: []
+    when:
+      - 'at least one non-optional artifact is missing'
+    then:
+      - 'result.passed is false'
+  - requirement: 'Result shape'
+    name: 'passed is true when all pass'
+    given: []
+    when:
+      - 'all non-optional artifacts are present and all validations pass'
+    then:
+      - 'result.passed is true and result.failures is empty'
+  - requirement: 'Save after validation'
+    name: 'Save called even when some artifacts fail'
+    given:
+      - 'one artifact passes validation (markComplete called) and one fails'
+    when:
+      - 'ValidateArtifacts.execute completes'
+    then:
+      - 'changeRepository.save(change) is called — partial progress is persisted'
