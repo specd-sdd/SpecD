@@ -232,10 +232,24 @@
 - **WHEN** a workspace declares no `contextIncludeSpecs` and that workspace is active in the current change
 - **THEN** `CompileContext` includes all specs in that workspace, as if `contextIncludeSpecs: ['*']` were declared
 
-#### Scenario: Resolution order — project-level before workspace-level
+#### Scenario: Resolution order — project includes, project excludes, workspace includes, workspace excludes
 
-- **WHEN** project-level includes `shared:_global/*` and `default` workspace includes `['*']`, and the change is active in `default`
-- **THEN** `shared:_global/*` specs appear first in context, followed by `default:*` specs
+- **GIVEN** project-level `contextIncludeSpecs: ['default:*']` and `contextExcludeSpecs: ['default:drafts/*']`
+- **AND** `default` workspace declares `contextIncludeSpecs: ['*']` and the change is active in `default`
+- **WHEN** `CompileContext` builds the context
+- **THEN** project-level includes are accumulated first, then project-level excludes remove `default:drafts/*`, then workspace-level includes from `default` add remaining specs, in that order
+
+#### Scenario: Project-level exclude applied before workspace-level includes
+
+- **GIVEN** project-level `contextExcludeSpecs: ['default:auth/*']`
+- **AND** `default` workspace declares `contextIncludeSpecs: ['auth/*']` and is active
+- **WHEN** `CompileContext` builds the context
+- **THEN** `default:auth/*` specs are excluded — the project-level exclude (step 2) fires before workspace-level includes (step 3)
+
+#### Scenario: Project-level exclude always applied regardless of active workspace
+
+- **WHEN** project-level `contextExcludeSpecs: ['default:drafts/*']` is declared and the change only touches `billing`
+- **THEN** `drafts/*` specs are still excluded from context even though `default` is not the active workspace
 
 #### Scenario: Workspace declaration order determines workspace-level priority
 
@@ -246,11 +260,6 @@
 
 - **WHEN** project-level includes `shared:_global/*` and `default` workspace includes `['shared:_global/architecture']`, and both match the same spec
 - **THEN** the spec appears once, at the position determined by the project-level pattern (first match)
-
-#### Scenario: Project-level exclude always applied
-
-- **WHEN** project-level `contextExcludeSpecs: ['default:drafts/*']` is declared and the change only touches `billing`
-- **THEN** `drafts/*` specs are still excluded from context even though `default` is not the active workspace
 
 #### Scenario: Workspace-level exclude only applied when workspace is active
 
@@ -333,3 +342,47 @@
 
 - **WHEN** `specd init` is run in a directory with no `specd.yaml`
 - **THEN** specd does not attempt to validate a config — it creates one from defaults and exits successfully
+
+### Requirement: Project context instructions
+
+#### Scenario: Context entries injected before spec content
+
+- **GIVEN** `specd.yaml` declares `context: [{ instruction: "Always prefer editing existing files." }]`
+- **WHEN** `CompileContext` builds the compiled context
+- **THEN** the instruction appears before any spec content in the output
+
+#### Scenario: File reference is read and injected verbatim
+
+- **GIVEN** `specd.yaml` declares `context: [{ file: specd-bootstrap.md }]` and the file exists
+- **WHEN** `CompileContext` builds the compiled context
+- **THEN** the full content of `specd-bootstrap.md` is injected verbatim, before spec content
+
+#### Scenario: Missing file emits a warning
+
+- **GIVEN** `specd.yaml` declares `context: [{ file: does-not-exist.md }]`
+- **WHEN** `CompileContext` builds the compiled context
+- **THEN** a warning is emitted identifying the missing file, compilation proceeds normally, and the entry is absent from the output
+
+#### Scenario: context absent — no effect
+
+- **GIVEN** `specd.yaml` does not declare a `context` field
+- **WHEN** `CompileContext` builds the compiled context
+- **THEN** the output is identical to a config with `context: []` — no error, no warning
+
+#### Scenario: Mixed inline and file entries preserve declaration order
+
+- **GIVEN** `context: [{ file: AGENTS.md }, { instruction: "Inline note." }, { file: specd-bootstrap.md }]`
+- **WHEN** `CompileContext` builds the compiled context
+- **THEN** `AGENTS.md` content appears first, then `"Inline note."`, then `specd-bootstrap.md` content, before any spec content
+
+#### Scenario: File path resolved relative to specd.yaml directory
+
+- **GIVEN** `specd.yaml` is at `/project/specd.yaml` and declares `context: [{ file: docs/bootstrap.md }]`
+- **WHEN** `CompileContext` resolves the file entry
+- **THEN** it reads `/project/docs/bootstrap.md`
+
+#### Scenario: Absolute file path accepted
+
+- **GIVEN** `specd.yaml` declares `context: [{ file: /shared/instructions.md }]` and that file exists
+- **WHEN** `CompileContext` resolves the file entry
+- **THEN** it reads `/shared/instructions.md` directly, without resolving relative to the specd.yaml directory
