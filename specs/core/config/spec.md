@@ -331,6 +331,18 @@ approvals:
 
 Both flags are independent — any combination is valid.
 
+### Requirement: LLM optimization
+
+`specd.yaml` may include a top-level `llmOptimizedContext` boolean field. When `true`, specd may invoke an LLM for optimization tasks that produce richer output than deterministic extraction alone. When `false` or absent (the default), all operations use deterministic processing only.
+
+```yaml
+llmOptimizedContext: true # default: false
+```
+
+The first use case is spec metadata generation: with `llmOptimizedContext: false`, the metadata agent extracts rules and scenarios by parsing the structural conventions of `spec.md` and `verify.md` directly; with `true`, the LLM generates richer `description`, structured `given`/`when`/`then` for free-form scenarios, and more precise `dependsOn` suggestions. Further use cases may be added in future versions.
+
+This field is a project-level opt-in. Teams that have no LLM available in their automation pipeline (e.g. offline CI, air-gapped environments) leave it `false`. Teams that want LLM-enriched output set it to `true` and ensure their tooling has access to a model.
+
 ### Requirement: Plugin declarations
 
 `specd.yaml` may include a `plugins` section declaring which agent-integration plugins are installed. Each entry must include `name`; `options` is plugin-specific and optional.
@@ -388,6 +400,7 @@ The following conditions emit **warnings** but allow startup to proceed:
 - All relative paths resolve from the `specd.yaml` directory; storage paths (`fs.path` in `changes` and `archive`) must remain within the repo root
 - Project-level `contextIncludeSpecs` defaults to `['default:*']`; project-level `contextExcludeSpecs` defaults to `[]`
 - Workspace-level `contextIncludeSpecs` defaults to `['*']` (all specs in that workspace); workspace-level `contextExcludeSpecs` defaults to `[]`
+- `llmOptimizedContext` is optional; defaults to `false`; must be a boolean — any other type is a startup validation error
 - `context` is optional; each entry is an object with exactly one key: either `file` or `instruction` — no other shapes are valid
 - `context` file paths are resolved relative to the `specd.yaml` directory; absolute paths are accepted
 - A missing `context` file is silently skipped at compile time — no warning, no error
@@ -406,6 +419,8 @@ The following conditions emit **warnings** but allow startup to proceed:
 
 ```yaml
 schema: '@specd/schema-std'
+
+llmOptimizedContext: true # omit or set false for deterministic-only processing
 
 context:
   - file: specd-bootstrap.md

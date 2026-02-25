@@ -1,10 +1,10 @@
 title: 'Project Configuration'
 description: >
-  specd.yaml is the single project-level configuration file that governs how specs are
-  organized, stored, and accessed within a specd project. Every tool in the specd
-  ecosystem — the CLI, MCP server, and plugins — derives its wiring from this file,
-  making it essential for declaring schemas, workspaces, storage locations, workflow
-  hooks, and artifact constraints.
+  specd.yaml governs how specs are organized, stored, and accessed within a project. The CLI,
+  MCP server, and all plugins derive their wiring from this file, making it the single source of
+  truth for schema declaration, workspace organization, storage locations, workflow hooks, artifact
+  constraints, and agent plugin integration. Use this spec when configuring a specd project or
+  understanding how configurations cascade to tooling.
 keywords:
   - 'configuration'
   - 'specd.yaml'
@@ -16,14 +16,16 @@ keywords:
   - 'artifact rules'
   - 'local override'
   - 'pattern-based spec selection'
+  - 'LLM optimization'
+  - 'approvals'
 dependsOn:
   - 'specs/core/schema-format/spec.md'
   - 'specs/_global/architecture/spec.md'
   - 'specs/core/storage/spec.md'
   - 'specs/core/spec-metadata/spec.md'
 contentHashes:
-  spec.md: 'sha256:6473cf522f734f8d098dd94d3160ff1822f6ae50a4369e231e2952feb86e0eae'
-  verify.md: 'sha256:f95ac6e64ecc7b8b857d45ba66b36ba78de90cb09596c3d0018bc875165578d7'
+  spec.md: 'sha256:5e8f049b23b3004edf570b6fbfa33a01b864500036349f7f8d7240a07661f50c'
+  verify.md: 'sha256:3d3d3f3444c508d9d4dfb43c5f78ef6c77989c42dcbc1e7893798a2745b02c5b'
 rules:
   - requirement: 'Config file location and format'
     rules:
@@ -117,9 +119,22 @@ rules:
       - 'Unknown workspace qualifiers produce warning at runtime but allow startup; in config validate they produce error'
       - 'References to non-existent spec paths silently skipped at compile time'
       - 'Invalid pattern syntax is startup error'
+  - requirement: 'LLM optimization'
+    rules:
+      - 'specd.yaml may include a top-level llmOptimizedContext boolean field'
+      - 'When true, specd may invoke an LLM for optimization tasks that produce richer output than deterministic extraction alone'
+      - 'When false or absent (the default), all operations use deterministic processing only'
+      - 'First use case is spec metadata generation: with false, metadata agent extracts rules and scenarios by parsing structural conventions directly; with true, LLM generates richer description, structured given/when/then for free-form scenarios, and more precise dependsOn suggestions'
+      - 'This field is a project-level opt-in; teams without LLM available leave it false; teams wanting LLM-enriched output set it to true and ensure tooling has access to model'
+  - requirement: 'Plugin declarations'
+    rules:
+      - 'specd.yaml may include plugins section declaring which agent-integration plugins are installed'
+      - 'Each entry must include name; options is plugin-specific and optional'
+      - "Plugin declarations used by specd init, specd plugin add, and specd update to install and maintain plugin's skill files and hooks"
+      - 'Plugin declarations do not affect schema resolution, storage, or context compilation'
   - requirement: 'Project context instructions'
     rules:
-      - 'specd.yaml may include top-level context field to inject additional freeform content into compiled context alongside specs'
+      - 'specd.yaml may include a top-level context field to inject additional freeform content into compiled context alongside specs'
       - 'Each entry is either inline instruction string or reference to external file'
       - 'Each item is an object with exactly one key: instruction or file'
       - 'instruction — string injected verbatim as additional context block'
@@ -137,12 +152,6 @@ rules:
       - 'Sign-off record captures what was reviewed — new specs, modified specs, removed specs'
       - 'When false (default), ready → implementing and done → archivable are free transitions'
       - 'Both flags are independent — any combination is valid'
-  - requirement: 'Plugin declarations'
-    rules:
-      - 'specd.yaml may include plugins section declaring which agent-integration plugins are installed'
-      - 'Each entry must include name; options is plugin-specific and optional'
-      - "Plugin declarations used by specd init, specd plugin add, and specd update to install and maintain plugin's skill files and hooks"
-      - 'Plugin declarations do not affect schema resolution, storage, or context compilation'
   - requirement: 'Startup validation'
     rules:
       - 'specd must validate specd.yaml before executing any command requiring config'
@@ -177,6 +186,7 @@ constraints:
   - 'Spec matched by multiple patterns appears once at first match position'
   - '* in pattern may only appear alone, as workspace:*, or as path suffix — other positions startup error'
   - 'Unknown workspace qualifiers produce warning not error; missing spec paths silently skipped at compile time'
+  - 'llmOptimizedContext is optional; defaults to false; must be a boolean — any other type is a startup validation error'
 scenarios:
   - requirement: 'Config file location and format'
     name: 'Config found — nearest file used'
@@ -409,7 +419,7 @@ scenarios:
   - requirement: 'Template variables'
     name: 'Archive pattern with year prefix'
     given:
-      - "storage.archive.fs.pattern is '{{year}}/{{change.archivedName}}'"
+      - "storage.archive.fs.pattern is '{{year}}/{{change.archivedName}}"
     when:
       - 'change is archived in 2024'
     then:
@@ -441,7 +451,7 @@ scenarios:
   - requirement: 'Workflow additions'
     name: 'Hook for step not in schema'
     given:
-      - "project-level workflow entry names step not declared in schema''s workflow"
+      - "project-level workflow entry names step not declared in schema's workflow"
     when:
       - 'specd starts'
     then:
@@ -462,6 +472,38 @@ scenarios:
       - 'specd starts'
     then:
       - 'specd emits warning at startup and ignores those rules'
+  - requirement: 'LLM optimization'
+    name: 'Flag absent — deterministic mode'
+    given:
+      - 'a specd.yaml with no llmOptimizedContext field'
+    when:
+      - 'the metadata agent runs'
+    then:
+      - 'it uses deterministic structural extraction only — no LLM is invoked'
+  - requirement: 'LLM optimization'
+    name: 'Flag false — deterministic mode'
+    given:
+      - 'a specd.yaml with llmOptimizedContext: false'
+    when:
+      - 'the metadata agent runs'
+    then:
+      - 'it uses deterministic structural extraction only — no LLM is invoked'
+  - requirement: 'LLM optimization'
+    name: 'Flag true — LLM mode'
+    given:
+      - 'a specd.yaml with llmOptimizedContext: true'
+    when:
+      - 'the metadata agent runs'
+    then:
+      - 'it invokes the LLM to produce richer metadata (descriptions, structured scenarios, dependsOn suggestions)'
+  - requirement: 'LLM optimization'
+    name: 'Non-boolean value — startup error'
+    given:
+      - 'llmOptimizedContext is set to a non-boolean value (e.g., "yes", 1)'
+    when:
+      - 'specd starts'
+    then:
+      - 'specd exits with a startup validation error'
   - requirement: 'Plugin declarations'
     name: 'Plugin installed'
     given:
@@ -469,11 +511,11 @@ scenarios:
     when:
       - 'specd update runs'
     then:
-      - "specd update ensures plugin''s skill files and hook configuration are up to date"
+      - "specd update ensures plugin's skill files and hook configuration are up to date"
   - requirement: 'Context spec selection'
     name: 'Project-level patterns always apply'
     given:
-      - "project-level contextIncludeSpecs: [''shared:_global/*''] is declared"
+      - "project-level contextIncludeSpecs: ['shared:_global/*'] is declared"
       - 'current change only touches default workspace'
     when:
       - 'CompileContext builds context'
@@ -482,7 +524,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Workspace-level patterns only apply when workspace is active'
     given:
-      - "billing workspace declares contextIncludeSpecs: [''*'']"
+      - "billing workspace declares contextIncludeSpecs: ['*']"
       - 'current change touches only default specs'
     when:
       - 'CompileContext builds context'
@@ -491,7 +533,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Workspace-level patterns apply when workspace is active'
     given:
-      - "billing workspace declares contextIncludeSpecs: [''*'']"
+      - "billing workspace declares contextIncludeSpecs: ['*']"
       - 'current change touches a billing spec'
     when:
       - 'CompileContext builds context'
@@ -500,7 +542,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Qualifier omitted at workspace level resolves to that workspace'
     given:
-      - "inside billing workspace, contextIncludeSpecs: [''payments/*''] is declared"
+      - "inside billing workspace, contextIncludeSpecs: ['payments/*'] is declared"
     when:
       - 'CompileContext resolves patterns'
     then:
@@ -512,7 +554,7 @@ scenarios:
     when:
       - 'CompileContext builds context'
     then:
-      - "CompileContext behaves as if contextIncludeSpecs: [''default:*''] were declared at project level"
+      - "CompileContext behaves as if contextIncludeSpecs: ['default:*'] were declared at project level"
   - requirement: 'Context spec selection'
     name: 'Default workspace-level include is all specs in that workspace'
     given:
@@ -520,12 +562,12 @@ scenarios:
     when:
       - 'CompileContext builds context'
     then:
-      - "CompileContext includes all specs in that workspace, as if contextIncludeSpecs: [''*''] were declared"
+      - "CompileContext includes all specs in that workspace, as if contextIncludeSpecs: ['*'] were declared"
   - requirement: 'Context spec selection'
     name: 'Resolution order — project includes, project excludes, workspace includes, workspace excludes'
     given:
-      - "project-level contextIncludeSpecs: [''default:*''] and contextExcludeSpecs: [''default:drafts/*'']"
-      - "default workspace declares contextIncludeSpecs: [''*''] and change is active in default"
+      - "project-level contextIncludeSpecs: ['default:*'] and contextExcludeSpecs: ['default:drafts/*']"
+      - "default workspace declares contextIncludeSpecs: ['*'] and change is active in default"
     when:
       - 'CompileContext builds context'
     then:
@@ -533,8 +575,8 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Project-level exclude applied before workspace-level includes'
     given:
-      - "project-level contextExcludeSpecs: [''default:auth/*'']"
-      - "default workspace declares contextIncludeSpecs: [''auth/*''] and is active"
+      - "project-level contextExcludeSpecs: ['default:auth/*']"
+      - "default workspace declares contextIncludeSpecs: ['auth/*'] and is active"
     when:
       - 'CompileContext builds context'
     then:
@@ -542,7 +584,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Project-level exclude always applied regardless of active workspace'
     given:
-      - "project-level contextExcludeSpecs: [''default:drafts/*''] is declared"
+      - "project-level contextExcludeSpecs: ['default:drafts/*'] is declared"
       - 'change only touches billing'
     when:
       - 'CompileContext builds context'
@@ -551,7 +593,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Workspace declaration order determines workspace-level priority'
     given:
-      - "default and billing both declare contextIncludeSpecs: [''*'']"
+      - "default and billing both declare contextIncludeSpecs: ['*']"
       - 'change touches both, and default is declared first in specd.yaml'
     when:
       - 'CompileContext builds context'
@@ -560,7 +602,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Spec matched by multiple patterns appears once'
     given:
-      - "project-level includes shared:_global/* and default workspace includes [''shared:_global/architecture''], and both match same spec"
+      - "project-level includes shared:_global/* and default workspace includes ['shared:_global/architecture'], and both match same spec"
     when:
       - 'CompileContext builds context'
     then:
@@ -568,7 +610,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Workspace-level exclude only applied when workspace is active'
     given:
-      - "billing workspace declares contextExcludeSpecs: [''drafts/*'']"
+      - "billing workspace declares contextExcludeSpecs: ['drafts/*']"
       - 'change only touches default'
     when:
       - 'CompileContext builds context'
@@ -577,7 +619,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Workspace-level exclude qualifier resolves to that workspace'
     given:
-      - "inside billing, contextExcludeSpecs: [''drafts/*''] is declared and billing is active"
+      - "inside billing, contextExcludeSpecs: ['drafts/*'] is declared and billing is active"
     when:
       - 'CompileContext resolves patterns'
     then:
@@ -585,7 +627,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Direct include path selects only that spec'
     given:
-      - "contextIncludeSpecs: [''auth/login''] is declared"
+      - "contextIncludeSpecs: ['auth/login'] is declared"
       - 'both auth/login and auth/register exist in default workspace'
     when:
       - 'CompileContext builds context'
@@ -594,7 +636,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Direct exclude path removes only that spec'
     given:
-      - "contextIncludeSpecs: [''auth/*''] and contextExcludeSpecs: [''auth/login''] are declared"
+      - "contextIncludeSpecs: ['auth/*'] and contextExcludeSpecs: ['auth/login'] are declared"
       - 'both auth/login and auth/register exist'
     when:
       - 'CompileContext builds context'
@@ -603,7 +645,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Non-existent spec path silently skipped at compile time'
     given:
-      - "contextIncludeSpecs: [''auth/does-not-exist''] is declared"
+      - "contextIncludeSpecs: ['auth/does-not-exist'] is declared"
       - 'no such spec exists on disk'
     when:
       - 'CompileContext builds context'
@@ -621,7 +663,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Unknown workspace qualifier warns at runtime'
     given:
-      - "contextIncludeSpecs: [''unknown-workspace:*''] is declared"
+      - "contextIncludeSpecs: ['unknown-workspace:*'] is declared"
       - 'no workspace named unknown-workspace exists'
     when:
       - 'specd starts'
@@ -639,7 +681,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Workspace becomes active from change metadata'
     given:
-      - "change''s metadata lists specs from both default workspace and billing workspace"
+      - "change's metadata lists specs from both default workspace and billing workspace"
     when:
       - 'CompileContext resolves active workspaces'
     then:
@@ -647,7 +689,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Workspace not active when absent from change metadata'
     given:
-      - "change''s metadata lists only default specs"
+      - "change's metadata lists only default specs"
     when:
       - 'CompileContext resolves active workspaces'
     then:
@@ -655,7 +697,7 @@ scenarios:
   - requirement: 'Context spec selection'
     name: 'Invalid pattern syntax is a startup error'
     given:
-      - "contextIncludeSpecs: [''auth/*/login''] is declared (* in middle of path segment)"
+      - "contextIncludeSpecs: ['auth/*/login'] is declared (* in middle of path segment)"
     when:
       - 'specd starts'
     then:
@@ -671,7 +713,7 @@ scenarios:
   - requirement: 'Startup validation'
     name: 'Invalid pattern syntax blocks startup'
     given:
-      - "contextIncludeSpecs contains invalid pattern such as ''auth/*/login''"
+      - "contextIncludeSpecs contains invalid pattern such as 'auth/*/login'"
     when:
       - 'specd starts'
     then:

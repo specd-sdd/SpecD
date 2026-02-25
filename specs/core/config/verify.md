@@ -193,6 +193,31 @@
 - **WHEN** `artifactRules` contains a key not matching any artifact ID in the active schema
 - **THEN** specd emits a warning at startup and ignores those rules
 
+### Requirement: LLM optimization
+
+#### Scenario: Flag absent — deterministic mode
+
+- **GIVEN** a `specd.yaml` with no `llmOptimizedContext` field
+- **WHEN** the metadata agent runs
+- **THEN** it uses deterministic structural extraction only — no LLM is invoked
+
+#### Scenario: Flag false — deterministic mode
+
+- **GIVEN** a `specd.yaml` with `llmOptimizedContext: false`
+- **WHEN** the metadata agent runs
+- **THEN** it uses deterministic structural extraction only — no LLM is invoked
+
+#### Scenario: Flag true — LLM mode
+
+- **GIVEN** a `specd.yaml` with `llmOptimizedContext: true`
+- **WHEN** the metadata agent runs
+- **THEN** it invokes the LLM to produce richer metadata (descriptions, structured scenarios, dependsOn suggestions)
+
+#### Scenario: Non-boolean value — startup error
+
+- **WHEN** `llmOptimizedContext` is set to a non-boolean value (e.g. `"yes"`, `1`)
+- **THEN** specd exits with a startup validation error
+
 ### Requirement: Plugin declarations
 
 #### Scenario: Plugin installed
