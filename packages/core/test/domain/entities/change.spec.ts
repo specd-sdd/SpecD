@@ -514,5 +514,60 @@ describe('Change', () => {
       c.setArtifact(makeArtifact('design', 'complete', ['proposal']))
       expect(c.effectiveStatus('design')).toBe('in-progress')
     })
+
+    it('returns skipped when artifact status is skipped', () => {
+      const c = makeChange()
+      c.setArtifact(makeArtifact('adr', 'skipped'))
+      expect(c.effectiveStatus('adr')).toBe('skipped')
+    })
+
+    it('does not block a dependent when required artifact is skipped', () => {
+      const c = makeChange()
+      c.setArtifact(makeArtifact('adr', 'skipped'))
+      c.setArtifact(makeArtifact('design', 'complete', ['adr']))
+      expect(c.effectiveStatus('design')).toBe('complete')
+    })
+
+    it('cascades skipped through a dependency chain', () => {
+      const c = makeChange()
+      c.setArtifact(makeArtifact('adr', 'skipped'))
+      c.setArtifact(makeArtifact('design', 'complete', ['adr']))
+      c.setArtifact(makeArtifact('tasks', 'complete', ['design']))
+      expect(c.effectiveStatus('tasks')).toBe('complete')
+    })
+  })
+
+  describe('recordArtifactSkipped', () => {
+    it('appends an artifact-skipped event', () => {
+      const c = makeChange()
+      c.recordArtifactSkipped('adr', actor)
+      const evt = c.history.at(-1)
+      expect(evt?.type).toBe('artifact-skipped')
+    })
+
+    it('stores the artifactId and actor', () => {
+      const c = makeChange()
+      c.recordArtifactSkipped('adr', actor)
+      const evt = c.history.at(-1)
+      if (evt?.type !== 'artifact-skipped') throw new Error('unexpected event type')
+      expect(evt.artifactId).toBe('adr')
+      expect(evt.by).toBe(actor)
+    })
+
+    it('omits reason when not provided', () => {
+      const c = makeChange()
+      c.recordArtifactSkipped('adr', actor)
+      const evt = c.history.at(-1)
+      if (evt?.type !== 'artifact-skipped') throw new Error('unexpected event type')
+      expect(evt.reason).toBeUndefined()
+    })
+
+    it('includes reason when provided', () => {
+      const c = makeChange()
+      c.recordArtifactSkipped('adr', actor, 'not applicable for this change')
+      const evt = c.history.at(-1)
+      if (evt?.type !== 'artifact-skipped') throw new Error('unexpected event type')
+      expect(evt.reason).toBe('not applicable for this change')
+    })
   })
 })

@@ -1,4 +1,12 @@
 import { type ArtifactStatus } from '../value-objects/artifact-status.js'
+import { ArtifactNotOptionalError } from '../errors/artifact-not-optional-error.js'
+
+/**
+ * Sentinel hash stored in `validatedHash` when an optional artifact is skipped.
+ * Presence of this value indicates the artifact was explicitly bypassed rather
+ * than validated.
+ */
+export const SKIPPED_SENTINEL = '__skipped__'
 
 /**
  * Construction properties for a {@link ChangeArtifact}.
@@ -94,5 +102,22 @@ export class ChangeArtifact {
   markComplete(hash: string): void {
     this._validatedHash = hash
     this._status = 'complete'
+  }
+
+  /**
+   * Marks this artifact as explicitly skipped, storing the sentinel hash and
+   * setting the status to `"skipped"`.
+   *
+   * Only optional artifacts may be skipped. Skipped artifacts satisfy dependency
+   * requirements — dependents do not treat a skipped artifact as a blocker.
+   *
+   * @throws {ArtifactNotOptionalError} If this artifact is not optional
+   */
+  markSkipped(): void {
+    if (!this._optional) {
+      throw new ArtifactNotOptionalError(this._type)
+    }
+    this._validatedHash = SKIPPED_SENTINEL
+    this._status = 'skipped'
   }
 }
