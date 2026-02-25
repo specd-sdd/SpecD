@@ -75,7 +75,13 @@ scenarios:
 
 - **`constraints`** (array of strings, optional) — hard invariants extracted from the spec's `## Constraints` section. Each entry is a single plain-text sentence. Omitted if the spec has no `## Constraints` section.
 
-- **`scenarios`** (array of objects, optional) — BDD-style verification scenarios extracted from verify files, grouped by requirement name. Each entry has `requirement` (string), `name` (string), `given` (array of strings), `when` (array of strings), and `then` (array of strings). Omitted if the spec has no verification scenarios.
+- **`scenarios`** (array of objects, optional) — BDD-style verification scenarios extracted from verify files. Flat array: one object per scenario, not one object per requirement. Each entry has:
+  - `requirement` (string) — name of the requirement this scenario verifies; multiple scenarios may share the same `requirement` value
+  - `name` (string) — the scenario title as it appears in the verify file (e.g. `"Config found — nearest file used"`)
+  - `given` (array of strings) — preconditions; may be empty
+  - `when` (array of strings) — the action or event being tested
+  - `then` (array of strings) — expected outcomes
+    Omitted if the spec has no verification scenarios.
 
 ### Requirement: LLM authorship
 

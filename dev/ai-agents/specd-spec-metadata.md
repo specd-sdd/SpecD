@@ -113,6 +113,12 @@ For each named requirement in rules/both files:
 Extract all scenarios from scenarios/both files in one pass. Store in memory. Do NOT write to disk.
 Mark each scenario task in_progress and completed as you process it (for progress visibility only).
 
+**Format rules for scenarios:**
+- Flat array: one object per scenario, never one object per requirement with nested scenarios inside.
+- Multiple scenarios that verify the same requirement each get their own top-level entry with the
+  same `requirement` value repeated — do NOT group them under a shared parent.
+- `name` is the scenario title exactly as it appears in the verify file.
+
 #### Single write — only here
 
 Once ALL extraction is complete, call Write exactly once to create .specd-metadata.yaml.tmp with
