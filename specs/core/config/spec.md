@@ -244,15 +244,16 @@ Keys are validated against the active schema's artifact IDs at startup. Unknown 
 - Workspace-level `contextIncludeSpecs`: `['*']` (equivalent to `{workspace-name}:*`)
 - Workspace-level `contextExcludeSpecs`: `[]`
 
-**Resolution order:** `CompileContext` builds the context spec set in this sequence:
+**Resolution order:** `CompileContext` builds the compiled context in this sequence:
 
-1. Project-level include patterns (in declaration order) — always applied
-2. Workspace-level include patterns from each active workspace (in workspace declaration order, then pattern order within each workspace)
-3. Project-level exclude patterns — always applied
-4. Workspace-level exclude patterns from each active workspace (same order as step 2)
-5. All specs reachable via `dependsOn` traversal — starting from the change's `contextSpecIds`, following `dependsOn` links in each spec's `.specd-metadata.yaml` transitively until no new specs are found. These specs are **not subject to exclude rules from steps 3 or 4** — a declared dependency is always included regardless of project or workspace excludes.
+1. Project-level `context` entries (in declaration order) — always first, before any spec content
+2. Project-level include patterns (in declaration order) — always applied
+3. Project-level exclude patterns — always applied; removes specs from the set accumulated in step 2
+4. Workspace-level include patterns from each active workspace (in workspace declaration order, then pattern order within each workspace)
+5. Workspace-level exclude patterns from each active workspace (same order as step 4)
+6. All specs reachable via `dependsOn` traversal — starting from the change's `contextSpecIds`, following `dependsOn` links in each spec's `.specd-metadata.yaml` transitively until no new specs are found. These specs are **not subject to exclude rules from steps 3 or 5** — a declared dependency is always included regardless of project or workspace excludes.
 
-Specs matched by earlier patterns take priority if the context must be truncated. A spec matched by multiple include patterns appears only once, at the position of the first matching pattern. Specs added in step 5 that were already included in steps 1–4 also appear only once (at their earlier position). See [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
+Specs matched by earlier patterns take priority if the context must be truncated. A spec matched by multiple include patterns appears only once, at the position of the first matching pattern. Specs added in step 6 that were already included in steps 2–5 also appear only once (at their earlier position). Step 1 (`context` entries) is not part of spec collection — those entries are injected as-is and are not deduplicated against specs. See [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
 
 ```yaml
 # always in context — global constraints regardless of change scope
@@ -291,6 +292,28 @@ workspaces:
 References to unknown workspace qualifiers produce a warning at startup but do not prevent startup — runtime is tolerant to allow working with partial workspace setups. However, `specd config validate` must fail with an error if any unknown workspace qualifier is found: a typo in a qualifier silently excludes specs from context, which is a dangerous silent failure in teams. References to non-existent spec paths are silently skipped at context-compilation time — this avoids breaking when a spec is temporarily deleted or not yet created. Invalid pattern syntax is an error caught at startup.
 
 `specd config validate` additionally warns when a pattern (include or exclude, at any level) matches no specs on disk at validation time. This is not a runtime error — specs may not exist yet — but the warning helps catch typos early.
+
+### Requirement: Project context instructions
+
+`specd.yaml` may include a top-level `context` field to inject additional freeform content into the compiled context alongside specs. Each entry is either an inline instruction string or a reference to an external file.
+
+```yaml
+context:
+  - file: specd-bootstrap.md # file path relative to specd.yaml
+  - file: AGENTS.md
+  - instruction: 'Always prefer editing existing files over creating new ones.'
+```
+
+Each item is an object with exactly one of the following keys:
+
+- **`instruction`** — a string injected verbatim as an additional context block.
+- **`file`** — the file at the given path is read at compile time and its content is injected verbatim. Paths are relative to the directory containing `specd.yaml`. Absolute paths are also accepted.
+
+The `context` field is optional. If absent, no additional content is injected. Entries are prepended to the compiled context in declaration order, before any spec content.
+
+If a referenced file does not exist at compile time, specd emits a warning identifying the missing file, skips that entry, and continues compilation normally.
+
+There is no depth limit on file content — the full file is injected. Files are not parsed or transformed; markdown, plain text, and any other format are all treated as opaque strings.
 
 ### Requirement: Approvals
 
@@ -365,6 +388,11 @@ The following conditions emit **warnings** but allow startup to proceed:
 - All relative paths resolve from the `specd.yaml` directory; storage paths (`fs.path` in `changes` and `archive`) must remain within the repo root
 - Project-level `contextIncludeSpecs` defaults to `['default:*']`; project-level `contextExcludeSpecs` defaults to `[]`
 - Workspace-level `contextIncludeSpecs` defaults to `['*']` (all specs in that workspace); workspace-level `contextExcludeSpecs` defaults to `[]`
+- `context` is optional; each entry is an object with exactly one key: either `file` or `instruction` — no other shapes are valid
+- `context` file paths are resolved relative to the `specd.yaml` directory; absolute paths are accepted
+- A missing `context` file is silently skipped at compile time — no warning, no error
+- `context` file content is injected verbatim — no parsing or transformation is applied
+- `context` entries are prepended to the compiled context in declaration order, before any spec content
 - Project-level patterns are always applied; workspace-level patterns are applied only when that workspace is active in the current change
 - At project level, omitting the workspace qualifier is equivalent to `default:`; at workspace level, omitting it means the declaring workspace
 - Include pattern order (project-level first, then active workspace declaration order) determines context order and truncation priority
@@ -378,6 +406,11 @@ The following conditions emit **warnings** but allow startup to proceed:
 
 ```yaml
 schema: '@specd/schema-std'
+
+context:
+  - file: specd-bootstrap.md
+  - file: AGENTS.md
+  - instruction: 'Always prefer editing existing files over creating new ones.'
 
 workspaces:
   default:
