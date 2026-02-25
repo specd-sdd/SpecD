@@ -33,7 +33,7 @@ deltaOperations:
   to: 'TO' # default — used inside RENAMED sections
 ```
 
-These labels appear as prefixes in delta section headings: `## {added} Requirements`, `## {modified} Requirements`, `## {removed} Requirements`, `## {renamed} Requirements`. The `from` and `to` labels are used as line prefixes inside RENAMED sections: `{from}: ### Requirement: Old name` / `{to}: ### Requirement: New name`. `mergeSpecs` and `ValidateSpec` read all keywords from the resolved schema — they do not hardcode the default strings.
+These labels appear as prefixes in delta section headings: `## {added} Requirements`, `## {modified} Requirements`, `## {removed} Requirements`, `## {renamed} Requirements`. The `from` and `to` labels are used as line prefixes inside RENAMED sections: `{from}: ### Requirement: Old name` / `{to}: ### Requirement: New name`. `mergeSpecs` and `ValidateArtifacts` read all keywords from the resolved schema — they do not hardcode the default strings.
 
 ### Requirement: Artifact definition
 
@@ -41,17 +41,55 @@ Each entry in `artifacts` must include:
 
 - `id` (string, required) — unique identifier within the schema, e.g. `proposal`, `specs`, `design`, `tasks`
 - `scope` (`spec` | `change`, required) — declares where this artifact lives after the change is archived. `spec` means the artifact file is synced to the `SpecRepository` (e.g. `spec.md`, `verify.md` — files that become part of the project's permanent spec record). `change` means the artifact stays only in the change directory and is never synced (e.g. `proposal.md`, `tasks.md` — working documents used during the change process).
-- `optional` (boolean, optional, default `false`) — when `false`, `ValidateSpec` requires this artifact to be present in the change before validation can pass. When `true`, the artifact may be absent without failing validation; if present, it is validated and (for `scope: spec` artifacts) synced normally. `scope` and `optional` are independent.
+- `optional` (boolean, optional, default `false`) — when `false`, `ValidateArtifacts` requires this artifact to be present in the change before validation can pass. When `true`, the artifact may be absent without failing validation; if present, it is validated and (for `scope: spec` artifacts) synced normally. `scope` and `optional` are independent.
 - `output` (string or glob, required) — path pattern for the artifact's files **relative to the change directory**, e.g. `proposal.md` or `specs/**/spec.md`. When creating a new artifact file within a change, the filename is derived from the last literal segment of the glob (e.g. `spec.md` from `specs/**/spec.md`); if the last segment is a wildcard, the filename falls back to the template filename. The final location of these files in the project repo after syncing is configured separately and may differ (e.g. `especificaciones/auth/login/spec.md` for a change file at `changes/my-change/specs/auth/login/spec.md`)
 - `description` (string, optional) — human-readable summary for tooling
 - `template` (string, optional) — path to a template file, relative to the schema directory; see Requirement: Template resolution
 - `instruction` (string, optional) — AI instruction text injected by `CompileContext`
-- `requires` (array of artifact IDs, optional) — artifacts that must be complete before this one; used to compute `Change.effectiveStatus()`. An artifact is _complete_ when its spec file(s) have been validated and the content hash recorded in the change manifest. Any other state (`missing`, `draft`, `in-progress`) is not complete.
+- `requires` (array of artifact IDs, optional) — artifacts that must be resolved before this one; used to compute `Change.effectiveStatus()`. A dependency is resolved when its status is `complete` or `skipped`. `skipped` is only reachable for `optional: true` artifacts. Any other state (`missing`, `in-progress`) blocks the dependent artifact.
 - `deltas` (array, optional) — delta merge configuration; see Requirement: Delta configuration
 - `deltaValidations` (array, optional) — structural validation rules for delta files; see Requirement: Delta validations
 - `validations` (array, optional) — structural validation rules for the base spec; see Requirement: Validation rules
 - `contextSections` (array, optional) — sections of existing specs to inject into the AI context; see Requirement: Context sections
 - `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has a `pattern` (regex string) and a `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons — e.g. normalizing checkbox state in a tasks artifact so that checking a task off does not trigger re-validation or approval invalidation.
+- `taskCompletionCheck` (object, optional) — declares how to detect task completion within this artifact's file content. Used to gate the `implementing → verifying` transition: if the artifact is listed in the `implementing` step's `requires`, all items matching `incompletePattern` must be absent (zero matches) before the transition is allowed. Both fields are optional and default to markdown checkbox syntax:
+  - `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item
+  - `completePattern` (string, regex, default `^\s*-\s+\[x\]`, case-insensitive) — matches a complete task item
+
+  When both patterns are present, the CLI can report progress (e.g. `3/5 tasks complete`) by counting matches of each. If `taskCompletionCheck` is omitted entirely, the defaults apply — a plain markdown artifact with `- [ ]` / `- [x]` checkboxes works without any configuration.
+
+  ```yaml
+  artifacts:
+    - id: proposal
+      scope: change
+      # no taskCompletionCheck — proposal has no task items
+
+    - id: spec
+      scope: spec
+      # no taskCompletionCheck — spec is a specification document, not a task list
+
+    - id: verify
+      scope: spec
+      # no taskCompletionCheck — verify contains scenarios, not task items
+
+    - id: tasks
+      scope: change
+      # markdown checkboxes (default) — omitting taskCompletionCheck is equivalent:
+      # - [ ] implement login
+      # - [x] implement logout
+      taskCompletionCheck:
+        incompletePattern: '^\s*-\s+\[ \]'
+        completePattern: '^\s*-\s+\[x\]'
+
+    - id: work-log
+      scope: change
+      # custom — numbered TODO list format:
+      # TODO: implement login
+      # DONE: implement logout
+      taskCompletionCheck:
+        incompletePattern: '^\s*TODO:'
+        completePattern: '^\s*DONE:'
+  ```
 
 ### Requirement: Template resolution
 
@@ -127,11 +165,11 @@ The `pattern` field on validation rules is matched against file content using th
 
 When `eachBlock` is set, blocks within the named section are identified using the block pattern from `deltas[]` for that section — the same pattern expansion (`{name}` → `.+`) used by `mergeSpecs`. A block starts at a line matching the block pattern and ends at the next line matching the same pattern, the next `##`-level section header, or end of file. The `pattern` check runs against the full content of each block (including its header line and any nested sub-sections), so a rule can match content at any depth within the block — e.g. a `HAS TO` inside a `#### New Decision` sub-section within a `### Decision: {name}` block.
 
-If `eachBlock` names a section that has no entry in `deltas[]`, `ValidateSpec` must report a configuration error — block boundaries cannot be determined without the block pattern.
+If `eachBlock` names a section that has no entry in `deltas[]`, `ValidateArtifacts` must report a configuration error — block boundaries cannot be determined without the block pattern.
 
 ### Requirement: Delta validations
 
-`deltaValidations` on an artifact defines structural validation rules that `ValidateSpec` checks against the delta file for that artifact — not against the base spec. This is distinct from `validations`, which checks the final merged spec. These rules validate that the delta file is well-formed before the merge is attempted.
+`deltaValidations` on an artifact defines structural validation rules that `ValidateArtifacts` checks against the delta file for that artifact — not against the base spec. This is distinct from `validations`, which checks the final merged spec. These rules validate that the delta file is well-formed before the merge is attempted.
 
 Each entry must include:
 
@@ -167,7 +205,7 @@ The section name in `scope` uses the schema's resolved operation keywords. If `d
 
 ### Requirement: Validation rules
 
-`validations` on an artifact defines structural validation rules checked by `ValidateSpec` against the base spec file (after merging). Each entry must include:
+`validations` on an artifact defines structural validation rules checked by `ValidateArtifacts` against the base spec file (after merging). Each entry must include:
 
 - `pattern` (string, required) — a pattern to search for; see Requirement: Pattern matching
 - `required` (boolean, optional, default `true`) — whether the pattern must be present
@@ -218,7 +256,7 @@ A spec created by an `added` operation also requires approval: someone must take
 
 1. **Spec directory layout** — artifacts with `scope: spec` (and `optional: false`) are the files specd expects to find in every `specs/<name>/` directory. When compiling context, specd reads all of them.
 2. **Existing spec validation** — `specd validate` checks that every spec directory in the project contains all non-optional `scope: spec` artifact files; missing files are reported as validation errors.
-3. **Change validation** — `ValidateSpec` requires all non-optional artifacts (regardless of scope) to be present in the change before validation can pass.
+3. **Change validation** — `ValidateArtifacts` requires all non-optional artifacts (regardless of scope) to be present in the change before validation can pass.
 
 `scope: change` artifacts (e.g. `proposal.md`, `tasks.md`) are working documents used during the change process. They are validated in the change but never synced to the `SpecRepository`. `scope: spec` artifacts (e.g. `spec.md`, `verify.md`) are merged or copied into the `SpecRepository` during `ArchiveChange`.
 
@@ -358,6 +396,7 @@ The `verify` artifact in the schema should declare `requires: [spec]` — scenar
 - `deltas[].section` must be unique within an artifact — duplicate section names in the same `deltas` array are a schema validation error
 - `workflow[].step` must be unique — duplicate step names in the same `workflow` array are a schema validation error
 - `requires` must not contain cycles; circular dependencies in the artifact graph are a schema validation error
+- If artifact A is `optional: true`, any artifact that lists A in its `requires` must also be `optional: true`; a non-optional artifact cannot hard-depend on an optional one — `SchemaRegistry.resolve()` must throw `SchemaValidationError` if this constraint is violated
 - `eachBlock` must contain a `{name}` placeholder — it is always a block pattern, never a plain section name
 - `required` on an `eachBlock` rule only applies when a block exists but the pattern is missing; it does not enforce block existence
 - `mergeSpecs` must not hardcode operation keywords; it receives them from the resolved schema's `deltaOperations` field
@@ -369,16 +408,17 @@ The `verify` artifact in the schema should declare `requires: [spec]` — scenar
 ## Schema Example
 
 ```yaml
-name: spec-driven
+name: schema-example
 version: 1
 description: Proposal → specs → design → tasks workflow
 
-# Optional: override default operation keywords
-# deltaOperations:
-#   added:    "ADDED"
-#   modified: "MODIFIED"
-#   removed:  "REMOVED"
-#   renamed:  "RENAMED"
+deltaOperations:
+  added: 'ADDED' # default — shown explicitly for reference
+  modified: 'MODIFIED'
+  removed: 'REMOVED'
+  renamed: 'RENAMED'
+  from: 'FROM' # used inside RENAMED sections
+  to: 'TO'
 
 artifacts:
   - id: proposal
@@ -397,34 +437,45 @@ artifacts:
     template: templates/spec.md
     requires:
       - proposal
+    instruction: |
+      Create specification files defining WHAT the system should do.
+      Do not include WHEN/THEN scenarios — those go in verify.md.
+    contextSections:
+      - name: Requirements # extracted section heading
+        contextTitle: Spec Requirements # title used in compiled context
+      - name: Constraints # contextTitle omitted — uses "Constraints"
     deltas:
       - section: Requirements
         pattern: '### Requirement: {name}'
+      - section: Spec Dependencies
+        pattern: '- \[`{name}`\]' # each dependency link is a named delta block
     deltaValidations:
-      # ADDED and MODIFIED requirement blocks must use normative language
-      - pattern: 'SHALL|MUST'
-        required: true
-        scope: 'ADDED Requirements'
+      - scope: 'ADDED Requirements'
         eachBlock: '### Requirement: {name}'
-      - pattern: 'SHALL|MUST'
+        pattern: 'SHALL|MUST'
         required: true
-        scope: 'MODIFIED Requirements'
+      - scope: 'MODIFIED Requirements'
         eachBlock: '### Requirement: {name}'
+        pattern: 'SHALL|MUST'
+        required: true
+      - scope: 'ADDED Spec Dependencies' # warning only — Spec Dependencies is optional
+        pattern: '- \[`[^`]+`\]\([^)]+\)' # entries must be backtick links with URL
+        required: false
+      - scope: 'MODIFIED Spec Dependencies'
+        pattern: '- \[`[^`]+`\]\([^)]+\)'
+        required: false
     validations:
       - pattern: '## Purpose'
         required: true
       - pattern: '## Requirements'
         required: true
-      - pattern: '### Requirement: {name}'
+      - scope: Requirements
+        pattern: '### Requirement: {name}'
         required: true
-        scope: Requirements
-      - pattern: 'SHALL|MUST'
-        required: true
-        scope: Requirements
+      - scope: Requirements
         eachBlock: '### Requirement: {name}'
-    instruction: |
-      Create specification files defining WHAT the system should do.
-      Do not include WHEN/THEN scenarios — those go in verify.md.
+        pattern: 'SHALL|MUST'
+        required: true
 
   - id: verify
     scope: spec
@@ -433,6 +484,10 @@ artifacts:
     template: templates/verify.md
     requires:
       - specs
+    instruction: |
+      Create verification scenarios (WHEN/THEN) for the spec.
+      Group scenarios under ### Requirement: headings matching the spec.md requirements exactly.
+      Only include scenarios that add information beyond what the requirement prose already states.
     deltas:
       - section: Requirements
         pattern: '### Requirement: {name}'
@@ -446,13 +501,10 @@ artifacts:
         required: true
         scope: Requirements
         eachBlock: '### Requirement: {name}'
-    instruction: |
-      Create verification scenarios (WHEN/THEN) for the spec.
-      Group scenarios under ### Requirement: headings matching the spec.md requirements exactly.
-      Only include scenarios that add information beyond what the requirement prose already states.
 
   - id: design
     scope: change
+    optional: true
     output: design.md
     description: Technical design with implementation decisions
     template: templates/design.md
@@ -467,10 +519,19 @@ artifacts:
     description: Implementation checklist with trackable tasks
     template: templates/tasks.md
     requires:
-      - specs
-      - design
+      - specs # design is optional — tasks cannot hard-depend on it
     instruction: |
       Create the task list breaking down the implementation work.
+      If a design document (design.md) exists, use it to inform the task breakdown.
+      If it does not exist, derive tasks from the specs alone.
+    preHashCleanup:
+      - pattern: '^\s*-\s+\[x\]' # normalize checked boxes before hashing
+        replacement: '- [ ]' # so checking a task off does not invalidate approvals
+    # - [ ] implement login
+    # - [x] implement logout
+    taskCompletionCheck:
+      incompletePattern: '^\s*-\s+\[ \]'
+      completePattern: '^\s*-\s+\[x\]'
 
 workflow:
   - step: designing
@@ -482,15 +543,25 @@ workflow:
         - instruction: |
             Read pending tasks, work through them one by one,
             mark each complete as you go. Pause if you hit a blocker.
+      post:
+        - run: 'pnpm test' # run: executed at phase boundary, not injected as context
+        - instruction: |
+            Confirm all tests pass before marking implementing complete.
   - step: verifying
     requires: [verify]
+    hooks:
+      pre:
+        - instruction: |
+            Run through each scenario in verify.md and confirm the implementation satisfies it.
   - step: archiving
     requires: [specs, tasks]
     hooks:
       pre:
+        - run: 'pnpm test'
         - instruction: |
             Review the delta specs before confirming the archive.
       post:
+        - run: 'git checkout -b specd/{{change.name}}'
         - instruction: |
             Summarise what changed in this archive.
 ```

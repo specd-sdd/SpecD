@@ -63,6 +63,16 @@
 - **WHEN** artifact A declares `requires: [b]` and artifact B declares `requires: [a]`
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` identifying the cycle
 
+#### Scenario: Non-optional artifact requires optional artifact
+
+- **WHEN** artifact A is `optional: true` and artifact B is `optional: false` and declares `requires: [a]`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` — a non-optional artifact cannot hard-depend on an optional one
+
+#### Scenario: Optional artifact requiring optional artifact is valid
+
+- **WHEN** artifact A is `optional: true` and artifact B is also `optional: true` and declares `requires: [a]`
+- **THEN** `SchemaRegistry.resolve()` loads successfully — the constraint is satisfied
+
 ### Requirement: Template resolution
 
 #### Scenario: Template loaded at resolve time
@@ -86,6 +96,24 @@
 
 - **WHEN** an artifact declares multiple entries in `deltas`
 - **THEN** each entry is processed independently against its own section
+
+#### Scenario: Spec dependency added appears in ADDED section
+
+- **GIVEN** a `specs` artifact with `deltas: [{ section: Spec Dependencies, pattern: '- \[`{name}`\]' }]`
+- **WHEN** a delta adds `- [\`specs/core/config/spec.md\`](../config/spec.md) — reason`
+- **THEN** the entry appears under `## ADDED Spec Dependencies` in the delta file, with `specs/core/config/spec.md` as the block name
+
+#### Scenario: Spec dependency removed appears in REMOVED section
+
+- **GIVEN** a dependency `specs/core/config/spec.md` exists in the base spec
+- **WHEN** a delta removes it
+- **THEN** the entry appears under `## REMOVED Spec Dependencies` in the delta file
+
+#### Scenario: Spec dependency description changed appears in MODIFIED section
+
+- **GIVEN** a dependency `specs/core/config/spec.md` exists in the base spec
+- **WHEN** a delta updates only its description text
+- **THEN** the full updated entry appears under `## MODIFIED Spec Dependencies` in the delta file
 
 ### Requirement: Delta merge operations
 
@@ -121,15 +149,55 @@
 
 ### Requirement: Delta conflict detection
 
-#### Scenario: Conflict in same section
+#### Scenario: MODIFIED and REMOVED name collision
 
 - **WHEN** a delta spec lists the same requirement name in both MODIFIED and REMOVED
+- **THEN** `mergeSpecs` must throw a conflict error before applying any changes
+
+#### Scenario: Duplicate name within ADDED
+
+- **WHEN** a delta spec contains two ADDED blocks with the same requirement name
+- **THEN** `mergeSpecs` must throw a conflict error before applying any changes
+
+#### Scenario: Duplicate name within MODIFIED
+
+- **WHEN** a delta spec contains two MODIFIED blocks with the same requirement name
+- **THEN** `mergeSpecs` must throw a conflict error before applying any changes
+
+#### Scenario: Duplicate name within REMOVED
+
+- **WHEN** a delta spec contains two REMOVED entries with the same requirement name
+- **THEN** `mergeSpecs` must throw a conflict error before applying any changes
+
+#### Scenario: Duplicate FROM name within RENAMED
+
+- **WHEN** a delta spec contains two RENAMED entries with the same `FROM` name
+- **THEN** `mergeSpecs` must throw a conflict error before applying any changes
+
+#### Scenario: Duplicate TO name within RENAMED
+
+- **WHEN** a delta spec contains two RENAMED entries with the same `TO` name
+- **THEN** `mergeSpecs` must throw a conflict error before applying any changes
+
+#### Scenario: MODIFIED and ADDED name collision
+
+- **WHEN** a delta spec lists the same requirement name in both MODIFIED and ADDED
+- **THEN** `mergeSpecs` must throw a conflict error before applying any changes
+
+#### Scenario: ADDED and REMOVED name collision
+
+- **WHEN** a delta spec lists the same requirement name in both ADDED and REMOVED
 - **THEN** `mergeSpecs` must throw a conflict error before applying any changes
 
 #### Scenario: MODIFIED references old name after RENAMED
 
 - **WHEN** a delta spec renames `Old` to `New` and also has a MODIFIED block for `Old`
 - **THEN** `mergeSpecs` must throw a conflict error (MODIFIED must use `New`)
+
+#### Scenario: ADDED uses TO name from RENAMED
+
+- **WHEN** a delta spec renames `Old` to `New` and also has an ADDED block named `New`
+- **THEN** `mergeSpecs` must throw a conflict error — the name `New` is already taken by the renamed block
 
 ### Requirement: Pattern matching
 
@@ -195,6 +263,30 @@
 - **WHEN** the schema defines `deltaOperations.added: "AÑADIDO"` and a rule has `scope: "AÑADIDO Requirements"`
 - **THEN** the check is run against the `## AÑADIDO Requirements` section of the delta file
 
+#### Scenario: ADDED Spec Dependencies section absent — passes vacuously
+
+- **GIVEN** a `deltaValidation` with `scope: 'ADDED Spec Dependencies'` and `required: false`
+- **WHEN** the delta file has no `## ADDED Spec Dependencies` section
+- **THEN** the rule passes with no warning — the section is optional
+
+#### Scenario: ADDED Spec Dependencies entry missing link format — warning
+
+- **GIVEN** a `deltaValidation` with `scope: 'ADDED Spec Dependencies'`, `pattern: '- \[`[^`]+`\]\([^)]+\)'`, and `required: false`
+- **WHEN** the `## ADDED Spec Dependencies` section contains an entry without a proper markdown link
+- **THEN** `ValidateSpec` emits a warning identifying the malformed entry
+
+#### Scenario: ADDED Spec Dependencies entry missing description — warning
+
+- **GIVEN** a `deltaValidation` with `scope: 'ADDED Spec Dependencies'`, `pattern: ' — '`, and `required: false`
+- **WHEN** the `## ADDED Spec Dependencies` section contains an entry with no `—` description
+- **THEN** `ValidateSpec` emits a warning — the dependency does not explain why it is needed
+
+#### Scenario: MODIFIED Spec Dependencies validated same as ADDED
+
+- **GIVEN** the same `deltaValidation` rules applied to `scope: 'MODIFIED Spec Dependencies'`
+- **WHEN** a modified entry is missing a link format or description
+- **THEN** `ValidateSpec` emits the same warnings as for ADDED entries
+
 ### Requirement: Validation rules
 
 #### Scenario: File-level required pattern
@@ -248,6 +340,69 @@
 
 - **WHEN** at least one touched spec path has not been approved
 - **THEN** `specd archive` must refuse and report which spec paths are pending approval
+
+### Requirement: taskCompletionCheck
+
+#### Scenario: Default patterns detect markdown checkboxes
+
+- **GIVEN** an artifact with no `taskCompletionCheck` declared
+- **AND** its file contains `- [ ] pending` and `- [x] done`
+- **WHEN** the CLI checks task completion
+- **THEN** `incompletePattern` defaults to `^\s*-\s+\[ \]` and matches `- [ ] pending`
+- **AND** `completePattern` defaults to `^\s*-\s+\[x\]` (case-insensitive) and matches `- [x] done`
+
+#### Scenario: Custom patterns override defaults
+
+- **GIVEN** an artifact declares `taskCompletionCheck.incompletePattern: '^\s*TODO:'` and `taskCompletionCheck.completePattern: '^\s*DONE:'`
+- **AND** its file contains `TODO: implement login` and `DONE: implement logout`
+- **WHEN** the CLI checks task completion
+- **THEN** `incompletePattern` matches `TODO: implement login` and the transition is blocked
+
+#### Scenario: Both patterns used to report progress
+
+- **GIVEN** an artifact with both `incompletePattern` and `completePattern` declared
+- **AND** its file has 4 complete items and 1 incomplete item
+- **WHEN** the CLI reports progress
+- **THEN** it reports `4/5 tasks complete`
+
+#### Scenario: All tasks complete — no incomplete matches
+
+- **GIVEN** an artifact file where all checkboxes are checked (`- [x]`) and none are unchecked
+- **WHEN** the `implementing → verifying` transition is attempted
+- **THEN** `incompletePattern` matches zero lines and the transition is allowed
+
+#### Scenario: taskCompletionCheck omitted entirely — defaults apply
+
+- **GIVEN** an artifact with no `taskCompletionCheck` field
+- **WHEN** the schema is loaded
+- **THEN** the artifact behaves as if `incompletePattern: '^\s*-\s+\[ \]'` and `completePattern: '^\s*-\s+\[x\]'` were declared
+
+### Requirement: preHashCleanup
+
+#### Scenario: Substitution applied before hashing
+
+- **GIVEN** an artifact with `preHashCleanup: [{ pattern: '^\s*-\s+\[x\]', replacement: '- [ ]' }]`
+- **AND** its file contains `- [x] implement logout`
+- **WHEN** the hash is computed
+- **THEN** the substitution is applied first and the hash is computed on the normalized content, not the original
+
+#### Scenario: Checking a task off does not invalidate approval
+
+- **GIVEN** an artifact with `preHashCleanup` that normalizes checked boxes to unchecked
+- **AND** the artifact was approved with some tasks unchecked
+- **WHEN** tasks are marked complete (boxes checked)
+- **THEN** the approval hash still matches — the transition does not require re-approval
+
+#### Scenario: Multiple substitutions applied in order
+
+- **GIVEN** an artifact with two `preHashCleanup` entries: first normalizes `[x]` to `[ ]`, second strips trailing whitespace
+- **WHEN** the hash is computed
+- **THEN** the first substitution is applied to the full content, then the second is applied to the result of the first
+
+#### Scenario: preHashCleanup omitted
+
+- **WHEN** an artifact declares no `preHashCleanup`
+- **THEN** the hash is computed directly from the file content with no normalization
 
 ### Requirement: Context sections
 
