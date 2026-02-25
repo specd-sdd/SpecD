@@ -1,12 +1,17 @@
 title: 'Architecture'
 description: >
-  specd uses Hexagonal Architecture (Ports & Adapters) combined with Domain-Driven Design tactical patterns. The domain is the center — all I/O is pushed to the edges. These principles apply to every package in the monorepo that contains business logic. Adapter packages (CLI, MCP, plugins) follow the same pattern at their level, delegating all logic to the core.
+  Defines hexagonal architecture principles for specd packages with business logic. Establishes
+  layering rules for domain, application, and infrastructure; requires pure domains, port-based
+  I/O, rich entities, and manual dependency injection. Use this spec when designing or reviewing
+  package structure and layer boundaries.
 keywords:
-  - 'hexagonal-architecture'
-  - 'ports-and-adapters'
+  - 'architecture'
+  - 'hexagonal'
+  - 'ports-adapters'
   - 'domain-driven-design'
-  - 'layered-architecture'
-  - 'dependency-injection'
+  - 'layering'
+  - 'dependencies'
+  - 'entities'
 dependsOn: []
 contentHashes:
   spec.md: 'sha256:dcf5e13d391351d725e30ba38fa4b24fbdefbbe840530521a7b2a9d1343d241d'
@@ -16,17 +21,16 @@ rules:
     rules:
       - 'Any package containing business logic must be organized in three layers: domain, application, and infrastructure.'
       - 'Each layer has strict import rules — inner layers never import from outer layers.'
-      - 'Currently @specd/core is the only package with business logic; any future package with domain logic must follow the same structure.'
+      - 'Currently @specd/core is the only such package; any future package with domain logic must follow the same structure.'
   - requirement: 'Domain layer is pure'
     rules:
-      - 'The domain layer has zero I/O dependencies.'
-      - 'No fs, no net, no child_process, no external HTTP.'
-      - 'The domain layer depends only on the TypeScript standard library and other domain types.'
+      - 'The domain layer has zero I/O dependencies: no fs, no net, no child_process, no external HTTP.'
+      - 'It depends only on the TypeScript standard library and other domain types.'
       - "This applies to every package's domain/ layer."
   - requirement: 'Application layer uses ports only'
     rules:
-      - 'The application layer (use cases and application services) interacts with the outside world exclusively through port interfaces defined in application/ports/.'
-      - 'The application layer never imports infrastructure adapters directly.'
+      - 'The application layer interacts with the outside world exclusively through port interfaces defined in application/ports/.'
+      - 'It never imports infrastructure adapters directly.'
       - "This applies to every package's application/ layer."
   - requirement: 'Rich domain entities'
     rules:
@@ -37,18 +41,18 @@ rules:
   - requirement: 'Domain value objects expose behaviour, not structure'
     rules:
       - 'Domain value objects expose operations and computed properties via methods and getters.'
-      - 'Internal representation (e.g. raw segment arrays, backing fields) must not be accessible from outside the class hierarchy.'
+      - 'Internal representation must not be accessible from outside the class hierarchy.'
       - "This applies to all value objects in any package's domain/ layer."
   - requirement: 'Ports with shared construction are abstract classes'
     rules:
-      - 'When a port has constructor arguments that are invariant across all implementations (e.g. scope, ownership, isExternal), it is defined as an abstract class rather than an interface.'
+      - 'When a port has constructor arguments that are invariant across all implementations, it is defined as an abstract class.'
       - 'The abstract class sets those fields in its constructor and exposes them as methods.'
       - 'All storage operations are declared abstract.'
       - 'This lets the TypeScript compiler enforce both the construction contract and the method contract without relying on ESLint or convention.'
       - 'All methods on port abstract classes — including the shared ones from the base — are explicit methods, never property signatures.'
   - requirement: 'Pure functions for stateless domain services'
     rules:
-      - 'Domain operations that are stateless and have no I/O are implemented as plain exported functions in domain/services/, not as classes.'
+      - 'Domain operations that are stateless and have no I/O are implemented as plain exported functions in domain/services/.'
       - 'This applies to any package with a domain/ layer.'
   - requirement: 'Manual dependency injection'
     rules:
@@ -68,115 +72,102 @@ rules:
       - 'schema-* has no dependencies on other specd packages.'
       - 'Any new package must fit into this directed graph without introducing cycles.'
 constraints:
-  - 'In any package with business logic, domain/ must not import from application/ or infrastructure/'
-  - 'In any package with business logic, application/ must not import from infrastructure/'
-  - 'Use cases receive all dependencies via constructor — no module-level singletons, in any package'
-  - 'Domain entities must throw typed errors (subclasses of SpecdError) for invalid operations'
-  - 'Stateless domain operations must be plain functions, not classes'
-  - 'Ports with invariant constructor arguments are abstract class, not interface'
-  - 'All port methods are explicit methods — no property signatures'
-  - 'No package may introduce a circular workspace:* dependency'
+  - 'In any package with business logic, domain/ must not import from application/ or infrastructure/.'
+  - 'In any package with business logic, application/ must not import from infrastructure/.'
+  - 'Use cases receive all dependencies via constructor — no module-level singletons, in any package.'
+  - 'Domain entities must throw typed errors (subclasses of SpecdError) for invalid operations.'
+  - 'Stateless domain operations must be plain functions, not classes.'
+  - 'Ports with invariant constructor arguments are abstract class, not interface.'
+  - 'All port methods are explicit methods — no property signatures.'
+  - 'No package may introduce a circular workspace:* dependency.'
 scenarios:
   - requirement: 'Layered structure for packages with business logic'
     name: 'Domain imports from infrastructure'
-    given:
-      - 'A file in domain/'
+    given: []
     when:
-      - 'it imports from infrastructure/'
+      - 'a file in domain/ imports from infrastructure/'
     then:
       - 'the TypeScript compiler must reject the import'
   - requirement: 'Layered structure for packages with business logic'
     name: 'Application imports infrastructure directly'
-    given:
-      - 'A use case'
+    given: []
     when:
-      - 'it imports a concrete adapter instead of the port interface'
+      - 'a use case imports a concrete adapter instead of the port interface'
     then:
       - 'the TypeScript compiler must reject the import'
   - requirement: 'Domain layer is pure'
     name: 'Domain imports node:fs'
-    given:
-      - 'A file in domain/'
+    given: []
     when:
-      - 'it imports node:fs or any I/O module'
+      - 'a file in domain/ imports node:fs or any I/O module'
     then:
       - 'the TypeScript compiler must reject the import'
   - requirement: 'Application layer uses ports only'
     name: 'Use case receives port via constructor'
-    given:
-      - 'A use case that needs to read specs'
+    given: []
     when:
-      - 'it receives a SpecRepository port via its constructor'
+      - 'a use case needs to read specs'
     then:
-      - 'it receives SpecRepository port via its constructor, not a concrete FsSpecRepository'
+      - 'it receives a SpecRepository port via its constructor, not a concrete FsSpecRepository'
   - requirement: 'Rich domain entities'
     name: 'Invalid state transition'
-    given:
-      - 'A domain entity with defined state transitions'
+    given: []
     when:
       - 'a use case attempts an invalid state transition on a domain entity'
     then:
       - 'the entity throws a typed SpecdError subclass before any side effect occurs'
   - requirement: 'Domain value objects expose behaviour, not structure'
     name: 'Value object exposes internal array'
-    given:
-      - 'A value object in domain/'
+    given: []
     when:
-      - 'it has a public getter that returns its internal backing field directly'
+      - 'a value object in domain/ has a public getter that returns its internal backing field directly'
     then:
       - 'it must be replaced with a method or getter that exposes only the behaviour the caller needs'
   - requirement: 'Domain value objects expose behaviour, not structure'
     name: 'Infrastructure adapter accesses internal segments'
-    given:
-      - 'An infrastructure adapter that needs a filesystem path from a domain path object'
+    given: []
     when:
-      - 'it accesses internal segments'
+      - 'an infrastructure adapter needs a filesystem path from a domain path object'
     then:
       - 'it must call domainPath.toFsPath(sep) — it must not access a segments property'
   - requirement: 'Ports with shared construction are abstract classes'
     name: 'Port has shared construction arguments'
-    given:
-      - 'A port interface'
+    given: []
     when:
       - 'every possible implementation of a port receives the same set of constructor arguments'
     then:
       - 'the port is an abstract class with those arguments in its constructor, not an interface'
   - requirement: 'Ports with shared construction are abstract classes'
     name: 'Port declares a property instead of a method'
-    given:
-      - 'A port class'
+    given: []
     when:
-      - 'it declares readonly scope: string instead of scope(): string'
+      - 'a port class declares readonly scope: string instead of scope(): string'
     then:
       - 'it must be changed to the method form'
   - requirement: 'Pure functions for stateless domain services'
     name: 'Domain service is a function'
-    given:
-      - 'A developer adding a stateless domain operation to any package'
+    given: []
     when:
-      - 'they implement a stateless domain operation'
+      - 'a developer adds a stateless domain operation to any package'
     then:
       - 'it is exported as a plain function, not as a class with methods'
   - requirement: 'Manual dependency injection'
     name: 'Use case wired at entry point'
-    given:
-      - 'A package (CLI, MCP, or future entry point) that boots'
+    given: []
     when:
-      - 'any package boots'
+      - 'any package boots (CLI, MCP, or future entry points)'
     then:
       - 'it constructs use cases manually, passing concrete adapters to each constructor'
   - requirement: 'Adapter packages contain no business logic'
     name: 'Adapter package contains business logic'
-    given:
-      - 'An adapter package (CLI, MCP, or plugin)'
+    given: []
     when:
       - 'a command, tool, or plugin implements domain logic instead of delegating to a use case'
     then:
       - 'the logic must be moved to the appropriate core package'
   - requirement: 'No circular dependencies between packages'
     name: 'Cycle introduced by new package'
-    given:
-      - 'A new package being added to the workspace'
+    given: []
     when:
       - 'a new package declares a workspace:* dependency that creates a cycle'
     then:

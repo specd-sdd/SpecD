@@ -1,19 +1,112 @@
-title: Testing Conventions
+title: 'Testing Conventions'
 description: >
   Defines the testing strategy for the specd monorepo — unit tests with
   mocked ports for domain and application layers, integration tests for
   infrastructure adapters — using Vitest with co-located test files mirroring
   the source tree.
 keywords:
-  - vitest
-  - unit-testing
-  - integration-testing
-  - code-quality
-  - test-isolation
-  - mocking
+  - 'vitest'
+  - 'unit-testing'
+  - 'integration-testing'
+  - 'code-quality'
+  - 'test-isolation'
+  - 'mocking'
 dependsOn:
-  - specs/_global/architecture/
-  - specs/_global/conventions/
+  - 'specs/_global/architecture/'
+  - 'specs/_global/conventions/'
 contentHashes:
   spec.md: 'sha256:2f2ce1056c8d8fa6d4316bf37f8749643a45078dcd1287c442d9ede502ddc63d'
   verify.md: 'sha256:7cdbf5af7e93cf8c770b7aed3c03672a2eec07b09e1c0466bd8f5ac3bb63c57e'
+rules:
+  - requirement: 'Test runner'
+    rules:
+      - 'All packages use Vitest.'
+      - 'Test files live in a `test/` directory at the package root, mirroring the `src/` structure.'
+      - 'A test for `src/domain/entities/change.ts` lives at `test/domain/entities/change.spec.ts`.'
+  - requirement: 'Unit tests for domain and application layers'
+    rules:
+      - 'Every use case and every domain entity method that enforces an invariant has at least one unit test.'
+      - 'Port implementations are mocked — no real filesystem or network access in unit tests.'
+  - requirement: 'Port mocks are typed'
+    rules:
+      - 'Port mocks implement the port interface fully.'
+      - 'No partial mocks with `as unknown as Port`.'
+      - "If a port has 5 methods, the mock implements all 5 — unused ones throw `new Error('not implemented')`."
+  - requirement: 'Integration tests for infrastructure adapters'
+    rules:
+      - '`FsSpecRepository`, `FsChangeRepository`, and other infrastructure adapters have integration tests that run against a real temporary directory (using `os.tmpdir()` + a unique subfolder per test).'
+      - 'The temp directory is cleaned up after each test.'
+  - requirement: 'Test naming'
+    rules:
+      - 'Test files use the `.spec.ts` suffix and match the name of the source file they test (`change.ts` → `change.spec.ts`).'
+      - 'Test descriptions follow the pattern `"given <state>, when <action>, then <outcome>"` for behaviour tests.'
+      - 'Setup/teardown helpers are named `setup<Thing>` and `cleanup<Thing>`.'
+  - requirement: 'No snapshot tests'
+    rules:
+      - 'Snapshot tests are forbidden.'
+      - 'Assertions must be explicit and readable without a stored snapshot file.'
+constraints:
+  - 'Test framework must be Vitest.'
+  - 'Test files live in `test/` mirroring the `src/` directory structure, never co-located with source files.'
+  - 'Test files must use the `.spec.ts` suffix.'
+  - 'Unit tests must not touch the filesystem, network, or spawn processes.'
+  - 'Port mocks must fully implement the port interface.'
+  - 'Infrastructure integration tests must clean up temp directories after each test.'
+  - 'Snapshot tests (`toMatchSnapshot`, `toMatchInlineSnapshot`) are forbidden.'
+scenarios:
+  - requirement: 'Test runner'
+    name: 'Jest used in a package'
+    given:
+      - 'a package imports from `jest` or uses `describe` from Jest globals'
+    when:
+      - 'the package is processed'
+    then:
+      - 'CI must reject it — only Vitest is allowed'
+  - requirement: 'Test runner'
+    name: 'Test file outside test/ directory'
+    given:
+      - 'a test file lives at `src/domain/entities/change.spec.ts`'
+    when:
+      - 'the test file is found'
+    then:
+      - 'it must be moved to `test/domain/entities/change.spec.ts`'
+  - requirement: 'Unit tests for domain and application layers'
+    name: 'Unit test touches filesystem'
+    given:
+      - 'a unit test exists'
+    when:
+      - 'a unit test calls `fs.readFile` or spawns a process'
+    then:
+      - 'it violates this requirement — filesystem access belongs in integration tests'
+  - requirement: 'Port mocks are typed'
+    name: 'Partial mock with type cast'
+    given:
+      - 'a test creates a mock'
+    when:
+      - 'a test creates a mock with `{ get: vi.fn() } as unknown as SpecRepository`'
+    then:
+      - 'it must be replaced with a full implementation of `SpecRepository`'
+  - requirement: 'Integration tests for infrastructure adapters'
+    name: 'Integration test without cleanup'
+    given:
+      - 'an integration test creates a temp directory'
+    when:
+      - 'the integration test does not remove it in `afterEach`'
+    then:
+      - 'it must be corrected — leftover temp dirs cause flaky tests across runs'
+  - requirement: 'Test naming'
+    name: 'Wrong test file suffix'
+    given:
+      - 'a test file exists'
+    when:
+      - 'a test file is named `change.test.ts`'
+    then:
+      - 'it must be renamed to `change.spec.ts`'
+  - requirement: 'No snapshot tests'
+    name: 'Snapshot assertion used'
+    given:
+      - 'a test exists'
+    when:
+      - 'a test calls `toMatchSnapshot()` or `toMatchInlineSnapshot()`'
+    then:
+      - 'it must be replaced with explicit assertions'
