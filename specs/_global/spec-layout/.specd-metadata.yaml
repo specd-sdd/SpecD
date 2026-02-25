@@ -1,8 +1,11 @@
 title: 'Spec Layout'
 description: >
-  Defines the directory structure, mandatory sections, and file conventions
-  for all specs in the specd project — both global constraint specs under
-  specs/_global/ and package-internal specs under specs/<package>/.
+  This spec defines the canonical directory structure and file conventions for
+  all specs in specd, ensuring consistency across global constraint specs and
+  package-internal specs. It establishes the paired file structure (spec.md +
+  verify.md), mandatory sections, and naming patterns that enable
+  cross-package consistency and support the delta merger's ability to correlate
+  specs when changes are applied.
 keywords:
   - 'spec-structure'
   - 'naming-convention'
