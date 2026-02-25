@@ -111,7 +111,7 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 
 ## Constraints
 
-- `.specd-metadata.yaml` is not a schema artifact — it is never listed in `requiredSpecArtifacts`, never validated by `ValidateSpec`, and never tracked in the change manifest's `artifacts` array
+- `.specd-metadata.yaml` is not a schema artifact — it is never listed in `requiredSpecArtifacts`, never validated by `ValidateArtifacts`, and never tracked in the change manifest's `artifacts` array
 - Its absence is not an error at any point — all reads of `.specd-metadata.yaml` treat a missing file as empty
 - `dependsOn` paths must not form cycles; if a cycle is detected during traversal, specd breaks the cycle and emits a warning
 - Staleness warnings are advisory only — they do not block any operation

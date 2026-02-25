@@ -1,20 +1,203 @@
-title: Spec Metadata
+title: 'Spec Metadata'
 description: >
-  Defines the .specd-metadata.yaml file format for per-spec metadata —
-  title, description, keywords, dependency declarations, and per-artifact
-  content hashes used for staleness detection and context compilation.
+  The .specd-metadata.yaml file stores machine-readable context dependencies, content hashes for staleness detection, and a dense summary of rules and scenarios extracted by the LLM agent. You need this spec when implementing context compilation, building staleness detection in CompileContext, or understanding how agent-authored metadata integrates with the specd workflow.
 keywords:
-  - yaml
-  - metadata
-  - dependency-graph
-  - integrity
-  - checksums
-  - context-compilation
-  - staleness
+  - 'yaml'
+  - 'metadata'
+  - 'dependency-graph'
+  - 'integrity'
+  - 'staleness'
+  - 'context-compilation'
+  - 'agent-authored'
 dependsOn:
-  - specs/core/config/
-  - specs/core/change/
-  - specs/core/schema-format/
+  - 'specs/core/config/'
+  - 'specs/core/change/'
+  - 'specs/core/schema-format/'
 contentHashes:
-  spec.md: 'sha256:4065bc361b0620028c48f8522dd5cbeda2fd7d76157d699cc05f8b14717bf814'
-  verify.md: 'sha256:4f6c5b74513ef740a4769d50cabdba3933e1956300a253ae6165610388daadc3'
+  spec.md: 'sha256:127a8a14c9eb5f0bc2a88f8ac2be207f0bb55c10cba7188f910829814ccae6cd'
+  verify.md: 'sha256:2e1627880acd63efb1ea6f594464863a35aa9fde50577d930fffe7e7c83c35b0'
+rules:
+  - requirement: 'File location and naming'
+    rules:
+      - ".specd-metadata.yaml lives inside the spec directory, at the same level as the spec's content artifacts (e.g. spec.md, verify.md)."
+      - 'The .specd- prefix namespaces the file as specd-managed, avoiding conflicts with other tooling.'
+      - 'Its absence is not an error — a spec with no .specd-metadata.yaml is treated as having no declared dependencies and no recorded content hash.'
+  - requirement: 'File format'
+    rules:
+      - '.specd-metadata.yaml is a YAML file; all fields are optional — an empty file or absent file is valid.'
+      - "title (string, optional) — short human-readable name for the spec; if absent, tooling falls back to the spec's path."
+      - 'description (string, optional) — 2–3 sentences written for discovery, used by tooling and the LLM to assess relevance without reading the full spec content; should not read like a dictionary definition.'
+      - 'keywords (array of strings, optional) — topic tags, lowercase, hyphen-separated, used by tooling to find related specs.'
+      - 'dependsOn (array of strings, optional) — spec paths this spec depends on for context; each path is relative to the workspace root and may include an optional workspace qualifier (e.g. billing:payments/invoices); an unqualified path is resolved within the same workspace; an empty array or absent field means no declared dependencies.'
+      - "contentHashes (map of filename to hash string, optional) — a SHA-256 hash per requiredSpecArtifacts file at the time the metadata was last derived; keys are the resolved filenames from the active schema's requiredSpecArtifacts; a missing entry or absent field is treated as stale for that file."
+      - 'rules (array of objects, optional) — normative statements extracted from the spec, grouped by requirement name; each entry has a requirement key and a rules key (array of plain-text sentences).'
+      - "constraints (array of strings, optional) — hard invariants extracted from the spec's ## Constraints section; omitted if the spec has no ## Constraints section."
+      - 'scenarios (array of objects, optional) — BDD-style verification scenarios extracted from verify files, grouped by requirement name; each entry has requirement, name, given, when, and then fields.'
+  - requirement: 'LLM authorship'
+    rules:
+      - '.specd-metadata.yaml is written and maintained by the LLM agent.'
+      - 'It is generated once per spec at archive time: when ArchiveChange completes, it signals which specs were modified via staleMetadataSpecPaths, and the caller (CLI or MCP layer) triggers the extraction agent for each of those specs.'
+      - 'specd does not generate or rewrite .specd-metadata.yaml automatically — the agent is responsible for producing accurate output.'
+      - 'After generation, the metadata is stable until the spec is modified again by a subsequent change.'
+  - requirement: 'Staleness detection'
+    rules:
+      - "When specd reads a spec's .specd-metadata.yaml, it iterates over the active schema's requiredSpecArtifacts, resolves the concrete filename for each artifact via its output field, computes the current SHA-256 hash of that file, and compares it against the entry in contentHashes keyed by that filename."
+      - "If any file's hash differs, a resolved filename is missing from contentHashes, or contentHashes itself is absent, specd emits a warning indicating that the spec has changed since the metadata was last derived and that the agent should review and regenerate .specd-metadata.yaml."
+      - 'A missing contentHashes field is treated as stale — specd emits the same warning.'
+      - 'Staleness is advisory only; specd does not block any operation because .specd-metadata.yaml is stale.'
+  - requirement: 'Use by CompileContext'
+    rules:
+      - 'CompileContext reads .specd-metadata.yaml for two purposes: (1) Spec collection — dependsOn is followed transitively from change.contextSpecIds to discover which specs to include in the context; (2) Spec content — for each spec in the collected context set, if metadata is fresh, CompileContext uses description, rules, constraints, and scenarios as the compact, machine-optimised representation of that spec.'
+      - "If metadata is absent or stale, CompileContext falls back to extracting the sections declared in the artifact's contextSections[] and emits a staleness warning."
+      - 'A spec that cannot be resolved (missing file, unknown workspace) is silently skipped with a warning.'
+  - requirement: 'Version control'
+    rules:
+      - '.specd-metadata.yaml must be committed to version control alongside the spec content.'
+      - "It is part of the spec's persistent record and must not be added to .gitignore."
+constraints:
+  - ".specd-metadata.yaml is not a schema artifact — it is never listed in requiredSpecArtifacts, never validated by ValidateArtifacts, and never tracked in the change manifest's artifacts array."
+  - 'Its absence is not an error at any point — all reads of .specd-metadata.yaml treat a missing file as empty.'
+  - 'dependsOn paths must not form cycles; if a cycle is detected during traversal, specd breaks the cycle and emits a warning.'
+  - 'Staleness warnings are advisory only — they do not block any operation.'
+  - 'The LLM must not include the spec itself in its own dependsOn list.'
+scenarios:
+  - requirement: 'File location and naming'
+    name: 'Metadata file present'
+    given: []
+    when:
+      - 'a spec directory contains a .specd-metadata.yaml file'
+    then:
+      - 'specd reads it to obtain dependsOn and contentHashes for that spec'
+  - requirement: 'File location and naming'
+    name: 'Metadata file absent'
+    given: []
+    when:
+      - 'a spec directory has no .specd-metadata.yaml'
+    then:
+      - 'specd treats the spec as having no declared dependencies and no content hash — no error is emitted'
+  - requirement: 'File format'
+    name: 'Valid metadata file with all fields'
+    given: []
+    when:
+      - '.specd-metadata.yaml contains title, description, keywords, dependsOn, contentHashes, rules, constraints, and scenarios'
+    then:
+      - 'specd parses all fields; title, description, and keywords are available to tooling without reading the spec content'
+  - requirement: 'File format'
+    name: 'Title absent — fallback to path'
+    given: []
+    when:
+      - '.specd-metadata.yaml has no title field'
+    then:
+      - "tooling displays the spec's path (e.g. core/change) instead of a title"
+  - requirement: 'File format'
+    name: 'Valid metadata file with only dependsOn'
+    given: []
+    when:
+      - '.specd-metadata.yaml contains dependsOn: [core/storage] and contentHashes with entries for each file'
+    then:
+      - 'specd parses core/storage as a dependency and uses the per-file hashes for staleness detection'
+  - requirement: 'File format'
+    name: 'Empty dependsOn'
+    given: []
+    when:
+      - '.specd-metadata.yaml contains dependsOn: []'
+    then:
+      - 'the spec has no declared dependencies — no traversal occurs from this spec'
+  - requirement: 'File format'
+    name: 'Cross-workspace dependency'
+    given: []
+    when:
+      - 'dependsOn contains billing:payments/invoices'
+    then:
+      - "specd resolves the spec from the billing workspace's specs root"
+  - requirement: 'File format'
+    name: 'Unqualified path resolves to same workspace'
+    given: []
+    when:
+      - 'a spec in the default workspace has dependsOn: [auth/login]'
+    then:
+      - 'specd resolves auth/login within the default workspace'
+  - requirement: 'LLM authorship'
+    name: 'Agent writes metadata after creating spec'
+    given: []
+    when:
+      - 'the LLM agent creates a new spec'
+    then:
+      - 'it produces a .specd-metadata.yaml with title, description, keywords, dependsOn, contentHashes, rules, constraints (if any), and scenarios (if any) derived from the spec content'
+  - requirement: 'LLM authorship'
+    name: 'specd does not overwrite metadata'
+    given: []
+    when:
+      - 'any specd command runs'
+    then:
+      - 'specd never rewrites .specd-metadata.yaml — only the LLM agent does'
+  - requirement: 'Staleness detection'
+    name: 'Content unchanged — no warning'
+    given: []
+    when:
+      - "the current hash of the spec's requiredSpecArtifacts matches contentHashes in .specd-metadata.yaml"
+    then:
+      - 'no staleness warning is emitted'
+  - requirement: 'Staleness detection'
+    name: 'Content changed — warning emitted'
+    given: []
+    when:
+      - "a spec's spec.md has been modified and its hash no longer matches contentHashes"
+    then:
+      - 'specd emits a warning that the spec metadata may be stale and the agent should regenerate it'
+  - requirement: 'Staleness detection'
+    name: 'Missing contentHashes — treated as stale'
+    given: []
+    when:
+      - '.specd-metadata.yaml exists but has no contentHashes field'
+    then:
+      - 'specd emits the same staleness warning'
+  - requirement: 'Staleness detection'
+    name: 'requiredSpecArtifact missing from contentHashes — treated as stale'
+    given: []
+    when:
+      - 'a requiredSpecArtifacts file exists but has no corresponding entry in contentHashes'
+    then:
+      - 'specd emits a staleness warning'
+  - requirement: 'Staleness detection'
+    name: 'Stale metadata does not block operations'
+    given: []
+    when:
+      - '.specd-metadata.yaml is stale'
+    then:
+      - 'specd emits a warning but does not block any command — the stale dependsOn is still used for context traversal'
+  - requirement: 'Use by CompileContext'
+    name: 'dependsOn adds context beyond excludes'
+    given: []
+    when:
+      - "specd.yaml has contextExcludeSpecs: ['core/storage'] and a spec's .specd-metadata.yaml lists core/storage in dependsOn"
+    then:
+      - 'CompileContext includes core/storage — dependsOn overrides project-level excludes'
+  - requirement: 'Use by CompileContext'
+    name: 'Transitive traversal'
+    given: []
+    when:
+      - 'change has contextSpecIds: [auth/login] and auth/login/.specd-metadata.yaml lists auth/jwt in dependsOn, and auth/jwt/.specd-metadata.yaml lists crypto/keys'
+    then:
+      - 'CompileContext includes all three: auth/login, auth/jwt, and crypto/keys'
+  - requirement: 'Use by CompileContext'
+    name: 'Missing spec in dependsOn skipped with warning'
+    given: []
+    when:
+      - 'dependsOn references a spec path that does not exist on disk'
+    then:
+      - 'specd emits a warning and skips that entry — context compilation continues'
+  - requirement: 'Use by CompileContext'
+    name: 'Cycle in dependsOn broken with warning'
+    given: []
+    when:
+      - 'spec A lists spec B in dependsOn and spec B lists spec A in dependsOn'
+    then:
+      - 'specd detects the cycle, breaks it, emits a warning, and includes both specs only once'
+  - requirement: 'Version control'
+    name: 'Metadata committed with spec'
+    given: []
+    when:
+      - 'a spec is created or updated and .specd-metadata.yaml is written'
+    then:
+      - 'it appears in git status as a tracked file alongside the spec content artifacts'
