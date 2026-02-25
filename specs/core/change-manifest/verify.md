@@ -21,13 +21,29 @@
 
 #### Scenario: Artifact validated hash stored
 
-- **WHEN** `ValidateSpec` marks an artifact complete with hash `sha256:abc`
+- **WHEN** `ValidateArtifacts` marks an artifact complete with hash `sha256:abc`
 - **THEN** the manifest's `artifacts` entry for that type has `validatedHash: "sha256:abc"` and no `status` field
 
 #### Scenario: validatedHash is null for unvalidated artifact
 
 - **WHEN** an artifact exists in `artifacts` but has never been validated
 - **THEN** its `validatedHash` is `null` in the manifest
+
+#### Scenario: validatedHash is sentinel for skipped artifact
+
+- **WHEN** an optional artifact is explicitly marked as not produced
+- **THEN** its `validatedHash` is `"__skipped__"` in the manifest and no `status` field is stored
+
+#### Scenario: artifact-skipped event serialized in history
+
+- **WHEN** an optional artifact is skipped with reason `"not needed for this change"`
+- **THEN** the history contains `{ "type": "artifact-skipped", "artifactId": "design", "reason": "not needed for this change", "at": "...", "by": { ... } }`
+
+#### Scenario: validatedHash cleared on invalidation
+
+- **GIVEN** one artifact with `validatedHash: "sha256:abc"` and one with `validatedHash: "__skipped__"`
+- **WHEN** an `invalidated` event is appended
+- **THEN** both `validatedHash` values are set to `null` in the manifest — rollback is uniform
 
 #### Scenario: contextSpecIds does not invalidate approvals
 

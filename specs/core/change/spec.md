@@ -27,25 +27,38 @@ A Change declares:
 A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:
 
 ```
-drafting → designing → ready ──────────────────────────────────────── → implementing → done ──────────────────── → archivable
-                             ╌→ pending-spec-approval → spec-approved ┘               ╌→ pending-signoff → signed-off ┘
-                               (if approvals.spec: true)                                (if approvals.signoff: true)
+drafting → designing → ready ──────────────────────────────────────── → implementing ⇄ verifying → done ──────────────────── → archivable
+                             ╌→ pending-spec-approval → spec-approved ┘                            ╌→ pending-signoff → signed-off ┘
+                               (if approvals.spec: true)                                              (if approvals.signoff: true)
 ```
 
-| State                   | Meaning                                                                             |
-| ----------------------- | ----------------------------------------------------------------------------------- |
-| `drafting`              | Initial state; the change has been created but no design work has started           |
-| `designing`             | The agent is elaborating the spec content                                           |
-| `ready`                 | The spec is complete; awaiting implementation (or spec approval if gate is enabled) |
-| `pending-spec-approval` | Waiting for human approval of the spec before implementation may begin              |
-| `spec-approved`         | Spec has been approved; implementation may begin                                    |
-| `implementing`          | Code is being written against the spec                                              |
-| `done`                  | Implementation is complete                                                          |
-| `pending-signoff`       | Waiting for human sign-off on the completed work before archiving                   |
-| `signed-off`            | Work has been signed off; the change may be archived                                |
-| `archivable`            | Terminal state; the change may be moved to the archive                              |
+| State                   | Meaning                                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------- |
+| `drafting`              | Initial state; the change has been created but no design work has started                     |
+| `designing`             | The agent is elaborating the spec content                                                     |
+| `ready`                 | The spec is complete; awaiting implementation (or spec approval if gate is enabled)           |
+| `pending-spec-approval` | Waiting for human approval of the spec before implementation may begin                        |
+| `spec-approved`         | Spec has been approved; implementation may begin                                              |
+| `implementing`          | Code is being written against the spec; all tasks must be complete to transition to verifying |
+| `verifying`             | The implementation is being verified against the spec scenarios                               |
+| `done`                  | Verification is complete; the change is ready to archive                                      |
+| `pending-signoff`       | Waiting for human sign-off on the completed work before archiving                             |
+| `signed-off`            | Work has been signed off; the change may be archived                                          |
+| `archivable`            | Terminal state; the change may be moved to the archive                                        |
 
 Only the transitions shown above are valid. Any attempt to transition to a state not reachable from the current state throws `InvalidStateTransitionError`. `archivable` is terminal — no further transitions are possible.
+
+The `implementing ↔ verifying` loop may repeat any number of times. The transition `implementing → verifying` is only valid when all tasks in the `tasks` artifact are complete. The transition `verifying → implementing` is taken when verification fails and changes are required — the tasks artifact is reset to `in-progress` to allow new tasks to be added before the next implementation round begins.
+
+### Requirement: Implementation and verification loop
+
+The `implementing` and `verifying` states form a loop that repeats until verification passes.
+
+The transition `implementing → verifying` is only valid when all artifacts listed in the `implementing` step's `requires` field have zero matches for their `taskCompletionCheck.incompletePattern` (defaulting to markdown unchecked checkboxes `- [ ]` if not declared). This is a content-level check on the artifact files, not a check on `effectiveStatus`. Attempting this transition while any incomplete task item remains throws `InvalidStateTransitionError`.
+
+The transition `verifying → implementing` is taken when verification fails and changes are required. No approval invalidation is triggered by this transition; the spec has not changed, only the implementation work has been found insufficient.
+
+The loop may repeat any number of times. History records each round in full.
 
 ### Requirement: Spec approval gate
 
@@ -67,14 +80,25 @@ A Change holds a set of artifacts — typed files whose types and dependency gra
 - **`filename`** — the file path within the change directory
 - **`optional`** — whether the artifact is required for archiving
 - **`requires`** — ordered list of artifact type IDs that must be complete before this artifact can be validated
-- **`status`** — derived at load time: `missing` | `in-progress` | `complete`
-- **`validatedHash`** — the hash recorded when the artifact was last validated, computed after applying `preHashCleanup` if declared in the schema
+- **`status`** — derived at load time: `missing` | `in-progress` | `complete` | `skipped`
+- **`validatedHash`** — the hash recorded when the artifact was last validated, computed after applying `preHashCleanup` if declared in the schema. The sentinel value `"__skipped__"` is used when an optional artifact is explicitly marked as not produced.
 
-`ArtifactStatus` is never stored directly — it is computed on load by comparing the hash of the current file content (after `preHashCleanup`) against `validatedHash`. An artifact whose cleaned hash matches `validatedHash` is `complete`; otherwise it is `missing` (file absent) or `in-progress` (file present but hash differs or unvalidated).
+`ArtifactStatus` is never stored directly — it is always derived on load from `validatedHash` and file presence:
 
-Effective status cascades: an artifact is `in-progress` if any artifact in its `requires` chain is not `complete`, even if its own hash matches. This prevents marking later artifacts as complete while earlier dependencies are stale.
+1. `validatedHash === "__skipped__"` → `skipped` (only valid for `optional: true` artifacts)
+2. File absent (and no sentinel) → `missing`
+3. File present and cleaned hash matches `validatedHash` → `complete`
+4. File present but hash differs or `validatedHash` is unset → `in-progress`
 
-`Artifact.markComplete(hash)` may only be called by the `ValidateSpec` use case. No other code path may set an artifact to `complete`.
+`skipped` is only valid for `optional: true` artifacts. Attempting to skip a non-optional artifact throws an error.
+
+The `skipped` state must be set explicitly by an actor — human or agent via a CLI command. The agent must be instructed (via the schema `instruction` or skill definition) to call that command when it decides not to produce an optional artifact. The specific CLI command is defined in the CLI spec.
+
+**Rollback:** when an `invalidated` event is appended, specd clears `validatedHash` for all artifacts in the change (sets to `null`). This resets them uniformly: `complete` artifacts become `in-progress` (file present, no valid hash), `skipped` artifacts become `missing` (file absent, sentinel cleared). For the `verifying → implementing` transition, only the `validatedHash` of artifacts in the `implementing` step's `requires` list is cleared.
+
+Effective status cascades: an artifact is `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`, even if its own hash matches. A `skipped` optional artifact satisfies the dependency — downstream artifacts and workflow steps treat it as resolved.
+
+`Artifact.markComplete(hash)` may only be called by the `ValidateArtifacts` use case. `Artifact.markSkipped()` sets `validatedHash` to the sentinel and may only be called by the skip use case. No other code path may set these values.
 
 ### Requirement: History and event sourcing
 
@@ -94,16 +118,17 @@ All events share common fields:
 
 Event types:
 
-| Type            | Additional fields                                                 | When appended                                                        |
-| --------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `created`       | `workspaces`, `specIds`, `schemaName`, `schemaVersion`            | Once, when the change is first created                               |
-| `transitioned`  | `from: ChangeState`, `to: ChangeState`                            | Each lifecycle state transition                                      |
-| `spec-approved` | `reason: string`, `artifactHashes: Record<string, string>`        | When the spec approval gate is passed                                |
-| `signed-off`    | `reason: string`, `artifactHashes: Record<string, string>`        | When the signoff gate is passed                                      |
-| `invalidated`   | `cause: 'workspace-change' \| 'spec-change' \| 'artifact-change'` | When workspaces, specIds, or artifacts change, superseding approvals |
-| `drafted`       | `reason?: string`                                                 | When a change is shelved to `drafts/`                                |
-| `restored`      | _(none beyond common fields)_                                     | When a drafted change is moved back to `changes/`                    |
-| `discarded`     | `reason: string`, `supersededBy?: string[]`                       | When a change is permanently abandoned                               |
+| Type               | Additional fields                                                 | When appended                                                        |
+| ------------------ | ----------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `created`          | `workspaces`, `specIds`, `schemaName`, `schemaVersion`            | Once, when the change is first created                               |
+| `transitioned`     | `from: ChangeState`, `to: ChangeState`                            | Each lifecycle state transition                                      |
+| `spec-approved`    | `reason: string`, `artifactHashes: Record<string, string>`        | When the spec approval gate is passed                                |
+| `signed-off`       | `reason: string`, `artifactHashes: Record<string, string>`        | When the signoff gate is passed                                      |
+| `invalidated`      | `cause: 'workspace-change' \| 'spec-change' \| 'artifact-change'` | When workspaces, specIds, or artifacts change, superseding approvals |
+| `drafted`          | `reason?: string`                                                 | When a change is shelved to `drafts/`                                |
+| `restored`         | _(none beyond common fields)_                                     | When a drafted change is moved back to `changes/`                    |
+| `artifact-skipped` | `artifactId: string`, `reason?: string`                           | When an optional artifact is explicitly marked as not produced       |
+| `discarded`        | `reason: string`, `supersededBy?: string[]`                       | When a change is permanently abandoned                               |
 
 **Approval invalidation:** when the workspace list, spec list, or any artifact content changes, specd appends an `invalidated` event (with the appropriate `cause`) followed immediately by a `transitioned` event rolling back to `designing`. The invalidated approvals remain in history for audit purposes and are identified as superseded by the presence of the subsequent `invalidated` event.
 
@@ -140,19 +165,27 @@ A change may be moved between storage locations without affecting its lifecycle 
 - A Change must have at least one workspace ID and at least one spec ID
 - Current lifecycle state is derived from history (last `transitioned` event); no state snapshot is stored
 - Any modification to the workspace list, spec list, or any artifact content appends an `invalidated` event followed by a `transitioned` event back to `designing`
-- `ArtifactStatus` is never persisted — always derived from cleaned hash vs `validatedHash`
-- `Artifact.markComplete(hash)` may only be called from `ValidateSpec`
+- `ArtifactStatus` is never stored directly — always derived from `validatedHash` and file presence
+- `validatedHash === "__skipped__"` is the sentinel for `skipped` status — only valid on `optional: true` artifacts
+- `skipped` is only valid for `optional: true` artifacts; attempting to skip a non-optional artifact throws an error
+- `skipped` satisfies the dependency in `requires` chains and workflow step availability checks — treated as resolved
+- On `invalidated` event: all `validatedHash` values are cleared — resets `complete` → `in-progress` and `skipped` → `missing` uniformly
+- On `verifying → implementing`: only `validatedHash` of artifacts in `implementing.requires` is cleared
+- `Artifact.markComplete(hash)` may only be called from `ValidateArtifacts`
+- `Artifact.markSkipped()` may only be called from the skip use case; sets `validatedHash` to the sentinel
 - `archivable` is the only state from which a change may be archived; attempting to archive from any other state throws `InvalidStateTransitionError`
 - Both approval gates default to `false` — teams opt in via `approvals` in `specd.yaml`
 - When `approvals.spec: true`, spec approval is required before `implementing`
 - When `approvals.signoff: true`, sign-off is always required before `archivable`, regardless of change content
+- `implementing → verifying` requires zero matches of `taskCompletionCheck.incompletePattern` across all artifacts in the `implementing` step's `requires`; defaults to `^\s*-\s+\[ \]` if not declared in the schema; throws `InvalidStateTransitionError` if any incomplete item is found
+- `verifying → implementing` does not trigger approval invalidation
 - History events are never modified or deleted; invalidated approvals are identifiable by a subsequent `invalidated` event
 - Discarding a change requires a `discarded` event with mandatory `reason` and `by`; it is irreversible
 
 ## Spec Dependencies
 
 - [`specs/core/config/spec.md`](../config/spec.md) — workspace IDs, active workspace semantics, approval gates config, storage locations
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — artifact type declarations, dependency graph, `preHashCleanup`
+- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — artifact type declarations, dependency graph, `preHashCleanup`, `taskCompletionCheck`
 - [`specs/core/change-manifest/spec.md`](../change-manifest/spec.md) — manifest format and JSON serialization of events
 - [`specs/core/storage/spec.md`](../storage/spec.md) — persistence mechanics, directory naming
 - [`specs/core/delta-merger/spec.md`](../delta-merger/spec.md) — delta operations

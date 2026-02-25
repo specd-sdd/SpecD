@@ -16,15 +16,20 @@ Active change directories must use the format `YYYYMMDD-HHmmss-<name>`, where th
 
 ### Requirement: Artifact status derivation
 
-Artifact status (`missing`, `in-progress`, `complete`) must be derived at load time — it must not be stored directly in the manifest. The manifest stores only `validatedHash` per artifact. `FsChangeRepository` must compute status by comparing the current SHA-256 hash of each artifact file against the stored `validatedHash`.
+Artifact status (`missing`, `in-progress`, `complete`, `skipped`) must be derived at load time — it must not be stored directly in the manifest. The manifest stores only `validatedHash` per artifact. `FsChangeRepository` must compute status using this precedence:
+
+1. `validatedHash === "__skipped__"` → `skipped` (only valid for `optional: true` artifacts)
+2. File absent (and no sentinel) → `missing`
+3. File present and cleaned hash matches `validatedHash` → `complete`
+4. File present but hash differs or `validatedHash` is `null` → `in-progress`
 
 ### Requirement: Artifact dependency cascade
 
-`Change.effectiveStatus(type)` must cascade through the artifact dependency graph. An artifact whose own hash matches its `validatedHash` must still be reported as `in-progress` if any artifact in its `requires` chain is not `complete`.
+`Change.effectiveStatus(type)` must cascade through the artifact dependency graph. An artifact whose own hash matches its `validatedHash` must still be reported as `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`. A `skipped` optional artifact satisfies the dependency — it does not block downstream artifacts.
 
-### Requirement: ValidateSpec is the sole path to `complete`
+### Requirement: ValidateArtifacts is the sole path to `complete`
 
-`Artifact.markComplete(hash)` must only be called by the `ValidateSpec` use case. No other use case, adapter, or external code path may mark an artifact as complete.
+`Artifact.markComplete(hash)` must only be called by the `ValidateArtifacts` use case. `Artifact.markSkipped()` must only be called by the skip use case (sets `validatedHash` to `"__skipped__"`). No other code path may set these values.
 
 ### Requirement: Archive pattern configuration
 

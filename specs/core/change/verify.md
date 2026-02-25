@@ -63,6 +63,64 @@
 - **WHEN** a Change has a history containing two `transitioned` events ending with `to: 'implementing'`
 - **THEN** deriving state from history returns `implementing` without reading any separate state field
 
+#### Scenario: Valid transition — implementing to verifying when all task items complete
+
+- **GIVEN** a Change in `implementing` state
+- **AND** all artifacts in the `implementing` step's `requires` have zero matches for their `taskCompletionCheck.incompletePattern`
+- **WHEN** the change is transitioned to `verifying`
+- **THEN** a `transitioned` event with `from: 'implementing'` and `to: 'verifying'` is appended and deriving state returns `verifying`
+
+#### Scenario: Default incompletePattern matches markdown unchecked checkboxes
+
+- **GIVEN** an artifact with no `taskCompletionCheck` declared
+- **AND** its file contains `- [ ] implement login` and `- [x] implement logout`
+- **WHEN** the `implementing → verifying` transition is attempted
+- **THEN** the default pattern `^\s*-\s+\[ \]` matches `- [ ] implement login` and the transition is blocked
+
+#### Scenario: Custom incompletePattern blocks transition
+
+- **GIVEN** an artifact declares `taskCompletionCheck.incompletePattern: '^\s*TODO:'`
+- **AND** its file contains `TODO: implement login` and `DONE: implement logout`
+- **WHEN** the `implementing → verifying` transition is attempted
+- **THEN** the custom pattern matches `TODO: implement login` and the transition is blocked
+
+#### Scenario: Invalid transition — implementing to verifying when a task item is incomplete
+
+- **GIVEN** a Change in `implementing` state
+- **AND** at least one artifact in the `implementing` step's `requires` has one or more matches for `taskCompletionCheck.incompletePattern`
+- **WHEN** the change is transitioned to `verifying`
+- **THEN** `InvalidStateTransitionError` is thrown and the state remains `implementing`
+
+#### Scenario: Progress reported from both patterns
+
+- **GIVEN** an artifact with `taskCompletionCheck.completePattern` and `taskCompletionCheck.incompletePattern` both declared
+- **AND** the artifact file contains 3 complete items and 2 incomplete items
+- **WHEN** the CLI reports task progress
+- **THEN** it reports `3/5 tasks complete`
+
+#### Scenario: Invalid transition — implementing to done (skipping verifying)
+
+- **WHEN** a Change in `implementing` state is transitioned directly to `done`
+- **THEN** `InvalidStateTransitionError` is thrown and the state remains `implementing`
+
+#### Scenario: Valid transition — verifying back to implementing when verification fails
+
+- **GIVEN** a Change in `verifying` state where verification has failed and changes are required
+- **WHEN** the change is transitioned back to `implementing`
+- **THEN** a `transitioned` event with `from: 'verifying'` and `to: 'implementing'` is appended
+- **AND** no approval invalidation is triggered
+
+#### Scenario: implementing ↔ verifying loop repeats until verification passes
+
+- **GIVEN** a Change that has cycled through `implementing → verifying → implementing → verifying`
+- **WHEN** verification passes on the second verifying round
+- **THEN** the change transitions to `done` and the full cycle is recorded in history
+
+#### Scenario: Valid transition — verifying to done
+
+- **WHEN** a Change in `verifying` state transitions to `done`
+- **THEN** a `transitioned` event with `from: 'verifying'` and `to: 'done'` is appended
+
 ### Requirement: Spec approval gate
 
 #### Scenario: Gate disabled — free transition to implementing
@@ -124,14 +182,50 @@
 - **WHEN** an artifact has `preHashCleanup` defined and a progress marker changes (e.g. a checkbox is checked)
 - **THEN** `effectiveStatus` remains `complete` — the cleaned hash is unchanged
 
+#### Scenario: Status derived — skipped
+
+- **GIVEN** an `optional: true` artifact with no file on disk
+- **AND** its `validatedHash` is `"__skipped__"`
+- **WHEN** `effectiveStatus` is derived
+- **THEN** it returns `skipped`
+
+#### Scenario: skipped persists across calls
+
+- **GIVEN** an `optional: true` artifact with `validatedHash === "__skipped__"` persisted in the manifest
+- **WHEN** `effectiveStatus` is derived in a subsequent CLI invocation
+- **THEN** it returns `skipped` — the sentinel in the manifest is the source of truth
+
+#### Scenario: skipping a non-optional artifact fails
+
+- **WHEN** an attempt is made to skip an artifact with `optional: false`
+- **THEN** the operation fails with an error and `validatedHash` is not modified
+
+#### Scenario: invalidated event clears all validatedHash values
+
+- **GIVEN** a change with one `complete` artifact (hash set) and one `skipped` artifact (sentinel set)
+- **WHEN** an `invalidated` event is appended
+- **THEN** all `validatedHash` values are cleared — the `complete` artifact becomes `in-progress` and the `skipped` artifact becomes `missing`
+
+#### Scenario: verifying → implementing clears only implementing.requires artifacts
+
+- **GIVEN** a change with `implementing.requires: [tasks]` and `tasks` is `complete`
+- **WHEN** the change transitions `verifying → implementing`
+- **THEN** only `tasks.validatedHash` is cleared — other artifacts retain their status
+
+#### Scenario: Dependency cascade — skipped optional satisfies dependency
+
+- **GIVEN** artifact B requires artifact A, and artifact A is `optional: true` and `skipped`
+- **WHEN** `effectiveStatus` for artifact B is derived
+- **THEN** it is not blocked by A — `skipped` is treated as resolved
+
 #### Scenario: Dependency cascade — incomplete dependency
 
 - **WHEN** artifact B requires artifact A, and artifact A is `in-progress`
 - **THEN** `effectiveStatus` for artifact B returns `in-progress` even if B's own cleaned hash matches its `validatedHash`
 
-#### Scenario: markComplete only from ValidateSpec
+#### Scenario: markComplete only from ValidateArtifacts
 
-- **WHEN** any code path other than `ValidateSpec` calls `Artifact.markComplete(hash)`
+- **WHEN** any code path other than `ValidateArtifacts` calls `Artifact.markComplete(hash)`
 - **THEN** this is a violation of the domain contract — no other use case may set an artifact to `complete`
 
 ### Requirement: History and event sourcing
@@ -143,8 +237,8 @@
 
 #### Scenario: State derived from last transitioned event
 
-- **WHEN** history contains `transitioned` events with `to` values of `designing`, `ready`, `implementing`
-- **THEN** deriving state returns `implementing` (the most recent `to` value)
+- **WHEN** history contains `transitioned` events with `to` values of `designing`, `ready`, `implementing`, `verifying`
+- **THEN** deriving state returns `verifying` (the most recent `to` value)
 
 #### Scenario: Draft status derived from history
 
