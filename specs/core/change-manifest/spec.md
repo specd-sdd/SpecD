@@ -37,6 +37,13 @@ Each change is persisted as a `manifest.json` file inside its change directory. 
       "requires": ["proposal"],
       "validatedHash": null,
     },
+    {
+      "type": "design",
+      "filename": "design.md",
+      "optional": true,
+      "requires": ["proposal"],
+      "validatedHash": "__skipped__", // optional artifact explicitly not produced
+    },
   ],
   "history": [
     {
@@ -67,7 +74,7 @@ Field definitions:
 - **`workspaces`** — current snapshot of active workspace IDs; mutable
 - **`specIds`** — current snapshot of spec paths; mutable
 - **`contextSpecIds`** — current snapshot of context dependency spec paths; populated at `ready` state from each spec's `.specd-metadata.yaml` `dependsOn` field (direct deps only); mutable; does not trigger approval invalidation when modified
-- **`artifacts`** — array of artifact descriptors; `validatedHash` is `null` when the artifact has not been validated. `ArtifactStatus` is never stored — it is derived at load time
+- **`artifacts`** — array of artifact descriptors; `validatedHash` is `null` when the artifact has not been validated, a SHA-256 string when validated, or `"__skipped__"` when an optional artifact has been explicitly marked as not produced. `ArtifactStatus` is never stored — it is derived at load time from `validatedHash` and file presence
 - **`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field.
 
 The JSON serialization of each event type is:
@@ -92,6 +99,9 @@ The JSON serialization of each event type is:
 // restored from drafts/
 { "type": "restored", "at": "...", "by": { "name": "...", "email": "..." } }
 
+// optional artifact explicitly marked as not produced
+{ "type": "artifact-skipped", "at": "...", "by": { "name": "...", "email": "..." }, "artifactId": "design", "reason": "not needed for this change" }
+
 // permanently abandoned
 { "type": "discarded", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "superseded", "supersededBy": ["new-auth-flow"] }
 ```
@@ -108,7 +118,8 @@ The manifest must be written atomically — by writing to a temporary file and t
 
 ## Constraints
 
-- `ArtifactStatus` is never stored in the manifest — only `validatedHash` per artifact
+- `ArtifactStatus` is never stored in the manifest — it is always derived from `validatedHash` and file presence at load time
+- `validatedHash` has three valid values: `null` (not yet validated), a SHA-256 string (validated), or `"__skipped__"` (optional artifact explicitly not produced)
 - The manifest has no `state` field; the current lifecycle state is always derived from the `history` array at load time
 - The `history` array is append-only — existing events must never be modified or removed by any operation
 - The `schema` field is written once at creation and must never be updated by subsequent operations

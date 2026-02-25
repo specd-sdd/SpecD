@@ -25,13 +25,31 @@
 
 #### Scenario: Artifact edited after validation
 
-- **WHEN** an artifact file is modified after `ValidateSpec` ran and stored its hash
+- **WHEN** an artifact file is modified after `ValidateArtifacts` ran and stored its hash
 - **THEN** `FsChangeRepository` recomputes the hash on next load and returns `in-progress`
 
 #### Scenario: Artifact file missing
 
-- **WHEN** an artifact file does not exist on disk
+- **WHEN** an artifact file does not exist on disk and `validatedHash` is `null`
 - **THEN** its status is `missing`
+
+#### Scenario: Artifact skipped — sentinel in manifest
+
+- **GIVEN** an `optional: true` artifact with `validatedHash: "__skipped__"` in the manifest and no file on disk
+- **WHEN** `FsChangeRepository` loads the change
+- **THEN** its status is `skipped`
+
+#### Scenario: validatedHash cleared on rollback — skipped becomes missing
+
+- **GIVEN** an artifact with `validatedHash: "__skipped__"` in the manifest
+- **WHEN** an `invalidated` event is appended and all `validatedHash` values are cleared
+- **THEN** its status becomes `missing` — the sentinel is gone and there is no file
+
+#### Scenario: validatedHash cleared on rollback — complete becomes in-progress
+
+- **GIVEN** an artifact with `validatedHash: "sha256:abc"` and its file still present
+- **WHEN** all `validatedHash` values are cleared
+- **THEN** its status becomes `in-progress` — file present but no valid hash
 
 ### Requirement: Artifact dependency cascade
 
@@ -40,11 +58,22 @@
 - **WHEN** artifact A is `complete` but its upstream dependency B is edited (becomes `in-progress`)
 - **THEN** `Change.effectiveStatus('a')` returns `in-progress`
 
-### Requirement: ValidateSpec is the sole path to `complete`
+#### Scenario: Upstream artifact skipped — downstream unblocked
 
-#### Scenario: Attempt to mark complete outside ValidateSpec
+- **GIVEN** artifact A requires optional artifact B, and B has `validatedHash: "__skipped__"`
+- **WHEN** `Change.effectiveStatus('a')` is called
+- **THEN** it returns A's own derived status — B's `skipped` state does not block A
 
-- **WHEN** any code other than `ValidateSpec` calls `artifact.markComplete(hash)`
+### Requirement: ValidateArtifacts is the sole path to `complete`
+
+#### Scenario: Attempt to mark complete outside ValidateArtifacts
+
+- **WHEN** any code other than `ValidateArtifacts` calls `artifact.markComplete(hash)`
+- **THEN** it violates this requirement — the call must be removed
+
+#### Scenario: Attempt to mark skipped outside skip use case
+
+- **WHEN** any code other than the skip use case sets `validatedHash` to `"__skipped__"`
 - **THEN** it violates this requirement — the call must be removed
 
 ### Requirement: Archive pattern configuration
