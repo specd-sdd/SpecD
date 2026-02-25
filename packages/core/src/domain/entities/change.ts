@@ -79,6 +79,15 @@ export interface DiscardedEvent {
   readonly supersededBy?: readonly string[]
 }
 
+/** Appended when an optional artifact is explicitly skipped. */
+export interface ArtifactSkippedEvent {
+  readonly type: 'artifact-skipped'
+  readonly at: Date
+  readonly by: GitIdentity
+  readonly artifactId: string
+  readonly reason?: string
+}
+
 /** Discriminated union of all change history event types. */
 export type ChangeEvent =
   | CreatedEvent
@@ -89,6 +98,7 @@ export type ChangeEvent =
   | DraftedEvent
   | RestoredEvent
   | DiscardedEvent
+  | ArtifactSkippedEvent
 
 /**
  * Construction properties for a `Change`.
@@ -255,7 +265,8 @@ export class Change {
     if (artifact.status === 'missing') return 'missing'
 
     for (const req of artifact.requires) {
-      if (this.effectiveStatus(req) !== 'complete') return 'in-progress'
+      const reqStatus = this.effectiveStatus(req)
+      if (reqStatus !== 'complete' && reqStatus !== 'skipped') return 'in-progress'
     }
 
     return artifact.status
@@ -317,6 +328,21 @@ export class Change {
    */
   recordSignoff(reason: string, artifactHashes: Record<string, string>, actor: GitIdentity): void {
     this._history.push({ type: 'signed-off', reason, artifactHashes, at: new Date(), by: actor })
+  }
+
+  /**
+   * Records that an optional artifact was explicitly skipped.
+   *
+   * @param artifactId - The artifact type ID that was skipped
+   * @param actor - Git identity of the actor skipping the artifact
+   * @param reason - Optional explanation for skipping
+   */
+  recordArtifactSkipped(artifactId: string, actor: GitIdentity, reason?: string): void {
+    const event: ArtifactSkippedEvent =
+      reason !== undefined
+        ? { type: 'artifact-skipped', artifactId, at: new Date(), by: actor, reason }
+        : { type: 'artifact-skipped', artifactId, at: new Date(), by: actor }
+    this._history.push(event)
   }
 
   /**

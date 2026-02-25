@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ChangeArtifact, SKIPPED_SENTINEL } from '../../../src/domain/entities/change-artifact.js'
+import { ArtifactNotOptionalError } from '../../../src/domain/errors/artifact-not-optional-error.js'
 
 describe('ChangeArtifact', () => {
   describe('constructor defaults', () => {
@@ -118,6 +119,36 @@ describe('ChangeArtifact', () => {
       })
       a.markComplete('sha256:new')
       expect(a.validatedHash).toBe('sha256:new')
+    })
+  })
+
+  describe('markSkipped', () => {
+    it('sets status to skipped on optional artifact', () => {
+      const a = new ChangeArtifact({ type: 'adr', filename: 'adr.md', optional: true })
+      a.markSkipped()
+      expect(a.status).toBe('skipped')
+    })
+
+    it('stores the skipped sentinel hash', () => {
+      const a = new ChangeArtifact({ type: 'adr', filename: 'adr.md', optional: true })
+      a.markSkipped()
+      expect(a.validatedHash).toBe(SKIPPED_SENTINEL)
+    })
+
+    it('throws ArtifactNotOptionalError on required artifact', () => {
+      const a = new ChangeArtifact({ type: 'proposal', filename: 'proposal.md' })
+      expect(() => a.markSkipped()).toThrow(ArtifactNotOptionalError)
+    })
+
+    it('throws with the correct artifact type in the message', () => {
+      const a = new ChangeArtifact({ type: 'proposal', filename: 'proposal.md' })
+      expect(() => a.markSkipped()).toThrow('"proposal"')
+    })
+  })
+
+  describe('SKIPPED_SENTINEL', () => {
+    it('equals the expected sentinel string', () => {
+      expect(SKIPPED_SENTINEL).toBe('__skipped__')
     })
   })
 })
