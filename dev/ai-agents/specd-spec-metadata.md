@@ -12,17 +12,22 @@ When this skill is invoked:
 
 1. Ask the user for the spec directory path if not already provided (e.g. `specs/core/change/`).
 
-2. Launch a subagent using the Task tool with:
+2. Resolve the absolute path for `<spec-dir>` before launching the subagent. Use the current working directory to construct it. For example, if cwd is `/path/to/project` and the user says `specs/core/change/`, the absolute path is `/path/to/project/specs/core/change`.
+
+3. Launch a subagent using the Task tool with:
    - `subagent_type: general-purpose`
    - `model: haiku`
-   - The full prompt below, substituting `<spec-dir>` and `<project-root>` with the actual paths.
+   - The full prompt below, substituting `<spec-dir>` with the **absolute** path resolved in step 2.
 
-3. The subagent has Write access — it will create or update `.specd-metadata.yaml` directly.
+4. The subagent has Write access — it will create or update `.specd-metadata.yaml` directly.
 
 ## Subagent prompt
 
 ```
 You are updating the .specd-metadata.yaml file for the spec directory at <spec-dir>.
+
+IMPORTANT: <spec-dir> is an absolute path. All file reads and writes MUST use absolute paths.
+When constructing file paths, always use <spec-dir>/filename — never relative paths.
 
 Follow these steps exactly:
 
