@@ -124,7 +124,7 @@ Delta files are located at `deltas/<workspace>/<capability-path>/<filename>.delt
 Each delta entry must include:
 
 - `op` (string, required) — one of `added`, `modified`, `removed`
-- `selector` (selector, required for `modified` and `removed`) — identifies the target node; see Requirement: Selector model
+- `selector` (selector, required for `modified` and `removed`, not valid for `added`) — identifies the existing node to modify or remove; for `added` entries, use `position.parent` to scope the insertion; see Requirement: Selector model
 - `position` (object, optional, `added` only) — declares where the new node is inserted. Contains:
   - `parent` (selector, optional) — scopes the insertion to the children of the matched node; if omitted, insertion happens at document root level
   - `after` (selector, optional) — inserts immediately after the matched sibling within the parent scope; if the selector resolves to no node, falls back to appending at the end of the parent scope with a warning
@@ -247,6 +247,7 @@ Declaration order is the authoritative execution order. No fixed operation order
 - An `added` entry with more than one of `position.after`, `position.before`, `position.first`, `position.last` — error
 - An `added` entry with `position.parent` that resolves to no node — error
 - `content` and `value` both present in the same entry — error
+- `selector` on an `added` entry — error; use `position.parent` to scope insertion
 - `rename` on an `added` or `removed` entry — error
 - `strategy: merge-by` without `mergeKey` — error
 - `mergeKey` present without `strategy: merge-by` — error
@@ -581,7 +582,7 @@ workflow:
 - `rename` is only valid on `modified` entries; using it on `added` or `removed` is an error
 - A `rename` value that collides with an existing sibling node or another `rename` in the same scope is a hard error checked during validation before any operation is applied
 - Unresolved `after`/`before` selectors are warnings, not errors — the node is appended at the end of the parent scope; unresolved `selector` in `modified`/`removed` is always a hard error
-- `content` for text-based nodes is the node body only — the identifying line is excluded; for `added`, the identifying property is provided via the first line of `content` or inferred from context
+- For `modified`, `content` is the node body only — the identifying line (heading, key name) is excluded and preserved or replaced via `rename`; for `added`, `content` must start with the identifying line (e.g. `### Heading` for markdown sections) followed by the body
 - `delta.content` and `delta.value` are mutually exclusive
 - `strategy: merge-by` requires `mergeKey`; `mergeKey` is invalid without `strategy: merge-by`
 - `strategy` is only valid on entries whose selector targets an array or sequence node
