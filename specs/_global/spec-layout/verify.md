@@ -48,7 +48,7 @@
 #### Scenario: Requirement heading missing in verify.md
 
 - **WHEN** a `verify.md` file contains scenarios not grouped under a `### Requirement:` heading
-- **THEN** it does not conform to this layout
+- **THEN** it does not conform to this layout and AST-based delta selectors will fail to locate those scenarios by heading
 
 ### Requirement: Spec Dependencies section
 
