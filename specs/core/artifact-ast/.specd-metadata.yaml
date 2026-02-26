@@ -1,0 +1,204 @@
+title: 'Artifact AST'
+description: >
+  Defines the normalized JSON-serializable AST format that all ArtifactParser adapters must produce and consume. This format is the contract between parsers, the delta application engine, selectors, and validation rules, supporting markdown, YAML, JSON, and plaintext formats.
+keywords:
+  - 'AST'
+  - 'artifact'
+  - 'parser'
+  - 'normalization'
+  - 'schema'
+  - 'contract'
+dependsOn:
+  - 'specs/core/delta-format/spec.md'
+contentHashes:
+  spec.md: 'sha256:cc278b6545845956504eda87e0bb68af7cb170a66387960b00fd5085e9759e64'
+  verify.md: 'sha256:fe58c628b17a48296c6df301d40e6ac5c748898686bbde0c88ec537e99864b6d'
+rules:
+  - requirement: 'Common node schema'
+    rules:
+      - 'Every node has a `type` field (string, required) with format-specific values'
+      - 'Every node has an optional `label` field (string) for the identifying value of the node, present on nodes with a primary identifier'
+      - 'Every node has an optional `value` field (string | number | boolean | null) for scalar leaf node content'
+      - 'Every node has an optional `children` field (array) for ordered child nodes'
+      - 'A node may have neither `value` nor `children` (e.g. a thematic break)'
+      - 'A node must not have both `value` and `children`'
+  - requirement: 'Markdown AST'
+    rules:
+      - 'The `document` node type is the root node with no `label` and has `children`'
+      - 'The `section` node type represents a heading and its content until the next heading of equal or lesser depth'
+      - 'Section `label` is the heading text without leading `#` characters and surrounding whitespace'
+      - 'Section nodes have a `level` field (integer 1–6) reflecting heading depth'
+      - 'Paragraph node type has a `value` (paragraph text as plain markdown inline content) and no `label`'
+      - 'List node type has an `ordered` field (boolean) and `children`, with no `label`'
+      - 'List-item node type has `label` (the item text) and may have `children` for nested lists'
+      - 'Code-block node type has `label` (language identifier if present) and `value` (code content)'
+      - 'Thematic-break node type has no `label`, no `value`, and no `children`'
+      - 'Sections nest by relative heading depth: each section becomes a child of the nearest preceding section whose `level` is strictly lower'
+      - 'Heading levels need not be contiguous — a `level: 4` section becomes a child of the nearest preceding `level: 1`, `2`, or `3` section'
+  - requirement: 'YAML AST'
+    rules:
+      - "The `document` node type is the root node with no `label` and has `children` (the top-level mapping's pairs, or a single sequence)"
+      - 'The `mapping` node type has no `label` and has `children` (array of `pair` nodes)'
+      - 'The `pair` node type has `label` (the key name as a string) and has either `value` for scalars or `children` containing a single `mapping` or `sequence` node for nested structures'
+      - 'The `sequence` node type has no `label` and has `children` (array of `sequence-item` nodes)'
+      - 'The `sequence-item` node type has no `label` and has either `value` for scalar items or `children` containing a single `mapping` or `sequence` node for structured items'
+  - requirement: 'JSON AST'
+    rules:
+      - 'The `document` node type is the root node with no `label` and has `children` containing a single root node'
+      - 'The `object` node type has no `label` and has `children` (array of `property` nodes)'
+      - 'The `property` node type has `label` (the key name) and has either `value` for scalars or `children` containing a single `object` or `array` node'
+      - 'The `array` node type has no `label` and has `children` (array of `array-item` nodes)'
+      - 'The `array-item` node type has no `label` and has either `value` for scalar items or `children` containing a single `object` or `array` node'
+  - requirement: 'Plaintext AST'
+    rules:
+      - 'The `document` node type is the root node with no `label` and has `children`'
+      - 'The `paragraph` node type has no `label` and has `value`'
+      - 'The `line` node type has no `label` and has `value`'
+  - requirement: 'Round-trip fidelity'
+    rules:
+      - "Each adapter must serialize a normalized AST back to the artifact's native format"
+      - 'All `label`, `value`, and `children` content is preserved exactly'
+      - 'For markdown: heading levels, list types (`ordered`), code block languages, and nesting structure are preserved'
+      - 'For YAML: key order within mappings is preserved; comments are preserved where the underlying library supports it (CST-level round-trip)'
+      - 'For JSON: key order is preserved; formatting is normalized to two-space indentation'
+      - 'Content not representable in the normalized format (e.g. inline markdown formatting such as bold or italic) is preserved as-is within `value` strings — the adapter does not decompose inline nodes'
+constraints:
+  - '`value` and `children` are mutually exclusive on any node'
+  - '`label` is only present on node types that have a primary identifier; it is absent on `document`, `paragraph`, `list`, `sequence`, `array`, `object`, `thematic-break`'
+  - 'All field values must be JSON-serializable — no functions, no circular references, no class instances'
+  - 'The adapter is the only component that may parse or serialize the native format; all other components operate exclusively on the normalized AST'
+scenarios:
+  - requirement: 'Common node schema'
+    name: 'value and children mutually exclusive'
+    given: []
+    when:
+      - 'a node has both `value` and `children`'
+    then:
+      - 'the adapter must not produce such a node — it is an invalid AST'
+  - requirement: 'Common node schema'
+    name: 'label absent on non-identifying nodes'
+    given: []
+    when:
+      - 'a `paragraph`, `list`, `sequence`, `object`, or `document` node is produced'
+    then:
+      - 'the node has no `label` field'
+  - requirement: 'Markdown AST'
+    name: 'Heading becomes section with label and level'
+    given:
+      - 'a markdown file containing `### Requirement: Login`'
+    when:
+      - 'the markdown adapter parses it'
+    then:
+      - 'the resulting AST contains a node `{ type: "section", label: "Requirement: Login", level: 3, children: [...] }`'
+  - requirement: 'Markdown AST'
+    name: 'Section nests by heading level'
+    given:
+      - 'a markdown file with a `## Requirements` heading followed by `### Requirement: Login`'
+    when:
+      - 'the markdown adapter parses it'
+    then:
+      - 'the `Requirement: Login` section node is a child of the `Requirements` section node'
+  - requirement: 'Markdown AST'
+    name: 'Non-contiguous heading levels nest correctly'
+    given:
+      - 'a markdown file with a `# Overview` heading followed by `#### Detail` (no intermediate levels)'
+    when:
+      - 'the markdown adapter parses it'
+    then:
+      - 'the `Detail` section node (`level: 4`) is a child of the `Overview` section node (`level: 1`)'
+  - requirement: 'Markdown AST'
+    name: 'Paragraph becomes leaf node with value'
+    given:
+      - 'a markdown file containing a prose paragraph'
+    when:
+      - 'the markdown adapter parses it'
+    then:
+      - 'the resulting node is `{ type: "paragraph", value: "<text>" }` with no `children`'
+  - requirement: 'Markdown AST'
+    name: 'Fenced code block preserves lang and content'
+    given:
+      - 'a markdown file with ` ```typescript\nconst x = 1\n``` `'
+    when:
+      - 'the markdown adapter parses it'
+    then:
+      - 'the resulting node is `{ type: "code-block", label: "typescript", value: "const x = 1" }`'
+  - requirement: 'Markdown AST'
+    name: 'Unordered list'
+    given:
+      - 'a markdown file with a bullet list'
+    when:
+      - 'the markdown adapter parses it'
+    then:
+      - 'the resulting node is `{ type: "list", ordered: false, children: [{ type: "list-item", label: "..." }, ...] }`'
+  - requirement: 'Markdown AST'
+    name: 'Round-trip preserves structure'
+    given:
+      - 'a markdown AST produced by parsing a spec file'
+    when:
+      - 'the adapter serializes it back to markdown'
+    then:
+      - 're-parsing the output produces an identical AST'
+  - requirement: 'YAML AST'
+    name: 'Scalar pair'
+    given:
+      - 'a YAML file containing `schema: spec-driven`'
+    when:
+      - 'the YAML adapter parses it'
+    then:
+      - 'the resulting AST contains `{ type: "pair", label: "schema", value: "spec-driven" }`'
+  - requirement: 'YAML AST'
+    name: 'Nested mapping under pair'
+    given:
+      - 'a YAML file with `llm:\n  model: claude-opus-4-6`'
+    when:
+      - 'the YAML adapter parses it'
+    then:
+      - 'the `llm` pair has `children` containing a `mapping` node, which has a `pair` child with `label: "model"`'
+  - requirement: 'YAML AST'
+    name: 'Sequence of scalars'
+    given:
+      - 'a YAML file with a sequence of strings under a key'
+    when:
+      - 'the YAML adapter parses it'
+    then:
+      - 'the pair has `children` containing a `sequence` node with `sequence-item` children each having `value`'
+  - requirement: 'YAML AST'
+    name: 'Sequence of objects'
+    given:
+      - 'a YAML file with a sequence of mappings (e.g. workflow steps)'
+    when:
+      - 'the YAML adapter parses it'
+    then:
+      - 'each `sequence-item` has `children` containing a `mapping` node with `pair` children'
+  - requirement: 'YAML AST'
+    name: 'Round-trip preserves comments'
+    given:
+      - 'a YAML file with inline comments'
+    when:
+      - 'the YAML adapter parses and re-serializes it without modification'
+    then:
+      - 'the output preserves all comments'
+  - requirement: 'JSON AST'
+    name: 'Object property'
+    given:
+      - 'a JSON file containing `{ "version": "1.0.0" }`'
+    when:
+      - 'the JSON adapter parses it'
+    then:
+      - 'the AST contains a `property` node with `label: "version"` and `value: "1.0.0"`'
+  - requirement: 'JSON AST'
+    name: 'Nested object'
+    given:
+      - 'a JSON file with a nested object value'
+    when:
+      - 'the JSON adapter parses it'
+    then:
+      - 'the property has children containing an object node with property children'
+  - requirement: 'JSON AST'
+    name: 'Array of scalars'
+    given:
+      - 'a JSON file with "keywords": ["specd", "spec-driven"]'
+    when:
+      - 'the JSON adapter parses it'
+    then:
+      - 'the keywords property has children containing an array node with array-item children each having value'
