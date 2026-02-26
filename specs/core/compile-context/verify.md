@@ -167,15 +167,15 @@
 
 #### Scenario: contextSections extracted from context specs
 
-- **GIVEN** the schema declares `artifacts[specs].contextSections: [{ name: 'Requirements' }]`
+- **GIVEN** the schema declares `artifacts[specs].contextSections: [{ selector: { type: section, matches: '^Requirements$' }, role: rules }]`
 - **AND** `auth/jwt/spec.md` is in the context set and has a `## Requirements` section
-- **WHEN** `CompileContext.execute` is called
-- **THEN** `result.instructionBlock` includes the `## Requirements` content from `auth/jwt/spec.md`
+- **WHEN** `CompileContext.execute` is called with stale or absent metadata for `auth/jwt`
+- **THEN** `result.instructionBlock` includes the serialized content of the `Requirements` section from `auth/jwt/spec.md`, labelled as `rules`
 
 #### Scenario: Missing contextSection silently skipped
 
-- **GIVEN** `artifacts[specs].contextSections: [{ name: 'Examples' }]`
-- **AND** a context spec has no `## Examples` section
+- **GIVEN** `artifacts[specs].contextSections: [{ selector: { type: section, matches: '^Examples$' } }]`
+- **AND** a context spec has no section matching `Examples`
 - **WHEN** `CompileContext.execute` is called
 - **THEN** no error is thrown and no warning is emitted for the missing section
 

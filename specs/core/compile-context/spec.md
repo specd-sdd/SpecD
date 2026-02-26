@@ -8,7 +8,7 @@
 
 ### Requirement: Ports and constructor
 
-`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaRegistry`, and `FileReader`.
+`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaRegistry`, `FileReader`, and `ArtifactParserRegistry`.
 
 ```typescript
 class CompileContext {
@@ -17,9 +17,12 @@ class CompileContext {
     specs: ReadonlyMap<string, SpecRepository>,
     schemas: SchemaRegistry,
     files: FileReader,
+    parsers: ArtifactParserRegistry,
   )
 }
 ```
+
+`ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `CompileContext` uses it to look up the correct adapter when injecting delta context for a delta-capable artifact.
 
 `specs` is keyed by workspace name (e.g. `'default'`, `'billing'`). The bootstrap layer constructs one `SpecRepository` instance per workspace declared in `specd.yaml` and passes them all here. `CompileContext` does not create or configure repositories — it only reads from them.
 
@@ -89,15 +92,20 @@ If the step is not available (one or more required artifacts are not `complete`)
 
 2. **Schema instruction** — if `activeArtifact` is present, include that artifact's `instruction` field from the schema if present. If `activeArtifact` is absent, no artifact instruction is injected.
 
-3. **Project artifact rules** — if `activeArtifact` is present and it appears in `config.artifactRules`, append the rule strings as a distinct constraints block below the schema instruction. Rules from `artifactRules` are additive — they do not replace the schema instruction.
+3. **Delta context** — if `activeArtifact` is present and the artifact has `delta: true`, inject three sub-blocks in order:
+   - **Format instructions** — call `parsers.get(artifact.format).deltaInstructions()` and inject the result verbatim. This explains selector syntax, op semantics, `content` vs `value`, file location (`deltas/<workspace>/<capability-path>/<filename>.delta.yaml`), and includes a concrete format-specific example.
+   - **Domain instructions** — inject the artifact's `deltaInstruction` field if present. This describes which domain concepts (requirements, scenarios, etc.) to add, modify, or remove.
+   - **Existing artifact outlines** — for each spec ID in `change.specIds`, read the corresponding artifact file from the `SpecRepository` for that workspace, parse it via `ArtifactParser.parse()`, call `outline(ast)`, and inject the result as a compact, labelled structure. If the file does not exist (new spec, not yet modified), skip it silently. This block is omitted entirely if no existing artifacts are found.
 
-4. **Spec content** — for each spec in the collected context set, include its content using the following strategy:
+4. **Project artifact rules** — if `activeArtifact` is present and it appears in `config.artifactRules`, append the rule strings as a distinct constraints block below the schema instruction. Rules from `artifactRules` are additive — they do not replace the schema instruction.
+
+5. **Spec content** — for each spec in the collected context set, include its content using the following strategy:
    - If `.specd-metadata.yaml` exists and is fresh: include `description`, `rules`, `constraints`, and `scenarios` from the metadata. This is the compact, machine-optimised representation.
-   - If metadata is absent or stale: fall back to extracting the sections declared in the artifact's `contextSections[]` from the spec's artifact files (loaded via `SpecRepository.artifact()`). Each entry in `contextSections` declares a section heading (`name`) and an optional display title (`contextTitle`); missing sections are silently skipped. Emit a staleness warning for this spec.
+   - If metadata is absent or stale: fall back to extracting nodes declared in the artifact's `contextSections[]` from the spec's artifact files (loaded via `SpecRepository.artifact()`). For each entry: parse the artifact file via `ArtifactParser.parse()`, apply the `selector` to find matching nodes, extract content per `extract` (`content` → `parser.renderSubtree(node)`; `label` → `node.label`; `both` → label + serialized content), and inject the result labelled with `role` and titled with `contextTitle` (falling back to `node.label`). Entries whose selector matches no node are silently skipped. Emit a staleness warning for this spec.
 
-5. **Step hooks** — for the requested step, include all `instruction:` entries from the matching workflow step's `hooks.pre` and `hooks.post`, in declaration order (schema hooks before project-level hooks). `run:` entries are not included — they are executed at archive time, not injected as AI context.
+6. **Step hooks** — for the requested step, include all `instruction:` entries from the matching workflow step's `hooks.pre` and `hooks.post`, in declaration order (schema hooks before project-level hooks). `run:` entries are not included — they are executed at archive time, not injected as AI context.
 
-6. **Available steps** — list all steps declared in the schema's `workflow[]`, each annotated with whether it is currently available. Unavailable steps must name the blocking artifacts.
+7. **Available steps** — list all steps declared in the schema's `workflow[]`, each annotated with whether it is currently available. Unavailable steps must name the blocking artifacts.
 
 ### Requirement: Result shape
 
@@ -128,7 +136,10 @@ If a pattern or `dependsOn` entry references a workspace name that has no corres
 - `CompileContext` must not perform direct filesystem reads — all file access goes through `SpecRepository` (for spec files) or `FileReader` (for `config.context` file entries)
 - The caller resolves the config and constructs all `SpecRepository` and `FileReader` instances before calling the constructor
 - The `specs` map must contain one entry per workspace declared in `specd.yaml`; workspaces missing from the map produce a warning, not an error
-- Artifact instructions and `artifactRules` are included only when `activeArtifact` is provided — and only for that artifact
+- Artifact instructions, delta context, and `artifactRules` are included only when `activeArtifact` is provided — and only for that artifact
+- Delta context (format instructions + domain instructions + outlines) is injected only when `activeArtifact` has `delta: true`
+- Existing artifact outlines are injected per spec ID in `change.specIds`; missing files are silently skipped
+- `ArtifactParserRegistry` must contain an adapter for every `format` value declared in the schema's artifacts; a missing adapter must emit a warning and skip the delta context block — no error
 - Step hooks (`pre`/`post`) fire once per step, not once per artifact iteration
 - `instruction:` hook entries are included in the compiled output; `run:` hook entries are not
 - Cycle detection is mandatory — cycles in `dependsOn` must not cause infinite loops
@@ -195,4 +206,5 @@ const result = await compileContext.execute({
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `contextSpecIds`, `effectiveStatus`, active workspaces
 - [`specs/core/config/spec.md`](../config/spec.md) — 5-step context spec resolution, include/exclude patterns, workspace-level patterns, `artifactRules`, workflow hooks
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal, staleness detection
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `contextSections` (fallback path), `workflow`, `instruction`, `requiredSpecArtifacts`
+- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `contextSections` (fallback path), `workflow`, `instruction`, `delta`, `format`, `deltaInstruction`
+- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `deltaInstructions()`, `outline()`
