@@ -1,0 +1,408 @@
+title: 'Delta Format'
+description: >
+  Defines YAML-based delta files that express changes to artifacts as structured
+  AST operations rather than text diffs. Delta files target nodes by type and
+  selector properties, apply changes atomically with full validation, and work
+  with all supported file formats (markdown, JSON, YAML, plain text).
+keywords:
+  - 'delta'
+  - 'artifact'
+  - 'AST'
+  - 'selector'
+  - 'YAML'
+  - 'parser'
+  - 'validation'
+dependsOn:
+  - 'specs/core/artifact-ast/spec.md'
+contentHashes:
+  spec.md: 'sha256:042f104b6f2805ddc811b93ffbfd554ce7d3df90a47f7b9b882a75b33018f8d6'
+  verify.md: 'sha256:f89dce5bd26f3e1cf28b2cc436929d643c49eda3412c828bc33ea3b9e61a64ad'
+rules:
+  - requirement: 'ArtifactParser port'
+    rules:
+      - 'ArtifactParser is the domain port that abstracts all file-type-specific operations for parsing, applying deltas, and serialization'
+      - 'The port provides fileExtensions, parse, apply, serialize, nodeTypes, outline, and deltaInstructions methods'
+      - 'parse(content) returns an ArtifactAST from artifact content'
+      - 'apply(ast, delta) applies a delta array to an artifact AST and returns a new AST, resolving all selectors before applying operations'
+      - 'serialize(ast) converts AST back to string representation, preserving comments and formatting for YAML via CST-level round-trip'
+      - 'nodeTypes() returns a static array of NodeTypeDescriptor objects describing all addressable node types for the file format'
+      - "outline(ast) returns a simplified, navigable summary of the artifact's addressable nodes without full content"
+      - 'deltaInstructions() returns a format-specific text block injected into LLM instructions explaining selector vocabulary and semantics'
+      - 'apply rejects the entire delta with DeltaApplicationError if any selector in modified or removed entries fails to resolve or if the target name for rename already exists'
+      - 'apply does not validate position.after/position.before selectors in added entries at this stage — their failure is a recoverable warning'
+      - 'apply validates position.parent selectors — failure rejects with DeltaApplicationError'
+      - 'Node types by format: Markdown (document, section, paragraph, list, list-item, code-block, thematic-break); JSON (document, object, property, array, array-item); YAML (document, mapping, pair, sequence, sequence-item); Plain text (document, paragraph, line)'
+      - 'The label field on a node is the identifying value evaluated by matches; the value field is the scalar content evaluated by contains'
+  - requirement: 'Selector model'
+    rules:
+      - "A selector is a YAML object that identifies one or more nodes in an artifact's AST"
+      - 'Selector fields: type (required string), matches (optional regex), contains (optional regex), parent (optional selector), index (optional integer), where (optional object)'
+      - 'type must be one of the values returned by ArtifactParser.nodeTypes() for the target file format'
+      - "matches is a regular expression matched case-insensitively against the node's label (heading text, key name, etc.); a plain string acts as a substring match; anchors and special characters work as expected"
+      - "contains is a regular expression matched case-insensitively against the node's value (paragraph text, scalar pair value, etc.)"
+      - 'parent constrains the search to nodes whose nearest ancestor matches the provided selector; used to disambiguate nodes at different nesting levels'
+      - 'index targets the item at a zero-based index for array-item and sequence-item nodes; mutually exclusive with where'
+      - 'where targets array items that are objects by matching their fields to all key-value pairs; values are matched as case-insensitive regular expressions; mutually exclusive with index'
+      - 'When multiple nodes match a selector, apply rejects with DeltaApplicationError unless the caller expects multiple matches (as in validation rules)'
+      - 'Delta entries targeting an array or sequence node accept an optional strategy field: replace (default), append, or merge-by'
+      - 'replace replaces the array value in its entirety with the supplied value'
+      - 'append appends the supplied value items to the end of the existing array'
+      - 'merge-by merges supplied items by matching objects on a key field; items with matching key are replaced, new keys appended, unmatched existing items preserved; requires mergeKey'
+  - requirement: 'Delta file format'
+    rules:
+      - 'A delta file is a YAML document containing an array of delta entry objects'
+      - 'Delta filename is <artifact-output-filename>.delta.yaml (e.g., spec.md.delta.yaml, package.json.delta.yaml)'
+      - 'Delta files are located at deltas/<workspace>/<capability-path>/<filename>.delta.yaml within the change directory'
+      - 'Delta files are never synced to permanent spec directories'
+      - 'Each delta entry must include op (required: added, modified, removed) and selector (required for modified and removed)'
+      - 'position object (optional, added only) declares where the new node is inserted with fields: parent (optional selector), after (optional selector), before (optional selector), first (optional boolean), last (optional boolean)'
+      - 'position.after inserts immediately after the matched sibling; if selector resolves to no node, falls back to appending at the end with a warning'
+      - 'position.before inserts immediately before the matched sibling; if selector resolves to no node, falls back to appending at the end with a warning'
+      - 'position.first inserts as the first child of parent scope or document root; mutually exclusive with after, before, last'
+      - 'position.last inserts as the last child of parent scope or document root; mutually exclusive with after, before, first; default when no placement hint given'
+      - 'If only parent is specified with no placement hint, the new node is appended as the last child of the matched parent'
+      - 'If position is omitted entirely, the new node is appended at the end of the document'
+      - "rename (optional, modified only) sets a new value for the node's identifying property; selector still uses current name to locate node"
+      - 'If rename target already exists as a sibling, apply rejects with DeltaApplicationError'
+      - "content (optional string) is the full new node content in the artifact's native format"
+      - 'For added entries, content includes the identifying line (e.g., "### Heading" for markdown, key name for YAML/JSON) as the first line'
+      - 'For modified entries, content contains only the body — the identifying line is preserved or replaced via rename'
+      - 'apply parses content using ArtifactParser.parse() before inserting into the AST'
+      - 'content and value are mutually exclusive'
+      - "value (optional, any type) is the node's value as a structured YAML value; used for structured nodes (JSON properties, YAML pairs)"
+      - 'strategy and mergeKey apply only to entries whose selector targets an array or sequence node'
+      - 'mergeKey (optional string) names the key field for merge-by strategy; required when strategy is merge-by'
+  - requirement: 'Delta application'
+    rules:
+      - 'ArtifactParser.apply(ast, delta) applies a delta array to an artifact AST and returns a new AST'
+      - 'First phase: resolve every selector in modified and removed entries against the AST; if any fails (no match or ambiguous), reject entire delta with DeltaApplicationError without applying any operation'
+      - 'First phase: for modified entries with rename, verify no sibling node already carries the target name; if one exists, reject with DeltaApplicationError'
+      - 'First phase: position.after/position.before selectors in added entries are not validated — their failure is a recoverable warning, not an error'
+      - 'First phase: position.parent selectors are validated — if a parent is declared and resolves to no node, reject with DeltaApplicationError'
+      - 'Second phase: process entries in declaration order'
+      - 'removed operation detaches the matched node from its parent'
+      - "modified operation: if rename is present, update the node's identifying property; if content is present, parse it and replace the node's body; if value is present, replace the node's value; for array targets, apply declared strategy"
+      - 'rename and content/value are independent and can be combined'
+      - "added operation: if content is present, parse it to obtain the new AST node; resolve position; if position.parent declared, scope insertion to that node's children; apply placement hint (first, last, after, before); if after/before not resolved, emit warning and append at end of scope; if no position, append at end of document"
+      - 'Declaration order is the authoritative execution order; no fixed operation ordering is imposed'
+  - requirement: 'Delta conflict detection'
+    rules:
+      - 'apply must detect and reject conflicting delta entries before applying any changes'
+      - 'Error: two modified or removed operations whose selectors resolve to the same node'
+      - "Error: a rename target that matches an existing sibling node's identifying property"
+      - "Error: a rename target that matches another modified entry's rename value within the same parent scope"
+      - 'Error: an added entry with more than one of position.after, position.before, position.first, position.last'
+      - 'Error: an added entry with position.parent that resolves to no node'
+      - 'Error: both content and value present in the same entry'
+      - 'Error: rename on an added or removed entry'
+      - 'Error: strategy merge-by without mergeKey'
+      - 'Error: mergeKey present without strategy merge-by'
+      - 'Error: strategy on an entry whose selector targets a non-array node'
+  - requirement: 'Delta structural validation'
+    rules:
+      - 'The deltaValidations field on a schema artifact allows schema authors to define JSONPath-based structural constraints'
+      - 'Constraints are checked against the normalized YAML AST of the delta file before application'
+      - 'The delta file is parsed by the YAML adapter to produce a normalized AST'
+      - "ValidateArtifacts evaluates each rule's selector JSONPath expression against that AST using the same mechanism as validations on artifact AST"
+      - 'The full rule format is specified in specs/core/schema-format/spec.md — Requirement: Delta validation rules'
+constraints:
+  - 'selector.index and selector.where are mutually exclusive'
+  - 'position.after, position.before, position.first, and position.last are mutually exclusive in an added entry'
+  - 'rename is only valid on modified entries; using it on added or removed is an error'
+  - 'A rename value that collides with an existing sibling node or another rename in the same scope is a hard error checked during validation before any operation is applied'
+  - 'Unresolved after/before selectors are warnings, not errors — the node is appended at the end of the parent scope; unresolved selector in modified/removed is always a hard error'
+  - 'content for text-based nodes is the node body only — the identifying line is excluded; for added, the identifying property is provided via the first line of content or inferred from context'
+  - 'delta.content and delta.value are mutually exclusive'
+  - 'strategy: merge-by requires mergeKey; mergeKey is invalid without strategy: merge-by'
+  - 'strategy is only valid on entries whose selector targets an array or sequence node'
+  - 'Delta files live at deltas/<workspace>/<capability-path>/<filename>.delta.yaml within the change directory and are never synced to permanent spec directories'
+  - 'A DeltaApplicationError on any entry must abort the entire delta — no partial application'
+  - 'Declaration order in the delta file is the execution order; no reordering is performed'
+scenarios:
+  - requirement: 'ArtifactParser port'
+    name: 'nodeTypes returns format-specific vocabulary'
+    given: []
+    when:
+      - 'nodeTypes() is called on the markdown parser'
+    then:
+      - 'it returns descriptors including section (identified by heading), paragraph, list, list-item, and code-block'
+  - requirement: 'ArtifactParser port'
+    name: 'nodeTypes returns JSON vocabulary'
+    given: []
+    when:
+      - 'nodeTypes() is called on the JSON parser'
+    then:
+      - 'it returns descriptors including property (identified by key), object, array, and array-item'
+  - requirement: 'ArtifactParser port'
+    name: 'deltaInstructions returns format-specific selector guidance'
+    given: []
+    when:
+      - 'deltaInstructions() is called on the markdown adapter'
+    then:
+      - 'it returns a string describing the selector fields (type, heading, parent), the semantics of content for modified and added, the delta file location pattern, and a concrete YAML example mapping an AST section node to a delta entry'
+  - requirement: 'ArtifactParser port'
+    name: 'deltaInstructions returns format-specific value guidance for JSON'
+    given: []
+    when:
+      - 'deltaInstructions() is called on the JSON adapter'
+    then:
+      - 'it returns a string describing type: property, key, value, index, where, and includes a concrete example using op: modified with a value field'
+  - requirement: 'ArtifactParser port'
+    name: 'outline reflects current artifact nodes'
+    given: []
+    when:
+      - 'outline(ast) is called on a parsed markdown spec with three ### Requirement: headings'
+    then:
+      - 'it returns three OutlineEntry objects with type: section and their respective heading texts as label'
+  - requirement: 'ArtifactParser port'
+    name: 'apply rejects on unresolved selector'
+    given: []
+    when:
+      - 'a delta entry has a selector that matches no node in the AST'
+    then:
+      - 'apply must throw DeltaApplicationError without modifying the AST'
+  - requirement: 'ArtifactParser port'
+    name: 'apply rejects on ambiguous selector'
+    given: []
+    when:
+      - 'a delta entry has a selector that matches more than one node and a single match is expected'
+    then:
+      - 'apply must throw DeltaApplicationError without modifying the AST'
+  - requirement: 'ArtifactParser port'
+    name: 'serialize round-trips YAML comments'
+    given: []
+    when:
+      - 'a YAML artifact containing inline comments is parsed and serialised without modification'
+    then:
+      - 'the serialised output preserves all comments'
+  - requirement: 'Selector model'
+    name: 'matches — plain string acts as regex'
+    given: []
+    when:
+      - 'a selector has type: section and matches: "Requirement: Load"'
+    then:
+      - 'it matches any section node whose identifier contains "Requirement: Load" (case-insensitive regex)'
+  - requirement: 'Selector model'
+    name: 'matches — anchored regex'
+    given: []
+    when:
+      - 'a selector has matches: "^Requirement:"'
+    then:
+      - 'it matches any section node whose identifier starts with "Requirement:"'
+  - requirement: 'Selector model'
+    name: 'contains matches node value'
+    given: []
+    when:
+      - 'a selector has type: paragraph and contains: "SHALL"'
+    then:
+      - 'it matches any paragraph node whose value contains "SHALL" (case-insensitive)'
+  - requirement: 'Selector model'
+    name: 'contains and matches combined'
+    given: []
+    when:
+      - 'a selector has type: pair, matches: "^op$", and contains: "added|modified"'
+    then:
+      - 'it matches only pair nodes whose label is "op" AND whose value matches "added|modified"'
+  - requirement: 'Selector model'
+    name: 'parent narrows search'
+    given: []
+    when:
+      - 'two pair nodes share matches: model at different nesting levels and a selector has matches: model with parent: { type: pair, matches: llm }'
+    then:
+      - 'only the node nested under llm is matched'
+  - requirement: 'Selector model'
+    name: 'index targets array item'
+    given: []
+    when:
+      - 'a selector has type: array-item and index: 0'
+    then:
+      - 'it targets the first item of the nearest matching array'
+  - requirement: 'Selector model'
+    name: 'where targets object array item'
+    given: []
+    when:
+      - 'a selector has type: sequence-item, parent: { type: pair, matches: steps }, and where: { name: "Run tests" }'
+    then:
+      - 'it targets the sequence item under steps whose name field matches the regex "Run tests" (case-insensitive)'
+  - requirement: 'Selector model'
+    name: 'index and where mutually exclusive'
+    given: []
+    when:
+      - 'a selector declares both index and where'
+    then:
+      - 'apply must throw DeltaApplicationError'
+  - requirement: 'Selector model'
+    name: 'strategy append adds items to end'
+    given: []
+    when:
+      - 'a delta entry targets a property node whose value is ["a", "b"] with strategy: append and value: ["c"]'
+    then:
+      - 'the resulting array is ["a", "b", "c"]'
+  - requirement: 'Selector model'
+    name: 'strategy merge-by replaces matched and preserves unmatched'
+    given: []
+    when:
+      - 'a delta targets a sequence with items [{name: "a", run: "old"}, {name: "b", run: "old"}] using strategy: merge-by, mergeKey: name, and value: [{name: "a", run: "new"}]'
+    then:
+      - 'the result is [{name: "a", run: "new"}, {name: "b", run: "old"}]'
+  - requirement: 'Selector model'
+    name: 'merge-by without mergeKey'
+    given: []
+    when:
+      - 'a delta entry has strategy: merge-by but no mergeKey'
+    then:
+      - 'apply must throw DeltaApplicationError'
+  - requirement: 'Delta file format'
+    name: 'modified replaces node body only'
+    given: []
+    when:
+      - 'a delta entry has op: modified, a selector matching a section node, and content with new markdown'
+    then:
+      - "apply replaces that section's body with the supplied content; the heading line is unchanged"
+  - requirement: 'Delta file format'
+    name: 'modified with rename updates identifying property'
+    given: []
+    when:
+      - 'a delta entry has op: modified, a selector matching matches: "Requirement: Login", and rename: "Requirement: Authentication"'
+    then:
+      - 'the section heading becomes "Requirement: Authentication" in the serialised output'
+  - requirement: 'Delta file format'
+    name: 'rename with body update in one operation'
+    given: []
+    when:
+      - 'a delta entry has both rename and content on a modified entry'
+    then:
+      - 'both are applied — the heading is renamed and the body is replaced'
+  - requirement: 'Delta file format'
+    name: 'rename collides with existing sibling'
+    given: []
+    when:
+      - 'a delta entry renames a section to a heading that already exists as a sibling'
+    then:
+      - 'apply must throw DeltaApplicationError before applying any changes'
+  - requirement: 'Delta file format'
+    name: 'rename on added entry is invalid'
+    given: []
+    when:
+      - 'a delta entry has op: added and includes rename'
+    then:
+      - 'apply must throw DeltaApplicationError'
+  - requirement: 'Delta file format'
+    name: 'added appends when no position'
+    given: []
+    when:
+      - 'a delta entry has op: added and omits position'
+    then:
+      - 'the new node is appended at the end of the document'
+  - requirement: 'Delta file format'
+    name: 'added with position.parent appends as last child'
+    given: []
+    when:
+      - 'a delta entry has op: added and position: { parent: { type: section, matches: "Requirements" } } with no placement hint'
+    then:
+      - 'the new node is appended as the last child of the matched Requirements section'
+  - requirement: 'Delta file format'
+    name: 'added positions after matched sibling'
+    given: []
+    when:
+      - 'a delta entry has op: added and position: { parent: { type: section, matches: "Requirements" }, after: { type: section, matches: "Requirement: A" } }'
+    then:
+      - 'the new node is inserted immediately after the Requirement: A section within Requirements'
+  - requirement: 'Delta file format'
+    name: 'position.after resolves to no node — fallback to end of parent'
+    given: []
+    when:
+      - 'a delta entry has op: added and position: { parent: { type: section, matches: "Requirements" }, after: { type: section, matches: "Requirement: Deleted" } } but the after node does not exist'
+    then:
+      - 'the new node is appended at the end of the parent scope and a warning is emitted; no error is thrown'
+  - requirement: 'Delta file format'
+    name: 'position.first inserts as first child'
+    given: []
+    when:
+      - 'a delta entry has op: added and position: { parent: { type: section, matches: "Requirements" }, first: true }'
+    then:
+      - 'the new node is inserted before all existing children of the matched Requirements section'
+  - requirement: 'Delta file format'
+    name: 'position.last inserts as last child'
+    given: []
+    when:
+      - 'a delta entry has op: added and position: { parent: { type: section, matches: "Requirements" }, last: true }'
+    then:
+      - 'the new node is appended after all existing children of the matched Requirements section'
+  - requirement: 'Delta file format'
+    name: 'position.parent resolves to no node — error'
+    given: []
+    when:
+      - 'a delta entry has op: added and position: { parent: { type: section, matches: "Nonexistent" } } but no such node exists'
+    then:
+      - 'apply must throw DeltaApplicationError'
+  - requirement: 'Delta file format'
+    name: 'removed detaches node'
+    given: []
+    when:
+      - 'a delta entry has op: removed and a selector matching a section node'
+    then:
+      - 'that section is absent from the serialised output'
+  - requirement: 'Delta file format'
+    name: 'content and value mutually exclusive'
+    given: []
+    when:
+      - 'a delta entry declares both content and value'
+    then:
+      - 'apply must throw DeltaApplicationError'
+  - requirement: 'Delta file format'
+    name: 'position placement hints mutually exclusive'
+    given: []
+    when:
+      - 'an added entry declares more than one of position.after, position.before, position.first, position.last'
+    then:
+      - 'apply must throw DeltaApplicationError'
+  - requirement: 'Delta file format'
+    name: 'delta file inferred from filename prefix'
+    given: []
+    when:
+      - 'a file named spec.md.delta.yaml is present in the change directory'
+    then:
+      - 'the system associates it with the artifact whose output filename is spec.md'
+  - requirement: 'Delta application'
+    name: 'entries applied in declaration order'
+    given: []
+    when:
+      - 'a delta has two modified entries targeting different nodes'
+    then:
+      - 'the first entry is applied before the second, and both changes appear in the result'
+  - requirement: 'Delta application'
+    name: 'removed followed by added at same position'
+    given: []
+    when:
+      - 'a delta removes a node and then adds a new node after the preceding sibling'
+    then:
+      - 'the old node is absent and the new node appears at the correct position'
+  - requirement: 'Delta application'
+    name: 'entire delta rejected on single selector failure'
+    given: []
+    when:
+      - 'a delta has three entries and the second selector resolves to no node'
+    then:
+      - 'apply throws DeltaApplicationError and none of the three operations are applied'
+  - requirement: 'Delta conflict detection'
+    name: 'Two entries targeting the same node'
+    given: []
+    when:
+      - 'a delta has two modified entries whose selectors both resolve to the same node'
+    then:
+      - 'apply must throw DeltaApplicationError before applying any changes'
+  - requirement: 'Delta conflict detection'
+    name: 'strategy on non-array target'
+    given: []
+    when:
+      - 'a delta entry specifies strategy: append but the selector targets a section node'
+    then:
+      - 'apply must throw DeltaApplicationError'
+  - requirement: 'Delta conflict detection'
+    name: 'multiple position placement hints — error'
+    given: []
+    when:
+      - 'an added entry declares both position.first: true and position.last: true (or any two of first, last, after, before)'
+    then:
+      - 'apply must throw DeltaApplicationError'
