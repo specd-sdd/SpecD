@@ -66,7 +66,7 @@ Every `spec.md` must follow this structure. Sections marked _optional_ may be om
 
 ### Requirement: verify.md structure
 
-Every `verify.md` must follow this structure. Scenarios are grouped under requirement headings using the same `### Requirement: <name>` pattern as `spec.md` — this is required for the delta merger to correlate scenarios with their requirement when changes are applied.
+Every `verify.md` must follow this structure. Scenarios are grouped under requirement headings using the same `### Requirement: <name>` pattern as `spec.md` — this is required for AST-based delta selectors to locate scenario nodes by heading when changes are applied to `verify.md`.
 
 ```markdown
 # Verification: <Title>
@@ -93,7 +93,8 @@ Every `spec.md` must include a `## Spec Dependencies` section listing other spec
 
 - `specs/_global/` is for cross-cutting constraints only — not for any single package's implementation details
 - Package spec directories use the short package name: `core`, `cli`, `mcp`, `skills`, `schema-std`, `schema-openspec`
-- Every spec subdirectory contains exactly two files: `spec.md` and `verify.md`
+- Every spec subdirectory contains exactly two authored files: `spec.md` and `verify.md`; `.specd-metadata.yaml` is a generated system file and is not counted
+- Delta files (`spec.md.delta.yaml`, `verify.md.delta.yaml`, etc.) are change artifacts — they live in the change directory alongside the artifact and are never synced to the permanent `specs/` directories
 - `spec.md` contains no WHEN/THEN scenarios; `verify.md` contains no requirement prose
 - Subdirectory names are kebab-case
 - A spec in `specs/<package>/` is not binding on any other package
