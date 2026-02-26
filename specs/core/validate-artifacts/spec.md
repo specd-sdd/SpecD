@@ -8,7 +8,7 @@
 
 ### Requirement: Ports and constructor
 
-`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaRegistry`, and `GitAdapter` to resolve the actor for any invalidation events.
+`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaRegistry`, `ArtifactParserRegistry`, and `GitAdapter`.
 
 ```typescript
 class ValidateArtifacts {
@@ -16,12 +16,13 @@ class ValidateArtifacts {
     changes: ChangeRepository,
     specs: ReadonlyMap<string, SpecRepository>,
     schemas: SchemaRegistry,
+    parsers: ArtifactParserRegistry,
     git: GitAdapter,
   )
 }
 ```
 
-`specs` is keyed by workspace name. When loading a base spec for delta merge preview, `ValidateArtifacts` looks up the `SpecRepository` for the spec path's workspace. The bootstrap layer constructs and passes all workspace repositories.
+`specs` is keyed by workspace name. When loading a base spec for delta application preview, `ValidateArtifacts` looks up the `SpecRepository` for the spec path's workspace. `ArtifactParserRegistry` maps format names to `ArtifactParser` adapters and is used for both `deltaValidations` checks and delta application preview.
 
 ### Requirement: Input
 
@@ -40,7 +41,7 @@ Before validating structure, `ValidateArtifacts` must verify that all non-option
 
 ### Requirement: Dependency order check
 
-Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped` (via `change.effectiveStatus(type)`). If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency — it is treated as resolved. `skipped` artifacts are not validated — there is no file to check.
+Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped` (via `change.effectiveStatus(type)`). If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.
 
 ### Requirement: Approval invalidation on content change
 
@@ -52,38 +53,43 @@ A single invalidation call is made per `execute` invocation even if multiple art
 
 ### Requirement: Delta validation
 
-If the schema artifact declares `deltaValidations[]`, `ValidateArtifacts` must validate the delta file (the artifact file in the change directory) against those rules before attempting any merge. Each rule is evaluated against the delta file content:
+If the schema artifact declares `deltaValidations[]` and a delta file exists for the artifact at `deltas/<workspace>/<capability-path>/<filename>.delta.yaml`, `ValidateArtifacts` must validate the delta file before attempting application.
 
-- If `scope` is set, the check is restricted to the named delta section within the file.
-- If `eachBlock` is set, the check runs once per block matching that pattern within the scope.
-- `required: true` (default) means absence is a validation failure.
-- `required: false` means absence is a warning.
+The delta file is parsed by the YAML adapter to produce a normalized YAML AST. Each `deltaValidations` rule is then evaluated against this AST using the same algorithm as structural validation (see Requirement: Structural validation), with the delta AST as the document root.
 
-If any delta validation rule with `required: true` fails, the artifact is not merged or marked complete. The failure is reported in the result.
+For each rule in `deltaValidations[]`, apply the rule evaluation algorithm (identical for both `validations` and `deltaValidations`; only the document root differs):
 
-If `eachBlock` references a section that has no entry in the artifact's `deltas[]`, `ValidateArtifacts` must report a configuration error — block boundaries cannot be determined.
+1. Select candidate nodes from the document root using one of:
+   - **Selector fields** (`type`, `matches`, `contains`, `parent`, `index`, `where`): apply the selector model defined in `delta-format/spec.md` against the AST.
+   - **`path`** (JSONPath string): evaluate the JSONPath expression against the document root.
+2. If zero nodes are selected: if `required: true`, record a failure; if `required: false`, record a warning. Skip `children` and `contentMatches` evaluation.
+3. If one or more nodes are selected: for each matched node:
+   - If `contentMatches` is present: call `parser.renderSubtree(node)` to serialize the subtree to its native format, then test the regex against the result. A non-matching node records a failure.
+   - Evaluate any `children` rules recursively, using the matched node as the document root.
 
-### Requirement: Merge preview and conflict detection
+A rule passes vacuously when zero nodes are selected. If any `required: true` delta validation rule fails, the artifact is not advanced to the delta application preview step — the failure is reported immediately.
 
-For artifacts that declare `deltas[]`, `ValidateArtifacts` must:
+### Requirement: Delta application preview and conflict detection
 
-1. Load the base spec from `SpecRepository` using the spec path.
-2. Load the artifact (delta) file from `ChangeRepository`.
-3. Call `mergeSpecs(base, delta, deltaConfigs, deltaOperations)` where `deltaConfigs` comes from the schema artifact's `deltas[]` and `deltaOperations` from the schema's `deltaOperations` field (or defaults).
-4. If `mergeSpecs` throws `DeltaConflictError`, report it as a validation failure and do not proceed to `validations[]` or `markComplete`.
+For artifacts with `delta: true` and an existing base spec in `SpecRepository`:
 
-The merged result is used for `validations[]` checks. The base spec in `SpecRepository` is **not modified** — archive (not validate) is the step that writes the merged content to the spec repo.
+1. Load the base artifact file from `SpecRepository` using the spec path and artifact filename.
+2. Load the delta file from the change directory at `deltas/<workspace>/<capability-path>/<filename>.delta.yaml`.
+3. Resolve the `ArtifactParser` adapter for `artifact.format`.
+4. Call `parser.parse(baseContent)` to produce the base AST.
+5. Call `parser.apply(baseAST, deltaEntries)` to produce the merged AST.
+6. If `apply` throws `DeltaApplicationError`, record it as a validation failure and do not proceed to `validations[]` or `markComplete`.
 
-For artifacts without `deltas[]` (new files with no merge step), `ValidateArtifacts` validates the artifact content directly against `validations[]`.
+The merged AST (from `parser.serialize(mergedAST)`) is used for `validations[]` checks. The base spec in `SpecRepository` is **not modified** — archive is the step that writes the merged content.
+
+For artifacts without a delta file (new files being created in the change), `ValidateArtifacts` validates the artifact content directly against `validations[]`.
 
 ### Requirement: Structural validation
 
-After a successful merge preview (or for non-delta artifacts), `ValidateArtifacts` runs all rules in the artifact's `validations[]` against the merged (or direct) content:
+After a successful delta application preview (or for non-delta artifacts), `ValidateArtifacts` runs all rules in the artifact's `validations[]` against the merged (or direct) content:
 
-- If `scope` is set, the check is restricted to the named section.
-- If `eachBlock` is set, the check runs once per block matching that pattern within the scope.
-- `required: true` (default) means absence is a validation failure.
-- `required: false` means absence is a warning.
+1. Parse the content via `ArtifactParser.parse()` to produce a normalized AST (if not already parsed during delta application preview).
+2. For each rule in `validations[]`, apply the rule evaluation algorithm: select nodes using selector fields or `path`; if zero nodes matched, record failure or warning per `required` and skip `children`/`contentMatches`; for each matched node, evaluate `contentMatches` against the serialized subtree (`parser.renderSubtree(node)`), then evaluate `children` rules recursively with that node as root.
 
 `ValidateArtifacts` collects all failures and warnings for the artifact before moving on — it does not stop at the first failure.
 
@@ -101,10 +107,10 @@ If any validation step fails, `markComplete` must not be called for that artifac
 `ValidateArtifacts.execute` must return a result object — it must not throw for validation failures. The result must include:
 
 - `passed: boolean` — `true` only if all required artifacts are present and all validations pass with no errors
-- `failures: ValidationFailure[]` — one entry per failed rule or missing artifact
+- `failures: ValidationFailure[]` — one entry per failed rule, missing artifact, or `DeltaApplicationError`
 - `warnings: ValidationWarning[]` — one entry per `required: false` rule that was absent
 
-Each `ValidationFailure` must include the artifact ID, the rule pattern or description, and enough context for the CLI to produce a useful error message.
+Each `ValidationFailure` must include the artifact ID, the rule or error description, and enough context for the CLI to produce a useful error message.
 
 ### Requirement: Save after validation
 
@@ -112,18 +118,20 @@ After all artifacts have been evaluated, `ValidateArtifacts` must call `changeRe
 
 ## Constraints
 
-- `ValidateArtifacts` is the **only** code path that may call `Artifact.markComplete(hash)` — this is a cross-cutting constraint enforced by convention and test coverage
+- `ValidateArtifacts` is the **only** code path that may call `Artifact.markComplete(hash)` — enforced by convention and test coverage
 - The merged spec is never written to `SpecRepository` during validate — only during `ArchiveChange`
 - `change.invalidate('artifact-change', actor)` is called at most once per `execute` invocation, even if multiple artifacts have changed
-- Delta validations run on the delta file (change artifact); structural validations run on the merged (or direct) content
-- A missing `deltaValidations[]` entry is not an error; the step is simply skipped
-- A missing `validations[]` entry is not an error; the step is simply skipped
+- `deltaValidations` evaluate rules against the normalized YAML AST of the delta file; `validations` evaluate rules against the normalized artifact AST; both use the same rule evaluation algorithm
+- `validations` run against the merged artifact content (or direct content for non-delta artifacts)
 - `preHashCleanup` substitutions are applied only for hash computation, never to the actual file content on disk
+- A missing `deltaValidations[]` is not an error — the step is skipped
+- A missing `validations[]` is not an error — the step is skipped
+- A missing delta file for a `delta: true` artifact is not itself a validation error — the artifact may be new (no existing base spec to delta against); in that case, validate the artifact file directly against `validations[]`
 
 ## Spec Dependencies
 
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, artifact model, approval invalidation, `effectiveStatus`
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — artifact definition, `validations[]`, `deltaValidations[]`, `requiredSpecArtifacts`, `preHashCleanup`, pattern matching rules
-- [`specs/core/delta-merger/spec.md`](../delta-merger/spec.md) — `mergeSpecs` contract used during validation preview
+- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — artifact definition, `validations[]`, `deltaValidations[]`, `delta`, `format`, `preHashCleanup`
+- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `apply()`, `DeltaApplicationError`, delta file location
 - [`specs/core/storage/spec.md`](../storage/spec.md) — `ValidateArtifacts` is the sole path to `complete`; artifact status derivation
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port-per-workspace pattern; manual DI at entry points
