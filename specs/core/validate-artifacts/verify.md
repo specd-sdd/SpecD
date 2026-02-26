@@ -49,7 +49,7 @@
 
 - **GIVEN** artifact `design` is `optional: true` with `validatedHash === "__skipped__"`
 - **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** no delta validation, merge preview, or structural validation is run for `design` — there is no file to check
+- **THEN** no delta validation, application preview, or structural validation is run for `design` — there is no file to check
 
 ### Requirement: Approval invalidation on content change
 
@@ -74,38 +74,71 @@
 
 ### Requirement: Delta validation
 
-#### Scenario: Delta validation failure blocks merge
+#### Scenario: Delta validation failure blocks application
 
-- **GIVEN** an artifact with `deltaValidations: [{ scope: 'ADDED Requirements', pattern: 'SHALL|MUST', required: true }]`
-- **AND** the delta file's `ADDED Requirements` section contains a block without `SHALL` or `MUST`
+- **GIVEN** an artifact with a `deltaValidations` rule `{ type: sequence-item, where: { op: 'added' }, required: true }`
+- **AND** the delta YAML AST contains no `sequence-item` node where the correlated `op` pair has `value: added`
 - **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `result.passed` is `false`, the artifact is not merged, and `markComplete` is not called
+- **THEN** `result.passed` is `false`, the artifact is not advanced to application preview, and `markComplete` is not called
 
-#### Scenario: Delta validation warning does not block merge
+#### Scenario: Delta validation warning does not block application
 
-- **GIVEN** a `required: false` delta validation rule that is not satisfied
+- **GIVEN** a `deltaValidations` rule with `required: false` that matches zero nodes in the delta YAML AST
 - **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** the artifact proceeds to merge and `result.warnings` includes the unsatisfied rule
+- **THEN** the artifact proceeds to application preview and `result.warnings` includes the unsatisfied rule
 
-### Requirement: Merge preview and conflict detection
+#### Scenario: Delta validation passes vacuously when no nodes match
 
-#### Scenario: Delta conflict blocks validation
-
-- **GIVEN** a delta file that renames `Old` to `New` and also modifies `Old`
+- **GIVEN** a `deltaValidations` rule whose selector matches zero nodes in the delta YAML AST
 - **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `mergeSpecs` throws `DeltaConflictError`, `result.passed` is `false`, and `markComplete` is not called
+- **THEN** the rule passes without error regardless of `required`
 
-#### Scenario: Merge preview does not write to SpecRepository
+### Requirement: Delta application preview and conflict detection
+
+#### Scenario: DeltaApplicationError blocks validation
+
+- **GIVEN** a delta file where two entries both target the same node
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `ArtifactParser.apply()` throws `DeltaApplicationError`, `result.passed` is `false`, and `markComplete` is not called
+
+#### Scenario: Application preview does not write to SpecRepository
 
 - **GIVEN** a valid delta that would modify the base spec
 - **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** the base spec file in `SpecRepository` is unchanged — the merged result is used only for validation
+- **THEN** the base spec file in `SpecRepository` is unchanged — the merged result is used only for `validations[]` checks
+
+#### Scenario: No delta file — artifact validated directly
+
+- **GIVEN** an artifact with `delta: true` but no delta file present in the change directory
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `validations[]` run against the artifact file content directly, with no application preview step
 
 #### Scenario: Non-delta artifact validated directly
 
-- **GIVEN** an artifact with no `deltas[]` declared
+- **GIVEN** an artifact with `delta: false`
 - **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `validations[]` run against the artifact file content directly, with no merge step
+- **THEN** `validations[]` run against the artifact file content directly, with no application preview step
+
+### Requirement: Structural validation
+
+#### Scenario: Required section absent — failure
+
+- **GIVEN** an artifact with a `validations` rule `{ type: section, matches: '^Purpose$', required: true }`
+- **AND** the merged artifact content has no top-level `Purpose` section
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `result.failures` includes the missing section and `markComplete` is not called
+
+#### Scenario: Optional section absent — warning only
+
+- **GIVEN** a `validations` rule with `required: false` that matches no node in the artifact AST
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `result.warnings` includes the absent section and validation still passes
+
+#### Scenario: All validation failures collected before returning
+
+- **GIVEN** two `required: true` validation rules both fail for the same artifact
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `result.failures` contains both failures — validation does not stop at the first
 
 ### Requirement: Hash computation and markComplete
 
