@@ -13,7 +13,7 @@ dependsOn:
   - 'specs/core/schema-format/spec.md'
   - 'specs/core/change-manifest/spec.md'
   - 'specs/core/storage/spec.md'
-  - 'specs/core/delta-merger/spec.md'
+  - 'specs/core/delta-format/spec.md'
   - 'specs/core/spec-metadata/spec.md'
 contentHashes:
   spec.md: 'sha256:b48f68b476e05a76fbcb1f9a427399e2bbb72c7482824da7aff8c0248a3396c5'

@@ -85,9 +85,9 @@ scenarios:
   - requirement: 'Spec file naming'
     name: 'Correct spec path'
     when:
-      - 'a spec covers delta merging in `@specd/core`'
+      - 'a spec covers snapshot hashing in `@specd/core`'
     then:
-      - 'the files are at `specs/core/delta-merger/spec.md` and `specs/core/delta-merger/verify.md`'
+      - 'the files are at `specs/core/snapshot-hasher/spec.md` and `specs/core/snapshot-hasher/verify.md`'
   - requirement: 'Spec file naming'
     name: 'Incorrect co-location'
     when:
