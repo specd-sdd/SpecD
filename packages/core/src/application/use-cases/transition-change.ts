@@ -3,6 +3,24 @@ import { type ChangeState } from '../../domain/value-objects/change-state.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type GitAdapter } from '../ports/git-adapter.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
+import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
+
+/** A single task completion check for the `implementing → verifying` transition. */
+export interface TaskCompletionCheck {
+  /**
+   * The artifact type ID to check (e.g. `'tasks'`).
+   * Used only for error context; the actual check reads the file by `filename`.
+   */
+  readonly artifactId: string
+  /** Filename of the artifact file within the change directory (e.g. `'tasks.md'`). */
+  readonly filename: string
+  /**
+   * Regex pattern matched against the artifact content line-by-line.
+   * Defaults to `^\s*-\s+\[ \]` (markdown unchecked checkbox) if not declared in schema.
+   * If any line matches, the transition is blocked.
+   */
+  readonly incompletePattern: string
+}
 
 /** Input for the {@link TransitionChange} use case. */
 export interface TransitionChangeInput {
@@ -49,6 +67,21 @@ export interface TransitionChangeInput {
    * Ignored on all other transitions.
    */
   implementingRequires?: readonly string[]
+  /**
+   * Task completion checks performed before allowing `implementing → verifying`.
+   *
+   * Each entry names an artifact file and the regex pattern for incomplete tasks.
+   * If any artifact file contains a line matching its pattern, the transition
+   * throws `InvalidStateTransitionError`. This is a content-level check on the
+   * artifact files, not a check on `effectiveStatus`.
+   *
+   * Derived by the caller from the `implementing` workflow step's `requires` list
+   * combined with each artifact's `taskCompletionCheck.incompletePattern` (defaulting
+   * to `^\s*-\s+\[ \]` when not declared in the schema).
+   *
+   * Ignored on all other transitions.
+   */
+  implementingTaskChecks?: ReadonlyArray<TaskCompletionCheck>
 }
 
 /**
@@ -59,6 +92,10 @@ export interface TransitionChangeInput {
  *   when the spec approval gate is active.
  * - `done → archivable` is redirected to `done → pending-signoff` when the
  *   signoff gate is active.
+ *
+ * When transitioning `implementing → verifying`, checks each artifact listed
+ * in `implementingTaskChecks` for incomplete task items. Throws
+ * `InvalidStateTransitionError` if any incomplete item is found.
  *
  * When transitioning from `designing` to `ready`, any provided `contextSpecIds`
  * are applied to the change before the transition is recorded.
@@ -84,7 +121,7 @@ export class TransitionChange {
    * @param input - Transition parameters
    * @returns The updated change after the transition
    * @throws {ChangeNotFoundError} If no change with the given name exists
-   * @throws {InvalidStateTransitionError} If the transition is not permitted
+   * @throws {InvalidStateTransitionError} If the transition is not permitted or incomplete tasks remain
    */
   async execute(input: TransitionChangeInput): Promise<Change> {
     const change = await this._changes.get(input.name)
@@ -100,6 +137,10 @@ export class TransitionChange {
       change.updateContextSpecIds(input.contextSpecIds)
     }
 
+    if (change.state === 'implementing' && effectiveTarget === 'verifying') {
+      await this._checkTaskCompletion(change, input.implementingTaskChecks ?? [])
+    }
+
     if (change.state === 'verifying' && effectiveTarget === 'implementing') {
       change.clearArtifactValidations(input.implementingRequires ?? [])
     }
@@ -107,6 +148,29 @@ export class TransitionChange {
     change.transition(effectiveTarget, actor)
     await this._changes.save(change)
     return change
+  }
+
+  /**
+   * Checks each artifact file for incomplete task items before allowing
+   * the `implementing → verifying` transition.
+   *
+   * @param change - The change whose artifact files are checked
+   * @param checks - Task completion check configurations
+   * @throws {InvalidStateTransitionError} If any artifact contains incomplete task items
+   */
+  private async _checkTaskCompletion(
+    change: Change,
+    checks: ReadonlyArray<TaskCompletionCheck>,
+  ): Promise<void> {
+    for (const check of checks) {
+      const artifact = await this._changes.artifact(change, check.filename)
+      if (artifact === null) continue
+
+      const re = new RegExp(check.incompletePattern, 'm')
+      if (re.test(artifact.content)) {
+        throw new InvalidStateTransitionError('implementing', 'verifying')
+      }
+    }
   }
 
   /**

@@ -4,6 +4,7 @@ import { ChangeNotFoundError } from '../../../src/application/errors/change-not-
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { makeChangeRepository, makeGitAdapter, testActor } from './helpers.js'
 
 function makeChangeInState(name: string, events: ChangeEvent[]): Change {
@@ -217,6 +218,99 @@ describe('TransitionChange', () => {
       })
 
       expect(spec.validatedHash).toBe('sha256:abc')
+    })
+  })
+
+  describe('given an implementing → verifying transition with task checks', () => {
+    function makeImplementingChange(name: string): Change {
+      return makeChangeInState(name, [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+      ])
+    }
+
+    it('blocks transition when an artifact has incomplete task items', async () => {
+      const change = makeImplementingChange('my-change')
+      const repo = makeChangeRepository([change])
+      repo.artifact = async (_c, filename) => {
+        if (filename === 'tasks.md') {
+          return new SpecArtifact('tasks.md', '- [ ] unfinished task\n- [x] done task')
+        }
+        return null
+      }
+      const uc = new TransitionChange(repo, makeGitAdapter())
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'verifying',
+          approvalsSpec: false,
+          approvalsSignoff: false,
+          implementingTaskChecks: [
+            { artifactId: 'tasks', filename: 'tasks.md', incompletePattern: '^\\s*-\\s+\\[ \\]' },
+          ],
+        }),
+      ).rejects.toThrow(InvalidStateTransitionError)
+    })
+
+    it('allows transition when all tasks are complete', async () => {
+      const change = makeImplementingChange('my-change')
+      const repo = makeChangeRepository([change])
+      repo.artifact = async (_c, filename) => {
+        if (filename === 'tasks.md') {
+          return new SpecArtifact('tasks.md', '- [x] done task\n- [x] another done')
+        }
+        return null
+      }
+      const uc = new TransitionChange(repo, makeGitAdapter())
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'verifying',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+        implementingTaskChecks: [
+          { artifactId: 'tasks', filename: 'tasks.md', incompletePattern: '^\\s*-\\s+\\[ \\]' },
+        ],
+      })
+
+      expect(result.state).toBe('verifying')
+    })
+
+    it('allows transition when artifact file is absent', async () => {
+      const change = makeImplementingChange('my-change')
+      const repo = makeChangeRepository([change])
+      // artifact() returns null (file does not exist) — should not block
+      repo.artifact = async () => null
+      const uc = new TransitionChange(repo, makeGitAdapter())
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'verifying',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+        implementingTaskChecks: [
+          { artifactId: 'tasks', filename: 'tasks.md', incompletePattern: '^\\s*-\\s+\\[ \\]' },
+        ],
+      })
+
+      expect(result.state).toBe('verifying')
+    })
+
+    it('allows transition when no task checks provided', async () => {
+      const change = makeImplementingChange('my-change')
+      const repo = makeChangeRepository([change])
+      const uc = new TransitionChange(repo, makeGitAdapter())
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'verifying',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(result.state).toBe('verifying')
     })
   })
 
