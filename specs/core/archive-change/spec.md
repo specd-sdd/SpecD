@@ -8,7 +8,7 @@
 
 ### Requirement: Ports and constructor
 
-`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `HookRunner`, and `GitAdapter`.
+`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `HookRunner`, `GitAdapter`, and `ArtifactParserRegistry`.
 
 ```typescript
 class ArchiveChange {
@@ -18,11 +18,14 @@ class ArchiveChange {
     archive: ArchiveRepository,
     hooks: HookRunner,
     git: GitAdapter,
+    parsers: ArtifactParserRegistry,
   )
 }
 ```
 
 `specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec path's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.
+
+`ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `ArchiveChange` uses it to look up the correct adapter when applying delta files to base artifacts. The bootstrap layer constructs it and injects it here — `ArchiveChange` does not instantiate parsers directly.
 
 ### Requirement: Input
 
@@ -51,17 +54,18 @@ After all pre-archive hooks succeed, `ArchiveChange` must merge each delta artif
 
 For each spec path in `change.specIds`:
 
-1. Resolve the active schema.
-2. For each artifact in the schema that declares `deltas[]`:
-   a. Load the artifact file from `ChangeRepository` (the delta file in the change directory). If absent or `skipped` (status `skipped` — `validatedHash === "__skipped__"`), skip — nothing to sync.
-   b. Load the base spec from `SpecRepository`. If the base does not exist, treat it as an empty spec.
-   c. Call `mergeSpecs(base, delta, deltaConfigs, deltaOperations)` with `deltaConfigs` from the artifact's `deltas[]` and `deltaOperations` from the schema (or defaults).
-   d. Save the merged content to `SpecRepository` via `specs.save(spec, artifact)`.
-3. For each artifact in the schema that does **not** declare `deltas[]` (new file artifacts):
-   a. Load the artifact content from `ChangeRepository`. If absent or `skipped` (status `skipped` — `validatedHash === "__skipped__"`), skip — nothing to sync.
-   b. Save the content to `SpecRepository` (creating the spec and file if necessary).
-
-`mergeSpecs` was already run during `ValidateArtifacts` for conflict detection. If `ArchiveChange` encounters a `DeltaConflictError`, it must throw it — this indicates a bug in the validation gate or a change to the artifacts after validation.
+1. Resolve the active schema for that spec's workspace.
+2. For each artifact in the schema that declares `delta: true`:
+   a. Look up the `ArtifactParser` for the artifact's `format` from `ArtifactParserRegistry`. If no adapter is registered for that format, throw — this is a configuration error.
+   b. Load the delta file from `ChangeRepository` (filename `<artifact-output-filename>.delta.yaml`). If absent or `skipped` (effective status `skipped`), skip — nothing to sync.
+   c. Parse the delta file as YAML to obtain the array of delta entries.
+   d. Load the base artifact content from `SpecRepository`. If the base does not exist, treat it as an empty document (parse an empty string via `ArtifactParser.parse('')`).
+   e. Parse the base content via `ArtifactParser.parse(baseContent)` to obtain a base AST.
+   f. Call `ArtifactParser.apply(baseAST, deltaEntries)` to produce the merged AST. If `apply` throws `DeltaApplicationError`, re-throw it — this indicates a structural problem that should have been caught during `ValidateArtifacts`, or the delta was modified after validation.
+   g. Serialize the merged AST via `ArtifactParser.serialize(mergedAST)` and save the result to `SpecRepository`.
+3. For each artifact in the schema that declares `delta: false` (new file artifacts created in-change):
+   a. Load the artifact file from `ChangeRepository`. If absent or `skipped` (effective status `skipped`), skip — nothing to sync.
+   b. Save the content directly to `SpecRepository` (creating the spec directory and file if they do not exist).
 
 ### Requirement: ArchivedChange construction
 
@@ -115,9 +119,9 @@ After post-archive hooks complete, `ArchiveChange` must collect the set of spec 
 ## Spec Dependencies
 
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `assertArchivable()`, `ArchivedChange`
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `artifacts[].deltas[]`, workflow hooks, `deltaOperations`
-- [`specs/core/validate-artifacts/spec.md`](../validate-artifacts/spec.md) — artifact validation gate before archive; conflict detection via `mergeSpecs`
-- [`specs/core/delta-merger/spec.md`](../delta-merger/spec.md) — `mergeSpecs` used during spec sync
+- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `artifacts[].delta`, `artifacts[].format`, workflow hooks
+- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `apply()`, `DeltaApplicationError`, `ArtifactParserRegistry`
+- [`specs/core/validate-artifacts/spec.md`](../validate-artifacts/spec.md) — artifact validation gate before archive
 - [`specs/core/storage/spec.md`](../storage/spec.md) — archive directory naming, `index.jsonl`, `FsArchiveRepository.archive()`
 - [`specs/core/config/spec.md`](../config/spec.md) — workflow hook structure, `run:` vs `instruction:` entries, template variables
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — metadata refresh signal; `staleMetadataSpecPaths` in result
