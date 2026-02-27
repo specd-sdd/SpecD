@@ -200,8 +200,7 @@ function makeArchivableChange(
     { type: 'transitioned', from: 'drafting', to: 'designing', at: createdAt, by: testActor },
     { type: 'transitioned', from: 'designing', to: 'ready', at: createdAt, by: testActor },
     { type: 'transitioned', from: 'ready', to: 'implementing', at: createdAt, by: testActor },
-    { type: 'transitioned', from: 'implementing', to: 'verifying', at: createdAt, by: testActor },
-    { type: 'transitioned', from: 'verifying', to: 'done', at: createdAt, by: testActor },
+    { type: 'transitioned', from: 'implementing', to: 'done', at: createdAt, by: testActor },
     { type: 'transitioned', from: 'done', to: 'archivable', at: createdAt, by: testActor },
   ]
   return new Change({
@@ -274,14 +273,7 @@ describe('ArchiveChange', () => {
         { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: testActor },
         { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: testActor },
         { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: testActor },
-        {
-          type: 'transitioned',
-          from: 'implementing',
-          to: 'verifying',
-          at: new Date(),
-          by: testActor,
-        },
-        { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: testActor },
+        { type: 'transitioned', from: 'implementing', to: 'done', at: new Date(), by: testActor },
         // deliberately stopped at 'done' — not transitioned to 'archivable'
       ],
     })
@@ -363,12 +355,11 @@ describe('ArchiveChange', () => {
         validatedHash: 'abc123',
       }),
     )
-    const changeRepo = {
-      ...makeChangeRepository([change]),
+    const changeRepo = Object.assign(makeChangeRepository([change]), {
       async artifact(_change: Change, _filename: string) {
         return new SpecArtifact('spec.md', '# Spec')
       },
-    }
+    })
 
     const uc = new ArchiveChange(
       changeRepo,
@@ -492,13 +483,12 @@ describe('ArchiveChange', () => {
         validatedHash: 'abc123',
       }),
     )
-    const changeRepo = {
-      ...makeChangeRepository([change]),
+    const changeRepo = Object.assign(makeChangeRepository([change]), {
       async artifact(_change: Change, filename: string) {
         if (filename === 'spec.md.delta.yaml') return new SpecArtifact(filename, 'delta-content')
         return null
       },
-    }
+    })
 
     const uc = new ArchiveChange(
       changeRepo,
@@ -535,12 +525,11 @@ describe('ArchiveChange', () => {
         validatedHash: 'abc123',
       }),
     )
-    const changeRepo = {
-      ...makeChangeRepository([change]),
+    const changeRepo = Object.assign(makeChangeRepository([change]), {
       async artifact(_change: Change, _filename: string) {
         return new SpecArtifact('spec.md', artifactContent)
       },
-    }
+    })
 
     const uc = new ArchiveChange(
       changeRepo,
@@ -637,13 +626,12 @@ describe('ArchiveChange', () => {
         validatedHash: 'abc123',
       }),
     )
-    const changeRepo = {
-      ...makeChangeRepository([conflictChange]),
+    const changeRepo = Object.assign(makeChangeRepository([conflictChange]), {
       async artifact(_change: Change, filename: string) {
         if (filename === 'spec.md.delta.yaml') return new SpecArtifact(filename, 'delta')
         return null
       },
-    }
+    })
 
     const uc = new ArchiveChange(
       changeRepo,
@@ -825,12 +813,11 @@ describe('ArchiveChange', () => {
         validatedHash: 'abc123',
       }),
     )
-    const changeRepo = {
-      ...makeChangeRepository([successChange]),
+    const changeRepo = Object.assign(makeChangeRepository([successChange]), {
       async artifact(_change: Change, _filename: string) {
         return new SpecArtifact('spec.md', '# Spec')
       },
-    }
+    })
 
     const uc = new ArchiveChange(
       changeRepo,
