@@ -174,6 +174,13 @@ export interface ChangeManifest {
   name: string
   /** ISO 8601 creation timestamp; immutable after creation. */
   createdAt: string
+  /**
+   * ISO 8601 timestamp when the change was archived.
+   *
+   * Present only in manifests that have been moved to the archive directory.
+   * Absent from active, drafted, and discarded change manifests.
+   */
+  archivedAt?: string
   /** Schema name and version recorded at creation; never updated. */
   schema: {
     /** Schema name (e.g. `"@specd/schema-std"`). */
