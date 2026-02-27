@@ -1,13 +1,13 @@
 /**
  * An artifact file within a spec directory or a change directory.
  *
- * Holds the filename, raw Markdown content, and an optional `originalHash`
+ * Holds the filename, raw file content, and an optional `originalHash`
  * that acts as a version token for optimistic concurrency control.
  *
  * **Lifecycle of `originalHash`:**
  * - When a repository loads an artifact from storage, it computes
  *   `sha256(content)` and passes it as `originalHash`.
- * - When a use case produces a derived artifact (e.g. via `mergeSpecs`),
+ * - When a use case produces a derived artifact,
  *   it propagates the `originalHash` from the source artifact so the
  *   token survives the transformation.
  * - When a repository saves a derived artifact, it re-hashes the current
@@ -28,7 +28,7 @@ export class SpecArtifact {
    * Creates a new `SpecArtifact`.
    *
    * @param filename - The artifact filename (e.g. `"spec.md"`, `"proposal.md"`)
-   * @param content - The raw Markdown content of the file
+   * @param content - The raw file content
    * @param originalHash - The `sha256:<hex>` hash of the content as it existed
    *   in storage when this artifact was loaded. Pass `undefined` for artifacts
    *   that have no prior storage representation (first write / scaffold).
@@ -44,7 +44,7 @@ export class SpecArtifact {
     return this._filename
   }
 
-  /** The raw Markdown content of the artifact. */
+  /** The raw file content of the artifact. */
   get content(): string {
     return this._content
   }
