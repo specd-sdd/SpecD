@@ -631,7 +631,8 @@ describe('ArchiveChange', () => {
       )
       const changeRepo = Object.assign(makeChangeRepository([change]), {
         async artifact(_change: Change, filename: string) {
-          if (filename === 'spec.md.delta.yaml') return new SpecArtifact(filename, 'delta-content')
+          if (filename === 'deltas/default/auth/oauth/spec.md.delta.yaml')
+            return new SpecArtifact(filename, 'delta-content')
           return null
         },
       })
@@ -678,7 +679,8 @@ describe('ArchiveChange', () => {
       )
       const changeRepo = Object.assign(makeChangeRepository([conflictChange]), {
         async artifact(_change: Change, filename: string) {
-          if (filename === 'spec.md.delta.yaml') return new SpecArtifact(filename, 'delta')
+          if (filename === 'deltas/default/auth/oauth/spec.md.delta.yaml')
+            return new SpecArtifact(filename, 'delta')
           return null
         },
       })
