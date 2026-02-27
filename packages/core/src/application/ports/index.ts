@@ -6,3 +6,13 @@ export { type SchemaRegistry, type SchemaEntry, type Schema } from './schema-reg
 export { type HookRunner, type HookResult, type HookVariables } from './hook-runner.js'
 export { type GitAdapter } from './git-adapter.js'
 export { type FileReader } from './file-reader.js'
+export {
+  type ArtifactNode,
+  type ArtifactAST,
+  type DeltaEntry,
+  type NodeTypeDescriptor,
+  type OutlineEntry,
+  type ArtifactParser,
+  type ArtifactParserRegistry,
+  DeltaApplicationError,
+} from './artifact-parser.js'

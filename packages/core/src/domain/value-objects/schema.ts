@@ -1,4 +1,3 @@
-import { type OperationKeywords } from '../services/delta-merger.js'
 import { ArtifactType } from './artifact-type.js'
 import { type WorkflowStep } from './workflow-step.js'
 
@@ -18,7 +17,6 @@ export class Schema {
   private readonly _artifactIndex: ReadonlyMap<string, ArtifactType>
   private readonly _workflow: readonly WorkflowStep[]
   private readonly _workflowIndex: ReadonlyMap<string, WorkflowStep>
-  private readonly _deltaOperations: OperationKeywords
 
   /**
    * Creates a fully-resolved schema instance.
@@ -27,14 +25,12 @@ export class Schema {
    * @param version - The schema version integer, monotonically increasing
    * @param artifacts - Artifact type definitions in schema-declared order
    * @param workflow - Workflow step configurations in schema-declared order
-   * @param deltaOperations - Operation keywords for delta section recognition
    */
   constructor(
     name: string,
     version: number,
     artifacts: readonly ArtifactType[],
     workflow: readonly WorkflowStep[],
-    deltaOperations: OperationKeywords,
   ) {
     this._name = name
     this._version = version
@@ -42,12 +38,10 @@ export class Schema {
     this._artifactIndex = new Map(artifacts.map((a) => [a.id(), a]))
     this._workflow = workflow
     this._workflowIndex = new Map(workflow.map((s) => [s.step, s]))
-    this._deltaOperations = deltaOperations
   }
 
   /**
-   * The resolved schema name as it appears in `specd.yaml` or the registry
-   * (e.g. `"@specd/schema-std"`, `"my-team-schema"`).
+   * The resolved schema name (e.g. `"@specd/schema-std"`, `"my-team-schema"`).
    *
    * @returns The schema name
    */
@@ -57,8 +51,6 @@ export class Schema {
 
   /**
    * The schema version integer from `schema.yaml`. Monotonically increasing.
-   * Recorded in the change manifest at creation time so specd can detect
-   * schema upgrades that occurred after a change was opened.
    *
    * @returns The schema version
    */
@@ -68,10 +60,6 @@ export class Schema {
 
   /**
    * All artifact type definitions in schema-declared order.
-   *
-   * The declaration order reflects the intended generation sequence, but
-   * callers that need strict topological order should sort by `requires[]`
-   * dependency chains.
    *
    * @returns All artifact types in declaration order
    */
@@ -92,9 +80,6 @@ export class Schema {
   /**
    * All workflow step configurations in schema-declared order.
    *
-   * Schema steps fire first; project-level steps from `specd.yaml` are
-   * appended after by the use case that compiles the instruction block.
-   *
    * @returns All workflow steps in declaration order
    */
   workflow(): readonly WorkflowStep[] {
@@ -109,16 +94,5 @@ export class Schema {
    */
   workflowStep(step: string): WorkflowStep | null {
     return this._workflowIndex.get(step) ?? null
-  }
-
-  /**
-   * The operation keywords used to recognise delta section headings.
-   * Defaults to `ADDED`, `MODIFIED`, `REMOVED`, `RENAMED`, `FROM`, `TO`
-   * when not overridden in the schema.
-   *
-   * @returns The configured delta operation keywords
-   */
-  deltaOperations(): OperationKeywords {
-    return this._deltaOperations
   }
 }

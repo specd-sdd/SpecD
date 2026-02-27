@@ -1,8 +1,15 @@
-import { type DeltaConfig } from '../services/delta-merger.js'
-import { type ValidationRule, type ContextSection } from './validation-rule.js'
+import {
+  type ValidationRule,
+  type ContextSection,
+  type PreHashCleanup,
+  type TaskCompletionCheck,
+} from './validation-rule.js'
 
 /** Where an artifact lives after the change is archived. */
 export type ArtifactScope = 'spec' | 'change'
+
+/** File format of an artifact. */
+export type ArtifactFormat = 'markdown' | 'json' | 'yaml' | 'plaintext'
 
 /** Construction properties for {@link ArtifactType}. */
 export interface ArtifactTypeProps {
@@ -15,35 +22,47 @@ export interface ArtifactTypeProps {
    */
   readonly scope: ArtifactScope
   /**
-   * Glob pattern for the file(s) this artifact output
+   * Glob pattern for the file(s) this artifact outputs
    * (e.g. `"proposal.md"`, `"specs/**\/spec.md"`).
    */
   readonly output: string
+  /** Human-readable summary for tooling. */
+  readonly description?: string
+  /** Path to a template file, relative to the schema directory. */
+  readonly template?: string
   /** The LLM instruction used to generate this artifact. */
-  readonly instruction: string
+  readonly instruction?: string
   /**
-   * IDs of other artifacts that must be `complete` before this artifact can
+   * IDs of other artifacts that must be resolved before this artifact can
    * be generated. Defines the generation dependency order within a schema.
    */
   readonly requires: readonly string[]
   /**
    * When `true`, this artifact may be absent without failing validation.
-   * When `false` (default), `ValidateSpec` requires it to be present.
+   * When `false` (default), `ValidateArtifacts` requires it to be present.
    */
   readonly optional?: boolean
   /**
-   * Per-section delta merge configurations. Determines which Markdown sections
-   * are treated as delta sections and how named blocks within them are matched.
+   * Declared file format. When omitted, inferred from the output extension.
    */
-  readonly deltas: readonly DeltaConfig[]
+  readonly format?: ArtifactFormat
   /**
-   * Structural validation rules applied to the *base* spec file after a delta
-   * merge. Empty array means no post-merge validation is performed.
+   * When `true`, this artifact supports delta files. Only valid for `scope: spec`.
+   */
+  readonly delta?: boolean
+  /**
+   * Domain-specific guidance injected by `CompileContext` alongside format-level
+   * delta instructions. Only valid when `delta: true`.
+   */
+  readonly deltaInstruction?: string
+  /**
+   * Structural validation rules applied to the base artifact content after
+   * delta application. Empty array means no post-merge validation is performed.
    */
   readonly validations: readonly ValidationRule[]
   /**
-   * Structural validation rules applied to the *delta* file before merging.
-   * Empty array means no pre-merge validation is performed.
+   * Structural validation rules applied to the delta file before application.
+   * Empty array means no pre-merge validation is performed. Only valid when `delta: true`.
    */
   readonly deltaValidations: readonly ValidationRule[]
   /**
@@ -51,6 +70,14 @@ export interface ArtifactTypeProps {
    * as context for the agent.
    */
   readonly contextSections: readonly ContextSection[]
+  /**
+   * Regex substitutions applied to artifact content before computing any hash.
+   */
+  readonly preHashCleanup: readonly PreHashCleanup[]
+  /**
+   * Declares how to detect task completion within this artifact's file content.
+   */
+  readonly taskCompletionCheck?: TaskCompletionCheck
 }
 
 /**
@@ -63,13 +90,19 @@ export class ArtifactType {
   private readonly _id: string
   private readonly _scope: ArtifactScope
   private readonly _output: string
-  private readonly _instruction: string
+  private readonly _description: string | undefined
+  private readonly _template: string | undefined
+  private readonly _instruction: string | undefined
   private readonly _requires: readonly string[]
   private readonly _optional: boolean
-  private readonly _deltas: readonly DeltaConfig[]
+  private readonly _format: ArtifactFormat | undefined
+  private readonly _delta: boolean
+  private readonly _deltaInstruction: string | undefined
   private readonly _validations: readonly ValidationRule[]
   private readonly _deltaValidations: readonly ValidationRule[]
   private readonly _contextSections: readonly ContextSection[]
+  private readonly _preHashCleanup: readonly PreHashCleanup[]
+  private readonly _taskCompletionCheck: TaskCompletionCheck | undefined
 
   /**
    * Creates a new `ArtifactType` from schema configuration.
@@ -80,19 +113,23 @@ export class ArtifactType {
     this._id = props.id
     this._scope = props.scope
     this._output = props.output
+    this._description = props.description
+    this._template = props.template
     this._instruction = props.instruction
     this._requires = props.requires
     this._optional = props.optional ?? false
-    this._deltas = props.deltas
+    this._format = props.format
+    this._delta = props.delta ?? false
+    this._deltaInstruction = props.deltaInstruction
     this._validations = props.validations
     this._deltaValidations = props.deltaValidations
     this._contextSections = props.contextSections
+    this._preHashCleanup = props.preHashCleanup
+    this._taskCompletionCheck = props.taskCompletionCheck
   }
 
   /**
    * Stable identifier for this artifact type (e.g. `"specs"`, `"tasks"`).
-   * Used to reference this type in `requires[]` arrays and skill `requires[]`
-   * arrays.
    *
    * @returns The artifact type ID
    */
@@ -101,8 +138,7 @@ export class ArtifactType {
   }
 
   /**
-   * Where this artifact lives after archiving. `"spec"` artifacts are synced
-   * to the `SpecRepository`; `"change"` artifacts remain in the change directory.
+   * Where this artifact lives after archiving: `"spec"` or `"change"`.
    *
    * @returns The artifact scope
    */
@@ -111,57 +147,88 @@ export class ArtifactType {
   }
 
   /**
-   * Glob pattern for the file(s) this artifact output
-   * (e.g. `"proposal.md"`, `"specs/**\/spec.md"`).
+   * Glob pattern for the artifact's output files.
    *
-   * @returns The glob pattern for generated files
+   * @returns The output glob pattern
    */
   output(): string {
     return this._output
   }
 
   /**
-   * The LLM instruction used to generate this artifact.
+   * Human-readable summary for tooling, or `undefined` if not set.
    *
-   * @returns The generation instruction text
+   * @returns The description string, or `undefined`
    */
-  instruction(): string {
+  description(): string | undefined {
+    return this._description
+  }
+
+  /**
+   * Path to a template file relative to the schema directory, or `undefined`.
+   *
+   * @returns The template path, or `undefined`
+   */
+  template(): string | undefined {
+    return this._template
+  }
+
+  /**
+   * The LLM instruction text for generating this artifact, or `undefined`.
+   *
+   * @returns The instruction text, or `undefined`
+   */
+  instruction(): string | undefined {
     return this._instruction
   }
 
   /**
-   * IDs of artifact types that must be `complete` before this artifact can be
-   * generated. Determines the topological sort order within a schema.
+   * IDs of artifact types that must be resolved before this one.
    *
-   * @returns Artifact IDs this type depends on
+   * @returns Array of prerequisite artifact type IDs
    */
   requires(): readonly string[] {
     return this._requires
   }
 
   /**
-   * When `true`, this artifact may be absent without failing `ValidateSpec`.
-   * When `false`, the artifact must be present in the change.
+   * `true` if this artifact may be absent without failing validation.
    *
-   * @returns `true` if the artifact is optional
+   * @returns Whether the artifact is optional
    */
   optional(): boolean {
     return this._optional
   }
 
   /**
-   * Per-section delta merge configurations for this artifact's spec files.
-   * Empty when this artifact type does not support delta merges.
+   * The declared file format, or `undefined` if inferred from the output extension.
    *
-   * @returns Delta merge configurations
+   * @returns The artifact format, or `undefined`
    */
-  deltas(): readonly DeltaConfig[] {
-    return this._deltas
+  format(): ArtifactFormat | undefined {
+    return this._format
   }
 
   /**
-   * Structural validation rules applied to the base spec file after a delta
-   * merge. Empty when no post-merge validation is configured.
+   * `true` if this artifact supports delta files.
+   *
+   * @returns Whether delta files are supported
+   */
+  delta(): boolean {
+    return this._delta
+  }
+
+  /**
+   * Domain-specific delta guidance injected by `CompileContext`, or `undefined`.
+   *
+   * @returns The delta instruction text, or `undefined`
+   */
+  deltaInstruction(): string | undefined {
+    return this._deltaInstruction
+  }
+
+  /**
+   * Structural validation rules applied to the base artifact after delta application.
    *
    * @returns Post-merge validation rules
    */
@@ -170,8 +237,7 @@ export class ArtifactType {
   }
 
   /**
-   * Structural validation rules applied to the delta file before merging.
-   * Empty when no pre-merge validation is configured.
+   * Structural validation rules applied to the delta file before application.
    *
    * @returns Pre-merge delta validation rules
    */
@@ -180,12 +246,29 @@ export class ArtifactType {
   }
 
   /**
-   * Spec sections extracted and injected into the compiled instruction block
-   * for this artifact type. Empty when no context injection is configured.
+   * Spec sections extracted and injected into the compiled instruction block.
    *
    * @returns Context section configurations
    */
   contextSections(): readonly ContextSection[] {
     return this._contextSections
+  }
+
+  /**
+   * Regex substitutions applied to artifact content before computing any hash.
+   *
+   * @returns Pre-hash cleanup substitutions
+   */
+  preHashCleanup(): readonly PreHashCleanup[] {
+    return this._preHashCleanup
+  }
+
+  /**
+   * Task completion detection config, or `undefined` if using defaults.
+   *
+   * @returns The task completion check config, or `undefined`
+   */
+  taskCompletionCheck(): TaskCompletionCheck | undefined {
+    return this._taskCompletionCheck
   }
 }
