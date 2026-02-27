@@ -445,21 +445,22 @@ export class ValidateArtifacts {
   private _nodeMatches(node: ArtifactNode, selector: Selector): boolean {
     if (node.type !== selector.type) return false
     if (selector.matches !== undefined) {
-      const re = new RegExp(selector.matches)
-      const labelOk = node.label !== undefined && re.test(node.label)
-      const valueOk = node.value !== undefined && re.test(String(node.value))
-      if (!labelOk && !valueOk) return false
+      const re = new RegExp(selector.matches, 'i')
+      if (!re.test(node.label ?? '')) return false
     }
     if (selector.contains !== undefined) {
-      const sub = selector.contains
-      const labelOk = node.label !== undefined && node.label.includes(sub)
-      const valueOk = node.value !== undefined && String(node.value).includes(sub)
-      if (!labelOk && !valueOk) return false
+      const re = new RegExp(selector.contains, 'i')
+      if (!re.test(String(node.value ?? ''))) return false
     }
     if (selector.where !== undefined) {
+      // For array-item/sequence-item nodes, fields are children of the inner
+      // mapping/object node (e.g. sequence-item → mapping → pair[])
+      const innerContainer = node.children?.[0]
+      const fieldNodes = innerContainer?.children ?? node.children ?? []
       for (const [k, v] of Object.entries(selector.where)) {
-        const nodeVal = (node as Record<string, unknown>)[k]
-        if (String(nodeVal) !== v) return false
+        const re = new RegExp(v, 'i')
+        const field = fieldNodes.find((c) => c.label === k)
+        if (field === undefined || !re.test(String(field.value ?? ''))) return false
       }
     }
     return true
