@@ -10,6 +10,8 @@ export class SchemaNotFoundError extends SpecdError {
   }
 
   /**
+   * Creates a new `SchemaNotFoundError` instance.
+   *
    * @param ref - The schema reference that could not be resolved
    */
   constructor(ref: string) {

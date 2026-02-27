@@ -11,6 +11,8 @@ export class ApprovalGateDisabledError extends SpecdError {
   }
 
   /**
+   * Creates a new `ApprovalGateDisabledError` instance.
+   *
    * @param gate - The gate that is disabled (`'spec'` or `'signoff'`)
    */
   constructor(gate: 'spec' | 'signoff') {

@@ -11,32 +11,42 @@ import {
 import { applyDelta } from './_shared/apply-delta.js'
 
 // We use duck typing for MDAST nodes to avoid needing 'mdast' as a direct dep.
+/** Duck-typed MDAST node with an arbitrary extension bag. */
 interface MdastNode {
   type: string
   [key: string]: unknown
 }
 
+/** An MDAST node that may contain child nodes. */
 interface MdastParent extends MdastNode {
   children: MdastNode[]
 }
 
+/** An MDAST heading node with depth and inline children. */
 interface MdastHeading extends MdastParent {
   type: 'heading'
   depth: number
   children: MdastInline[]
 }
 
+/** An MDAST inline node such as text or emphasis. */
 interface MdastInline extends MdastNode {
   value?: string
   children?: MdastInline[]
 }
 
+/** The root MDAST node of a parsed Markdown document. */
 interface MdastRoot extends MdastParent {
   type: 'root'
   children: MdastNode[]
 }
 
-/** Extracts plain text from inline MDAST nodes. */
+/**
+ * Extracts plain text from inline MDAST nodes.
+ *
+ * @param nodes - The inline MDAST nodes to extract text from
+ * @returns The concatenated text content of all inline nodes
+ */
 function extractText(nodes: readonly MdastInline[]): string {
   return nodes
     .map((n) => {
@@ -47,12 +57,18 @@ function extractText(nodes: readonly MdastInline[]): string {
     .join('')
 }
 
+/** An entry in the section-nesting stack used during AST construction. */
 interface StackEntry {
   level: number
   node: ArtifactNode & { children: ArtifactNode[] }
 }
 
-/** Converts an MDAST block node (non-heading) to a normalized AST node. */
+/**
+ * Converts an MDAST block node (non-heading) to a normalized AST node.
+ *
+ * @param node - The MDAST block node to convert
+ * @returns The normalized `ArtifactNode`, or `null` if the node type is unsupported
+ */
 function convertBlockNode(node: MdastNode): ArtifactNode | null {
   if (node.type === 'paragraph') {
     const text = extractText((node as MdastParent).children as MdastInline[])
@@ -103,6 +119,12 @@ function convertBlockNode(node: MdastNode): ArtifactNode | null {
   return null
 }
 
+/**
+ * Converts an MDAST list item node into a normalized `list-item` AST node.
+ *
+ * @param item - The MDAST list item to convert
+ * @returns A `list-item` `ArtifactNode` with label and optional sub-list children
+ */
 function convertListItem(item: MdastParent): ArtifactNode {
   const textParts: string[] = []
   const subLists: ArtifactNode[] = []
@@ -123,16 +145,30 @@ function convertListItem(item: MdastParent): ArtifactNode {
   return { type: 'list-item', label }
 }
 
+/** {@link ArtifactParser} implementation for Markdown files. */
 export class MarkdownParser implements ArtifactParser {
+  /** File extensions this adapter handles. */
   get fileExtensions(): readonly string[] {
     return ['.md']
   }
 
+  /**
+   * Parses Markdown content into a normalized `ArtifactAST` using a sectionize algorithm.
+   *
+   * @param content - The Markdown content to parse
+   * @returns The normalized AST with a `document` root node containing `section` and block children
+   */
   parse(content: string): ArtifactAST {
     const mdast = fromMarkdown(content) as unknown as MdastRoot
     return this.mdastToAst(mdast)
   }
 
+  /**
+   * Converts an MDAST root into a normalized `ArtifactAST` by sectionizing headings.
+   *
+   * @param mdast - The MDAST root node to convert
+   * @returns The normalized AST
+   */
   private mdastToAst(mdast: MdastRoot): ArtifactAST {
     const docNode: ArtifactNode & { children: ArtifactNode[] } = {
       type: 'document',
@@ -172,6 +208,13 @@ export class MarkdownParser implements ArtifactParser {
     return { root: docNode }
   }
 
+  /**
+   * Applies delta entries to the Markdown AST.
+   *
+   * @param ast - The base AST to apply the delta to
+   * @param delta - The ordered list of delta entries
+   * @returns A new AST with all delta operations applied
+   */
   apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): ArtifactAST {
     return applyDelta(
       ast,
@@ -181,11 +224,23 @@ export class MarkdownParser implements ArtifactParser {
     )
   }
 
+  /**
+   * Serializes a Markdown AST back to a Markdown string.
+   *
+   * @param ast - The AST to serialize
+   * @returns The Markdown string representation
+   */
   serialize(ast: ArtifactAST): string {
     const mdastRoot = this.astToMdast(ast.root)
     return toMarkdown(mdastRoot as Parameters<typeof toMarkdown>[0])
   }
 
+  /**
+   * Serializes a single AST node and its descendants to a Markdown string.
+   *
+   * @param node - The AST node to serialize
+   * @returns The Markdown string representation of the node
+   */
   renderSubtree(node: ArtifactNode): string {
     if (node.type === 'document') {
       return this.serialize({ root: node })
@@ -195,12 +250,24 @@ export class MarkdownParser implements ArtifactParser {
     return toMarkdown(root as Parameters<typeof toMarkdown>[0])
   }
 
+  /**
+   * Converts a normalized AST node into an MDAST root for serialization.
+   *
+   * @param node - The AST node to convert
+   * @returns An MDAST root containing the converted nodes
+   */
   private astToMdast(node: ArtifactNode): MdastRoot {
     const children: MdastNode[] = []
     this.collectMdastFromNode(node, children)
     return { type: 'root', children }
   }
 
+  /**
+   * Recursively collects MDAST nodes from a normalized AST node into the output array.
+   *
+   * @param node - The normalized AST node to convert
+   * @param out - Accumulator array for the resulting MDAST nodes
+   */
   private collectMdastFromNode(node: ArtifactNode, out: MdastNode[]): void {
     if (node.type === 'document') {
       for (const child of node.children ?? []) {
@@ -214,6 +281,12 @@ export class MarkdownParser implements ArtifactParser {
     }
   }
 
+  /**
+   * Converts a single normalized AST node to its MDAST equivalent nodes.
+   *
+   * @param node - The normalized AST node to convert
+   * @returns An array of MDAST nodes representing the normalized node
+   */
   private nodeToMdastNodes(node: ArtifactNode): MdastNode[] {
     if (node.type === 'section') {
       const depth = (node.level ?? 1) as 1 | 2 | 3 | 4 | 5 | 6
@@ -284,6 +357,11 @@ export class MarkdownParser implements ArtifactParser {
     return []
   }
 
+  /**
+   * Returns the static node type descriptors for Markdown format.
+   *
+   * @returns An array of node type descriptors describing addressable Markdown node types
+   */
   nodeTypes(): readonly NodeTypeDescriptor[] {
     return [
       {
@@ -325,12 +403,24 @@ export class MarkdownParser implements ArtifactParser {
     ]
   }
 
+  /**
+   * Returns a simplified navigable outline of the Markdown artifact's section hierarchy.
+   *
+   * @param ast - The AST to generate an outline for
+   * @returns A nested list of section outline entries
+   */
   outline(ast: ArtifactAST): readonly OutlineEntry[] {
     const entries: OutlineEntry[] = []
     this.collectOutlineEntries(ast.root, entries)
     return entries
   }
 
+  /**
+   * Recursively collects section nodes into the outline entries list.
+   *
+   * @param node - The current AST node being processed
+   * @param entries - Accumulator for outline entries
+   */
   private collectOutlineEntries(node: ArtifactNode, entries: OutlineEntry[]): void {
     if (node.type === 'document') {
       for (const child of node.children ?? []) {
@@ -355,6 +445,11 @@ export class MarkdownParser implements ArtifactParser {
     }
   }
 
+  /**
+   * Returns format-specific delta authoring instructions for injection into AI context.
+   *
+   * @returns A Markdown string describing Markdown delta format and examples
+   */
   deltaInstructions(): string {
     return `## Markdown Delta Instructions
 
@@ -422,6 +517,11 @@ Delta files live at \`deltas/<workspace>/<capability-path>/<filename>.md.delta.y
 \`\`\``
   }
 
+  /**
+   * Markdown files do not serve as delta files; always returns an empty array.
+   *
+   * @returns An empty array
+   */
   parseDelta(): readonly DeltaEntry[] {
     return []
   }

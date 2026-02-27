@@ -45,9 +45,9 @@ export default tseslint.config(
     },
   },
 
-  // Domain layer — no public class fields (architecture/spec.md: expose behaviour, not structure)
+  // All source files — kebab-case filenames and JSDoc (eslint/spec.md, docs/spec.md)
   {
-    files: ['packages/*/src/domain/**/*.ts'],
+    files: ['packages/*/src/**/*.ts'],
     rules: {
       // Kebab-case filenames for source files
       'unicorn/filename-case': ['error', { case: 'kebabCase' }],

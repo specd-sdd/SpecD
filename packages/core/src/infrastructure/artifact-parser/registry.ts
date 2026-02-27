@@ -7,6 +7,11 @@ import { MarkdownParser } from './markdown-parser.js'
 import { PlaintextParser } from './plaintext-parser.js'
 import { YamlParser } from './yaml-parser.js'
 
+/**
+ * Creates and returns the default {@link ArtifactParserRegistry} with all built-in parsers registered.
+ *
+ * @returns A map of format name to parser: `'markdown'`, `'yaml'`, `'json'`, and `'plaintext'`
+ */
 export function createArtifactParserRegistry(): ArtifactParserRegistry {
   const md = new MarkdownParser()
   const yaml = new YamlParser()

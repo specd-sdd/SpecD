@@ -36,6 +36,8 @@ export class GetStatus {
   private readonly _changes: ChangeRepository
 
   /**
+   * Creates a new `GetStatus` use case instance.
+   *
    * @param changes - Repository for loading the change
    */
   constructor(changes: ChangeRepository) {

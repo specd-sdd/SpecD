@@ -10,6 +10,8 @@ export class ChangeNotFoundError extends SpecdError {
   }
 
   /**
+   * Creates a new `ChangeNotFoundError` instance.
+   *
    * @param name - The change name that was not found
    */
   constructor(name: string) {

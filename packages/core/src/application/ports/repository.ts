@@ -35,6 +35,8 @@ export abstract class Repository {
   private readonly _isExternal: boolean
 
   /**
+   * Creates a new `Repository` instance.
+   *
    * @param config - Workspace, ownership, and locality configuration for this repository
    */
   constructor(config: RepositoryConfig) {

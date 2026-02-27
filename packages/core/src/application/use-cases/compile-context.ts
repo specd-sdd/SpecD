@@ -133,6 +133,8 @@ export class CompileContext {
   private readonly _parsers: ArtifactParserRegistry
 
   /**
+   * Creates a new `CompileContext` use case instance.
+   *
    * @param changes - Repository for loading the change
    * @param specs - Spec repositories keyed by workspace name
    * @param schemas - Registry for resolving schema references

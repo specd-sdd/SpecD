@@ -18,6 +18,8 @@ export { type RepositoryConfig as SpecRepositoryConfig }
  */
 export abstract class SpecRepository extends Repository {
   /**
+   * Creates a new `SpecRepository` instance.
+   *
    * @param config - Workspace, ownership, and locality configuration
    */
   constructor(config: RepositoryConfig) {
