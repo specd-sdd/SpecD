@@ -53,7 +53,7 @@ function makeChange(
   const change = new Change({
     name,
     createdAt: new Date('2024-01-15'),
-    workspaces: [...new Set(specIds.map((id) => id.split('/')[0]))],
+    workspaces: [...new Set(specIds.map((id) => id.split('/')[0] ?? id))],
     specIds,
     contextSpecIds,
     history: events,
@@ -998,7 +998,7 @@ describe('CompileContext', () => {
               {
                 type: 'section',
                 label: 'Requirements',
-                children: [{ type: 'paragraph', label: undefined, value: 'Some requirements.' }],
+                children: [{ type: 'paragraph', value: 'Some requirements.' }],
               },
             ],
           },
