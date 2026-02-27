@@ -1,0 +1,436 @@
+# Schema Format Reference
+
+A specd schema is a YAML file that defines the artifact workflow for a project: what artifacts exist, how they relate to each other, what validation rules apply, and what instructions guide the AI at each phase.
+
+For annotated, scenario-based examples see the [`examples/`](examples/) directory.
+
+## Overview
+
+Every specd project has exactly one active schema. The schema is declared in `specd.yaml` via the `schema` field and resolved at command dispatch time. For how schema references are resolved, see the [configuration reference](../config/config-reference.md#schema).
+
+The schema controls:
+
+- Which artifact files are created and expected in every spec directory (`scope: spec`)
+- Which artifact files are produced during a change but not permanently archived (`scope: change`)
+- The dependency order between artifacts (`requires`)
+- Structural validation rules applied to artifact content (`validations`)
+- Structural validation rules applied to delta files before application (`deltaValidations`)
+- Lifecycle step definitions and their hooks (`workflow`)
+- Which parts of existing specs are extracted into AI context (`contextSections`)
+
+## File layout
+
+A schema lives in a named subdirectory alongside its templates:
+
+```
+specd/schemas/
+└── my-workflow/
+    ├── schema.yaml
+    └── templates/
+        ├── proposal.md
+        ├── spec.md
+        ├── verify.md
+        └── tasks.md
+```
+
+The `schema.yaml` file is the schema definition. Template files are plain text — no interpolation is performed on them. They serve as scaffolding when the agent creates a new artifact file. HTML comments (`<!-- ... -->`) are valid template content and are preserved in the scaffolded file; they are useful as guidance hints for the AI.
+
+The `template` field in each artifact entry is a path relative to the directory containing `schema.yaml`.
+
+## Top-level fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Machine identifier for this schema, e.g. `spec-driven`. |
+| `version` | integer | yes | Schema version, monotonically increasing. |
+| `description` | string | no | Human-readable summary. |
+| `artifacts` | array | yes | One entry per artifact type. See [`artifacts`](#artifacts). |
+| `workflow` | array | no | Named lifecycle phase definitions. See [`workflow`](#workflow). |
+
+A minimal schema with a single artifact:
+
+```yaml
+name: minimal
+version: 1
+description: Single-artifact schema for simple projects
+
+artifacts:
+  - id: spec
+    scope: spec
+    output: 'specs/**/spec.md'
+    description: The specification document
+```
+
+## artifacts
+
+Each entry in `artifacts` defines one type of file that participates in a change or lives permanently in a spec directory.
+
+### Artifact fields
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `id` | string | yes | — | Unique identifier within the schema. Must match `/^[a-z][a-z0-9-]*$/`. |
+| `scope` | `spec` \| `change` | yes | — | Where the artifact lives after archiving. See [`scope`](#scope). |
+| `output` | string or glob | yes | — | Path pattern for the artifact's files, relative to the change directory. |
+| `optional` | boolean | no | `false` | When `true`, the artifact may be absent without failing validation. |
+| `description` | string | no | — | Human-readable summary for tooling. |
+| `template` | string | no | — | Path to a template file, relative to the schema directory. |
+| `instruction` | string | no | — | AI instruction text injected by `CompileContext` for this artifact. |
+| `requires` | array of IDs | no | `[]` | Artifact IDs that must be complete before this artifact is ready. |
+| `format` | `markdown` \| `json` \| `yaml` \| `plaintext` | no | inferred | Declares the file format explicitly when the extension is ambiguous. |
+| `delta` | boolean | no | `false` | Declares that this artifact supports delta files. Only valid with `scope: spec`. |
+| `deltaInstruction` | string | no | — | Domain-specific guidance injected alongside the format-level delta instructions. Only valid with `delta: true`. |
+| `deltaValidations` | array | no | — | Structural validation rules checked against the delta file AST. Only valid with `delta: true`. |
+| `validations` | array | no | — | Structural validation rules checked against the artifact content. |
+| `contextSections` | array | no | — | Nodes of existing spec files to extract into AI context. |
+| `preHashCleanup` | array | no | — | Regex substitutions applied before computing the artifact's content hash. |
+| `taskCompletionCheck` | object | no | markdown checkboxes | How to detect incomplete task items in this artifact's content. |
+
+### scope
+
+`scope` is the single source of truth for what constitutes a complete spec directory and which files survive archiving.
+
+- **`scope: spec`** — the artifact is a permanent part of the spec record. specd syncs it from the change directory into the `SpecRepository` when the change is archived. `specd validate` checks that every spec directory in the project contains all non-optional `scope: spec` artifacts. These are files like `spec.md` and `verify.md` — they outlive the change.
+- **`scope: change`** — the artifact is a working document used during the change process. It is validated in the change but never synced to the spec directory. These are files like `proposal.md` and `tasks.md` — they belong to the change, not the spec.
+
+`scope` and `optional` are independent. A `scope: spec` artifact can be `optional: true` — meaning it is not required in every spec directory, but if present it is synced normally.
+
+### optional and requires
+
+`optional: false` (the default) means the artifact is required in every change and, for `scope: spec` artifacts, in every spec directory. `ValidateArtifacts` fails if a required artifact is missing.
+
+`optional: true` means the artifact may be absent. If the agent decides not to produce it, it must explicitly mark it as skipped via the appropriate CLI command. A skipped optional artifact is treated as resolved in `requires` chains — downstream artifacts and workflow steps are not blocked by it.
+
+`requires` declares which other artifacts must be `complete` (or `skipped`, for optional ones) before this artifact can be validated. specd uses this to compute each artifact's effective status and to determine which workflow steps are available. The `requires` graph must be acyclic. A non-optional artifact must not hard-depend on an optional one.
+
+```yaml
+artifacts:
+  - id: proposal
+    scope: change
+    output: proposal.md
+    requires: []              # no dependencies
+
+  - id: specs
+    scope: spec
+    output: 'specs/**/spec.md'
+    requires: [proposal]      # proposal must be complete first
+
+  - id: verify
+    scope: spec
+    output: 'specs/**/verify.md'
+    requires: [specs]         # specs must be complete first
+
+  - id: design
+    scope: change
+    optional: true            # may be skipped
+    output: design.md
+    requires: [proposal]
+
+  - id: tasks
+    scope: change
+    output: tasks.md
+    requires: [specs]         # skipped design does not block tasks
+```
+
+### output and template
+
+`output` is a path pattern for the artifact's files relative to the change directory. It can be a literal filename (`proposal.md`) or a glob (`specs/**/spec.md`).
+
+When creating a new artifact file within a change, specd derives the filename from the last literal segment of the glob — `spec.md` from `specs/**/spec.md`. If the last segment is a wildcard, the filename falls back to the template filename. If neither yields a determinate filename, schema loading fails with a `SchemaValidationError`.
+
+`template` is the path to a scaffolding file relative to the schema directory. Its content is placed verbatim into the new artifact file when it is first created. Templates are plain text — specd performs no variable substitution.
+
+### format
+
+`format` declares the file format of the artifact. It determines which `ArtifactParser` adapter is used for delta application, context section extraction, and validation.
+
+If omitted, specd infers the format from the file extension: `.md` → `markdown`, `.json` → `json`, `.yaml` / `.yml` → `yaml`, anything else → `plaintext`. Declare `format` explicitly when the extension is non-standard or ambiguous.
+
+### delta, deltaInstruction, deltaValidations
+
+`delta: true` declares that an artifact supports delta files — structured YAML documents that express changes to an existing spec as AST operations, rather than replacing it entirely. Only valid with `scope: spec`.
+
+When `delta: true`, a delta file may be present at `deltas/<workspace>/<spec-path>/<artifact-filename>.delta.yaml` within the change directory. specd applies it deterministically during archiving.
+
+`deltaInstruction` is an optional string injected by `CompileContext` alongside the format-level delta instructions when the agent is working with this artifact. Use it to describe domain-specific guidance — which sections to add or modify, what constitutes a meaningful change — without repeating the technical delta format, which the adapter provides automatically.
+
+`deltaValidations` defines structural rules checked against the delta file's AST before application. It uses the same rule format as `validations`. See [Selector model](#selector-model) and the [validations and delta validations example](examples/validations-and-delta-validations.md).
+
+```yaml
+- id: specs
+  scope: spec
+  output: 'specs/**/spec.md'
+  delta: true
+  deltaInstruction: |
+    When modifying existing requirements, use op: modified.
+    When adding a new requirement, use op: added with a position.parent
+    targeting the Requirements section.
+  deltaValidations:
+    - type: sequence-item
+      where:
+        op: 'added|modified'
+      contentMatches: '#### Scenario:'
+      required: true
+```
+
+For the full delta file format, see [examples/delta-files.md](examples/delta-files.md).
+
+### validations
+
+`validations` defines structural constraints checked by `ValidateArtifacts` against the artifact content after delta application. Each rule identifies nodes in the artifact's AST and asserts they exist and optionally satisfy content constraints.
+
+See [Selector model](#selector-model) for how to identify nodes. See [examples/validations-and-delta-validations.md](examples/validations-and-delta-validations.md) for annotated examples.
+
+```yaml
+validations:
+  - type: section
+    matches: '^Requirements$'
+    required: true
+    children:
+      - type: section
+        matches: '^Requirement:'
+        required: true
+```
+
+### contextSections
+
+`contextSections` declares which nodes of existing spec files are extracted into AI context by `CompileContext`. This is the fallback mechanism used when `.specd-metadata.yaml` is absent or stale — specd extracts content directly from the artifact files using these declarations.
+
+Each entry has four fields:
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `selector` | selector | yes | — | Identifies which node(s) to extract. See [Selector model](#selector-model). |
+| `role` | `rules` \| `constraints` \| `scenarios` \| `context` | no | `context` | Semantic category. `CompileContext` uses this to label and group the injected block. |
+| `extract` | `content` \| `label` \| `both` | no | `content` | What to inject: full subtree content, the node's label only, or label followed by content. |
+| `contextTitle` | string | no | node label | Title used for this section in the compiled context block. |
+
+```yaml
+contextSections:
+  - selector:
+      type: section
+      matches: '^Requirements$'
+    role: rules
+    contextTitle: Spec Requirements
+  - selector:
+      type: section
+      matches: '^Constraints$'
+    role: constraints
+```
+
+### preHashCleanup
+
+`preHashCleanup` defines a list of regex substitutions applied to the artifact content before specd computes its hash. This allows volatile content — progress markers, timestamps, completion checkboxes — to be normalised away so that checking off a task does not invalidate an artifact's `complete` status.
+
+Each entry has `pattern` (a regex string) and `replacement` (a string, may be empty). Substitutions are applied in declaration order.
+
+```yaml
+preHashCleanup:
+  - pattern: '^\s*-\s+\[x\]'
+    replacement: '- [ ]'
+```
+
+### taskCompletionCheck
+
+`taskCompletionCheck` declares how to detect incomplete task items in this artifact's content. specd uses it to gate the `implementing → verifying` lifecycle transition: the transition is blocked while any item matching `incompletePattern` exists in any artifact listed in the `implementing` step's `requires`.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `incompletePattern` | string (regex) | `^\s*-\s+\[ \]` | Matches an incomplete task item. |
+| `completePattern` | string (regex) | `^\s*-\s+\[x\]` (case-insensitive) | Matches a complete task item. |
+
+When both patterns are declared, the CLI can report progress (e.g. `3/5 tasks complete`) by counting matches of each. If `taskCompletionCheck` is omitted, the markdown checkbox defaults apply.
+
+```yaml
+taskCompletionCheck:
+  incompletePattern: '^\s*-\s+\[ \]'
+  completePattern: '^\s*-\s+\[x\]'
+```
+
+## Selector model
+
+A selector identifies one or more nodes in an artifact's AST. Selectors appear in `validations`, `deltaValidations`, `contextSections`, and inside delta file entries.
+
+### Selector fields
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | string | The node type. Must be one of the values for the target file format (see table below). Required. |
+| `matches` | string | Regex matched case-insensitively against the node's `label` (heading text, key name). |
+| `contains` | string | Regex matched case-insensitively against the node's `value` (paragraph text, scalar value). Useful for finding leaf nodes by content. |
+| `parent` | selector | Constrains search to nodes whose nearest ancestor matches this selector. Used to disambiguate nodes with the same label at different nesting levels. |
+| `index` | integer | For `array-item` and `sequence-item` nodes: targets the item at this zero-based index. Mutually exclusive with `where`. |
+| `where` | object | For `array-item` and `sequence-item` nodes that are objects: targets the item whose fields match all key–value pairs. Values are matched as case-insensitive regexes. Mutually exclusive with `index`. |
+
+### Node types by file format
+
+| Format | Addressable node types |
+|---|---|
+| Markdown | `document`, `section`, `paragraph`, `list`, `list-item`, `code-block`, `thematic-break` |
+| JSON | `document`, `object`, `property`, `array`, `array-item` |
+| YAML | `document`, `mapping`, `pair`, `sequence`, `sequence-item` |
+| Plain text | `document`, `paragraph`, `line` |
+
+The `label` field is the identifying value evaluated by `matches`. The `value` field is the scalar content evaluated by `contains`.
+
+### matches patterns
+
+`matches` is a case-insensitive regular expression evaluated against the node's label. Plain strings match anywhere in the label; use anchors for exact matches.
+
+| Pattern | Matches |
+|---|---|
+| `'Login'` | Any label containing `Login` |
+| `'^Requirement: Login$'` | Exactly the string `Requirement: Login` |
+| `'^Requirement:'` | Any label starting with `Requirement:` |
+| `'_url$'` | Any label ending with `_url` |
+| `'^Requirement: .+ \(deprecated\)$'` | Labels like `Requirement: Old thing (deprecated)` |
+
+```yaml
+# Any section whose heading contains "Login"
+selector:
+  type: section
+  matches: 'Login'
+
+# Exactly the Requirements section at any nesting level
+selector:
+  type: section
+  matches: '^Requirements$'
+
+# Every Requirement: section inside the Requirements section
+selector:
+  type: section
+  matches: '^Requirement:'
+  parent:
+    type: section
+    matches: '^Requirements$'
+
+# A YAML pair whose key ends with _url
+selector:
+  type: pair
+  matches: '_url$'
+
+# The item in a YAML sequence whose "name" field matches "Run tests"
+selector:
+  type: sequence-item
+  parent:
+    type: pair
+    matches: 'steps'
+  where:
+    name: 'Run tests'
+```
+
+## workflow
+
+`workflow` defines the named lifecycle phases of a change and what artifact conditions gate each one. The order of entries is the intended display order for tooling; it does not enforce sequential blocking between steps — each step is independently gated by its own `requires`.
+
+### Step fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `step` | string | yes | Step name identifying a phase of the change lifecycle. |
+| `requires` | array of artifact IDs | no | Artifacts that must be `complete` (or `skipped`) before this step is available. |
+| `hooks` | object | no | `pre` and/or `post` arrays of hook entries for this step's boundaries. |
+
+### Hook entries
+
+Each hook entry is one of:
+
+- `{ instruction: 'text' }` — injected into the AI context when this step is compiled. Used to guide agent behaviour during this phase.
+- `{ run: 'shell command' }` — executed at the phase boundary. Supports template variables.
+
+**Hook failure behaviour:**
+
+- **`pre` hook failure** — if a `run:` hook exits non-zero, the step is aborted. The agent should offer to fix the problem before retrying.
+- **`post` hook failure** — the step has already completed; it is not rolled back. After each failing `run:` hook, the user is prompted to continue with the remaining hooks or stop.
+
+### Template variables in `run:` hooks
+
+| Variable | Value |
+|---|---|
+| `{{change.name}}` | The change's slug name |
+| `{{change.workspace}}` | The primary workspace of the change |
+| `{{codeRoot}}` | Resolved absolute path to the active workspace's `codeRoot` |
+
+### Relationship with specd.yaml workflow hooks
+
+`specd.yaml` can add project-level hooks to any step declared in the schema using the same `workflow` format, with one difference: `requires` is not valid in `specd.yaml` workflow entries. Schema hooks fire first, then project hooks, within the same `pre` or `post` event. See the [configuration reference](../config/config-reference.md#workflow).
+
+```yaml
+workflow:
+  - step: designing
+    requires: []
+
+  - step: implementing
+    requires: [tasks]
+    hooks:
+      pre:
+        - instruction: |
+            Read the pending tasks, work through them one by one,
+            and mark each complete as you go.
+      post:
+        - run: 'pnpm test'
+        - instruction: |
+            Confirm all tests pass before marking implementing complete.
+
+  - step: verifying
+    requires: [verify]
+    hooks:
+      pre:
+        - instruction: |
+            Run through each scenario in verify.md and confirm the
+            implementation satisfies it.
+
+  - step: archiving
+    requires: [specs, tasks]
+    hooks:
+      pre:
+        - run: 'pnpm test'
+      post:
+        - run: 'git checkout -b specd/{{change.name}}'
+```
+
+## verify.md format
+
+`verify.md` is the verification artifact for a spec. It contains WHEN/THEN scenarios that describe how to confirm the system behaves correctly. It is always paired with a `spec.md` — the spec describes what the system does; the verify file describes how to check it.
+
+The file groups scenarios under `### Requirement: <name>` headings that mirror the `spec.md` structure exactly. `ValidateArtifacts` uses this heading pattern to correlate requirements with their verification scenarios.
+
+```markdown
+# Verification: <spec name>
+
+## Requirements
+
+### Requirement: <Name>
+
+#### Scenario: <scenario name>
+
+- **WHEN** <condition>
+- **THEN** <expected outcome>
+- **AND** <additional assertion> (optional)
+```
+
+Only scenarios that add information beyond what the requirement prose already states are included. Scenarios that merely restate the happy path from the spec are omitted.
+
+In the schema, the `verify` artifact should declare `requires: [specs]` — scenarios are written after the spec is stable. The `verifying` workflow step should declare `requires: [verify]`.
+
+## Schema validation on load
+
+specd validates the schema YAML when it loads. Unknown top-level fields are ignored for forward compatibility. The following conditions produce a `SchemaValidationError` and prevent startup:
+
+| Condition | Error |
+|---|---|
+| Duplicate `artifact.id` within `artifacts` | IDs must be unique within a schema. |
+| `artifact.id` not matching `/^[a-z][a-z0-9-]*$/` | IDs must be lowercase alphanumeric with hyphens. |
+| Duplicate `workflow[].step` within `workflow` | Step names must be unique. |
+| Unknown artifact ID in `artifact.requires` | References must resolve to a declared artifact. |
+| Circular dependency in the artifact `requires` graph | Cycles are not allowed. |
+| Non-optional artifact depending on an optional artifact | Would make the non-optional artifact effectively optional. |
+| `deltaValidations` declared on an artifact with `delta: false` | `deltaValidations` is only meaningful when `delta: true`. |
+| `delta: true` combined with `scope: change` | Delta files only apply to permanent spec artifacts. |
+| No determinate filename from `output` glob or `template` | specd cannot derive a filename for new artifact files. |
+
+## Examples
+
+- [Full schema](examples/full-schema.md) — a complete annotated schema covering the standard proposal → specs → design → tasks workflow
+- [Validations and delta validations](examples/validations-and-delta-validations.md) — structural validation rules using selector fields, JSONPath, nested children, and `contentMatches`
+- [Delta files](examples/delta-files.md) — the `.delta.yaml` file format with all three operations, position hints, `rename`, `content` vs `value`, and array merge strategies

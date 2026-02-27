@@ -148,7 +148,10 @@ export class ArchiveChange {
             throw new Error('No YAML parser registered — required for delta file parsing')
           }
 
-          const deltaFilename = `${artifactType.output()}.delta.yaml`
+          const deltaFilename =
+            capabilityPath.length > 0
+              ? `deltas/${workspace}/${capabilityPath}/${artifactType.output()}.delta.yaml`
+              : `deltas/${workspace}/${artifactType.output()}.delta.yaml`
           const deltaFile = await this._changes.artifact(change, deltaFilename)
           if (deltaFile === null) continue
 
