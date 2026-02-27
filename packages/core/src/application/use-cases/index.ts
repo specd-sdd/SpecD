@@ -11,3 +11,10 @@ export { RestoreChange, type RestoreChangeInput } from './restore-change.js'
 export { DiscardChange, type DiscardChangeInput } from './discard-change.js'
 export { ApproveSpec, type ApproveSpecInput } from './approve-spec.js'
 export { ApproveSignoff, type ApproveSignoffInput } from './approve-signoff.js'
+export {
+  ValidateArtifacts,
+  type ValidateArtifactsInput,
+  type ValidateArtifactsResult,
+  type ValidationFailure,
+  type ValidationWarning,
+} from './validate-artifacts.js'

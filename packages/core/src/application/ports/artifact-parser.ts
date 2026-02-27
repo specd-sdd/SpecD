@@ -113,6 +113,16 @@ export interface ArtifactParser {
    * verbatim when `delta: true` is active for the artifact.
    */
   deltaInstructions(): string
+
+  /**
+   * Parses a YAML delta file's raw content into a typed array of delta entries.
+   *
+   * Called by `ValidateArtifacts` on the YAML adapter to convert the raw delta
+   * file into `DeltaEntry[]` before passing them to `apply()`. Only the YAML
+   * adapter is expected to return a non-empty result — other adapters may return
+   * an empty array.
+   */
+  parseDelta(content: string): readonly DeltaEntry[]
 }
 
 /**
