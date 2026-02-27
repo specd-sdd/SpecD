@@ -127,7 +127,8 @@ describe('TransitionChange', () => {
         { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
         { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
         { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
-        { type: 'transitioned', from: 'implementing', to: 'done', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: actor },
       ])
     }
 

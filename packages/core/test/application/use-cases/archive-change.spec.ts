@@ -200,7 +200,8 @@ function makeArchivableChange(
     { type: 'transitioned', from: 'drafting', to: 'designing', at: createdAt, by: testActor },
     { type: 'transitioned', from: 'designing', to: 'ready', at: createdAt, by: testActor },
     { type: 'transitioned', from: 'ready', to: 'implementing', at: createdAt, by: testActor },
-    { type: 'transitioned', from: 'implementing', to: 'done', at: createdAt, by: testActor },
+    { type: 'transitioned', from: 'implementing', to: 'verifying', at: createdAt, by: testActor },
+    { type: 'transitioned', from: 'verifying', to: 'done', at: createdAt, by: testActor },
     { type: 'transitioned', from: 'done', to: 'archivable', at: createdAt, by: testActor },
   ]
   return new Change({
@@ -273,7 +274,14 @@ describe('ArchiveChange', () => {
         { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: testActor },
         { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: testActor },
         { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: testActor },
-        { type: 'transitioned', from: 'implementing', to: 'done', at: new Date(), by: testActor },
+        {
+          type: 'transitioned',
+          from: 'implementing',
+          to: 'verifying',
+          at: new Date(),
+          by: testActor,
+        },
+        { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: testActor },
         // deliberately stopped at 'done' — not transitioned to 'archivable'
       ],
     })
