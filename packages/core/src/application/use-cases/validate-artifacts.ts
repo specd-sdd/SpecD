@@ -12,6 +12,11 @@ import {
 } from '../ports/artifact-parser.js'
 import { type GitAdapter } from '../ports/git-adapter.js'
 import {
+  type GitIdentity,
+  type SpecApprovedEvent,
+  type SignedOffEvent,
+} from '../../domain/entities/change.js'
+import {
   type ValidationRule,
   type PreHashCleanup,
 } from '../../domain/value-objects/validation-rule.js'
@@ -113,7 +118,7 @@ export class ValidateArtifacts {
     const schema = await this._schemas.resolve(input.schemaRef, input.workspaceSchemasPaths)
     if (schema === null) throw new SchemaNotFoundError(input.schemaRef)
 
-    const actor = await this._git.identity()
+    const actor: GitIdentity = await this._git.identity()
     const failures: ValidationFailure[] = []
     const warnings: ValidationWarning[] = []
 
@@ -133,8 +138,8 @@ export class ValidateArtifacts {
     }
 
     // --- Approval invalidation check ---
-    const approval = change.activeSpecApproval
-    const signoff = change.activeSignoff
+    const approval: SpecApprovedEvent | undefined = change.activeSpecApproval
+    const signoff: SignedOffEvent | undefined = change.activeSignoff
     if (approval !== undefined || signoff !== undefined) {
       let invalidated = false
       for (const artifactType of schema.artifacts()) {
