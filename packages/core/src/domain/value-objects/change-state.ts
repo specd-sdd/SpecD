@@ -10,6 +10,7 @@ export type ChangeState =
   | 'pending-spec-approval'
   | 'spec-approved'
   | 'implementing'
+  | 'verifying'
   | 'done'
   | 'pending-signoff'
   | 'signed-off'
@@ -30,7 +31,8 @@ export const VALID_TRANSITIONS: Record<ChangeState, readonly ChangeState[]> = {
   ready: ['implementing', 'pending-spec-approval'],
   'pending-spec-approval': ['spec-approved'],
   'spec-approved': ['implementing'],
-  implementing: ['done'],
+  implementing: ['verifying'],
+  verifying: ['implementing', 'done'],
   done: ['archivable', 'pending-signoff'],
   'pending-signoff': ['signed-off'],
   'signed-off': ['archivable'],

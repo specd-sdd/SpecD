@@ -11,7 +11,8 @@ function makePendingSignoffChange(name: string): Change {
     { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: testActor },
     { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: testActor },
     { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: testActor },
-    { type: 'transitioned', from: 'implementing', to: 'done', at: new Date(), by: testActor },
+    { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: testActor },
+    { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: testActor },
     { type: 'transitioned', from: 'done', to: 'pending-signoff', at: new Date(), by: testActor },
   ]
   return new Change({

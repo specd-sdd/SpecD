@@ -12,6 +12,7 @@ const ALL_STATES: ChangeState[] = [
   'pending-spec-approval',
   'spec-approved',
   'implementing',
+  'verifying',
   'done',
   'pending-signoff',
   'signed-off',
@@ -27,7 +28,9 @@ describe('ChangeState', () => {
       ['ready', 'pending-spec-approval'],
       ['pending-spec-approval', 'spec-approved'],
       ['spec-approved', 'implementing'],
-      ['implementing', 'done'],
+      ['implementing', 'verifying'],
+      ['verifying', 'implementing'],
+      ['verifying', 'done'],
       ['done', 'archivable'],
       ['done', 'pending-signoff'],
       ['pending-signoff', 'signed-off'],
@@ -45,6 +48,7 @@ describe('ChangeState', () => {
     it('rejects skipping states', () => {
       expect(isValidTransition('drafting', 'ready')).toBe(false)
       expect(isValidTransition('drafting', 'archivable')).toBe(false)
+      expect(isValidTransition('implementing', 'done')).toBe(false)
       expect(isValidTransition('implementing', 'archivable')).toBe(false)
     })
 
