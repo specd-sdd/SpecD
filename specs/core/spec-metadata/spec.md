@@ -32,7 +32,7 @@ description: >
   approval gates, and event history model that everything else depends on.
 dependsOn:
   - core/storage
-  - core/delta-merger
+  - core/delta-format
   - core/config
   - core/schema-format
 keywords:

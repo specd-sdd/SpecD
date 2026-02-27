@@ -188,5 +188,5 @@ A change may be moved between storage locations without affecting its lifecycle 
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — artifact type declarations, dependency graph, `preHashCleanup`, `taskCompletionCheck`
 - [`specs/core/change-manifest/spec.md`](../change-manifest/spec.md) — manifest format and JSON serialization of events
 - [`specs/core/storage/spec.md`](../storage/spec.md) — persistence mechanics, directory naming
-- [`specs/core/delta-merger/spec.md`](../delta-merger/spec.md) — delta operations
+- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta operations, `ArtifactParser` port
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal

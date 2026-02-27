@@ -30,8 +30,8 @@
 
 #### Scenario: Correct spec path
 
-- **WHEN** a spec covers delta merging in `@specd/core`
-- **THEN** the files are at `specs/core/delta-merger/spec.md` and `specs/core/delta-merger/verify.md`
+- **WHEN** a spec covers snapshot hashing in `@specd/core`
+- **THEN** the files are at `specs/core/snapshot-hasher/spec.md` and `specs/core/snapshot-hasher/verify.md`
 
 #### Scenario: Incorrect co-location
 

@@ -35,6 +35,7 @@ interface ArtifactParser {
   nodeTypes(): NodeTypeDescriptor[]
   outline(ast: ArtifactAST): OutlineEntry[]
   deltaInstructions(): string
+  parseDelta(content: string): DeltaEntry[]
 }
 ```
 
@@ -45,6 +46,8 @@ interface ArtifactParser {
 `deltaInstructions()` returns a format-specific, static text block that `CompileContext` injects verbatim into the LLM instruction when `delta: true` is active for the artifact. Each adapter implements this method to explain its selector vocabulary, the semantics of `content` vs `value` for that format, and a concrete example mapping an AST node to a delta entry. This separates format-level technical guidance (owned by the adapter) from domain-level guidance (owned by the schema's `deltaInstruction` field).
 
 `renderSubtree(node)` serializes a single AST node and all its descendants back to the artifact's native format string. It is used by `ValidateArtifacts` (to evaluate `contentMatches` against a node's serialized subtree) and by `CompileContext` (to extract spec content via `contextSections` when metadata is absent or stale, using `extract: 'content'` or `extract: 'both'`). The output is identical to calling `serialize` on a minimal AST containing only this node — the adapter is free to implement it that way or via a dedicated code path.
+
+`parseDelta(content)` parses a YAML delta file's raw string content into a typed array of `DeltaEntry[]`. It is called by `ValidateArtifacts` and `ArchiveChange` on the YAML adapter to convert the raw delta file into entries before passing them to `apply()`. Only the YAML adapter is expected to return a non-empty result — other adapters may return an empty array. This method separates the concern of YAML deserialization from AST application so that callers do not need to depend on a YAML library directly.
 
 `apply(ast, delta)` is the single entry point for all delta application. It resolves all selectors against the AST before applying any operation — if any selector fails to resolve (no match or ambiguous match), the entire application is rejected with a `DeltaApplicationError`.
 
