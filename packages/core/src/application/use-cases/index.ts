@@ -23,3 +23,12 @@ export {
   type ValidationFailure,
   type ValidationWarning,
 } from './validate-artifacts.js'
+export {
+  CompileContext,
+  type CompileContextInput,
+  type CompileContextResult,
+  type CompileContextConfig,
+  type ContextEntry,
+  type WorkspaceContextConfig,
+  type ContextWarning,
+} from './compile-context.js'

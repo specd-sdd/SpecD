@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "yaml": "^2.0.0"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
