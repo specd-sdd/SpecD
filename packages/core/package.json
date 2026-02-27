@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-to-markdown": "^2.1.2",
     "yaml": "^2.0.0"
   },
   "exports": {
