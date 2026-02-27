@@ -195,12 +195,9 @@ export class CompileContext {
     for (const key of projectExcludedKeys) includedSpecs.delete(key)
 
     // Step 3: Workspace-level include patterns (active workspaces only)
-    const activeWorkspaces = new Set(
-      change.specIds.map((id) => {
-        const idx = id.indexOf('/')
-        return idx >= 0 ? id.slice(0, idx) : id
-      }),
-    )
+    // Per change spec: CompileContext reads workspaces from the change manifest;
+    // it does not infer active workspaces from spec paths at compile time.
+    const activeWorkspaces = new Set(change.workspaces)
 
     for (const [wsName, wsConfig] of Object.entries(input.config.workspaces ?? {})) {
       if (!activeWorkspaces.has(wsName)) continue
@@ -253,7 +250,8 @@ export class CompileContext {
 
     if (schemaWorkflowStep !== null) {
       for (const requiredId of schemaWorkflowStep.requires) {
-        if (change.effectiveStatus(requiredId) !== 'complete') {
+        const reqStatus = change.effectiveStatus(requiredId)
+        if (reqStatus !== 'complete' && reqStatus !== 'skipped') {
           stepAvailable = false
           blockingArtifacts.push(requiredId)
         }
@@ -512,7 +510,8 @@ export class CompileContext {
     for (const workflowStep of schema.workflow()) {
       const blocking: string[] = []
       for (const requiredId of workflowStep.requires) {
-        if (change.effectiveStatus(requiredId) !== 'complete') {
+        const reqStatus = change.effectiveStatus(requiredId)
+        if (reqStatus !== 'complete' && reqStatus !== 'skipped') {
           blocking.push(requiredId)
         }
       }
