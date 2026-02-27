@@ -1125,4 +1125,90 @@ describe('CompileContext', () => {
       expect(wsWarnings[0]?.path).toBe('unknown-workspace')
     })
   })
+
+  describe('Requirement: Active workspace from change.workspaces', () => {
+    it('uses change.workspaces to determine active workspaces, not specIds prefixes', async () => {
+      // The billing workspace is not in change.workspaces even though the
+      // change has a specId whose first segment could be misread as a workspace.
+      const billingSpec = new Spec('billing', SpecPath.parse('payments'), ['spec.md'])
+      const billingRepo = makeSpecRepo([billingSpec])
+      const defaultRepo = makeSpecRepo([])
+
+      // change.workspaces = ['default'] only; specIds could have confused the old code
+      const change = new Change({
+        name: 'my-change',
+        createdAt: new Date(),
+        workspaces: ['default'],
+        specIds: ['billing/payments'], // first segment is 'billing', but workspace is NOT active
+        contextSpecIds: [],
+        history: [
+          {
+            type: 'transitioned',
+            from: 'drafting',
+            to: 'designing',
+            at: new Date(),
+            by: testActor,
+          },
+        ],
+      })
+
+      const schema = makeSchema()
+      const { sut } = makeSut({
+        change,
+        schema,
+        specRepos: new Map([
+          ['default', defaultRepo],
+          ['billing', billingRepo],
+        ]),
+      })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        schemaRef: '@specd/schema-std',
+        workspaceSchemasPaths: new Map(),
+        config: {
+          contextIncludeSpecs: [],
+          contextExcludeSpecs: [],
+          workspaces: {
+            billing: { contextIncludeSpecs: ['*'] },
+          },
+        },
+      })
+
+      // billing workspace NOT active → billing:payments must NOT appear in output
+      expect(result.instructionBlock).not.toContain('billing:payments')
+    })
+  })
+
+  describe('Requirement: Step availability — skipped artifacts', () => {
+    it('treats a skipped optional artifact as satisfying the step requires', async () => {
+      const workflowStep: WorkflowStep = {
+        step: 'implementing',
+        requires: ['design'],
+        hooks: { pre: [], post: [] },
+      }
+      const designArtifact = new ChangeArtifact({
+        type: 'design',
+        filename: 'design.md',
+        status: 'skipped',
+        validatedHash: '__skipped__',
+      })
+      const change = makeChange('my-change', { artifacts: [designArtifact] })
+      const schema = makeSchema({ workflow: [workflowStep] })
+
+      const { sut } = makeSut({ change, schema })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'implementing',
+        schemaRef: '@specd/schema-std',
+        workspaceSchemasPaths: new Map(),
+        config: noOp,
+      })
+
+      expect(result.stepAvailable).toBe(true)
+      expect(result.blockingArtifacts).toHaveLength(0)
+    })
+  })
 })
