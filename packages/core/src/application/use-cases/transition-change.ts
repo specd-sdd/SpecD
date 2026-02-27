@@ -41,6 +41,14 @@ export interface TransitionChangeInput {
    * Ignored on all other transitions.
    */
   contextSpecIds?: string[]
+  /**
+   * Artifact IDs whose validation is cleared when transitioning
+   * `verifying → implementing`.
+   *
+   * Should be the `requires` list of the schema's `implementing` workflow step.
+   * Ignored on all other transitions.
+   */
+  implementingRequires?: readonly string[]
 }
 
 /**
@@ -90,6 +98,10 @@ export class TransitionChange {
 
     if (change.state === 'designing' && effectiveTarget === 'ready' && input.contextSpecIds) {
       change.updateContextSpecIds(input.contextSpecIds)
+    }
+
+    if (change.state === 'verifying' && effectiveTarget === 'implementing') {
+      change.clearArtifactValidations(input.implementingRequires ?? [])
     }
 
     change.transition(effectiveTarget, actor)

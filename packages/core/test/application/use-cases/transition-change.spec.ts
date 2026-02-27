@@ -3,6 +3,7 @@ import { TransitionChange } from '../../../src/application/use-cases/transition-
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
+import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { makeChangeRepository, makeGitAdapter, testActor } from './helpers.js'
 
 function makeChangeInState(name: string, events: ChangeEvent[]): Change {
@@ -160,6 +161,62 @@ describe('TransitionChange', () => {
       })
 
       expect(result.state).toBe('pending-signoff')
+    })
+  })
+
+  describe('given a verifying → implementing transition', () => {
+    function makeVerifyingChange(name: string): Change {
+      return makeChangeInState(name, [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: actor },
+      ])
+    }
+
+    it('clears validatedHash for artifacts listed in implementingRequires', async () => {
+      const change = makeVerifyingChange('my-change')
+      const spec = new ChangeArtifact({ type: 'spec', filename: 'spec.md' })
+      spec.markComplete('sha256:abc')
+      const tasks = new ChangeArtifact({ type: 'tasks', filename: 'tasks.md' })
+      tasks.markComplete('sha256:def')
+      change.setArtifact(spec)
+      change.setArtifact(tasks)
+
+      const repo = makeChangeRepository([change])
+      const uc = new TransitionChange(repo, makeGitAdapter())
+
+      await uc.execute({
+        name: 'my-change',
+        to: 'implementing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+        implementingRequires: ['spec'],
+      })
+
+      expect(spec.validatedHash).toBeUndefined()
+      expect(spec.status).toBe('in-progress')
+      expect(tasks.validatedHash).toBe('sha256:def')
+      expect(tasks.status).toBe('complete')
+    })
+
+    it('does not clear hashes when implementingRequires is absent', async () => {
+      const change = makeVerifyingChange('my-change')
+      const spec = new ChangeArtifact({ type: 'spec', filename: 'spec.md' })
+      spec.markComplete('sha256:abc')
+      change.setArtifact(spec)
+
+      const repo = makeChangeRepository([change])
+      const uc = new TransitionChange(repo, makeGitAdapter())
+
+      await uc.execute({
+        name: 'my-change',
+        to: 'implementing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(spec.validatedHash).toBe('sha256:abc')
     })
   })
 
