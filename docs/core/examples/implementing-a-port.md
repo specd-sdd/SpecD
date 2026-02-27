@@ -37,9 +37,7 @@ export class InMemoryChangeRepository extends ChangeRepository {
   }
 
   async list(): Promise<Change[]> {
-    return [...this._changes.values()].sort(
-      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
-    )
+    return [...this._changes.values()].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
   }
 
   async save(change: Change): Promise<void> {
@@ -63,11 +61,7 @@ export class InMemoryChangeRepository extends ChangeRepository {
     if (!options?.force && artifact.originalHash !== undefined) {
       const existing = this._artifacts.get(change.name)?.get(artifact.filename)
       if (existing !== undefined && existing.originalHash !== artifact.originalHash) {
-        throw new ArtifactConflictError(
-          artifact.filename,
-          artifact.content,
-          existing.content,
-        )
+        throw new ArtifactConflictError(artifact.filename, artifact.content, existing.content)
       }
     }
 
@@ -164,10 +158,12 @@ export class PlainTextParser implements ArtifactParser {
   parse(content: string): ArtifactAST {
     // Convert the raw string to a normalized ArtifactAST.
     // For plain text: split into paragraphs, each becomes an ArtifactNode.
-    const paragraphs = content.split(/\n{2,}/).map((text, i): ArtifactNode => ({
-      type: 'paragraph',
-      value: text.trim(),
-    }))
+    const paragraphs = content.split(/\n{2,}/).map(
+      (text, i): ArtifactNode => ({
+        type: 'paragraph',
+        value: text.trim(),
+      }),
+    )
     return { root: { type: 'document', children: paragraphs } }
   }
 
@@ -227,11 +223,13 @@ export class PlainTextParser implements ArtifactParser {
 
   outline(ast: ArtifactAST): readonly OutlineEntry[] {
     const paragraphs = ast.root.children ?? []
-    return paragraphs.map((node, i): OutlineEntry => ({
-      type: 'paragraph',
-      label: `Paragraph ${i + 1}`,
-      depth: 0,
-    }))
+    return paragraphs.map(
+      (node, i): OutlineEntry => ({
+        type: 'paragraph',
+        label: `Paragraph ${i + 1}`,
+        depth: 0,
+      }),
+    )
   }
 
   deltaInstructions(): string {
@@ -279,11 +277,7 @@ export class PlainTextParser implements ArtifactParser {
 Once you have your port implementations, inject them at the entry point of your adapter:
 
 ```typescript
-import {
-  CreateChange,
-  GetStatus,
-  TransitionChange,
-} from '@specd/core'
+import { CreateChange, GetStatus, TransitionChange } from '@specd/core'
 import { InMemoryChangeRepository } from './in-memory-change-repository.js'
 import { SimpleGitAdapter } from './simple-git-adapter.js'
 
@@ -311,21 +305,51 @@ const change = await createChange.execute({
 })
 
 const status = await getStatus.execute({ name: 'add-oauth-login' })
-console.log(status.change.state)          // 'drafting'
-console.log(status.artifactStatuses)      // []
+console.log(status.change.state) // 'drafting'
+console.log(status.artifactStatuses) // []
 ```
 
 ### Using a workspace map for multi-workspace use cases
 
-`ArchiveChange`, `ValidateArtifacts`, and `CompileContext` accept a `ReadonlyMap<string, SpecRepository>` keyed by workspace name. Build the map from your resolved config:
+`ArchiveChange`, `ValidateArtifacts`, and `CompileContext` accept a `ReadonlyMap<string, SpecRepository>` keyed by workspace name. Build the map from your resolved config.
+
+`@specd/core` ships `FsSpecRepository` and `FsChangeRepository` as built-in filesystem adapters. They are not part of the public `@specd/core` exports — they live in `@specd/core/src/infrastructure/fs/` and are used by the CLI and MCP adapters directly. If you are building your own adapter on top of the same filesystem layout, you can import them from their internal paths; otherwise implement `SpecRepository` and `ChangeRepository` yourself following the pattern shown above.
+
+The built-in `FsSpecRepository` takes a `specsPath` in addition to the base config:
 
 ```typescript
 import { ArchiveChange } from '@specd/core'
-import { FsSpecRepository } from './fs-spec-repository.js'
+import { FsSpecRepository } from '@specd/core/src/infrastructure/fs/spec-repository.js'
+import { FsChangeRepository } from '@specd/core/src/infrastructure/fs/change-repository.js'
+
+const changeRepo = new FsChangeRepository({
+  workspace: 'default',
+  ownership: 'owned',
+  isExternal: false,
+  changesPath: '/path/to/specd/changes',
+  draftsPath: '/path/to/specd/drafts',
+  discardedPath: '/path/to/specd/discarded',
+})
 
 const specRepos = new Map([
-  ['default', new FsSpecRepository({ workspace: 'default', ownership: 'owned', isExternal: false })],
-  ['billing', new FsSpecRepository({ workspace: 'billing', ownership: 'readOnly', isExternal: true })],
+  [
+    'default',
+    new FsSpecRepository({
+      workspace: 'default',
+      ownership: 'owned',
+      isExternal: false,
+      specsPath: '/path/to/specs',
+    }),
+  ],
+  [
+    'billing',
+    new FsSpecRepository({
+      workspace: 'billing',
+      ownership: 'readOnly',
+      isExternal: true,
+      specsPath: '/path/to/billing-repo/specs',
+    }),
+  ],
 ])
 
 const archiveChange = new ArchiveChange(
