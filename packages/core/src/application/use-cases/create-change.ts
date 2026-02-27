@@ -29,6 +29,8 @@ export class CreateChange {
   private readonly _git: GitAdapter
 
   /**
+   * Creates a new `CreateChange` use case instance.
+   *
    * @param changes - Repository for persisting the new change
    * @param git - Adapter for resolving the actor identity
    */

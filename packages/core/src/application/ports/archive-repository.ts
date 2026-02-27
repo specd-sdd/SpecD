@@ -19,6 +19,8 @@ export type { InvalidStateTransitionError }
  */
 export abstract class ArchiveRepository extends Repository {
   /**
+   * Creates a new `ArchiveRepository` instance.
+   *
    * @param config - Workspace, ownership, and locality configuration
    */
   constructor(config: RepositoryConfig) {

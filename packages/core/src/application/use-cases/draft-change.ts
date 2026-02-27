@@ -22,6 +22,8 @@ export class DraftChange {
   private readonly _git: GitAdapter
 
   /**
+   * Creates a new `DraftChange` use case instance.
+   *
    * @param changes - Repository for loading and persisting the change
    * @param git - Adapter for resolving the actor identity
    */

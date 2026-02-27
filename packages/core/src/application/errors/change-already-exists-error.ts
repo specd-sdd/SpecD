@@ -10,6 +10,8 @@ export class ChangeAlreadyExistsError extends SpecdError {
   }
 
   /**
+   * Creates a new `ChangeAlreadyExistsError` instance.
+   *
    * @param name - The change name that already exists
    */
   constructor(name: string) {

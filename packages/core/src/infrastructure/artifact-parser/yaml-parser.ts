@@ -10,8 +10,15 @@ import {
 } from '../../application/ports/artifact-parser.js'
 import { applyDelta } from './_shared/apply-delta.js'
 
+/** A YAML-compatible scalar value type. */
 type ScalarValue = string | number | boolean | null
 
+/**
+ * Converts a `yaml` library `Scalar` node to a `ScalarValue`.
+ *
+ * @param s - The `Scalar` node to convert
+ * @returns The scalar value, or a JSON-stringified fallback for unsupported types
+ */
 function scalarToValue(s: Scalar): ScalarValue {
   const v = s.value
   if (v === null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
@@ -20,6 +27,13 @@ function scalarToValue(s: Scalar): ScalarValue {
   return JSON.stringify(v)
 }
 
+/**
+ * Converts a `yaml` library parsed node (`YAMLMap`, `YAMLSeq`, or `Scalar`) to a
+ * normalized `ArtifactNode`. Returns `null` for top-level scalars (handled by the caller).
+ *
+ * @param node - The `yaml` library node to convert
+ * @returns The normalized `ArtifactNode`, or `null` if the node type cannot be represented
+ */
 function yamlNodeToArtifact(node: unknown): ArtifactNode | null {
   if (node === null || node === undefined) return null
 
@@ -71,6 +85,13 @@ function yamlNodeToArtifact(node: unknown): ArtifactNode | null {
   return null
 }
 
+/**
+ * Converts a parsed `yaml` `Document` to a normalized `ArtifactAST`.
+ *
+ * @param doc - The parsed YAML document
+ * @param originalContent - The original YAML string, stored on the root node as `_yaml` for round-trip fidelity
+ * @returns The normalized AST with a `document` root node
+ */
 function documentToArtifactAST(doc: Document, originalContent: string): ArtifactAST {
   const docNode = doc.contents
 
@@ -109,6 +130,12 @@ function documentToArtifactAST(doc: Document, originalContent: string): Artifact
   return { root: { type: 'document', children: [], _yaml: originalContent } }
 }
 
+/**
+ * Converts a normalized `ArtifactNode` back into a plain JavaScript value suitable for YAML serialization.
+ *
+ * @param node - The AST node to convert
+ * @returns The JavaScript value represented by the node
+ */
 function artifactNodeToJsValue(node: ArtifactNode): unknown {
   if (node.type === 'document') {
     const children = node.children ?? []
@@ -143,6 +170,12 @@ function artifactNodeToJsValue(node: ArtifactNode): unknown {
   return node.value ?? null
 }
 
+/**
+ * Converts a normalized `pair` AST node to its JavaScript value.
+ *
+ * @param pair - The `pair` node to convert
+ * @returns The JavaScript value of the pair's child or scalar value
+ */
 function artifactPairToJsValue(pair: ArtifactNode): unknown {
   if (pair.children && pair.children.length > 0) {
     return artifactNodeToJsValue(pair.children[0]!)
@@ -150,6 +183,12 @@ function artifactPairToJsValue(pair: ArtifactNode): unknown {
   return pair.value ?? null
 }
 
+/**
+ * Converts a normalized `sequence-item` AST node to its JavaScript value.
+ *
+ * @param item - The `sequence-item` node to convert
+ * @returns The JavaScript value of the item's child or scalar value
+ */
 function artifactSequenceItemToJsValue(item: ArtifactNode): unknown {
   if (item.children && item.children.length > 0) {
     return artifactNodeToJsValue(item.children[0]!)
@@ -157,6 +196,12 @@ function artifactSequenceItemToJsValue(item: ArtifactNode): unknown {
   return item.value ?? null
 }
 
+/**
+ * Converts a plain JavaScript value into a normalized YAML mapping or sequence `ArtifactNode`.
+ *
+ * @param value - The JavaScript value to convert (object, array, or scalar)
+ * @returns A `mapping`, `sequence`, or scalar-typed `ArtifactNode`
+ */
 function jsValueToMapping(value: unknown): ArtifactNode {
   if (typeof value !== 'object' || value === null) {
     return { type: 'mapping', children: [] }
@@ -180,6 +225,16 @@ function jsValueToMapping(value: unknown): ArtifactNode {
   return { type: 'mapping', children: pairs }
 }
 
+/**
+ * Converts a raw delta `value` field into the appropriate `ArtifactNode` for YAML format,
+ * respecting the target node type and parent type from the delta context.
+ *
+ * @param value - The raw value from the delta entry
+ * @param ctx - Context describing the target node type and its parent type
+ * @param ctx.nodeType - The type of the node being replaced or created
+ * @param ctx.parentType - The type of the parent node
+ * @returns The corresponding `ArtifactNode`
+ */
 function yamlValueToNode(
   value: unknown,
   ctx: { nodeType: string; parentType: string },
@@ -204,20 +259,41 @@ function yamlValueToNode(
   return jsValueToMapping(value)
 }
 
+/** {@link ArtifactParser} implementation for YAML files. */
 export class YamlParser implements ArtifactParser {
+  /** File extensions this adapter handles. */
   get fileExtensions(): readonly string[] {
     return ['.yaml', '.yml']
   }
 
+  /**
+   * Parses YAML content into a normalized `ArtifactAST`.
+   *
+   * @param content - The YAML content to parse
+   * @returns The normalized AST with a `document` root node
+   */
   parse(content: string): ArtifactAST {
     const doc = parseDocument(content)
     return documentToArtifactAST(doc, content)
   }
 
+  /**
+   * Applies delta entries to the YAML AST using the YAML-specific value converter.
+   *
+   * @param ast - The base AST to apply the delta to
+   * @param delta - The ordered list of delta entries
+   * @returns A new AST with all delta operations applied
+   */
   apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): ArtifactAST {
     return applyDelta(ast, delta, (c) => this.parse(c), yamlValueToNode)
   }
 
+  /**
+   * Serializes a YAML AST back to a YAML string, preserving the original content when unchanged.
+   *
+   * @param ast - The AST to serialize
+   * @returns The YAML string representation
+   */
   serialize(ast: ArtifactAST): string {
     const yamlStr = (ast.root as Record<string, unknown>)['_yaml']
     if (typeof yamlStr === 'string') {
@@ -227,11 +303,22 @@ export class YamlParser implements ArtifactParser {
     return stringify(jsValue)
   }
 
+  /**
+   * Serializes a single AST node and its descendants to a YAML string.
+   *
+   * @param node - The AST node to serialize
+   * @returns The YAML string representation of the node
+   */
   renderSubtree(node: ArtifactNode): string {
     const jsValue = artifactNodeToJsValue(node)
     return stringify(jsValue)
   }
 
+  /**
+   * Returns the static node type descriptors for YAML format.
+   *
+   * @returns An array of node type descriptors describing addressable YAML node types
+   */
   nodeTypes(): readonly NodeTypeDescriptor[] {
     return [
       {
@@ -263,12 +350,25 @@ export class YamlParser implements ArtifactParser {
     ]
   }
 
+  /**
+   * Returns a simplified navigable outline of the YAML artifact's key hierarchy.
+   *
+   * @param ast - The AST to generate an outline for
+   * @returns A nested list of pair outline entries
+   */
   outline(ast: ArtifactAST): readonly OutlineEntry[] {
     const entries: OutlineEntry[] = []
     this.collectOutlineEntries(ast.root, 0, entries)
     return entries
   }
 
+  /**
+   * Recursively collects `pair` and `mapping` nodes into the outline entries list.
+   *
+   * @param node - The current AST node being processed
+   * @param depth - The nesting depth (0 = root children)
+   * @param entries - Accumulator for outline entries
+   */
   private collectOutlineEntries(node: ArtifactNode, depth: number, entries: OutlineEntry[]): void {
     if (node.type === 'document') {
       for (const child of node.children ?? []) {
@@ -292,6 +392,11 @@ export class YamlParser implements ArtifactParser {
     }
   }
 
+  /**
+   * Returns format-specific delta authoring instructions for injection into AI context.
+   *
+   * @returns A Markdown string describing YAML delta format and examples
+   */
   deltaInstructions(): string {
     return `## YAML Delta Instructions
 
@@ -345,6 +450,12 @@ YAML files are parsed into a normalized AST with \`mapping\`, \`pair\`, \`sequen
 \`\`\``
   }
 
+  /**
+   * Parses a YAML delta file into a typed array of `DeltaEntry` objects.
+   *
+   * @param content - The YAML content of the delta file
+   * @returns The parsed delta entries, or an empty array if the content is not a sequence
+   */
   parseDelta(content: string): readonly DeltaEntry[] {
     const parsed = parseYaml(content) as unknown
     if (!Array.isArray(parsed)) return []

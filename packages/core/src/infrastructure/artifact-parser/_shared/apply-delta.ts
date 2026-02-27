@@ -14,6 +14,13 @@ interface NodeCtx {
   ancestors: readonly ArtifactNode[]
 }
 
+/**
+ * Returns `true` if the node's key-value pairs satisfy every entry in the `where` map.
+ *
+ * @param node - The candidate node (typically a sequence-item or array-item)
+ * @param where - A map of key names to regex patterns that must all match
+ * @returns Whether all `where` conditions are satisfied
+ */
 function matchesWhere(node: ArtifactNode, where: Readonly<Record<string, string>>): boolean {
   // The node is a sequence-item or array-item; look at its first child (mapping/object)
   const firstChild = node.children?.[0]
@@ -36,6 +43,13 @@ function matchesWhere(node: ArtifactNode, where: Readonly<Record<string, string>
   return true
 }
 
+/**
+ * Returns `true` if the node context satisfies all criteria in the selector.
+ *
+ * @param ctx - The node context containing the node and its position in the tree
+ * @param sel - The selector to match against
+ * @returns Whether the node matches the selector
+ */
 function matchesSelector(ctx: NodeCtx, sel: Selector): boolean {
   if (ctx.node.type !== sel.type) return false
 
@@ -83,13 +97,28 @@ function matchesSelector(ctx: NodeCtx, sel: Selector): boolean {
   return true
 }
 
-/** Resolves all nodes in the tree matching a selector. */
+/**
+ * Resolves all nodes in the tree matching a selector.
+ *
+ * @param root - The root node to search from
+ * @param selector - The selector to match against
+ * @returns All node contexts whose node satisfies the selector
+ */
 export function resolveNodes(root: ArtifactNode, selector: Selector): NodeCtx[] {
   const all: NodeCtx[] = []
   walkTree(root, null, 0, [], all)
   return all.filter((ctx) => matchesSelector(ctx, selector))
 }
 
+/**
+ * Walks the AST depth-first, collecting every node into `result` with its context.
+ *
+ * @param node - The current node being visited
+ * @param parent - The parent node, or `null` for the root
+ * @param indexInParent - The zero-based index of this node within its parent's children
+ * @param ancestors - All ancestor nodes from root to the parent
+ * @param result - Accumulator for collected node contexts
+ */
 function walkTree(
   node: ArtifactNode,
   parent: ArtifactNode | null,
@@ -105,6 +134,14 @@ function walkTree(
   }
 }
 
+/**
+ * Walks the AST depth-first, collecting each node together with its numeric path from the root.
+ *
+ * @param node - The current node being visited
+ * @param path - The numeric index path from the root to this node
+ * @param ancestors - All ancestor nodes from root to the parent
+ * @param result - Accumulator for `{ ctx, path }` pairs
+ */
 function walkTreeForPaths(
   node: ArtifactNode,
   path: number[],
@@ -125,12 +162,26 @@ function walkTreeForPaths(
   }
 }
 
+/**
+ * Returns the numeric child-index paths of all nodes in the tree that match the selector.
+ *
+ * @param root - The root node to search
+ * @param selector - The selector to match against
+ * @returns An array of numeric paths, one per matching node
+ */
 function getPathsMatchingSelector(root: ArtifactNode, selector: Selector): number[][] {
   const all: Array<{ ctx: NodeCtx; path: number[] }> = []
   walkTreeForPaths(root, [], [], all)
   return all.filter(({ ctx }) => matchesSelector(ctx, selector)).map(({ path }) => path)
 }
 
+/**
+ * Navigates the AST using a numeric child-index path and returns the node at that position.
+ *
+ * @param root - The root node to navigate from
+ * @param path - A sequence of zero-based child indices
+ * @returns The node at the given path
+ */
 function getNodeAtPath(root: ArtifactNode, path: readonly number[]): ArtifactNode {
   let node = root
   for (const idx of path) {
@@ -139,6 +190,13 @@ function getNodeAtPath(root: ArtifactNode, path: readonly number[]): ArtifactNod
   return node
 }
 
+/**
+ * Returns a deep clone of an AST node, copying all enumerable non-underscore-prefixed fields
+ * and recursively cloning any `children` arrays.
+ *
+ * @param node - The node to clone
+ * @returns A deep clone of the node
+ */
 function deepCloneNode(node: ArtifactNode): ArtifactNode {
   const clone: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(node)) {
@@ -152,6 +210,12 @@ function deepCloneNode(node: ArtifactNode): ArtifactNode {
   return clone as ArtifactNode
 }
 
+/**
+ * Counts the number of placement hints set on a `position` object.
+ *
+ * @param pos - The position object from a delta `added` entry
+ * @returns The count of placement hints (`after`, `before`, `first`, `last`)
+ */
 function countPlacementHints(pos: NonNullable<DeltaEntry['position']>): number {
   let count = 0
   if (pos.after !== undefined) count++
@@ -161,6 +225,13 @@ function countPlacementHints(pos: NonNullable<DeltaEntry['position']>): number {
   return count
 }
 
+/**
+ * Returns `true` if the node represents an array/sequence/list structure,
+ * or is a single-child wrapper around one.
+ *
+ * @param node - The node to test
+ * @returns Whether the node is array-like
+ */
 function isArrayLike(node: ArtifactNode): boolean {
   const arrayTypes = ['array', 'sequence', 'list']
   if (arrayTypes.includes(node.type)) return true
@@ -175,6 +246,14 @@ function isArrayLike(node: ArtifactNode): boolean {
   return false
 }
 
+/**
+ * Returns a shallow clone of `node` with `children` replaced by `newChildren`,
+ * removing any existing `value` field.
+ *
+ * @param node - The node whose children should be replaced
+ * @param newChildren - The new children array
+ * @returns A new node with the updated children
+ */
 function setChildren(node: ArtifactNode, newChildren: readonly ArtifactNode[]): ArtifactNode {
   const clone: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(node)) {
@@ -185,12 +264,28 @@ function setChildren(node: ArtifactNode, newChildren: readonly ArtifactNode[]): 
   return clone as ArtifactNode
 }
 
+/**
+ * Returns a new parent node with the child at `indexInParent` removed.
+ *
+ * @param parent - The parent node whose child should be removed
+ * @param indexInParent - The zero-based index of the child to remove
+ * @returns A new parent node with the child removed
+ */
 function removeFromParentChildren(parent: ArtifactNode, indexInParent: number): ArtifactNode {
   const newChildren = [...(parent.children ?? [])]
   newChildren.splice(indexInParent, 1)
   return setChildren(parent, newChildren)
 }
 
+/**
+ * Returns a new AST root with the node at `path` replaced by `updater(node)`,
+ * preserving the immutability of all ancestor nodes.
+ *
+ * @param root - The root of the AST to update
+ * @param path - The numeric child-index path to the node to update
+ * @param updater - A function that receives the current node and returns the replacement
+ * @returns A new root node reflecting the update
+ */
 function updateNodeInTree(
   root: ArtifactNode,
   path: readonly number[],
@@ -205,7 +300,13 @@ function updateNodeInTree(
   return setChildren(root, children)
 }
 
-/** Finds the index within children matching a selector, or -1 if not found. */
+/**
+ * Finds the index within children matching a selector, or -1 if not found.
+ *
+ * @param children - The array of child nodes to search
+ * @param sel - The selector to match against
+ * @returns The zero-based index of the first matching child, or -1 if none match
+ */
 function findInChildren(children: readonly ArtifactNode[], sel: Selector): number {
   for (let i = 0; i < children.length; i++) {
     const child = children[i]!
@@ -223,6 +324,13 @@ function findInChildren(children: readonly ArtifactNode[], sel: Selector): numbe
 /**
  * Applies a sequence of delta entries to an AST and returns a new AST.
  * All selectors are validated before any operation is applied.
+ *
+ * @param ast - The original AST to apply the delta to
+ * @param delta - The ordered list of delta entries to apply
+ * @param parseContent - A format-specific parser for the `content` field of `added`/`modified` entries
+ * @param valueToNode - A format-specific converter from raw `value` objects to AST nodes
+ * @returns A new AST with all delta operations applied
+ * @throws {DeltaApplicationError} When any selector fails to resolve, is ambiguous, or a structural rule is violated
  */
 export function applyDelta(
   ast: ArtifactAST,
@@ -231,6 +339,7 @@ export function applyDelta(
   valueToNode: (value: unknown, ctx: { nodeType: string; parentType: string }) => ArtifactNode,
 ): ArtifactAST {
   // Phase 1 — Validate structural rules and resolve selectors against ORIGINAL AST
+  /** A delta entry with its resolved tree path. */
   type ResolvedEntry = { entry: DeltaEntry; path: number[] }
   const resolvedModifiedRemoved: ResolvedEntry[] = []
 
@@ -572,7 +681,13 @@ export function applyDelta(
   return { root: newRoot }
 }
 
-/** Extracts the merge key value from an item node (sequence-item / array-item). */
+/**
+ * Extracts the merge key value from an item node (sequence-item / array-item).
+ *
+ * @param item - The item node whose merge key value should be extracted
+ * @param mergeKey - The key name to look up inside the item's inner mapping/object
+ * @returns The string value of the merge key, or `null` if not found
+ */
 function getMergeKeyValue(item: ArtifactNode, mergeKey: string): string | null {
   // Item may have children containing a mapping/object node with pairs/properties
   const inner = item.children?.[0]
@@ -585,6 +700,9 @@ function getMergeKeyValue(item: ArtifactNode, mergeKey: string): string | null {
 /**
  * If a node is a wrapper (e.g. property or pair) with a single array/sequence/list child,
  * returns that inner array node. Otherwise returns null.
+ *
+ * @param node - The node to inspect
+ * @returns The inner array/sequence/list node, or `null` if the node is not a single-child wrapper
  */
 function getInnerArrayNode(node: ArtifactNode): ArtifactNode | null {
   const arrayTypes = ['array', 'sequence', 'list']

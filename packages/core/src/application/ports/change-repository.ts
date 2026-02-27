@@ -21,6 +21,8 @@ export { type RepositoryConfig as ChangeRepositoryConfig }
  */
 export abstract class ChangeRepository extends Repository {
   /**
+   * Creates a new `ChangeRepository` instance.
+   *
    * @param config - Workspace, ownership, and locality configuration
    */
   constructor(config: RepositoryConfig) {

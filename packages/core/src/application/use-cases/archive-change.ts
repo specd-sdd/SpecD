@@ -57,6 +57,8 @@ export class ArchiveChange {
   private readonly _schemas: SchemaRegistry
 
   /**
+   * Creates a new `ArchiveChange` use case instance.
+   *
    * @param changes - Repository for loading the change
    * @param specs - Spec repositories keyed by workspace name
    * @param archive - Repository for archiving the change
@@ -198,7 +200,12 @@ export class ArchiveChange {
     }
   }
 
-  /** Infers the format name from an output filename extension. */
+  /**
+   * Infers the format name from an output filename extension.
+   *
+   * @param output - The artifact output filename
+   * @returns The inferred format name (`'markdown'`, `'json'`, `'yaml'`, or `'plaintext'`)
+   */
   private _inferFormat(output: string): string {
     const ext = output.split('.').pop() ?? ''
     if (ext === 'md') return 'markdown'

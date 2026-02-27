@@ -83,6 +83,8 @@ export class ValidateArtifacts {
   private readonly _git: GitAdapter
 
   /**
+   * Creates a new `ValidateArtifacts` use case instance.
+   *
    * @param changes - Repository for loading and persisting the change
    * @param specs - Spec repositories keyed by workspace name
    * @param schemas - Registry for resolving schema references
@@ -280,10 +282,23 @@ export class ValidateArtifacts {
     return { passed: failures.length === 0, failures, warnings }
   }
 
+  /**
+   * Computes a SHA-256 hash of the given content string.
+   *
+   * @param content - The content to hash
+   * @returns A hex digest prefixed with `sha256:`
+   */
   private _sha256(content: string): string {
     return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`
   }
 
+  /**
+   * Applies a sequence of pre-hash cleanup rules to the content string.
+   *
+   * @param content - The content to clean
+   * @param cleanups - The cleanup rules to apply in order
+   * @returns The cleaned content string
+   */
   private _applyCleanup(content: string, cleanups: readonly PreHashCleanup[]): string {
     let result = content
     for (const cleanup of cleanups) {
@@ -292,6 +307,12 @@ export class ValidateArtifacts {
     return result
   }
 
+  /**
+   * Infers the format name from an artifact filename extension.
+   *
+   * @param filename - The artifact filename to inspect
+   * @returns The inferred format name, or `undefined` if the extension is unrecognised
+   */
   private _inferFormat(filename: string): string | undefined {
     const parts = filename.split('.')
     const ext = parts[parts.length - 1]
@@ -302,6 +323,15 @@ export class ValidateArtifacts {
     return undefined
   }
 
+  /**
+   * Evaluates a list of validation rules against an AST root node.
+   *
+   * @param rules - The rules to evaluate
+   * @param root - The AST root node to evaluate against
+   * @param artifactId - The artifact type ID for failure/warning attribution
+   * @param parser - The parser for rendering subtrees during `contentMatches` checks
+   * @returns An object containing all failures and warnings collected
+   */
   private _evaluateRules(
     rules: readonly ValidationRule[],
     root: ArtifactNode,
@@ -316,6 +346,16 @@ export class ValidateArtifacts {
     return { failures, warnings }
   }
 
+  /**
+   * Evaluates a single validation rule against the AST, appending results to the provided accumulators.
+   *
+   * @param rule - The validation rule to evaluate
+   * @param root - The AST root node to evaluate against
+   * @param artifactId - The artifact type ID for failure/warning attribution
+   * @param parser - The parser for rendering subtrees during `contentMatches` checks
+   * @param failures - Accumulator for validation failures
+   * @param warnings - Accumulator for validation warnings
+   */
   private _evaluateRule(
     rule: ValidationRule,
     root: ArtifactNode,
@@ -352,12 +392,26 @@ export class ValidateArtifacts {
     }
   }
 
+  /**
+   * Selects nodes from the AST according to the rule's `path` or `selector`, defaulting to the root.
+   *
+   * @param root - The AST root node to select from
+   * @param rule - The validation rule containing the selection criteria
+   * @returns The matched AST nodes
+   */
   private _selectNodes(root: ArtifactNode, rule: ValidationRule): ArtifactNode[] {
     if (rule.path !== undefined) return this._selectByJsonPath(root, rule.path)
     if (rule.selector !== undefined) return this._selectBySelector(root, rule.selector)
     return [root]
   }
 
+  /**
+   * Selects nodes matching the given selector, optionally constrained by a parent selector.
+   *
+   * @param root - The AST root node to search
+   * @param selector - The selector criteria to match
+   * @returns All matching nodes, filtered by `selector.index` when present
+   */
   private _selectBySelector(root: ArtifactNode, selector: Selector): ArtifactNode[] {
     if (selector.parent !== undefined) {
       const parentNodes = this._selectBySelector(root, selector.parent)
@@ -381,6 +435,13 @@ export class ValidateArtifacts {
     return matched
   }
 
+  /**
+   * Returns `true` if the node satisfies all criteria in the selector.
+   *
+   * @param node - The AST node to test
+   * @param selector - The selector criteria to match against
+   * @returns Whether the node matches the selector
+   */
   private _nodeMatches(node: ArtifactNode, selector: Selector): boolean {
     if (node.type !== selector.type) return false
     if (selector.matches !== undefined) {
@@ -404,6 +465,12 @@ export class ValidateArtifacts {
     return true
   }
 
+  /**
+   * Recursively collects all nodes in the AST, including the root.
+   *
+   * @param root - The starting AST node
+   * @returns All nodes in document order
+   */
   private _collectNodes(root: ArtifactNode): ArtifactNode[] {
     const result: ArtifactNode[] = [root]
     if (root.children !== undefined) {
@@ -414,6 +481,13 @@ export class ValidateArtifacts {
     return result
   }
 
+  /**
+   * Selects nodes from the AST using a simplified JSONPath expression.
+   *
+   * @param root - The AST root node to navigate
+   * @param path - The JSONPath expression (e.g. `$.children[*]`)
+   * @returns All nodes matching the path
+   */
   private _selectByJsonPath(root: ArtifactNode, path: string): ArtifactNode[] {
     if (path === '$') return [root]
     const tokens = this._tokenizeJsonPath(path)
@@ -458,6 +532,12 @@ export class ValidateArtifacts {
     )
   }
 
+  /**
+   * Tokenises a JSONPath expression into its component segments.
+   *
+   * @param path - The JSONPath expression string
+   * @returns An array of path token strings
+   */
   private _tokenizeJsonPath(path: string): string[] {
     const tokens: string[] = []
     let i = 0
@@ -504,6 +584,13 @@ export class ValidateArtifacts {
     return tokens
   }
 
+  /**
+   * Recursively collects all values at a given field key from any nested object or array.
+   *
+   * @param node - The value to traverse (object, array, or primitive)
+   * @param field - The field name to collect values for
+   * @returns All values found at the given field in any nested structure
+   */
   private _recursiveCollect(node: unknown, field: string): unknown[] {
     const result: unknown[] = []
     if (node === null || typeof node !== 'object') return result
