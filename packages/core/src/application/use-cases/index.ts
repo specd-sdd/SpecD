@@ -12,6 +12,11 @@ export { DiscardChange, type DiscardChangeInput } from './discard-change.js'
 export { ApproveSpec, type ApproveSpecInput } from './approve-spec.js'
 export { ApproveSignoff, type ApproveSignoffInput } from './approve-signoff.js'
 export {
+  ArchiveChange,
+  type ArchiveChangeInput,
+  type ArchiveChangeResult,
+} from './archive-change.js'
+export {
   ValidateArtifacts,
   type ValidateArtifactsInput,
   type ValidateArtifactsResult,
