@@ -254,7 +254,8 @@ export class Change {
    * the dependency graph to reflect blocking dependencies.
    *
    * An artifact whose own hash matches its `validatedHash` is still reported
-   * as `in-progress` if any artifact in its `requires` chain is not `complete`.
+   * as `in-progress` if any artifact in its `requires` chain is neither
+   * `complete` nor `skipped`.
    *
    * @param type - The artifact type ID to evaluate
    * @returns The effective `ArtifactStatus` after dependency resolution
