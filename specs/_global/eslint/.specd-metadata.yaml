@@ -1,8 +1,6 @@
 title: 'ESLint Rules'
 description: >
-  Specifies the ESLint configuration that enforces coding conventions across
-  all packages, including type-aware rules, jsdoc requirements, and import
-  restrictions.
+  Specifies the ESLint configuration enforced across all packages in the monorepo, including type-aware rules, JSDoc requirements, layer boundary enforcement, and import restrictions. This spec defines what the linter enforces; refer to it when setting up a new package or understanding why a lint error appears.
 keywords:
   - 'eslint'
   - 'linting'
@@ -12,8 +10,9 @@ keywords:
   - 'code-style'
 dependsOn:
   - 'specs/_global/conventions/'
+  - 'specs/_global/architecture/'
 contentHashes:
-  spec.md: 'sha256:cedd44235fc271069dc7cdcc3aafb501037fa39111b938c388b28b8304ff9ece'
+  spec.md: 'sha256:945bb39cd0799331a16708873794d264be81911a1e98aed567aac5448f58fa98'
   verify.md: 'sha256:158f656872560db796e95015fbc18ebd42510dc6944ce64052d8224244859ab6'
 rules:
   - requirement: 'No `any` type'
@@ -39,6 +38,13 @@ rules:
       - 'The JSDoc comment must include `@param` tags for all parameters (with description) on functions and methods.'
       - 'The JSDoc comment must include `@returns` tag describing the return value on functions and methods (omit for `void`).'
       - 'The JSDoc comment must include `@throws` tag for each error type that can be thrown.'
+  - requirement: 'Layer boundary enforcement'
+    rules:
+      - 'ESLint must enforce the import constraints defined in `specs/_global/architecture/spec.md` via `no-restricted-imports` rules.'
+      - 'Files under `domain/` must not import from `application/`, `infrastructure/`, or `composition/`.'
+      - 'Files under `application/` must not import from `infrastructure/` or `composition/`.'
+      - 'Files under `infrastructure/` must not import from `composition/`.'
+      - 'These rules make layer boundary violations a lint error, not a convention violation.'
 constraints:
   - 'Type-aware lint rules are enabled for all `.ts` files.'
   - 'Lint errors must be resolved before committing (enforced by lint-staged in the pre-commit hook).'

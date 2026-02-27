@@ -33,6 +33,16 @@ The comment must include:
 - `@returns` tag describing the return value on functions and methods (omit for `void`)
 - `@throws` tag for each error type that can be thrown
 
+### Requirement: Layer boundary enforcement
+
+ESLint must enforce the import constraints defined in `specs/_global/architecture/spec.md` via `no-restricted-imports` rules:
+
+- Files under `domain/` must not import from `application/`, `infrastructure/`, or `composition/`
+- Files under `application/` must not import from `infrastructure/` or `composition/`
+- Files under `infrastructure/` must not import from `composition/`
+
+These rules make layer boundary violations a lint error, not a convention violation.
+
 ## Constraints
 
 - Type-aware lint rules are enabled for all `.ts` files

@@ -1,9 +1,6 @@
 title: 'Architecture'
 description: >
-  Defines hexagonal architecture principles for specd packages with business logic. Establishes
-  layering rules for domain, application, and infrastructure; requires pure domains, port-based
-  I/O, rich entities, and manual dependency injection. Use this spec when designing or reviewing
-  package structure and layer boundaries.
+  Defines hexagonal architecture and domain-driven design principles for specd packages with business logic. Establishes layering rules for domain, application, infrastructure, and composition; requires pure domains, port-based I/O, rich entities, and manual dependency injection. Use this spec when designing or reviewing package structure, dependency directions, and layer boundaries.
 keywords:
   - 'architecture'
   - 'hexagonal'
@@ -12,9 +9,12 @@ keywords:
   - 'layering'
   - 'dependencies'
   - 'entities'
+  - 'composition'
+  - 'adapter-construction'
+  - 'dependency-injection'
 dependsOn: []
 contentHashes:
-  spec.md: 'sha256:dcf5e13d391351d725e30ba38fa4b24fbdefbbe840530521a7b2a9d1343d241d'
+  spec.md: 'sha256:b64dfcecfa24e0ea460053a771e7fbc3de77fd166cb44c80509fb2eaf429383b'
   verify.md: 'sha256:dbbf29057514a748003772a3670aa33c62a8fb2a7e859ec9d9a49d49367cbbff'
 rules:
   - requirement: 'Layered structure for packages with business logic'
@@ -41,24 +41,34 @@ rules:
   - requirement: 'Domain value objects expose behaviour, not structure'
     rules:
       - 'Domain value objects expose operations and computed properties via methods and getters.'
-      - 'Internal representation must not be accessible from outside the class hierarchy.'
+      - 'Internal representation (e.g. raw segment arrays, backing fields) must not be accessible from outside the class hierarchy.'
       - "This applies to all value objects in any package's domain/ layer."
   - requirement: 'Ports with shared construction are abstract classes'
     rules:
-      - 'When a port has constructor arguments that are invariant across all implementations, it is defined as an abstract class.'
+      - 'When a port has constructor arguments that are invariant across all implementations (e.g. scope, ownership, isExternal), it is defined as an abstract class rather than an interface.'
       - 'The abstract class sets those fields in its constructor and exposes them as methods.'
       - 'All storage operations are declared abstract.'
       - 'This lets the TypeScript compiler enforce both the construction contract and the method contract without relying on ESLint or convention.'
       - 'All methods on port abstract classes — including the shared ones from the base — are explicit methods, never property signatures.'
   - requirement: 'Pure functions for stateless domain services'
     rules:
-      - 'Domain operations that are stateless and have no I/O are implemented as plain exported functions in domain/services/.'
+      - 'Domain operations that are stateless and have no I/O are implemented as plain exported functions in domain/services/, not as classes.'
       - 'This applies to any package with a domain/ layer.'
   - requirement: 'Manual dependency injection'
     rules:
       - 'Dependencies are wired manually at the application entry point of each package.'
       - 'No IoC container.'
       - 'Use case constructors receive their port implementations as arguments.'
+  - requirement: 'Composition layer for adapter construction'
+    rules:
+      - 'Each package with business logic may have a composition/ layer above infrastructure/.'
+      - 'This layer contains factory functions that construct infrastructure adapters and return the abstract port type.'
+      - 'It is the only layer permitted to import from infrastructure/.'
+      - "Factory functions must accept a discriminated union config (e.g. { type: 'fs', ...fsConfig }) to remain extensible as new adapter types are added."
+      - 'Factory functions must return the abstract port type (SpecRepository, ChangeRepository), never the concrete class.'
+      - 'Factory functions must be the only public export surface for infrastructure adapters — concrete adapter classes are never exported from index.ts.'
+      - 'Adapter packages (CLI, MCP) import from composition/ to construct their dependencies.'
+      - 'Adapter packages never import concrete infrastructure classes directly.'
   - requirement: 'Adapter packages contain no business logic'
     rules:
       - 'Packages that serve as delivery mechanisms (@specd/cli, @specd/mcp, @specd/plugin-*) contain no business logic.'
@@ -72,8 +82,10 @@ rules:
       - 'schema-* has no dependencies on other specd packages.'
       - 'Any new package must fit into this directed graph without introducing cycles.'
 constraints:
-  - 'In any package with business logic, domain/ must not import from application/ or infrastructure/.'
-  - 'In any package with business logic, application/ must not import from infrastructure/.'
+  - 'In any package with business logic, domain/ must not import from application/, infrastructure/, or composition/.'
+  - 'In any package with business logic, application/ must not import from infrastructure/ or composition/.'
+  - 'In any package with business logic, infrastructure/ must not import from composition/.'
+  - 'Only composition/ may import from infrastructure/; concrete adapter classes must not be exported from index.ts.'
   - 'Use cases receive all dependencies via constructor — no module-level singletons, in any package.'
   - 'Domain entities must throw typed errors (subclasses of SpecdError) for invalid operations.'
   - 'Stateless domain operations must be plain functions, not classes.'
