@@ -24,7 +24,7 @@ export function makeChangeRepository(
       return 'default'
     },
     ownership() {
-      return 'project' as const
+      return 'owned' as const
     },
     isExternal() {
       return false
