@@ -67,21 +67,22 @@ For each spec path in `change.specIds`:
    a. Load the artifact file from `ChangeRepository`. If absent or `skipped` (effective status `skipped`), skip — nothing to sync.
    b. Save the content directly to `SpecRepository` (creating the spec directory and file if they do not exist).
 
-### Requirement: ArchivedChange construction
-
-After syncing all specs, `ArchiveChange` must construct an `ArchivedChange` record:
-
-- `name` — the change's slug name (e.g. `add-auth-flow`)
-- `archivedName` — the full timestamped directory name: `YYYYMMDD-HHmmss-<name>` where the timestamp is derived from `change.createdAt` (zero-padded)
-- `workspace` — the `SpecPath` of the primary workspace (the first entry in `change.workspaces`)
-- `archivedAt` — the current timestamp
-- `artifacts` — an array of artifact filenames that were synced to `SpecRepository`
-
-`ArchivedChange` has no `approval` field and no `wasStructural` flag — these were removed from the domain model.
-
 ### Requirement: Archive repository call
 
-`ArchiveChange` must call `archiveRepository.archive(archivedChange)`. The `FsArchiveRepository` implementation moves the change directory from its current location (`changes/` or `drafts/`) to the archive directory using the configured pattern, then appends an entry to `index.jsonl`. The use case has no knowledge of these implementation details.
+After syncing all specs, `ArchiveChange` must call `archiveRepository.archive(change)`, passing the `Change` entity. The `ArchiveRepository` port is responsible for constructing the `ArchivedChange` record — the use case never builds it directly, because `archivedAt` can only be set by the operation that performs the archive, and `archivedName` is an infrastructure naming concern.
+
+The port's contract requires:
+
+- `archivedName` — the full timestamped directory name: `YYYYMMDD-HHmmss-<name>` where the timestamp is derived from `change.createdAt` (zero-padded), never from wall-clock time at execution
+- `archivedAt` — the timestamp when the archive operation completes, set by the repository
+- `workspace` — the `SpecPath` of the primary workspace (the first entry in `change.workspaces`)
+- `artifacts` — artifact metadata tracked by the repository
+
+The `FsArchiveRepository` implementation additionally moves the change directory from its current location (`changes/` or `drafts/`) to the archive directory using the configured pattern, then appends an entry to `index.jsonl`. The use case has no knowledge of these implementation details.
+
+`ArchiveChange` receives the returned `ArchivedChange` record and includes it in the result.
+
+`ArchivedChange` has no `approval` field and no `wasStructural` flag — these were removed from the domain model.
 
 ### Requirement: Post-archive hooks
 
@@ -113,7 +114,8 @@ After post-archive hooks complete, `ArchiveChange` must collect the set of spec 
 - Pre-archive hook failures abort the archive and throw — no partial state is written
 - Post-archive hook failures are returned in the result; the archive is not rolled back
 - `ArchiveChange` must not call `change.invalidate()` or any mutation on the `Change` entity — the change is already at its terminal state
-- The `archivedName` is always derived from `change.createdAt`, never from wall-clock time at archive execution
+- `ArchiveChange` never constructs `ArchivedChange` directly — it is always returned by `archiveRepository.archive(change)`
+- `archivedName` must be derived from `change.createdAt` by the repository — never from wall-clock time at archive execution
 - `ArchiveChange` does not delete the change from `ChangeRepository` — `FsArchiveRepository.archive()` moves the directory as part of the archive operation
 
 ## Spec Dependencies
