@@ -40,6 +40,18 @@ Domain operations that are stateless and have no I/O are implemented as plain ex
 
 Dependencies are wired manually at the application entry point of each package. No IoC container. Use case constructors receive their port implementations as arguments.
 
+### Requirement: Composition layer for adapter construction
+
+Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer contains factory functions that construct infrastructure adapters and return the abstract port type. It is the only layer permitted to import from `infrastructure/`.
+
+Factory functions must:
+
+- Accept a discriminated union config (e.g. `{ type: 'fs', ...fsConfig }`) to remain extensible as new adapter types are added
+- Return the abstract port type (`SpecRepository`, `ChangeRepository`), never the concrete class
+- Be the only public export surface for infrastructure adapters — concrete adapter classes are never exported from `index.ts`
+
+Adapter packages (CLI, MCP) import from `composition/` to construct their dependencies. They never import concrete infrastructure classes directly.
+
 ### Requirement: Adapter packages contain no business logic
 
 Packages that serve as delivery mechanisms (`@specd/cli`, `@specd/mcp`, `@specd/plugin-*`) contain no business logic. They translate between their delivery mechanism and use cases. Any new adapter package must follow the same rule.
@@ -50,8 +62,10 @@ Package dependency direction is strictly one-way: `plugin-*` → `skills` → `c
 
 ## Constraints
 
-- In any package with business logic, `domain/` must not import from `application/` or `infrastructure/`
-- In any package with business logic, `application/` must not import from `infrastructure/`
+- In any package with business logic, `domain/` must not import from `application/`, `infrastructure/`, or `composition/`
+- In any package with business logic, `application/` must not import from `infrastructure/` or `composition/`
+- In any package with business logic, `infrastructure/` must not import from `composition/`
+- Only `composition/` may import from `infrastructure/`; concrete adapter classes must not be exported from `index.ts`
 - Use cases receive all dependencies via constructor — no module-level singletons, in any package
 - Domain entities must throw typed errors (subclasses of `SpecdError`) for invalid operations
 - Stateless domain operations must be plain functions, not classes
