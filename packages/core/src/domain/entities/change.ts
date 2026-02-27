@@ -302,6 +302,9 @@ export class Change {
     const now = new Date()
     this._history.push({ type: 'invalidated', cause, at: now, by: actor })
     this._history.push({ type: 'transitioned', from, to: 'designing', at: now, by: actor })
+    for (const artifact of this._artifacts.values()) {
+      artifact.resetValidation()
+    }
   }
 
   /**
@@ -430,6 +433,20 @@ export class Change {
   assertArchivable(): void {
     if (!this.isArchivable) {
       throw new InvalidStateTransitionError(this.state, 'archivable')
+    }
+  }
+
+  /**
+   * Resets the validation state for the specified artifacts.
+   *
+   * Called when transitioning `verifying → implementing` to clear only the
+   * artifacts listed in the `implementing` workflow step's `requires` field.
+   *
+   * @param artifactIds - The artifact type IDs whose validation is cleared
+   */
+  clearArtifactValidations(artifactIds: readonly string[]): void {
+    for (const id of artifactIds) {
+      this._artifacts.get(id)?.resetValidation()
     }
   }
 

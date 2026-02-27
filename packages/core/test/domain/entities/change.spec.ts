@@ -179,6 +179,46 @@ describe('Change', () => {
       const transitioned = [...c.history].reverse().find((e) => e.type === 'transitioned')
       expect(transitioned?.type === 'transitioned' && transitioned.from).toBe('ready')
     })
+
+    it('clears validatedHash and resets complete artifacts to in-progress', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      const proposal = new ChangeArtifact({ type: 'proposal', filename: 'proposal.md' })
+      proposal.markComplete('sha256:abc')
+      c.setArtifact(proposal)
+
+      c.invalidate('spec-change', actor)
+
+      expect(proposal.validatedHash).toBeUndefined()
+      expect(proposal.status).toBe('in-progress')
+    })
+
+    it('clears validatedHash and resets skipped artifacts to missing', () => {
+      const c = makeChange()
+      const adr = new ChangeArtifact({ type: 'adr', filename: 'adr.md', optional: true })
+      adr.markSkipped()
+      c.setArtifact(adr)
+
+      c.invalidate('spec-change', actor)
+
+      expect(adr.validatedHash).toBeUndefined()
+      expect(adr.status).toBe('missing')
+    })
+
+    it('clears hashes on all artifacts when invalidated', () => {
+      const c = makeChange()
+      const proposal = new ChangeArtifact({ type: 'proposal', filename: 'proposal.md' })
+      proposal.markComplete('sha256:111')
+      const design = new ChangeArtifact({ type: 'design', filename: 'design.md' })
+      design.markComplete('sha256:222')
+      c.setArtifact(proposal)
+      c.setArtifact(design)
+
+      c.invalidate('artifact-change', actor)
+
+      expect(proposal.validatedHash).toBeUndefined()
+      expect(design.validatedHash).toBeUndefined()
+    })
   })
 
   describe('recordSpecApproval', () => {
@@ -537,6 +577,41 @@ describe('Change', () => {
       c.setArtifact(makeArtifact('design', 'complete', ['adr']))
       c.setArtifact(makeArtifact('tasks', 'complete', ['design']))
       expect(c.effectiveStatus('tasks')).toBe('complete')
+    })
+  })
+
+  describe('clearArtifactValidations', () => {
+    it('clears only the specified artifacts', () => {
+      const c = makeChange()
+      const proposal = new ChangeArtifact({ type: 'proposal', filename: 'proposal.md' })
+      proposal.markComplete('sha256:abc')
+      const tasks = new ChangeArtifact({ type: 'tasks', filename: 'tasks.md' })
+      tasks.markComplete('sha256:def')
+      c.setArtifact(proposal)
+      c.setArtifact(tasks)
+
+      c.clearArtifactValidations(['proposal'])
+
+      expect(proposal.validatedHash).toBeUndefined()
+      expect(proposal.status).toBe('in-progress')
+      expect(tasks.validatedHash).toBe('sha256:def')
+      expect(tasks.status).toBe('complete')
+    })
+
+    it('silently skips unknown artifact IDs', () => {
+      const c = makeChange()
+      expect(() => c.clearArtifactValidations(['unknown'])).not.toThrow()
+    })
+
+    it('does nothing when the list is empty', () => {
+      const c = makeChange()
+      const proposal = new ChangeArtifact({ type: 'proposal', filename: 'proposal.md' })
+      proposal.markComplete('sha256:abc')
+      c.setArtifact(proposal)
+
+      c.clearArtifactValidations([])
+
+      expect(proposal.validatedHash).toBe('sha256:abc')
     })
   })
 

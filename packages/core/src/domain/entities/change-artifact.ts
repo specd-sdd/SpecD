@@ -120,4 +120,18 @@ export class ChangeArtifact {
     this._validatedHash = SKIPPED_SENTINEL
     this._status = 'skipped'
   }
+
+  /**
+   * Resets the validation state by clearing `validatedHash` and rolling the
+   * status back to its unvalidated equivalent.
+   *
+   * - `complete` → `in-progress` (file still present, hash no longer valid)
+   * - `skipped` → `missing` (sentinel cleared, file treated as absent)
+   * - `in-progress` / `missing` — no status change, hash already unset
+   */
+  resetValidation(): void {
+    if (this._status === 'complete') this._status = 'in-progress'
+    else if (this._status === 'skipped') this._status = 'missing'
+    this._validatedHash = undefined
+  }
 }
