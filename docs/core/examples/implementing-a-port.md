@@ -274,20 +274,23 @@ export class PlainTextParser implements ArtifactParser {
 
 ## Wiring ports into a use case
 
-Once you have your port implementations, inject them at the entry point of your adapter:
+Once you have your port implementations, inject them at the entry point of your adapter. For the built-in filesystem adapters, use the factory functions exported from `@specd/core`:
 
 ```typescript
-import { CreateChange, GetStatus, TransitionChange } from '@specd/core'
-import { InMemoryChangeRepository } from './in-memory-change-repository.js'
+import { CreateChange, GetStatus, TransitionChange, createChangeRepository } from '@specd/core'
 import { SimpleGitAdapter } from './simple-git-adapter.js'
 
-// Construct ports
+// Construct ports via factory — no concrete class imported
 const git = new SimpleGitAdapter()
 
-const changeRepo = new InMemoryChangeRepository({
+const changeRepo = createChangeRepository({
+  type: 'fs',
   workspace: 'default',
   ownership: 'owned',
   isExternal: false,
+  changesPath: '/path/to/specd/changes',
+  draftsPath: '/path/to/specd/drafts',
+  discardedPath: '/path/to/specd/discarded',
 })
 
 // Construct use cases — inject ports
@@ -311,18 +314,19 @@ console.log(status.artifactStatuses) // []
 
 ### Using a workspace map for multi-workspace use cases
 
-`ArchiveChange`, `ValidateArtifacts`, and `CompileContext` accept a `ReadonlyMap<string, SpecRepository>` keyed by workspace name. Build the map from your resolved config.
-
-`@specd/core` ships `FsSpecRepository` and `FsChangeRepository` as built-in filesystem adapters. They are not part of the public `@specd/core` exports — they live in `@specd/core/src/infrastructure/fs/` and are used by the CLI and MCP adapters directly. If you are building your own adapter on top of the same filesystem layout, you can import them from their internal paths; otherwise implement `SpecRepository` and `ChangeRepository` yourself following the pattern shown above.
-
-The built-in `FsSpecRepository` takes a `specsPath` in addition to the base config:
+`ArchiveChange`, `ValidateArtifacts`, and `CompileContext` accept a `ReadonlyMap<string, SpecRepository>` keyed by workspace name. Build the map using `createSpecRepository`, `createArchiveRepository`, and `createArtifactParserRegistry`:
 
 ```typescript
-import { ArchiveChange } from '@specd/core'
-import { FsSpecRepository } from '@specd/core/src/infrastructure/fs/spec-repository.js'
-import { FsChangeRepository } from '@specd/core/src/infrastructure/fs/change-repository.js'
+import {
+  ArchiveChange,
+  createChangeRepository,
+  createSpecRepository,
+  createArchiveRepository,
+  createArtifactParserRegistry,
+} from '@specd/core'
 
-const changeRepo = new FsChangeRepository({
+const changeRepo = createChangeRepository({
+  type: 'fs',
   workspace: 'default',
   ownership: 'owned',
   isExternal: false,
@@ -334,7 +338,8 @@ const changeRepo = new FsChangeRepository({
 const specRepos = new Map([
   [
     'default',
-    new FsSpecRepository({
+    createSpecRepository({
+      type: 'fs',
       workspace: 'default',
       ownership: 'owned',
       isExternal: false,
@@ -343,7 +348,8 @@ const specRepos = new Map([
   ],
   [
     'billing',
-    new FsSpecRepository({
+    createSpecRepository({
+      type: 'fs',
       workspace: 'billing',
       ownership: 'readOnly',
       isExternal: true,
@@ -351,6 +357,18 @@ const specRepos = new Map([
     }),
   ],
 ])
+
+const archiveRepo = createArchiveRepository({
+  type: 'fs',
+  workspace: 'default',
+  ownership: 'owned',
+  isExternal: false,
+  changesPath: '/path/to/specd/changes',
+  draftsPath: '/path/to/specd/drafts',
+  archivePath: '/path/to/specd/archive',
+})
+
+const parsers = createArtifactParserRegistry()
 
 const archiveChange = new ArchiveChange(
   changeRepo,
@@ -364,3 +382,5 @@ const archiveChange = new ArchiveChange(
 ```
 
 The use case looks up the correct `SpecRepository` for each workspace by name. If a workspace referenced in the change has no corresponding entry in the map, the use case will not be able to access its specs — make sure the map covers all workspaces declared in `specd.yaml`.
+
+If you implement a custom adapter (e.g. database-backed), construct your class directly and pass it as the port type. The factories are conveniences for the built-in `'fs'` adapter, not a requirement for all implementations.
