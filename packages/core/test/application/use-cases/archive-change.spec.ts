@@ -34,11 +34,12 @@ function makeArtifactType(
     delta?: boolean
     format?: 'markdown' | 'json' | 'yaml' | 'plaintext'
     output?: string
+    scope?: 'change' | 'spec'
   } = {},
 ): ArtifactType {
   return new ArtifactType({
     id,
-    scope: 'change',
+    scope: opts.scope ?? 'change',
     output: opts.output ?? `${id}.md`,
     requires: [],
     validations: [],
@@ -388,7 +389,7 @@ describe('ArchiveChange', () => {
     })
 
     it('returns archivedChange, empty postHookFailures, and staleMetadataSpecPaths on success', async () => {
-      const artifactType = makeArtifactType('spec', { delta: false })
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
       const schema = makeSchema([artifactType])
       const specRepo = makeSpecRepository()
 
@@ -446,7 +447,7 @@ describe('ArchiveChange', () => {
         },
       }
 
-      const artifactType = makeArtifactType('spec', { delta: false })
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
       const schema = makeSchema(
         [artifactType],
         [
@@ -617,7 +618,11 @@ describe('ArchiveChange', () => {
       const yamlParser = makeParser({ parseDelta: () => [{ op: 'modified' as const }] })
 
       const specRepo = makeSpecRepository(new Map([['spec.md', baseContent]]))
-      const artifactType = makeArtifactType('spec', { delta: true, format: 'markdown' })
+      const artifactType = makeArtifactType('spec', {
+        delta: true,
+        format: 'markdown',
+        scope: 'spec',
+      })
       const schema = makeSchema([artifactType])
 
       const change = makeArchivableChange('my-change', { specIds: ['default/auth/oauth'] })
@@ -665,7 +670,11 @@ describe('ArchiveChange', () => {
       })
       const yamlParser = makeParser({ parseDelta: () => [{ op: 'modified' as const }] })
 
-      const artifactType = makeArtifactType('spec', { delta: true, format: 'markdown' })
+      const artifactType = makeArtifactType('spec', {
+        delta: true,
+        format: 'markdown',
+        scope: 'spec',
+      })
       const schema = makeSchema([artifactType])
 
       const conflictChange = makeArchivableChange('my-change', { specIds: ['default/auth/oauth'] })
@@ -709,7 +718,7 @@ describe('ArchiveChange', () => {
   describe('given a non-delta artifact type', () => {
     it('syncs the artifact directly from change to spec', async () => {
       const artifactContent = '# New Spec\n\nContent.'
-      const artifactType = makeArtifactType('spec', { delta: false })
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
       const schema = makeSchema([artifactType])
       const specRepo = makeSpecRepository()
 
@@ -723,8 +732,10 @@ describe('ArchiveChange', () => {
         }),
       )
       const changeRepo = Object.assign(makeChangeRepository([change]), {
-        async artifact(_change: Change, _filename: string) {
-          return new SpecArtifact('spec.md', artifactContent)
+        async artifact(_change: Change, filename: string) {
+          if (filename === 'specs/default/auth/oauth/spec.md')
+            return new SpecArtifact('spec.md', artifactContent)
+          return null
         },
       })
 
@@ -750,7 +761,7 @@ describe('ArchiveChange', () => {
 
   describe('given an artifact with missing effective status', () => {
     it('does not sync the artifact to the spec', async () => {
-      const artifactType = makeArtifactType('spec', { optional: true })
+      const artifactType = makeArtifactType('spec', { optional: true, scope: 'spec' })
       const schema = makeSchema([artifactType])
       const specRepo = makeSpecRepository()
 
@@ -779,7 +790,7 @@ describe('ArchiveChange', () => {
 
   describe('given an artifact with skipped effective status', () => {
     it('does not sync the artifact to the spec', async () => {
-      const artifactType = makeArtifactType('spec', { optional: true })
+      const artifactType = makeArtifactType('spec', { optional: true, scope: 'spec' })
       const schema = makeSchema([artifactType])
       const specRepo = makeSpecRepository()
 

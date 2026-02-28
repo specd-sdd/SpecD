@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { HookFailedError } from '../../domain/errors/hook-failed-error.js'
@@ -132,12 +133,16 @@ export class ArchiveChange {
       let synced = false
 
       for (const artifactType of schema.artifacts()) {
+        if (artifactType.scope() !== 'spec') continue
+
         const effectiveStatus = change.effectiveStatus(artifactType.id())
         if (effectiveStatus === 'skipped' || effectiveStatus === 'missing') continue
 
+        const outputBasename = path.basename(artifactType.output())
+
         if (artifactType.delta()) {
           // Delta artifact: parse and apply delta file onto base spec
-          const format = artifactType.format() ?? this._inferFormat(artifactType.output())
+          const format = artifactType.format() ?? this._inferFormat(outputBasename)
           const formatParser = this._parsers.get(format)
           if (formatParser === undefined) {
             throw new Error(
@@ -150,28 +155,33 @@ export class ArchiveChange {
 
           const deltaFilename =
             capabilityPath.length > 0
-              ? `deltas/${workspace}/${capabilityPath}/${artifactType.output()}.delta.yaml`
-              : `deltas/${workspace}/${artifactType.output()}.delta.yaml`
+              ? `deltas/${workspace}/${capabilityPath}/${outputBasename}.delta.yaml`
+              : `deltas/${workspace}/${outputBasename}.delta.yaml`
           const deltaFile = await this._changes.artifact(change, deltaFilename)
           if (deltaFile === null) continue
 
           const deltaEntries = yamlParser.parseDelta(deltaFile.content)
-          const baseArtifact = await specRepo.artifact(spec, artifactType.output())
+          const baseArtifact = await specRepo.artifact(spec, outputBasename)
           const baseContent = baseArtifact?.content ?? ''
           const baseAst = formatParser.parse(baseContent)
           const mergedAst = formatParser.apply(baseAst, deltaEntries)
           const mergedContent = formatParser.serialize(mergedAst)
 
-          await specRepo.save(spec, new SpecArtifact(artifactType.output(), mergedContent), {
+          await specRepo.save(spec, new SpecArtifact(outputBasename, mergedContent), {
             force: true,
           })
           synced = true
         } else {
-          // Non-delta artifact: copy directly from change to spec
-          const artifactFile = await this._changes.artifact(change, artifactType.output())
+          // Non-delta spec-scoped artifact: copy from change dir to spec
+          // The file lives at specs/<workspace>/<capability-path>/<filename> within the change dir
+          const artifactFilename =
+            capabilityPath.length > 0
+              ? `specs/${workspace}/${capabilityPath}/${outputBasename}`
+              : `specs/${workspace}/${outputBasename}`
+          const artifactFile = await this._changes.artifact(change, artifactFilename)
           if (artifactFile === null) continue
 
-          await specRepo.save(spec, new SpecArtifact(artifactType.output(), artifactFile.content), {
+          await specRepo.save(spec, new SpecArtifact(outputBasename, artifactFile.content), {
             force: true,
           })
           synced = true
