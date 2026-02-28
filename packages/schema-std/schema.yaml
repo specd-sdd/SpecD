@@ -1,0 +1,281 @@
+name: schema-std
+version: 1
+description: Standard SpecD workflow — proposal → specs → design → tasks
+
+artifacts:
+  # ── proposal ──────────────────────────────────────────────────────────────
+  - id: proposal
+    scope: change
+    output: proposal.md
+    description: Initial proposal outlining why the change is needed
+    template: templates/proposal.md
+    requires: []
+    instruction: |
+      Create the proposal document that establishes WHY this change is needed.
+
+      Sections to include:
+      - **Why**: 1–2 sentences on the problem or opportunity. What is broken or missing? Why now?
+      - **What changes**: Bullet list of the concrete changes — new capabilities, modified
+        behaviour, removals. Mark breaking changes explicitly.
+      - **Specs affected**: List every spec that will be created or modified.
+        - New specs: each becomes a new `specs/<path>/spec.md` file.
+        - Modified specs: each needs a delta file. Run `specd list --specs` to see
+          existing specs with their exact paths before filling this in.
+      - **Impact**: Affected code areas, APIs, data models, or external dependencies.
+      - **Open questions**: Unresolved decisions that must be settled before spec work begins.
+
+      This section is the contract between proposal and specs — every spec listed here
+      will need a corresponding spec.md. Research existing specs before filling it in.
+
+      Keep it concise (1–2 pages). Focus on the "why", not the "how" — implementation
+      details belong in design.md.
+
+  # ── specs ──────────────────────────────────────────────────────────────────
+  - id: specs
+    scope: spec
+    output: 'specs/**/spec.md'
+    description: Detailed specifications defining what the system should do
+    template: templates/spec.md
+    requires:
+      - proposal
+    instruction: |
+      Create or update specification files that define WHAT the system should do.
+      One spec file per capability listed in the proposal's "Specs affected" section.
+
+      Format requirements:
+      - Use `### Requirement: <name>` for each requirement.
+      - Use SHALL / MUST for normative statements. Avoid "should" or "may" for hard rules.
+      - Do not include WHEN/THEN scenarios here — those go in verify.md.
+
+      For new specs: create `specs/<path>/spec.md` using the template. Include a Purpose
+      section and at least one Requirement.
+
+      For modified specs: do not rewrite the file. Produce a delta file instead
+      (`deltas/<workspace>/<path>/spec.md.delta.yaml`). Read the existing spec first
+      to understand its current structure before writing the delta.
+
+      Common pitfalls:
+      - Using the wrong heading level. Requirements are `###`, never `##` or `####`.
+      - Mixing requirement content into the Purpose section.
+      - Forgetting to read the existing spec before writing a MODIFIED delta — the
+        selector must match the exact heading text.
+    delta: true
+    deltaInstruction: |
+      Produce a delta file when modifying an existing spec rather than rewriting it.
+
+      Operations:
+      - **added**: New requirement. Use `position.parent` targeting the Requirements
+        section. Include the full `### Requirement: <name>` heading in `content`.
+      - **modified**: Changed requirement. Selector must target the requirement section
+        by its exact heading text. Include the complete updated block in `content` —
+        partial content loses detail at archive time.
+      - **removed**: Deprecated requirement. Include a reason and migration path in
+        `content` so readers understand what replaces it.
+      - **renamed**: Name change only. Use `from` / `to` in the selector.
+
+      Every `### Requirement:` heading in `content` must use exactly three hashtags.
+    validations:
+      - type: section
+        matches: '^Purpose$'
+        required: true
+      - type: section
+        matches: '^Requirements$'
+        required: true
+        children:
+          - type: section
+            matches: '^Requirement:'
+            required: true
+    contextSections:
+      - selector:
+          type: section
+          matches: '^Requirements$'
+        role: rules
+        contextTitle: Spec Requirements
+      - selector:
+          type: section
+          matches: '^Constraints$'
+        role: constraints
+
+  # ── verify ─────────────────────────────────────────────────────────────────
+  - id: verify
+    scope: spec
+    output: 'specs/**/verify.md'
+    description: Verification scenarios for the spec
+    template: templates/verify.md
+    requires:
+      - specs
+    instruction: |
+      Create the verification file that describes HOW to confirm the spec is satisfied.
+
+      Format requirements:
+      - Top-level heading: `# Verification: <spec name>`
+      - Group scenarios under `### Requirement: <name>` headings.
+        The heading text must match the corresponding requirement in spec.md exactly —
+        same wording, same order.
+      - Each scenario: `#### Scenario: <name>` with WHEN / THEN lines.
+        Scenarios use exactly four hashtags. Never three, never bullets.
+
+      Only write scenarios that add information beyond what the requirement prose already
+      states. Do not restate the happy path if it is obvious from the requirement itself.
+      Focus on edge cases, error conditions, and non-obvious interactions.
+
+      Every requirement in spec.md should have at least one scenario unless its behaviour
+      is fully described by a parent requirement's scenarios.
+    delta: true
+    deltaInstruction: |
+      Produce a delta file when modifying verification scenarios for an existing spec.
+
+      Operations:
+      - **modified**: Updated scenarios under an existing requirement. Selector targets
+        the `### Requirement: <name>` section. Include all scenarios for that requirement
+        in `content` — not just the new ones.
+      - **added**: Scenarios for a new requirement (one added to spec.md in the same change).
+        Use `position.parent` targeting the Requirements section. Include the full
+        `### Requirement:` heading and at least one `#### Scenario:` block in `content`.
+
+      Every `#### Scenario:` heading in `content` must use exactly four hashtags.
+    deltaValidations:
+      - type: sequence-item
+        where:
+          op: 'added|modified'
+        contentMatches: '#### Scenario:'
+        required: false
+    validations:
+      - type: section
+        matches: '^Requirements$'
+        required: true
+        children:
+          - type: section
+            matches: '^Requirement:'
+            required: true
+            children:
+              - type: section
+                matches: '^Scenario:'
+                required: true
+
+  # ── design ─────────────────────────────────────────────────────────────────
+  - id: design
+    scope: change
+    optional: true
+    output: design.md
+    description: Technical design with implementation decisions
+    template: templates/design.md
+    requires:
+      - proposal
+    instruction: |
+      Create the design document explaining HOW to implement the change.
+
+      Write design.md only when at least one of these applies:
+      - The change spans multiple modules, services, or packages.
+      - A new external dependency or significant data model change is introduced.
+      - There are non-obvious security, performance, or migration concerns.
+      - Key technical decisions need to be recorded before coding begins.
+
+      If none of these apply, skip design.md — the agent must explicitly mark it as
+      skipped rather than leaving it absent.
+
+      Sections to include:
+      - **Approach**: The chosen technical strategy and why.
+      - **Key decisions**: Each significant choice with its rationale. For each decision,
+        note what alternatives were considered and why they were rejected.
+      - **Trade-offs**: Known limitations or things that could go wrong, with mitigations.
+      - **Migration plan**: Steps to deploy and roll back (if applicable).
+      - **Open questions**: Outstanding technical unknowns to resolve during implementation.
+
+      Reference the spec requirements — do not repeat them. Focus on architecture and
+      approach, not line-by-line implementation.
+
+  # ── tasks ──────────────────────────────────────────────────────────────────
+  - id: tasks
+    scope: change
+    output: tasks.md
+    description: Implementation checklist with trackable tasks
+    template: templates/tasks.md
+    requires:
+      - specs
+    instruction: |
+      Create the task list that breaks down the implementation into discrete,
+      trackable steps.
+
+      Format requirements:
+      - Group related tasks under `## <n>. <Group name>` headings.
+      - Each task must be a checkbox: `- [ ] <n>.<m> <description>`.
+        Tasks not using this format will not be tracked by SpecD.
+      - Order tasks by dependency — what must be done first?
+      - Tasks should be small enough to complete in a single session.
+
+      If design.md exists, use it to inform the breakdown. If it does not exist,
+      derive tasks from the specs alone.
+
+      Reference each spec requirement at least once — every requirement must map
+      to at least one task, otherwise it may never be implemented.
+
+      Example:
+      ```
+      ## 1. Setup
+
+      - [ ] 1.1 Create module structure
+      - [ ] 1.2 Add dependencies
+
+      ## 2. Core implementation
+
+      - [ ] 2.1 Implement <requirement A>
+      - [ ] 2.2 Add unit tests for <requirement A>
+      - [ ] 2.3 Implement <requirement B>
+      ```
+
+      Each task should be verifiable — you know unambiguously when it is done.
+    preHashCleanup:
+      - pattern: '^\s*-\s+\[x\]'
+        replacement: '- [ ]'
+    taskCompletionCheck:
+      incompletePattern: '^\s*-\s+\[ \]'
+      completePattern: '^\s*-\s+\[x\]'
+
+workflow:
+  - step: designing
+    requires: []
+    hooks:
+      pre:
+        - instruction: |
+            Start with the proposal — establish why the change is needed and which specs
+            will be created or modified. Once the proposal is ready, write spec.md and
+            verify.md for each new spec. For modified specs, produce delta files instead
+            of rewriting the existing files. Write design.md only if the change warrants it
+            (cross-cutting concern, new dependency, significant architectural decision).
+
+  - step: implementing
+    requires: [tasks]
+    hooks:
+      pre:
+        - instruction: |
+            Read tasks.md. Work through tasks one by one in order, marking each complete
+            (- [x]) as you go. Pause and ask for guidance if you hit a blocker or the
+            task is ambiguous. Do not advance to verifying while any - [ ] items remain.
+      post:
+        - run: 'pnpm test'
+        - instruction: |
+            Confirm all tests pass before marking implementing complete.
+
+  - step: verifying
+    requires: [verify]
+    hooks:
+      pre:
+        - instruction: |
+            Run through every scenario in verify.md. For each one, confirm the implementation
+            satisfies it by inspecting the code and running the relevant tests. If a scenario
+            fails, return to implementing — do not mark verifying complete until all scenarios pass.
+
+  - step: archiving
+    requires: [specs, tasks]
+    hooks:
+      pre:
+        - run: 'pnpm test'
+        - instruction: |
+            Review the delta files before confirming the archive. Confirm that every modified
+            spec accurately reflects what was actually built. If the implementation diverged
+            from the spec, update the spec now rather than archiving an inaccurate record.
+      post:
+        - instruction: |
+            Summarise what changed in this archive for the commit message. List each spec
+            created or modified and the key requirement changes.
