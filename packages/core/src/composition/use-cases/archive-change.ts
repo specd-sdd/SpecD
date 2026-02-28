@@ -1,0 +1,144 @@
+import path from 'node:path'
+import { ArchiveChange } from '../../application/use-cases/archive-change.js'
+import { type SpecRepository } from '../../application/ports/spec-repository.js'
+import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
+import { createChangeRepository } from '../change-repository.js'
+import { createSpecRepository } from '../spec-repository.js'
+import { createArchiveRepository } from '../archive-repository.js'
+import { createArtifactParserRegistry } from '../artifact-parser-registry.js'
+import { createSchemaRegistry } from '../schema-registry.js'
+import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
+import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
+
+/**
+ * Domain context for the primary (default) workspace used by `ArchiveChange`.
+ */
+export interface ArchiveChangeContext {
+  /** The workspace name from `specd.yaml` (e.g. `'default'`). */
+  readonly workspace: string
+  /** Ownership level of this workspace. */
+  readonly ownership: 'owned' | 'shared' | 'readOnly'
+  /** Whether the workspace's specs live outside the current git root. */
+  readonly isExternal: boolean
+}
+
+/**
+ * Filesystem adapter paths and pre-built port instances for
+ * `createArchiveChange(context, options)`.
+ */
+export interface FsArchiveChangeOptions {
+  /** Absolute path to the `changes/` directory. */
+  readonly changesPath: string
+  /** Absolute path to the `drafts/` directory. */
+  readonly draftsPath: string
+  /** Absolute path to the `discarded/` directory. */
+  readonly discardedPath: string
+  /** Absolute path to the archive root directory. */
+  readonly archivePath: string
+  /** Optional archive directory pattern (e.g. `'{{year}}/{{change.archivedName}}'`). */
+  readonly archivePattern?: string
+  /**
+   * Pre-built spec repositories keyed by workspace name.
+   *
+   * Must include entries for every workspace declared in the project config.
+   * `ArchiveChange` looks up the correct repo for each workspace by name.
+   */
+  readonly specRepositories: ReadonlyMap<string, SpecRepository>
+  /** Absolute path to the `node_modules` directory for schema resolution. */
+  readonly nodeModulesPath: string
+}
+
+/**
+ * Constructs an `ArchiveChange` use case wired to all configured workspaces.
+ *
+ * The `SpecdConfig` overload builds the workspace spec repository map, the
+ * archive repository, the schema registry, the parser registry, the hook
+ * runner, and the git adapter internally.
+ *
+ * @param config - The fully-resolved project configuration
+ * @returns The pre-wired use case instance
+ */
+export function createArchiveChange(config: SpecdConfig): ArchiveChange
+/**
+ * Constructs an `ArchiveChange` use case with explicit context and options.
+ *
+ * Use this form in tests or integration scenarios where custom paths or
+ * pre-built repositories are needed.
+ *
+ * @param context - Domain context for the primary workspace
+ * @param options - Filesystem paths and pre-built spec repositories
+ * @returns The pre-wired use case instance
+ */
+export function createArchiveChange(
+  context: ArchiveChangeContext,
+  options: FsArchiveChangeOptions,
+): ArchiveChange
+/**
+ * Constructs an `ArchiveChange` instance wired with filesystem adapters.
+ *
+ * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
+ * @param options - Filesystem path options; required when `configOrContext` is a context object
+ * @returns The pre-wired use case instance
+ */
+export function createArchiveChange(
+  configOrContext: SpecdConfig | ArchiveChangeContext,
+  options?: FsArchiveChangeOptions,
+): ArchiveChange {
+  if (isSpecdConfig(configOrContext)) {
+    const config = configOrContext
+    const defaultWs = config.workspaces.find((w) => w.name === 'default')!
+    const specRepos = new Map(
+      config.workspaces.map((ws) => [
+        ws.name,
+        createSpecRepository(
+          'fs',
+          { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+          { specsPath: ws.specsPath },
+        ),
+      ]),
+    )
+    return createArchiveChange(
+      {
+        workspace: defaultWs.name,
+        ownership: defaultWs.ownership,
+        isExternal: defaultWs.isExternal,
+      },
+      {
+        changesPath: config.storage.changesPath,
+        draftsPath: config.storage.draftsPath,
+        discardedPath: config.storage.discardedPath,
+        archivePath: config.storage.archivePath,
+        ...(config.storage.archivePattern !== undefined
+          ? { archivePattern: config.storage.archivePattern }
+          : {}),
+        specRepositories: specRepos,
+        nodeModulesPath: path.join(config.projectRoot, 'node_modules'),
+      },
+    )
+  }
+  const opts = options!
+  const changeRepo = createChangeRepository('fs', configOrContext, {
+    changesPath: opts.changesPath,
+    draftsPath: opts.draftsPath,
+    discardedPath: opts.discardedPath,
+  })
+  const archiveRepo = createArchiveRepository('fs', configOrContext, {
+    changesPath: opts.changesPath,
+    draftsPath: opts.draftsPath,
+    archivePath: opts.archivePath,
+    ...(opts.archivePattern !== undefined ? { pattern: opts.archivePattern } : {}),
+  })
+  const schemas = createSchemaRegistry('fs', { nodeModulesPath: opts.nodeModulesPath })
+  const parsers = createArtifactParserRegistry()
+  const hooks = new NodeHookRunner()
+  const git = new GitCLIAdapter()
+  return new ArchiveChange(
+    changeRepo,
+    opts.specRepositories,
+    archiveRepo,
+    hooks,
+    git,
+    parsers,
+    schemas,
+  )
+}

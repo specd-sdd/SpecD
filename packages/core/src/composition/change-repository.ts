@@ -2,20 +2,24 @@ import { type ChangeRepository } from '../application/ports/change-repository.js
 import { FsChangeRepository } from '../infrastructure/fs/change-repository.js'
 
 /**
- * Discriminated union of all supported `ChangeRepository` adapter configurations.
+ * Domain context shared by all `ChangeRepository` adapter types.
  *
- * Each member carries a `type` discriminant and the fields required by that
- * adapter. New adapter types are added here without breaking existing callers.
+ * These fields belong to the port contract and are independent of the
+ * underlying storage technology.
  */
-export type CreateChangeRepositoryConfig = {
-  /** Adapter type discriminant. */
-  readonly type: 'fs'
+export interface ChangeRepositoryContext {
   /** The workspace name from `specd.yaml` (e.g. `"default"`, `"billing"`). */
   readonly workspace: string
   /** Ownership level of this repository instance. */
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   /** Whether this repository points to data outside the current git root. */
   readonly isExternal: boolean
+}
+
+/**
+ * Filesystem adapter options for `createChangeRepository('fs', ...)`..
+ */
+export interface FsChangeRepositoryOptions {
   /** Absolute path to the `changes/` directory for active changes. */
   readonly changesPath: string
   /** Absolute path to the `drafts/` directory for shelved changes. */
@@ -35,20 +39,26 @@ export type CreateChangeRepositoryConfig = {
  * Returns the abstract `ChangeRepository` port type — callers never see the
  * concrete class.
  *
- * @param config - Discriminated union config identifying the adapter type and its options
+ * @param type - Adapter type discriminant; determines which implementation is used
+ * @param context - Domain context shared across all adapter types
+ * @param options - Filesystem adapter options
  * @returns A fully constructed `ChangeRepository` bound to the given workspace
  */
-export function createChangeRepository(config: CreateChangeRepositoryConfig): ChangeRepository {
-  switch (config.type) {
+export function createChangeRepository(
+  type: 'fs',
+  context: ChangeRepositoryContext,
+  options: FsChangeRepositoryOptions,
+): ChangeRepository {
+  switch (type) {
     case 'fs':
       return new FsChangeRepository({
-        workspace: config.workspace,
-        ownership: config.ownership,
-        isExternal: config.isExternal,
-        changesPath: config.changesPath,
-        draftsPath: config.draftsPath,
-        discardedPath: config.discardedPath,
-        ...(config.activeSchema !== undefined ? { activeSchema: config.activeSchema } : {}),
+        workspace: context.workspace,
+        ownership: context.ownership,
+        isExternal: context.isExternal,
+        changesPath: options.changesPath,
+        draftsPath: options.draftsPath,
+        discardedPath: options.discardedPath,
+        ...(options.activeSchema !== undefined ? { activeSchema: options.activeSchema } : {}),
       })
   }
 }
