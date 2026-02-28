@@ -274,32 +274,16 @@ export class PlainTextParser implements ArtifactParser {
 
 ## Wiring ports into a use case
 
-Once you have your port implementations, inject them at the entry point of your adapter. For the built-in filesystem adapters, use the factory functions exported from `@specd/core`:
+The recommended entry point for delivery mechanisms is `createKernel(config)`. It accepts a fully-resolved `SpecdConfig` and returns all use cases pre-wired with their built-in `fs` adapters, grouped by domain area:
 
 ```typescript
-import { CreateChange, GetStatus, TransitionChange, createChangeRepository } from '@specd/core'
-import { SimpleGitAdapter } from './simple-git-adapter.js'
+import { createKernel, type SpecdConfig } from '@specd/core'
 
-// Construct ports via factory — no concrete class imported
-const git = new SimpleGitAdapter()
+// config comes from FsConfigLoader (see below)
+const kernel = createKernel(config)
 
-const changeRepo = createChangeRepository({
-  type: 'fs',
-  workspace: 'default',
-  ownership: 'owned',
-  isExternal: false,
-  changesPath: '/path/to/specd/changes',
-  draftsPath: '/path/to/specd/drafts',
-  discardedPath: '/path/to/specd/discarded',
-})
-
-// Construct use cases — inject ports
-const createChange = new CreateChange(changeRepo, git)
-const getStatus = new GetStatus(changeRepo)
-const transitionChange = new TransitionChange(changeRepo, git)
-
-// Use them from your handler
-const change = await createChange.execute({
+// All use cases are ready to use
+const change = await kernel.changes.create.execute({
   name: 'add-oauth-login',
   workspaces: ['default'],
   specIds: ['auth/oauth'],
@@ -307,80 +291,68 @@ const change = await createChange.execute({
   schemaVersion: 1,
 })
 
-const status = await getStatus.execute({ name: 'add-oauth-login' })
+const status = await kernel.changes.status.execute({ name: 'add-oauth-login' })
 console.log(status.change.state) // 'drafting'
 console.log(status.artifactStatuses) // []
 ```
 
-### Using a workspace map for multi-workspace use cases
+### Loading the config
 
-`ArchiveChange`, `ValidateArtifacts`, and `CompileContext` accept a `ReadonlyMap<string, SpecRepository>` keyed by workspace name. Build the map using `createSpecRepository`, `createArchiveRepository`, and `createArtifactParserRegistry`:
+Use `FsConfigLoader` to discover and load `specd.yaml` before calling `createKernel`:
 
 ```typescript
-import {
-  ArchiveChange,
-  createChangeRepository,
-  createSpecRepository,
-  createArchiveRepository,
-  createArtifactParserRegistry,
-} from '@specd/core'
+import { FsConfigLoader, createKernel } from '@specd/core'
 
-const changeRepo = createChangeRepository({
-  type: 'fs',
-  workspace: 'default',
-  ownership: 'owned',
-  isExternal: false,
-  changesPath: '/path/to/specd/changes',
-  draftsPath: '/path/to/specd/drafts',
-  discardedPath: '/path/to/specd/discarded',
-})
+// Discovery mode: walks up from CWD, bounded by the git root
+const loader = new FsConfigLoader({ startDir: process.cwd() })
+const config = await loader.load()
+const kernel = createKernel(config)
+```
 
-const specRepos = new Map([
-  [
-    'default',
-    createSpecRepository({
-      type: 'fs',
-      workspace: 'default',
-      ownership: 'owned',
-      isExternal: false,
-      specsPath: '/path/to/specs',
-    }),
-  ],
-  [
-    'billing',
-    createSpecRepository({
-      type: 'fs',
-      workspace: 'billing',
-      ownership: 'readOnly',
-      isExternal: true,
-      specsPath: '/path/to/billing-repo/specs',
-    }),
-  ],
-])
+When the CLI is invoked with `--config path/to/specd.yaml`, use forced mode instead:
 
-const archiveRepo = createArchiveRepository({
-  type: 'fs',
-  workspace: 'default',
-  ownership: 'owned',
-  isExternal: false,
-  changesPath: '/path/to/specd/changes',
-  draftsPath: '/path/to/specd/drafts',
-  archivePath: '/path/to/specd/archive',
-})
+```typescript
+const loader = new FsConfigLoader({ configPath: options.config })
+```
 
-const parsers = createArtifactParserRegistry()
+### Using a single use-case factory
 
-const archiveChange = new ArchiveChange(
-  changeRepo,
-  specRepos,
-  archiveRepo,
-  hookRunner,
-  git,
-  parsers,
-  schemaRegistry,
+If you only need one use case, call its factory directly instead of building the full kernel:
+
+```typescript
+import { createCreateChange, type SpecdConfig } from '@specd/core'
+
+const createChange = createCreateChange(config)
+const change = await createChange.execute({ name: 'add-oauth-login', … })
+```
+
+### Explicit (context + options) form
+
+Each factory also accepts an explicit context and options object — useful for custom paths in tests or integration scenarios:
+
+```typescript
+import { createCreateChange } from '@specd/core'
+
+const createChange = createCreateChange(
+  { workspace: 'default', ownership: 'owned', isExternal: false },
+  {
+    changesPath: '/tmp/test/changes',
+    draftsPath: '/tmp/test/drafts',
+    discardedPath: '/tmp/test/discarded',
+  },
 )
 ```
 
-The use case looks up the correct `SpecRepository` for each workspace by name. If a workspace referenced in the change has no corresponding entry in the map, the use case will not be able to access its specs — make sure the map covers all workspaces declared in `specd.yaml`.
+### Custom adapters
 
-If you implement a custom adapter (e.g. database-backed), construct your class directly and pass it as the port type. The factories are conveniences for the built-in `'fs'` adapter, not a requirement for all implementations.
+If you implement a custom adapter (e.g. database-backed), construct your class directly and pass it to the use case constructor — the factories wire the built-in `fs` adapters only:
+
+```typescript
+import { CreateChange } from '@specd/core'
+import { MyDbChangeRepository } from './my-db-change-repository.js'
+import { MyGitAdapter } from './my-git-adapter.js'
+
+const changeRepo = new MyDbChangeRepository(…)
+const git = new MyGitAdapter()
+const createChange = new CreateChange(changeRepo, git)
+```
