@@ -216,7 +216,7 @@ If the resolved file does not exist, `resolve()` must return `null`; the caller 
 
 ### Requirement: Schema validation on load
 
-`SchemaRegistry.resolve()` must validate the parsed YAML against the schema structure before returning it. Unknown top-level fields must be ignored (forward compatibility). Missing required fields and structural duplicates must produce a `SchemaValidationError`:
+`SchemaRegistry.resolve()` must validate the parsed YAML against a Zod schema before constructing the `Schema` object. Unknown top-level fields must be ignored (forward compatibility). Structural mismatches and semantic errors must produce a `SchemaValidationError` — a domain error extending `SpecdError` — before any domain object construction takes place. Validation covers:
 
 - Duplicate `artifact.id` within `artifacts`
 - Duplicate `workflow[].step` within `workflow`

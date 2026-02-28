@@ -50,6 +50,10 @@ Each package with business logic may have a `composition/` layer above `infrastr
 
 Concrete adapter classes and repository-level factories are never exported from `index.ts`. Delivery mechanisms (CLI, MCP) import only use-case factories, the kernel, and the config loader port — never ports, infrastructure classes, or use case constructors.
 
+### Requirement: YAML inputs validated at the infrastructure boundary
+
+Infrastructure adapters that read external YAML files (config, schema, metadata) must validate the parsed input at the filesystem boundary using a schema validator before constructing domain or application objects. Validation failures must surface as typed errors (`ConfigValidationError`, `SchemaValidationError`) that extend `SpecdError`. Raw YAML structures must never reach domain or application code without prior validation.
+
 ### Requirement: Adapter packages contain no business logic
 
 Packages that serve as delivery mechanisms (`@specd/cli`, `@specd/mcp`, `@specd/plugin-*`) contain no business logic. They translate between their delivery mechanism and use cases. Any new adapter package must follow the same rule.
@@ -71,6 +75,7 @@ Package dependency direction is strictly one-way: `plugin-*` → `skills` → `c
 - Ports with invariant constructor arguments are `abstract class`, not `interface`
 - All port methods are explicit methods — no property signatures
 - No package may introduce a circular `workspace:*` dependency
+- Infrastructure adapters that read external YAML files must validate the parsed content with a schema validator before constructing any domain or application objects; unvalidated YAML must never reach domain or application code
 
 ## Spec Dependencies
 
