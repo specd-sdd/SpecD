@@ -10,13 +10,13 @@ All error classes are exported from `@specd/core`.
 import { SpecdError } from '@specd/core'
 
 abstract class SpecdError extends Error {
-  abstract get code(): string   // machine-readable error code
-  readonly name: string         // set to the concrete class name
-  readonly message: string      // human-readable description
+  abstract get code(): string // machine-readable error code
+  readonly name: string // set to the concrete class name
+  readonly message: string // human-readable description
 }
 ```
 
-Use `instanceof SpecdError` to catch any specd error in your adapter before letting it propagate as an unhandled exception.
+Use `instanceof SpecdError` to catch any SpecD error in your adapter before letting it propagate as an unhandled exception.
 
 ```typescript
 try {
@@ -26,7 +26,7 @@ try {
     // error.code — route to appropriate response
     // error.message — surface to user
   }
-  throw error // re-throw non-specd errors
+  throw error // re-throw non-SpecD errors
 }
 ```
 
@@ -161,11 +161,11 @@ try {
 
 **Additional properties:**
 
-| Property | Type | Description |
-|---|---|---|
-| `command` | `string` | The shell command that failed. |
-| `exitCode` | `number` | The non-zero exit code. |
-| `stderr` | `string` | Captured standard error output. |
+| Property   | Type     | Description                     |
+| ---------- | -------- | ------------------------------- |
+| `command`  | `string` | The shell command that failed.  |
+| `exitCode` | `number` | The non-zero exit code.         |
+| `stderr`   | `string` | Captured standard error output. |
 
 **Thrown by:** `ArchiveChange` (pre-archive hooks).
 
@@ -196,11 +196,11 @@ try {
 
 **Additional properties:**
 
-| Property | Type | Description |
-|---|---|---|
-| `filename` | `string` | The artifact filename where the conflict was detected. |
-| `incomingContent` | `string` | Content the caller is trying to write. |
-| `currentContent` | `string` | Content currently on disk. |
+| Property          | Type     | Description                                            |
+| ----------------- | -------- | ------------------------------------------------------ |
+| `filename`        | `string` | The artifact filename where the conflict was detected. |
+| `incomingContent` | `string` | Content the caller is trying to write.                 |
+| `currentContent`  | `string` | Content currently on disk.                             |
 
 **Thrown by:** `SpecRepository.save()`, `ChangeRepository.saveArtifact()`.
 
@@ -226,14 +226,14 @@ import { DeltaApplicationError } from '@specd/core'
 
 ## Error codes reference
 
-| Code | Class | Layer |
-|---|---|---|
-| `CHANGE_NOT_FOUND` | `ChangeNotFoundError` | Application |
-| `CHANGE_ALREADY_EXISTS` | `ChangeAlreadyExistsError` | Application |
-| `APPROVAL_GATE_DISABLED` | `ApprovalGateDisabledError` | Application |
-| `SCHEMA_NOT_FOUND` | `SchemaNotFoundError` | Application |
-| `INVALID_STATE_TRANSITION` | `InvalidStateTransitionError` | Domain |
-| `APPROVAL_REQUIRED` | `ApprovalRequiredError` | Domain |
-| `HOOK_FAILED` | `HookFailedError` | Domain |
-| `ARTIFACT_CONFLICT` | `ArtifactConflictError` | Domain |
-| `DELTA_APPLICATION` | `DeltaApplicationError` | Domain |
+| Code                       | Class                         | Layer       |
+| -------------------------- | ----------------------------- | ----------- |
+| `CHANGE_NOT_FOUND`         | `ChangeNotFoundError`         | Application |
+| `CHANGE_ALREADY_EXISTS`    | `ChangeAlreadyExistsError`    | Application |
+| `APPROVAL_GATE_DISABLED`   | `ApprovalGateDisabledError`   | Application |
+| `SCHEMA_NOT_FOUND`         | `SchemaNotFoundError`         | Application |
+| `INVALID_STATE_TRANSITION` | `InvalidStateTransitionError` | Domain      |
+| `APPROVAL_REQUIRED`        | `ApprovalRequiredError`       | Domain      |
+| `HOOK_FAILED`              | `HookFailedError`             | Domain      |
+| `ARTIFACT_CONFLICT`        | `ArtifactConflictError`       | Domain      |
+| `DELTA_APPLICATION`        | `DeltaApplicationError`       | Domain      |

@@ -10,7 +10,7 @@ informed: '-'
 
 ## Context and Problem Statement
 
-Node.js has supported native ES Modules for several years and the ecosystem has largely converged on ESM for new packages. Maintaining dual CJS/ESM output adds build complexity, larger dist directories, and subtle interop bugs. specd targets Node.js >= 20 where ESM is fully stable.
+Node.js has supported native ES Modules for several years and the ecosystem has largely converged on ESM for new packages. Maintaining dual CJS/ESM output adds build complexity, larger dist directories, and subtle interop bugs. SpecD targets Node.js >= 20 where ESM is fully stable.
 
 ## Decision Drivers
 

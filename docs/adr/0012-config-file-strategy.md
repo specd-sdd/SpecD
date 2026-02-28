@@ -10,7 +10,7 @@ informed: '-'
 
 ## Context and Problem Statement
 
-specd needs project configuration (schema reference, storage paths, workspace overrides, workflow hooks). There are three plausible locations for this configuration, and the tension is between what must be shared (storage paths, schema, workflow) and what must not be (local path overrides, personal environment differences).
+SpecD needs project configuration (schema reference, storage paths, workspace overrides, workflow hooks). There are three plausible locations for this configuration, and the tension is between what must be shared (storage paths, schema, workflow) and what must not be (local path overrides, personal environment differences).
 
 ## Decision Drivers
 
@@ -21,7 +21,7 @@ specd needs project configuration (schema reference, storage paths, workspace ov
 ## Considered Options
 
 - **Single committed file only** — `specd.yaml` shared across all contributors, version-controlled alongside the project.
-- **Global user file** — `~/.specd/config.yaml`, machine-level, never committed, applies to every specd project on that machine.
+- **Global user file** — `~/.specd/config.yaml`, machine-level, never committed, applies to every SpecD project on that machine.
 - **Committed file + gitignored local override** — `specd.yaml` committed as the shared source of truth, `specd.local.yaml` gitignored for per-developer overrides.
 
 ## Decision Outcome

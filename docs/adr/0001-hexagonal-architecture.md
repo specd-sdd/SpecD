@@ -10,7 +10,7 @@ informed: '-'
 
 ## Context and Problem Statement
 
-specd needs to expose the same core functionality through multiple delivery mechanisms: a CLI, an MCP server, and agent plugins. A CLI-first design tangles business logic with I/O, making it impossible to reuse logic across adapters without significant duplication. The core domain would also be untestable without a real filesystem.
+SpecD needs to expose the same core functionality through multiple delivery mechanisms: a CLI, an MCP server, and agent plugins. A CLI-first design tangles business logic with I/O, making it impossible to reuse logic across adapters without significant duplication. The core domain would also be untestable without a real filesystem.
 
 ## Decision Drivers
 

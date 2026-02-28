@@ -1,6 +1,6 @@
 # @specd/core — Overview
 
-`@specd/core` is the domain library for specd. It contains all business logic — entities, use cases, ports, and errors — with zero I/O dependencies. The CLI, MCP server, and plugins are adapters that translate between their delivery mechanism and the core.
+`@specd/core` is the domain library for SpecD. It contains all business logic — entities, use cases, ports, and errors — with zero I/O dependencies. The CLI, MCP server, and plugins are adapters that translate between their delivery mechanism and the core.
 
 ## Who this documentation is for
 
