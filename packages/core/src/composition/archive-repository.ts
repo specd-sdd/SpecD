@@ -2,20 +2,24 @@ import { type ArchiveRepository } from '../application/ports/archive-repository.
 import { FsArchiveRepository } from '../infrastructure/fs/archive-repository.js'
 
 /**
- * Discriminated union of all supported `ArchiveRepository` adapter configurations.
+ * Domain context shared by all `ArchiveRepository` adapter types.
  *
- * Each member carries a `type` discriminant and the fields required by that
- * adapter. New adapter types are added here without breaking existing callers.
+ * These fields belong to the port contract and are independent of the
+ * underlying storage technology.
  */
-export type CreateArchiveRepositoryConfig = {
-  /** Adapter type discriminant. */
-  readonly type: 'fs'
+export interface ArchiveRepositoryContext {
   /** The workspace name from `specd.yaml` (e.g. `"default"`, `"billing"`). */
   readonly workspace: string
   /** Ownership level of this repository instance. */
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   /** Whether this repository points to data outside the current git root. */
   readonly isExternal: boolean
+}
+
+/**
+ * Filesystem adapter options for `createArchiveRepository('fs', ...)`.
+ */
+export interface FsArchiveRepositoryOptions {
   /** Absolute path to the `changes/` directory for active changes. */
   readonly changesPath: string
   /** Absolute path to the `drafts/` directory for shelved changes. */
@@ -38,20 +42,26 @@ export type CreateArchiveRepositoryConfig = {
  * Returns the abstract `ArchiveRepository` port type — callers never see the
  * concrete class.
  *
- * @param config - Discriminated union config identifying the adapter type and its options
+ * @param type - Adapter type discriminant; determines which implementation is used
+ * @param context - Domain context shared across all adapter types
+ * @param options - Filesystem adapter options
  * @returns A fully constructed `ArchiveRepository` bound to the given workspace
  */
-export function createArchiveRepository(config: CreateArchiveRepositoryConfig): ArchiveRepository {
-  switch (config.type) {
+export function createArchiveRepository(
+  type: 'fs',
+  context: ArchiveRepositoryContext,
+  options: FsArchiveRepositoryOptions,
+): ArchiveRepository {
+  switch (type) {
     case 'fs':
       return new FsArchiveRepository({
-        workspace: config.workspace,
-        ownership: config.ownership,
-        isExternal: config.isExternal,
-        changesPath: config.changesPath,
-        draftsPath: config.draftsPath,
-        archivePath: config.archivePath,
-        ...(config.pattern !== undefined ? { pattern: config.pattern } : {}),
+        workspace: context.workspace,
+        ownership: context.ownership,
+        isExternal: context.isExternal,
+        changesPath: options.changesPath,
+        draftsPath: options.draftsPath,
+        archivePath: options.archivePath,
+        ...(options.pattern !== undefined ? { pattern: options.pattern } : {}),
       })
   }
 }
