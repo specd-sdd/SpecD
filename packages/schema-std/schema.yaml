@@ -136,6 +136,8 @@ artifacts:
         without verification coverage. Use `position.parent` targeting the Requirements section.
         Include the full `### Requirement:` heading and at least one `#### Scenario:` block
         in `content`.
+      - **removed**: Required for every requirement removed from spec.md in the same change.
+        The selector must target the `### Requirement: <name>` section by its exact heading text.
 
       Every `#### Scenario:` heading in `content` must use exactly four hashtags.
     deltaValidations:
