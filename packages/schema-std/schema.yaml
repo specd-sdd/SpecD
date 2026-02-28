@@ -47,12 +47,13 @@ artifacts:
       - Use SHALL / MUST for normative statements. Avoid "should" or "may" for hard rules.
       - Do not include WHEN/THEN scenarios here — those go in verify.md.
 
-      For new specs: create `specs/<path>/spec.md` using the template. Include a Purpose
-      section and at least one Requirement.
+      For new specs: create `specs/<workspace>/<capability-path>/spec.md` using the template.
+      The workspace segment matches the workspace ID from `specd.yaml` (e.g. `default`).
+      Include a Purpose section and at least one Requirement.
 
       For modified specs: do not rewrite the file. Produce a delta file instead
-      (`deltas/<workspace>/<path>/spec.md.delta.yaml`). Read the existing spec first
-      to understand its current structure before writing the delta.
+      (`deltas/<workspace>/<capability-path>/spec.md.delta.yaml`). Read the existing spec
+      first to understand its current structure before writing the delta.
 
       Common pitfalls:
       - Using the wrong heading level. Requirements are `###`, never `##` or `####`.
@@ -123,7 +124,8 @@ artifacts:
       is fully described by a parent requirement's scenarios.
     delta: true
     deltaInstruction: |
-      Produce a delta file when modifying verification scenarios for an existing spec.
+      Produce a delta file (`deltas/<workspace>/<capability-path>/verify.md.delta.yaml`)
+      when modifying verification scenarios for an existing spec.
 
       Operations:
       - **modified**: Updated scenarios under an existing requirement. Selector targets
@@ -239,9 +241,11 @@ workflow:
       pre:
         - instruction: |
             Start with the proposal — establish why the change is needed and which specs
-            will be created or modified. Once the proposal is ready, write spec.md and
-            verify.md for each new spec. For modified specs, produce delta files instead
-            of rewriting the existing files. Write design.md only if the change warrants it
+            will be created or modified. Once the proposal is ready, write
+            `specs/<workspace>/<capability-path>/spec.md` and the paired `verify.md` for
+            each new spec. For modified specs, produce delta files at
+            `deltas/<workspace>/<capability-path>/<filename>.delta.yaml` instead of
+            rewriting the existing files. Write design.md only if the change warrants it
             (cross-cutting concern, new dependency, significant architectural decision).
 
   - step: implementing
