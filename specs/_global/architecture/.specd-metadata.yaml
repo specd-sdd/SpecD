@@ -1,6 +1,6 @@
 title: 'Architecture'
 description: >
-  Defines hexagonal architecture and domain-driven design principles for specd packages with business logic. Establishes layering rules for domain, application, infrastructure, and composition; requires pure domains, port-based I/O, rich entities, and manual dependency injection. Use this spec when designing or reviewing package structure, dependency directions, layer boundaries, and composition patterns.
+  Defines hexagonal architecture and domain-driven design principles for specd packages with business logic. Covers layering (domain, application, infrastructure, composition), pure domains, port-based I/O, rich entities, manual dependency injection, and YAML validation at boundaries. Use this spec when designing or reviewing package structure, layer boundaries, dependency directions, composition patterns, and validation strategies.
 keywords:
   - 'architecture'
   - 'hexagonal'
@@ -12,9 +12,10 @@ keywords:
   - 'composition'
   - 'use-case-wiring'
   - 'config-loading'
+  - 'yaml-validation'
 dependsOn: []
 contentHashes:
-  spec.md: 'sha256:391763ad2fd1dc16e123060d759a3767302f3282054aa8d8ff8cd7da68039655'
+  spec.md: 'sha256:1221b89976c713e5e9fbbd2affec5adc82d1547aedfd8f9a83857bcf5c3b85f1'
   verify.md: 'sha256:dbbf29057514a748003772a3670aa33c62a8fb2a7e859ec9d9a49d49367cbbff'
 rules:
   - requirement: 'Layered structure for packages with business logic'
@@ -63,11 +64,20 @@ rules:
     rules:
       - 'Each package with business logic may have a composition/ layer above infrastructure/.'
       - 'This layer is the only layer permitted to import from infrastructure/.'
-      - 'It exposes use-case factories (one per use case; construct all required ports internally and return the pre-wired use case; internal ports with a single concrete implementation are constructed here and never exported; each factory supports two call signatures: createX(config: SpecdConfig) and createX(context, options)).'
+      - 'It exposes use-case factories — one per use case; construct all required ports internally and return the pre-wired use case.'
+      - 'Internal ports with a single concrete implementation are constructed here and never exported.'
+      - 'Each factory supports two call signatures: createX(config: SpecdConfig) and createX(context, options).'
       - 'It exposes Kernel — createKernel(config: SpecdConfig) calls every use-case factory and returns all use cases grouped by domain area.'
-      - 'Config loader port — ConfigLoader is defined in application/ports/ and resolves a SpecdConfig from one or more sources; implementations live in infrastructure/.'
+      - 'It is a convenience, not a mandatory entry point.'
+      - 'Config loader port — ConfigLoader is defined in application/ports/ and resolves a SpecdConfig from one or more sources.'
+      - 'Implementations live in infrastructure/.'
       - 'Concrete adapter classes and repository-level factories are never exported from index.ts.'
       - 'Delivery mechanisms (CLI, MCP) import only use-case factories, the kernel, and the config loader port — never ports, infrastructure classes, or use case constructors.'
+  - requirement: 'YAML inputs validated at the infrastructure boundary'
+    rules:
+      - 'Infrastructure adapters that read external YAML files (config, schema, metadata) must validate the parsed input at the filesystem boundary using a schema validator before constructing domain or application objects.'
+      - 'Validation failures must surface as typed errors (ConfigValidationError, SchemaValidationError) that extend SpecdError.'
+      - 'Raw YAML structures must never reach domain or application code without prior validation.'
   - requirement: 'Adapter packages contain no business logic'
     rules:
       - 'Packages that serve as delivery mechanisms (@specd/cli, @specd/mcp, @specd/plugin-*) contain no business logic.'
@@ -92,6 +102,7 @@ constraints:
   - 'Ports with invariant constructor arguments are abstract class, not interface.'
   - 'All port methods are explicit methods — no property signatures.'
   - 'No package may introduce a circular workspace:* dependency.'
+  - 'Infrastructure adapters that read external YAML files must validate the parsed content with a schema validator before constructing any domain or application objects; unvalidated YAML must never reach domain or application code.'
 scenarios:
   - requirement: 'Layered structure for packages with business logic'
     name: 'Domain imports from infrastructure'

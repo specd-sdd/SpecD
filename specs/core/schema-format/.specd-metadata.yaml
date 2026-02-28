@@ -1,11 +1,6 @@
 title: 'Schema Format'
 description: >
-  The spec defines the YAML structure that projects use to declare their artifact workflow,
-  including artifact types, validation rules, delta validation rules, and lifecycle phases.
-  It covers how schemas are resolved at runtime, how deltas are validated and merged when
-  applying changes, and how the AI compiler extracts context for agent work. Read this spec
-  when implementing schema loading, validation, delta application, context compilation, or
-  artifact definition features.
+  This spec defines the YAML structure and content model for specd schemas, which declare artifact workflows, validation rules, delta handling, and AI context instructions. Read this spec when implementing schema loading, validation, delta application, context compilation, or defining new artifact types and their lifecycle phases.
 keywords:
   - 'schema'
   - 'YAML'
@@ -15,10 +10,13 @@ keywords:
   - 'delta'
   - 'merge'
   - 'context'
+  - 'scope'
+  - 'requirements'
+  - 'constraints'
 dependsOn:
   - 'specs/core/delta-format'
 contentHashes:
-  spec.md: 'sha256:e2442edae718c715c8722731e0026a2aa492d30e1ff13ead95065d331d1f1f29'
+  spec.md: 'sha256:a5accb856fd3606a202b0b4adff39a4c007844536f66215de35030c8f6c58e8e'
   verify.md: 'sha256:52a680a7e66b3b2ba218d9e58b9f86d078e8da6b7cf681286cb05b2df090e6a8'
 constraints:
   - 'artifact.id must match /^[a-z][a-z0-9-]*$/ and must be unique within a schema'

@@ -361,6 +361,8 @@ Plugin declarations are used by `specd init`, `specd plugin add`, and `specd upd
 
 specd must validate `specd.yaml` before executing any command that requires a config (see Schema reference requirement for which commands skip this). `specd init` is exempt — it creates `specd.yaml` and therefore requires no existing config.
 
+`FsConfigLoader` validates the parsed YAML against a Zod schema before constructing the `SpecdConfig` object. Any structural mismatch (missing required fields, wrong types, unknown adapter values) surfaces immediately as a `ConfigValidationError` — a domain error that extends `SpecdError` — before any path resolution or domain object construction takes place.
+
 The following conditions are **errors** that abort startup immediately:
 
 - `schema` field is missing
