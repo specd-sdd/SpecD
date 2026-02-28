@@ -1,3 +1,12 @@
 export * from './ports/index.js'
 export * from './errors/index.js'
 export * from './use-cases/index.js'
+export {
+  type SpecdConfig,
+  type SpecdWorkspaceConfig,
+  type SpecdStorageConfig,
+  type SpecdWorkflowStep,
+  type SpecdWorkflowHook,
+  type SpecdContextEntry,
+  isSpecdConfig,
+} from './specd-config.js'

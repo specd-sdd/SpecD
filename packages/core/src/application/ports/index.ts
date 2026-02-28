@@ -16,3 +16,4 @@ export {
   type ArtifactParserRegistry,
   DeltaApplicationError,
 } from './artifact-parser.js'
+export { type ConfigLoader } from './config-loader.js'
