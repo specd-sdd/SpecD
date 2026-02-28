@@ -46,8 +46,8 @@ storage:
       pattern: '{{year}}/{{change.archivedName}}'
 
 approvals:
-  spec: true      # human approval required before implementation may begin
-  signoff: true   # human sign-off required before archiving
+  spec: true # human approval required before implementation may begin
+  signoff: true # human sign-off required before archiving
 
 workflow:
   - step: implementing
@@ -55,7 +55,7 @@ workflow:
       pre:
         - instruction: |
             Before writing any code, confirm that the spec approval has been recorded.
-            Do not begin implementation until specd confirms the change is in spec-approved state.
+            Do not begin implementation until SpecD confirms the change is in spec-approved state.
   - step: archiving
     hooks:
       pre:
@@ -84,13 +84,13 @@ ready → pending-spec-approval → spec-approved → implementing → ... → d
 
 With `approvals.spec: true`, a human must explicitly run `specd approve spec` for each spec touched by the change before the agent can begin implementation. With `approvals.signoff: true`, a human must run `specd approve signoff` after verification is complete before the change can be archived. Both approval records capture the approver's git identity, a reason, and a hash of the artifacts at approval time.
 
-**LLM-optimised context** — `llmOptimizedContext: true` enables richer metadata generation. When specd builds `.specd-metadata.yaml` files for specs, it uses an LLM to produce more precise descriptions, structured scenarios, and accurate `dependsOn` suggestions. This requires LLM access in the automation pipeline.
+**LLM-optimised context** — `llmOptimizedContext: true` enables richer metadata generation. When SpecD builds `.specd-metadata.yaml` files for specs, it uses an LLM to produce more precise descriptions, structured scenarios, and accurate `dependsOn` suggestions. This requires LLM access in the automation pipeline.
 
 **Context entries** — `AGENTS.md` is injected verbatim into every compiled context before any spec content. The inline instruction is appended after it. These entries fire regardless of which change or workspace is active.
 
 **Project-level context spec selection** — `contextIncludeSpecs: ['default:_global/*']` ensures that specs under `specs/_global/` are always in context, for every change, regardless of scope. This is declared at the project level so it applies unconditionally — without it, specs outside the active change's scope would only be included if the change explicitly referenced them.
 
-**Workflow hooks** — the `implementing` pre-hook injects an instruction reminding the agent to confirm spec approval state before writing code. This is belt-and-suspenders: specd enforces the gate, but the instruction makes the expectation explicit in the agent's context.
+**Workflow hooks** — the `implementing` pre-hook injects an instruction reminding the agent to confirm spec approval state before writing code. This is belt-and-suspenders: SpecD enforces the gate, but the instruction makes the expectation explicit in the agent's context.
 
 The `archiving` pre-hook runs `pnpm test` before the archive proceeds — if tests fail, the archive is aborted and the user is informed. The post-hook fires after the archive is complete and sends a Slack notification.
 

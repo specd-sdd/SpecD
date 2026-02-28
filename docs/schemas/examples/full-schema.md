@@ -2,7 +2,7 @@
 
 ## When to use this schema as a starting point
 
-This is the standard specd workflow for teams adopting spec-driven development. It models the full lifecycle of a change: a proposal explains why the change is needed, specs define what the system should do, an optional design document captures how to implement it, and a task list drives implementation.
+This is the standard SpecD workflow for teams adopting spec-driven development. It models the full lifecycle of a change: a proposal explains why the change is needed, specs define what the system should do, an optional design document captures how to implement it, and a task list drives implementation.
 
 Use this as your starting point and trim or extend it to match your team's conventions. The `design` artifact is declared `optional: true` — teams that do not produce design documents can skip it without affecting the rest of the workflow.
 
@@ -118,7 +118,7 @@ artifacts:
         where:
           op: 'added|modified'
         contentMatches: '#### Scenario:'
-        required: false   # warning only — some requirements legitimately have no scenarios
+        required: false # warning only — some requirements legitimately have no scenarios
     validations:
       - type: section
         matches: '^Requirements$'
@@ -235,7 +235,7 @@ proposal → specs → verify
 
 The agent cannot produce `specs` until `proposal` is complete. It cannot produce `verify` until `specs` is complete.
 
-**Delta support on specs and verify** — both `specs` and `verify` declare `delta: true`. When a change modifies an existing spec rather than creating a new one, the agent produces a `.delta.yaml` file instead of rewriting the file in full. specd applies the delta deterministically during archiving, giving a precise, reviewable record of exactly what changed.
+**Delta support on specs and verify** — both `specs` and `verify` declare `delta: true`. When a change modifies an existing spec rather than creating a new one, the agent produces a `.delta.yaml` file instead of rewriting the file in full. SpecD applies the delta deterministically during archiving, giving a precise, reviewable record of exactly what changed.
 
 **preHashCleanup on tasks** — checking off a task in `tasks.md` changes the file's content. Without `preHashCleanup`, that would reset the artifact's status from `complete` back to `in-progress`, requiring re-validation. The cleanup rule normalises all `[x]` checkboxes back to `[ ]` before hashing, so the hash is stable regardless of task completion state.
 

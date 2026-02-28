@@ -10,7 +10,7 @@ informed: '-'
 
 ## Context and Problem Statement
 
-specd ships multiple packages that must be versioned and published independently (`@specd/core`, `@specd/cli`, `@specd/plugin-*`, etc.) but developed together with shared tooling and cross-package type safety. A single package would couple all concerns; a multi-repo setup would make cross-package changes painful.
+SpecD ships multiple packages that must be versioned and published independently (`@specd/core`, `@specd/cli`, `@specd/plugin-*`, etc.) but developed together with shared tooling and cross-package type safety. A single package would couple all concerns; a multi-repo setup would make cross-package changes painful.
 
 ## Decision Drivers
 

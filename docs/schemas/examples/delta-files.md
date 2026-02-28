@@ -2,7 +2,7 @@
 
 ## What a delta file is
 
-A delta file is a YAML document that expresses changes to an existing spec as a sequence of AST operations. Instead of replacing the entire spec file, the agent produces a `.delta.yaml` that says precisely which sections to add, modify, or remove. specd applies the delta deterministically — no LLM is involved in the application step.
+A delta file is a YAML document that expresses changes to an existing spec as a sequence of AST operations. Instead of replacing the entire spec file, the agent produces a `.delta.yaml` that says precisely which sections to add, modify, or remove. SpecD applies the delta deterministically — no LLM is involved in the application step.
 
 Delta files are only produced when `delta: true` is declared on an artifact in the schema. They are only valid for `scope: spec` artifacts.
 
@@ -10,12 +10,12 @@ Delta files are only produced when `delta: true` is declared on an artifact in t
 
 A delta file's filename is the target artifact's filename with `.delta.yaml` appended:
 
-| Target artifact | Delta filename |
-|---|---|
-| `spec.md` | `spec.md.delta.yaml` |
-| `verify.md` | `verify.md.delta.yaml` |
-| `openapi.json` | `openapi.json.delta.yaml` |
-| `config.yaml` | `config.yaml.delta.yaml` |
+| Target artifact | Delta filename            |
+| --------------- | ------------------------- |
+| `spec.md`       | `spec.md.delta.yaml`      |
+| `verify.md`     | `verify.md.delta.yaml`    |
+| `openapi.json`  | `openapi.json.delta.yaml` |
+| `config.yaml`   | `config.yaml.delta.yaml`  |
 
 Delta files live inside the change directory at:
 
@@ -35,16 +35,16 @@ Delta files are never synced to permanent spec directories — they remain in th
 
 A delta file is a YAML sequence. Each entry is one delta operation.
 
-| Field | Required for | Description |
-|---|---|---|
-| `op` | all | Operation type: `added`, `modified`, or `removed`. |
-| `selector` | `modified`, `removed` | Identifies the existing node to target. Not valid on `added`. |
-| `position` | `added` (optional) | Where to insert the new node. See [Position](#position). |
-| `rename` | `modified` (optional) | New label for the node's identifying property (heading text, key name). |
-| `content` | `added`, `modified` (optional) | New node content in the artifact's native format. Mutually exclusive with `value`. |
-| `value` | `added`, `modified` (optional) | Node value as a structured YAML value. For JSON/YAML structured nodes. Mutually exclusive with `content`. |
-| `strategy` | optional | Array merge strategy: `replace` (default), `append`, or `merge-by`. Only valid when the selector targets an array or sequence node. |
-| `mergeKey` | required with `merge-by` | Key field used to match objects in `merge-by` strategy. |
+| Field      | Required for                   | Description                                                                                                                         |
+| ---------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `op`       | all                            | Operation type: `added`, `modified`, or `removed`.                                                                                  |
+| `selector` | `modified`, `removed`          | Identifies the existing node to target. Not valid on `added`.                                                                       |
+| `position` | `added` (optional)             | Where to insert the new node. See [Position](#position).                                                                            |
+| `rename`   | `modified` (optional)          | New label for the node's identifying property (heading text, key name).                                                             |
+| `content`  | `added`, `modified` (optional) | New node content in the artifact's native format. Mutually exclusive with `value`.                                                  |
+| `value`    | `added`, `modified` (optional) | Node value as a structured YAML value. For JSON/YAML structured nodes. Mutually exclusive with `content`.                           |
+| `strategy` | optional                       | Array merge strategy: `replace` (default), `append`, or `merge-by`. Only valid when the selector targets an array or sequence node. |
+| `mergeKey` | required with `merge-by`       | Key field used to match objects in `merge-by` strategy.                                                                             |
 
 ## The three operations
 
@@ -52,7 +52,7 @@ A delta file is a YAML sequence. Each entry is one delta operation.
 
 `modified` updates the body of an existing node identified by `selector`. The node's identifying property (its heading, key name) is preserved unless `rename` is also specified.
 
-`content` contains only the body — the identifying line is not repeated. specd parses it and replaces the node's existing body.
+`content` contains only the body — the identifying line is not repeated. SpecD parses it and replaces the node's existing body.
 
 ```yaml
 # Change the body of an existing requirement section
@@ -122,7 +122,7 @@ A delta file is a YAML sequence. Each entry is one delta operation.
 
 For text-based formats (markdown, plain text), `content` includes the identifying line as its first line — the heading, for a section.
 
-```yaml
+````yaml
 # Append a new requirement to the end of the Requirements section (default position)
 - op: added
   position:
@@ -186,19 +186,19 @@ For text-based formats (markdown, plain text), `content` includes the identifyin
     ```yaml
     schema: '@specd/schema-std'
     ```
-```
+````
 
 ## Position
 
 `position` controls where an `added` entry inserts its node. All fields are optional — omitting `position` entirely appends the node at the end of the document.
 
-| Field | Description |
-|---|---|
-| `parent` | Scopes the insertion to the children of the matched node. If omitted, insertion is at document root level. |
-| `after` | Inserts immediately after the matched sibling within the parent scope. Falls back to appending at the end of scope with a warning if the sibling is not found. |
+| Field    | Description                                                                                                                                                     |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parent` | Scopes the insertion to the children of the matched node. If omitted, insertion is at document root level.                                                      |
+| `after`  | Inserts immediately after the matched sibling within the parent scope. Falls back to appending at the end of scope with a warning if the sibling is not found.  |
 | `before` | Inserts immediately before the matched sibling within the parent scope. Falls back to appending at the end of scope with a warning if the sibling is not found. |
-| `first` | Inserts as the first child of the parent scope. |
-| `last` | Inserts as the last child of the parent scope. This is the default when `parent` is specified but no placement hint is given. |
+| `first`  | Inserts as the first child of the parent scope.                                                                                                                 |
+| `last`   | Inserts as the last child of the parent scope. This is the default when `parent` is specified but no placement hint is given.                                   |
 
 `after`, `before`, `first`, and `last` are mutually exclusive. If only `parent` is given, the node is appended as the last child.
 
@@ -206,11 +206,11 @@ For text-based formats (markdown, plain text), `content` includes the identifyin
 
 When the selector targets an array or sequence node (not an individual item), the `strategy` field controls how the new value is merged:
 
-| Strategy | Behaviour |
-|---|---|
-| `replace` (default) | Replaces the entire array with the supplied value. |
-| `append` | Appends the supplied items to the end of the existing array. |
-| `merge-by` | Merges the supplied items into the existing array by matching objects on `mergeKey`. Items with a matching key are replaced; items with new keys are appended; existing items not in the supplied value are preserved. |
+| Strategy            | Behaviour                                                                                                                                                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `replace` (default) | Replaces the entire array with the supplied value.                                                                                                                                                                     |
+| `append`            | Appends the supplied items to the end of the existing array.                                                                                                                                                           |
+| `merge-by`          | Merges the supplied items into the existing array by matching objects on `mergeKey`. Items with a matching key are replaced; items with new keys are appended; existing items not in the supplied value are preserved. |
 
 ```yaml
 # Replace the entire keywords array
@@ -281,21 +281,21 @@ To modify a specific item in an array or sequence, use a selector that targets t
 
 ## Conflict detection
 
-specd validates the entire delta for conflicts before applying any operation. If any conflict is found, the whole delta is rejected with a `DeltaApplicationError` and no changes are made to the artifact.
+SpecD validates the entire delta for conflicts before applying any operation. If any conflict is found, the whole delta is rejected with a `DeltaApplicationError` and no changes are made to the artifact.
 
-| Conflict | Error |
-|---|---|
-| Two `modified` or `removed` entries resolve to the same node | Cannot apply two operations to the same node. |
-| A `rename` target already exists as a sibling | Would produce a duplicate node. |
-| Two `modified` entries rename to the same target within the same parent | Ambiguous result. |
-| `content` and `value` both present in the same entry | Mutually exclusive. |
-| `selector` on an `added` entry | Use `position.parent` instead. |
-| `rename` on an `added` or `removed` entry | Only valid on `modified`. |
-| `strategy: merge-by` without `mergeKey` | `mergeKey` is required for `merge-by`. |
-| `mergeKey` without `strategy: merge-by` | `mergeKey` is only meaningful with `merge-by`. |
-| `strategy` on a non-array selector | Strategy is only valid for array/sequence targets. |
-| More than one of `after`, `before`, `first`, `last` in the same `position` | Mutually exclusive placement hints. |
-| `position.parent` resolves to no node | specd cannot scope the insertion. |
+| Conflict                                                                   | Error                                              |
+| -------------------------------------------------------------------------- | -------------------------------------------------- |
+| Two `modified` or `removed` entries resolve to the same node               | Cannot apply two operations to the same node.      |
+| A `rename` target already exists as a sibling                              | Would produce a duplicate node.                    |
+| Two `modified` entries rename to the same target within the same parent    | Ambiguous result.                                  |
+| `content` and `value` both present in the same entry                       | Mutually exclusive.                                |
+| `selector` on an `added` entry                                             | Use `position.parent` instead.                     |
+| `rename` on an `added` or `removed` entry                                  | Only valid on `modified`.                          |
+| `strategy: merge-by` without `mergeKey`                                    | `mergeKey` is required for `merge-by`.             |
+| `mergeKey` without `strategy: merge-by`                                    | `mergeKey` is only meaningful with `merge-by`.     |
+| `strategy` on a non-array selector                                         | Strategy is only valid for array/sequence targets. |
+| More than one of `after`, `before`, `first`, `last` in the same `position` | Mutually exclusive placement hints.                |
+| `position.parent` resolves to no node                                      | SpecD cannot scope the insertion.                  |
 
 ## Complete delta file example
 

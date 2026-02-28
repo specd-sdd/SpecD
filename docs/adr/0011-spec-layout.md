@@ -10,7 +10,7 @@ informed: '-'
 
 ## Context and Problem Statement
 
-specd uses specs to define requirements and constraints for its own development (dogfooding). As the codebase grows, specs accumulate for different concerns: cross-cutting constraints (architecture, conventions, commits), package-internal implementation details (use cases, domain services), and schema definitions.
+SpecD uses specs to define requirements and constraints for its own development (dogfooding). As the codebase grows, specs accumulate for different concerns: cross-cutting constraints (architecture, conventions, commits), package-internal implementation details (use cases, domain services), and schema definitions.
 
 Without a clear convention, two problems arise:
 

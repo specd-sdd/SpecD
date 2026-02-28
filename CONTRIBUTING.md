@@ -1,4 +1,4 @@
-# Contributing to specd
+# Contributing to SpecD
 
 ## Workflow
 
@@ -50,7 +50,7 @@ Two hooks run automatically via **Husky**:
 
 ## Commit conventions
 
-specd follows [Conventional Commits](https://www.conventionalcommits.org/). Every commit message must match:
+SpecD follows [Conventional Commits](https://www.conventionalcommits.org/). Every commit message must match:
 
 ```
 <type>(<scope>): <description>

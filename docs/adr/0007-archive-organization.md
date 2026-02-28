@@ -43,7 +43,7 @@ The archive `fs` adapter exposes a `pattern` configuration field in `specd.yaml`
 
 ### Consequences
 
-- Good, because teams can choose flat (default), by-year, by-month, or by-day organization without forking specd
+- Good, because teams can choose flat (default), by-year, by-month, or by-day organization without forking SpecD
 - Good, because the archive remains navigable at any scale
 - Good, because the index provides fast lookups; inconsistency is recoverable via `specd storage reindex`
 - Bad, because `{{change.scope}}` is not available in patterns — scope-based grouping must be achieved through change naming conventions
