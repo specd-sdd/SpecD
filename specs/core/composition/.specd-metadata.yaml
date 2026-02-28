@@ -1,0 +1,140 @@
+title: 'Composition Layer'
+description: >
+  The composition layer is @specd/core's only gateway to infrastructure adapters and the sole responsibility for wiring ports into use cases. It defines factory patterns for exposing pre-wired use cases to delivery mechanisms (CLI, MCP), plus a kernel for assembling all use cases from resolved config, ensuring consistent dependency injection and preventing direct infrastructure imports throughout the system.
+keywords:
+  - 'composition'
+  - 'factory'
+  - 'dependency injection'
+  - 'ports'
+  - 'kernel'
+  - 'use-case wiring'
+  - 'SpecdConfig'
+dependsOn:
+  - 'specs/_global/architecture/spec.md'
+contentHashes:
+  spec.md: 'sha256:299c9a1dab6ef193be10397460b301e91d52910252ba5ceb0f463195bffbb93b'
+  verify.md: 'sha256:dcd793012f3074251678166299c9a67a73993ac24abe903950a06bf9398dea0b'
+rules:
+  - requirement: 'Use-case factories are the unit of composition'
+    rules:
+      - 'The composition layer exposes one factory function per use case (e.g. createArchiveChange, createCompileContext).'
+      - 'Each factory constructs all ports the use case requires and returns the pre-wired use case instance.'
+      - 'Use case constructors are not exported from index.ts.'
+      - 'Callers always go through the factory.'
+  - requirement: 'Use-case factories accept SpecdConfig or explicit options'
+    rules:
+      - 'Every use-case factory supports two call signatures: createArchiveChange(config: SpecdConfig) and createArchiveChange(context: ArchiveChangeContext, options: FsArchiveChangeOptions).'
+      - 'Both signatures are public exports.'
+      - 'The explicit form is used in tests and in scenarios where only a subset of the config is available.'
+      - 'The SpecdConfig form is used by the kernel and by delivery mechanisms that have already loaded config.'
+  - requirement: 'Internal ports are never exported'
+    rules:
+      - 'Port implementations that have a single concrete class and no caller-visible configuration — NodeHookRunner, GitCLIAdapter, FsFileReader — are constructed inside use-case factories.'
+      - 'These internal ports never appear in any public export.'
+      - 'Repository-level factories (createSpecRepository, createChangeRepository, createArchiveRepository) are internal to the composition layer.'
+  - requirement: 'Kernel builds all use cases from SpecdConfig'
+    rules:
+      - 'createKernel(config: SpecdConfig) calls every use-case factory with the given config and returns an object containing all pre-wired use cases.'
+      - 'The kernel object groups use cases by domain area.'
+      - 'The kernel is a convenience — it is not the mandatory entry point.'
+      - 'Callers that need a single use case call its factory directly.'
+  - requirement: 'ConfigLoader is an application port'
+    rules:
+      - 'ConfigLoader is defined in application/ports/config-loader.ts as an interface.'
+      - 'It has a single method load(): Promise<SpecdConfig>.'
+      - 'The FsConfigLoader implementation reads specd.yaml and specd.local.yaml, with local values taking precedence.'
+      - 'Future implementations (EnvConfigLoader, CompositeConfigLoader) add new config sources without touching the kernel or any delivery layer.'
+  - requirement: 'SpecdConfig is a plain typed object'
+    rules:
+      - 'SpecdConfig is a plain TypeScript interface with no methods.'
+      - 'It represents the fully resolved configuration for a project.'
+      - 'The kernel and use-case factories accept it but do not know how it was produced.'
+      - 'SpecdConfig is defined in domain/ or application/ — not in infrastructure/ or composition/.'
+constraints:
+  - 'composition/ is the only directory in @specd/core permitted to import from infrastructure/'
+  - 'Concrete adapter classes (FsSpecRepository, NodeHookRunner, GitCLIAdapter, FsFileReader, FsSchemaRegistry, etc.) must not appear in src/index.ts or any re-export chain'
+  - 'Repository-level factories (createSpecRepository, createChangeRepository, createArchiveRepository) must not appear in src/index.ts'
+  - 'Use-case factories and the kernel are the only composition exports in src/index.ts'
+  - 'ConfigLoader implementations live in infrastructure/; the port interface lives in application/ports/'
+  - 'The kernel groups use cases under domain-area namespaces — use cases are not properties at the top level of the kernel object'
+  - 'Both call signatures of every use-case factory must be public exports'
+scenarios:
+  - requirement: 'Use-case factories are the unit of composition'
+    name: 'Use case constructed via factory'
+    given:
+      - 'A caller imports createArchiveChange from @specd/core'
+    when:
+      - 'calling it returns an ArchiveChange instance ready to execute'
+    then:
+      - 'no port constructor (FsChangeRepository, NodeHookRunner, etc.) is imported by the caller'
+  - requirement: 'Use-case factories are the unit of composition'
+    name: 'Use case constructors not exported'
+    given: []
+    when:
+      - 'a caller attempts to import ArchiveChange class constructor from @specd/core'
+    then:
+      - 'the import is not available — ArchiveChange is not a named export of index.ts'
+  - requirement: 'Use-case factories accept SpecdConfig or explicit options'
+    name: 'Factory called with SpecdConfig'
+    given: []
+    when:
+      - 'createArchiveChange(config) is called with a valid SpecdConfig'
+    then:
+      - 'it returns a pre-wired ArchiveChange with all ports constructed from the config values'
+  - requirement: 'Use-case factories accept SpecdConfig or explicit options'
+    name: 'Factory called with explicit context and options'
+    given: []
+    when:
+      - 'createArchiveChange(context, options) is called with an explicit context and options object'
+    then:
+      - 'it returns a pre-wired ArchiveChange using those values directly'
+  - requirement: 'Internal ports are never exported'
+    name: 'NodeHookRunner not in public exports'
+    given: []
+    when:
+      - 'the public export surface of @specd/core is inspected'
+    then:
+      - 'NodeHookRunner, GitCLIAdapter, and FsFileReader are not present'
+  - requirement: 'Internal ports are never exported'
+    name: 'Repository factories not in public exports'
+    given: []
+    when:
+      - 'the public export surface of @specd/core is inspected'
+    then:
+      - 'createSpecRepository, createChangeRepository, and createArchiveRepository are not present'
+  - requirement: 'Kernel builds all use cases from SpecdConfig'
+    name: 'Kernel returns grouped use cases'
+    given: []
+    when:
+      - 'createKernel(config) is called with a valid SpecdConfig'
+    then:
+      - 'the returned object exposes use cases grouped under domain-area namespaces'
+      - 'each use case is ready to execute without further configuration'
+  - requirement: 'Kernel builds all use cases from SpecdConfig'
+    name: 'Kernel is not the mandatory entry point'
+    given: []
+    when:
+      - 'a caller needs only CreateChange'
+    then:
+      - 'calling createCreateChange(config) directly returns a ready use case without requiring the full kernel'
+  - requirement: 'ConfigLoader is an application port'
+    name: 'FsConfigLoader reads specd.yaml'
+    given: []
+    when:
+      - 'FsConfigLoader.load() is called in a directory containing specd.yaml'
+    then:
+      - 'it returns a SpecdConfig object with values from that file'
+  - requirement: 'ConfigLoader is an application port'
+    name: 'specd.local.yaml overrides specd.yaml'
+    given: []
+    when:
+      - 'both specd.yaml and specd.local.yaml are present'
+    then:
+      - 'values in specd.local.yaml take precedence over values in specd.yaml'
+  - requirement: 'SpecdConfig is a plain typed object'
+    name: 'SpecdConfig has no methods'
+    given: []
+    when:
+      - 'the SpecdConfig type is inspected'
+    then:
+      - 'it contains only readonly properties — no methods, no class instances'

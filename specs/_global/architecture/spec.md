@@ -40,17 +40,15 @@ Domain operations that are stateless and have no I/O are implemented as plain ex
 
 Dependencies are wired manually at the application entry point of each package. No IoC container. Use case constructors receive their port implementations as arguments.
 
-### Requirement: Composition layer for adapter construction
+### Requirement: Composition layer for use-case wiring
 
-Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer contains factory functions that construct infrastructure adapters and return the abstract port type. It is the only layer permitted to import from `infrastructure/`.
+Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes three levels of factory:
 
-Factory functions must:
+- **Use-case factories** — one per use case; construct all required ports internally and return the pre-wired use case. Internal ports with a single concrete implementation are constructed here and never exported. Each factory supports two call signatures: `createX(config: SpecdConfig)` and `createX(context, options)`.
+- **Kernel** — `createKernel(config: SpecdConfig)` calls every use-case factory and returns all use cases grouped by domain area. It is a convenience, not a mandatory entry point.
+- **Config loader port** — `ConfigLoader` is defined in `application/ports/` and resolves a `SpecdConfig` from one or more sources. Implementations live in `infrastructure/`.
 
-- Accept a discriminated union config (e.g. `{ type: 'fs', ...fsConfig }`) to remain extensible as new adapter types are added
-- Return the abstract port type (`SpecRepository`, `ChangeRepository`), never the concrete class
-- Be the only public export surface for infrastructure adapters — concrete adapter classes are never exported from `index.ts`
-
-Adapter packages (CLI, MCP) import from `composition/` to construct their dependencies. They never import concrete infrastructure classes directly.
+Concrete adapter classes and repository-level factories are never exported from `index.ts`. Delivery mechanisms (CLI, MCP) import only use-case factories, the kernel, and the config loader port — never ports, infrastructure classes, or use case constructors.
 
 ### Requirement: Adapter packages contain no business logic
 
@@ -65,7 +63,8 @@ Package dependency direction is strictly one-way: `plugin-*` → `skills` → `c
 - In any package with business logic, `domain/` must not import from `application/`, `infrastructure/`, or `composition/`
 - In any package with business logic, `application/` must not import from `infrastructure/` or `composition/`
 - In any package with business logic, `infrastructure/` must not import from `composition/`
-- Only `composition/` may import from `infrastructure/`; concrete adapter classes must not be exported from `index.ts`
+- Only `composition/` may import from `infrastructure/`; concrete adapter classes and repository-level factories must not be exported from `index.ts`
+- Delivery mechanisms import only use-case factories, the kernel, and the config loader port — never ports, infrastructure classes, or use case constructors
 - Use cases receive all dependencies via constructor — no module-level singletons, in any package
 - Domain entities must throw typed errors (subclasses of `SpecdError`) for invalid operations
 - Stateless domain operations must be plain functions, not classes
@@ -83,3 +82,4 @@ _none — this is a global constraint spec_
 - [ADR-0004: Rich Domain Entities](../../../docs/adr/0004-rich-domain-entities.md)
 - [ADR-0005: Manual Dependency Injection](../../../docs/adr/0005-manual-dependency-injection.md)
 - [ADR-0006: Filesystem-Only Storage Adapter in v1](../../../docs/adr/0006-fs-only-adapter-v1.md)
+- [ADR-0015: Use-Case-Level Composition and Config Loading](../../../docs/adr/0015-use-case-level-composition.md)
