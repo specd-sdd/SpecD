@@ -1,6 +1,6 @@
 title: 'Architecture'
 description: >
-  Defines hexagonal architecture and domain-driven design principles for specd packages with business logic. Establishes layering rules for domain, application, infrastructure, and composition; requires pure domains, port-based I/O, rich entities, and manual dependency injection. Use this spec when designing or reviewing package structure, dependency directions, and layer boundaries.
+  Defines hexagonal architecture and domain-driven design principles for specd packages with business logic. Establishes layering rules for domain, application, infrastructure, and composition; requires pure domains, port-based I/O, rich entities, and manual dependency injection. Use this spec when designing or reviewing package structure, dependency directions, layer boundaries, and composition patterns.
 keywords:
   - 'architecture'
   - 'hexagonal'
@@ -10,11 +10,11 @@ keywords:
   - 'dependencies'
   - 'entities'
   - 'composition'
-  - 'adapter-construction'
-  - 'dependency-injection'
+  - 'use-case-wiring'
+  - 'config-loading'
 dependsOn: []
 contentHashes:
-  spec.md: 'sha256:b64dfcecfa24e0ea460053a771e7fbc3de77fd166cb44c80509fb2eaf429383b'
+  spec.md: 'sha256:391763ad2fd1dc16e123060d759a3767302f3282054aa8d8ff8cd7da68039655'
   verify.md: 'sha256:dbbf29057514a748003772a3670aa33c62a8fb2a7e859ec9d9a49d49367cbbff'
 rules:
   - requirement: 'Layered structure for packages with business logic'
@@ -29,7 +29,7 @@ rules:
       - "This applies to every package's domain/ layer."
   - requirement: 'Application layer uses ports only'
     rules:
-      - 'The application layer interacts with the outside world exclusively through port interfaces defined in application/ports/.'
+      - 'The application layer (use cases and application services) interacts with the outside world exclusively through port interfaces defined in application/ports/.'
       - 'It never imports infrastructure adapters directly.'
       - "This applies to every package's application/ layer."
   - requirement: 'Rich domain entities'
@@ -59,16 +59,15 @@ rules:
       - 'Dependencies are wired manually at the application entry point of each package.'
       - 'No IoC container.'
       - 'Use case constructors receive their port implementations as arguments.'
-  - requirement: 'Composition layer for adapter construction'
+  - requirement: 'Composition layer for use-case wiring'
     rules:
       - 'Each package with business logic may have a composition/ layer above infrastructure/.'
-      - 'This layer contains factory functions that construct infrastructure adapters and return the abstract port type.'
-      - 'It is the only layer permitted to import from infrastructure/.'
-      - "Factory functions must accept a discriminated union config (e.g. { type: 'fs', ...fsConfig }) to remain extensible as new adapter types are added."
-      - 'Factory functions must return the abstract port type (SpecRepository, ChangeRepository), never the concrete class.'
-      - 'Factory functions must be the only public export surface for infrastructure adapters — concrete adapter classes are never exported from index.ts.'
-      - 'Adapter packages (CLI, MCP) import from composition/ to construct their dependencies.'
-      - 'Adapter packages never import concrete infrastructure classes directly.'
+      - 'This layer is the only layer permitted to import from infrastructure/.'
+      - 'It exposes use-case factories (one per use case; construct all required ports internally and return the pre-wired use case; internal ports with a single concrete implementation are constructed here and never exported; each factory supports two call signatures: createX(config: SpecdConfig) and createX(context, options)).'
+      - 'It exposes Kernel — createKernel(config: SpecdConfig) calls every use-case factory and returns all use cases grouped by domain area.'
+      - 'Config loader port — ConfigLoader is defined in application/ports/ and resolves a SpecdConfig from one or more sources; implementations live in infrastructure/.'
+      - 'Concrete adapter classes and repository-level factories are never exported from index.ts.'
+      - 'Delivery mechanisms (CLI, MCP) import only use-case factories, the kernel, and the config loader port — never ports, infrastructure classes, or use case constructors.'
   - requirement: 'Adapter packages contain no business logic'
     rules:
       - 'Packages that serve as delivery mechanisms (@specd/cli, @specd/mcp, @specd/plugin-*) contain no business logic.'
@@ -85,7 +84,8 @@ constraints:
   - 'In any package with business logic, domain/ must not import from application/, infrastructure/, or composition/.'
   - 'In any package with business logic, application/ must not import from infrastructure/ or composition/.'
   - 'In any package with business logic, infrastructure/ must not import from composition/.'
-  - 'Only composition/ may import from infrastructure/; concrete adapter classes must not be exported from index.ts.'
+  - 'Only composition/ may import from infrastructure/; concrete adapter classes and repository-level factories must not be exported from index.ts.'
+  - 'Delivery mechanisms import only use-case factories, the kernel, and the config loader port — never ports, infrastructure classes, or use case constructors.'
   - 'Use cases receive all dependencies via constructor — no module-level singletons, in any package.'
   - 'Domain entities must throw typed errors (subclasses of SpecdError) for invalid operations.'
   - 'Stateless domain operations must be plain functions, not classes.'
