@@ -131,9 +131,11 @@ artifacts:
       - **modified**: Updated scenarios under an existing requirement. Selector targets
         the `### Requirement: <name>` section. Include all scenarios for that requirement
         in `content` — not just the new ones.
-      - **added**: Scenarios for a new requirement (one added to spec.md in the same change).
-        Use `position.parent` targeting the Requirements section. Include the full
-        `### Requirement:` heading and at least one `#### Scenario:` block in `content`.
+      - **added**: Required for every new requirement added to spec.md in the same change.
+        Every new requirement must have at least one scenario — do not leave a new requirement
+        without verification coverage. Use `position.parent` targeting the Requirements section.
+        Include the full `### Requirement:` heading and at least one `#### Scenario:` block
+        in `content`.
 
       Every `#### Scenario:` heading in `content` must use exactly four hashtags.
     deltaValidations:
@@ -141,7 +143,7 @@ artifacts:
         where:
           op: 'added|modified'
         contentMatches: '#### Scenario:'
-        required: false
+        required: true
     validations:
       - type: section
         matches: '^Requirements$'
