@@ -1,5 +1,7 @@
 {
   "name": "specd",
+  "version": "0.0.1",
+  "license": "MIT",
   "type": "module",
   "private": true,
   "packageManager": "pnpm@10.6.5",

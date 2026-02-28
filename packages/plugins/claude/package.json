@@ -1,6 +1,7 @@
 {
   "name": "@specd/plugin-claude",
   "version": "0.0.1",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "exports": {

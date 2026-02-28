@@ -1,6 +1,7 @@
 {
   "name": "@specd/cli",
   "version": "0.0.1",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "bin": {

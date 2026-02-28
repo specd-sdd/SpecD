@@ -17,14 +17,14 @@ Key differences from earlier SDD tools:
 
 ## Core concepts
 
-| Concept | Description |
-|---|---|
-| **Change** | A named, in-progress unit of spec work. A change tracks which specs are being modified, which artifacts have been produced, and where it sits in its lifecycle. |
-| **Spec** | A specification file (or set of files) that defines what a system should do. Specs live in a dedicated directory and are governed by the active schema. |
-| **Artifact** | A typed file produced during a change — for example, a proposal, a spec, a design, or a task list. Artifact types and their dependency order are declared in the schema. |
-| **Schema** | A `schema.yaml` file that defines the artifact workflow for a project: what artifacts exist, how they relate, what validations apply, and what instructions guide the AI. |
+| Concept       | Description                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Change**    | A named, in-progress unit of spec work. A change tracks which specs are being modified, which artifacts have been produced, and where it sits in its lifecycle.                             |
+| **Spec**      | A specification file (or set of files) that defines what a system should do. Specs live in a dedicated directory and are governed by the active schema.                                     |
+| **Artifact**  | A typed file produced during a change — for example, a proposal, a spec, a design, or a task list. Artifact types and their dependency order are declared in the schema.                    |
+| **Schema**    | A `schema.yaml` file that defines the artifact workflow for a project: what artifacts exist, how they relate, what validations apply, and what instructions guide the AI.                   |
 | **Workspace** | A declared location of specs, with its own storage path, code root, and ownership relationship. A project can span multiple workspaces (e.g. a coordinator managing several service repos). |
-| **Delta** | A structured YAML document that expresses changes to a spec as AST operations, rather than inline text diffs. Deltas are applied deterministically by specd. |
+| **Delta**     | A structured YAML document that expresses changes to a spec as AST operations, rather than inline text diffs. Deltas are applied deterministically by specd.                                |
 
 The change lifecycle progresses through well-defined states:
 
@@ -36,17 +36,17 @@ Optional approval gates can require human sign-off between `ready → implementi
 
 ## Packages
 
-| Package | Description |
-|---|---|
-| `@specd/core` | Domain library. All business logic: entities, use cases, and port interfaces. Zero I/O dependencies. |
-| `@specd/cli` | CLI adapter. Exposes the full spec lifecycle as `specd` commands. |
-| `@specd/mcp` | MCP server adapter. Exposes the full spec lifecycle to any MCP-compatible AI agent. |
-| `@specd/skills` | Canonical skill definitions installed by agent plugins. |
-| `@specd/schema-std` | The standard specd schema: proposal → specs → design → tasks workflow. |
-| `@specd/schema-openspec` | An OpenSpec-compatible schema for teams migrating from OpenSpec. |
-| `@specd/plugin-claude` | Agent plugin for Claude Code. |
-| `@specd/plugin-copilot` | Agent plugin for GitHub Copilot. |
-| `@specd/plugin-codex` | Agent plugin for OpenAI Codex. |
+| Package                  | Description                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `@specd/core`            | Domain library. All business logic: entities, use cases, and port interfaces. Zero I/O dependencies. |
+| `@specd/cli`             | CLI adapter. Exposes the full spec lifecycle as `specd` commands.                                    |
+| `@specd/mcp`             | MCP server adapter. Exposes the full spec lifecycle to any MCP-compatible AI agent.                  |
+| `@specd/skills`          | Canonical skill definitions installed by agent plugins.                                              |
+| `@specd/schema-std`      | The standard specd schema: proposal → specs → design → tasks workflow.                               |
+| `@specd/schema-openspec` | An OpenSpec-compatible schema for teams migrating from OpenSpec.                                     |
+| `@specd/plugin-claude`   | Agent plugin for Claude Code.                                                                        |
+| `@specd/plugin-copilot`  | Agent plugin for GitHub Copilot.                                                                     |
+| `@specd/plugin-codex`    | Agent plugin for OpenAI Codex.                                                                       |
 
 ## Getting started
 
@@ -104,13 +104,13 @@ See the [configuration reference](docs/schemas/config-reference.md) for all avai
 
 ## Documentation
 
-| Section | Contents |
-|---|---|
-| [`docs/cli/`](docs/cli/) | Reference for every `specd` command: purpose, flags, examples, exit codes. |
-| [`docs/mcp/`](docs/mcp/) | Reference for every tool and resource exposed by `@specd/mcp`. |
-| [`docs/core/`](docs/core/) | Public API of `@specd/core`: entities, ports, use cases, and error types. |
-| [`docs/schemas/`](docs/schemas/) | Schema authoring guide and `specd.yaml` configuration reference. |
-| [`docs/adr/`](docs/adr/) | Architecture Decision Records documenting the key design decisions. |
+| Section                          | Contents                                                                   |
+| -------------------------------- | -------------------------------------------------------------------------- |
+| [`docs/cli/`](docs/cli/)         | Reference for every `specd` command: purpose, flags, examples, exit codes. |
+| [`docs/mcp/`](docs/mcp/)         | Reference for every tool and resource exposed by `@specd/mcp`.             |
+| [`docs/core/`](docs/core/)       | Public API of `@specd/core`: entities, ports, use cases, and error types.  |
+| [`docs/schemas/`](docs/schemas/) | Schema authoring guide and `specd.yaml` configuration reference.           |
+| [`docs/adr/`](docs/adr/)         | Architecture Decision Records documenting the key design decisions.        |
 
 ## Project status
 
@@ -120,4 +120,4 @@ This repository follows a spec-driven workflow: each significant area of behavio
 
 ## License
 
-To be determined.
+MIT — see [LICENSE](LICENSE).
