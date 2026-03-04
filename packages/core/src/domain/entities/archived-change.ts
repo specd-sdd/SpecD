@@ -51,7 +51,7 @@ export class ArchivedChange {
     this._name = props.name
     this._archivedName = props.archivedName
     this._workspace = props.workspace
-    this._archivedAt = props.archivedAt
+    this._archivedAt = new Date(props.archivedAt.getTime())
     this._archivedBy = props.archivedBy
     this._artifacts = props.artifacts
     this._specIds = props.specIds
@@ -76,7 +76,7 @@ export class ArchivedChange {
 
   /** Timestamp when the change was archived. */
   get archivedAt(): Date {
-    return this._archivedAt
+    return new Date(this._archivedAt.getTime())
   }
 
   /** Git identity of the actor who archived the change, or `undefined` if not recorded. */

@@ -158,7 +158,8 @@ export class Change {
     this._specIds = [...props.specIds]
     this._contextSpecIds = [...(props.contextSpecIds ?? [])]
     this._history = [...props.history]
-    this._artifacts = props.artifacts ?? new Map<string, ChangeArtifact>()
+    this._artifacts =
+      props.artifacts !== undefined ? new Map(props.artifacts) : new Map<string, ChangeArtifact>()
   }
 
   /** Unique slug name identifying this change. */
@@ -168,7 +169,7 @@ export class Change {
 
   /** Timestamp when the change was created. */
   get createdAt(): Date {
-    return this._createdAt
+    return new Date(this._createdAt.getTime())
   }
 
   /** Optional free-text description of the change's purpose. */
@@ -190,12 +191,12 @@ export class Change {
 
   /** Current snapshot of workspace IDs this change belongs to. */
   get workspaces(): readonly string[] {
-    return this._workspaces
+    return [...this._workspaces]
   }
 
   /** Current snapshot of spec paths being created or modified. */
   get specIds(): readonly string[] {
-    return this._specIds
+    return [...this._specIds]
   }
 
   /** Context spec paths that provide context but are not being modified. */
@@ -205,7 +206,7 @@ export class Change {
 
   /** Read-only view of the append-only event history. */
   get history(): readonly ChangeEvent[] {
-    return this._history
+    return [...this._history]
   }
 
   /**
@@ -262,7 +263,7 @@ export class Change {
 
   /** All artifacts currently attached to this change, keyed by type. */
   get artifacts(): ReadonlyMap<string, ChangeArtifact> {
-    return this._artifacts
+    return new Map(this._artifacts)
   }
 
   /** Whether this change is in `archivable` state and may be archived. */
