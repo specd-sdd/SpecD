@@ -61,10 +61,11 @@ There is no implicit multi-level fallback — the prefix determines exactly wher
 ```yaml
 workspaces:
   default: # required — the local project workspace
+    prefix: _global # optional — logical path prefix for all specs in this workspace
     specs: # where this workspace's spec files live (required)
       adapter: fs # storage adapter (required; only "fs" in v1)
       fs:
-        path: specs/
+        path: specs/_global
     schemas: # where named local schemas live (optional)
       adapter: fs
       fs:
@@ -104,6 +105,27 @@ workspaces:
 - `owned` — the project owns these specs; changes are freely proposed (default for `default`)
 - `shared` — the project co-owns these specs; changes may require coordination
 - `readOnly` — the project reads but does not modify these specs (default for non-`default` workspaces)
+
+**`prefix`** (optional) — a logical path prefix prepended to all capability paths in this workspace. When set, a spec at `architecture/` on disk becomes `<prefix>/architecture` in the specd model. When omitted, specs use bare capability paths (current behavior).
+
+- Prefix may be single-segment (`_global`) or multi-segment (`team_1/shared/core`). Each segment must match `/^[a-z0-9_][a-z0-9_-]*$/`.
+- The full prefix is validated as: one or more valid segments separated by `/`. No leading/trailing `/`. No empty segments (`a//b`). No `.` or `..` segments. No `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|` characters.
+- Two workspaces MAY share the same prefix — prefix is not a unique identifier.
+- `dependsOn` references use the prefixed path: `_global/architecture` (same-workspace) or `default:_global/architecture` (cross-workspace).
+- `contextIncludeSpecs` / `contextExcludeSpecs` patterns use the prefixed path: `default:_global/*`.
+- Invalid prefix values produce `ConfigValidationError` at startup.
+
+Examples:
+
+```yaml
+# Single-segment prefix
+default:
+  prefix: _global # architecture → _global/architecture
+
+# Multi-segment prefix
+shared:
+  prefix: team_1/shared # auth/login → team_1/shared/auth/login
+```
 
 **`isExternal`** is not declared in config — it is inferred by the application layer from whether the resolved `specs.fs.path` is outside the project repo root.
 
@@ -343,6 +365,19 @@ The first use case is spec metadata generation: with `llmOptimizedContext: false
 
 This field is a project-level opt-in. Teams that have no LLM available in their automation pipeline (e.g. offline CI, air-gapped environments) leave it `false`. Teams that want LLM-enriched output set it to `true` and ensure their tooling has access to a model.
 
+### Requirement: Skills manifest
+
+`specd.yaml` may include a `skills` section recording which skills from `@specd/skills` have been installed at the project level for each agent. This manifest is written and read by `specd skills install` and `specd skills update`.
+
+```yaml
+skills:
+  claude:
+    - specd-bootstrap
+    - specd-spec-metadata
+```
+
+Keys are agent IDs (e.g. `claude`); values are arrays of skill names. The section is optional — its absence means no skills are tracked. Skills installed globally (`--global`) are not recorded here.
+
 ### Requirement: Plugin declarations
 
 `specd.yaml` may include a `plugins` section declaring which agent-integration plugins are installed. Each entry must include `name`; `options` is plugin-specific and optional.
@@ -355,7 +390,29 @@ plugins:
       commandsDir: .github/copilot/instructions
 ```
 
-Plugin declarations are used by `specd init`, `specd plugin add`, and `specd update` to install and maintain the plugin's skill files and hooks in the project. They do not affect schema resolution, storage, or context compilation.
+Plugin declarations are used by `specd project init`, `specd plugin add`, and `specd project update` to install and maintain the plugin's skill files and hooks in the project. They do not affect schema resolution, storage, or context compilation.
+
+### Requirement: Config writer port
+
+`@specd/core` exposes a `ConfigWriter` application port for all operations that mutate `specd.yaml`. Adapters (CLI, MCP) never serialise or deserialise YAML directly — they call use cases that delegate to `ConfigWriter`.
+
+The port defines the following operations:
+
+- **`initProject(options)`** — writes a new `specd.yaml` at the given path with the provided schema reference, workspace id, and workspace specs path. Fails if the file already exists and `force` is false. Also creates the standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`) and appends `specd.local.yaml` to `.gitignore`.
+- **`recordSkillInstall(configPath, agent, skillNames)`** — adds the given skill names to `specd.yaml`'s `skills.<agent>` array, deduplicating existing entries.
+- **`readSkillsManifest(configPath)`** — returns the `skills` section of `specd.yaml` as a typed map `{ [agent: string]: string[] }`. This is a targeted read that does not require a fully validated `SpecdConfig`.
+
+The `FsConfigWriter` adapter implements this port using the filesystem. It reads the existing YAML (when required), makes the targeted mutation, and writes the file back, preserving comments and key order as much as the YAML library permits.
+
+**Responsibility boundary:** `@specd/core` owns all YAML serialisation and deserialisation. Adapters (CLI, MCP) call use cases with typed inputs and receive typed outputs — they never read or write `specd.yaml` directly. Conversely, `@specd/core` never writes agent-specific files (e.g. `.claude/commands/*.md`) — those are adapter-layer concerns. This boundary is intentional: `@specd/skills` depends on `@specd/core`, not the other way around, so core cannot resolve skill content.
+
+Use cases that call `ConfigWriter`:
+
+| Use case             | Operation            |
+| -------------------- | -------------------- |
+| `InitProject`        | `initProject`        |
+| `RecordSkillInstall` | `recordSkillInstall` |
+| `GetSkillsManifest`  | `readSkillsManifest` |
 
 ### Requirement: Startup validation
 

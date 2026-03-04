@@ -36,6 +36,13 @@ export type SpecdContextEntry = { readonly file: string } | { readonly instructi
 export interface SpecdWorkspaceConfig {
   /** The workspace name (e.g. `'default'`, `'billing'`). */
   readonly name: string
+  /**
+   * Optional logical path prefix for all specs in this workspace.
+   *
+   * When set, a spec at `architecture/` on disk becomes `<prefix>/architecture`
+   * in the specd model. When omitted, specs use bare capability paths.
+   */
+  readonly prefix?: string
   /** Absolute path to the specs root for this workspace. */
   readonly specsPath: string
   /**
@@ -116,6 +123,15 @@ export interface SpecdConfig {
   readonly artifactRules?: Readonly<Record<string, readonly string[]>>
   /** Freeform context entries prepended to the compiled context. */
   readonly context?: readonly SpecdContextEntry[]
+  /**
+   * Project-level context spec include patterns. Always applied regardless of active workspace.
+   * Defaults to `['default:*']` when absent.
+   */
+  readonly contextIncludeSpecs?: readonly string[]
+  /**
+   * Project-level context spec exclude patterns. Always applied regardless of active workspace.
+   */
+  readonly contextExcludeSpecs?: readonly string[]
   /** When `true`, specd may invoke an LLM for enriched output (default: `false`). */
   readonly llmOptimizedContext?: boolean
 }

@@ -67,7 +67,25 @@ const ContextEntryRawZodSchema = z.union([
   z.object({ instruction: z.string() }),
 ])
 
+const PREFIX_SEGMENT_RE = /^[a-z0-9_][a-z0-9_-]*$/
+
+const PrefixZodSchema = z.string().refine(
+  (v) => {
+    if (v === '') return false
+    if (v.startsWith('/') || v.endsWith('/')) return false
+    const segments = v.split('/')
+    return segments.every(
+      (s) => s.length > 0 && s !== '.' && s !== '..' && PREFIX_SEGMENT_RE.test(s),
+    )
+  },
+  {
+    message:
+      'prefix must be one or more segments matching /^[a-z0-9_][a-z0-9_-]*$/ separated by "/", with no leading/trailing "/" or empty segments',
+  },
+)
+
 const WorkspaceRawZodSchema = z.object({
+  prefix: PrefixZodSchema.optional(),
   specs: FsAdapterZodSchema,
   schemas: FsAdapterZodSchema.optional(),
   codeRoot: z.string().optional(),
@@ -94,6 +112,8 @@ const SpecdYamlZodSchema = z.object({
   workflow: z.array(WorkflowStepRawZodSchema).optional(),
   artifactRules: z.record(z.array(z.string())).optional(),
   context: z.array(ContextEntryRawZodSchema).optional(),
+  contextIncludeSpecs: z.array(z.string()).optional(),
+  contextExcludeSpecs: z.array(z.string()).optional(),
   llmOptimizedContext: z.boolean().optional(),
 })
 
@@ -123,10 +143,11 @@ async function findGitRoot(startDir: string): Promise<string | null> {
 
 /**
  * Walks up from `startDir`, bounded by the git root (or filesystem root if
- * outside a git repo), to locate `specd.yaml`.
+ * outside a git repo), to locate `specd.local.yaml` or `specd.yaml`.
  *
- * If `specd.local.yaml` exists alongside `specd.yaml`, it is returned instead
- * (local override is used exclusively — no merging).
+ * At each directory level, `specd.local.yaml` is checked first. If it exists,
+ * it is returned immediately — `specd.yaml` need not be present. Otherwise
+ * `specd.yaml` is checked. The first match wins.
  *
  * @param startDir - Directory to begin the search from
  * @returns Absolute path to the active config file, or `null` if not found
@@ -136,25 +157,21 @@ async function findConfigFile(startDir: string): Promise<string | null> {
   let dir = path.resolve(startDir)
 
   while (true) {
-    const mainPath = path.join(dir, 'specd.yaml')
-    let mainExists = false
+    // Local override takes precedence — no specd.yaml required
+    const localPath = path.join(dir, 'specd.local.yaml')
     try {
-      await fs.access(mainPath)
-      mainExists = true
+      await fs.access(localPath)
+      return localPath
     } catch {
-      // not found at this level
+      // no local file at this level
     }
 
-    if (mainExists) {
-      // Check for local override in the same directory
-      const localPath = path.join(dir, 'specd.local.yaml')
-      try {
-        await fs.access(localPath)
-        return localPath
-      } catch {
-        // no local override
-      }
+    const mainPath = path.join(dir, 'specd.yaml')
+    try {
+      await fs.access(mainPath)
       return mainPath
+    } catch {
+      // no main file at this level
     }
 
     // Stop at git root (or filesystem root when outside a repo)
@@ -299,6 +316,7 @@ export class FsConfigLoader implements ConfigLoader {
 
       return {
         name,
+        ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
         specsPath,
         schemasPath,
         codeRoot,
@@ -345,6 +363,12 @@ export class FsConfigLoader implements ConfigLoader {
       ...(workflow !== undefined && workflow.length > 0 ? { workflow } : {}),
       ...(data.artifactRules !== undefined ? { artifactRules: data.artifactRules } : {}),
       ...(context !== undefined ? { context } : {}),
+      ...(data.contextIncludeSpecs !== undefined
+        ? { contextIncludeSpecs: data.contextIncludeSpecs }
+        : {}),
+      ...(data.contextExcludeSpecs !== undefined
+        ? { contextExcludeSpecs: data.contextExcludeSpecs }
+        : {}),
       ...(data.llmOptimizedContext !== undefined
         ? { llmOptimizedContext: data.llmOptimizedContext }
         : {}),
