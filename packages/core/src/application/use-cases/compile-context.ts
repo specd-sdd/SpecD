@@ -250,8 +250,10 @@ export class CompileContext {
     if (input.followDeps === true) {
       const depSeen = new Set<string>()
       for (const specId of change.contextSpecIds) {
+        const slashIdx = specId.indexOf('/')
+        const workspace = slashIdx >= 0 ? specId.slice(0, slashIdx) : 'default'
         await this._traverseDependsOn(
-          'default',
+          workspace,
           specId,
           includedSpecs,
           dependsOnAdded,
