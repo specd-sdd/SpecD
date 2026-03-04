@@ -6,7 +6,7 @@ import { Change } from '../../domain/entities/change.js'
 import { type ChangeEvent } from '../../domain/entities/change.js'
 import { ChangeArtifact, SKIPPED_SENTINEL } from '../../domain/entities/change-artifact.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
-import { type ChangeState } from '../../domain/value-objects/change-state.js'
+import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
 import {
@@ -547,6 +547,41 @@ function serializeEvent(event: ChangeEvent): RawChangeEvent {
   }
 }
 
+/** All valid `ChangeState` values, derived from the transition map keys. */
+const CHANGE_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
+
+/** All valid `InvalidatedEvent` cause values. */
+const INVALIDATED_CAUSES = ['workspace-change', 'spec-change', 'artifact-change'] as const
+/**
+ *
+ */
+type InvalidatedCause = (typeof INVALIDATED_CAUSES)[number]
+
+/**
+ * Asserts that a string value is a valid `ChangeState`.
+ *
+ * @param value - The raw string to validate
+ * @param field - Field name used in the error message
+ * @returns The validated `ChangeState`
+ * @throws {Error} If the value is not a valid state
+ */
+function assertChangeState(value: string, field: string): ChangeState {
+  if ((CHANGE_STATES as string[]).includes(value)) return value as ChangeState
+  throw new Error(`Invalid ChangeState in manifest field '${field}': '${value}'`)
+}
+
+/**
+ * Asserts that a string value is a valid `InvalidatedEvent` cause.
+ *
+ * @param value - The raw string to validate
+ * @returns The validated cause
+ * @throws {Error} If the value is not a valid cause
+ */
+function assertInvalidatedCause(value: string): InvalidatedCause {
+  if ((INVALIDATED_CAUSES as readonly string[]).includes(value)) return value as InvalidatedCause
+  throw new Error(`Invalid invalidated cause in manifest: '${value}'`)
+}
+
 /**
  * Deserializes a raw JSON event object into a `ChangeEvent` domain type.
  *
@@ -570,8 +605,8 @@ function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
         type: 'transitioned',
         at: new Date(raw.at),
         by: raw.by,
-        from: raw.from as ChangeState,
-        to: raw.to as ChangeState,
+        from: assertChangeState(raw.from, 'from'),
+        to: assertChangeState(raw.to, 'to'),
       }
     case 'spec-approved':
       return {
@@ -594,7 +629,7 @@ function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
         type: 'invalidated',
         at: new Date(raw.at),
         by: raw.by,
-        cause: raw.cause as 'workspace-change' | 'spec-change' | 'artifact-change',
+        cause: assertInvalidatedCause(raw.cause),
       }
     case 'drafted':
       return raw.reason !== undefined
