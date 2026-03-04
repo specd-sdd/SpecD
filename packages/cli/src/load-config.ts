@@ -1,7 +1,7 @@
-import { FsConfigLoader, type SpecdConfig } from '@specd/core'
+import { createConfigLoader, type SpecdConfig } from '@specd/core'
 
 /**
- * Loads the project configuration using `FsConfigLoader`.
+ * Loads the project configuration using `createConfigLoader`.
  *
  * If `configPath` is provided (from `--config`), loads that file directly.
  * Otherwise, discovers `specd.yaml` by walking up from `process.cwd()`.
@@ -11,10 +11,8 @@ import { FsConfigLoader, type SpecdConfig } from '@specd/core'
  * @returns The fully-resolved project configuration
  * @throws {ConfigValidationError} If the config file fails validation
  */
-export async function loadConfig(options?: {
-  configPath?: string | undefined
-}): Promise<SpecdConfig> {
-  const loader = new FsConfigLoader(
+export function loadConfig(options?: { configPath?: string | undefined }): Promise<SpecdConfig> {
+  const loader = createConfigLoader(
     options?.configPath !== undefined
       ? { configPath: options.configPath }
       : { startDir: process.cwd() },
