@@ -7,7 +7,7 @@
  */
 import { vi } from 'vitest'
 import { Command } from 'commander'
-import type { SpecdConfig } from '@specd/core'
+import type { SpecdConfig, Kernel } from '@specd/core'
 
 // ---------------------------------------------------------------------------
 // Minimal SpecdConfig factory
@@ -67,7 +67,7 @@ export function makeMockChange(overrides: Record<string, unknown> = {}): Record<
 // Mock kernel factory
 // ---------------------------------------------------------------------------
 
-export function makeMockKernel(overrides: Record<string, any> = {}): any {
+export function makeMockKernel(overrides: Record<string, unknown> = {}): any {
   const changes = {
     create: { execute: vi.fn() },
     list: { execute: vi.fn().mockResolvedValue([]) },
@@ -84,7 +84,6 @@ export function makeMockKernel(overrides: Record<string, any> = {}): any {
     validate: { execute: vi.fn() },
     edit: { execute: vi.fn() },
     skipArtifact: { execute: vi.fn() },
-    compileContext: { execute: vi.fn() },
     compile: { execute: vi.fn() },
   }
 
