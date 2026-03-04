@@ -1,0 +1,76 @@
+import { type Command } from 'commander'
+import { createCliKernel } from '../../kernel.js'
+import { loadConfig } from '../../load-config.js'
+import { output, parseFormat } from '../../formatter.js'
+import { handleError } from '../../handle-error.js'
+import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
+
+/**
+ * Registers the `schema show` subcommand on the given parent command.
+ *
+ * @param parent - The parent Commander command to attach the subcommand to.
+ */
+export function registerSchemaShow(parent: Command): void {
+  parent
+    .command('show')
+    .description('Show the active schema')
+    .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .option('--config <path>', 'path to specd.yaml')
+    .action(async (opts: { format: string; config?: string }) => {
+      try {
+        const config = await loadConfig({ configPath: opts.config })
+        const kernel = createCliKernel(config)
+        const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
+
+        const schema = await kernel.specs.getActiveSchema.execute({
+          schemaRef: config.schemaRef,
+          workspaceSchemasPaths,
+        })
+
+        const fmt = parseFormat(opts.format)
+        if (fmt === 'text') {
+          const artifactLines = schema.artifacts().map((a) => {
+            const label = a.optional() ? 'optional' : 'required'
+            const requires = a.requires()
+            const reqStr = requires.length > 0 ? `  requires=[${requires.join(',')}]` : ''
+            return `  ${a.id()}  ${a.scope()}  ${label}${reqStr}`
+          })
+          const workflowLines = schema.workflow().map((s) => {
+            const reqStr = `requires=[${s.requires.join(',')}]`
+            return `  ${s.step}  ${reqStr}`
+          })
+          const lines = [
+            `schema: ${schema.name()}  version: ${schema.version()}`,
+            '',
+            `artifacts:`,
+            ...artifactLines,
+            '',
+            `workflow:`,
+            ...workflowLines,
+          ]
+          output(lines.join('\n'), 'text')
+        } else {
+          output(
+            {
+              schema: { name: schema.name(), version: schema.version() },
+              artifacts: schema.artifacts().map((a) => ({
+                id: a.id(),
+                scope: a.scope(),
+                optional: a.optional(),
+                requires: [...a.requires()],
+                format: a.format(),
+                delta: a.delta(),
+              })),
+              workflow: schema.workflow().map((s) => ({
+                step: s.step,
+                requires: [...s.requires],
+              })),
+            },
+            fmt,
+          )
+        }
+      } catch (err) {
+        handleError(err)
+      }
+    })
+}

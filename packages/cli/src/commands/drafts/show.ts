@@ -1,0 +1,54 @@
+import { type Command } from 'commander'
+import { createCliKernel } from '../../kernel.js'
+import { loadConfig } from '../../load-config.js'
+import { output, parseFormat } from '../../formatter.js'
+import { handleError } from '../../handle-error.js'
+
+/**
+ * Registers the `drafts show` subcommand on the given parent command.
+ *
+ * @param parent - The parent Commander command to attach the subcommand to.
+ */
+export function registerDraftsShow(parent: Command): void {
+  parent
+    .command('show <name>')
+    .description('Show details of a drafted change')
+    .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .option('--config <path>', 'path to specd.yaml')
+    .action(async (name: string, opts: { format: string; config?: string }) => {
+      try {
+        const config = await loadConfig({ configPath: opts.config })
+        const kernel = createCliKernel(config)
+        const { change } = await kernel.changes.status.execute({ name })
+
+        if (!change.isDrafted) {
+          process.stderr.write(`error: change '${name}' is not in drafts\n`)
+          process.exit(1)
+        }
+
+        const fmt = parseFormat(opts.format)
+
+        if (fmt === 'text') {
+          const lines = [
+            `name:    ${change.name}`,
+            `state:   ${change.state}`,
+            `specs:   ${[...change.specIds].join(', ') || '(none)'}`,
+            `schema:  ${change.schemaName}@${change.schemaVersion}`,
+          ]
+          output(lines.join('\n'), 'text')
+        } else {
+          output(
+            {
+              name: change.name,
+              state: change.state,
+              specIds: [...change.specIds],
+              schema: { name: change.schemaName, version: change.schemaVersion },
+            },
+            fmt,
+          )
+        }
+      } catch (err) {
+        handleError(err)
+      }
+    })
+}
