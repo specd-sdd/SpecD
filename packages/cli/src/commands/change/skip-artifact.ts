@@ -1,0 +1,51 @@
+import { type Command } from 'commander'
+import { createCliKernel } from '../../kernel.js'
+import { loadConfig } from '../../load-config.js'
+import { output, parseFormat } from '../../formatter.js'
+import { handleError } from '../../handle-error.js'
+
+/**
+ * Registers the `change skip-artifact` subcommand on the given parent command.
+ *
+ * @param parent - The parent Commander command to attach the subcommand to.
+ */
+export function registerChangeSkipArtifact(parent: Command): void {
+  parent
+    .command('skip-artifact <name> <artifactId>')
+    .description('Explicitly skip an optional artifact')
+    .option('--reason <text>', 'reason for skipping')
+    .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .option('--config <path>', 'path to specd.yaml')
+    .action(
+      async (
+        name: string,
+        artifactId: string,
+        opts: { reason?: string; format: string; config?: string },
+      ) => {
+        try {
+          const config = await loadConfig({ configPath: opts.config })
+          const kernel = createCliKernel(config)
+          await kernel.changes.skipArtifact.execute({
+            name,
+            artifactId,
+            ...(opts.reason !== undefined ? { reason: opts.reason } : {}),
+          })
+          const fmt = parseFormat(opts.format)
+          if (fmt === 'text') {
+            output(`skipped artifact ${artifactId} on ${name}`, 'text')
+          } else {
+            output({ result: 'ok', name, artifactId }, fmt)
+          }
+        } catch (err) {
+          if (
+            err instanceof Error &&
+            (err.message.includes('unknown artifact') || err.message.includes('not optional'))
+          ) {
+            process.stderr.write(`error: ${err.message}\n`)
+            process.exit(1)
+          }
+          handleError(err)
+        }
+      },
+    )
+}
