@@ -3,7 +3,7 @@ import { type ConfigWriter } from '../ports/config-writer.js'
 /** Input for the {@link GetSkillsManifest} use case. */
 export interface GetSkillsManifestInput {
   /** Absolute path to the `specd.yaml` to read. */
-  configPath: string
+  readonly configPath: string
 }
 
 /**

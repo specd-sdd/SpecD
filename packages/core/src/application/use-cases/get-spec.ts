@@ -6,17 +6,17 @@ import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 /** Input for the {@link GetSpec} use case. */
 export interface GetSpecInput {
   /** The workspace name (e.g. `'default'`, `'billing'`). */
-  workspace: string
+  readonly workspace: string
   /** The spec path within the workspace (e.g. `'auth/oauth'`). */
-  specPath: SpecPath
+  readonly specPath: SpecPath
 }
 
 /** Result returned by the {@link GetSpec} use case. */
 export interface GetSpecResult {
   /** The spec metadata. */
-  spec: Spec
+  readonly spec: Spec
   /** Loaded artifact file contents, keyed by filename. */
-  artifacts: Map<string, SpecArtifact>
+  readonly artifacts: Map<string, SpecArtifact>
 }
 
 /**

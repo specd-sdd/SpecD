@@ -3,11 +3,11 @@ import { type ConfigWriter } from '../ports/config-writer.js'
 /** Input for the {@link RecordSkillInstall} use case. */
 export interface RecordSkillInstallInput {
   /** Absolute path to the `specd.yaml` to update. */
-  configPath: string
+  readonly configPath: string
   /** The agent name (e.g. `'claude'`). */
-  agent: string
+  readonly agent: string
   /** The skill names to record. */
-  skillNames: string[]
+  readonly skillNames: string[]
 }
 
 /**

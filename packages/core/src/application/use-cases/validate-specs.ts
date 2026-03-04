@@ -20,25 +20,25 @@ export interface ValidateSpecsInput extends WorkspaceContext {
 /** Validation result for a single spec. */
 export interface SpecValidationEntry {
   /** Qualified label `workspace:path`. */
-  spec: string
+  readonly spec: string
   /** `true` if all artifacts pass validation. */
-  passed: boolean
+  readonly passed: boolean
   /** All validation failures for this spec. */
-  failures: ValidationFailure[]
+  readonly failures: ValidationFailure[]
   /** All validation warnings for this spec. */
-  warnings: ValidationWarning[]
+  readonly warnings: ValidationWarning[]
 }
 
 /** Aggregated result of validating one or more specs. */
 export interface ValidateSpecsResult {
   /** Per-spec validation results. */
-  entries: SpecValidationEntry[]
+  readonly entries: SpecValidationEntry[]
   /** Total number of specs validated. */
-  totalSpecs: number
+  readonly totalSpecs: number
   /** Number of specs that passed. */
-  passed: number
+  readonly passed: number
   /** Number of specs that failed. */
-  failed: number
+  readonly failed: number
 }
 
 /**

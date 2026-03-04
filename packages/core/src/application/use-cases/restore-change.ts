@@ -6,7 +6,7 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 /** Input for the {@link RestoreChange} use case. */
 export interface RestoreChangeInput {
   /** The drafted change to restore. */
-  name: string
+  readonly name: string
 }
 
 /**

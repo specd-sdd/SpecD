@@ -26,7 +26,7 @@ export interface TaskCompletionCheck {
 /** Input for the {@link TransitionChange} use case. */
 export interface TransitionChangeInput {
   /** The change to transition. */
-  name: string
+  readonly name: string
   /**
    * The requested target state.
    *
@@ -38,28 +38,28 @@ export interface TransitionChangeInput {
    *
    * All other states are transitioned directly.
    */
-  to: ChangeState
+  readonly to: ChangeState
   /**
    * Whether the spec approval gate is enabled in the active configuration.
    *
    * When `true` and the change is in `ready` state transitioning toward
    * `implementing`, the actual target is routed to `pending-spec-approval`.
    */
-  approvalsSpec: boolean
+  readonly approvalsSpec: boolean
   /**
    * Whether the signoff gate is enabled in the active configuration.
    *
    * When `true` and the change is in `done` state transitioning toward
    * `archivable`, the actual target is routed to `pending-signoff`.
    */
-  approvalsSignoff: boolean
+  readonly approvalsSignoff: boolean
   /**
    * Context spec paths to set when transitioning `designing → ready`.
    *
    * Resolved by the caller from `.specd-metadata.yaml` `dependsOn` entries.
    * Ignored on all other transitions.
    */
-  contextSpecIds?: string[]
+  readonly contextSpecIds?: string[]
   /**
    * Artifact IDs whose validation is cleared when transitioning
    * `verifying → implementing`.
@@ -67,7 +67,7 @@ export interface TransitionChangeInput {
    * Should be the `requires` list of the schema's `implementing` workflow step.
    * Ignored on all other transitions.
    */
-  implementingRequires?: readonly string[]
+  readonly implementingRequires?: readonly string[]
   /**
    * Task completion checks performed before allowing `implementing → verifying`.
    *
@@ -82,7 +82,7 @@ export interface TransitionChangeInput {
    *
    * Ignored on all other transitions.
    */
-  implementingTaskChecks?: ReadonlyArray<TaskCompletionCheck>
+  readonly implementingTaskChecks?: ReadonlyArray<TaskCompletionCheck>
 }
 
 /**

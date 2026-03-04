@@ -29,28 +29,28 @@ export type ContextEntry = { instruction: string } | { file: string }
 /** Per-workspace configuration for context spec selection. */
 export interface WorkspaceContextConfig {
   /** Include patterns evaluated only when this workspace is active. */
-  contextIncludeSpecs?: string[]
+  readonly contextIncludeSpecs?: string[]
   /** Exclude patterns evaluated only when this workspace is active. */
-  contextExcludeSpecs?: string[]
+  readonly contextExcludeSpecs?: string[]
 }
 
 /** Project configuration subset used by `CompileContext`. */
 export interface CompileContextConfig {
   /** Ordered list of project-level context entries injected verbatim at the top. */
-  context?: ContextEntry[]
+  readonly context?: ContextEntry[]
   /** Project-level include patterns; always applied regardless of active workspace. */
-  contextIncludeSpecs?: string[]
+  readonly contextIncludeSpecs?: string[]
   /** Project-level exclude patterns; always applied regardless of active workspace. */
-  contextExcludeSpecs?: string[]
+  readonly contextExcludeSpecs?: string[]
   /**
    * Per-artifact additional constraint strings injected below the schema instruction.
    * Keyed by artifact ID.
    */
-  artifactRules?: Record<string, string[]>
+  readonly artifactRules?: Record<string, string[]>
   /** Project-level workflow hook overrides; merged after schema hooks. */
-  workflow?: readonly WorkflowStep[]
+  readonly workflow?: readonly WorkflowStep[]
   /** Per-workspace context include/exclude patterns. */
-  workspaces?: Record<string, WorkspaceContextConfig>
+  readonly workspaces?: Record<string, WorkspaceContextConfig>
 }
 
 /** Metadata section names that can be individually selected for output. */
@@ -91,7 +91,7 @@ export interface CompileContextInput extends WorkspaceContext {
 /** Advisory warning emitted during context compilation. */
 export interface ContextWarning {
   /** The warning category. */
-  type:
+  readonly type:
     | 'stale-metadata'
     | 'missing-spec'
     | 'unknown-workspace'
@@ -99,44 +99,44 @@ export interface ContextWarning {
     | 'cycle'
     | 'missing-parser'
   /** The affected spec path, workspace name, or file path. */
-  path?: string
+  readonly path?: string
   /** Human-readable description of the warning. */
-  message: string
+  readonly message: string
 }
 
 /** Result returned by a successful {@link CompileContext} execution. */
 export interface CompileContextResult {
   /** Whether the requested step is currently available. */
-  stepAvailable: boolean
+  readonly stepAvailable: boolean
   /** Artifact IDs blocking the step; empty when `stepAvailable` is `true`. */
-  blockingArtifacts: string[]
+  readonly blockingArtifacts: string[]
   /** The fully assembled instruction text to inject into the AI context. */
-  instructionBlock: string
+  readonly instructionBlock: string
   /** Stale metadata warnings and other advisory conditions. */
-  warnings: ContextWarning[]
+  readonly warnings: ContextWarning[]
 }
 
 /** Internal resolved spec reference. */
 interface ResolvedSpec {
-  workspace: string
-  capPath: string
+  readonly workspace: string
+  readonly capPath: string
 }
 
 /** Parsed `.specd-metadata.yaml` content. */
 interface SpecMetadata {
-  title?: string
-  description?: string
-  keywords?: string[]
-  dependsOn?: string[]
-  contentHashes?: Record<string, string>
-  rules?: Array<{ requirement: string; rules: string[] }>
-  constraints?: string[]
-  scenarios?: Array<{
-    requirement: string
-    name: string
-    given?: string[]
-    when?: string[]
-    then?: string[]
+  readonly title?: string
+  readonly description?: string
+  readonly keywords?: string[]
+  readonly dependsOn?: string[]
+  readonly contentHashes?: Record<string, string>
+  readonly rules?: Array<{ readonly requirement: string; readonly rules: string[] }>
+  readonly constraints?: string[]
+  readonly scenarios?: Array<{
+    readonly requirement: string
+    readonly name: string
+    readonly given?: string[]
+    readonly when?: string[]
+    readonly then?: string[]
   }>
 }
 

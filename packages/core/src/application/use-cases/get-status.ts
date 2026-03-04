@@ -6,23 +6,23 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 /** Input for the {@link GetStatus} use case. */
 export interface GetStatusInput {
   /** The change name to look up. */
-  name: string
+  readonly name: string
 }
 
 /** Effective status of a single artifact, after dependency cascade. */
 export interface ArtifactStatusEntry {
   /** Artifact type identifier (e.g. `'proposal'`, `'spec'`). */
-  type: string
+  readonly type: string
   /** Effective status after cascading through required dependencies. */
-  effectiveStatus: ArtifactStatus
+  readonly effectiveStatus: ArtifactStatus
 }
 
 /** Result returned by the {@link GetStatus} use case. */
 export interface GetStatusResult {
   /** The loaded change with its current artifact state. */
-  change: Change
+  readonly change: Change
   /** Effective status for each artifact attached to the change. */
-  artifactStatuses: ArtifactStatusEntry[]
+  readonly artifactStatuses: ArtifactStatusEntry[]
 }
 
 /**

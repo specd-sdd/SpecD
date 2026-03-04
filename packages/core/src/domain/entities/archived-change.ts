@@ -6,23 +6,23 @@ import { type GitIdentity } from './change.js'
  */
 export interface ArchivedChangeProps {
   /** The original change name. */
-  name: string
+  readonly name: string
   /** The name used for the archive directory (may differ from `name`). */
-  archivedName: string
+  readonly archivedName: string
   /** The workspace under which the change's specs lived. */
-  workspace: SpecPath
+  readonly workspace: SpecPath
   /** Timestamp when the change was archived. */
-  archivedAt: Date
+  readonly archivedAt: Date
   /** Git identity of the actor who archived the change, if recorded. */
-  archivedBy?: GitIdentity
+  readonly archivedBy?: GitIdentity
   /** Artifact type IDs that were present when the change was archived. */
-  artifacts: readonly string[]
+  readonly artifacts: readonly string[]
   /** Spec paths that were associated with the change at archive time. */
-  specIds: readonly string[]
+  readonly specIds: readonly string[]
   /** Name of the schema that governed the change. */
-  schemaName: string
+  readonly schemaName: string
   /** Version of the schema that governed the change. */
-  schemaVersion: number
+  readonly schemaVersion: number
 }
 
 /**

@@ -7,13 +7,13 @@ import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-erro
 /** Input for the {@link ApproveSpec} use case. */
 export interface ApproveSpecInput {
   /** The change to approve the spec for. */
-  name: string
+  readonly name: string
   /** Free-text rationale recorded in the approval event. */
-  reason: string
+  readonly reason: string
   /** Hashes of the artifacts reviewed during this approval. */
-  artifactHashes: Record<string, string>
+  readonly artifactHashes: Record<string, string>
   /** Whether the spec approval gate is enabled in the active configuration. */
-  approvalsSpec: boolean
+  readonly approvalsSpec: boolean
 }
 
 /**

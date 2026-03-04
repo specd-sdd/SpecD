@@ -31,16 +31,16 @@ export interface ArchiveChangeInput extends WorkspaceContext {
 /** Result returned by a successful {@link ArchiveChange} execution. */
 export interface ArchiveChangeResult {
   /** The `ArchivedChange` record that was persisted. */
-  archivedChange: ArchivedChange
+  readonly archivedChange: ArchivedChange
   /** Absolute path to the archive directory where the change was stored. */
-  archiveDirPath: string
+  readonly archiveDirPath: string
   /** Commands of post-archive hooks that failed; empty on full success. */
-  postHookFailures: string[]
+  readonly postHookFailures: string[]
   /**
    * Spec paths whose `.specd-metadata.yaml` should be regenerated because their
    * content was modified during the delta merge step.
    */
-  staleMetadataSpecPaths: string[]
+  readonly staleMetadataSpecPaths: string[]
 }
 
 /**

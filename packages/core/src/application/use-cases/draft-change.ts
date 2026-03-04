@@ -6,9 +6,9 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 /** Input for the {@link DraftChange} use case. */
 export interface DraftChangeInput {
   /** The change to shelve. */
-  name: string
+  readonly name: string
   /** Optional explanation for shelving the change. */
-  reason?: string
+  readonly reason?: string
 }
 
 /**

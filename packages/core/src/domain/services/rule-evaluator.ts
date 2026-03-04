@@ -26,23 +26,23 @@ export interface RuleEvaluatorParser {
 /** A single validation failure — missing artifact, failed rule, or application error. */
 export interface RuleEvaluationFailure {
   /** The artifact type ID this failure pertains to. */
-  artifactId: string
+  readonly artifactId: string
   /** Human-readable description suitable for CLI output. */
-  description: string
+  readonly description: string
 }
 
 /** A non-fatal rule mismatch (`required: false` rule that was absent). */
 export interface RuleEvaluationWarning {
   /** The artifact type ID this warning pertains to. */
-  artifactId: string
+  readonly artifactId: string
   /** Human-readable description suitable for CLI output. */
-  description: string
+  readonly description: string
 }
 
 /** Result of evaluating validation rules against an AST. */
 export interface RuleEvaluationResult {
-  failures: RuleEvaluationFailure[]
-  warnings: RuleEvaluationWarning[]
+  readonly failures: RuleEvaluationFailure[]
+  readonly warnings: RuleEvaluationWarning[]
 }
 
 /**
