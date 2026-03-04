@@ -34,6 +34,7 @@ describe('DraftChange', () => {
       const result = await uc.execute({ name: 'my-change', reason: 'waiting for review' })
 
       const drafted = result.history.find((e) => e.type === 'drafted')
+      expect(drafted).toBeDefined()
       if (drafted?.type === 'drafted') {
         expect(drafted.reason).toBe('waiting for review')
       }

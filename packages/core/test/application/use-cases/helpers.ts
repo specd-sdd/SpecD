@@ -35,6 +35,12 @@ export function makeChangeRepository(
     async list(): Promise<Change[]> {
       return [...store.values()]
     },
+    async listDrafts(): Promise<Change[]> {
+      throw new Error('not implemented')
+    },
+    async listDiscarded(): Promise<Change[]> {
+      throw new Error('not implemented')
+    },
     async save(change: Change): Promise<void> {
       store.set(change.name, change)
     },
