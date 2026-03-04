@@ -1,9 +1,7 @@
 import { type Command } from 'commander'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
+import { resolveChangeContext } from '../../helpers/change-context.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
@@ -19,9 +17,9 @@ export function registerChangeValidate(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, specPath: string, opts: { format: string; config?: string }) => {
       try {
-        const config = await loadConfig({ configPath: opts.config })
-        const kernel = createCliKernel(config)
-        const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
+        const { config, kernel, workspaceSchemasPaths } = await resolveChangeContext({
+          configPath: opts.config,
+        })
         const parsed = parseSpecId(specPath, config)
         const fullSpecPath = `${parsed.workspace}:${parsed.capabilityPath}`
 
