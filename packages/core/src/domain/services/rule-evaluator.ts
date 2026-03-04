@@ -1,5 +1,6 @@
 import { type ValidationRule } from '../value-objects/validation-rule.js'
 import { type Selector } from '../value-objects/selector.js'
+import { safeRegex } from './safe-regex.js'
 
 /** A single node in a normalized artifact AST (domain-local mirror). */
 export interface RuleEvaluatorNode {
@@ -123,20 +124,20 @@ export function selectBySelector(root: RuleEvaluatorNode, selector: Selector): R
 export function nodeMatches(node: RuleEvaluatorNode, selector: Selector): boolean {
   if (node.type !== selector.type) return false
   if (selector.matches !== undefined) {
-    const re = new RegExp(selector.matches, 'i')
-    if (!re.test(node.label ?? '')) return false
+    const re = safeRegex(selector.matches, 'i')
+    if (re === null || !re.test(node.label ?? '')) return false
   }
   if (selector.contains !== undefined) {
-    const re = new RegExp(selector.contains, 'i')
-    if (!re.test(String(node.value ?? ''))) return false
+    const re = safeRegex(selector.contains, 'i')
+    if (re === null || !re.test(String(node.value ?? ''))) return false
   }
   if (selector.where !== undefined) {
     const innerContainer = node.children?.[0]
     const fieldNodes = innerContainer?.children ?? node.children ?? []
     for (const [k, v] of Object.entries(selector.where)) {
-      const re = new RegExp(v, 'i')
+      const re = safeRegex(v, 'i')
       const field = fieldNodes.find((c) => c.label === k)
-      if (field === undefined || !re.test(String(field.value ?? ''))) return false
+      if (re === null || field === undefined || !re.test(String(field.value ?? ''))) return false
     }
   }
   return true
@@ -315,12 +316,20 @@ function evaluateRule(
   }
   for (const node of nodes) {
     if (rule.contentMatches !== undefined) {
-      const serialized = parser.renderSubtree(node)
-      if (!new RegExp(rule.contentMatches).test(serialized)) {
+      const re = safeRegex(rule.contentMatches)
+      if (re === null) {
         failures.push({
           artifactId,
-          description: `Node content does not match pattern '${rule.contentMatches}'`,
+          description: `Invalid regex pattern '${rule.contentMatches}'`,
         })
+      } else {
+        const serialized = parser.renderSubtree(node)
+        if (!re.test(serialized)) {
+          failures.push({
+            artifactId,
+            description: `Node content does not match pattern '${rule.contentMatches}'`,
+          })
+        }
       }
     }
     if (rule.children !== undefined) {

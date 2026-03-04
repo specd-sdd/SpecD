@@ -4,6 +4,7 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type GitAdapter } from '../ports/git-adapter.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
+import { safeRegex } from '../../domain/services/safe-regex.js'
 
 /** A single task completion check for the `implementing → verifying` transition. */
 export interface TaskCompletionCheck {
@@ -166,8 +167,8 @@ export class TransitionChange {
       const artifact = await this._changes.artifact(change, check.filename)
       if (artifact === null) continue
 
-      const re = new RegExp(check.incompletePattern, 'm')
-      if (re.test(artifact.content)) {
+      const re = safeRegex(check.incompletePattern, 'm')
+      if (re !== null && re.test(artifact.content)) {
         throw new InvalidStateTransitionError('implementing', 'verifying')
       }
     }

@@ -16,6 +16,7 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type WorkflowStep } from '../../domain/value-objects/workflow-step.js'
 import { type Selector } from '../../domain/value-objects/selector.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
+import { safeRegex } from '../../domain/services/safe-regex.js'
 
 /**
  * Shifts all Markdown ATX heading levels in a text block by a given delta.
@@ -912,13 +913,13 @@ export class CompileContext {
     if (node.type !== selector.type) return false
 
     if (selector.matches !== undefined) {
-      const regex = new RegExp(selector.matches, 'i')
-      if (!regex.test(node.label ?? '')) return false
+      const regex = safeRegex(selector.matches, 'i')
+      if (regex === null || !regex.test(node.label ?? '')) return false
     }
 
     if (selector.contains !== undefined) {
-      const regex = new RegExp(selector.contains, 'i')
-      if (!regex.test(String(node.value ?? ''))) return false
+      const regex = safeRegex(selector.contains, 'i')
+      if (regex === null || !regex.test(String(node.value ?? ''))) return false
     }
 
     if (selector.parent !== undefined) {
