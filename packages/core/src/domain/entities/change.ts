@@ -279,16 +279,22 @@ export class Change {
    * as `in-progress` if any artifact in its `requires` chain is neither
    * `complete` nor `skipped`.
    *
+   * Includes cycle detection to prevent infinite recursion on circular
+   * artifact dependencies.
+   *
    * @param type - The artifact type ID to evaluate
+   * @param visited - Set of already-visited artifact IDs (for cycle detection)
    * @returns The effective `ArtifactStatus` after dependency resolution
    */
-  effectiveStatus(type: string): ArtifactStatus {
+  effectiveStatus(type: string, visited: Set<string> = new Set()): ArtifactStatus {
     const artifact = this._artifacts.get(type)
     if (!artifact) return 'missing'
     if (artifact.status === 'missing') return 'missing'
+    if (visited.has(type)) return 'in-progress'
 
+    visited.add(type)
     for (const req of artifact.requires) {
-      const reqStatus = this.effectiveStatus(req)
+      const reqStatus = this.effectiveStatus(req, visited)
       if (reqStatus !== 'complete' && reqStatus !== 'skipped') return 'in-progress'
     }
 
