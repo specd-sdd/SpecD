@@ -4,24 +4,16 @@ import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
-import {
-  type ArtifactParser,
-  type ArtifactParserRegistry,
-  type ArtifactNode,
-  DeltaApplicationError,
-} from '../ports/artifact-parser.js'
+import { type ArtifactParserRegistry, DeltaApplicationError } from '../ports/artifact-parser.js'
 import { type GitAdapter } from '../ports/git-adapter.js'
 import {
   type GitIdentity,
   type SpecApprovedEvent,
   type SignedOffEvent,
 } from '../../domain/entities/change.js'
-import {
-  type ValidationRule,
-  type PreHashCleanup,
-} from '../../domain/value-objects/validation-rule.js'
-import { type Selector } from '../../domain/value-objects/selector.js'
+import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
+import { evaluateRules } from '../../domain/services/rule-evaluator.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
 export interface ValidateArtifactsInput {
@@ -213,7 +205,7 @@ export class ValidateArtifacts {
         if (deltaFile !== null) {
           if (artifactType.deltaValidations().length > 0 && yamlParser !== undefined) {
             const deltaAST = yamlParser.parse(deltaFile.content)
-            const result = this._evaluateRules(
+            const result = evaluateRules(
               artifactType.deltaValidations(),
               deltaAST.root,
               artifactType.id(),
@@ -257,7 +249,7 @@ export class ValidateArtifacts {
       // --- Structural validation ---
       if (!artifactFailed && artifactType.validations().length > 0 && parser !== undefined) {
         const ast = parser.parse(validationContent)
-        const result = this._evaluateRules(
+        const result = evaluateRules(
           artifactType.validations(),
           ast.root,
           artifactType.id(),
@@ -321,287 +313,5 @@ export class ValidateArtifacts {
     if (ext === 'yaml' || ext === 'yml') return 'yaml'
     if (ext === 'txt') return 'plaintext'
     return undefined
-  }
-
-  /**
-   * Evaluates a list of validation rules against an AST root node.
-   *
-   * @param rules - The rules to evaluate
-   * @param root - The AST root node to evaluate against
-   * @param artifactId - The artifact type ID for failure/warning attribution
-   * @param parser - The parser for rendering subtrees during `contentMatches` checks
-   * @returns An object containing all failures and warnings collected
-   */
-  private _evaluateRules(
-    rules: readonly ValidationRule[],
-    root: ArtifactNode,
-    artifactId: string,
-    parser: ArtifactParser,
-  ): { failures: ValidationFailure[]; warnings: ValidationWarning[] } {
-    const failures: ValidationFailure[] = []
-    const warnings: ValidationWarning[] = []
-    for (const rule of rules) {
-      this._evaluateRule(rule, root, artifactId, parser, failures, warnings)
-    }
-    return { failures, warnings }
-  }
-
-  /**
-   * Evaluates a single validation rule against the AST, appending results to the provided accumulators.
-   *
-   * @param rule - The validation rule to evaluate
-   * @param root - The AST root node to evaluate against
-   * @param artifactId - The artifact type ID for failure/warning attribution
-   * @param parser - The parser for rendering subtrees during `contentMatches` checks
-   * @param failures - Accumulator for validation failures
-   * @param warnings - Accumulator for validation warnings
-   */
-  private _evaluateRule(
-    rule: ValidationRule,
-    root: ArtifactNode,
-    artifactId: string,
-    parser: ArtifactParser,
-    failures: ValidationFailure[],
-    warnings: ValidationWarning[],
-  ): void {
-    const nodes = this._selectNodes(root, rule)
-    if (nodes.length === 0) {
-      const desc = JSON.stringify(rule.selector ?? rule.path ?? {})
-      if (rule.required === true) {
-        failures.push({ artifactId, description: `Required rule not satisfied: ${desc}` })
-      } else if (rule.required === false) {
-        warnings.push({ artifactId, description: `Optional rule not satisfied: ${desc}` })
-      }
-      return
-    }
-    for (const node of nodes) {
-      if (rule.contentMatches !== undefined) {
-        const serialized = parser.renderSubtree(node)
-        if (!new RegExp(rule.contentMatches).test(serialized)) {
-          failures.push({
-            artifactId,
-            description: `Node content does not match pattern '${rule.contentMatches}'`,
-          })
-        }
-      }
-      if (rule.children !== undefined) {
-        for (const childRule of rule.children) {
-          this._evaluateRule(childRule, node, artifactId, parser, failures, warnings)
-        }
-      }
-    }
-  }
-
-  /**
-   * Selects nodes from the AST according to the rule's `path` or `selector`, defaulting to the root.
-   *
-   * @param root - The AST root node to select from
-   * @param rule - The validation rule containing the selection criteria
-   * @returns The matched AST nodes
-   */
-  private _selectNodes(root: ArtifactNode, rule: ValidationRule): ArtifactNode[] {
-    if (rule.path !== undefined) return this._selectByJsonPath(root, rule.path)
-    if (rule.selector !== undefined) return this._selectBySelector(root, rule.selector)
-    return [root]
-  }
-
-  /**
-   * Selects nodes matching the given selector, optionally constrained by a parent selector.
-   *
-   * @param root - The AST root node to search
-   * @param selector - The selector criteria to match
-   * @returns All matching nodes, filtered by `selector.index` when present
-   */
-  private _selectBySelector(root: ArtifactNode, selector: Selector): ArtifactNode[] {
-    if (selector.parent !== undefined) {
-      const parentNodes = this._selectBySelector(root, selector.parent)
-      const result: ArtifactNode[] = []
-      for (const parentNode of parentNodes) {
-        const children = parentNode.children ?? []
-        result.push(...children.filter((child) => this._nodeMatches(child, selector)))
-      }
-      if (selector.index !== undefined) {
-        const node = result[selector.index]
-        return node !== undefined ? [node] : []
-      }
-      return result
-    }
-    const all = this._collectNodes(root)
-    const matched = all.filter((node) => this._nodeMatches(node, selector))
-    if (selector.index !== undefined) {
-      const node = matched[selector.index]
-      return node !== undefined ? [node] : []
-    }
-    return matched
-  }
-
-  /**
-   * Returns `true` if the node satisfies all criteria in the selector.
-   *
-   * @param node - The AST node to test
-   * @param selector - The selector criteria to match against
-   * @returns Whether the node matches the selector
-   */
-  private _nodeMatches(node: ArtifactNode, selector: Selector): boolean {
-    if (node.type !== selector.type) return false
-    if (selector.matches !== undefined) {
-      const re = new RegExp(selector.matches, 'i')
-      if (!re.test(node.label ?? '')) return false
-    }
-    if (selector.contains !== undefined) {
-      const re = new RegExp(selector.contains, 'i')
-      if (!re.test(String(node.value ?? ''))) return false
-    }
-    if (selector.where !== undefined) {
-      // For array-item/sequence-item nodes, fields are children of the inner
-      // mapping/object node (e.g. sequence-item → mapping → pair[])
-      const innerContainer = node.children?.[0]
-      const fieldNodes = innerContainer?.children ?? node.children ?? []
-      for (const [k, v] of Object.entries(selector.where)) {
-        const re = new RegExp(v, 'i')
-        const field = fieldNodes.find((c) => c.label === k)
-        if (field === undefined || !re.test(String(field.value ?? ''))) return false
-      }
-    }
-    return true
-  }
-
-  /**
-   * Recursively collects all nodes in the AST, including the root.
-   *
-   * @param root - The starting AST node
-   * @returns All nodes in document order
-   */
-  private _collectNodes(root: ArtifactNode): ArtifactNode[] {
-    const result: ArtifactNode[] = [root]
-    if (root.children !== undefined) {
-      for (const child of root.children) {
-        result.push(...this._collectNodes(child))
-      }
-    }
-    return result
-  }
-
-  /**
-   * Selects nodes from the AST using a simplified JSONPath expression.
-   *
-   * @param root - The AST root node to navigate
-   * @param path - The JSONPath expression (e.g. `$.children[*]`)
-   * @returns All nodes matching the path
-   */
-  private _selectByJsonPath(root: ArtifactNode, path: string): ArtifactNode[] {
-    if (path === '$') return [root]
-    const tokens = this._tokenizeJsonPath(path)
-    let current: unknown[] = [root]
-    for (const token of tokens) {
-      const next: unknown[] = []
-      if (token === '$') {
-        current = [root]
-        continue
-      }
-      if (token.startsWith('..')) {
-        const field = token.slice(2)
-        for (const node of current) next.push(...this._recursiveCollect(node, field))
-      } else if (token.startsWith('.')) {
-        const field = token.slice(1)
-        for (const node of current) {
-          if (node !== null && typeof node === 'object' && !Array.isArray(node)) {
-            const val = (node as Record<string, unknown>)[field]
-            if (val !== undefined) next.push(val)
-          }
-        }
-      } else if (token === '[*]') {
-        for (const node of current) {
-          if (Array.isArray(node)) {
-            for (const item of node as unknown[]) next.push(item)
-          }
-        }
-      } else if (/^\[\d+\]$/.test(token)) {
-        const idx = parseInt(token.slice(1, -1), 10)
-        for (const node of current) {
-          if (Array.isArray(node) && node[idx] !== undefined) next.push(node[idx])
-        }
-      }
-      current = next
-    }
-    return current.filter(
-      (n): n is ArtifactNode =>
-        n !== null &&
-        typeof n === 'object' &&
-        !Array.isArray(n) &&
-        typeof (n as Record<string, unknown>)['type'] === 'string',
-    )
-  }
-
-  /**
-   * Tokenises a JSONPath expression into its component segments.
-   *
-   * @param path - The JSONPath expression string
-   * @returns An array of path token strings
-   */
-  private _tokenizeJsonPath(path: string): string[] {
-    const tokens: string[] = []
-    let i = 0
-    while (i < path.length) {
-      if (path[i] === '$') {
-        tokens.push('$')
-        i++
-      } else if (path[i] === '.' && path[i + 1] === '.') {
-        const rest = path.slice(i + 2)
-        const dotIdx = rest.indexOf('.')
-        const brIdx = rest.indexOf('[')
-        const stop =
-          dotIdx === -1 && brIdx === -1
-            ? rest.length
-            : dotIdx === -1
-              ? brIdx
-              : brIdx === -1
-                ? dotIdx
-                : Math.min(dotIdx, brIdx)
-        tokens.push('..' + rest.slice(0, stop))
-        i += 2 + stop
-      } else if (path[i] === '.') {
-        const rest = path.slice(i + 1)
-        const dotIdx = rest.indexOf('.')
-        const brIdx = rest.indexOf('[')
-        const stop =
-          dotIdx === -1 && brIdx === -1
-            ? rest.length
-            : dotIdx === -1
-              ? brIdx
-              : brIdx === -1
-                ? dotIdx
-                : Math.min(dotIdx, brIdx)
-        tokens.push('.' + rest.slice(0, stop))
-        i += 1 + stop
-      } else if (path[i] === '[') {
-        const close = path.indexOf(']', i)
-        tokens.push(path.slice(i, close + 1))
-        i = close + 1
-      } else {
-        i++
-      }
-    }
-    return tokens
-  }
-
-  /**
-   * Recursively collects all values at a given field key from any nested object or array.
-   *
-   * @param node - The value to traverse (object, array, or primitive)
-   * @param field - The field name to collect values for
-   * @returns All values found at the given field in any nested structure
-   */
-  private _recursiveCollect(node: unknown, field: string): unknown[] {
-    const result: unknown[] = []
-    if (node === null || typeof node !== 'object') return result
-    if (Array.isArray(node)) {
-      for (const item of node) result.push(...this._recursiveCollect(item, field))
-      return result
-    }
-    const obj = node as Record<string, unknown>
-    if (obj[field] !== undefined) result.push(obj[field])
-    for (const val of Object.values(obj)) result.push(...this._recursiveCollect(val, field))
-    return result
   }
 }
