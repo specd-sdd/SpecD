@@ -1,11 +1,9 @@
 import { type Command } from 'commander'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { hashChangeArtifacts } from '../../helpers/artifact-hash.js'
 import { findChangeDir } from '../../helpers/change-dir.js'
-import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
+import { resolveChangeContext } from '../../helpers/change-context.js'
 import { type PreHashCleanup } from '@specd/core'
 
 /**
@@ -13,14 +11,15 @@ import { type PreHashCleanup } from '@specd/core'
  *
  * @param kernel - The CLI kernel instance
  * @param config - The resolved project configuration
+ * @param workspaceSchemasPaths - Map of workspace name to absolute schemas path
  * @returns A map of artifact type ID to cleanup rules
  */
 async function buildCleanupMap(
   kernel: ReturnType<typeof import('../../kernel.js').createCliKernel>,
   config: Awaited<ReturnType<typeof import('../../load-config.js').loadConfig>>,
+  workspaceSchemasPaths: ReadonlyMap<string, string>,
 ): Promise<ReadonlyMap<string, readonly PreHashCleanup[]>> {
   try {
-    const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
     const schema = await kernel.specs.getActiveSchema.execute({
       schemaRef: config.schemaRef,
       workspaceSchemasPaths,
@@ -56,12 +55,13 @@ export function registerChangeApprove(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
-        const config = await loadConfig({ configPath: opts.config })
-        const kernel = createCliKernel(config)
+        const { config, kernel, workspaceSchemasPaths } = await resolveChangeContext({
+          configPath: opts.config,
+        })
 
         const { change } = await kernel.changes.status.execute({ name })
         const changeDir = await findChangeDir(config.storage.changesPath, name)
-        const cleanupMap = await buildCleanupMap(kernel, config)
+        const cleanupMap = await buildCleanupMap(kernel, config, workspaceSchemasPaths)
         const artifactHashes =
           changeDir !== null ? await hashChangeArtifacts(changeDir, change, cleanupMap) : {}
 
@@ -91,12 +91,13 @@ export function registerChangeApprove(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
-        const config = await loadConfig({ configPath: opts.config })
-        const kernel = createCliKernel(config)
+        const { config, kernel, workspaceSchemasPaths } = await resolveChangeContext({
+          configPath: opts.config,
+        })
 
         const { change } = await kernel.changes.status.execute({ name })
         const changeDir = await findChangeDir(config.storage.changesPath, name)
-        const cleanupMap = await buildCleanupMap(kernel, config)
+        const cleanupMap = await buildCleanupMap(kernel, config, workspaceSchemasPaths)
         const artifactHashes =
           changeDir !== null ? await hashChangeArtifacts(changeDir, change, cleanupMap) : {}
 
