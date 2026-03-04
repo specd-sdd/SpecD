@@ -1,0 +1,227 @@
+import path from 'node:path'
+import { type SpecRepository } from '../ports/spec-repository.js'
+import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
+import { type ValidationFailure, type ValidationWarning } from './validate-artifacts.js'
+import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
+import { SpecPath } from '../../domain/value-objects/spec-path.js'
+import { evaluateRules } from '../../domain/services/rule-evaluator.js'
+
+/** Input for the {@link ValidateSpecs} use case. */
+export interface ValidateSpecsInput {
+  /** Single spec path in `workspace:capability-path` format (e.g. `"default:auth/login"`). */
+  specPath?: string
+  /** Validate all specs in this workspace. */
+  workspace?: string
+  /** The schema reference string from `specd.yaml`. */
+  schemaRef: string
+  /** Resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. */
+  workspaceSchemasPaths: ReadonlyMap<string, string>
+}
+
+/** Validation result for a single spec. */
+export interface SpecValidationEntry {
+  /** Qualified label `workspace:path`. */
+  spec: string
+  /** `true` if all artifacts pass validation. */
+  passed: boolean
+  /** All validation failures for this spec. */
+  failures: ValidationFailure[]
+  /** All validation warnings for this spec. */
+  warnings: ValidationWarning[]
+}
+
+/** Aggregated result of validating one or more specs. */
+export interface ValidateSpecsResult {
+  /** Per-spec validation results. */
+  entries: SpecValidationEntry[]
+  /** Total number of specs validated. */
+  totalSpecs: number
+  /** Number of specs that passed. */
+  passed: number
+  /** Number of specs that failed. */
+  failed: number
+}
+
+/**
+ * Validates spec artifacts against the active schema's structural rules.
+ *
+ * Supports validating a single spec, all specs in a workspace, or all specs
+ * across all workspaces. Only `scope: 'spec'` artifacts from the schema are
+ * validated — change-scoped artifacts are ignored.
+ */
+export class ValidateSpecs {
+  private readonly _specs: ReadonlyMap<string, SpecRepository>
+  private readonly _schemas: SchemaRegistry
+  private readonly _parsers: ArtifactParserRegistry
+
+  /**
+   * Creates a new `ValidateSpecs` use case instance.
+   *
+   * @param specs - Spec repositories keyed by workspace name
+   * @param schemas - Registry for resolving schema references
+   * @param parsers - Registry of artifact format parsers
+   */
+  constructor(
+    specs: ReadonlyMap<string, SpecRepository>,
+    schemas: SchemaRegistry,
+    parsers: ArtifactParserRegistry,
+  ) {
+    this._specs = specs
+    this._schemas = schemas
+    this._parsers = parsers
+  }
+
+  /**
+   * Executes the use case.
+   *
+   * @param input - Validation parameters
+   * @returns Aggregated validation result
+   * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
+   */
+  async execute(input: ValidateSpecsInput): Promise<ValidateSpecsResult> {
+    const schema = await this._schemas.resolve(input.schemaRef, input.workspaceSchemasPaths)
+    if (schema === null) throw new SchemaNotFoundError(input.schemaRef)
+
+    const specArtifactTypes = schema.artifacts().filter((a) => a.scope() === 'spec')
+    const entries: SpecValidationEntry[] = []
+
+    if (input.specPath !== undefined) {
+      const colonIdx = input.specPath.indexOf(':')
+      const workspace = colonIdx >= 0 ? input.specPath.slice(0, colonIdx) : 'default'
+      const capabilityPath = colonIdx >= 0 ? input.specPath.slice(colonIdx + 1) : input.specPath
+      const specRepo = this._specs.get(workspace)
+      if (specRepo === undefined) {
+        return { entries: [], totalSpecs: 0, passed: 0, failed: 0 }
+      }
+      const specPath = SpecPath.parse(capabilityPath)
+      const spec = await specRepo.get(specPath)
+      if (spec === null) {
+        return { entries: [], totalSpecs: 0, passed: 0, failed: 0 }
+      }
+      const entry = await this._validateSpec(
+        specRepo,
+        spec.workspace,
+        capabilityPath,
+        spec.filenames,
+        specArtifactTypes,
+      )
+      entries.push(entry)
+    } else if (input.workspace !== undefined) {
+      const specRepo = this._specs.get(input.workspace)
+      if (specRepo === undefined) {
+        return { entries: [], totalSpecs: 0, passed: 0, failed: 0 }
+      }
+      const specs = await specRepo.list()
+      for (const spec of specs) {
+        const entry = await this._validateSpec(
+          specRepo,
+          spec.workspace,
+          spec.name.toFsPath('/'),
+          spec.filenames,
+          specArtifactTypes,
+        )
+        entries.push(entry)
+      }
+    } else {
+      for (const [, specRepo] of this._specs) {
+        const specs = await specRepo.list()
+        for (const spec of specs) {
+          const entry = await this._validateSpec(
+            specRepo,
+            spec.workspace,
+            spec.name.toFsPath('/'),
+            spec.filenames,
+            specArtifactTypes,
+          )
+          entries.push(entry)
+        }
+      }
+    }
+
+    const passed = entries.filter((e) => e.passed).length
+    return {
+      entries,
+      totalSpecs: entries.length,
+      passed,
+      failed: entries.length - passed,
+    }
+  }
+
+  /**
+   * Validates all spec-scoped artifacts for a single spec.
+   *
+   * @param specRepo - Repository to read artifacts from
+   * @param workspace - Workspace name for the spec label
+   * @param capabilityPath - Capability path within the workspace
+   * @param filenames - Filenames present in the spec directory
+   * @param specArtifactTypes - Spec-scoped artifact types from the active schema
+   * @returns Validation entry with failures and warnings
+   */
+  private async _validateSpec(
+    specRepo: SpecRepository,
+    workspace: string,
+    capabilityPath: string,
+    filenames: readonly string[],
+    specArtifactTypes: readonly import('../../domain/value-objects/artifact-type.js').ArtifactType[],
+  ): Promise<SpecValidationEntry> {
+    const label = `${workspace}:${capabilityPath}`
+    const failures: ValidationFailure[] = []
+    const warnings: ValidationWarning[] = []
+    const specPath = SpecPath.parse(capabilityPath)
+    const spec = await specRepo.get(specPath)
+
+    for (const artifactType of specArtifactTypes) {
+      const filename = path.basename(artifactType.output())
+      const hasFile = filenames.includes(filename)
+
+      if (!hasFile) {
+        if (!artifactType.optional()) {
+          failures.push({
+            artifactId: artifactType.id(),
+            description: `Required artifact '${artifactType.id()}' is missing`,
+          })
+        }
+        continue
+      }
+
+      if (artifactType.validations().length === 0) continue
+      if (spec === null) continue
+
+      const artifact = await specRepo.artifact(spec, filename)
+      if (artifact === null) continue
+
+      const format = artifactType.format() ?? this._inferFormat(filename)
+      const parser = format !== undefined ? this._parsers.get(format) : undefined
+      if (parser === undefined) continue
+
+      const ast = parser.parse(artifact.content)
+      const result = evaluateRules(artifactType.validations(), ast.root, artifactType.id(), parser)
+      failures.push(...result.failures)
+      warnings.push(...result.warnings)
+    }
+
+    return {
+      spec: label,
+      passed: failures.length === 0,
+      failures,
+      warnings,
+    }
+  }
+
+  /**
+   * Infers the artifact format from a filename extension.
+   *
+   * @param filename - Filename to infer format from
+   * @returns Format string, or `undefined` if unrecognised
+   */
+  private _inferFormat(filename: string): string | undefined {
+    const parts = filename.split('.')
+    const ext = parts[parts.length - 1]
+    if (ext === 'md') return 'markdown'
+    if (ext === 'json') return 'json'
+    if (ext === 'yaml' || ext === 'yml') return 'yaml'
+    if (ext === 'txt') return 'plaintext'
+    return undefined
+  }
+}
