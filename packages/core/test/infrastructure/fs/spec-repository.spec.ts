@@ -408,16 +408,18 @@ describe('FsSpecRepository', () => {
       })
 
       const multiCtx: RepoContext = { repo, specsPath, tmpDir }
-      await writeSpecFile(multiCtx, 'auth/login', 'spec.md', '# Login')
+      try {
+        await writeSpecFile(multiCtx, 'auth/login', 'spec.md', '# Login')
 
-      const results = await repo.list()
-      expect(results[0]!.name.toString()).toBe('team_1/shared/auth/login')
+        const results = await repo.list()
+        expect(results[0]!.name.toString()).toBe('team_1/shared/auth/login')
 
-      const spec = await repo.get(SpecPath.parse('team_1/shared/auth/login'))
-      expect(spec).not.toBeNull()
-      expect(spec!.filenames).toContain('spec.md')
-
-      await cleanupRepo(multiCtx)
+        const spec = await repo.get(SpecPath.parse('team_1/shared/auth/login'))
+        expect(spec).not.toBeNull()
+        expect(spec!.filenames).toContain('spec.md')
+      } finally {
+        await cleanupRepo(multiCtx)
+      }
     })
   })
 
