@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hashFiles } from '../../../src/domain/services/snapshot-hasher.js'
+import { hashFiles } from '../../../src/infrastructure/fs/hash.js'
 
 describe('hashFiles', () => {
   it('returns empty object for empty input', () => {

@@ -1,6 +1,7 @@
 export * from './domain/index.js'
 export * from './application/index.js'
 export * from './composition/index.js'
+export { hashFiles } from './infrastructure/fs/hash.js'
 
 import { createRequire } from 'module'
 const _require = createRequire(import.meta.url)
