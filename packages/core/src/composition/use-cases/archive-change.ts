@@ -1,3 +1,4 @@
+import * as path from 'node:path'
 import { ArchiveChange } from '../../application/use-cases/archive-change.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
@@ -118,7 +119,10 @@ export function createArchiveChange(
           ? { archivePattern: config.storage.archivePattern }
           : {}),
         specRepositories: specRepos,
-        nodeModulesPaths: kernelOpts?.extraNodeModulesPaths ?? [],
+        nodeModulesPaths: [
+          path.join(config.projectRoot, 'node_modules'),
+          ...(kernelOpts?.extraNodeModulesPaths ?? []),
+        ],
       },
     )
   }

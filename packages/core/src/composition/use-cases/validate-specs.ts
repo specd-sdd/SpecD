@@ -1,3 +1,4 @@
+import * as path from 'node:path'
 import { ValidateSpecs } from '../../application/use-cases/validate-specs.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
@@ -56,7 +57,10 @@ export function createValidateSpecs(
     )
     return createValidateSpecs({
       specRepositories: specRepos,
-      nodeModulesPaths: kernelOpts?.extraNodeModulesPaths ?? [],
+      nodeModulesPaths: [
+        path.join(config.projectRoot, 'node_modules'),
+        ...(kernelOpts?.extraNodeModulesPaths ?? []),
+      ],
     })
   }
   const schemas = createSchemaRegistry('fs', { nodeModulesPaths: configOrOptions.nodeModulesPaths })
