@@ -61,7 +61,7 @@ import { registerSkillsUpdate } from './commands/skills/update.js'
 
 const program = new Command('specd')
   .description('SpecD — spec-driven development CLI')
-  .version('0.0.1')
+  .version(CLI_VERSION)
   .option('--hide-banner', 'suppress the SpecD banner')
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
