@@ -689,10 +689,11 @@ function isDiscardedChange(change: Change): boolean {
  * @returns The names of entries that are directories
  */
 async function filterDirectories(basePath: string, entries: string[]): Promise<string[]> {
-  const results: string[] = []
-  for (const entry of entries) {
-    const stat = await fs.stat(path.join(basePath, entry))
-    if (stat.isDirectory()) results.push(entry)
-  }
-  return results
+  const checks = await Promise.all(
+    entries.map(async (entry) => {
+      const stat = await fs.stat(path.join(basePath, entry))
+      return { entry, isDir: stat.isDirectory() }
+    }),
+  )
+  return checks.filter((c) => c.isDir).map((c) => c.entry)
 }
