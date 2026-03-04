@@ -11,21 +11,18 @@ import {
 
 vi.mock('../../src/load-config.js', () => ({ loadConfig: vi.fn() }))
 vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
-vi.mock('node:fs', async () => {
-  const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+vi.mock('node:fs/promises', async () => {
+  const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
   return {
     ...actual,
-    promises: {
-      ...actual.promises,
-      readFile: vi.fn(),
-    },
+    readFile: vi.fn(),
   }
 })
 
 import { loadConfig } from '../../src/load-config.js'
 import { createCliKernel } from '../../src/kernel.js'
 import { registerSpecWriteMetadata } from '../../src/commands/spec/write-metadata.js'
-import { promises as fsPromises } from 'node:fs'
+import * as fsPromises from 'node:fs/promises'
 import { ArtifactConflictError } from '@specd/core'
 
 function setup() {
