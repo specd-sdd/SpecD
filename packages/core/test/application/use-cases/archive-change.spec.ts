@@ -205,6 +205,15 @@ function makeArchivableChange(
 ): Change {
   const createdAt = opts.createdAt ?? new Date('2024-01-15T12:00:00Z')
   const events: ChangeEvent[] = [
+    {
+      type: 'created',
+      at: createdAt,
+      by: testActor,
+      workspaces: ['default'],
+      specIds: opts.specIds ?? ['default/auth/oauth'],
+      schemaName: '@specd/schema-std',
+      schemaVersion: 1,
+    },
     { type: 'transitioned', from: 'drafting', to: 'designing', at: createdAt, by: testActor },
     { type: 'transitioned', from: 'designing', to: 'ready', at: createdAt, by: testActor },
     { type: 'transitioned', from: 'ready', to: 'implementing', at: createdAt, by: testActor },
@@ -282,6 +291,15 @@ describe('ArchiveChange', () => {
         workspaces: ['default'],
         specIds: [],
         history: [
+          {
+            type: 'created',
+            at: new Date(),
+            by: testActor,
+            workspaces: ['default'],
+            specIds: [],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
           {
             type: 'transitioned',
             from: 'drafting',
