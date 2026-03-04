@@ -1,3 +1,4 @@
+export { inferFormat } from './format-inference.js'
 export {
   evaluateRules,
   selectNodes,

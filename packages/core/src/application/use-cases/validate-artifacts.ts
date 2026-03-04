@@ -14,6 +14,7 @@ import {
 import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
+import { inferFormat } from '../../domain/services/format-inference.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
 export interface ValidateArtifactsInput {
@@ -187,7 +188,7 @@ export class ValidateArtifacts {
       const artifactFile = await this._changes.artifact(change, changeArtifact.filename)
       if (artifactFile === null) continue
 
-      const format = artifactType.format() ?? this._inferFormat(changeArtifact.filename)
+      const format = artifactType.format() ?? inferFormat(changeArtifact.filename)
       const parser = format !== undefined ? this._parsers.get(format) : undefined
       const yamlParser = this._parsers.get('yaml')
 
@@ -297,21 +298,5 @@ export class ValidateArtifacts {
       result = result.replace(new RegExp(cleanup.pattern, 'g'), cleanup.replacement)
     }
     return result
-  }
-
-  /**
-   * Infers the format name from an artifact filename extension.
-   *
-   * @param filename - The artifact filename to inspect
-   * @returns The inferred format name, or `undefined` if the extension is unrecognised
-   */
-  private _inferFormat(filename: string): string | undefined {
-    const parts = filename.split('.')
-    const ext = parts[parts.length - 1]
-    if (ext === 'md') return 'markdown'
-    if (ext === 'json') return 'json'
-    if (ext === 'yaml' || ext === 'yml') return 'yaml'
-    if (ext === 'txt') return 'plaintext'
-    return undefined
   }
 }
