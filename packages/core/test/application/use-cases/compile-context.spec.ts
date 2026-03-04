@@ -119,6 +119,8 @@ function freshMetadata(
     description?: string
     dependsOn?: string[]
     rules?: Array<{ requirement: string; rules: string[] }>
+    constraints?: string[]
+    scenarios?: Array<{ requirement: string; name: string; when?: string[]; then?: string[] }>
   } = {},
 ): string {
   const hash = sha256Hex(specContent)
@@ -140,6 +142,25 @@ function freshMetadata(
       for (const rule of r.rules) parts.push(`      - '${rule}'`)
     }
   }
+  if (opts.constraints && opts.constraints.length > 0) {
+    parts.push(`constraints:`)
+    for (const c of opts.constraints) parts.push(`  - '${c}'`)
+  }
+  if (opts.scenarios && opts.scenarios.length > 0) {
+    parts.push(`scenarios:`)
+    for (const s of opts.scenarios) {
+      parts.push(`  - requirement: '${s.requirement}'`)
+      parts.push(`    name: '${s.name}'`)
+      if (s.when?.length) {
+        parts.push(`    when:`)
+        for (const w of s.when) parts.push(`      - '${w}'`)
+      }
+      if (s.then?.length) {
+        parts.push(`    then:`)
+        for (const t of s.then) parts.push(`      - '${t}'`)
+      }
+    }
+  }
   return parts.join('\n')
 }
 
@@ -154,6 +175,18 @@ const stubParser: ArtifactParser = {
   outline: () => [],
   deltaInstructions: () => 'delta format instructions',
   parseDelta: () => [],
+}
+
+/** Recursively renders a node and its children, collecting all `value` fields. */
+function renderSubtreeRecursive(node: {
+  value?: unknown
+  children?: readonly { value?: unknown; children?: readonly unknown[] }[]
+}): string {
+  if (node.value !== undefined) return String(node.value as string)
+  return (node.children ?? [])
+    .map((c) => renderSubtreeRecursive(c as typeof node))
+    .filter(Boolean)
+    .join('\n')
 }
 
 const noOp: CompileContextConfig = {
@@ -406,6 +439,7 @@ describe('CompileContext', () => {
         schemaRef: '@specd/schema-std',
         workspaceSchemasPaths: new Map(),
         config: noOp, // no include patterns
+        followDeps: true,
       })
 
       // auth/jwt should appear via dependsOn from auth/login
@@ -446,6 +480,7 @@ describe('CompileContext', () => {
           contextIncludeSpecs: [],
           contextExcludeSpecs: ['default:auth/*'], // exclude all auth — but dependsOn specs are immune
         },
+        followDeps: true,
       })
 
       expect(result.instructionBlock).toContain('auth/jwt')
@@ -507,6 +542,7 @@ describe('CompileContext', () => {
         schemaRef: '@specd/schema-std',
         workspaceSchemasPaths: new Map(),
         config: noOp,
+        followDeps: true,
       })
 
       // No infinite loop — we got a result
@@ -543,6 +579,7 @@ describe('CompileContext', () => {
         schemaRef: '@specd/schema-std',
         workspaceSchemasPaths: new Map(),
         config: noOp,
+        followDeps: true,
       })
 
       const stalenessWarnings = result.warnings.filter((w) => w.type === 'stale-metadata')
@@ -574,6 +611,7 @@ describe('CompileContext', () => {
         schemaRef: '@specd/schema-std',
         workspaceSchemasPaths: new Map(),
         config: noOp,
+        followDeps: true,
       })
 
       const stalenessWarnings = result.warnings.filter((w) => w.type === 'stale-metadata')
@@ -974,6 +1012,7 @@ describe('CompileContext', () => {
         schemaRef: '@specd/schema-std',
         workspaceSchemasPaths: new Map(),
         config: noOp,
+        followDeps: true,
       })
 
       expect(result.instructionBlock).toContain('Handles user authentication flows.')
@@ -1003,7 +1042,7 @@ describe('CompileContext', () => {
             ],
           },
         }),
-        renderSubtree: (node) => node.value?.toString() ?? '',
+        renderSubtree: renderSubtreeRecursive,
       }
 
       const parsers: ArtifactParserRegistry = new Map([['markdown', parser]])
@@ -1036,6 +1075,7 @@ describe('CompileContext', () => {
         schemaRef: '@specd/schema-std',
         workspaceSchemasPaths: new Map(),
         config: noOp,
+        followDeps: true,
       })
 
       // Should emit a staleness warning (no metadata) and include content from contextSections
@@ -1178,6 +1218,408 @@ describe('CompileContext', () => {
 
       // billing workspace NOT active → billing:payments must NOT appear in output
       expect(result.instructionBlock).not.toContain('billing:payments')
+    })
+  })
+
+  describe('Requirement: contextSections fallback with glob output pattern', () => {
+    it('resolves glob-style output to the base filename for specRepo.artifact', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginContent = '# Login\n\n## Requirements\n\nSome requirements.\n'
+
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/spec.md': loginContent,
+        // no .specd-metadata.yaml → forces fallback
+      })
+
+      const parser: ArtifactParser = {
+        ...stubParser,
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Requirements',
+                children: [{ type: 'paragraph', value: 'Some requirements.' }],
+              },
+            ],
+          },
+        }),
+        renderSubtree: renderSubtreeRecursive,
+      }
+
+      const parsers: ArtifactParserRegistry = new Map([['markdown', parser]])
+
+      const change = makeChange('my-change')
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('spec', {
+            // Glob-style output like schema-std uses
+            output: 'specs/**/spec.md',
+            contextSections: [
+              {
+                selector: { type: 'section', matches: '^Requirements$' },
+                role: 'rules',
+                extract: 'content',
+              },
+            ],
+          }),
+        ],
+      })
+
+      const { sut } = makeSut({
+        change,
+        schema,
+        specRepos: new Map([['default', specRepo]]),
+        parsers,
+      })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        schemaRef: '@specd/schema-std',
+        workspaceSchemasPaths: new Map(),
+        config: { contextIncludeSpecs: ['default:auth/login'] },
+      })
+
+      // The spec content should be present even though output has glob pattern
+      expect(result.instructionBlock).toContain('Some requirements.')
+      expect(result.instructionBlock).toContain('Spec: default:auth/login')
+    })
+  })
+
+  describe('Requirement: sections filter', () => {
+    const specContent = '# Login\n'
+    const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+
+    function metadataWithAllSections(): string {
+      return freshMetadata(specContent, {
+        description: 'Auth login spec.',
+        rules: [{ requirement: 'Auth', rules: ['Must validate tokens'] }],
+        constraints: ['Passwords must be hashed'],
+        scenarios: [
+          {
+            requirement: 'Auth',
+            name: 'Login works',
+            when: ['user logs in'],
+            then: ['session created'],
+          },
+        ],
+      })
+    }
+
+    it('renders all sections when sections is undefined', async () => {
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': metadataWithAllSections(),
+        'auth/login/spec.md': specContent,
+      })
+      const change = makeChange('my-change')
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        schemaRef: '@specd/schema-std',
+        workspaceSchemasPaths: new Map(),
+        config: { contextIncludeSpecs: ['default:auth/login'] },
+      })
+
+      expect(result.instructionBlock).toContain('Auth login spec.')
+      expect(result.instructionBlock).toContain('Must validate tokens')
+      expect(result.instructionBlock).toContain('Passwords must be hashed')
+      expect(result.instructionBlock).toContain('Login works')
+    })
+
+    it('renders only rules when sections is ["rules"]', async () => {
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': metadataWithAllSections(),
+        'auth/login/spec.md': specContent,
+      })
+      const change = makeChange('my-change')
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        schemaRef: '@specd/schema-std',
+        workspaceSchemasPaths: new Map(),
+        config: { contextIncludeSpecs: ['default:auth/login'] },
+        sections: ['rules'],
+      })
+
+      expect(result.instructionBlock).toContain('Must validate tokens')
+      expect(result.instructionBlock).not.toContain('Auth login spec.')
+      expect(result.instructionBlock).not.toContain('Passwords must be hashed')
+      expect(result.instructionBlock).not.toContain('Login works')
+    })
+
+    it('renders rules and constraints when sections is ["rules", "constraints"]', async () => {
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': metadataWithAllSections(),
+        'auth/login/spec.md': specContent,
+      })
+      const change = makeChange('my-change')
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        schemaRef: '@specd/schema-std',
+        workspaceSchemasPaths: new Map(),
+        config: { contextIncludeSpecs: ['default:auth/login'] },
+        sections: ['rules', 'constraints'],
+      })
+
+      expect(result.instructionBlock).toContain('Must validate tokens')
+      expect(result.instructionBlock).toContain('Passwords must be hashed')
+      expect(result.instructionBlock).not.toContain('Auth login spec.')
+      expect(result.instructionBlock).not.toContain('Login works')
+    })
+
+    it('filters fallback contextSections by role when sections is set', async () => {
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/spec.md': specContent,
+        // no metadata → forces fallback
+      })
+
+      const parser: ArtifactParser = {
+        ...stubParser,
+        parse: () => ({
+          root: {
+            type: 'document',
+            children: [
+              {
+                type: 'section',
+                label: 'Requirements',
+                children: [{ type: 'paragraph', value: 'Some rules.' }],
+              },
+              {
+                type: 'section',
+                label: 'Constraints',
+                children: [{ type: 'paragraph', value: 'Some constraints.' }],
+              },
+            ],
+          },
+        }),
+        renderSubtree: renderSubtreeRecursive,
+      }
+
+      const parsers: ArtifactParserRegistry = new Map([['markdown', parser]])
+
+      const change = makeChange('my-change')
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('spec', {
+            contextSections: [
+              {
+                selector: { type: 'section', matches: '^Requirements$' },
+                role: 'rules',
+                extract: 'content',
+              },
+              {
+                selector: { type: 'section', matches: '^Constraints$' },
+                role: 'constraints',
+                extract: 'content',
+              },
+            ],
+          }),
+        ],
+      })
+
+      const { sut } = makeSut({
+        change,
+        schema,
+        specRepos: new Map([['default', specRepo]]),
+        parsers,
+      })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        schemaRef: '@specd/schema-std',
+        workspaceSchemasPaths: new Map(),
+        config: { contextIncludeSpecs: ['default:auth/login'] },
+        sections: ['rules'],
+      })
+
+      expect(result.instructionBlock).toContain('Some rules.')
+      expect(result.instructionBlock).not.toContain('Some constraints.')
+    })
+
+    it('sections filter does not affect schema instructions, hooks, or available steps', async () => {
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': metadataWithAllSections(),
+        'auth/login/spec.md': specContent,
+      })
+      const specArtifact = new ArtifactType({
+        id: 'spec',
+        scope: 'spec',
+        output: 'spec.md',
+        requires: [],
+        validations: [],
+        deltaValidations: [],
+        contextSections: [],
+        preHashCleanup: [],
+        instruction: 'Write a spec.',
+      })
+      const workflowStep: WorkflowStep = {
+        step: 'designing',
+        requires: [],
+        hooks: {
+          pre: [{ type: 'instruction', text: 'Review before starting.' }],
+          post: [],
+        },
+      }
+      const change = makeChange('my-change')
+      const schema = makeSchema({ artifacts: [specArtifact], workflow: [workflowStep] })
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        activeArtifact: 'spec',
+        schemaRef: '@specd/schema-std',
+        workspaceSchemasPaths: new Map(),
+        config: { contextIncludeSpecs: ['default:auth/login'] },
+        sections: ['constraints'],
+      })
+
+      // Schema instruction and hooks still present even with section filter
+      expect(result.instructionBlock).toContain('Write a spec.')
+      expect(result.instructionBlock).toContain('[pre] Review before starting.')
+      expect(result.instructionBlock).toContain('designing')
+    })
+  })
+
+  describe('Requirement: depth limiting', () => {
+    it('depth 1 includes direct deps only, not transitive deps', async () => {
+      const specA = new Spec('default', SpecPath.parse('a'), ['spec.md'])
+      const specB = new Spec('default', SpecPath.parse('b'), ['spec.md'])
+      const specC = new Spec('default', SpecPath.parse('c'), ['spec.md'])
+
+      const contentA = '# A\n'
+      const contentB = '# B\n'
+      const contentC = '# C\n'
+
+      const metadataA = freshMetadata(contentA, { dependsOn: ['b'], description: 'Spec A' })
+      const metadataB = freshMetadata(contentB, { dependsOn: ['c'], description: 'Spec B' })
+      const metadataC = freshMetadata(contentC, { description: 'Spec C' })
+
+      const specRepo = makeSpecRepo([specA, specB, specC], {
+        'a/.specd-metadata.yaml': metadataA,
+        'a/spec.md': contentA,
+        'b/.specd-metadata.yaml': metadataB,
+        'b/spec.md': contentB,
+        'c/.specd-metadata.yaml': metadataC,
+        'c/spec.md': contentC,
+      })
+
+      const change = makeChange('my-change', {
+        specIds: ['default/a'],
+        contextSpecIds: ['a'],
+      })
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        schemaRef: '@specd/schema-std',
+        workspaceSchemasPaths: new Map(),
+        config: noOp,
+        followDeps: true,
+        depth: 1,
+      })
+
+      // A (seed at depth 0) and B (direct dep at depth 1) should appear
+      expect(result.instructionBlock).toContain('Spec A')
+      expect(result.instructionBlock).toContain('Spec B')
+      // C (transitive dep at depth 2) should NOT appear
+      expect(result.instructionBlock).not.toContain('Spec C')
+    })
+
+    it('unlimited depth includes all transitive deps', async () => {
+      const specA = new Spec('default', SpecPath.parse('a'), ['spec.md'])
+      const specB = new Spec('default', SpecPath.parse('b'), ['spec.md'])
+      const specC = new Spec('default', SpecPath.parse('c'), ['spec.md'])
+
+      const contentA = '# A\n'
+      const contentB = '# B\n'
+      const contentC = '# C\n'
+
+      const metadataA = freshMetadata(contentA, { dependsOn: ['b'], description: 'Spec A' })
+      const metadataB = freshMetadata(contentB, { dependsOn: ['c'], description: 'Spec B' })
+      const metadataC = freshMetadata(contentC, { description: 'Spec C' })
+
+      const specRepo = makeSpecRepo([specA, specB, specC], {
+        'a/.specd-metadata.yaml': metadataA,
+        'a/spec.md': contentA,
+        'b/.specd-metadata.yaml': metadataB,
+        'b/spec.md': contentB,
+        'c/.specd-metadata.yaml': metadataC,
+        'c/spec.md': contentC,
+      })
+
+      const change = makeChange('my-change', {
+        specIds: ['default/a'],
+        contextSpecIds: ['a'],
+      })
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        schemaRef: '@specd/schema-std',
+        workspaceSchemasPaths: new Map(),
+        config: noOp,
+        followDeps: true,
+      })
+
+      expect(result.instructionBlock).toContain('Spec A')
+      expect(result.instructionBlock).toContain('Spec B')
+      expect(result.instructionBlock).toContain('Spec C')
+    })
+
+    it('followDeps false skips traversal even with contextSpecIds', async () => {
+      const specA = new Spec('default', SpecPath.parse('a'), ['spec.md'])
+      const specB = new Spec('default', SpecPath.parse('b'), ['spec.md'])
+
+      const contentA = '# A\n'
+      const contentB = '# B\n'
+
+      const metadataA = freshMetadata(contentA, { dependsOn: ['b'], description: 'Spec A' })
+      const metadataB = freshMetadata(contentB, { description: 'Spec B' })
+
+      const specRepo = makeSpecRepo([specA, specB], {
+        'a/.specd-metadata.yaml': metadataA,
+        'a/spec.md': contentA,
+        'b/.specd-metadata.yaml': metadataB,
+        'b/spec.md': contentB,
+      })
+
+      const change = makeChange('my-change', {
+        specIds: ['default/a'],
+        contextSpecIds: ['a'],
+      })
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        schemaRef: '@specd/schema-std',
+        workspaceSchemasPaths: new Map(),
+        config: noOp,
+        // followDeps omitted → false by default
+      })
+
+      // Neither A nor B should appear — contextSpecIds require followDeps to be included
+      expect(result.instructionBlock).not.toContain('Spec A')
+      expect(result.instructionBlock).not.toContain('Spec B')
     })
   })
 

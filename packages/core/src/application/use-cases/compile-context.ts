@@ -16,6 +16,40 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type WorkflowStep } from '../../domain/value-objects/workflow-step.js'
 import { type Selector } from '../../domain/value-objects/selector.js'
 
+/**
+ * Shifts all Markdown ATX heading levels in a text block by a given delta.
+ * Lines inside fenced code blocks are left untouched. Levels are clamped to 1–6.
+ *
+ * @param markdown - The Markdown text to transform
+ * @param delta - Amount to shift heading levels (positive = deeper)
+ * @returns Transformed Markdown with adjusted heading levels
+ */
+export function shiftHeadings(markdown: string, delta: number): string {
+  if (delta === 0) return markdown
+  const lines = markdown.split('\n')
+  let inFence = false
+  const result: string[] = []
+  for (const line of lines) {
+    if (/^```/.test(line)) {
+      inFence = !inFence
+      result.push(line)
+      continue
+    }
+    if (inFence) {
+      result.push(line)
+      continue
+    }
+    const m = /^(#{1,6})(\s.*)$/.exec(line)
+    if (m) {
+      const level = Math.max(1, Math.min(6, m[1]!.length + delta))
+      result.push(`${'#'.repeat(level)}${m[2]}`)
+    } else {
+      result.push(line)
+    }
+  }
+  return result.join('\n')
+}
+
 /** A single entry in the project-level `context:` list. */
 export type ContextEntry = { instruction: string } | { file: string }
 
@@ -46,6 +80,9 @@ export interface CompileContextConfig {
   workspaces?: Record<string, WorkspaceContextConfig>
 }
 
+/** Metadata section names that can be individually selected for output. */
+export type SpecSection = 'rules' | 'constraints' | 'scenarios'
+
 /** Input for the {@link CompileContext} use case. */
 export interface CompileContextInput {
   /** The change name to compile context for. */
@@ -64,6 +101,22 @@ export interface CompileContextInput {
   workspaceSchemasPaths: ReadonlyMap<string, string>
   /** Resolved project configuration. */
   config: CompileContextConfig
+  /**
+   * When `true`, performs the `dependsOn` transitive traversal (step 5) to discover
+   * additional specs. When `false` or absent, step 5 is skipped entirely.
+   */
+  followDeps?: boolean
+  /**
+   * Limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`.
+   * `1` = direct dependencies only; `2` = deps of deps; absent = unlimited.
+   */
+  depth?: number
+  /**
+   * When present, restricts the metadata sections rendered per spec to the listed values.
+   * When absent, all sections are rendered (description + rules + constraints + scenarios).
+   * Does not affect schema instructions, delta context, artifact rules, hooks, or available steps.
+   */
+  sections?: ReadonlyArray<SpecSection>
 }
 
 /** Advisory warning emitted during context compilation. */
@@ -222,19 +275,23 @@ export class CompileContext {
       }
     }
 
-    // Step 5: dependsOn traversal from change.contextSpecIds (immune to exclude rules)
+    // Step 5: dependsOn traversal from change.contextSpecIds (only when followDeps is true)
     const dependsOnAdded = new Map<string, ResolvedSpec>()
-    const depSeen = new Set<string>()
-    for (const specId of change.contextSpecIds) {
-      await this._traverseDependsOn(
-        'default',
-        specId,
-        includedSpecs,
-        dependsOnAdded,
-        depSeen,
-        new Set<string>(),
-        warnings,
-      )
+    if (input.followDeps === true) {
+      const depSeen = new Set<string>()
+      for (const specId of change.contextSpecIds) {
+        await this._traverseDependsOn(
+          'default',
+          specId,
+          includedSpecs,
+          dependsOnAdded,
+          depSeen,
+          new Set<string>(),
+          warnings,
+          input.depth,
+          0,
+        )
+      }
     }
 
     // Merge: includedSpecs first (preserve order), then dependsOnAdded
@@ -261,10 +318,10 @@ export class CompileContext {
     // --- Assemble instruction block ---
     const parts: string[] = []
 
-    // Part 1: Project context entries
+    // Part 1: Project context entries (labelled with source, headings shifted +1)
     for (const entry of input.config.context ?? []) {
       if ('instruction' in entry) {
-        parts.push(entry.instruction)
+        parts.push(`**Source: instruction**\n\n${entry.instruction}`)
       } else {
         const content = await this._files.read(entry.file)
         if (content === null) {
@@ -274,7 +331,7 @@ export class CompileContext {
             message: `Context file '${entry.file}' not found`,
           })
         } else {
-          parts.push(content)
+          parts.push(`**Source: ${entry.file}**\n\n${shiftHeadings(content, 1)}`)
         }
       }
     }
@@ -329,7 +386,8 @@ export class CompileContext {
           }
 
           const spec = new Spec(workspace, specPathObj, [])
-          const artifactFile = await specRepo.artifact(spec, activeArtifactType.output())
+          const deltaOutputFilename = activeArtifactType.output().split('/').pop()!
+          const artifactFile = await specRepo.artifact(spec, deltaOutputFilename)
           if (artifactFile === null) continue
 
           const ast = parser.parse(artifactFile.content)
@@ -387,27 +445,30 @@ export class CompileContext {
 
       const specLabel = `${workspace}:${capPath}`
 
+      const sectionsFilter = input.sections
+      const showAll = sectionsFilter === undefined
+
       if (isFresh && metadata !== null) {
         // Fresh metadata path
         const metaParts: string[] = []
-        if (metadata.description !== undefined) {
+        if (showAll && metadata.description !== undefined) {
           metaParts.push(`**Description:** ${metadata.description}`)
         }
-        if (metadata.rules !== undefined && metadata.rules.length > 0) {
+        if ((showAll || sectionsFilter.includes('rules')) && metadata.rules?.length) {
           const rulesText = metadata.rules
-            .map((r) => `#### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
+            .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
             .join('\n\n')
-          metaParts.push(`### Rules\n\n${rulesText}`)
+          metaParts.push(`#### Rules\n\n${rulesText}`)
         }
-        if (metadata.constraints !== undefined && metadata.constraints.length > 0) {
+        if ((showAll || sectionsFilter.includes('constraints')) && metadata.constraints?.length) {
           const constraintsText = metadata.constraints.map((c) => `- ${c}`).join('\n')
-          metaParts.push(`### Constraints\n\n${constraintsText}`)
+          metaParts.push(`#### Constraints\n\n${constraintsText}`)
         }
-        if (metadata.scenarios !== undefined && metadata.scenarios.length > 0) {
+        if ((showAll || sectionsFilter.includes('scenarios')) && metadata.scenarios?.length) {
           const scenariosText = metadata.scenarios
             .map((s) => {
               const lines: string[] = [
-                `#### Scenario: ${s.name}`,
+                `##### Scenario: ${s.name}`,
                 `*Requirement: ${s.requirement}*`,
               ]
               if (s.given?.length) lines.push(`**Given:** ${s.given.join('; ')}`)
@@ -416,7 +477,7 @@ export class CompileContext {
               return lines.join('\n')
             })
             .join('\n\n')
-          metaParts.push(`### Scenarios\n\n${scenariosText}`)
+          metaParts.push(`#### Scenarios\n\n${scenariosText}`)
         }
         specContentParts.push(`### Spec: ${specLabel}\n\n${metaParts.join('\n\n')}`)
       } else {
@@ -438,19 +499,23 @@ export class CompileContext {
         const fallbackParts: string[] = []
         for (const artifactType of schema.artifacts()) {
           if (artifactType.scope() !== 'spec') continue
-          const sections = artifactType.contextSections()
-          if (sections.length === 0) continue
+          const contextSections = artifactType.contextSections()
+          if (contextSections.length === 0) continue
 
-          const artifactFile = await specRepo.artifact(spec, artifactType.output())
+          const outputFilename = artifactType.output().split('/').pop()!
+          const artifactFile = await specRepo.artifact(spec, outputFilename)
           if (artifactFile === null) continue
 
-          const format = artifactType.format() ?? this._inferFormat(artifactType.output())
+          const format = artifactType.format() ?? this._inferFormat(outputFilename)
           const parser = this._parsers.get(format)
           if (parser === undefined) continue
 
           const ast = parser.parse(artifactFile.content)
 
-          for (const section of sections) {
+          for (const section of contextSections) {
+            const role = section.role ?? 'context'
+            if (!showAll && !sectionsFilter.includes(role as SpecSection)) continue
+
             const nodes = this._findNodes(ast, section.selector)
             for (const node of nodes) {
               let content: string
@@ -465,7 +530,6 @@ export class CompileContext {
 
               if (!content) continue
               const title = section.contextTitle ?? node.label ?? 'section'
-              const role = section.role ?? 'context'
               fallbackParts.push(`**${title}** (${role})\n\n${content}`)
             }
           }
@@ -480,7 +544,7 @@ export class CompileContext {
     }
 
     if (specContentParts.length > 0) {
-      parts.push(`## Spec content\n\n${specContentParts.join('\n\n')}`)
+      parts.push(`## Spec content\n\n${specContentParts.join('\n\n---\n\n')}`)
     }
 
     // Part 6: Step hooks (instruction: entries only, pre then post)
@@ -529,7 +593,7 @@ export class CompileContext {
     return {
       stepAvailable,
       blockingArtifacts,
-      instructionBlock: parts.join('\n\n'),
+      instructionBlock: parts.join('\n\n---\n\n'),
       warnings,
     }
   }
@@ -674,6 +738,8 @@ export class CompileContext {
    * @param allSeen - All spec keys ever visited (prevents re-processing)
    * @param ancestors - Current DFS ancestry set for cycle detection
    * @param warnings - Accumulator for advisory warnings
+   * @param maxDepth - Maximum traversal depth; `undefined` = unlimited
+   * @param currentDepth - Current traversal depth (0 = starting spec)
    */
   private async _traverseDependsOn(
     workspace: string,
@@ -683,6 +749,8 @@ export class CompileContext {
     allSeen: Set<string>,
     ancestors: Set<string>,
     warnings: ContextWarning[],
+    maxDepth: number | undefined,
+    currentDepth: number,
   ): Promise<void> {
     const key = `${workspace}:${capPath}`
 
@@ -701,6 +769,8 @@ export class CompileContext {
     if (!includedSpecs.has(key)) {
       dependsOnAdded.set(key, { workspace, capPath })
     }
+
+    if (maxDepth !== undefined && currentDepth >= maxDepth) return
 
     const specRepo = this._specs.get(workspace)
     if (specRepo === undefined) {
@@ -739,6 +809,8 @@ export class CompileContext {
         allSeen,
         newAncestors,
         warnings,
+        maxDepth,
+        currentDepth + 1,
       )
     }
   }
