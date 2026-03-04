@@ -8,19 +8,19 @@ import { EmptySpecIdsError } from '../errors/empty-spec-ids-error.js'
 /** Input for the {@link EditChange} use case. */
 export interface EditChangeInput {
   /** The change to edit. */
-  name: string
+  readonly name: string
   /** Spec paths to add to `specIds`. */
-  addSpecIds?: string[]
+  readonly addSpecIds?: string[]
   /** Spec paths to remove from `specIds`. */
-  removeSpecIds?: string[]
+  readonly removeSpecIds?: string[]
 }
 
 /** Result returned by the {@link EditChange} use case. */
 export interface EditChangeResult {
   /** The updated change. */
-  change: Change
+  readonly change: Change
   /** Whether approvals were invalidated by the edit. */
-  invalidated: boolean
+  readonly invalidated: boolean
 }
 
 /**

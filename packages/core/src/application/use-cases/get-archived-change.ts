@@ -5,7 +5,7 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 /** Input for the {@link GetArchivedChange} use case. */
 export interface GetArchivedChangeInput {
   /** The change name to look up in the archive. */
-  name: string
+  readonly name: string
 }
 
 /**

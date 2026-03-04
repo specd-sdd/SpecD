@@ -7,13 +7,13 @@ import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-erro
 /** Input for the {@link ApproveSignoff} use case. */
 export interface ApproveSignoffInput {
   /** The change to sign off. */
-  name: string
+  readonly name: string
   /** Free-text rationale recorded in the signoff event. */
-  reason: string
+  readonly reason: string
   /** Hashes of the artifacts reviewed during this signoff. */
-  artifactHashes: Record<string, string>
+  readonly artifactHashes: Record<string, string>
   /** Whether the signoff gate is enabled in the active configuration. */
-  approvalsSignoff: boolean
+  readonly approvalsSignoff: boolean
 }
 
 /**

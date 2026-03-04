@@ -8,11 +8,11 @@ import { ArtifactNotOptionalError } from '../../domain/errors/artifact-not-optio
 /** Input for the {@link SkipArtifact} use case. */
 export interface SkipArtifactInput {
   /** The change name. */
-  name: string
+  readonly name: string
   /** The artifact type ID to skip (e.g. `'proposal'`). */
-  artifactId: string
+  readonly artifactId: string
   /** Optional explanation for skipping. */
-  reason?: string
+  readonly reason?: string
 }
 
 /**

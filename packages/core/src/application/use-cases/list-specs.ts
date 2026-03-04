@@ -9,21 +9,21 @@ import { extractSpecSummary } from '../../domain/services/spec-summary.js'
  */
 export interface SpecListEntry {
   /** The workspace this spec belongs to. */
-  workspace: string
+  readonly workspace: string
   /** The spec's capability path within the workspace (e.g. `auth/login`). */
-  path: string
+  readonly path: string
   /**
    * Human-readable title: the `title` field from `.specd-metadata.yaml` when
    * present and non-empty, otherwise the last segment of the capability path.
    */
-  title: string
+  readonly title: string
   /**
    * Short summary, present only when `includeSummary` was requested and a
    * summary could be resolved. Sources in priority order:
    * 1. `description` field from `.specd-metadata.yaml`
    * 2. Extracted from `spec.md` via {@link extractSpecSummary}
    */
-  summary?: string | undefined
+  readonly summary?: string | undefined
 }
 
 /**

@@ -32,17 +32,17 @@ export interface ValidateArtifactsInput extends WorkspaceContext {
 /** A single validation failure — missing artifact, failed rule, or application error. */
 export interface ValidationFailure {
   /** The artifact type ID this failure pertains to. */
-  artifactId: string
+  readonly artifactId: string
   /** Human-readable description suitable for CLI output. */
-  description: string
+  readonly description: string
 }
 
 /** A non-fatal rule mismatch (`required: false` rule that was absent). */
 export interface ValidationWarning {
   /** The artifact type ID this warning pertains to. */
-  artifactId: string
+  readonly artifactId: string
   /** Human-readable description suitable for CLI output. */
-  description: string
+  readonly description: string
 }
 
 /** Result returned by {@link ValidateArtifacts.execute}. */
@@ -51,11 +51,11 @@ export interface ValidateArtifactsResult {
    * `true` only if all required artifacts are present and all validations
    * pass with no errors.
    */
-  passed: boolean
+  readonly passed: boolean
   /** One entry per failed rule, missing artifact, or `DeltaApplicationError`. */
-  failures: ValidationFailure[]
+  readonly failures: ValidationFailure[]
   /** One entry per `required: false` rule that was absent. */
-  warnings: ValidationWarning[]
+  readonly warnings: ValidationWarning[]
 }
 
 /**

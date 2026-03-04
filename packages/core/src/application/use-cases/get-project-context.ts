@@ -48,44 +48,44 @@ export interface GetProjectContextInput extends WorkspaceContext {
 /** A single spec entry in the {@link GetProjectContextResult}. */
 export interface GetProjectContextSpecEntry {
   /** Workspace name the spec belongs to. */
-  workspace: string
+  readonly workspace: string
   /** Capability path of the spec within the workspace. */
-  path: string
+  readonly path: string
   /** Rendered spec content (metadata or fallback). */
-  content: string
+  readonly content: string
 }
 
 /** Result returned by a successful {@link GetProjectContext} execution. */
 export interface GetProjectContextResult {
   /** Rendered project-level context entries (instruction text or file content). */
-  contextEntries: string[]
+  readonly contextEntries: string[]
   /** Specs matched by include/exclude patterns across all configured workspaces. */
-  specs: GetProjectContextSpecEntry[]
+  readonly specs: GetProjectContextSpecEntry[]
   /** Advisory warnings for missing files, stale metadata, unknown workspaces, etc. */
-  warnings: ContextWarning[]
+  readonly warnings: ContextWarning[]
 }
 
 /** Internal resolved spec reference. */
 interface ResolvedSpec {
-  workspace: string
-  capPath: string
+  readonly workspace: string
+  readonly capPath: string
 }
 
 /** Parsed `.specd-metadata.yaml` content. */
 interface SpecMetadata {
-  title?: string
-  description?: string
-  keywords?: string[]
-  dependsOn?: string[]
-  contentHashes?: Record<string, string>
-  rules?: Array<{ requirement: string; rules: string[] }>
-  constraints?: string[]
-  scenarios?: Array<{
-    requirement: string
-    name: string
-    given?: string[]
-    when?: string[]
-    then?: string[]
+  readonly title?: string
+  readonly description?: string
+  readonly keywords?: string[]
+  readonly dependsOn?: string[]
+  readonly contentHashes?: Record<string, string>
+  readonly rules?: Array<{ readonly requirement: string; readonly rules: string[] }>
+  readonly constraints?: string[]
+  readonly scenarios?: Array<{
+    readonly requirement: string
+    readonly name: string
+    readonly given?: string[]
+    readonly when?: string[]
+    readonly then?: string[]
   }>
 }
 

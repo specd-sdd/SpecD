@@ -5,19 +5,19 @@ import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 /** Input for the {@link SaveSpecMetadata} use case. */
 export interface SaveSpecMetadataInput {
   /** The workspace name (e.g. `'default'`, `'billing'`). */
-  workspace: string
+  readonly workspace: string
   /** The spec path within the workspace (e.g. `'auth/oauth'`). */
-  specPath: SpecPath
+  readonly specPath: SpecPath
   /** Raw YAML string to write as `.specd-metadata.yaml`. */
-  content: string
+  readonly content: string
   /** When `true`, skip conflict detection and overwrite unconditionally. */
-  force?: boolean
+  readonly force?: boolean
 }
 
 /** Result returned by the {@link SaveSpecMetadata} use case. */
 export interface SaveSpecMetadataResult {
   /** The qualified spec label (e.g. `'default:auth/oauth'`). */
-  spec: string
+  readonly spec: string
 }
 
 /**

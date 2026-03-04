@@ -109,21 +109,21 @@ export type ChangeEvent =
  */
 export interface ChangeProps {
   /** Unique slug name; immutable after creation. */
-  name: string
+  readonly name: string
   /** Timestamp when the change was created; immutable. */
-  createdAt: Date
+  readonly createdAt: Date
   /** Optional free-text description of the change's purpose. */
-  description?: string
+  readonly description?: string
   /** Current snapshot of active workspace IDs. */
-  workspaces: string[]
+  readonly workspaces: string[]
   /** Current snapshot of spec paths being modified. */
-  specIds: string[]
+  readonly specIds: string[]
   /** Context spec paths; populated at `ready` state; does not trigger invalidation. */
-  contextSpecIds?: string[]
+  readonly contextSpecIds?: string[]
   /** Append-only event history from which lifecycle state is derived. */
-  history: readonly ChangeEvent[]
+  readonly history: readonly ChangeEvent[]
   /** Pre-loaded artifact map; defaults to an empty map. */
-  artifacts?: Map<string, ChangeArtifact>
+  readonly artifacts?: Map<string, ChangeArtifact>
 }
 
 /**

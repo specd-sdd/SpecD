@@ -6,11 +6,11 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 /** Input for the {@link DiscardChange} use case. */
 export interface DiscardChangeInput {
   /** The change to permanently discard. */
-  name: string
+  readonly name: string
   /** Mandatory explanation for discarding. */
-  reason: string
+  readonly reason: string
   /** Optional list of change names that supersede this one. */
-  supersededBy?: string[]
+  readonly supersededBy?: string[]
 }
 
 /**

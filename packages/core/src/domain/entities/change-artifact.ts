@@ -13,17 +13,17 @@ export const SKIPPED_SENTINEL = '__skipped__'
  */
 export interface ChangeArtifactProps {
   /** The artifact type identifier (e.g. `"proposal"`, `"specs"`, `"tasks"`). */
-  type: string
+  readonly type: string
   /** The artifact filename (e.g. `"proposal.md"`). */
-  filename: string
+  readonly filename: string
   /** Whether the artifact is optional in the schema. Defaults to `false`. */
-  optional?: boolean
+  readonly optional?: boolean
   /** Artifact type IDs that must be `complete` before this one can be validated. */
-  requires?: readonly string[]
+  readonly requires?: readonly string[]
   /** Current validation status. Defaults to `"missing"`. */
-  status?: ArtifactStatus
+  readonly status?: ArtifactStatus
   /** SHA-256 hash recorded at last successful validation, if any. */
-  validatedHash?: string
+  readonly validatedHash?: string
 }
 
 /**

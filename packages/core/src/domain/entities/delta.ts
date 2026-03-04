@@ -5,13 +5,13 @@ import { SpecPath } from '../value-objects/spec-path.js'
  */
 export interface DeltaProps {
   /** The spec path this delta targets. */
-  specPath: SpecPath
+  readonly specPath: SpecPath
   /** Block names added to the spec. */
-  added: readonly string[]
+  readonly added: readonly string[]
   /** Block names modified in the spec. */
-  modified: readonly string[]
+  readonly modified: readonly string[]
   /** Block names removed from the spec. */
-  removed: readonly string[]
+  readonly removed: readonly string[]
 }
 
 /**
