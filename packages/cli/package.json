@@ -14,6 +14,21 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@specd/core": "workspace:*"
+    "@clack/prompts": "^0.9.1",
+    "@specd/core": "workspace:*",
+    "@specd/plugin-claude": "workspace:*",
+    "@specd/plugin-codex": "workspace:*",
+    "@specd/plugin-copilot": "workspace:*",
+    "@specd/schema-std": "workspace:*",
+    "@specd/skills": "workspace:*",
+    "@toon-format/toon": "^2.1.0",
+    "boxen": "^8.0.1",
+    "chalk": "^5.6.2",
+    "commander": "^13.0.0",
+    "figlet": "^1.10.0",
+    "yaml": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/figlet": "^1.7.0"
   }
 }
