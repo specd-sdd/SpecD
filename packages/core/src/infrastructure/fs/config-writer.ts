@@ -1,5 +1,6 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import { z } from 'zod'
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml'
 import {
   type ConfigWriter,
@@ -88,7 +89,7 @@ export class FsConfigWriter implements ConfigWriter {
     const content = await fs.readFile(configPath, 'utf8')
     const doc = (yamlParse(content) ?? {}) as Record<string, unknown>
 
-    const skills = (doc['skills'] as Record<string, string[]> | undefined) ?? {}
+    const skills = parseSkills(doc['skills'])
     const existing = skills[agent] ?? []
     const merged = [...new Set([...existing, ...skillNames])]
     skills[agent] = merged
@@ -114,8 +115,24 @@ export class FsConfigWriter implements ConfigWriter {
     }
 
     const doc = (yamlParse(content) ?? {}) as Record<string, unknown>
-    return (doc['skills'] as Record<string, string[]> | undefined) ?? {}
+    return parseSkills(doc['skills'])
   }
+}
+
+// ---- Skills YAML validation ----
+
+/** Validates the `skills` key from `specd.yaml` — a record of agent → skill name list. */
+const skillsSchema = z.record(z.array(z.string()))
+
+/**
+ * Parses a raw `skills` value from a YAML document, returning `{}` if invalid.
+ *
+ * @param raw - The raw value from the YAML document
+ * @returns A valid skills record, or `{}` on validation failure
+ */
+function parseSkills(raw: unknown): Record<string, string[]> {
+  const result = skillsSchema.safeParse(raw)
+  return result.success ? result.data : {}
 }
 
 // ---- Helpers ----
