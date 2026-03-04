@@ -1,3 +1,4 @@
+import * as path from 'node:path'
 import { GetActiveSchema } from '../../application/use-cases/get-active-schema.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { createSchemaRegistry } from '../schema-registry.js'
@@ -43,7 +44,10 @@ export function createGetActiveSchema(
 ): GetActiveSchema {
   if (isSpecdConfig(configOrOptions)) {
     const schemas = createSchemaRegistry('fs', {
-      nodeModulesPaths: kernelOpts?.extraNodeModulesPaths ?? [],
+      nodeModulesPaths: [
+        path.join(configOrOptions.projectRoot, 'node_modules'),
+        ...(kernelOpts?.extraNodeModulesPaths ?? []),
+      ],
     })
     return new GetActiveSchema(schemas)
   }

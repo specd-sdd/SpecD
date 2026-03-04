@@ -1,3 +1,4 @@
+import * as path from 'node:path'
 import { GetProjectContext } from '../../application/use-cases/get-project-context.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { createSpecRepository } from '../spec-repository.js'
@@ -28,7 +29,10 @@ export function createGetProjectContext(
     ]),
   )
   const schemas = createSchemaRegistry('fs', {
-    nodeModulesPaths: kernelOpts?.extraNodeModulesPaths ?? [],
+    nodeModulesPaths: [
+      path.join(config.projectRoot, 'node_modules'),
+      ...(kernelOpts?.extraNodeModulesPaths ?? []),
+    ],
   })
   const files = new FsFileReader()
   const parsers = createArtifactParserRegistry()
