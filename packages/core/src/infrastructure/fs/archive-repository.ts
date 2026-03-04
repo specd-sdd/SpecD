@@ -405,15 +405,21 @@ export class FsArchiveRepository extends ArchiveRepository {
       return null
     }
 
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry)
-      let stat
-      try {
-        stat = await fs.stat(fullPath)
-      } catch {
-        continue
-      }
-      if (!stat.isDirectory()) continue
+    // Stat all entries in parallel to identify directories
+    const statResults = await Promise.all(
+      entries.map(async (entry) => {
+        const fullPath = path.join(dir, entry)
+        try {
+          const stat = await fs.stat(fullPath)
+          return { entry, fullPath, isDir: stat.isDirectory() }
+        } catch {
+          return { entry, fullPath, isDir: false }
+        }
+      }),
+    )
+
+    for (const { entry, fullPath, isDir } of statResults) {
+      if (!isDir) continue
 
       if (entry.endsWith(suffix)) {
         try {
@@ -452,16 +458,23 @@ export class FsArchiveRepository extends ArchiveRepository {
       return
     }
 
-    for (const entry of entries) {
-      if (entry === INDEX_FILE) continue
-      const fullPath = path.join(dir, entry)
-      let stat
-      try {
-        stat = await fs.stat(fullPath)
-      } catch {
-        continue
-      }
-      if (!stat.isDirectory()) continue
+    // Stat all entries in parallel to identify directories
+    const statResults = await Promise.all(
+      entries
+        .filter((e) => e !== INDEX_FILE)
+        .map(async (entry) => {
+          const fullPath = path.join(dir, entry)
+          try {
+            const stat = await fs.stat(fullPath)
+            return { entry, fullPath, isDir: stat.isDirectory() }
+          } catch {
+            return { entry, fullPath, isDir: false }
+          }
+        }),
+    )
+
+    for (const { fullPath, isDir } of statResults) {
+      if (!isDir) continue
 
       // Try to read manifest.json in this directory
       try {
