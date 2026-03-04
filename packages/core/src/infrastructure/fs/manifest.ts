@@ -9,21 +9,21 @@
 /** Git identity as stored in the manifest JSON. */
 export interface ManifestGitIdentity {
   /** Display name of the actor. */
-  name: string
+  readonly name: string
   /** Email address of the actor. */
-  email: string
+  readonly email: string
 }
 
 /** A single artifact descriptor as stored in the manifest `artifacts` array. */
 export interface ManifestArtifact {
   /** The artifact type identifier (e.g. `"proposal"`, `"specs"`). */
-  type: string
+  readonly type: string
   /** The artifact filename (e.g. `"proposal.md"`). */
-  filename: string
+  readonly filename: string
   /** Whether the artifact is optional in the schema. */
-  optional: boolean
+  readonly optional: boolean
   /** Artifact type IDs that must be complete before this one can be validated. */
-  requires: string[]
+  readonly requires: string[]
   /**
    * The hash recorded at last validation.
    *
@@ -31,129 +31,129 @@ export interface ManifestArtifact {
    * - `"__skipped__"` — optional artifact explicitly not produced
    * - `"sha256:..."` — validated
    */
-  validatedHash: string | null
+  readonly validatedHash: string | null
 }
 
 /** Raw JSON shape of a `created` event. */
 export interface RawCreatedEvent {
   /** Event discriminant. */
-  type: 'created'
+  readonly type: 'created'
   /** ISO 8601 timestamp. */
-  at: string
+  readonly at: string
   /** Actor who created the change. */
-  by: ManifestGitIdentity
+  readonly by: ManifestGitIdentity
   /** Workspace IDs at creation time. */
-  workspaces: string[]
+  readonly workspaces: string[]
   /** Spec paths at creation time. */
-  specIds: string[]
+  readonly specIds: string[]
   /** Schema name at creation time. */
-  schemaName: string
+  readonly schemaName: string
   /** Schema version at creation time. */
-  schemaVersion: number
+  readonly schemaVersion: number
 }
 
 /** Raw JSON shape of a `transitioned` event. */
 export interface RawTransitionedEvent {
   /** Event discriminant. */
-  type: 'transitioned'
+  readonly type: 'transitioned'
   /** ISO 8601 timestamp. */
-  at: string
+  readonly at: string
   /** Actor who triggered the transition. */
-  by: ManifestGitIdentity
+  readonly by: ManifestGitIdentity
   /** The state transitioned from. */
-  from: string
+  readonly from: string
   /** The state transitioned to. */
-  to: string
+  readonly to: string
 }
 
 /** Raw JSON shape of a `spec-approved` event. */
 export interface RawSpecApprovedEvent {
   /** Event discriminant. */
-  type: 'spec-approved'
+  readonly type: 'spec-approved'
   /** ISO 8601 timestamp. */
-  at: string
+  readonly at: string
   /** Actor who approved the spec. */
-  by: ManifestGitIdentity
+  readonly by: ManifestGitIdentity
   /** Free-text rationale for the approval. */
-  reason: string
+  readonly reason: string
   /** Hashes of the artifacts reviewed during approval, keyed by artifact type. */
-  artifactHashes: Record<string, string>
+  readonly artifactHashes: Record<string, string>
 }
 
 /** Raw JSON shape of a `signed-off` event. */
 export interface RawSignedOffEvent {
   /** Event discriminant. */
-  type: 'signed-off'
+  readonly type: 'signed-off'
   /** ISO 8601 timestamp. */
-  at: string
+  readonly at: string
   /** Actor who signed off. */
-  by: ManifestGitIdentity
+  readonly by: ManifestGitIdentity
   /** Free-text rationale for the sign-off. */
-  reason: string
+  readonly reason: string
   /** Hashes of the artifacts reviewed during sign-off, keyed by artifact type. */
-  artifactHashes: Record<string, string>
+  readonly artifactHashes: Record<string, string>
 }
 
 /** Raw JSON shape of an `invalidated` event. */
 export interface RawInvalidatedEvent {
   /** Event discriminant. */
-  type: 'invalidated'
+  readonly type: 'invalidated'
   /** ISO 8601 timestamp. */
-  at: string
+  readonly at: string
   /** Actor who triggered the invalidation. */
-  by: ManifestGitIdentity
+  readonly by: ManifestGitIdentity
   /** The reason the approval was invalidated. */
-  cause: string
+  readonly cause: string
 }
 
 /** Raw JSON shape of a `drafted` event. */
 export interface RawDraftedEvent {
   /** Event discriminant. */
-  type: 'drafted'
+  readonly type: 'drafted'
   /** ISO 8601 timestamp. */
-  at: string
+  readonly at: string
   /** Actor who shelved the change. */
-  by: ManifestGitIdentity
+  readonly by: ManifestGitIdentity
   /** Optional explanation for shelving. */
-  reason?: string
+  readonly reason?: string
 }
 
 /** Raw JSON shape of a `restored` event. */
 export interface RawRestoredEvent {
   /** Event discriminant. */
-  type: 'restored'
+  readonly type: 'restored'
   /** ISO 8601 timestamp. */
-  at: string
+  readonly at: string
   /** Actor who restored the change. */
-  by: ManifestGitIdentity
+  readonly by: ManifestGitIdentity
 }
 
 /** Raw JSON shape of a `discarded` event. */
 export interface RawDiscardedEvent {
   /** Event discriminant. */
-  type: 'discarded'
+  readonly type: 'discarded'
   /** ISO 8601 timestamp. */
-  at: string
+  readonly at: string
   /** Actor who discarded the change. */
-  by: ManifestGitIdentity
+  readonly by: ManifestGitIdentity
   /** Mandatory reason for discarding. */
-  reason: string
+  readonly reason: string
   /** Optional list of change names that replace this one. */
-  supersededBy?: string[]
+  readonly supersededBy?: string[]
 }
 
 /** Raw JSON shape of an `artifact-skipped` event. */
 export interface RawArtifactSkippedEvent {
   /** Event discriminant. */
-  type: 'artifact-skipped'
+  readonly type: 'artifact-skipped'
   /** ISO 8601 timestamp. */
-  at: string
+  readonly at: string
   /** Actor who skipped the artifact. */
-  by: ManifestGitIdentity
+  readonly by: ManifestGitIdentity
   /** The artifact type ID that was skipped. */
-  artifactId: string
+  readonly artifactId: string
   /** Optional explanation for skipping. */
-  reason?: string
+  readonly reason?: string
 }
 
 /** Discriminated union of all raw event JSON shapes. */
@@ -171,39 +171,39 @@ export type RawChangeEvent =
 /** The top-level structure of a `manifest.json` file. */
 export interface ChangeManifest {
   /** The change slug; immutable after creation. */
-  name: string
+  readonly name: string
   /** ISO 8601 creation timestamp; immutable after creation. */
-  createdAt: string
+  readonly createdAt: string
   /** Optional free-text description of the change's purpose. */
-  description?: string
+  readonly description?: string
   /**
    * ISO 8601 timestamp when the change was archived.
    *
    * Present only in manifests that have been moved to the archive directory.
    * Absent from active, drafted, and discarded change manifests.
    */
-  archivedAt?: string
+  readonly archivedAt?: string
   /**
    * Git identity of the actor who archived the change.
    *
    * Present only in manifests that have been moved to the archive directory.
    */
-  archivedBy?: ManifestGitIdentity
+  readonly archivedBy?: ManifestGitIdentity
   /** Schema name and version recorded at creation; never updated. */
-  schema: {
+  readonly schema: {
     /** Schema name (e.g. `"@specd/schema-std"`). */
-    name: string
+    readonly name: string
     /** Schema version integer. */
-    version: number
+    readonly version: number
   }
   /** Current snapshot of workspace IDs. */
-  workspaces: string[]
+  readonly workspaces: string[]
   /** Current snapshot of spec paths being modified. */
-  specIds: string[]
+  readonly specIds: string[]
   /** Current snapshot of context spec paths. */
-  contextSpecIds: string[]
+  readonly contextSpecIds: string[]
   /** Artifact descriptors including their validation hashes. */
-  artifacts: ManifestArtifact[]
+  readonly artifacts: ManifestArtifact[]
   /** Append-only event history. */
-  history: RawChangeEvent[]
+  readonly history: RawChangeEvent[]
 }
