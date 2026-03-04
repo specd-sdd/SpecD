@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 /**
  * A lifecycle hook declared in the project-level `workflow` section of `specd.yaml`.
  *
@@ -136,6 +138,15 @@ export interface SpecdConfig {
   readonly llmOptimizedContext?: boolean
 }
 
+/** Minimal shape check for {@link isSpecdConfig} — validates the structural signature. */
+const specdConfigShape = z.object({
+  projectRoot: z.string(),
+  schemaRef: z.string(),
+  workspaces: z.array(z.object({ name: z.string() })),
+  storage: z.object({ changesPath: z.string() }),
+  approvals: z.object({ spec: z.boolean(), signoff: z.boolean() }),
+})
+
 /**
  * Type guard that returns `true` when `v` is a {@link SpecdConfig}.
  *
@@ -146,7 +157,5 @@ export interface SpecdConfig {
  * @returns `true` when `v` is a `SpecdConfig`
  */
 export function isSpecdConfig(v: unknown): v is SpecdConfig {
-  return (
-    typeof v === 'object' && v !== null && 'projectRoot' in v && 'workspaces' in v && 'storage' in v
-  )
+  return specdConfigShape.safeParse(v).success
 }
