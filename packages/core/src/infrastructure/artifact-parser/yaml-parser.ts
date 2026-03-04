@@ -1,5 +1,6 @@
 import { parse as parseYaml, parseDocument, stringify, YAMLMap, YAMLSeq, Scalar } from 'yaml'
 import type { Document } from 'yaml'
+import { z } from 'zod'
 import {
   type ArtifactAST,
   type ArtifactNode,
@@ -8,7 +9,40 @@ import {
   type NodeTypeDescriptor,
   type OutlineEntry,
 } from '../../application/ports/artifact-parser.js'
+import { SchemaValidationError } from '../../domain/errors/schema-validation-error.js'
 import { applyDelta } from './_shared/apply-delta.js'
+
+const selectorSchema: z.ZodType<unknown> = z.lazy(() =>
+  z.object({
+    type: z.string(),
+    matches: z.string().optional(),
+    contains: z.string().optional(),
+    parent: selectorSchema.optional(),
+    index: z.number().optional(),
+    where: z.record(z.string()).optional(),
+  }),
+)
+
+const deltaPositionSchema = z.object({
+  parent: selectorSchema.optional(),
+  after: selectorSchema.optional(),
+  before: selectorSchema.optional(),
+  first: z.boolean().optional(),
+  last: z.boolean().optional(),
+})
+
+const deltaEntrySchema = z.object({
+  op: z.enum(['added', 'modified', 'removed']),
+  selector: selectorSchema.optional(),
+  position: deltaPositionSchema.optional(),
+  rename: z.string().optional(),
+  content: z.string().optional(),
+  value: z.unknown().optional(),
+  strategy: z.enum(['replace', 'append', 'merge-by']).optional(),
+  mergeKey: z.string().optional(),
+})
+
+const deltaArraySchema = z.array(deltaEntrySchema)
 
 /** A YAML-compatible scalar value type. */
 type ScalarValue = string | number | boolean | null
@@ -455,10 +489,18 @@ YAML files are parsed into a normalized AST with \`mapping\`, \`pair\`, \`sequen
    *
    * @param content - The YAML content of the delta file
    * @returns The parsed delta entries, or an empty array if the content is not a sequence
+   * @throws {SchemaValidationError} If the parsed YAML does not conform to the `DeltaEntry` schema
    */
   parseDelta(content: string): readonly DeltaEntry[] {
     const parsed = parseYaml(content) as unknown
     if (!Array.isArray(parsed)) return []
-    return parsed as DeltaEntry[]
+    const result = deltaArraySchema.safeParse(parsed)
+    if (!result.success) {
+      throw new SchemaValidationError(
+        'delta',
+        result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '),
+      )
+    }
+    return result.data as DeltaEntry[]
   }
 }
