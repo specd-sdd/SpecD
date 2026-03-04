@@ -1,4 +1,3 @@
-import path from 'node:path'
 import { CompileContext } from '../../application/use-cases/compile-context.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
@@ -38,16 +37,21 @@ export interface FsCompileContextOptions {
    */
   readonly specRepositories: ReadonlyMap<string, SpecRepository>
   /** Absolute path to the `node_modules` directory for schema resolution. */
-  readonly nodeModulesPath: string
+  readonly nodeModulesPaths: readonly string[]
 }
 
 /**
  * Constructs a `CompileContext` use case wired to all configured workspaces.
  *
  * @param config - The fully-resolved project configuration
+ * @param kernelOpts - Optional kernel-level overrides
+ * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
  * @returns The pre-wired use case instance
  */
-export function createCompileContext(config: SpecdConfig): CompileContext
+export function createCompileContext(
+  config: SpecdConfig,
+  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
+): CompileContext
 /**
  * Constructs a `CompileContext` use case with explicit context and options.
  *
@@ -68,10 +72,11 @@ export function createCompileContext(
  */
 export function createCompileContext(
   configOrContext: SpecdConfig | CompileContextContext,
-  options?: FsCompileContextOptions,
+  options?: FsCompileContextOptions | { extraNodeModulesPaths?: readonly string[] },
 ): CompileContext {
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
+    const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
     const defaultWs = config.workspaces.find((w) => w.name === 'default')!
     const specRepos = new Map(
       config.workspaces.map((ws) => [
@@ -79,7 +84,7 @@ export function createCompileContext(
         createSpecRepository(
           'fs',
           { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
-          { specsPath: ws.specsPath },
+          { specsPath: ws.specsPath, ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}) },
         ),
       ]),
     )
@@ -94,17 +99,17 @@ export function createCompileContext(
         draftsPath: config.storage.draftsPath,
         discardedPath: config.storage.discardedPath,
         specRepositories: specRepos,
-        nodeModulesPath: path.join(config.projectRoot, 'node_modules'),
+        nodeModulesPaths: kernelOpts?.extraNodeModulesPaths ?? [],
       },
     )
   }
-  const opts = options!
+  const opts = options as FsCompileContextOptions
   const changeRepo = createChangeRepository('fs', configOrContext, {
     changesPath: opts.changesPath,
     draftsPath: opts.draftsPath,
     discardedPath: opts.discardedPath,
   })
-  const schemas = createSchemaRegistry('fs', { nodeModulesPath: opts.nodeModulesPath })
+  const schemas = createSchemaRegistry('fs', { nodeModulesPaths: opts.nodeModulesPaths })
   const files = new FsFileReader()
   const parsers = createArtifactParserRegistry()
   return new CompileContext(changeRepo, opts.specRepositories, schemas, files, parsers)

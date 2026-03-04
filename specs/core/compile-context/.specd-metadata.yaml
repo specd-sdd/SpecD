@@ -2,31 +2,29 @@ title: 'CompileContext'
 description: >
   Application use case assembling the instruction block for AI agents entering a lifecycle step by collecting context specs via include/exclude patterns and dependsOn traversal, extracting structured metadata, evaluating step availability, and combining schema instructions, artifact rules, delta context, spec content, and workflow hooks. Read this when implementing context compilation or reasoning about how specs, workspace patterns, hooks, and delta updates are assembled into agent prompts.
 keywords:
-  - 'context'
-  - 'ai-agent'
-  - 'workflow'
-  - 'spec-metadata'
-  - 'delta'
-  - 'lifecycle'
-  - 'artifact'
-  - 'instruction-block'
-  - 'delta-context'
+  - 'context compilation'
+  - 'spec collection'
+  - 'include/exclude patterns'
+  - 'dependsOn traversal'
+  - 'instruction assembly'
+  - 'artifact rules'
+  - 'workflow hooks'
 dependsOn:
-  - 'core/change'
-  - 'core/config'
-  - 'core/spec-metadata'
-  - 'core/schema-format'
-  - 'core/delta-format'
+  - 'core:core/change'
+  - 'core:core/config'
+  - 'core:core/spec-metadata'
+  - 'core:core/schema-format'
+  - 'core:core/delta-format'
 contentHashes:
-  spec.md: 'sha256:a158c2253bcf92199f84b16d0098ad80305e51a4dcd59142003bf595bcda3d92'
-  verify.md: 'sha256:68e091f60a71b9a5f875eb230e9e4f5d97de37453f52c2b86937a0f465f17355'
+  spec.md: 'sha256:b979fd3978691c80ac4fc2041c810cb46af626c36e6763296eae50cd78cf2652'
+  verify.md: 'sha256:65d99da97f2a73e54db1c17fa8d56a344978d593198f847248d60de21cc66cad'
 rules:
   - requirement: 'Ports and constructor'
     rules:
       - 'CompileContext receives at construction time: ChangeRepository, a map of SpecRepository instances (one per configured workspace), SchemaRegistry, FileReader, and ArtifactParserRegistry.'
-      - "ArtifactParserRegistry is a map from format name ('markdown', 'json', 'yaml', 'plaintext') to the corresponding ArtifactParser adapter."
+      - 'ArtifactParserRegistry is a map from format name (markdown, json, yaml, plaintext) to the corresponding ArtifactParser adapter.'
       - 'CompileContext uses ArtifactParserRegistry to look up the correct adapter when injecting delta context for a delta-capable artifact.'
-      - "specs is keyed by workspace name (e.g. 'default', 'billing')."
+      - 'specs is keyed by workspace name (e.g. default, billing).'
       - 'The bootstrap layer constructs one SpecRepository instance per workspace declared in specd.yaml and passes them all here.'
       - 'CompileContext does not create or configure repositories — it only reads from them.'
       - 'Each SpecRepository in the map must have been constructed with the matching RepositoryConfig.workspace value so that repo.workspace() returns the same key used in the map.'
@@ -36,7 +34,7 @@ rules:
       - 'CompileContext does not perform direct filesystem reads.'
   - requirement: 'Input'
     rules:
-      - "CompileContext.execute receives: name (the change name to compile context for), step (the lifecycle step name being entered, e.g. 'designing', 'implementing', 'verifying', 'archiving'), activeArtifact (optional — the artifact ID currently active in the step's iteration, only applicable to the designing step), schemaRef (the schema reference string from specd.yaml), workspaceSchemasPaths (resolved workspace-to-schemas-path map), and config (the resolved project configuration containing context, contextIncludeSpecs, contextExcludeSpecs, artifactRules, workflow, and per-workspace contextIncludeSpecs/contextExcludeSpecs)."
+      - "CompileContext.execute receives: name (the change name to compile context for), step (the lifecycle step name being entered, e.g. designing, implementing, verifying, archiving), activeArtifact (optional — the artifact ID currently active in the step's iteration, only applicable to the designing step), schemaRef (the schema reference string from specd.yaml), workspaceSchemasPaths (resolved workspace-to-schemas-path map), and config (the resolved project configuration containing context, contextIncludeSpecs, contextExcludeSpecs, artifactRules, workflow, and per-workspace contextIncludeSpecs/contextExcludeSpecs)."
       - 'activeArtifact is optional and applicable only to the designing step.'
       - "When activeArtifact is present, only that artifact's instruction and artifactRules are injected."
       - 'When activeArtifact is absent, no artifact instructions are injected.'
@@ -274,7 +272,7 @@ scenarios:
   - requirement: 'Assembled instruction block'
     name: 'Schema instruction included for the active artifact only'
     given:
-      - 'the schema declares artifacts[spec].instruction: "Create specifications..." and artifacts[verify].instruction: "Write scenarios..."'
+      - "the schema declares artifacts[spec].instruction: 'Create specifications...' and artifacts[verify].instruction: 'Write scenarios...'"
       - 'CompileContext.execute is called with activeArtifact: "spec"'
     when:
       - 'CompileContext.execute is called'
@@ -293,7 +291,7 @@ scenarios:
   - requirement: 'Assembled instruction block'
     name: 'artifactRules injected for the active artifact only'
     given:
-      - 'artifactRules.spec: ["All requirements must use SHALL/MUST"] and artifactRules.verify: ["Scenarios must use GIVEN/WHEN/THEN"]'
+      - "artifactRules.spec: ['All requirements must use SHALL/MUST'] and artifactRules.verify: ['Scenarios must use GIVEN/WHEN/THEN']"
       - 'CompileContext.execute is called with activeArtifact: "spec"'
     when:
       - 'CompileContext.execute is called'
@@ -304,7 +302,7 @@ scenarios:
   - requirement: 'Assembled instruction block'
     name: 'Step hooks fire once regardless of artifact iteration'
     given:
-      - 'the designing step declares hooks.pre: [{ instruction: "Plan your approach first." }]'
+      - "the designing step declares hooks.pre: [{ instruction: 'Plan your approach first.' }]"
       - 'CompileContext.execute is called twice — once with activeArtifact: "spec" and once with activeArtifact: "tasks"'
     when:
       - 'CompileContext.execute is called'

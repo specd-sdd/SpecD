@@ -40,6 +40,9 @@ Each `SpecRepository` in the map must have been constructed with the matching `R
 - `schemaRef` — the schema reference string from `specd.yaml`
 - `workspaceSchemasPaths` — resolved workspace-to-schemas-path map
 - `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, `artifactRules`, `workflow`, and per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`
+- `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1–4 are included.
+- `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.
+- `sections` (optional) — when present, restricts the metadata content rendered for each spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, all available sections are rendered (description + rules + constraints + scenarios). `sections` applies only to spec content (step 5 of the assembled instruction block) — it does not affect schema instructions, delta context, artifact rules, step hooks, or available steps.
 
 ### Requirement: Workspace resolution for spec paths
 
@@ -61,7 +64,7 @@ If a pattern or `dependsOn` entry references a workspace name that has no entry 
 2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set.
 3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec paths appears in `change.specIds`).
 4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set.
-5. **`dependsOn` traversal** — starting from `change.contextSpecIds`, `CompileContext` reads each spec's `.specd-metadata.yaml` and follows `dependsOn` links transitively until no new specs are discovered. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4.
+5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.contextSpecIds`, `CompileContext` reads each spec's `.specd-metadata.yaml` and follows `dependsOn` links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely.
 
 A spec matched by multiple include patterns appears exactly once, at the position of the first matching include pattern. Specs added via `dependsOn` traversal that were already included in steps 1–4 also appear once (at their earlier position).
 
@@ -80,9 +83,9 @@ Staleness is advisory — it never blocks context compilation. The fallback ensu
 
 ### Requirement: Step availability
 
-`CompileContext` must evaluate whether the requested step is available for the current change. A step is available if all artifact IDs in the matching `workflow` entry's `requires` list (the entry whose `step` field equals the requested step name) have effective status `complete` via `change.effectiveStatus(type)`.
+`CompileContext` must evaluate whether the requested step is available for the current change. A step is available if all artifact IDs in the matching `workflow` entry's `requires` list (the entry whose `step` field equals the requested step name) have effective status `complete` or `skipped` via `change.effectiveStatus(type)`. A skipped optional artifact satisfies the requirement in the same way a completed artifact does.
 
-If the step is not available (one or more required artifacts are not `complete`), `CompileContext` must include the availability status and the list of blocking artifacts in the result. It must not throw — unavailability is surfaced to the caller, not treated as an error.
+If the step is not available (one or more required artifacts are neither `complete` nor `skipped`), `CompileContext` must include the availability status and the list of blocking artifacts in the result. It must not throw — unavailability is surfaced to the caller, not treated as an error.
 
 ### Requirement: Assembled instruction block
 
@@ -99,11 +102,11 @@ If the step is not available (one or more required artifacts are not `complete`)
 
 4. **Project artifact rules** — if `activeArtifact` is present and it appears in `config.artifactRules`, append the rule strings as a distinct constraints block below the schema instruction. Rules from `artifactRules` are additive — they do not replace the schema instruction.
 
-5. **Spec content** — for each spec in the collected context set, include its content using the following strategy:
-   - If `.specd-metadata.yaml` exists and is fresh: include `description`, `rules`, `constraints`, and `scenarios` from the metadata. This is the compact, machine-optimised representation.
-   - If metadata is absent or stale: fall back to extracting nodes declared in the artifact's `contextSections[]` from the spec's artifact files (loaded via `SpecRepository.artifact()`). For each entry: parse the artifact file via `ArtifactParser.parse()`, apply the `selector` to find matching nodes, extract content per `extract` (`content` → `parser.renderSubtree(node)`; `label` → `node.label`; `both` → label + serialized content), and inject the result labelled with `role` and titled with `contextTitle` (falling back to `node.label`). Entries whose selector matches no node are silently skipped. Emit a staleness warning for this spec.
+5. **Spec content** — for each spec in the collected context set, include its content using the following strategy. When `sections` is present, only the listed sections are rendered; when absent, all available sections are included (description + rules + constraints + scenarios).
+   - If `.specd-metadata.yaml` exists and is fresh: include the requested sections from the metadata. This is the compact, machine-optimised representation.
+   - If metadata is absent or stale: fall back to extracting nodes declared in the artifact's `contextSections[]` from the spec's artifact files (loaded via `SpecRepository.artifact()`). For each entry: parse the artifact file via `ArtifactParser.parse()`, apply the `selector` to find matching nodes, extract content per `extract` (`content` → `parser.renderSubtree(node)`; `label` → `node.label`; `both` → label + serialized content), and inject the result labelled with `role` and titled with `contextTitle` (falling back to `node.label`). Only entries whose `role` matches a requested section are included when `sections` is present. Entries whose selector matches no node are silently skipped. Emit a staleness warning for this spec.
 
-6. **Step hooks** — for the requested step, include all `instruction:` entries from the matching workflow step's `hooks.pre` and `hooks.post`, in declaration order (schema hooks before project-level hooks). `run:` entries are not included — they are executed at archive time, not injected as AI context.
+6. **Step hooks** — for the requested step, include all `instruction:` entries from the matching workflow step's `hooks.pre` and `hooks.post`, in declaration order (schema hooks before project-level hooks). Each entry is prefixed with `[pre]` or `[post]` according to its hook list. `run:` entries are not included — they are executed at archive time, not injected as AI context.
 
 7. **Available steps** — list all steps declared in the schema's `workflow[]`, each annotated with whether it is currently available. Unavailable steps must name the blocking artifacts.
 
@@ -141,7 +144,10 @@ If a pattern or `dependsOn` entry references a workspace name that has no corres
 - Existing artifact outlines are injected per spec ID in `change.specIds`; missing files are silently skipped
 - `ArtifactParserRegistry` must contain an adapter for every `format` value declared in the schema's artifacts; a missing adapter must emit a warning and skip the delta context block — no error
 - Step hooks (`pre`/`post`) fire once per step, not once per artifact iteration
-- `instruction:` hook entries are included in the compiled output; `run:` hook entries are not
+- `instruction:` hook entries are included in the compiled output, each prefixed with `[pre]` or `[post]`; `run:` hook entries are not
+- `dependsOn` traversal is opt-in via `followDeps: true`; when absent or `false`, step 5 is skipped entirely
+- `depth` is only meaningful when `followDeps: true`; it limits traversal levels (1 = direct deps only)
+- `sections` applies only to spec content rendering; schema instructions, delta context, artifact rules, step hooks, and available steps are unaffected
 - Cycle detection is mandatory — cycles in `dependsOn` must not cause infinite loops
 - Metadata-based content (fresh `.specd-metadata.yaml`) is always preferred; the `contextSections` fallback is only used when metadata is absent or stale
 
