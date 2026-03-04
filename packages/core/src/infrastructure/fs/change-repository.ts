@@ -1,5 +1,6 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import { z } from 'zod'
 import { Change } from '../../domain/entities/change.js'
 import { type ChangeEvent } from '../../domain/entities/change.js'
 import { ChangeArtifact, SKIPPED_SENTINEL } from '../../domain/entities/change-artifact.js'
@@ -317,14 +318,22 @@ export class FsChangeRepository extends ChangeRepository {
   }
 
   /**
-   * Reads and JSON-parses `manifest.json` from the given directory.
+   * Reads, JSON-parses, and validates `manifest.json` from the given directory.
    *
    * @param dir - Absolute path to the change directory
-   * @returns The parsed `ChangeManifest`
+   * @returns The parsed and validated `ChangeManifest`
+   * @throws {Error} If the manifest structure is invalid
    */
   private async _loadManifest(dir: string): Promise<ChangeManifest> {
     const content = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
-    return JSON.parse(content) as ChangeManifest
+    const raw: unknown = JSON.parse(content)
+    const result = changeManifestSchema.safeParse(raw)
+    if (!result.success) {
+      throw new Error(
+        `Invalid manifest.json in ${dir}: ${result.error.issues.map((i) => i.message).join(', ')}`,
+      )
+    }
+    return result.data as ChangeManifest
   }
 
   /**
@@ -635,6 +644,46 @@ function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
         : { type: 'artifact-skipped', at: new Date(raw.at), by: raw.by, artifactId: raw.artifactId }
   }
 }
+
+// ---- Manifest validation schema ----
+
+const gitIdentitySchema = z.object({
+  name: z.string(),
+  email: z.string(),
+})
+
+const manifestArtifactSchema = z.object({
+  type: z.string(),
+  filename: z.string(),
+  optional: z.boolean(),
+  requires: z.array(z.string()),
+  validatedHash: z.string().nullable(),
+})
+
+const rawChangeEventSchema = z
+  .object({
+    type: z.string(),
+    at: z.string(),
+    by: gitIdentitySchema,
+  })
+  .passthrough()
+
+const changeManifestSchema = z.object({
+  name: z.string(),
+  createdAt: z.string(),
+  description: z.string().optional(),
+  archivedAt: z.string().optional(),
+  archivedBy: gitIdentitySchema.optional(),
+  schema: z.object({
+    name: z.string(),
+    version: z.number(),
+  }),
+  workspaces: z.array(z.string()),
+  specIds: z.array(z.string()),
+  contextSpecIds: z.array(z.string()).optional(),
+  artifacts: z.array(manifestArtifactSchema),
+  history: z.array(rawChangeEventSchema),
+})
 
 // ---- Node.js ENOENT detection ----
 
