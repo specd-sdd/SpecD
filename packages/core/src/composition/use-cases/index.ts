@@ -1,4 +1,47 @@
 export {
+  createListChanges,
+  type ListChangesContext,
+  type FsListChangesOptions,
+} from './list-changes.js'
+export {
+  createListDrafts,
+  type ListDraftsContext,
+  type FsListDraftsOptions,
+} from './list-drafts.js'
+export {
+  createListDiscarded,
+  type ListDiscardedContext,
+  type FsListDiscardedOptions,
+} from './list-discarded.js'
+export {
+  createListArchived,
+  type ListArchivedContext,
+  type FsListArchivedOptions,
+} from './list-archived.js'
+export {
+  createGetArchivedChange,
+  type GetArchivedChangeContext,
+  type FsGetArchivedChangeOptions,
+} from './get-archived-change.js'
+export {
+  createEditChange,
+  type EditChangeContext,
+  type FsEditChangeOptions,
+} from './edit-change.js'
+export {
+  createSkipArtifact,
+  type SkipArtifactContext,
+  type FsSkipArtifactOptions,
+} from './skip-artifact.js'
+export { createListSpecs, type FsListSpecsOptions } from './list-specs.js'
+export { createGetSpec, type FsGetSpecOptions } from './get-spec.js'
+export { createSaveSpecMetadata, type FsSaveSpecMetadataOptions } from './save-spec-metadata.js'
+export { createGetActiveSchema, type FsGetActiveSchemaOptions } from './get-active-schema.js'
+export { createInitProject } from './init-project.js'
+export { createRecordSkillInstall } from './record-skill-install.js'
+export { createGetSkillsManifest } from './get-skills-manifest.js'
+export { createGetProjectContext } from './get-project-context.js'
+export {
   createCreateChange,
   type CreateChangeContext,
   type FsCreateChangeOptions,
@@ -49,3 +92,4 @@ export {
   type CompileContextContext,
   type FsCompileContextOptions,
 } from './compile-context.js'
+export { createValidateSpecs, type FsValidateSpecsOptions } from './validate-specs.js'
