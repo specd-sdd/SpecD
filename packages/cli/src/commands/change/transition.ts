@@ -1,9 +1,12 @@
 import { type Command } from 'commander'
-import { type ChangeState } from '@specd/core'
+import { type ChangeState, VALID_TRANSITIONS } from '@specd/core'
 import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
+
+/** All valid `ChangeState` values. */
+const VALID_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
 
 /**
  * Registers the `change transition` subcommand on the given parent command.
@@ -18,6 +21,13 @@ export function registerChangeTransition(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, step: string, opts: { format: string; config?: string }) => {
       try {
+        if (!(VALID_STATES as string[]).includes(step)) {
+          process.stderr.write(
+            `error: invalid state '${step}'. valid states: ${VALID_STATES.join(', ')}\n`,
+          )
+          process.exit(1)
+        }
+
         const config = await loadConfig({ configPath: opts.config })
         const kernel = createCliKernel(config)
 
