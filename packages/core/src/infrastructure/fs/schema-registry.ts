@@ -40,9 +40,7 @@ export interface FsSchemaRegistryConfig {
 // Used only inside this module; domain types are built from these shapes.
 // ---------------------------------------------------------------------------
 
-/**
- *
- */
+/** Zod-inferred intermediate shape for a parsed selector before domain conversion. */
 interface SelectorRaw {
   type: string
   matches?: string | undefined
@@ -52,9 +50,7 @@ interface SelectorRaw {
   where?: Record<string, string> | undefined
 }
 
-/**
- *
- */
+/** Zod-inferred intermediate shape for a parsed validation rule before domain conversion. */
 interface ValidationRuleRaw {
   selector?: SelectorRaw | undefined
   path?: string | undefined
@@ -70,9 +66,7 @@ interface ValidationRuleRaw {
   where?: Record<string, string> | undefined
 }
 
-/**
- *
- */
+/** Zod-inferred intermediate shape for a parsed context section before domain conversion. */
 interface ContextSectionRaw {
   selector: SelectorRaw
   role?: 'rules' | 'constraints' | 'scenarios' | 'context' | undefined
@@ -191,9 +185,7 @@ const SchemaYamlZodSchema = z.object({
   workflow: z.array(WorkflowStepZodSchema).optional(),
 })
 
-/**
- *
- */
+/** Zod-inferred type representing a single artifact entry in `schema.yaml`. */
 type ArtifactYaml = z.infer<typeof ArtifactZodSchema>
 
 // ---------------------------------------------------------------------------
