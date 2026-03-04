@@ -11,6 +11,7 @@ import {
 import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
 import { UnsupportedPatternError } from '../../domain/errors/unsupported-pattern-error.js'
 import { changeDirName } from './dir-name.js'
+import { isEnoent } from './is-enoent.js'
 import { type ChangeManifest } from './manifest.js'
 
 /** Filename of the append-only archive index at the archive root. */
@@ -181,8 +182,11 @@ export class FsArchiveRepository extends ArchiveRepository {
         const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
         const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
         map.set(entry.name, this._buildArchivedChange(manifest, archivedName, archivedAt))
-      } catch {
-        // Skip malformed or unreadable entries
+      } catch (err) {
+        // Skip malformed JSON lines, missing manifest directories (ENOENT), or
+        // invalid manifest structure (SyntaxError). Re-throw unexpected I/O errors.
+        if (err instanceof SyntaxError || isEnoent(err)) continue
+        throw err
       }
     }
 
@@ -370,8 +374,9 @@ export class FsArchiveRepository extends ArchiveRepository {
     let content: string
     try {
       content = await fs.readFile(indexPath, 'utf8')
-    } catch {
-      return []
+    } catch (err) {
+      if (isEnoent(err)) return []
+      throw err
     }
     return content.split('\n').filter((l) => l.trim().length > 0)
   }
