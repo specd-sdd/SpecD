@@ -4,6 +4,7 @@ import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
+import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
 
 /**
  * Accumulates repeated option values into an array.
@@ -64,13 +65,19 @@ export function registerChangeCreate(parent: Command): void {
           }
           const workspaces = [...workspaceSet]
 
+          const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
+          const schema = await kernel.specs.getActiveSchema.execute({
+            schemaRef: config.schemaRef,
+            workspaceSchemasPaths,
+          })
+
           const change = await kernel.changes.create.execute({
             name,
             ...(opts.description !== undefined ? { description: opts.description } : {}),
             workspaces,
             specIds,
-            schemaName: config.schemaRef,
-            schemaVersion: 1,
+            schemaName: schema.name(),
+            schemaVersion: schema.version(),
           })
 
           const fmt = parseFormat(opts.format)
