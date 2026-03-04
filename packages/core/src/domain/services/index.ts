@@ -1,4 +1,5 @@
 export { inferFormat } from './format-inference.js'
+export { safeRegex } from './safe-regex.js'
 export {
   evaluateRules,
   selectNodes,
