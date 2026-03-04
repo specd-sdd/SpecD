@@ -7,10 +7,6 @@ const execFileAsync = promisify(execFile)
 
 /**
  * Runs `git <args>` in the given working directory and returns trimmed stdout.
- * Throws if the git process exits with a non-zero code.
- */
-/**
- * Runs `git <args>` in the given working directory and returns trimmed stdout.
  *
  * @param cwd - Working directory for the git command
  * @param args - Arguments to pass to the git binary
