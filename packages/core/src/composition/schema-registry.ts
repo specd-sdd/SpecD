@@ -5,8 +5,13 @@ import { FsSchemaRegistry } from '../infrastructure/fs/schema-registry.js'
  * Filesystem adapter options for `createSchemaRegistry('fs', ...)`.
  */
 export interface FsSchemaRegistryOptions {
-  /** Absolute path to the `node_modules` directory for npm package resolution. */
-  readonly nodeModulesPath: string
+  /**
+   * Ordered list of `node_modules` directories to search for npm schema
+   * packages. Searched in order; first hit wins. Typically the project's
+   * `node_modules` is first, followed by the CLI installation's `node_modules`
+   * as a fallback.
+   */
+  readonly nodeModulesPaths: readonly string[]
 }
 
 /**
@@ -22,6 +27,6 @@ export interface FsSchemaRegistryOptions {
 export function createSchemaRegistry(type: 'fs', options: FsSchemaRegistryOptions): SchemaRegistry {
   switch (type) {
     case 'fs':
-      return new FsSchemaRegistry({ nodeModulesPath: options.nodeModulesPath })
+      return new FsSchemaRegistry({ nodeModulesPaths: options.nodeModulesPaths })
   }
 }
