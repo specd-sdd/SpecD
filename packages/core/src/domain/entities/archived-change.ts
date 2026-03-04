@@ -53,8 +53,8 @@ export class ArchivedChange {
     this._workspace = props.workspace
     this._archivedAt = new Date(props.archivedAt.getTime())
     this._archivedBy = props.archivedBy
-    this._artifacts = props.artifacts
-    this._specIds = props.specIds
+    this._artifacts = [...props.artifacts]
+    this._specIds = [...props.specIds]
     this._schemaName = props.schemaName
     this._schemaVersion = props.schemaVersion
   }

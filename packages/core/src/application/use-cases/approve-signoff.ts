@@ -11,7 +11,7 @@ export interface ApproveSignoffInput {
   /** Free-text rationale recorded in the signoff event. */
   readonly reason: string
   /** Hashes of the artifacts reviewed during this signoff. */
-  readonly artifactHashes: Record<string, string>
+  readonly artifactHashes: Readonly<Record<string, string>>
   /** Whether the signoff gate is enabled in the active configuration. */
   readonly approvalsSignoff: boolean
 }

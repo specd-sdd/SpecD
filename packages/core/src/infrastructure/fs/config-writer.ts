@@ -85,7 +85,11 @@ export class FsConfigWriter implements ConfigWriter {
    * @param agent - The agent name (e.g. `'claude'`)
    * @param skillNames - The skill names to record (deduplicated)
    */
-  async recordSkillInstall(configPath: string, agent: string, skillNames: string[]): Promise<void> {
+  async recordSkillInstall(
+    configPath: string,
+    agent: string,
+    skillNames: readonly string[],
+  ): Promise<void> {
     const content = await fs.readFile(configPath, 'utf8')
     const doc = (yamlParse(content) ?? {}) as Record<string, unknown>
 

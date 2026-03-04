@@ -7,7 +7,7 @@ export interface RecordSkillInstallInput {
   /** The agent name (e.g. `'claude'`). */
   readonly agent: string
   /** The skill names to record. */
-  readonly skillNames: string[]
+  readonly skillNames: readonly string[]
 }
 
 /**
