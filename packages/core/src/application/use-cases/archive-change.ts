@@ -15,20 +15,17 @@ import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
+import { type WorkspaceContext } from '../ports/workspace-context.js'
 
 /** Input for the {@link ArchiveChange} use case. */
-export interface ArchiveChangeInput {
+export interface ArchiveChangeInput extends WorkspaceContext {
   /** The change name to archive. */
-  name: string
-  /** The schema reference string from `specd.yaml`. */
-  schemaRef: string
-  /** Resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. */
-  workspaceSchemasPaths: ReadonlyMap<string, string>
+  readonly name: string
   /**
    * Template variable values available to `run:` hook commands.
    * Provided by the caller from the active config and runtime context.
    */
-  hookVariables: HookVariables
+  readonly hookVariables: HookVariables
 }
 
 /** Result returned by a successful {@link ArchiveChange} execution. */

@@ -16,20 +16,17 @@ import { safeRegex } from '../../domain/services/safe-regex.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
+import { type WorkspaceContext } from '../ports/workspace-context.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
-export interface ValidateArtifactsInput {
+export interface ValidateArtifactsInput extends WorkspaceContext {
   /** The change name to validate. */
-  name: string
+  readonly name: string
   /**
    * The spec path to validate — must be one of `change.specIds`.
    * Encoded as `<workspace>/<capability-path>` (e.g. `"default/auth/oauth"`).
    */
-  specPath: string
-  /** The schema reference string from `specd.yaml`. */
-  schemaRef: string
-  /** Resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. */
-  workspaceSchemasPaths: ReadonlyMap<string, string>
+  readonly specPath: string
 }
 
 /** A single validation failure — missing artifact, failed rule, or application error. */

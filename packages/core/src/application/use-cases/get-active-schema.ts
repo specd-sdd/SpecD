@@ -1,14 +1,10 @@
 import { type Schema } from '../../domain/value-objects/schema.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
+import { type WorkspaceContext } from '../ports/workspace-context.js'
 
 /** Input for the {@link GetActiveSchema} use case. */
-export interface GetActiveSchemaInput {
-  /** The schema reference string from `specd.yaml` (e.g. `'@specd/schema-std'`). */
-  schemaRef: string
-  /** Map of workspace name → absolute `schemasPath` for that workspace. */
-  workspaceSchemasPaths: ReadonlyMap<string, string>
-}
+export type GetActiveSchemaInput = WorkspaceContext
 
 /**
  * Resolves and returns the active schema for the project.
