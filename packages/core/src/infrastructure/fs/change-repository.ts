@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { z } from 'zod'
@@ -344,7 +345,7 @@ export class FsChangeRepository extends ChangeRepository {
    */
   private async _writeManifestAtomic(dir: string, manifest: ChangeManifest): Promise<void> {
     const manifestPath = path.join(dir, 'manifest.json')
-    const tmpPath = path.join(dir, `manifest.json.tmp-${process.pid.toString()}`)
+    const tmpPath = path.join(dir, `manifest.json.tmp-${process.pid.toString()}-${randomUUID()}`)
     const content = JSON.stringify(manifest, null, 2)
     await fs.writeFile(tmpPath, content, 'utf8')
     await fs.rename(tmpPath, manifestPath)
