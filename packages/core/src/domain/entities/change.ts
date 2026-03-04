@@ -200,7 +200,7 @@ export class Change {
 
   /** Context spec paths that provide context but are not being modified. */
   get contextSpecIds(): readonly string[] {
-    return this._contextSpecIds
+    return [...this._contextSpecIds]
   }
 
   /** Read-only view of the append-only event history. */
@@ -324,9 +324,13 @@ export class Change {
    *
    * @param cause - The reason for invalidation
    * @param actor - Git identity of the actor triggering the change
+   * @throws {InvalidStateTransitionError} If the current state cannot transition to `designing`
    */
   invalidate(cause: InvalidatedEvent['cause'], actor: GitIdentity): void {
     const from = this.state
+    if (!isValidTransition(from, 'designing')) {
+      throw new InvalidStateTransitionError(from, 'designing')
+    }
     const now = new Date()
     this._history.push({ type: 'invalidated', cause, at: now, by: actor })
     this._history.push({ type: 'transitioned', from, to: 'designing', at: now, by: actor })
