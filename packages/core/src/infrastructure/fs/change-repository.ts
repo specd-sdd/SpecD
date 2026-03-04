@@ -54,7 +54,6 @@ export class FsChangeRepository extends ChangeRepository {
   private readonly _changesPath: string
   private readonly _draftsPath: string
   private readonly _discardedPath: string
-  private readonly _activeSchema: { name: string; version: number } | undefined
 
   /**
    * Creates a new `FsChangeRepository` instance.
@@ -66,7 +65,6 @@ export class FsChangeRepository extends ChangeRepository {
     this._changesPath = config.changesPath
     this._draftsPath = config.draftsPath
     this._discardedPath = config.discardedPath
-    this._activeSchema = config.activeSchema
   }
 
   /**
@@ -81,7 +79,6 @@ export class FsChangeRepository extends ChangeRepository {
     if (dir === null) return null
 
     const manifest = await this._loadManifest(dir)
-    this._warnOnSchemaMismatch(name, manifest)
     return this._manifestToChange(manifest, dir)
   }
 
@@ -420,25 +417,6 @@ export class FsChangeRepository extends ChangeRepository {
 
     const currentHash = sha256(content)
     return currentHash === artifact.validatedHash ? 'complete' : 'in-progress'
-  }
-
-  /**
-   * Emits a `console.warn` when the manifest's schema differs from the active schema.
-   *
-   * @param name - The change name (used in the warning message)
-   * @param manifest - The parsed manifest whose schema is checked
-   */
-  private _warnOnSchemaMismatch(name: string, manifest: ChangeManifest): void {
-    if (this._activeSchema === undefined) return
-    const { name: activeName, version: activeVersion } = this._activeSchema
-    const { name: storedName, version: storedVersion } = manifest.schema
-    if (storedName !== activeName || storedVersion !== activeVersion) {
-      console.warn(
-        `[specd] Change "${name}" was created with schema ${storedName}@${storedVersion.toString()} ` +
-          `but the active schema is ${activeName}@${activeVersion.toString()}. ` +
-          `The change is still usable — review before archiving.`,
-      )
-    }
   }
 }
 
