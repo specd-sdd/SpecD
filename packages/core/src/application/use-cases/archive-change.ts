@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
+import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
 import { HookFailedError } from '../../domain/errors/hook-failed-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
@@ -149,12 +150,10 @@ export class ArchiveChange {
           const format = artifactType.format() ?? this._inferFormat(outputBasename)
           const formatParser = this._parsers.get(format)
           if (formatParser === undefined) {
-            throw new Error(
-              `No parser registered for format '${format}' (artifact '${artifactType.id()}')`,
-            )
+            throw new ParserNotRegisteredError(format, `artifact '${artifactType.id()}'`)
           }
           if (yamlParser === undefined) {
-            throw new Error('No YAML parser registered — required for delta file parsing')
+            throw new ParserNotRegisteredError('yaml', 'required for delta file parsing')
           }
 
           const deltaFilename =

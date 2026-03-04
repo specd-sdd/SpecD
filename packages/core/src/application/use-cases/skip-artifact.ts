@@ -2,6 +2,7 @@ import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type GitAdapter } from '../ports/git-adapter.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
+import { ArtifactNotFoundError } from '../errors/artifact-not-found-error.js'
 import { ArtifactNotOptionalError } from '../../domain/errors/artifact-not-optional-error.js'
 
 /** Input for the {@link SkipArtifact} use case. */
@@ -41,6 +42,7 @@ export class SkipArtifact {
    * @param input - Skip parameters
    * @returns The updated change
    * @throws {ChangeNotFoundError} If no change with the given name exists
+   * @throws {ArtifactNotFoundError} If the artifact does not exist on the change
    * @throws {ArtifactNotOptionalError} If the artifact is not optional
    */
   async execute(input: SkipArtifactInput): Promise<Change> {
@@ -51,7 +53,7 @@ export class SkipArtifact {
 
     const artifact = change.getArtifact(input.artifactId)
     if (artifact === null) {
-      throw new Error(`Artifact '${input.artifactId}' not found on change '${input.name}'`)
+      throw new ArtifactNotFoundError(input.artifactId, input.name)
     }
 
     if (!artifact.optional) {

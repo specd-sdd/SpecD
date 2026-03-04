@@ -7,6 +7,7 @@ import {
   ArchiveRepository,
   type ArchiveRepositoryConfig,
 } from '../../application/ports/archive-repository.js'
+import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
 import { changeDirName } from './dir-name.js'
 import { type ChangeManifest } from './manifest.js'
 
@@ -133,7 +134,7 @@ export class FsArchiveRepository extends ArchiveRepository {
 
     const sourceDir = await this._resolveChangeDir(change.name)
     if (sourceDir === null) {
-      throw new Error(`Change '${change.name}' not found in changes or drafts`)
+      throw new ChangeNotFoundError(change.name)
     }
 
     // Move the change directory into the archive
