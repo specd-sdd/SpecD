@@ -21,7 +21,7 @@ async function setupRegistry(): Promise<RegistryContext> {
   const defaultSchemasPath = path.join(tmpDir, 'schemas', 'default')
   await fs.mkdir(nodeModulesPath, { recursive: true })
   await fs.mkdir(defaultSchemasPath, { recursive: true })
-  const registry = new FsSchemaRegistry({ nodeModulesPath })
+  const registry = new FsSchemaRegistry({ nodeModulesPaths: [nodeModulesPath] })
   const workspaceSchemasPaths = new Map([['default', defaultSchemasPath]])
   return { registry, tmpDir, nodeModulesPath, defaultSchemasPath, workspaceSchemasPaths }
 }

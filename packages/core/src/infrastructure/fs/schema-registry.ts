@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 import { type SchemaRegistry, type SchemaEntry } from '../../application/ports/schema-registry.js'
@@ -21,8 +22,16 @@ import { SchemaValidationError } from '../../domain/errors/schema-validation-err
 
 /** Construction configuration for {@link FsSchemaRegistry}. */
 export interface FsSchemaRegistryConfig {
-  /** Absolute path to the `node_modules` directory for npm package resolution. */
-  readonly nodeModulesPath: string
+  /**
+   * Ordered list of `node_modules` directories to search when resolving
+   * `@scope/name` schema references. Searched in order; first hit wins.
+   *
+   * Typically includes the project's own `node_modules` as the first entry,
+   * followed by the CLI/tool installation's `node_modules` as a fallback so
+   * that globally-installed schema packages are found even when the project
+   * has no local copy.
+   */
+  readonly nodeModulesPaths: readonly string[]
 }
 
 // ---------------------------------------------------------------------------
@@ -51,6 +60,13 @@ interface ValidationRuleRaw {
   required?: boolean | undefined
   contentMatches?: string | undefined
   children?: ValidationRuleRaw[] | undefined
+  // Flat selector fields — inlined `type`, `matches`, etc. at the rule level
+  type?: string | undefined
+  matches?: string | undefined
+  contains?: string | undefined
+  parent?: SelectorRaw | undefined
+  index?: number | undefined
+  where?: Record<string, string> | undefined
 }
 
 /**
@@ -85,6 +101,14 @@ const ValidationRuleZodSchema: z.ZodType<ValidationRuleRaw> = z.lazy(() =>
     required: z.boolean().optional(),
     contentMatches: z.string().optional(),
     children: z.array(ValidationRuleZodSchema).optional(),
+    // Flat selector fields — allows writing `type: section` directly on the rule
+    // instead of wrapping in `selector: { type: section }`.
+    type: z.string().optional(),
+    matches: z.string().optional(),
+    contains: z.string().optional(),
+    parent: SelectorZodSchema.optional(),
+    index: z.number().optional(),
+    where: z.record(z.string()).optional(),
   }),
 )
 
@@ -201,8 +225,23 @@ function buildSelector(raw: SelectorRaw): Selector {
  * @returns A domain-compatible `ValidationRule`
  */
 function buildValidationRule(raw: ValidationRuleRaw): ValidationRule {
+  // Build selector from either explicit `selector` or flat fields (`type`, `matches`, etc.)
+  let selector: Selector | undefined
+  if (raw.selector !== undefined) {
+    selector = buildSelector(raw.selector)
+  } else if (raw.type !== undefined) {
+    selector = buildSelector({
+      type: raw.type,
+      ...(raw.matches !== undefined ? { matches: raw.matches } : {}),
+      ...(raw.contains !== undefined ? { contains: raw.contains } : {}),
+      ...(raw.parent !== undefined ? { parent: raw.parent } : {}),
+      ...(raw.index !== undefined ? { index: raw.index } : {}),
+      ...(raw.where !== undefined ? { where: raw.where } : {}),
+    })
+  }
+
   return {
-    ...(raw.selector !== undefined ? { selector: buildSelector(raw.selector) } : {}),
+    ...(selector !== undefined ? { selector } : {}),
     ...(raw.path !== undefined ? { path: raw.path } : {}),
     ...(raw.required !== undefined ? { required: raw.required } : {}),
     ...(raw.contentMatches !== undefined ? { contentMatches: raw.contentMatches } : {}),
@@ -281,15 +320,15 @@ function formatZodPath(issuePath: ReadonlyArray<string | number>): string {
  * constructed {@link Schema} instances.
  */
 export class FsSchemaRegistry implements SchemaRegistry {
-  private readonly _nodeModulesPath: string
+  private readonly _nodeModulesPaths: readonly string[]
 
   /**
    * Creates a new `FsSchemaRegistry`.
    *
-   * @param config - Registry configuration including the `node_modules` path
+   * @param config - Registry configuration including the `node_modules` paths
    */
   constructor(config: FsSchemaRegistryConfig) {
-    this._nodeModulesPath = config.nodeModulesPath
+    this._nodeModulesPaths = config.nodeModulesPaths
   }
 
   /**
@@ -303,13 +342,42 @@ export class FsSchemaRegistry implements SchemaRegistry {
     ref: string,
     workspaceSchemasPaths: ReadonlyMap<string, string>,
   ): Promise<Schema | null> {
-    const schemaFilePath = this._resolveFilePath(ref, workspaceSchemasPaths)
-    let content: string
-    try {
-      content = await fs.readFile(schemaFilePath, 'utf-8')
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
-      throw err
+    // Resolve to an absolute path + content. For @-prefixed npm refs we search
+    // nodeModulesPaths in order, then fall back to module resolution (covers
+    // globally-installed schemas co-installed alongside the CLI). Non-@ refs
+    // use a single derived path and return null on ENOENT.
+    let resolvedPath: string | null = null
+    let content: string | null = null
+
+    if (ref.startsWith('@')) {
+      for (const nmPath of this._nodeModulesPaths) {
+        const candidate = path.join(nmPath, ref, 'schema.yaml')
+        const result = await this._tryReadFile(candidate)
+        if (result !== null) {
+          resolvedPath = candidate
+          content = result
+          break
+        }
+      }
+      if (content === null) {
+        const fallbackPath = this._tryModuleResolve(ref)
+        if (fallbackPath !== null) {
+          const result = await this._tryReadFile(fallbackPath)
+          if (result !== null) {
+            resolvedPath = fallbackPath
+            content = result
+          }
+        }
+      }
+      if (content === null || resolvedPath === null) return null
+    } else {
+      resolvedPath = this._resolveFilePath(ref, workspaceSchemasPaths)
+      try {
+        content = await fs.readFile(resolvedPath, 'utf-8')
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+        throw err
+      }
     }
 
     const raw: unknown = parseYaml(content)
@@ -330,7 +398,7 @@ export class FsSchemaRegistry implements SchemaRegistry {
       throw new SchemaValidationError(ref, message)
     }
 
-    return this._buildSchema(ref, parseResult.data, path.dirname(schemaFilePath))
+    return this._buildSchema(ref, parseResult.data, path.dirname(resolvedPath))
   }
 
   /**
@@ -366,26 +434,28 @@ export class FsSchemaRegistry implements SchemaRegistry {
       }
     }
 
-    const specdScopeDir = path.join(this._nodeModulesPath, '@specd')
-    try {
-      const items = await fs.readdir(specdScopeDir, { withFileTypes: true })
-      for (const item of items) {
-        if (!item.isDirectory()) continue
-        if (!item.name.startsWith('schema-')) continue
-        const schemaFile = path.join(specdScopeDir, item.name, 'schema.yaml')
-        try {
-          await fs.access(schemaFile)
-        } catch {
-          continue
+    const seen = new Set<string>()
+    for (const nmPath of this._nodeModulesPaths) {
+      const specdScopeDir = path.join(nmPath, '@specd')
+      try {
+        const items = await fs.readdir(specdScopeDir, { withFileTypes: true })
+        for (const item of items) {
+          if (!item.isDirectory()) continue
+          if (!item.name.startsWith('schema-')) continue
+          const ref = `@specd/${item.name}`
+          if (seen.has(ref)) continue
+          const schemaFile = path.join(specdScopeDir, item.name, 'schema.yaml')
+          try {
+            await fs.access(schemaFile)
+          } catch {
+            continue
+          }
+          seen.add(ref)
+          entries.push({ ref, name: item.name, source: 'npm' })
         }
-        entries.push({
-          ref: `@specd/${item.name}`,
-          name: item.name,
-          source: 'npm',
-        })
+      } catch {
+        // path not found — try next
       }
-    } catch {
-      // @specd scope not in node_modules — no npm entries
     }
 
     return entries
@@ -394,6 +464,39 @@ export class FsSchemaRegistry implements SchemaRegistry {
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * Reads a file and returns its content, or `null` on `ENOENT`.
+   *
+   * @param filePath - Absolute path to read
+   * @returns File content string, or `null` if the file does not exist
+   */
+  private async _tryReadFile(filePath: string): Promise<string | null> {
+    try {
+      return await fs.readFile(filePath, 'utf-8')
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw err
+    }
+  }
+
+  /**
+   * Attempts to resolve `ref/schema.yaml` via Node.js module resolution,
+   * using the location of this file as the starting point. This lets globally-
+   * installed schema packages (co-installed alongside the CLI) be found even
+   * when the user's project has no local `node_modules`.
+   *
+   * @param ref - An npm-scoped schema reference (e.g. `'@specd/schema-std'`)
+   * @returns Absolute path to `schema.yaml`, or `null` if resolution fails
+   */
+  private _tryModuleResolve(ref: string): string | null {
+    try {
+      const require = createRequire(import.meta.url)
+      return require.resolve(`${ref}/schema.yaml`)
+    } catch {
+      return null
+    }
+  }
 
   /**
    * Resolves a schema `ref` string to an absolute path to the `schema.yaml` file.
@@ -406,10 +509,6 @@ export class FsSchemaRegistry implements SchemaRegistry {
     ref: string,
     workspaceSchemasPaths: ReadonlyMap<string, string>,
   ): string {
-    if (ref.startsWith('@')) {
-      return path.join(this._nodeModulesPath, ref, 'schema.yaml')
-    }
-
     if (ref.startsWith('#')) {
       const inner = ref.slice(1)
       const colonIdx = inner.indexOf(':')
