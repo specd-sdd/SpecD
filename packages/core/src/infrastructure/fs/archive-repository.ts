@@ -111,11 +111,17 @@ export class FsArchiveRepository extends ArchiveRepository {
    * @param change - The change to archive
    * @param options - Archive options
    * @param options.force - When `true`, skip the state guard and archive unconditionally
+   * @param options.actor - The git identity of the user performing the archive
+   * @param options.actor.name - The actor's display name
+   * @param options.actor.email - The actor's email address
    * @returns The created `ArchivedChange` record
    * @throws {InvalidStateTransitionError} When the change is not archivable and `force` is not set
    * @throws {Error} When the change directory cannot be found in `changes/` or `drafts/`
    */
-  override async archive(change: Change, options?: { force?: boolean }): Promise<ArchivedChange> {
+  override async archive(
+    change: Change,
+    options?: { force?: boolean; actor?: { name: string; email: string } },
+  ): Promise<{ archivedChange: ArchivedChange; archiveDirPath: string }> {
     if (options?.force !== true) {
       change.assertArchivable()
     }
@@ -134,9 +140,13 @@ export class FsArchiveRepository extends ArchiveRepository {
     await fs.mkdir(path.dirname(archiveDir), { recursive: true })
     await fs.rename(sourceDir, archiveDir)
 
-    // Augment the manifest with archivedAt
+    // Augment the manifest with archivedAt and optional archivedBy
     const manifest = await this._loadManifest(archiveDir)
-    const archivedManifest: ChangeManifest = { ...manifest, archivedAt: archivedAt.toISOString() }
+    const archivedManifest: ChangeManifest = {
+      ...manifest,
+      archivedAt: archivedAt.toISOString(),
+      ...(options?.actor !== undefined ? { archivedBy: options.actor } : {}),
+    }
     await this._writeManifestAtomic(archiveDir, archivedManifest)
 
     // Build the domain record
@@ -145,7 +155,7 @@ export class FsArchiveRepository extends ArchiveRepository {
     // Append index entry (O(1))
     await this._appendIndex({ name: change.name, path: relPath })
 
-    return archivedChange
+    return { archivedChange, archiveDirPath: archiveDir }
   }
 
   /**
@@ -302,7 +312,11 @@ export class FsArchiveRepository extends ArchiveRepository {
       archivedName,
       workspace: SpecPath.parse(firstWorkspace),
       archivedAt,
+      ...(manifest.archivedBy !== undefined ? { archivedBy: manifest.archivedBy } : {}),
       artifacts: manifest.artifacts.map((a) => a.type),
+      specIds: manifest.specIds,
+      schemaName: manifest.schema.name,
+      schemaVersion: manifest.schema.version,
     })
   }
 

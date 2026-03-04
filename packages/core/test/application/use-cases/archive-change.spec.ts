@@ -78,18 +78,25 @@ function makeArchiveRepository(override?: (change: Change) => ArchivedChange): A
     isExternal() {
       return false
     },
-    async archive(change: Change): Promise<ArchivedChange> {
-      if (override) return override(change)
+    async archive(
+      change: Change,
+    ): Promise<{ archivedChange: ArchivedChange; archiveDirPath: string }> {
       const ts = change.createdAt
       const p = (n: number) => String(n).padStart(2, '0')
       const archivedName = `${ts.getUTCFullYear()}${p(ts.getUTCMonth() + 1)}${p(ts.getUTCDate())}-${p(ts.getUTCHours())}${p(ts.getUTCMinutes())}${p(ts.getUTCSeconds())}-${change.name}`
-      return new ArchivedChange({
-        name: change.name,
-        archivedName,
-        workspace: SpecPath.parse(change.workspaces[0] ?? 'default'),
-        archivedAt: new Date(),
-        artifacts: [],
-      })
+      const archivedChange = override
+        ? override(change)
+        : new ArchivedChange({
+            name: change.name,
+            archivedName,
+            workspace: SpecPath.parse(change.workspaces[0] ?? 'default'),
+            archivedAt: new Date(),
+            artifacts: [],
+            specIds: [...change.specIds],
+            schemaName: change.schemaName,
+            schemaVersion: change.schemaVersion,
+          })
+      return { archivedChange, archiveDirPath: `/archive/${archivedName}` }
     },
     async list() {
       return []

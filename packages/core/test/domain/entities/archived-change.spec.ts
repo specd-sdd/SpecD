@@ -14,6 +14,9 @@ describe('ArchivedChange', () => {
         workspace,
         archivedAt,
         artifacts: ['proposal', 'design', 'tasks'],
+        specIds: ['auth/oauth'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
       })
 
       expect(ac.name).toBe('add-oauth-login')
@@ -30,6 +33,9 @@ describe('ArchivedChange', () => {
         workspace,
         archivedAt,
         artifacts: [],
+        specIds: [],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
       })
       expect(ac.artifacts).toHaveLength(0)
     })

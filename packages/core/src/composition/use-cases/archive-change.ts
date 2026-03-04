@@ -1,4 +1,3 @@
-import path from 'node:path'
 import { ArchiveChange } from '../../application/use-cases/archive-change.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
@@ -45,7 +44,7 @@ export interface FsArchiveChangeOptions {
    */
   readonly specRepositories: ReadonlyMap<string, SpecRepository>
   /** Absolute path to the `node_modules` directory for schema resolution. */
-  readonly nodeModulesPath: string
+  readonly nodeModulesPaths: readonly string[]
 }
 
 /**
@@ -56,9 +55,14 @@ export interface FsArchiveChangeOptions {
  * runner, and the git adapter internally.
  *
  * @param config - The fully-resolved project configuration
+ * @param kernelOpts - Optional kernel-level overrides
+ * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
  * @returns The pre-wired use case instance
  */
-export function createArchiveChange(config: SpecdConfig): ArchiveChange
+export function createArchiveChange(
+  config: SpecdConfig,
+  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
+): ArchiveChange
 /**
  * Constructs an `ArchiveChange` use case with explicit context and options.
  *
@@ -82,10 +86,11 @@ export function createArchiveChange(
  */
 export function createArchiveChange(
   configOrContext: SpecdConfig | ArchiveChangeContext,
-  options?: FsArchiveChangeOptions,
+  options?: FsArchiveChangeOptions | { extraNodeModulesPaths?: readonly string[] },
 ): ArchiveChange {
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
+    const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
     const defaultWs = config.workspaces.find((w) => w.name === 'default')!
     const specRepos = new Map(
       config.workspaces.map((ws) => [
@@ -93,7 +98,7 @@ export function createArchiveChange(
         createSpecRepository(
           'fs',
           { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
-          { specsPath: ws.specsPath },
+          { specsPath: ws.specsPath, ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}) },
         ),
       ]),
     )
@@ -112,11 +117,11 @@ export function createArchiveChange(
           ? { archivePattern: config.storage.archivePattern }
           : {}),
         specRepositories: specRepos,
-        nodeModulesPath: path.join(config.projectRoot, 'node_modules'),
+        nodeModulesPaths: kernelOpts?.extraNodeModulesPaths ?? [],
       },
     )
   }
-  const opts = options!
+  const opts = options as FsArchiveChangeOptions
   const changeRepo = createChangeRepository('fs', configOrContext, {
     changesPath: opts.changesPath,
     draftsPath: opts.draftsPath,
@@ -128,7 +133,7 @@ export function createArchiveChange(
     archivePath: opts.archivePath,
     ...(opts.archivePattern !== undefined ? { pattern: opts.archivePattern } : {}),
   })
-  const schemas = createSchemaRegistry('fs', { nodeModulesPath: opts.nodeModulesPath })
+  const schemas = createSchemaRegistry('fs', { nodeModulesPaths: opts.nodeModulesPaths })
   const parsers = createArtifactParserRegistry()
   const hooks = new NodeHookRunner()
   const git = new GitCLIAdapter()
