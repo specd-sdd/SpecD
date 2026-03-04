@@ -16,6 +16,9 @@ dist/
 .env.local
 .env.*.local
 
+# Local config override
+specd.local.yaml
+
 # OS
 .DS_Store
 
