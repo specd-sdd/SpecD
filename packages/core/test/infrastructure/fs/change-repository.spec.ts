@@ -7,6 +7,7 @@ import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { type GitIdentity } from '../../../src/domain/entities/change.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../../src/domain/errors/artifact-conflict-error.js'
+import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { FsChangeRepository } from '../../../src/infrastructure/fs/change-repository.js'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
 
@@ -414,8 +415,8 @@ describe('FsChangeRepository', () => {
     it('given no change directory exists, when saveArtifact is called, then an error is thrown', async () => {
       const change = makeChange('ghost')
       const artifact = new SpecArtifact('proposal.md', '# Content\n')
-      await expect(ctx.repo.saveArtifact(change, artifact)).rejects.toThrow(
-        /Change directory not found/,
+      await expect(ctx.repo.saveArtifact(change, artifact)).rejects.toBeInstanceOf(
+        ChangeNotFoundError,
       )
     })
   })
