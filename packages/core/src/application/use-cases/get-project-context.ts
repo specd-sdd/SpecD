@@ -14,6 +14,7 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type Selector } from '../../domain/value-objects/selector.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
+import { specMetadataSchema } from './_shared/spec-metadata-schema.js'
 import {
   type CompileContextConfig,
   type ContextWarning,
@@ -453,7 +454,8 @@ export class GetProjectContext {
   private _parseMetadata(content: string): SpecMetadata {
     try {
       const parsed = parseYaml(content) as unknown
-      return (parsed as SpecMetadata) ?? {}
+      const result = specMetadataSchema.safeParse(parsed)
+      return result.success ? (result.data as SpecMetadata) : {}
     } catch {
       return {}
     }

@@ -17,6 +17,7 @@ import { type WorkflowStep } from '../../domain/value-objects/workflow-step.js'
 import { type Selector } from '../../domain/value-objects/selector.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
+import { specMetadataSchema } from './_shared/spec-metadata-schema.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
 import { type WorkspaceContext } from '../ports/workspace-context.js'
 
@@ -795,7 +796,8 @@ export class CompileContext {
   private _parseMetadata(content: string): SpecMetadata {
     try {
       const parsed = parseYaml(content) as unknown
-      return (parsed as SpecMetadata) ?? {}
+      const result = specMetadataSchema.safeParse(parsed)
+      return result.success ? (result.data as SpecMetadata) : {}
     } catch {
       return {}
     }
