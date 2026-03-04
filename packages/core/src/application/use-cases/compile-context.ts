@@ -18,6 +18,7 @@ import { type Selector } from '../../domain/value-objects/selector.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
+import { type WorkspaceContext } from '../ports/workspace-context.js'
 
 // Re-export from domain for backwards compatibility
 export { shiftHeadings } from '../../domain/services/shift-headings.js'
@@ -56,39 +57,35 @@ export interface CompileContextConfig {
 export type SpecSection = 'rules' | 'constraints' | 'scenarios'
 
 /** Input for the {@link CompileContext} use case. */
-export interface CompileContextInput {
+export interface CompileContextInput extends WorkspaceContext {
   /** The change name to compile context for. */
-  name: string
+  readonly name: string
   /** The lifecycle step being entered (e.g. `'designing'`, `'implementing'`). */
-  step: string
+  readonly step: string
   /**
    * The artifact ID currently being generated. Only applicable to the `designing` step.
    * When present, only this artifact's instruction and rules are injected.
    * When absent, no artifact instructions are injected.
    */
-  activeArtifact?: string
-  /** Schema reference string from `specd.yaml`. */
-  schemaRef: string
-  /** Resolved workspace-to-schemas-path map. */
-  workspaceSchemasPaths: ReadonlyMap<string, string>
+  readonly activeArtifact?: string
   /** Resolved project configuration. */
-  config: CompileContextConfig
+  readonly config: CompileContextConfig
   /**
    * When `true`, performs the `dependsOn` transitive traversal (step 5) to discover
    * additional specs. When `false` or absent, step 5 is skipped entirely.
    */
-  followDeps?: boolean
+  readonly followDeps?: boolean
   /**
    * Limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`.
    * `1` = direct dependencies only; `2` = deps of deps; absent = unlimited.
    */
-  depth?: number
+  readonly depth?: number
   /**
    * When present, restricts the metadata sections rendered per spec to the listed values.
    * When absent, all sections are rendered (description + rules + constraints + scenarios).
    * Does not affect schema instructions, delta context, artifact rules, hooks, or available steps.
    */
-  sections?: ReadonlyArray<SpecSection>
+  readonly sections?: ReadonlyArray<SpecSection>
 }
 
 /** Advisory warning emitted during context compilation. */

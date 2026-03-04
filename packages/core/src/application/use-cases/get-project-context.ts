@@ -20,32 +20,29 @@ import {
   type SpecSection,
   shiftHeadings,
 } from './compile-context.js'
+import { type WorkspaceContext } from '../ports/workspace-context.js'
 
 /** Input for the {@link GetProjectContext} use case. */
-export interface GetProjectContextInput {
-  /** Schema reference string from `specd.yaml`. */
-  schemaRef: string
-  /** Resolved workspace-to-schemas-path map. */
-  workspaceSchemasPaths: ReadonlyMap<string, string>
+export interface GetProjectContextInput extends WorkspaceContext {
   /** Resolved project configuration. */
-  config: CompileContextConfig
+  readonly config: CompileContextConfig
   /**
    * When `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to
    * discover additional specs beyond those matched by include/exclude patterns.
    * When `false` or absent, traversal is not performed.
    */
-  followDeps?: boolean
+  readonly followDeps?: boolean
   /**
    * Limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`.
    * `1` = direct dependencies only; absent = unlimited.
    */
-  depth?: number
+  readonly depth?: number
   /**
    * When present, restricts the metadata sections rendered per spec to the listed values.
    * When absent, all sections are rendered (description + rules + constraints + scenarios).
    * Project `context:` entries are always rendered in full regardless of this field.
    */
-  sections?: ReadonlyArray<SpecSection>
+  readonly sections?: ReadonlyArray<SpecSection>
 }
 
 /** A single spec entry in the {@link GetProjectContextResult}. */

@@ -7,17 +7,14 @@ import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
+import { type WorkspaceContext } from '../ports/workspace-context.js'
 
 /** Input for the {@link ValidateSpecs} use case. */
-export interface ValidateSpecsInput {
+export interface ValidateSpecsInput extends WorkspaceContext {
   /** Single spec path in `workspace:capability-path` format (e.g. `"default:auth/login"`). */
-  specPath?: string
+  readonly specPath?: string
   /** Validate all specs in this workspace. */
-  workspace?: string
-  /** The schema reference string from `specd.yaml`. */
-  schemaRef: string
-  /** Resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. */
-  workspaceSchemasPaths: ReadonlyMap<string, string>
+  readonly workspace?: string
 }
 
 /** Validation result for a single spec. */
