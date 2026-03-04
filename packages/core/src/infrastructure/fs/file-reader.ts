@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { type FileReader } from '../../application/ports/file-reader.js'
+import { isEnoent } from './is-enoent.js'
 
 /**
  * Filesystem implementation of the {@link FileReader} port.
@@ -44,7 +45,7 @@ export class FsFileReader implements FileReader {
     try {
       return await fs.readFile(resolved, 'utf-8')
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+      if (isEnoent(err)) return null
       throw err
     }
   }
