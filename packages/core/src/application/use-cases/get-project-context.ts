@@ -12,6 +12,7 @@ import {
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type Selector } from '../../domain/value-objects/selector.js'
+import { inferFormat } from '../../domain/services/format-inference.js'
 import {
   type CompileContextConfig,
   type ContextWarning,
@@ -287,7 +288,7 @@ export class GetProjectContext {
           const artifactFile = await specRepo.artifact(spec, outputFilename)
           if (artifactFile === null) continue
 
-          const format = artifactType.format() ?? this._inferFormat(outputFilename)
+          const format = artifactType.format() ?? inferFormat(outputFilename) ?? 'plaintext'
           const parser = this._parsers.get(format)
           if (parser === undefined) continue
 
@@ -641,19 +642,5 @@ export class GetProjectContext {
         currentDepth + 1,
       )
     }
-  }
-
-  /**
-   * Infers the artifact format from a filename extension.
-   *
-   * @param output - Filename to infer format from
-   * @returns Format string (e.g. `"markdown"`, `"json"`, `"yaml"`)
-   */
-  private _inferFormat(output: string): string {
-    const ext = output.split('.').pop() ?? ''
-    if (ext === 'md') return 'markdown'
-    if (ext === 'json') return 'json'
-    if (ext === 'yaml' || ext === 'yml') return 'yaml'
-    return 'plaintext'
   }
 }

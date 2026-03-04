@@ -15,6 +15,7 @@ import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type WorkflowStep } from '../../domain/value-objects/workflow-step.js'
 import { type Selector } from '../../domain/value-objects/selector.js'
+import { inferFormat } from '../../domain/services/format-inference.js'
 
 /**
  * Shifts all Markdown ATX heading levels in a text block by a given delta.
@@ -349,7 +350,8 @@ export class CompileContext {
 
     // Part 3: Delta context (only when activeArtifact has delta: true)
     if (activeArtifactType !== null && activeArtifactType.delta()) {
-      const format = activeArtifactType.format() ?? this._inferFormat(activeArtifactType.output())
+      const format =
+        activeArtifactType.format() ?? inferFormat(activeArtifactType.output()) ?? 'plaintext'
       const parser = this._parsers.get(format)
       if (parser === undefined) {
         warnings.push({
@@ -506,7 +508,7 @@ export class CompileContext {
           const artifactFile = await specRepo.artifact(spec, outputFilename)
           if (artifactFile === null) continue
 
-          const format = artifactType.format() ?? this._inferFormat(outputFilename)
+          const format = artifactType.format() ?? inferFormat(outputFilename) ?? 'plaintext'
           const parser = this._parsers.get(format)
           if (parser === undefined) continue
 
@@ -963,19 +965,5 @@ export class CompileContext {
     return slashIdx >= 0
       ? { workspace: specId.slice(0, slashIdx), capPath: specId.slice(slashIdx + 1) }
       : { workspace: specId, capPath: '' }
-  }
-
-  /**
-   * Infers the format name from an output filename extension.
-   *
-   * @param output - The artifact output filename
-   * @returns The inferred format name
-   */
-  private _inferFormat(output: string): string {
-    const ext = output.split('.').pop() ?? ''
-    if (ext === 'md') return 'markdown'
-    if (ext === 'json') return 'json'
-    if (ext === 'yaml' || ext === 'yml') return 'yaml'
-    return 'plaintext'
   }
 }

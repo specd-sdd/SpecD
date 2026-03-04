@@ -14,6 +14,7 @@ import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
+import { inferFormat } from '../../domain/services/format-inference.js'
 
 /** Input for the {@link ArchiveChange} use case. */
 export interface ArchiveChangeInput {
@@ -147,7 +148,7 @@ export class ArchiveChange {
 
         if (artifactType.delta()) {
           // Delta artifact: parse and apply delta file onto base spec
-          const format = artifactType.format() ?? this._inferFormat(outputBasename)
+          const format = artifactType.format() ?? inferFormat(outputBasename) ?? 'plaintext'
           const formatParser = this._parsers.get(format)
           if (formatParser === undefined) {
             throw new ParserNotRegisteredError(format, `artifact '${artifactType.id()}'`)
@@ -224,19 +225,5 @@ export class ArchiveChange {
       postHookFailures,
       staleMetadataSpecPaths: [...staleSpecIds],
     }
-  }
-
-  /**
-   * Infers the format name from an output filename extension.
-   *
-   * @param output - The artifact output filename
-   * @returns The inferred format name (`'markdown'`, `'json'`, `'yaml'`, or `'plaintext'`)
-   */
-  private _inferFormat(output: string): string {
-    const ext = output.split('.').pop() ?? ''
-    if (ext === 'md') return 'markdown'
-    if (ext === 'json') return 'json'
-    if (ext === 'yaml' || ext === 'yml') return 'yaml'
-    return 'plaintext'
   }
 }

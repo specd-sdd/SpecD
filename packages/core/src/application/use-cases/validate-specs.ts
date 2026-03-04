@@ -6,6 +6,7 @@ import { type ValidationFailure, type ValidationWarning } from './validate-artif
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
+import { inferFormat } from '../../domain/services/format-inference.js'
 
 /** Input for the {@link ValidateSpecs} use case. */
 export interface ValidateSpecsInput {
@@ -191,7 +192,7 @@ export class ValidateSpecs {
       const artifact = await specRepo.artifact(spec, filename)
       if (artifact === null) continue
 
-      const format = artifactType.format() ?? this._inferFormat(filename)
+      const format = artifactType.format() ?? inferFormat(filename)
       const parser = format !== undefined ? this._parsers.get(format) : undefined
       if (parser === undefined) continue
 
@@ -207,21 +208,5 @@ export class ValidateSpecs {
       failures,
       warnings,
     }
-  }
-
-  /**
-   * Infers the artifact format from a filename extension.
-   *
-   * @param filename - Filename to infer format from
-   * @returns Format string, or `undefined` if unrecognised
-   */
-  private _inferFormat(filename: string): string | undefined {
-    const parts = filename.split('.')
-    const ext = parts[parts.length - 1]
-    if (ext === 'md') return 'markdown'
-    if (ext === 'json') return 'json'
-    if (ext === 'yaml' || ext === 'yml') return 'yaml'
-    if (ext === 'txt') return 'plaintext'
-    return undefined
   }
 }
