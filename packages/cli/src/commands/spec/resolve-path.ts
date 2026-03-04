@@ -1,4 +1,4 @@
-import * as fs from 'node:fs'
+import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { type Command } from 'commander'
 import { loadConfig } from '../../load-config.js'
@@ -23,9 +23,9 @@ export function registerSpecResolvePath(parent: Command): void {
 
         const absolute = path.resolve(process.cwd(), fsPath)
 
-        let stat: fs.Stats
+        let stat: Awaited<ReturnType<typeof fs.stat>>
         try {
-          stat = await fs.promises.stat(absolute)
+          stat = await fs.stat(absolute)
         } catch {
           process.stderr.write(`error: path does not exist: ${absolute}\n`)
           process.exit(1)

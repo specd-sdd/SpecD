@@ -1,4 +1,4 @@
-import * as fs from 'node:fs'
+import * as fs from 'node:fs/promises'
 import { type Command } from 'commander'
 import { parse as parseYaml } from 'yaml'
 import { SpecPath } from '@specd/core'
@@ -34,7 +34,7 @@ export function registerSpecWriteMetadata(parent: Command): void {
           // Read content from --input file or stdin
           let content: string
           if (opts.input !== undefined) {
-            content = await fs.promises.readFile(opts.input, 'utf-8')
+            content = await fs.readFile(opts.input, 'utf-8')
           } else {
             content = await readStdin()
           }
