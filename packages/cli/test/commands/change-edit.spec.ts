@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { describe, it, expect, vi, afterEach } from 'vitest'
+import { EmptySpecIdsError } from '@specd/core'
 import {
   makeMockConfig,
   makeMockChange,
@@ -227,7 +228,7 @@ describe('change edit', () => {
 
   it('exits 1 when removing last spec is rejected', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.edit.execute.mockRejectedValue(new Error('cannot remove last spec'))
+    kernel.changes.edit.execute.mockRejectedValue(new EmptySpecIdsError('feat'))
 
     const program = makeProgram()
     registerChangeEdit(program.command('change'))
@@ -242,6 +243,6 @@ describe('change edit', () => {
     ])
 
     expect(process.exit).toHaveBeenCalledWith(1)
-    expect(stderr()).toContain('cannot remove last spec')
+    expect(stderr()).toMatch(/error:/i)
   })
 })

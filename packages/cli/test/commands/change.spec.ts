@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Command } from 'commander'
-import { ChangeNotFoundError } from '@specd/core'
+import { ChangeNotFoundError, InvalidStateTransitionError } from '@specd/core'
 import {
   makeMockConfig,
   makeMockChange,
@@ -645,7 +645,9 @@ describe('change draft', () => {
 
   it('exits 1 with error when change is already drafted', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.draft.execute.mockRejectedValue(new Error('change is already drafted'))
+    kernel.changes.draft.execute.mockRejectedValue(
+      new InvalidStateTransitionError('drafting', 'drafted'),
+    )
 
     const program = makeProgram()
     registerChangeDraft(program.command('change'))

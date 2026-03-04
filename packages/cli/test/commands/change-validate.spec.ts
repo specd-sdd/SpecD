@@ -14,7 +14,7 @@ vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 
 import { loadConfig } from '../../src/load-config.js'
 import { createCliKernel } from '../../src/kernel.js'
-import { ChangeNotFoundError } from '@specd/core'
+import { ChangeNotFoundError, SpecNotInChangeError } from '@specd/core'
 import { registerChangeValidate } from '../../src/commands/change/validate.js'
 
 function setup() {
@@ -123,7 +123,9 @@ describe('change validate', () => {
 
   it('exits 1 when spec path is not in the change', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.validate.execute.mockRejectedValue(new Error('spec not found in change'))
+    kernel.changes.validate.execute.mockRejectedValue(
+      new SpecNotInChangeError('default:billing/invoices', 'feat'),
+    )
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))

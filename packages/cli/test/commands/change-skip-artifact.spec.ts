@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { ChangeNotFoundError, ArtifactNotOptionalError } from '@specd/core'
+import { ChangeNotFoundError, ArtifactNotFoundError, ArtifactNotOptionalError } from '@specd/core'
 import {
   makeMockConfig,
   makeMockKernel,
@@ -126,7 +126,9 @@ describe('change skip-artifact', () => {
 
   it('exits 1 when artifact ID is unknown', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.skipArtifact.execute.mockRejectedValue(new Error('unknown artifact'))
+    kernel.changes.skipArtifact.execute.mockRejectedValue(
+      new ArtifactNotFoundError('unknown-artifact', 'my-change'),
+    )
 
     const program = makeProgram()
     registerChangeSkipArtifact(program.command('change'))
