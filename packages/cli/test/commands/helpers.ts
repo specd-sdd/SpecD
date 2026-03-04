@@ -94,7 +94,9 @@ export function makeMockKernel(overrides: Record<string, any> = {}): any {
     list: { execute: vi.fn().mockResolvedValue([]) },
     get: { execute: vi.fn() },
     saveMetadata: { execute: vi.fn() },
-    getActiveSchema: { execute: vi.fn() },
+    getActiveSchema: {
+      execute: vi.fn().mockResolvedValue({ name: () => '@specd/schema-std', version: () => 1 }),
+    },
     validate: { execute: vi.fn() },
   }
 
