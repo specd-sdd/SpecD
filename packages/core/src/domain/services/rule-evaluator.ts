@@ -253,6 +253,7 @@ export function tokenizeJsonPath(path: string): string[] {
       i += 1 + stop
     } else if (path[i] === '[') {
       const close = path.indexOf(']', i)
+      if (close === -1) break
       tokens.push(path.slice(i, close + 1))
       i = close + 1
     } else {
