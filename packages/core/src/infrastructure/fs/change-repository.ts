@@ -294,7 +294,7 @@ export class FsChangeRepository extends ChangeRepository {
         throw err
       }
 
-      const match = entries.find((entry) => entry.endsWith(suffix))
+      const match = entries.find((entry) => entry.endsWith(suffix) && /^\d{8}-\d{6}/.test(entry))
       if (match !== undefined) {
         return path.join(basePath, match)
       }

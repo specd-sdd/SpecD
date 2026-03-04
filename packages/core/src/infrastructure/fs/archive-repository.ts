@@ -272,7 +272,7 @@ export class FsArchiveRepository extends ArchiveRepository {
       } catch {
         continue
       }
-      const match = entries.find((e) => e.endsWith(suffix))
+      const match = entries.find((e) => e.endsWith(suffix) && /^\d{8}-\d{6}/.test(e))
       if (match !== undefined) return path.join(basePath, match)
     }
     return null
