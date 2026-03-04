@@ -9,6 +9,7 @@ import {
   type ArchiveRepositoryConfig,
 } from '../../application/ports/archive-repository.js'
 import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
+import { UnsupportedPatternError } from '../../domain/errors/unsupported-pattern-error.js'
 import { changeDirName } from './dir-name.js'
 import { type ChangeManifest } from './manifest.js'
 
@@ -88,14 +89,14 @@ export class FsArchiveRepository extends ArchiveRepository {
    * Creates a new `FsArchiveRepository` instance.
    *
    * @param config - Storage paths, archive pattern, and repository configuration
-   * @throws {Error} If `config.pattern` contains the unsupported `{{change.scope}}` variable
+   * @throws {UnsupportedPatternError} If `config.pattern` contains the unsupported `{{change.scope}}` variable
    */
   constructor(config: FsArchiveRepositoryConfig) {
     super(config)
     if ((config.pattern ?? '').includes('{{change.scope}}')) {
-      throw new Error(
-        'Archive pattern variable {{change.scope}} is not supported — ' +
-          'scope paths contain "/" which produces ambiguous directory names',
+      throw new UnsupportedPatternError(
+        '{{change.scope}}',
+        'scope paths contain "/" which produces ambiguous directory names',
       )
     }
     this._changesPath = config.changesPath
