@@ -51,6 +51,7 @@ describe('CreateChange', () => {
 
       expect(result.history).toHaveLength(1)
       const evt = result.history[0]
+      expect(evt).toBeDefined()
       expect(evt?.type).toBe('created')
       if (evt?.type === 'created') {
         expect(evt.by).toEqual(testActor)

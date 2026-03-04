@@ -105,6 +105,10 @@ function makeSpecRepo(
       if (content === undefined || content === null) return null
       return new SpecArtifact(filename, content)
     },
+    save: async () => {},
+    delete: async () => {},
+    ownership: () => 'owned' as const,
+    isExternal: () => false,
   } as unknown as SpecRepository
 }
 
