@@ -1,5 +1,6 @@
 import { ListChanges } from '../../application/use-cases/list-changes.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
+import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 
 /** Domain context for `createListChanges(context, options)`. */
@@ -47,7 +48,7 @@ export function createListChanges(
 ): ListChanges {
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
-    const ws = config.workspaces.find((w) => w.name === 'default')!
+    const ws = getDefaultWorkspace(config)
     return createListChanges(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {
