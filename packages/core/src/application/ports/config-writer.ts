@@ -47,7 +47,11 @@ export interface ConfigWriter {
    * @param agent - The agent name (e.g. `'claude'`)
    * @param skillNames - The skill names to record
    */
-  recordSkillInstall(configPath: string, agent: string, skillNames: string[]): Promise<void>
+  recordSkillInstall(
+    configPath: string,
+    agent: string,
+    skillNames: readonly string[],
+  ): Promise<void>
 
   /**
    * Reads the `skills` key from `specd.yaml` and returns it, or `{}` if absent.

@@ -11,7 +11,7 @@ export interface ApproveSpecInput {
   /** Free-text rationale recorded in the approval event. */
   readonly reason: string
   /** Hashes of the artifacts reviewed during this approval. */
-  readonly artifactHashes: Record<string, string>
+  readonly artifactHashes: Readonly<Record<string, string>>
   /** Whether the spec approval gate is enabled in the active configuration. */
   readonly approvalsSpec: boolean
 }
