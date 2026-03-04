@@ -242,14 +242,15 @@ export class FsSpecRepository extends SpecRepository {
     const files: string[] = []
     const subdirs: string[] = []
 
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry)
-      const stat = await fs.stat(fullPath)
-      if (stat.isDirectory()) {
-        subdirs.push(entry)
-      } else if (stat.isFile()) {
-        files.push(entry)
-      }
+    const stats = await Promise.all(
+      entries.map(async (entry) => {
+        const stat = await fs.stat(path.join(dir, entry))
+        return { entry, isDir: stat.isDirectory(), isFile: stat.isFile() }
+      }),
+    )
+    for (const { entry, isDir, isFile } of stats) {
+      if (isDir) subdirs.push(entry)
+      else if (isFile) files.push(entry)
     }
 
     if (files.length > 0) {
@@ -277,10 +278,11 @@ export class FsSpecRepository extends SpecRepository {
  * @returns Names of entries that are regular files
  */
 async function filterFiles(dir: string, entries: string[]): Promise<string[]> {
-  const results: string[] = []
-  for (const entry of entries) {
-    const stat = await fs.stat(path.join(dir, entry))
-    if (stat.isFile()) results.push(entry)
-  }
-  return results
+  const checks = await Promise.all(
+    entries.map(async (entry) => {
+      const stat = await fs.stat(path.join(dir, entry))
+      return { entry, isFile: stat.isFile() }
+    }),
+  )
+  return checks.filter((c) => c.isFile).map((c) => c.entry)
 }
