@@ -7,6 +7,7 @@ import {
   type InitProjectResult,
 } from '../../application/ports/config-writer.js'
 import { AlreadyInitialisedError } from '../../application/errors/already-initialised-error.js'
+import { isEnoent } from './is-enoent.js'
 
 /**
  * Filesystem implementation of {@link ConfigWriter}.
@@ -156,14 +157,4 @@ async function appendToGitignore(gitignorePath: string, entry: string): Promise<
         : `${existing}\n${entry}\n`
     await fs.writeFile(gitignorePath, newContent, 'utf8')
   }
-}
-
-/**
- * Type-guard for `ENOENT` filesystem errors.
- *
- * @param err - The caught error value
- * @returns `true` if the error has code `ENOENT`
- */
-function isEnoent(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && (err as NodeJS.ErrnoException).code === 'ENOENT'
 }

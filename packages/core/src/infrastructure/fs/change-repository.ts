@@ -15,6 +15,7 @@ import {
 } from '../../application/ports/change-repository.js'
 import { changeDirName } from './dir-name.js'
 import { sha256 } from './hash.js'
+import { isEnoent } from './is-enoent.js'
 import { type ChangeManifest, type ManifestArtifact, type RawChangeEvent } from './manifest.js'
 
 /**
@@ -685,18 +686,6 @@ const changeManifestSchema = z.object({
   artifacts: z.array(manifestArtifactSchema),
   history: z.array(rawChangeEventSchema),
 })
-
-// ---- Node.js ENOENT detection ----
-
-/**
- * Returns `true` if `err` is a Node.js ENOENT filesystem error.
- *
- * @param err - The caught error value to inspect
- * @returns Whether `err` is an ENOENT error
- */
-function isEnoent(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && (err as NodeJS.ErrnoException).code === 'ENOENT'
-}
 
 // ---- Discard detection ----
 

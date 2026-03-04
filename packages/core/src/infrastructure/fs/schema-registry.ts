@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { isEnoent } from './is-enoent.js'
 import { createRequire } from 'node:module'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
@@ -375,7 +376,7 @@ export class FsSchemaRegistry implements SchemaRegistry {
       try {
         content = await fs.readFile(resolvedPath, 'utf-8')
       } catch (err) {
-        if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+        if (isEnoent(err)) return null
         throw err
       }
     }
@@ -475,7 +476,7 @@ export class FsSchemaRegistry implements SchemaRegistry {
     try {
       return await fs.readFile(filePath, 'utf-8')
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+      if (isEnoent(err)) return null
       throw err
     }
   }
@@ -598,7 +599,7 @@ export class FsSchemaRegistry implements SchemaRegistry {
         try {
           templateContent = await fs.readFile(templatePath, 'utf-8')
         } catch (err) {
-          if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+          if (isEnoent(err)) {
             throw new SchemaValidationError(ref, `${ctx}: template file '${r.template}' not found`)
           }
           throw err

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 import { type ConfigLoader } from '../../application/ports/config-loader.js'
+import { isEnoent } from './is-enoent.js'
 import {
   type SpecdConfig,
   type SpecdWorkspaceConfig,
@@ -251,7 +252,7 @@ export class FsConfigLoader implements ConfigLoader {
     try {
       content = await fs.readFile(configPath, 'utf-8')
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (isEnoent(err)) {
         throw new ConfigValidationError(configPath, 'config file not found')
       }
       throw err
