@@ -1,6 +1,7 @@
 import { type ChangeState, isValidTransition } from '../value-objects/change-state.js'
 import { type ArtifactStatus } from '../value-objects/artifact-status.js'
 import { InvalidStateTransitionError } from '../errors/invalid-state-transition-error.js'
+import { CorruptedManifestError } from '../errors/corrupted-manifest-error.js'
 import { type ChangeArtifact } from './change-artifact.js'
 
 /** Git identity of the actor performing an operation. */
@@ -514,14 +515,12 @@ export class Change {
    * Returns the `created` event from the history.
    *
    * @returns The `created` event
-   * @throws {Error} If no `created` event exists — every Change must have one
+   * @throws {CorruptedManifestError} If no `created` event exists — every Change must have one
    */
   private _createdEvent(): CreatedEvent {
     const event = this._history.find((e): e is CreatedEvent => e.type === 'created')
     if (event === undefined) {
-      throw new Error(
-        `Change '${this._name}' has no 'created' event in its history — this is a corrupted manifest`,
-      )
+      throw new CorruptedManifestError(this._name)
     }
     return event
   }
