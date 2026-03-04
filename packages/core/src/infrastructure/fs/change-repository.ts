@@ -109,6 +109,58 @@ export class FsChangeRepository extends ChangeRepository {
   }
 
   /**
+   * Lists all drafted (shelved) changes, oldest first.
+   *
+   * @returns All drafted changes in this workspace, sorted by creation order
+   */
+  override async listDrafts(): Promise<Change[]> {
+    let entries: string[]
+    try {
+      entries = await fs.readdir(this._draftsPath)
+    } catch (err) {
+      if (isEnoent(err)) return []
+      throw err
+    }
+
+    const dirs = await filterDirectories(this._draftsPath, entries)
+    dirs.sort()
+
+    const changes: Change[] = []
+    for (const dirName of dirs) {
+      const dir = path.join(this._draftsPath, dirName)
+      const manifest = await this._loadManifest(dir)
+      changes.push(await this._manifestToChange(manifest, dir))
+    }
+    return changes
+  }
+
+  /**
+   * Lists all discarded changes, oldest first.
+   *
+   * @returns All discarded changes in this workspace, sorted by creation order
+   */
+  override async listDiscarded(): Promise<Change[]> {
+    let entries: string[]
+    try {
+      entries = await fs.readdir(this._discardedPath)
+    } catch (err) {
+      if (isEnoent(err)) return []
+      throw err
+    }
+
+    const dirs = await filterDirectories(this._discardedPath, entries)
+    dirs.sort()
+
+    const changes: Change[] = []
+    for (const dirName of dirs) {
+      const dir = path.join(this._discardedPath, dirName)
+      const manifest = await this._loadManifest(dir)
+      changes.push(await this._manifestToChange(manifest, dir))
+    }
+    return changes
+  }
+
+  /**
    * Persists the change manifest, moving the change directory between
    * `changes/`, `drafts/`, or `discarded/` as the lifecycle state requires.
    *
@@ -321,6 +373,7 @@ export class FsChangeRepository extends ChangeRepository {
     return new Change({
       name: manifest.name,
       createdAt: new Date(manifest.createdAt),
+      ...(manifest.description !== undefined ? { description: manifest.description } : {}),
       workspaces: manifest.workspaces,
       specIds: manifest.specIds,
       contextSpecIds: manifest.contextSpecIds ?? [],
@@ -396,6 +449,7 @@ function changeToManifest(change: Change): ChangeManifest {
   return {
     name: change.name,
     createdAt: change.createdAt.toISOString(),
+    ...(change.description !== undefined ? { description: change.description } : {}),
     schema,
     workspaces: [...change.workspaces],
     specIds: [...change.specIds],

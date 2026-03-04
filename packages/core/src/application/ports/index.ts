@@ -17,3 +17,8 @@ export {
   DeltaApplicationError,
 } from './artifact-parser.js'
 export { type ConfigLoader } from './config-loader.js'
+export {
+  type ConfigWriter,
+  type InitProjectOptions,
+  type InitProjectResult,
+} from './config-writer.js'

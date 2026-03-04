@@ -7,6 +7,8 @@ import { ChangeAlreadyExistsError } from '../errors/change-already-exists-error.
 export interface CreateChangeInput {
   /** Unique slug name for the new change (e.g. `'add-oauth-login'`). */
   name: string
+  /** Optional free-text description of the change's purpose. */
+  description?: string
   /** Workspace IDs this change belongs to. */
   workspaces: string[]
   /** Spec paths being created or modified by this change. */
@@ -68,6 +70,7 @@ export class CreateChange {
     const change = new Change({
       name: input.name,
       createdAt: now,
+      ...(input.description !== undefined ? { description: input.description } : {}),
       workspaces: input.workspaces,
       specIds: input.specIds,
       history: [created],

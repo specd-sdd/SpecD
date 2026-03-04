@@ -22,6 +22,8 @@ export interface SpecRepositoryContext {
 export interface FsSpecRepositoryOptions {
   /** Absolute path to the specs root directory for this workspace. */
   readonly specsPath: string
+  /** Optional logical path prefix for all specs in this workspace. */
+  readonly prefix?: string
 }
 
 /**
@@ -47,6 +49,7 @@ export function createSpecRepository(
         ownership: context.ownership,
         isExternal: context.isExternal,
         specsPath: options.specsPath,
+        ...(options.prefix !== undefined ? { prefix: options.prefix } : {}),
       })
   }
 }

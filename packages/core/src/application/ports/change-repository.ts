@@ -43,13 +43,31 @@ export abstract class ChangeRepository extends Repository {
   abstract get(name: string): Promise<Change | null>
 
   /**
-   * Lists all changes in this workspace, sorted by creation order.
+   * Lists all active (non-drafted, non-discarded) changes, sorted by creation order.
    *
    * Returns {@link Change} objects with artifact state but without content.
    *
-   * @returns All changes in this workspace, oldest first
+   * @returns All active changes in this workspace, oldest first
    */
   abstract list(): Promise<Change[]>
+
+  /**
+   * Lists all drafted (shelved) changes in this workspace, sorted by creation order.
+   *
+   * Returns {@link Change} objects with artifact state but without content.
+   *
+   * @returns All drafted changes in this workspace, oldest first
+   */
+  abstract listDrafts(): Promise<Change[]>
+
+  /**
+   * Lists all discarded changes in this workspace, sorted by creation order.
+   *
+   * Returns {@link Change} objects with artifact state but without content.
+   *
+   * @returns All discarded changes in this workspace, oldest first
+   */
+  abstract listDiscarded(): Promise<Change[]>
 
   /**
    * Persists the change manifest — state, artifact statuses, validated

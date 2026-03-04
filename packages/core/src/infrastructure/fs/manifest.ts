@@ -174,6 +174,8 @@ export interface ChangeManifest {
   name: string
   /** ISO 8601 creation timestamp; immutable after creation. */
   createdAt: string
+  /** Optional free-text description of the change's purpose. */
+  description?: string
   /**
    * ISO 8601 timestamp when the change was archived.
    *
@@ -181,6 +183,12 @@ export interface ChangeManifest {
    * Absent from active, drafted, and discarded change manifests.
    */
   archivedAt?: string
+  /**
+   * Git identity of the actor who archived the change.
+   *
+   * Present only in manifests that have been moved to the archive directory.
+   */
+  archivedBy?: ManifestGitIdentity
   /** Schema name and version recorded at creation; never updated. */
   schema: {
     /** Schema name (e.g. `"@specd/schema-std"`). */
