@@ -1,4 +1,3 @@
-export { hashFiles } from './snapshot-hasher.js'
 export {
   evaluateRules,
   selectNodes,
