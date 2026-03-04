@@ -6,6 +6,22 @@ import {
 } from '../../../application/ports/artifact-parser.js'
 import { type Selector } from '../../../domain/value-objects/selector.js'
 
+/**
+ * Returns `true` if `pattern` is safe to compile as a `RegExp`.
+ *
+ * Rejects patterns longer than 500 characters and patterns containing nested
+ * quantifiers — the primary vector for ReDoS (catastrophic backtracking).
+ *
+ * @param pattern - The raw pattern string to inspect
+ * @returns Whether the pattern is safe to use with `new RegExp()`
+ */
+function isSafePattern(pattern: string): boolean {
+  if (pattern.length > 500) return false
+  // Detect nested quantifiers: e.g. (a+)+ or [a-z]* followed by +
+  if (/([+*?])\{?\d*,?\d*\}?\s*[+*?]|\(([^)]*[+*?][^)]*)\)[+*?]/.test(pattern)) return false
+  return true
+}
+
 /** Internal context for a resolved node. */
 interface NodeCtx {
   node: ArtifactNode
@@ -33,10 +49,14 @@ function matchesWhere(node: ArtifactNode, where: Readonly<Record<string, string>
     const pair = pairs.find((p) => p.label === key)
     if (!pair) return false
     const value = typeof pair.value === 'string' ? pair.value : String(pair.value ?? '')
-    try {
-      const regex = new RegExp(pattern, 'i')
-      if (!regex.test(value)) return false
-    } catch {
+    if (isSafePattern(pattern)) {
+      try {
+        const regex = new RegExp(pattern, 'i')
+        if (!regex.test(value)) return false
+      } catch {
+        if (!value.toLowerCase().includes(pattern.toLowerCase())) return false
+      }
+    } else {
       if (!value.toLowerCase().includes(pattern.toLowerCase())) return false
     }
   }
@@ -55,20 +75,28 @@ function matchesSelector(ctx: NodeCtx, sel: Selector): boolean {
 
   if (sel.matches !== undefined) {
     const label = typeof ctx.node.label === 'string' ? ctx.node.label : ''
-    try {
-      const regex = new RegExp(sel.matches, 'i')
-      if (!regex.test(label)) return false
-    } catch {
+    if (isSafePattern(sel.matches)) {
+      try {
+        const regex = new RegExp(sel.matches, 'i')
+        if (!regex.test(label)) return false
+      } catch {
+        if (!label.toLowerCase().includes(sel.matches.toLowerCase())) return false
+      }
+    } else {
       if (!label.toLowerCase().includes(sel.matches.toLowerCase())) return false
     }
   }
 
   if (sel.contains !== undefined) {
     const value = typeof ctx.node.value === 'string' ? ctx.node.value : String(ctx.node.value ?? '')
-    try {
-      const regex = new RegExp(sel.contains, 'i')
-      if (!regex.test(value)) return false
-    } catch {
+    if (isSafePattern(sel.contains)) {
+      try {
+        const regex = new RegExp(sel.contains, 'i')
+        if (!regex.test(value)) return false
+      } catch {
+        if (!value.toLowerCase().includes(sel.contains.toLowerCase())) return false
+      }
+    } else {
       if (!value.toLowerCase().includes(sel.contains.toLowerCase())) return false
     }
   }
