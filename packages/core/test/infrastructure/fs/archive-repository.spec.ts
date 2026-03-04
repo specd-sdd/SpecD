@@ -253,33 +253,40 @@ describe('FsArchiveRepository', () => {
 
     it('uses custom pattern to place archive directory', async () => {
       const localCtx = await setupRepo('{{year}}/{{change.archivedName}}')
-      const change = await makeArchivableChange(localCtx, 'patterned')
-      const beforeArchive = new Date()
+      try {
+        const change = await makeArchivableChange(localCtx, 'patterned')
+        const beforeArchive = new Date()
 
-      await localCtx.archive.archive(change)
+        await localCtx.archive.archive(change)
 
-      // Year directory should exist (derived from archivedAt, which is ~now)
-      const expectedYear = beforeArchive.getUTCFullYear().toString()
-      const yearDir = path.join(localCtx.archivePath, expectedYear)
-      const yearEntries = await fs.readdir(yearDir)
-      const expectedDirName = changeDirName('patterned', change.createdAt)
-      expect(yearEntries).toContain(expectedDirName)
-
-      await cleanupRepo(localCtx)
+        // Year directory should exist (derived from archivedAt, which is ~now)
+        const expectedYear = beforeArchive.getUTCFullYear().toString()
+        const yearDir = path.join(localCtx.archivePath, expectedYear)
+        const yearEntries = await fs.readdir(yearDir)
+        const expectedDirName = changeDirName('patterned', change.createdAt)
+        expect(yearEntries).toContain(expectedDirName)
+      } finally {
+        await cleanupRepo(localCtx)
+      }
     })
 
     it('index path uses forward slashes with nested pattern', async () => {
       const localCtx = await setupRepo('{{year}}/{{change.archivedName}}')
-      const change = await makeArchivableChange(localCtx, 'slash-test')
+      try {
+        const change = await makeArchivableChange(localCtx, 'slash-test')
 
-      await localCtx.archive.archive(change)
+        await localCtx.archive.archive(change)
 
-      const indexContent = await fs.readFile(path.join(localCtx.archivePath, 'index.jsonl'), 'utf8')
-      const entry = JSON.parse(indexContent.trim()) as Record<string, unknown>
-      expect(entry['path']).toContain('/')
-      expect(entry['path']).not.toContain('\\')
-
-      await cleanupRepo(localCtx)
+        const indexContent = await fs.readFile(
+          path.join(localCtx.archivePath, 'index.jsonl'),
+          'utf8',
+        )
+        const entry = JSON.parse(indexContent.trim()) as Record<string, unknown>
+        expect(entry['path']).toContain('/')
+        expect(entry['path']).not.toContain('\\')
+      } finally {
+        await cleanupRepo(localCtx)
+      }
     })
   })
 
