@@ -179,14 +179,12 @@ export class Change {
 
   /** Schema name recorded at creation time, derived from the `created` history event. */
   get schemaName(): string {
-    const created = this._history.find((e) => e.type === 'created')
-    return created?.type === 'created' ? created.schemaName : ''
+    return this._createdEvent().schemaName
   }
 
   /** Schema version recorded at creation time, derived from the `created` history event. */
   get schemaVersion(): number {
-    const created = this._history.find((e) => e.type === 'created')
-    return created?.type === 'created' ? created.schemaVersion : 0
+    return this._createdEvent().schemaVersion
   }
 
   /** Current snapshot of workspace IDs this change belongs to. */
@@ -510,5 +508,21 @@ export class Change {
    */
   getArtifact(type: string): ChangeArtifact | null {
     return this._artifacts.get(type) ?? null
+  }
+
+  /**
+   * Returns the `created` event from the history.
+   *
+   * @returns The `created` event
+   * @throws {Error} If no `created` event exists — every Change must have one
+   */
+  private _createdEvent(): CreatedEvent {
+    const event = this._history.find((e): e is CreatedEvent => e.type === 'created')
+    if (event === undefined) {
+      throw new Error(
+        `Change '${this._name}' has no 'created' event in its history — this is a corrupted manifest`,
+      )
+    }
+    return event
   }
 }
