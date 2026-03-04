@@ -1,8 +1,8 @@
 import { SpecdError } from './specd-error.js'
 
 /**
- * Thrown when a change manifest is missing its required `created` event,
- * indicating the manifest file is corrupted or was manually edited incorrectly.
+ * Thrown when a change manifest is corrupted — missing required events,
+ * containing invalid state values, or failing schema validation.
  */
 export class CorruptedManifestError extends SpecdError {
   /** Machine-readable error code for programmatic handling. */
@@ -13,11 +13,9 @@ export class CorruptedManifestError extends SpecdError {
   /**
    * Creates a new `CorruptedManifestError`.
    *
-   * @param changeName - The name of the change whose manifest is corrupted
+   * @param context - A string describing the corruption context (e.g. change name or directory path)
    */
-  constructor(changeName: string) {
-    super(
-      `Change '${changeName}' has no 'created' event in its history — this is a corrupted manifest`,
-    )
+  constructor(context: string) {
+    super(`Corrupted manifest: ${context}`)
   }
 }

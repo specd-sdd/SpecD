@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { type FileReader } from '../../application/ports/file-reader.js'
+import { PathTraversalError } from '../../domain/errors/path-traversal-error.js'
 import { isEnoent } from './is-enoent.js'
 
 /**
@@ -30,15 +31,13 @@ export class FsFileReader implements FileReader {
    *
    * @param absolutePath - The absolute filesystem path to read
    * @returns The file contents as a string, or `null` if the file does not exist
-   * @throws {Error} If the resolved path escapes the configured `basePath`
+   * @throws {PathTraversalError} If the resolved path escapes the configured `basePath`
    */
   async read(absolutePath: string): Promise<string | null> {
     const resolved = path.resolve(absolutePath)
     if (this._basePath !== undefined) {
       if (!resolved.startsWith(this._basePath + path.sep) && resolved !== this._basePath) {
-        throw new Error(
-          `Path traversal detected: "${absolutePath}" resolves outside the allowed base directory`,
-        )
+        throw new PathTraversalError(absolutePath)
       }
     }
 

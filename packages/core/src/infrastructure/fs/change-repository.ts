@@ -9,6 +9,8 @@ import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
+import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
+import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
 import {
   ChangeRepository,
   type ChangeRepositoryConfig,
@@ -243,7 +245,7 @@ export class FsChangeRepository extends ChangeRepository {
   ): Promise<void> {
     const dir = await this._resolveDir(change.name)
     if (dir === null) {
-      throw new Error(`Change directory not found for change "${change.name}" — call save() first`)
+      throw new ChangeNotFoundError(change.name)
     }
 
     const filePath = path.join(dir, artifact.filename)
@@ -328,8 +330,8 @@ export class FsChangeRepository extends ChangeRepository {
     const raw: unknown = JSON.parse(content)
     const result = changeManifestSchema.safeParse(raw)
     if (!result.success) {
-      throw new Error(
-        `Invalid manifest.json in ${dir}: ${result.error.issues.map((i) => i.message).join(', ')}`,
+      throw new CorruptedManifestError(
+        `invalid manifest.json in ${dir}: ${result.error.issues.map((i) => i.message).join(', ')}`,
       )
     }
     return result.data as ChangeManifest
@@ -567,7 +569,7 @@ type InvalidatedCause = (typeof INVALIDATED_CAUSES)[number]
  */
 function assertChangeState(value: string, field: string): ChangeState {
   if ((CHANGE_STATES as string[]).includes(value)) return value as ChangeState
-  throw new Error(`Invalid ChangeState in manifest field '${field}': '${value}'`)
+  throw new CorruptedManifestError(`invalid ChangeState in manifest field '${field}': '${value}'`)
 }
 
 /**
@@ -579,7 +581,7 @@ function assertChangeState(value: string, field: string): ChangeState {
  */
 function assertInvalidatedCause(value: string): InvalidatedCause {
   if ((INVALIDATED_CAUSES as readonly string[]).includes(value)) return value as InvalidatedCause
-  throw new Error(`Invalid invalidated cause in manifest: '${value}'`)
+  throw new CorruptedManifestError(`invalid invalidated cause in manifest: '${value}'`)
 }
 
 /**
