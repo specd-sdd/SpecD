@@ -306,6 +306,121 @@ describe('FsSpecRepository', () => {
     })
   })
 
+  // ---- prefix ----
+
+  describe('prefix', () => {
+    let prefixCtx: RepoContext
+
+    beforeEach(async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-spec-prefix-'))
+      const specsPath = path.join(tmpDir, 'specs')
+      await fs.mkdir(specsPath, { recursive: true })
+
+      const repo = new FsSpecRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        specsPath,
+        prefix: '_global',
+      })
+
+      prefixCtx = { repo, specsPath, tmpDir }
+    })
+
+    afterEach(async () => {
+      await cleanupRepo(prefixCtx)
+    })
+
+    it('list() returns prefixed paths', async () => {
+      await writeSpecFile(prefixCtx, 'architecture', 'spec.md', '# Architecture')
+      await writeSpecFile(prefixCtx, 'conventions', 'spec.md', '# Conventions')
+
+      const results = await prefixCtx.repo.list()
+
+      const names = results.map((s) => s.name.toString()).sort()
+      expect(names).toEqual(['_global/architecture', '_global/conventions'])
+    })
+
+    it('get() strips prefix for fs lookup', async () => {
+      await writeSpecFile(prefixCtx, 'architecture', 'spec.md', '# Architecture')
+
+      const result = await prefixCtx.repo.get(SpecPath.parse('_global/architecture'))
+
+      expect(result).not.toBeNull()
+      expect(result!.name.toString()).toBe('_global/architecture')
+      expect(result!.filenames).toContain('spec.md')
+    })
+
+    it('artifact() strips prefix for fs lookup', async () => {
+      const content = '# Architecture spec'
+      await writeSpecFile(prefixCtx, 'architecture', 'spec.md', content)
+      const spec = new Spec('default', SpecPath.parse('_global/architecture'), ['spec.md'])
+
+      const result = await prefixCtx.repo.artifact(spec, 'spec.md')
+
+      expect(result).not.toBeNull()
+      expect(result!.content).toBe(content)
+    })
+
+    it('save() strips prefix for fs write', async () => {
+      const spec = new Spec('default', SpecPath.parse('_global/testing'), [])
+      const artifact = new SpecArtifact('spec.md', '# Testing')
+
+      await prefixCtx.repo.save(spec, artifact)
+
+      const written = await readSpecFile(prefixCtx, 'testing', 'spec.md')
+      expect(written).toBe('# Testing')
+    })
+
+    it('delete() strips prefix for fs removal', async () => {
+      await writeSpecFile(prefixCtx, 'testing', 'spec.md', 'content')
+      const spec = new Spec('default', SpecPath.parse('_global/testing'), ['spec.md'])
+
+      await prefixCtx.repo.delete(spec)
+
+      const dirExists = await fs
+        .access(path.join(prefixCtx.specsPath, 'testing'))
+        .then(() => true)
+        .catch(() => false)
+      expect(dirExists).toBe(false)
+    })
+
+    it('no prefix = current behavior unchanged', async () => {
+      // ctx from the outer describe has no prefix
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', 'content')
+
+      const results = await ctx.repo.list()
+
+      expect(results[0]!.name.toString()).toBe('auth/login')
+    })
+
+    it('multi-segment prefix works correctly', async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-spec-multiprefix-'))
+      const specsPath = path.join(tmpDir, 'specs')
+      await fs.mkdir(specsPath, { recursive: true })
+
+      const repo = new FsSpecRepository({
+        workspace: 'shared',
+        ownership: 'readOnly',
+        isExternal: false,
+        specsPath,
+        prefix: 'team_1/shared',
+      })
+
+      const multiCtx: RepoContext = { repo, specsPath, tmpDir }
+      await writeSpecFile(multiCtx, 'auth/login', 'spec.md', '# Login')
+
+      const results = await repo.list()
+      expect(results[0]!.name.toString()).toBe('team_1/shared/auth/login')
+
+      const spec = await repo.get(SpecPath.parse('team_1/shared/auth/login'))
+      expect(spec).not.toBeNull()
+      expect(spec!.filenames).toContain('spec.md')
+
+      await cleanupRepo(multiCtx)
+    })
+  })
+
   // ---- delete ----
 
   describe('delete', () => {

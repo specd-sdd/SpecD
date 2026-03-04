@@ -24,6 +24,14 @@ export interface FsSpecRepositoryConfig extends SpecRepositoryConfig {
    * slash-separated spec path (e.g. `auth/oauth`).
    */
   readonly specsPath: string
+  /**
+   * Optional logical path prefix for all specs in this workspace.
+   *
+   * When set, `list()` prepends prefix segments to discovered `SpecPath`
+   * values, and `get()` / `artifact()` strip prefix segments before
+   * computing the filesystem path.
+   */
+  readonly prefix?: string
 }
 
 /**
@@ -40,6 +48,7 @@ export interface FsSpecRepositoryConfig extends SpecRepositoryConfig {
  */
 export class FsSpecRepository extends SpecRepository {
   private readonly _specsPath: string
+  private readonly _prefixSegments: readonly string[]
 
   /**
    * Creates a new `FsSpecRepository` instance.
@@ -49,6 +58,8 @@ export class FsSpecRepository extends SpecRepository {
   constructor(config: FsSpecRepositoryConfig) {
     super(config)
     this._specsPath = config.specsPath
+    this._prefixSegments =
+      config.prefix !== undefined ? config.prefix.split('/').filter((s) => s.length > 0) : []
   }
 
   /**
@@ -83,8 +94,19 @@ export class FsSpecRepository extends SpecRepository {
    * @returns All matching specs with their artifact filenames
    */
   override async list(prefix?: SpecPath): Promise<Spec[]> {
-    const basePath =
-      prefix !== undefined ? path.join(this._specsPath, prefix.toFsPath(path.sep)) : this._specsPath
+    let basePath: string
+    if (prefix !== undefined) {
+      // Strip the logical prefix segments from the filter before computing the fs path
+      if (this._prefixSegments.length > 0) {
+        const filterSegments = prefix.toString().split('/')
+        const stripped = filterSegments.slice(this._prefixSegments.length)
+        basePath = stripped.length > 0 ? path.join(this._specsPath, ...stripped) : this._specsPath
+      } else {
+        basePath = path.join(this._specsPath, prefix.toFsPath(path.sep))
+      }
+    } else {
+      basePath = this._specsPath
+    }
 
     const specs: Spec[] = []
     await this._walk(basePath, this._specsPath, specs)
@@ -179,10 +201,19 @@ export class FsSpecRepository extends SpecRepository {
   /**
    * Returns the absolute path to the spec directory for the given spec name.
    *
-   * @param name - The spec identity path
+   * When a prefix is configured, strips the prefix segments from the front
+   * of the spec name before computing the filesystem path. For example,
+   * with prefix `_global`, name `_global/architecture` → fs path `architecture/`.
+   *
+   * @param name - The spec identity path (possibly prefixed)
    * @returns Absolute path to the spec directory
    */
   private _specDir(name: SpecPath): string {
+    if (this._prefixSegments.length > 0) {
+      const nameSegments = name.toString().split('/')
+      const stripped = nameSegments.slice(this._prefixSegments.length)
+      return path.join(this._specsPath, ...stripped)
+    }
     return path.join(this._specsPath, name.toFsPath(path.sep))
   }
 
@@ -225,7 +256,8 @@ export class FsSpecRepository extends SpecRepository {
       const rel = path.relative(root, dir)
       const segments = rel.split(path.sep).filter((s) => s.length > 0)
       if (segments.length > 0) {
-        const specPath = SpecPath.fromSegments(segments)
+        const prefixed = [...this._prefixSegments, ...segments]
+        const specPath = SpecPath.fromSegments(prefixed)
         results.push(new Spec(this.workspace(), specPath, files))
       }
     }
