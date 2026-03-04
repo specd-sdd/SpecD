@@ -328,12 +328,17 @@ export class Change {
    */
   invalidate(cause: InvalidatedEvent['cause'], actor: GitIdentity): void {
     const from = this.state
-    if (!isValidTransition(from, 'designing')) {
+    // Invalidation is a forced rollback — only throw if already in a terminal
+    // state (archivable) where no further transitions are meaningful.
+    if (from === 'archivable') {
       throw new InvalidStateTransitionError(from, 'designing')
     }
     const now = new Date()
     this._history.push({ type: 'invalidated', cause, at: now, by: actor })
-    this._history.push({ type: 'transitioned', from, to: 'designing', at: now, by: actor })
+    // Only push a transition event when we are not already in 'designing'.
+    if (from !== 'designing') {
+      this._history.push({ type: 'transitioned', from, to: 'designing', at: now, by: actor })
+    }
     for (const artifact of this._artifacts.values()) {
       artifact.resetValidation()
     }
