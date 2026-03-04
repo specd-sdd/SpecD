@@ -47,14 +47,7 @@ export class SpecPath extends DomainPath {
     const segments = trimmed.split('/').filter((s) => s.length > 0)
     if (segments.length === 0) throw new InvalidSpecPathError('path cannot be empty')
 
-    for (const segment of segments) {
-      if (segment === '.' || segment === '..') {
-        throw new InvalidSpecPathError(`segment '${segment}' is not allowed`)
-      }
-      if (/[\\:*?"<>|]/.test(segment)) {
-        throw new InvalidSpecPathError(`segment '${segment}' contains invalid characters`)
-      }
-    }
+    SpecPath._validateSegments(segments)
 
     return new SpecPath(segments)
   }
@@ -64,11 +57,29 @@ export class SpecPath extends DomainPath {
    *
    * @param segments - Non-empty array of path segments
    * @returns A `SpecPath` instance wrapping the given segments
-   * @throws {InvalidSpecPathError} If the segments array is empty
+   * @throws {InvalidSpecPathError} If the segments array is empty or any segment is invalid
    */
   static fromSegments(segments: readonly string[]): SpecPath {
     if (segments.length === 0) throw new InvalidSpecPathError('segments cannot be empty')
+    SpecPath._validateSegments(segments)
     return new SpecPath(segments)
+  }
+
+  /**
+   * Validates each segment in the array, throwing if any is invalid.
+   *
+   * @param segments - The segments to validate
+   * @throws {InvalidSpecPathError} If any segment is `.`, `..`, or contains reserved characters
+   */
+  private static _validateSegments(segments: readonly string[]): void {
+    for (const segment of segments) {
+      if (segment === '.' || segment === '..') {
+        throw new InvalidSpecPathError(`segment '${segment}' is not allowed`)
+      }
+      if (/[\\:*?"<>|]/.test(segment)) {
+        throw new InvalidSpecPathError(`segment '${segment}' contains invalid characters`)
+      }
+    }
   }
 
   /**
