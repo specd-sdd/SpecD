@@ -5,6 +5,13 @@ import {
   ApprovalGateDisabledError,
   SchemaNotFoundError,
   InvalidSpecPathError,
+  SpecNotInChangeError,
+  EmptySpecIdsError,
+  ArtifactNotFoundError,
+  CorruptedManifestError,
+  ParserNotRegisteredError,
+  UnsupportedPatternError,
+  PathTraversalError,
 } from '@specd/core'
 import {
   InvalidStateTransitionError,
@@ -39,7 +46,14 @@ export function handleError(err: unknown): never {
     err instanceof ApprovalGateDisabledError ||
     err instanceof ArtifactConflictError ||
     err instanceof ConfigValidationError ||
-    err instanceof InvalidSpecPathError
+    err instanceof InvalidSpecPathError ||
+    err instanceof SpecNotInChangeError ||
+    err instanceof EmptySpecIdsError ||
+    err instanceof ArtifactNotFoundError ||
+    err instanceof CorruptedManifestError ||
+    err instanceof ParserNotRegisteredError ||
+    err instanceof UnsupportedPatternError ||
+    err instanceof PathTraversalError
   ) {
     process.stderr.write(`error: ${err.message}\n`)
     process.exit(1)

@@ -37,13 +37,6 @@ export function registerChangeSkipArtifact(parent: Command): void {
             output({ result: 'ok', name, artifactId }, fmt)
           }
         } catch (err) {
-          if (
-            err instanceof Error &&
-            (err.message.includes('unknown artifact') || err.message.includes('not optional'))
-          ) {
-            process.stderr.write(`error: ${err.message}\n`)
-            process.exit(1)
-          }
           handleError(err)
         }
       },

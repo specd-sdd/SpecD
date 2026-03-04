@@ -100,14 +100,6 @@ export function registerChangeEdit(parent: Command): void {
             )
           }
         } catch (err) {
-          if (
-            err instanceof Error &&
-            (err.message.includes('cannot remove last spec') ||
-              err.message.includes('not in specIds'))
-          ) {
-            process.stderr.write(`error: ${err.message}\n`)
-            process.exit(1)
-          }
           handleError(err)
         }
       },
