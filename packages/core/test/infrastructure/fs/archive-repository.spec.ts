@@ -150,13 +150,13 @@ describe('FsArchiveRepository', () => {
     it('returns an ArchivedChange with correct fields', async () => {
       const change = await makeArchivableChange(ctx, 'add-auth')
 
-      const result = await ctx.archive.archive(change)
+      const { archivedChange } = await ctx.archive.archive(change)
 
-      expect(result.name).toBe('add-auth')
-      expect(result.archivedName).toBe(changeDirName('add-auth', change.createdAt))
-      expect(result.workspace.toString()).toBe('default')
-      expect(result.archivedAt).toBeInstanceOf(Date)
-      expect(result.artifacts).toEqual([])
+      expect(archivedChange.name).toBe('add-auth')
+      expect(archivedChange.archivedName).toBe(changeDirName('add-auth', change.createdAt))
+      expect(archivedChange.workspace.toString()).toBe('default')
+      expect(archivedChange.archivedAt).toBeInstanceOf(Date)
+      expect(archivedChange.artifacts).toEqual([])
     })
 
     it('augments the manifest with archivedAt', async () => {
@@ -231,9 +231,9 @@ describe('FsArchiveRepository', () => {
       })
       await ctx.changes.save(change)
 
-      const result = await ctx.archive.archive(change, { force: true })
+      const { archivedChange } = await ctx.archive.archive(change, { force: true })
 
-      expect(result.name).toBe('forced')
+      expect(archivedChange.name).toBe('forced')
     })
 
     it('archives a drafted change from drafts/', async () => {
@@ -244,9 +244,9 @@ describe('FsArchiveRepository', () => {
       // Restore to archivable state (already archivable, just drafted)
       // Actually we need to check: can an archivable change also be drafted?
       // The isDrafted flag is orthogonal to state. Let's just archive directly.
-      const result = await ctx.archive.archive(change)
+      const { archivedChange } = await ctx.archive.archive(change)
 
-      expect(result.name).toBe('drafted-change')
+      expect(archivedChange.name).toBe('drafted-change')
       const draftsEntries = await fs.readdir(ctx.draftsPath)
       expect(draftsEntries).toHaveLength(0)
     })

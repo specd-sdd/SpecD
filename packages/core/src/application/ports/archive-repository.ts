@@ -1,4 +1,4 @@
-import { type Change } from '../../domain/entities/change.js'
+import { type Change, type GitIdentity } from '../../domain/entities/change.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { type InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { Repository, type RepositoryConfig } from './repository.js'
@@ -47,10 +47,14 @@ export abstract class ArchiveRepository extends Repository {
    * @param change - The change to archive
    * @param options - Archive options
    * @param options.force - When `true`, skip the state check and archive unconditionally
+   * @param options.actor - Git identity of the actor performing the archive, recorded in the manifest
    * @returns The created `ArchivedChange` record
    * @throws {InvalidStateTransitionError} When the change is not in `archivable` state and `force` is not set
    */
-  abstract archive(change: Change, options?: { force?: boolean }): Promise<ArchivedChange>
+  abstract archive(
+    change: Change,
+    options?: { force?: boolean; actor?: GitIdentity },
+  ): Promise<{ archivedChange: ArchivedChange; archiveDirPath: string }>
 
   /**
    * Lists all archived changes in this workspace in chronological order (oldest first).

@@ -112,6 +112,8 @@ export interface ChangeProps {
   name: string
   /** Timestamp when the change was created; immutable. */
   createdAt: Date
+  /** Optional free-text description of the change's purpose. */
+  description?: string
   /** Current snapshot of active workspace IDs. */
   workspaces: string[]
   /** Current snapshot of spec paths being modified. */
@@ -136,6 +138,7 @@ export interface ChangeProps {
 export class Change {
   private readonly _name: string
   private readonly _createdAt: Date
+  private readonly _description: string | undefined
   private _workspaces: string[]
   private _specIds: string[]
   private _contextSpecIds: string[]
@@ -150,6 +153,7 @@ export class Change {
   constructor(props: ChangeProps) {
     this._name = props.name
     this._createdAt = props.createdAt
+    this._description = props.description
     this._workspaces = [...props.workspaces]
     this._specIds = [...props.specIds]
     this._contextSpecIds = [...(props.contextSpecIds ?? [])]
@@ -165,6 +169,23 @@ export class Change {
   /** Timestamp when the change was created. */
   get createdAt(): Date {
     return this._createdAt
+  }
+
+  /** Optional free-text description of the change's purpose. */
+  get description(): string | undefined {
+    return this._description
+  }
+
+  /** Schema name recorded at creation time, derived from the `created` history event. */
+  get schemaName(): string {
+    const created = this._history.find((e) => e.type === 'created')
+    return created?.type === 'created' ? created.schemaName : ''
+  }
+
+  /** Schema version recorded at creation time, derived from the `created` history event. */
+  get schemaVersion(): number {
+    const created = this._history.find((e) => e.type === 'created')
+    return created?.type === 'created' ? created.schemaVersion : 0
   }
 
   /** Current snapshot of workspace IDs this change belongs to. */
@@ -424,6 +445,20 @@ export class Change {
    */
   updateContextSpecIds(contextSpecIds: readonly string[]): void {
     this._contextSpecIds = [...contextSpecIds]
+  }
+
+  /**
+   * Updates the workspaces snapshot without appending any event or triggering invalidation.
+   *
+   * Used when workspace membership is derived from a `specIds` change that
+   * already caused an `invalidated` event — the workspace snapshot is brought
+   * in line with the new spec scope without emitting a redundant
+   * `workspace-change` invalidation.
+   *
+   * @param workspaces - The new workspace IDs
+   */
+  setWorkspacesSnapshot(workspaces: readonly string[]): void {
+    this._workspaces = [...workspaces]
   }
 
   /**

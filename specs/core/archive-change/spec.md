@@ -69,12 +69,15 @@ For each spec path in `change.specIds`:
 
 ### Requirement: Archive repository call
 
-After syncing all specs, `ArchiveChange` must call `archiveRepository.archive(change)`, passing the `Change` entity. The `ArchiveRepository` port is responsible for constructing the `ArchivedChange` record — the use case never builds it directly, because `archivedAt` can only be set by the operation that performs the archive, and `archivedName` is an infrastructure naming concern.
+After syncing all specs, `ArchiveChange` must resolve the git actor via `GitAdapter.identity()` before calling `archiveRepository.archive()`. If `identity()` throws (e.g. no git config), the archive proceeds without an actor.
+
+`ArchiveChange` must then call `archiveRepository.archive(change, { actor })` when an actor is available, or `archiveRepository.archive(change, {})` when it is not. The `ArchiveRepository` port is responsible for constructing the `ArchivedChange` record — the use case never builds it directly, because `archivedAt` can only be set by the operation that performs the archive, and `archivedName` is an infrastructure naming concern.
 
 The port's contract requires:
 
 - `archivedName` — the full timestamped directory name: `YYYYMMDD-HHmmss-<name>` where the timestamp is derived from `change.createdAt` (zero-padded), never from wall-clock time at execution
 - `archivedAt` — the timestamp when the archive operation completes, set by the repository
+- `archivedBy` (optional) — the git identity of the actor who performed the archive; absent if git identity was unavailable
 - `workspace` — the `SpecPath` of the primary workspace (the first entry in `change.workspaces`)
 - `artifacts` — artifact metadata tracked by the repository
 
@@ -114,7 +117,7 @@ After post-archive hooks complete, `ArchiveChange` must collect the set of spec 
 - Pre-archive hook failures abort the archive and throw — no partial state is written
 - Post-archive hook failures are returned in the result; the archive is not rolled back
 - `ArchiveChange` must not call `change.invalidate()` or any mutation on the `Change` entity — the change is already at its terminal state
-- `ArchiveChange` never constructs `ArchivedChange` directly — it is always returned by `archiveRepository.archive(change)`
+- `ArchiveChange` never constructs `ArchivedChange` directly — it is always returned by `archiveRepository.archive(change, { actor })`
 - `archivedName` must be derived from `change.createdAt` by the repository — never from wall-clock time at archive execution
 - `ArchiveChange` does not delete the change from `ChangeRepository` — `FsArchiveRepository.archive()` moves the directory as part of the archive operation
 

@@ -33,6 +33,8 @@ export interface ArchiveChangeInput {
 export interface ArchiveChangeResult {
   /** The `ArchivedChange` record that was persisted. */
   archivedChange: ArchivedChange
+  /** Absolute path to the archive directory where the change was stored. */
+  archiveDirPath: string
   /** Commands of post-archive hooks that failed; empty on full success. */
   postHookFailures: string[]
   /**
@@ -54,6 +56,7 @@ export class ArchiveChange {
   private readonly _specs: ReadonlyMap<string, SpecRepository>
   private readonly _archive: ArchiveRepository
   private readonly _hooks: HookRunner
+  private readonly _git: GitAdapter
   private readonly _parsers: ArtifactParserRegistry
   private readonly _schemas: SchemaRegistry
 
@@ -64,7 +67,7 @@ export class ArchiveChange {
    * @param specs - Spec repositories keyed by workspace name
    * @param archive - Repository for archiving the change
    * @param hooks - Adapter for executing `run:` hook commands
-   * @param _git - Git adapter (reserved for future use)
+   * @param git - Git adapter for resolving the actor identity
    * @param parsers - Registry of artifact format parsers
    * @param schemas - Registry for resolving schema references
    */
@@ -73,7 +76,7 @@ export class ArchiveChange {
     specs: ReadonlyMap<string, SpecRepository>,
     archive: ArchiveRepository,
     hooks: HookRunner,
-    _git: GitAdapter,
+    git: GitAdapter,
     parsers: ArtifactParserRegistry,
     schemas: SchemaRegistry,
   ) {
@@ -81,6 +84,7 @@ export class ArchiveChange {
     this._specs = specs
     this._archive = archive
     this._hooks = hooks
+    this._git = git
     this._parsers = parsers
     this._schemas = schemas
   }
@@ -192,7 +196,16 @@ export class ArchiveChange {
     }
 
     // --- Archive ---
-    const archivedChange = await this._archive.archive(change)
+    let actor: { name: string; email: string } | undefined
+    try {
+      actor = await this._git.identity()
+    } catch {
+      // If git identity is unavailable (e.g. no git config), proceed without it
+    }
+    const { archivedChange, archiveDirPath } = await this._archive.archive(
+      change,
+      actor !== undefined ? { actor } : undefined,
+    )
 
     // --- Post-archive hooks ---
     const postHookFailures: string[] = []
@@ -208,6 +221,7 @@ export class ArchiveChange {
 
     return {
       archivedChange,
+      archiveDirPath,
       postHookFailures,
       staleMetadataSpecPaths: [...staleSpecIds],
     }
