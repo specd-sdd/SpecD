@@ -1,5 +1,7 @@
 import { type DeltaPosition, type Selector } from '../../domain/value-objects/index.js'
-import { SpecdError } from '../../domain/errors/specd-error.js'
+
+// Re-export from domain for backwards compatibility
+export { DeltaApplicationError } from '../../domain/errors/delta-application-error.js'
 
 /** A single node in a normalized artifact AST. */
 export interface ArtifactNode {
@@ -50,26 +52,6 @@ export interface OutlineEntry {
   /** Nesting depth (0 = root children). */
   readonly depth: number
   readonly children?: readonly OutlineEntry[]
-}
-
-/**
- * Thrown by {@link ArtifactParser.apply} when a selector fails to resolve
- * (no match, ambiguous match, or structural conflict during application).
- */
-export class DeltaApplicationError extends SpecdError {
-  /** Machine-readable error code for programmatic handling. */
-  override get code(): string {
-    return 'DELTA_APPLICATION'
-  }
-
-  /**
-   * Creates a new `DeltaApplicationError` instance.
-   *
-   * @param message - Human-readable description of the application failure
-   */
-  constructor(message: string) {
-    super(message)
-  }
 }
 
 /**
