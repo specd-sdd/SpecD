@@ -22,7 +22,7 @@ describe('ArchivedChange', () => {
       expect(ac.name).toBe('add-oauth-login')
       expect(ac.archivedName).toBe('20260219-143022-add-oauth-login')
       expect(ac.workspace.equals(workspace)).toBe(true)
-      expect(ac.archivedAt).toBe(archivedAt)
+      expect(ac.archivedAt).toEqual(archivedAt)
       expect(ac.artifacts).toEqual(['proposal', 'design', 'tasks'])
     })
 
