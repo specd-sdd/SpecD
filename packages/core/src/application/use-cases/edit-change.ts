@@ -2,6 +2,8 @@ import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type GitAdapter } from '../ports/git-adapter.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
+import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
+import { EmptySpecIdsError } from '../errors/empty-spec-ids-error.js'
 
 /** Input for the {@link EditChange} use case. */
 export interface EditChangeInput {
@@ -60,7 +62,8 @@ export class EditChange {
    * @param input - Edit parameters
    * @returns The updated change and whether approvals were invalidated
    * @throws {ChangeNotFoundError} If no change with the given name exists
-   * @throws {Error} If the result would leave `specIds` empty or a spec to remove is not found
+   * @throws {SpecNotInChangeError} If a spec to remove is not in the change's specIds
+   * @throws {EmptySpecIdsError} If the result would leave specIds empty
    */
   async execute(input: EditChangeInput): Promise<EditChangeResult> {
     const change = await this._changes.get(input.name)
@@ -83,7 +86,7 @@ export class EditChange {
       for (const id of input.removeSpecIds) {
         const idx = specIds.indexOf(id)
         if (idx === -1) {
-          throw new Error(`Spec '${id}' is not in the current specIds of change '${input.name}'`)
+          throw new SpecNotInChangeError(id, input.name)
         }
         specIds.splice(idx, 1)
       }
@@ -98,7 +101,7 @@ export class EditChange {
     }
 
     if (specIds.length === 0) {
-      throw new Error(`Editing change '${input.name}' would leave specIds empty`)
+      throw new EmptySpecIdsError(input.name)
     }
 
     const actor = await this._git.identity()
