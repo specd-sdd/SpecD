@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { ArchivedChange } from '../../domain/entities/archived-change.js'
@@ -340,7 +341,7 @@ export class FsArchiveRepository extends ArchiveRepository {
    */
   private async _writeManifestAtomic(dir: string, manifest: ChangeManifest): Promise<void> {
     const manifestPath = path.join(dir, 'manifest.json')
-    const tmpPath = path.join(dir, `manifest.json.tmp-${process.pid.toString()}`)
+    const tmpPath = path.join(dir, `manifest.json.tmp-${process.pid.toString()}-${randomUUID()}`)
     await fs.writeFile(tmpPath, JSON.stringify(manifest, null, 2), 'utf8')
     await fs.rename(tmpPath, manifestPath)
   }
