@@ -1,5 +1,6 @@
 import { ListDrafts } from '../../application/use-cases/list-drafts.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
+import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 
 /** Domain context for `createListDrafts(context, options)`. */
@@ -47,7 +48,7 @@ export function createListDrafts(
 ): ListDrafts {
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
-    const ws = config.workspaces.find((w) => w.name === 'default')!
+    const ws = getDefaultWorkspace(config)
     return createListDrafts(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {

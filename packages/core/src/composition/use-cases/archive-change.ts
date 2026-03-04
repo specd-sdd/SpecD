@@ -1,6 +1,7 @@
 import { ArchiveChange } from '../../application/use-cases/archive-change.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
+import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createSpecRepository } from '../spec-repository.js'
 import { createArchiveRepository } from '../archive-repository.js'
@@ -91,7 +92,7 @@ export function createArchiveChange(
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
     const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
-    const defaultWs = config.workspaces.find((w) => w.name === 'default')!
+    const defaultWs = getDefaultWorkspace(config)
     const specRepos = new Map(
       config.workspaces.map((ws) => [
         ws.name,

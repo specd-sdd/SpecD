@@ -1,5 +1,6 @@
 import { ListArchived } from '../../application/use-cases/list-archived.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
+import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createArchiveRepository } from '../archive-repository.js'
 
 /** Domain context for `createListArchived(context, options)`. */
@@ -48,7 +49,7 @@ export function createListArchived(
 ): ListArchived {
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
-    const ws = config.workspaces.find((w) => w.name === 'default')!
+    const ws = getDefaultWorkspace(config)
     return createListArchived(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {

@@ -1,5 +1,6 @@
 import { ApproveSignoff } from '../../application/use-cases/approve-signoff.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
+import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
 
@@ -58,7 +59,7 @@ export function createApproveSignoff(
 ): ApproveSignoff {
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
-    const ws = config.workspaces.find((w) => w.name === 'default')!
+    const ws = getDefaultWorkspace(config)
     return createApproveSignoff(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {

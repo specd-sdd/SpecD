@@ -1,5 +1,6 @@
 import { CreateChange } from '../../application/use-cases/create-change.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
+import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
 
@@ -61,7 +62,7 @@ export function createCreateChange(
 ): CreateChange {
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
-    const ws = config.workspaces.find((w) => w.name === 'default')!
+    const ws = getDefaultWorkspace(config)
     return createCreateChange(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {

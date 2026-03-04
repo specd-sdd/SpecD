@@ -1,5 +1,6 @@
 import { GetStatus } from '../../application/use-cases/get-status.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
+import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 
 /**
@@ -54,7 +55,7 @@ export function createGetStatus(
 ): GetStatus {
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
-    const ws = config.workspaces.find((w) => w.name === 'default')!
+    const ws = getDefaultWorkspace(config)
     return createGetStatus(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {
