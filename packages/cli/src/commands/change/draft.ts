@@ -31,10 +31,6 @@ export function registerChangeDraft(parent: Command): void {
           output({ result: 'ok', name }, fmt)
         }
       } catch (err) {
-        if (err instanceof Error && err.message.includes('already drafted')) {
-          process.stderr.write(`error: ${err.message}\n`)
-          process.exit(1)
-        }
         handleError(err)
       }
     })

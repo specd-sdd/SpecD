@@ -71,10 +71,6 @@ export function registerChangeValidate(parent: Command): void {
           }
         }
       } catch (err) {
-        if (err instanceof Error && err.message.includes('spec not found')) {
-          process.stderr.write(`error: ${err.message}\n`)
-          process.exit(1)
-        }
         handleError(err)
       }
     })
