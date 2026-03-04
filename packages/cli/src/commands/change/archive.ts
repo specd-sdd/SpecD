@@ -23,6 +23,9 @@ export function registerChangeArchive(parent: Command): void {
         const kernel = createCliKernel(config)
         const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
 
+        const { change } = await kernel.changes.status.execute({ name })
+        const workspace = change.workspaces[0] ?? 'default'
+
         const result = await kernel.changes.archive.execute({
           name,
           schemaRef: config.schemaRef,
@@ -31,7 +34,7 @@ export function registerChangeArchive(parent: Command): void {
             project: { root: config.projectRoot },
             change: {
               name,
-              workspace: config.workspaces.find((w) => w.name === 'default')?.name ?? 'default',
+              workspace,
               path: config.storage.changesPath,
             },
           },
