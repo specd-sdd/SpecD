@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { ValidateArtifacts } from '../../../src/application/use-cases/validate-artifacts.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
+import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactType } from '../../../src/domain/value-objects/artifact-type.js'
@@ -148,7 +149,7 @@ function makeChangeWithArtifacts(
     name,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     workspaces: ['default'],
-    specIds: opts.specIds ?? ['default/auth/login'],
+    specIds: opts.specIds ?? ['default:auth'],
     history: opts.history ?? [],
     artifacts: artifactMap,
   })
@@ -173,11 +174,32 @@ describe('ValidateArtifacts', () => {
       await expect(
         uc.execute({
           name: 'missing',
-          specPath: 'default/auth',
+          specPath: 'default:auth',
           schemaRef: 'test',
           workspaceSchemasPaths: defaultSchemasPaths,
         }),
       ).rejects.toThrow(ChangeNotFoundError)
+    })
+  })
+
+  describe('specPath not in change', () => {
+    it('throws SpecNotInChangeError when specPath is not in change.specIds', async () => {
+      const change = makeChangeWithArtifacts('c', [], { specIds: ['default:auth/login'] })
+      const uc = new ValidateArtifacts(
+        makeChangeRepository([change]),
+        new Map(),
+        makeSchemaRegistry(makeSchema([])),
+        makeParsers(),
+        makeGitAdapter(),
+      )
+      await expect(
+        uc.execute({
+          name: 'c',
+          specPath: 'default:billing/invoices',
+          schemaRef: 'test',
+          workspaceSchemasPaths: defaultSchemasPaths,
+        }),
+      ).rejects.toThrow(SpecNotInChangeError)
     })
   })
 
@@ -194,7 +216,7 @@ describe('ValidateArtifacts', () => {
       await expect(
         uc.execute({
           name: 'c',
-          specPath: 'default/auth',
+          specPath: 'default:auth',
           schemaRef: 'bad-ref',
           workspaceSchemasPaths: defaultSchemasPaths,
         }),
@@ -218,7 +240,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -249,7 +271,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -272,7 +294,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -320,7 +342,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -371,7 +393,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -420,7 +442,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -472,7 +494,7 @@ describe('ValidateArtifacts', () => {
 
       await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -526,7 +548,7 @@ describe('ValidateArtifacts', () => {
 
       await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -577,7 +599,7 @@ describe('ValidateArtifacts', () => {
 
       await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -619,7 +641,7 @@ describe('ValidateArtifacts', () => {
 
       await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -665,7 +687,7 @@ describe('ValidateArtifacts', () => {
 
       await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -715,7 +737,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -768,7 +790,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -814,7 +836,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -873,7 +895,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -917,7 +939,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -967,7 +989,7 @@ describe('ValidateArtifacts', () => {
 
       await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -1008,7 +1030,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })
@@ -1031,7 +1053,7 @@ describe('ValidateArtifacts', () => {
 
       const result = await uc.execute({
         name: 'c',
-        specPath: 'default/auth',
+        specPath: 'default:auth',
         schemaRef: 'test',
         workspaceSchemasPaths: defaultSchemasPaths,
       })

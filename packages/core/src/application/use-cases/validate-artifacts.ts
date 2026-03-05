@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
+import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
@@ -24,7 +25,7 @@ export interface ValidateArtifactsInput extends WorkspaceContext {
   readonly name: string
   /**
    * The spec path to validate — must be one of `change.specIds`.
-   * Encoded as `<workspace>/<capability-path>` (e.g. `"default/auth/oauth"`).
+   * Encoded as `<workspace>:<capability-path>` (e.g. `"default:auth/oauth"`).
    */
   readonly specPath: string
 }
@@ -108,6 +109,10 @@ export class ValidateArtifacts {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
+    if (!change.specIds.includes(input.specPath)) {
+      throw new SpecNotInChangeError(input.specPath, input.name)
+    }
+
     const schema = await this._schemas.resolve(input.schemaRef, input.workspaceSchemasPaths)
     if (schema === null) throw new SchemaNotFoundError(input.schemaRef)
 
@@ -115,9 +120,9 @@ export class ValidateArtifacts {
     const failures: ValidationFailure[] = []
     const warnings: ValidationWarning[] = []
 
-    const slashIdx = input.specPath.indexOf('/')
-    const workspace = slashIdx >= 0 ? input.specPath.slice(0, slashIdx) : input.specPath
-    const capabilityPath = slashIdx >= 0 ? input.specPath.slice(slashIdx + 1) : ''
+    const colonIdx = input.specPath.indexOf(':')
+    const workspace = colonIdx >= 0 ? input.specPath.slice(0, colonIdx) : 'default'
+    const capabilityPath = colonIdx >= 0 ? input.specPath.slice(colonIdx + 1) : input.specPath
     const specRepo = this._specs.get(workspace)
 
     // --- Required artifacts check ---
