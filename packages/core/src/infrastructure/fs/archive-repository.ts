@@ -267,7 +267,6 @@ export class FsArchiveRepository extends ArchiveRepository {
    * @returns Absolute path to the change directory, or `null` if not found
    */
   private async _resolveChangeDir(name: string): Promise<string | null> {
-    const suffix = `-${name}`
     for (const basePath of [this._changesPath, this._draftsPath]) {
       let entries: string[]
       try {
@@ -276,7 +275,10 @@ export class FsArchiveRepository extends ArchiveRepository {
         if (isEnoent(err)) continue
         throw err
       }
-      const match = entries.find((e) => e.endsWith(suffix) && /^\d{8}-\d{6}/.test(e))
+      const match = entries.find((e) => {
+        const m = e.match(/^\d{8}-\d{6}-(.+)$/)
+        return m !== null && m[1] === name
+      })
       if (match !== undefined) return path.join(basePath, match)
     }
     return null
@@ -406,7 +408,6 @@ export class FsArchiveRepository extends ArchiveRepository {
     root: string,
     name: string,
   ): Promise<GlobResult | null> {
-    const suffix = `-${name}`
     let entries: string[]
     try {
       entries = await fs.readdir(dir)
@@ -431,7 +432,8 @@ export class FsArchiveRepository extends ArchiveRepository {
     for (const { entry, fullPath, isDir } of statResults) {
       if (!isDir) continue
 
-      if (entry.endsWith(suffix)) {
+      const m = entry.match(/^\d{8}-\d{6}-(.+)$/)
+      if (m !== null && m[1] === name) {
         try {
           await fs.access(path.join(fullPath, 'manifest.json'))
           const relPath = path.relative(root, fullPath).split(path.sep).join('/')
@@ -490,7 +492,9 @@ export class FsArchiveRepository extends ArchiveRepository {
       // Try to read manifest.json in this directory
       try {
         const content = await fs.readFile(path.join(fullPath, 'manifest.json'), 'utf8')
-        const manifest = JSON.parse(content) as ChangeManifest
+        const parsed = changeManifestSchema.safeParse(JSON.parse(content))
+        if (!parsed.success) continue // skip corrupted manifests during reindex
+        const manifest = parsed.data as ChangeManifest
         if (manifest.archivedAt !== undefined) {
           const relPath = path.relative(this._archivePath, fullPath).split(path.sep).join('/')
           results.push({ archivedAt: new Date(manifest.archivedAt), manifest, relPath })
