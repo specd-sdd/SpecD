@@ -244,8 +244,12 @@ export class FsSpecRepository extends SpecRepository {
 
     const stats = await Promise.all(
       entries.map(async (entry) => {
-        const stat = await fs.stat(path.join(dir, entry))
-        return { entry, isDir: stat.isDirectory(), isFile: stat.isFile() }
+        try {
+          const stat = await fs.stat(path.join(dir, entry))
+          return { entry, isDir: stat.isDirectory(), isFile: stat.isFile() }
+        } catch {
+          return { entry, isDir: false, isFile: false }
+        }
       }),
     )
     for (const { entry, isDir, isFile } of stats) {
@@ -280,8 +284,12 @@ export class FsSpecRepository extends SpecRepository {
 async function filterFiles(dir: string, entries: string[]): Promise<string[]> {
   const checks = await Promise.all(
     entries.map(async (entry) => {
-      const stat = await fs.stat(path.join(dir, entry))
-      return { entry, isFile: stat.isFile() }
+      try {
+        const stat = await fs.stat(path.join(dir, entry))
+        return { entry, isFile: stat.isFile() }
+      } catch {
+        return { entry, isFile: false }
+      }
     }),
   )
   return checks.filter((c) => c.isFile).map((c) => c.entry)

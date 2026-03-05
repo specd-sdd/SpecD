@@ -289,8 +289,6 @@ export class FsChangeRepository extends ChangeRepository {
    * @returns The absolute path to the change directory, or `null` if not found
    */
   private async _resolveDir(name: string): Promise<string | null> {
-    const suffix = `-${name}`
-
     for (const basePath of [this._changesPath, this._draftsPath, this._discardedPath]) {
       let entries: string[]
       try {
@@ -300,7 +298,10 @@ export class FsChangeRepository extends ChangeRepository {
         throw err
       }
 
-      const match = entries.find((entry) => entry.endsWith(suffix) && /^\d{8}-\d{6}/.test(entry))
+      const match = entries.find((entry) => {
+        const m = entry.match(/^\d{8}-\d{6}-(.+)$/)
+        return m !== null && m[1] === name
+      })
       if (match !== undefined) {
         return path.join(basePath, match)
       }
@@ -694,8 +695,12 @@ function isDiscardedChange(change: Change): boolean {
 async function filterDirectories(basePath: string, entries: string[]): Promise<string[]> {
   const checks = await Promise.all(
     entries.map(async (entry) => {
-      const stat = await fs.stat(path.join(basePath, entry))
-      return { entry, isDir: stat.isDirectory() }
+      try {
+        const stat = await fs.stat(path.join(basePath, entry))
+        return { entry, isDir: stat.isDirectory() }
+      } catch {
+        return { entry, isDir: false }
+      }
     }),
   )
   return checks.filter((c) => c.isDir).map((c) => c.entry)
