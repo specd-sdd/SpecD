@@ -16,29 +16,22 @@ export interface FsEditChangeOptions {
   readonly changesPath: string
   readonly draftsPath: string
   readonly discardedPath: string
-  readonly workspaceNames: readonly string[]
 }
 
 /**
- * Derives the workspace list from a set of spec IDs, given a list of known workspace names.
+ * Derives the workspace list from a set of spec IDs.
  *
- * A spec path like `billing-ws/billing/invoices` belongs to workspace `billing-ws`.
- * A spec path without a matching workspace prefix belongs to workspace `default`.
+ * A spec ID like `billing:invoices/create` belongs to workspace `billing`.
+ * A bare path like `auth/login` (no colon) belongs to workspace `default`.
  *
- * @param specIds - The spec IDs to derive workspaces from
- * @param workspaceNames - Known workspace names for prefix matching
+ * @param specIds - The spec IDs in canonical `workspace:capPath` format
  * @returns Deduplicated list of resolved workspace names
  */
-function deriveWorkspaces(specIds: readonly string[], workspaceNames: readonly string[]): string[] {
+function deriveWorkspaces(specIds: readonly string[]): string[] {
   const workspaces = new Set<string>()
   for (const specId of specIds) {
-    const slash = specId.indexOf('/')
-    const prefix = slash !== -1 ? specId.slice(0, slash) : null
-    if (prefix !== null && workspaceNames.includes(prefix)) {
-      workspaces.add(prefix)
-    } else {
-      workspaces.add('default')
-    }
+    const colon = specId.indexOf(':')
+    workspaces.add(colon !== -1 ? specId.slice(0, colon) : 'default')
   }
   return [...workspaces]
 }
@@ -75,14 +68,12 @@ export function createEditChange(
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
-    const workspaceNames = config.workspaces.map((w) => w.name)
     return createEditChange(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,
         discardedPath: config.storage.discardedPath,
-        workspaceNames,
       },
     )
   }
@@ -93,6 +84,5 @@ export function createEditChange(
     discardedPath: opts.discardedPath,
   })
   const git = new GitCLIAdapter()
-  const workspaceNames = [...opts.workspaceNames]
-  return new EditChange(changeRepo, git, (specIds) => deriveWorkspaces(specIds, workspaceNames))
+  return new EditChange(changeRepo, git, (specIds) => deriveWorkspaces(specIds))
 }
