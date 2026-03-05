@@ -23,7 +23,7 @@ export class Spec {
   constructor(workspace: string, name: SpecPath, filenames: readonly string[]) {
     this._workspace = workspace
     this._name = name
-    this._filenames = filenames
+    this._filenames = [...filenames]
   }
 
   /** The workspace name this spec belongs to (from `specd.yaml`). */

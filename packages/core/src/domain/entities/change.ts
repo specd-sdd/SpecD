@@ -153,7 +153,7 @@ export class Change {
    */
   constructor(props: ChangeProps) {
     this._name = props.name
-    this._createdAt = props.createdAt
+    this._createdAt = new Date(props.createdAt.getTime())
     this._description = props.description
     this._workspaces = [...props.workspaces]
     this._specIds = [...props.specIds]

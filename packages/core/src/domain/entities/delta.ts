@@ -34,9 +34,9 @@ export class Delta {
    */
   constructor(props: DeltaProps) {
     this._specPath = props.specPath
-    this._added = props.added
-    this._modified = props.modified
-    this._removed = props.removed
+    this._added = [...props.added]
+    this._modified = [...props.modified]
+    this._removed = [...props.removed]
   }
 
   /** The spec path this delta targets. */
