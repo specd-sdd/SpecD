@@ -26,6 +26,7 @@ export function registerChangeArchive(parent: Command): void {
         const { change } = await kernel.changes.status.execute({ name })
         const workspace = change.workspaces[0] ?? 'default'
 
+        const projectStep = config.workflow?.find((s) => s.step === 'archiving')
         const result = await kernel.changes.archive.execute({
           name,
           schemaRef: config.schemaRef,
@@ -38,6 +39,7 @@ export function registerChangeArchive(parent: Command): void {
               path: config.storage.changesPath,
             },
           },
+          ...(projectStep !== undefined ? { projectHooks: projectStep.hooks } : {}),
         })
 
         const archivePath = path.relative(config.projectRoot, result.archiveDirPath)

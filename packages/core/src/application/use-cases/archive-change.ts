@@ -15,6 +15,7 @@ import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
+import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
 import { type WorkspaceContext } from '../ports/workspace-context.js'
 
 /** Input for the {@link ArchiveChange} use case. */
@@ -26,6 +27,14 @@ export interface ArchiveChangeInput extends WorkspaceContext {
    * Provided by the caller from the active config and runtime context.
    */
   readonly hookVariables: HookVariables
+  /**
+   * Project-level hooks for the `archiving` workflow step, resolved by the caller
+   * from `specd.yaml`. Schema hooks fire first, then project-level hooks.
+   */
+  readonly projectHooks?: {
+    readonly pre: readonly HookEntry[]
+    readonly post: readonly HookEntry[]
+  }
 }
 
 /** Result returned by a successful {@link ArchiveChange} execution. */
@@ -109,10 +118,19 @@ export class ArchiveChange {
     // --- Archivable guard ---
     change.assertArchivable()
 
-    // --- Pre-archive hooks ---
+    // --- Pre-archive hooks (schema first, then project-level) ---
     const workflowStep = schema.workflowStep('archiving')
     if (workflowStep !== null) {
       for (const hook of workflowStep.hooks.pre) {
+        if (hook.type !== 'run') continue
+        const result = await this._hooks.run(hook.command, input.hookVariables)
+        if (!result.isSuccess()) {
+          throw new HookFailedError(hook.command, result.exitCode(), result.stderr())
+        }
+      }
+    }
+    if (input.projectHooks !== undefined) {
+      for (const hook of input.projectHooks.pre) {
         if (hook.type !== 'run') continue
         const result = await this._hooks.run(hook.command, input.hookVariables)
         if (!result.isSuccess()) {
@@ -126,9 +144,9 @@ export class ArchiveChange {
     const yamlParser = this._parsers.get('yaml')
 
     for (const specId of change.specIds) {
-      const slashIdx = specId.indexOf('/')
-      const workspace = slashIdx >= 0 ? specId.slice(0, slashIdx) : specId
-      const capabilityPath = slashIdx >= 0 ? specId.slice(slashIdx + 1) : ''
+      const colonIdx = specId.indexOf(':')
+      const workspace = colonIdx >= 0 ? specId.slice(0, colonIdx) : 'default'
+      const capabilityPath = colonIdx >= 0 ? specId.slice(colonIdx + 1) : specId
       const specRepo = this._specs.get(workspace)
       if (specRepo === undefined) continue
 
@@ -204,10 +222,19 @@ export class ArchiveChange {
       actor !== undefined ? { actor } : undefined,
     )
 
-    // --- Post-archive hooks ---
+    // --- Post-archive hooks (schema first, then project-level) ---
     const postHookFailures: string[] = []
     if (workflowStep !== null) {
       for (const hook of workflowStep.hooks.post) {
+        if (hook.type !== 'run') continue
+        const result = await this._hooks.run(hook.command, input.hookVariables)
+        if (!result.isSuccess()) {
+          postHookFailures.push(hook.command)
+        }
+      }
+    }
+    if (input.projectHooks !== undefined) {
+      for (const hook of input.projectHooks.post) {
         if (hook.type !== 'run') continue
         const result = await this._hooks.run(hook.command, input.hookVariables)
         if (!result.isSuccess()) {
