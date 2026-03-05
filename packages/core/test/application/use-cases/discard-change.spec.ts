@@ -24,10 +24,9 @@ describe('DiscardChange', () => {
       const result = await uc.execute({ name: 'my-change', reason: 'superseded by new approach' })
 
       const discarded = result.history.find((e) => e.type === 'discarded')
-      expect(discarded).toBeDefined()
-      if (discarded?.type === 'discarded') {
-        expect(discarded.reason).toBe('superseded by new approach')
-      }
+      expect(discarded?.type).toBe('discarded')
+      if (discarded?.type !== 'discarded') throw new Error('unreachable')
+      expect(discarded.reason).toBe('superseded by new approach')
     })
 
     it('records supersededBy when provided', async () => {

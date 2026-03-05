@@ -51,15 +51,13 @@ describe('CreateChange', () => {
 
       expect(result.history).toHaveLength(1)
       const evt = result.history[0]
-      expect(evt).toBeDefined()
       expect(evt?.type).toBe('created')
-      if (evt?.type === 'created') {
-        expect(evt.by).toEqual(testActor)
-        expect(evt.schemaName).toBe('specd-std')
-        expect(evt.schemaVersion).toBe(2)
-        expect(evt.workspaces).toEqual(['default'])
-        expect(evt.specIds).toEqual(['auth/login'])
-      }
+      if (evt?.type !== 'created') throw new Error('unreachable')
+      expect(evt.by).toEqual(testActor)
+      expect(evt.schemaName).toBe('specd-std')
+      expect(evt.schemaVersion).toBe(2)
+      expect(evt.workspaces).toEqual(['default'])
+      expect(evt.specIds).toEqual(['auth/login'])
     })
 
     it('leaves the change in drafting state', async () => {
