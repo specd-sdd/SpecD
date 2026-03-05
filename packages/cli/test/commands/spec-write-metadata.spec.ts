@@ -5,6 +5,7 @@ import {
   makeMockConfig,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -32,7 +33,7 @@ function setup() {
   vi.mocked(createCliKernel).mockReturnValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -71,15 +72,17 @@ describe('spec write-metadata', () => {
 
     const program = makeProgram()
     registerSpecWriteMetadata(program.command('spec'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'spec',
-      'write-metadata',
-      'auth/login',
-      '--input',
-      '/tmp/bad.yaml',
-    ])
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'spec',
+        'write-metadata',
+        'auth/login',
+        '--input',
+        '/tmp/bad.yaml',
+      ])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error: invalid YAML:')
@@ -92,15 +95,17 @@ describe('spec write-metadata', () => {
 
     const program = makeProgram()
     registerSpecWriteMetadata(program.command('spec'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'spec',
-      'write-metadata',
-      'missing/spec',
-      '--input',
-      '/tmp/metadata.yaml',
-    ])
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'spec',
+        'write-metadata',
+        'missing/spec',
+        '--input',
+        '/tmp/metadata.yaml',
+      ])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('not found')
@@ -111,15 +116,17 @@ describe('spec write-metadata', () => {
 
     const program = makeProgram()
     registerSpecWriteMetadata(program.command('spec'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'spec',
-      'write-metadata',
-      'unknown-ws:some/path',
-      '--input',
-      '/tmp/metadata.yaml',
-    ])
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'spec',
+        'write-metadata',
+        'unknown-ws:some/path',
+        '--input',
+        '/tmp/metadata.yaml',
+      ])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error:')
@@ -181,15 +188,17 @@ describe('spec write-metadata', () => {
 
     const program = makeProgram()
     registerSpecWriteMetadata(program.command('spec'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'spec',
-      'write-metadata',
-      'auth/login',
-      '--input',
-      '/tmp/metadata.yaml',
-    ])
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'spec',
+        'write-metadata',
+        'auth/login',
+        '--input',
+        '/tmp/metadata.yaml',
+      ])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error:')

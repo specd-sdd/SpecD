@@ -5,6 +5,7 @@ import {
   makeMockConfig,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -28,7 +29,7 @@ function setup() {
   vi.mocked(createCliKernel).mockReturnValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -252,7 +253,9 @@ describe('spec resolve-path', () => {
 
     const program = makeProgram()
     registerSpecResolvePath(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'resolve-path', '/nonexistent/path'])
+    await program
+      .parseAsync(['node', 'specd', 'spec', 'resolve-path', '/nonexistent/path'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
   })
@@ -277,7 +280,9 @@ describe('spec resolve-path', () => {
 
     const program = makeProgram()
     registerSpecResolvePath(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'resolve-path', '/other/path'])
+    await program
+      .parseAsync(['node', 'specd', 'spec', 'resolve-path', '/other/path'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('does not fall under any configured workspace')

@@ -6,6 +6,7 @@ import {
   makeMockConfig,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -29,7 +30,7 @@ function setup() {
   vi.mocked(createCliKernel).mockReturnValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -141,7 +142,7 @@ describe('spec metadata', () => {
 
     const program = makeProgram()
     registerSpecMetadata(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'metadata', 'auth/login'])
+    await program.parseAsync(['node', 'specd', 'spec', 'metadata', 'auth/login']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error:')
@@ -152,7 +153,9 @@ describe('spec metadata', () => {
 
     const program = makeProgram()
     registerSpecMetadata(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'metadata', 'unknown-ws:auth/login'])
+    await program
+      .parseAsync(['node', 'specd', 'spec', 'metadata', 'unknown-ws:auth/login'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error:')
@@ -366,7 +369,9 @@ describe('spec metadata', () => {
 
       const program = makeProgram()
       registerSpecMetadata(program.command('spec'))
-      await program.parseAsync(['node', 'specd', 'spec', 'metadata', 'auth/login', '--infer'])
+      await program
+        .parseAsync(['node', 'specd', 'spec', 'metadata', 'auth/login', '--infer'])
+        .catch(() => {})
 
       expect(process.exit).toHaveBeenCalledWith(1)
       expect(stderr()).toContain('error:')

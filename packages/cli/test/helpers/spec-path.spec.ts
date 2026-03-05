@@ -27,25 +27,25 @@ function makeConfig(workspaceNames: string[]): SpecdConfig {
 }
 
 describe('parseSpecId', () => {
-  describe('single workspace ("default")', () => {
+  describe('bare path shorthand (no colon)', () => {
     const config = makeConfig(['default'])
 
-    it('routes plain path to default workspace', () => {
+    it('routes bare path to default workspace', () => {
       const result = parseSpecId('auth/login', config)
       expect(result.workspace).toBe('default')
       expect(result.capabilityPath).toBe('auth/login')
     })
 
-    it('does not treat "default" as workspace prefix when it is the only workspace', () => {
-      const result = parseSpecId('default/auth/login', config)
-      expect(result.workspace).toBe('default')
-      expect(result.capabilityPath).toBe('auth/login')
+    it('returns fully-qualified specId for bare path', () => {
+      const result = parseSpecId('auth/login', config)
+      expect(result.specId).toBe('default:auth/login')
     })
 
-    it('single-segment path routes to default workspace', () => {
+    it('single-segment bare path routes to default workspace', () => {
       const result = parseSpecId('billing', config)
       expect(result.workspace).toBe('default')
       expect(result.capabilityPath).toBe('billing')
+      expect(result.specId).toBe('default:billing')
     })
   })
 
@@ -56,54 +56,42 @@ describe('parseSpecId', () => {
       const result = parseSpecId('default:_global/architecture', config)
       expect(result.workspace).toBe('default')
       expect(result.capabilityPath).toBe('_global/architecture')
+      expect(result.specId).toBe('default:_global/architecture')
     })
 
     it('parses non-default workspace with colon separator', () => {
       const result = parseSpecId('billing-ws:billing/invoices', config)
       expect(result.workspace).toBe('billing-ws')
       expect(result.capabilityPath).toBe('billing/invoices')
+      expect(result.specId).toBe('billing-ws:billing/invoices')
     })
 
     it('throws InvalidSpecPathError when colon prefix is not a known workspace', () => {
       expect(() => parseSpecId('unknown:something/path', config)).toThrow(/unknown workspace/)
     })
 
-    it('colon syntax takes precedence over slash syntax', () => {
+    it('parses auth workspace with colon separator', () => {
       const result = parseSpecId('auth-ws:oauth/callback', config)
       expect(result.workspace).toBe('auth-ws')
       expect(result.capabilityPath).toBe('oauth/callback')
     })
   })
 
-  describe('multiple workspaces', () => {
+  describe('multiple workspaces — bare paths always default', () => {
     const config = makeConfig(['default', 'billing-ws', 'auth-ws'])
 
-    it('first segment matching a workspace name is used as workspace', () => {
-      const result = parseSpecId('billing-ws/billing/invoices', config)
-      expect(result.workspace).toBe('billing-ws')
-      expect(result.capabilityPath).toBe('billing/invoices')
-    })
-
-    it('path with non-workspace first segment defaults to default workspace', () => {
+    it('bare path defaults to default workspace even if first segment matches a workspace', () => {
       const result = parseSpecId('auth/login', config)
       expect(result.workspace).toBe('default')
       expect(result.capabilityPath).toBe('auth/login')
+      expect(result.specId).toBe('default:auth/login')
     })
 
-    it('auth-ws prefix is stripped when it matches workspace', () => {
-      const result = parseSpecId('auth-ws/oauth/callback', config)
-      expect(result.workspace).toBe('auth-ws')
-      expect(result.capabilityPath).toBe('oauth/callback')
-    })
-
-    it('specId matches original input when workspace prefix present', () => {
+    it('bare path with workspace-like prefix is treated as capability path', () => {
       const result = parseSpecId('billing-ws/billing/invoices', config)
-      expect(result.specId).toBe('billing-ws/billing/invoices')
-    })
-
-    it('specId matches original input when defaulting to default workspace', () => {
-      const result = parseSpecId('auth/login', config)
-      expect(result.specId).toBe('auth/login')
+      expect(result.workspace).toBe('default')
+      expect(result.capabilityPath).toBe('billing-ws/billing/invoices')
+      expect(result.specId).toBe('default:billing-ws/billing/invoices')
     })
   })
 })

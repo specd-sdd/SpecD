@@ -6,6 +6,7 @@ import {
   makeMockConfig,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -24,7 +25,7 @@ function setup() {
   vi.mocked(createCliKernel).mockReturnValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -106,7 +107,9 @@ describe('change skip-artifact', () => {
 
     const program = makeProgram()
     registerChangeSkipArtifact(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'skip-artifact', 'my-change', 'spec'])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'skip-artifact', 'my-change', 'spec'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -118,7 +121,9 @@ describe('change skip-artifact', () => {
 
     const program = makeProgram()
     registerChangeSkipArtifact(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'skip-artifact', 'missing', 'proposal'])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'skip-artifact', 'missing', 'proposal'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -132,14 +137,9 @@ describe('change skip-artifact', () => {
 
     const program = makeProgram()
     registerChangeSkipArtifact(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'skip-artifact',
-      'my-change',
-      'unknown-artifact',
-    ])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'skip-artifact', 'my-change', 'unknown-artifact'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)

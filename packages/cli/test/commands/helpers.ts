@@ -9,6 +9,29 @@ import { vi } from 'vitest'
 import { Command } from 'commander'
 import type { SpecdConfig, Kernel } from '@specd/core'
 
+/**
+ * Sentinel thrown by the `mockProcessExit` mock so code under test does
+ * not keep executing after a `process.exit()` call.
+ */
+export class ExitSentinel extends Error {
+  readonly code: number
+  constructor(code: number) {
+    super(`process.exit(${code})`)
+    this.code = code
+  }
+}
+
+/**
+ * Replaces `process.exit` with a spy that throws an {@link ExitSentinel}
+ * instead of silently continuing execution. Call in `beforeEach` or a
+ * test-level setup function — the spy is restored by `vi.restoreAllMocks()`.
+ */
+export function mockProcessExit(): void {
+  vi.spyOn(process, 'exit').mockImplementation(((code: number) => {
+    throw new ExitSentinel(code)
+  }) as never)
+}
+
 // ---------------------------------------------------------------------------
 // Minimal SpecdConfig factory
 // ---------------------------------------------------------------------------

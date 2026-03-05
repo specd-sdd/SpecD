@@ -8,6 +8,7 @@ import {
   makeMockConfig,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -37,7 +38,7 @@ function setup() {
   vi.mocked(createCliKernel).mockReturnValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -127,7 +128,7 @@ describe('config show', () => {
     vi.mocked(createCliKernel).mockReturnValue(makeMockKernel())
     const stdout = captureStdout()
     captureStderr()
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    mockProcessExit()
 
     const program = makeProgram()
     registerConfigShow(program.command('config'))
@@ -310,7 +311,7 @@ describe('schema show — resolution failure', () => {
 
     const program = makeProgram()
     registerSchemaShow(program.command('schema'))
-    await program.parseAsync(['node', 'specd', 'schema', 'show'])
+    await program.parseAsync(['node', 'specd', 'schema', 'show']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(3)
     expect(stderr()).toContain('fatal:')
@@ -414,7 +415,9 @@ describe('project context', () => {
 
     const program = makeProgram()
     registerProjectContext(program.command('project'))
-    await program.parseAsync(['node', 'specd', 'project', 'context', '--depth', '2'])
+    await program
+      .parseAsync(['node', 'specd', 'project', 'context', '--depth', '2'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)

@@ -6,6 +6,7 @@ import {
   makeMockConfig,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -46,7 +47,7 @@ function setup() {
   kernel.changes.compile.execute.mockResolvedValue({ ...mockResult })
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -156,16 +157,9 @@ describe('change context', () => {
 
     const program = makeProgram()
     registerChangeContext(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'context',
-      'my-change',
-      'designing',
-      '--depth',
-      '2',
-    ])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'context', 'my-change', 'designing', '--depth', '2'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('--depth requires --follow-deps')
@@ -254,7 +248,9 @@ describe('change context', () => {
 
     const program = makeProgram()
     registerChangeContext(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'context', 'missing', 'designing'])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'context', 'missing', 'designing'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)

@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { output, parseFormat } from '../src/formatter.js'
+import { mockProcessExit, ExitSentinel } from './commands/helpers.js'
 
 describe('parseFormat', () => {
   beforeEach(() => {
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    mockProcessExit()
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
   })
 
@@ -25,13 +26,21 @@ describe('parseFormat', () => {
   })
 
   it('exits 1 and writes error for unknown format', () => {
-    parseFormat('xml')
+    try {
+      parseFormat('xml')
+    } catch (e) {
+      if (!(e instanceof ExitSentinel)) throw e
+    }
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(vi.mocked(process.stderr.write).mock.calls[0]?.[0]).toMatch(/invalid format 'xml'/)
   })
 
   it('error message lists valid formats', () => {
-    parseFormat('csv')
+    try {
+      parseFormat('csv')
+    } catch (e) {
+      if (!(e instanceof ExitSentinel)) throw e
+    }
     expect(vi.mocked(process.stderr.write).mock.calls[0]?.[0]).toMatch(/text, json, toon/)
   })
 })

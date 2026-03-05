@@ -5,6 +5,7 @@ import {
   makeMockConfig,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -31,7 +32,7 @@ function setup() {
   vi.mocked(createCliKernel).mockReturnValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -119,7 +120,9 @@ describe('skills update', () => {
 
     const program = makeProgram()
     registerSkillsUpdate(program.command('skills'))
-    await program.parseAsync(['node', 'specd', 'skills', 'update', '--agent', 'unknown'])
+    await program
+      .parseAsync(['node', 'specd', 'skills', 'update', '--agent', 'unknown'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('unknown agent')

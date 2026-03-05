@@ -5,6 +5,7 @@ import {
   makeMockConfig,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -23,7 +24,7 @@ function setup() {
   vi.mocked(createCliKernel).mockReturnValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -65,7 +66,7 @@ describe('spec validate', () => {
 
     const program = makeProgram()
     registerSpecValidate(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'validate', 'auth/login'])
+    await program.parseAsync(['node', 'specd', 'spec', 'validate', 'auth/login']).catch(() => {})
 
     expect(stdout()).toContain('validation failed default:auth/login:')
     expect(stdout()).toContain('error: specs')
@@ -111,7 +112,7 @@ describe('spec validate', () => {
 
     const program = makeProgram()
     registerSpecValidate(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'validate', '--all'])
+    await program.parseAsync(['node', 'specd', 'spec', 'validate', '--all']).catch(() => {})
 
     expect(stdout()).toContain('validated 2 specs: 1 passed, 1 failed')
     expect(stdout()).toContain('FAIL  default:billing/inv')
@@ -169,7 +170,7 @@ describe('spec validate', () => {
 
     const program = makeProgram()
     registerSpecValidate(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'validate', 'nonexistent'])
+    await program.parseAsync(['node', 'specd', 'spec', 'validate', 'nonexistent']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error: spec not found')
@@ -180,7 +181,9 @@ describe('spec validate', () => {
 
     const program = makeProgram()
     registerSpecValidate(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'validate', '--workspace', 'nonexistent'])
+    await program
+      .parseAsync(['node', 'specd', 'spec', 'validate', '--workspace', 'nonexistent'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain("error: unknown workspace 'nonexistent'")
@@ -191,7 +194,7 @@ describe('spec validate', () => {
 
     const program = makeProgram()
     registerSpecValidate(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'validate'])
+    await program.parseAsync(['node', 'specd', 'spec', 'validate']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error:')

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { makeProgram, captureStdout, captureStderr } from './helpers.js'
+import { makeProgram, mockProcessExit, captureStdout, captureStderr } from './helpers.js'
 
 vi.mock('@specd/core', async (importOriginal) => {
   const original = await importOriginal<typeof import('@specd/core')>()
@@ -43,7 +43,7 @@ function setup() {
 
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { mockExecute, mockRecordExecute, stdout, stderr }
 }
 
@@ -146,16 +146,18 @@ describe('project init (non-interactive)', () => {
 
     const program = makeProgram()
     registerProjectInit(program.command('project'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'project',
-      'init',
-      '--workspace',
-      'default',
-      '--workspace-path',
-      'specs/',
-    ])
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'project',
+        'init',
+        '--workspace',
+        'default',
+        '--workspace-path',
+        'specs/',
+      ])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)

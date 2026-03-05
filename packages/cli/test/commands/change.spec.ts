@@ -8,6 +8,7 @@ import {
   makeMockChange,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -33,7 +34,7 @@ function setup() {
   vi.mocked(createCliKernel).mockReturnValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -166,7 +167,15 @@ describe('change create', () => {
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'create', 'new-feat'])
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'create',
+      'new-feat',
+      '--spec',
+      'auth/login',
+    ])
 
     expect(stdout()).toContain('created change new-feat')
   })
@@ -217,8 +226,8 @@ describe('change create', () => {
     ])
 
     const call = kernel.changes.create.execute.mock.calls[0][0]
-    expect(call.specIds).toContain('auth/login')
-    expect(call.specIds).toContain('auth/logout')
+    expect(call.specIds).toContain('default:auth/login')
+    expect(call.specIds).toContain('default:auth/logout')
     expect(call.name).toBe('feat')
   })
 
@@ -229,7 +238,7 @@ describe('change create', () => {
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'create', 'new-feat'])
+    await program.parseAsync(['node', 'specd', 'change', 'create', 'new-feat']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -240,7 +249,7 @@ describe('change create', () => {
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'create', 'my-change'])
+    await program.parseAsync(['node', 'specd', 'change', 'create', 'my-change']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/--spec/)
@@ -374,7 +383,7 @@ describe('change status', () => {
 
     const program = makeProgram()
     registerChangeStatus(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'status', 'missing'])
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'missing']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -431,7 +440,9 @@ describe('change transition', () => {
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'transition', 'feat', 'done'])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'feat', 'done'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -450,7 +461,9 @@ describe('change transition', () => {
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'transition', 'feat', 'implementing'])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'feat', 'implementing'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(2)
     expect(stderr()).toContain('pre-transition')
@@ -542,7 +555,7 @@ describe('change transition', () => {
     vi.mocked(createCliKernel).mockReturnValue(kernel)
     captureStdout()
     captureStderr()
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    mockProcessExit()
 
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', state: 'designing' }),
@@ -637,7 +650,7 @@ describe('change draft', () => {
 
     const program = makeProgram()
     registerChangeDraft(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'draft', 'missing'])
+    await program.parseAsync(['node', 'specd', 'change', 'draft', 'missing']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -651,7 +664,7 @@ describe('change draft', () => {
 
     const program = makeProgram()
     registerChangeDraft(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'draft', 'my-change'])
+    await program.parseAsync(['node', 'specd', 'change', 'draft', 'my-change']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/i)
@@ -679,7 +692,9 @@ describe('change discard', () => {
 
     const program = makeProgram()
     registerChangeDiscard(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'discard', 'missing', '--reason', 'done'])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'discard', 'missing', '--reason', 'done'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -828,7 +843,7 @@ describe('drafts restore', () => {
 
     const program = makeProgram()
     registerDraftsRestore(program.command('drafts'))
-    await program.parseAsync(['node', 'specd', 'drafts', 'restore', 'missing'])
+    await program.parseAsync(['node', 'specd', 'drafts', 'restore', 'missing']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)

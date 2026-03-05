@@ -5,6 +5,7 @@ import {
   makeMockConfig,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -24,7 +25,7 @@ function setup() {
   vi.mocked(createCliKernel).mockReturnValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -51,7 +52,9 @@ describe('change validate', () => {
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'auth/login'])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'auth/login'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stdout()).toContain('validation failed')
@@ -105,7 +108,9 @@ describe('change validate', () => {
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'validate', 'missing', 'auth/login'])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'validate', 'missing', 'auth/login'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -129,14 +134,9 @@ describe('change validate', () => {
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'validate',
-      'feat',
-      'default:billing/invoices',
-    ])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'default:billing/invoices'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -151,16 +151,9 @@ describe('change validate', () => {
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'validate',
-      'feat',
-      'auth/login',
-      '--format',
-      'json',
-    ])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'auth/login', '--format', 'json'])
+      .catch(() => {})
 
     const parsed = JSON.parse(stdout())
     expect(parsed.passed).toBe(false)
