@@ -104,6 +104,15 @@ export class EditChange {
       throw new EmptySpecIdsError(input.name)
     }
 
+    // Check if specIds actually changed
+    const currentSpecIds = change.specIds
+    const specIdsChanged =
+      specIds.length !== currentSpecIds.length || specIds.some((id, i) => id !== currentSpecIds[i])
+
+    if (!specIdsChanged) {
+      return { change, invalidated: false }
+    }
+
     const actor = await this._git.identity()
 
     // Update spec IDs — this also appends an invalidated + transitioned event
