@@ -118,6 +118,28 @@ SpecD is under active development. The domain core (`@specd/core`) is being buil
 
 This repository follows a spec-driven workflow: each significant area of behavior is specified in `specs/` before implementation begins.
 
+## Positioning: SpecD vs OpenSpec and similar alternatives
+
+The table below summarizes the current intended positioning.
+
+| Dimension                | SpecD                                                                                                                                           | OpenSpec / similar alternatives                                                                 |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Determinism              | Core operations (merge, validation, lifecycle resolution, delta apply) are deterministic where possible, rather than delegated to LLM behavior. | Often rely more heavily on model behavior, with less deterministic execution in core workflows. |
+| Workflow customization   | Workflow is schema-driven (`schema.yaml`): artifact types, ordering, validation hooks, and context instructions are configurable by teams.      | Usually provide a fixed baseline workflow with narrower customization points.                   |
+| Governance               | Native approval gates can enforce human sign-off at lifecycle transitions (`ready → implementing`, `done → archivable`).                        | Governance patterns vary; in many tools, approval flow is externalized to process/convention.   |
+| Integration model        | One `@specd/core` domain model exposed via CLI, MCP server, and agent plugins.                                                                  | Tooling is often centered around one primary interface or editor integration.                   |
+| Migration path           | Includes `@specd/schema-openspec` for teams migrating incrementally from OpenSpec-style structures.                                             | Migration away from incumbent formats may require custom adapters.                              |
+| Current maturity (today) | Active development; CLI and MCP are documented as not yet generally available.                                                                  | Some alternatives may currently be more production-ready in out-of-the-box CLI workflows.       |
+
+### MVP gaps to close for competitive adoption
+
+To compete strongly with established alternatives, an MVP should prioritize:
+
+- A true 5-minute onboarding path: `pnpm add -D @specd/cli` + `pnpm specd init` + default schema + first successful workflow.
+- Reliable command ergonomics and clear errors for config/schema resolution.
+- Polished plugin install/update/doctor flows across supported agents.
+- Fast-path templates and examples for common team setups.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
