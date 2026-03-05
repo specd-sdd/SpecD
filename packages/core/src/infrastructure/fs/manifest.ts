@@ -6,6 +6,8 @@
  * a typed surface for JSON serialization and deserialization.
  */
 
+import { z } from 'zod'
+
 /** Git identity as stored in the manifest JSON. */
 export interface ManifestGitIdentity {
   /** Display name of the actor. */
@@ -167,6 +169,46 @@ export type RawChangeEvent =
   | RawRestoredEvent
   | RawDiscardedEvent
   | RawArtifactSkippedEvent
+
+// ---- Zod validation schemas ----
+
+export const gitIdentitySchema = z.object({
+  name: z.string(),
+  email: z.string(),
+})
+
+export const manifestArtifactSchema = z.object({
+  type: z.string(),
+  filename: z.string(),
+  optional: z.boolean(),
+  requires: z.array(z.string()),
+  validatedHash: z.string().nullable(),
+})
+
+export const rawChangeEventSchema = z
+  .object({
+    type: z.string(),
+    at: z.string(),
+    by: gitIdentitySchema,
+  })
+  .passthrough()
+
+export const changeManifestSchema = z.object({
+  name: z.string(),
+  createdAt: z.string(),
+  description: z.string().optional(),
+  archivedAt: z.string().optional(),
+  archivedBy: gitIdentitySchema.optional(),
+  schema: z.object({
+    name: z.string(),
+    version: z.number(),
+  }),
+  workspaces: z.array(z.string()),
+  specIds: z.array(z.string()),
+  contextSpecIds: z.array(z.string()).optional(),
+  artifacts: z.array(manifestArtifactSchema),
+  history: z.array(rawChangeEventSchema),
+})
 
 /** The top-level structure of a `manifest.json` file. */
 export interface ChangeManifest {

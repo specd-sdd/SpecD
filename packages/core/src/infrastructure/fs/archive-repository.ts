@@ -10,9 +10,10 @@ import {
 } from '../../application/ports/archive-repository.js'
 import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
 import { UnsupportedPatternError } from '../../domain/errors/unsupported-pattern-error.js'
+import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
 import { changeDirName } from './dir-name.js'
 import { isEnoent } from './is-enoent.js'
-import { type ChangeManifest } from './manifest.js'
+import { type ChangeManifest, changeManifestSchema } from './manifest.js'
 
 /** Filename of the append-only archive index at the archive root. */
 const INDEX_FILE = 'index.jsonl'
@@ -218,8 +219,10 @@ export class FsArchiveRepository extends ArchiveRepository {
         const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
         const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
         return this._buildArchivedChange(manifest, archivedName, archivedAt)
-      } catch {
-        continue
+      } catch (err) {
+        if (err instanceof SyntaxError || isEnoent(err) || err instanceof CorruptedManifestError)
+          continue
+        throw err
       }
     }
 
@@ -269,8 +272,9 @@ export class FsArchiveRepository extends ArchiveRepository {
       let entries: string[]
       try {
         entries = await fs.readdir(basePath)
-      } catch {
-        continue
+      } catch (err) {
+        if (isEnoent(err)) continue
+        throw err
       }
       const match = entries.find((e) => e.endsWith(suffix) && /^\d{8}-\d{6}/.test(e))
       if (match !== undefined) return path.join(basePath, match)
@@ -335,7 +339,12 @@ export class FsArchiveRepository extends ArchiveRepository {
    */
   private async _loadManifest(dir: string): Promise<ChangeManifest> {
     const content = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
-    return JSON.parse(content) as ChangeManifest
+    const json: unknown = JSON.parse(content)
+    const result = changeManifestSchema.safeParse(json)
+    if (!result.success) {
+      throw new CorruptedManifestError(dir)
+    }
+    return result.data as ChangeManifest
   }
 
   /**
@@ -401,8 +410,9 @@ export class FsArchiveRepository extends ArchiveRepository {
     let entries: string[]
     try {
       entries = await fs.readdir(dir)
-    } catch {
-      return null
+    } catch (err) {
+      if (isEnoent(err)) return null
+      throw err
     }
 
     // Stat all entries in parallel to identify directories
@@ -454,8 +464,9 @@ export class FsArchiveRepository extends ArchiveRepository {
     let entries: string[]
     try {
       entries = await fs.readdir(dir)
-    } catch {
-      return
+    } catch (err) {
+      if (isEnoent(err)) return
+      throw err
     }
 
     // Stat all entries in parallel to identify directories
@@ -486,7 +497,8 @@ export class FsArchiveRepository extends ArchiveRepository {
           // This is an archived change directory — no need to recurse further
           continue
         }
-      } catch {
+      } catch (err) {
+        if (!(err instanceof SyntaxError || isEnoent(err))) throw err
         // Not a manifest or unreadable — recurse into directory
       }
 

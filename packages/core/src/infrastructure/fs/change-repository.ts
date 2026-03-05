@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { z } from 'zod'
 import { Change } from '../../domain/entities/change.js'
 import { type ChangeEvent } from '../../domain/entities/change.js'
 import { ChangeArtifact, SKIPPED_SENTINEL } from '../../domain/entities/change-artifact.js'
@@ -18,7 +17,12 @@ import {
 import { changeDirName } from './dir-name.js'
 import { sha256 } from './hash.js'
 import { isEnoent } from './is-enoent.js'
-import { type ChangeManifest, type ManifestArtifact, type RawChangeEvent } from './manifest.js'
+import {
+  type ChangeManifest,
+  type ManifestArtifact,
+  type RawChangeEvent,
+  changeManifestSchema,
+} from './manifest.js'
 
 /**
  * Configuration for `FsChangeRepository`.
@@ -662,45 +666,7 @@ function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
   }
 }
 
-// ---- Manifest validation schema ----
-
-const gitIdentitySchema = z.object({
-  name: z.string(),
-  email: z.string(),
-})
-
-const manifestArtifactSchema = z.object({
-  type: z.string(),
-  filename: z.string(),
-  optional: z.boolean(),
-  requires: z.array(z.string()),
-  validatedHash: z.string().nullable(),
-})
-
-const rawChangeEventSchema = z
-  .object({
-    type: z.string(),
-    at: z.string(),
-    by: gitIdentitySchema,
-  })
-  .passthrough()
-
-const changeManifestSchema = z.object({
-  name: z.string(),
-  createdAt: z.string(),
-  description: z.string().optional(),
-  archivedAt: z.string().optional(),
-  archivedBy: gitIdentitySchema.optional(),
-  schema: z.object({
-    name: z.string(),
-    version: z.number(),
-  }),
-  workspaces: z.array(z.string()),
-  specIds: z.array(z.string()),
-  contextSpecIds: z.array(z.string()).optional(),
-  artifacts: z.array(manifestArtifactSchema),
-  history: z.array(rawChangeEventSchema),
-})
+// changeManifestSchema imported from ./manifest.js
 
 // ---- Discard detection ----
 
