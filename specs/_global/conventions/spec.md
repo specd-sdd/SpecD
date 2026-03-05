@@ -20,7 +20,7 @@ No default exports. All exported values use named exports. This makes refactorin
 
 ### Requirement: File naming
 
-Source files use `kebab-case.ts`. Test files use the `.spec.ts` suffix and match the source file name (`change.ts` → `change.spec.ts`), living in `test/` mirroring the `src/` structure — never co-located with source files. No `index.ts` barrel files except at the package root (`src/index.ts`).
+Source files use `kebab-case.ts`. Test files use the `.spec.ts` suffix and match the source file name (`change.ts` → `change.spec.ts`), living in `test/` mirroring the `src/` structure — never co-located with source files. No `index.ts` barrel files except at the package root (`src/index.ts`). Layer-level barrels (`domain/index.ts`, `application/index.ts`, `composition/index.ts`) are permitted in packages with more than 50 internal modules.
 
 ### Requirement: No `any`
 
