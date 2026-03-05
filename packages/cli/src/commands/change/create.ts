@@ -5,17 +5,7 @@ import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
-
-/**
- * Accumulates repeated option values into an array.
- *
- * @param value - The current option value.
- * @param previous - The accumulated array so far.
- * @returns A new array with the value appended.
- */
-function collect(value: string, previous: string[]): string[] {
-  return [...previous, value]
-}
+import { collect } from '../../helpers/collect.js'
 
 /**
  * Registers the `change create` subcommand on the given parent command.
@@ -51,17 +41,11 @@ export function registerChangeCreate(parent: Command): void {
 
           const specIds = opts.spec.map((s) => parseSpecId(s, config).specId)
 
-          // Derive workspaces from specIds
-          const workspaceNames = config.workspaces.map((w) => w.name)
+          // Derive workspaces from specIds (already fully-qualified from parseSpecId)
           const workspaceSet = new Set<string>()
           for (const specId of specIds) {
-            const slash = specId.indexOf('/')
-            const prefix = slash !== -1 ? specId.slice(0, slash) : null
-            if (prefix !== null && workspaceNames.includes(prefix)) {
-              workspaceSet.add(prefix)
-            } else {
-              workspaceSet.add('default')
-            }
+            const colon = specId.indexOf(':')
+            workspaceSet.add(colon !== -1 ? specId.slice(0, colon) : 'default')
           }
           const workspaces = [...workspaceSet]
 

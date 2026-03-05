@@ -6,11 +6,9 @@ import { handleError } from '../../handle-error.js'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { execSync } from 'node:child_process'
-
-/** Known agent ids and the project directory where their skill files are written. */
-const KNOWN_AGENTS: Record<string, { projectDir: (root: string) => string }> = {
-  claude: { projectDir: (root) => path.join(root, '.claude', 'commands') },
-}
+import { KNOWN_AGENTS } from '../../helpers/known-agents.js'
+import { fileExists } from '../../helpers/file-exists.js'
+import { collect } from '../../helpers/collect.js'
 
 /**
  * Resolves the project root to the git repository root when inside a git repo,
@@ -65,17 +63,6 @@ async function installSkillsForAgents(
   }
 
   return result
-}
-
-/**
- * Collects repeatable option values into an array.
- *
- * @param value - The new option value.
- * @param prev - Previously collected values.
- * @returns The updated array including the new value.
- */
-function collect(value: string, prev: string[]): string[] {
-  return [...prev, value]
 }
 
 /**
@@ -158,21 +145,6 @@ export function registerProjectInit(parent: Command): void {
         }
       },
     )
-}
-
-/**
- * Checks whether a file exists at the given path.
- *
- * @param filePath - The path to check.
- * @returns True if the file exists, false otherwise.
- */
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await fs.access(filePath)
-    return true
-  } catch {
-    return false
-  }
 }
 
 /**

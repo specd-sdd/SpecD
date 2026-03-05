@@ -7,9 +7,7 @@ import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { findChangeDir } from '../../helpers/change-dir.js'
 import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
-
-const vlen = (s: string): number => s.normalize('NFC').length
-const pad = (s: string, w: number): string => s + ' '.repeat(Math.max(0, w - vlen(s)))
+import { vlen, pad } from '../../helpers/table.js'
 
 /**
  * Registers the `change artifacts` subcommand on the given parent command.

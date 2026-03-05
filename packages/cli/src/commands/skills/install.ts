@@ -6,15 +6,8 @@ import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import * as os from 'node:os'
 import { execSync } from 'node:child_process'
-
-const KNOWN_AGENTS: Record<string, { projectDir: (root: string) => string; globalDir: string }> = {
-  claude: {
-    projectDir: (root) => path.join(root, '.claude', 'commands'),
-    globalDir: path.join(os.homedir(), '.claude', 'commands'),
-  },
-}
+import { KNOWN_AGENTS } from '../../helpers/known-agents.js'
 
 /**
  * Registers the `skills install` subcommand on the given parent command.
