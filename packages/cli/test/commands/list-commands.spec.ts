@@ -10,6 +10,7 @@ import {
   makeMockChange,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -35,7 +36,7 @@ function setup() {
   vi.mocked(createCliKernel).mockReturnValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -158,7 +159,7 @@ describe('drafts show', () => {
 
     const program = makeProgram()
     registerDraftsShow(program.command('drafts'))
-    await program.parseAsync(['node', 'specd', 'drafts', 'show', 'nonexistent'])
+    await program.parseAsync(['node', 'specd', 'drafts', 'show', 'nonexistent']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -222,7 +223,7 @@ describe('drafts show', () => {
 
     const program = makeProgram()
     registerDraftsShow(program.command('drafts'))
-    await program.parseAsync(['node', 'specd', 'drafts', 'show', 'my-change'])
+    await program.parseAsync(['node', 'specd', 'drafts', 'show', 'my-change']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -384,7 +385,7 @@ describe('discarded show', () => {
 
     const program = makeProgram()
     registerDiscardedShow(program.command('discarded'))
-    await program.parseAsync(['node', 'specd', 'discarded', 'show', 'nonexistent'])
+    await program.parseAsync(['node', 'specd', 'discarded', 'show', 'nonexistent']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -499,7 +500,7 @@ describe('archive show', () => {
 
     const program = makeProgram()
     registerArchiveShow(program.command('archive'))
-    await program.parseAsync(['node', 'specd', 'archive', 'show', 'nonexistent'])
+    await program.parseAsync(['node', 'specd', 'archive', 'show', 'nonexistent']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -725,7 +726,7 @@ describe('spec list', () => {
     vi.mocked(createCliKernel).mockReturnValue(makeMockKernel())
     const stdout = captureStdout()
     captureStderr()
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+    mockProcessExit()
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))

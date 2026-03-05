@@ -5,6 +5,7 @@ import {
   makeMockConfig,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -22,9 +23,13 @@ function setup() {
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
   vi.mocked(createCliKernel).mockReturnValue(kernel)
+  kernel.changes.status.execute.mockResolvedValue({
+    change: { workspaces: ['default'] },
+    artifactStatuses: [],
+  })
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -65,7 +70,7 @@ describe('change archive', () => {
 
     const program = makeProgram()
     registerChangeArchive(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat'])
+    await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(2)
     expect(stderr()).toContain('notify-team')
@@ -100,7 +105,7 @@ describe('change archive', () => {
 
     const program = makeProgram()
     registerChangeArchive(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'archive', 'missing'])
+    await program.parseAsync(['node', 'specd', 'change', 'archive', 'missing']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -123,7 +128,7 @@ describe('change archive', () => {
 
     const program = makeProgram()
     registerChangeArchive(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat'])
+    await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)

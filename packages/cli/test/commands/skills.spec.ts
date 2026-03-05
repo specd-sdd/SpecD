@@ -8,6 +8,7 @@ import {
   makeMockConfig,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -23,6 +24,7 @@ vi.mock('node:fs/promises', () => ({
   writeFile: vi.fn().mockResolvedValue(undefined),
   readFile: vi.fn(),
   access: vi.fn(),
+  stat: vi.fn().mockResolvedValue({}),
 }))
 
 import { loadConfig } from '../../src/load-config.js'
@@ -41,7 +43,7 @@ function setup() {
   vi.mocked(getSkill).mockReturnValue(undefined)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -99,7 +101,9 @@ describe('skills list', () => {
 
     const program = makeProgram()
     registerSkillsList(program.command('skills'))
-    await program.parseAsync(['node', 'specd', 'skills', 'list', '--agent', 'unknown'])
+    await program
+      .parseAsync(['node', 'specd', 'skills', 'list', '--agent', 'unknown'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error:')
@@ -147,7 +151,7 @@ describe('skills show', () => {
 
     const program = makeProgram()
     registerSkillsShow(program.command('skills'))
-    await program.parseAsync(['node', 'specd', 'skills', 'show', 'nonexistent'])
+    await program.parseAsync(['node', 'specd', 'skills', 'show', 'nonexistent']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain("skill 'nonexistent' not found")
@@ -188,7 +192,9 @@ describe('skills install (project scope)', () => {
 
     const program = makeProgram()
     registerSkillsInstall(program.command('skills'))
-    await program.parseAsync(['node', 'specd', 'skills', 'install', 'commit', '--format', 'json'])
+    await program
+      .parseAsync(['node', 'specd', 'skills', 'install', 'commit', '--format', 'json'])
+      .catch(() => {})
 
     const parsed = JSON.parse(stdout())
     expect(Array.isArray(parsed)).toBe(true)
@@ -202,7 +208,7 @@ describe('skills install (project scope)', () => {
 
     const program = makeProgram()
     registerSkillsInstall(program.command('skills'))
-    await program.parseAsync(['node', 'specd', 'skills', 'install', 'nonexistent'])
+    await program.parseAsync(['node', 'specd', 'skills', 'install', 'nonexistent']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain("skill 'nonexistent' not found")
@@ -216,7 +222,7 @@ describe('skills install (project scope)', () => {
 
     const program = makeProgram()
     registerSkillsInstall(program.command('skills'))
-    await program.parseAsync(['node', 'specd', 'skills', 'install', 'commit'])
+    await program.parseAsync(['node', 'specd', 'skills', 'install', 'commit']).catch(() => {})
 
     expect(kernel.project.recordSkillInstall.execute).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -233,7 +239,9 @@ describe('skills install (project scope)', () => {
 
     const program = makeProgram()
     registerSkillsInstall(program.command('skills'))
-    await program.parseAsync(['node', 'specd', 'skills', 'install', 'commit', '--agent', 'claude'])
+    await program
+      .parseAsync(['node', 'specd', 'skills', 'install', 'commit', '--agent', 'claude'])
+      .catch(() => {})
 
     expect(stdout()).toContain('installed commit →')
   })

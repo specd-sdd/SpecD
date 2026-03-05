@@ -7,6 +7,7 @@ import {
   makeMockChange,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -32,7 +33,7 @@ function setup() {
   vi.mocked(findChangeDir).mockResolvedValue('/project/.specd/changes/20260115-100000-my-change')
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -201,7 +202,7 @@ describe('change artifacts', () => {
 
     const program = makeProgram()
     registerChangeArtifacts(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'artifacts', 'missing'])
+    await program.parseAsync(['node', 'specd', 'change', 'artifacts', 'missing']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)

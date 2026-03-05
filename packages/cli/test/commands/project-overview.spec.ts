@@ -6,6 +6,7 @@ import {
   makeMockChange,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -24,7 +25,7 @@ function setup() {
   vi.mocked(createCliKernel).mockReturnValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -94,7 +95,7 @@ describe('project overview', () => {
 
     const program = makeProgram()
     registerProjectOverview(program.command('project'))
-    await program.parseAsync(['node', 'specd', 'project', 'overview'])
+    await program.parseAsync(['node', 'specd', 'project', 'overview']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(expect.any(Number))
     expect(stderr()).toMatch(/error:|fatal:/)

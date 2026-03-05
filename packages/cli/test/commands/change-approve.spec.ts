@@ -7,6 +7,7 @@ import {
   makeMockChange,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -35,7 +36,7 @@ function setup() {
   })
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -107,16 +108,9 @@ describe('change approve spec', () => {
 
     const program = makeProgram()
     registerChangeApprove(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'approve',
-      'spec',
-      'nonexistent',
-      '--reason',
-      'ok',
-    ])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'approve', 'spec', 'nonexistent', '--reason', 'ok'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -128,16 +122,9 @@ describe('change approve spec', () => {
 
     const program = makeProgram()
     registerChangeApprove(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'approve',
-      'spec',
-      'my-change',
-      '--reason',
-      'ok',
-    ])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'approve', 'spec', 'my-change', '--reason', 'ok'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)

@@ -7,6 +7,7 @@ import {
   makeMockChange,
   makeMockKernel,
   makeProgram,
+  mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
@@ -26,7 +27,7 @@ function setup() {
   vi.mocked(createCliKernel).mockReturnValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
-  vi.spyOn(process, 'exit').mockImplementation((() => {}) as never)
+  mockProcessExit()
   return { config, kernel, stdout, stderr }
 }
 
@@ -38,7 +39,7 @@ describe('change edit', () => {
 
     const program = makeProgram()
     registerChangeEdit(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'edit', 'feat'])
+    await program.parseAsync(['node', 'specd', 'change', 'edit', 'feat']).catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error:')
@@ -128,15 +129,9 @@ describe('change edit', () => {
 
     const program = makeProgram()
     registerChangeEdit(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'edit',
-      'missing',
-      '--add-spec',
-      'auth/login',
-    ])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'edit', 'missing', '--add-spec', 'auth/login'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -212,15 +207,9 @@ describe('change edit', () => {
 
     const program = makeProgram()
     registerChangeEdit(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'edit',
-      'feat',
-      '--add-spec',
-      'unknown-ws:some/path',
-    ])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'edit', 'feat', '--add-spec', 'unknown-ws:some/path'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
@@ -232,15 +221,9 @@ describe('change edit', () => {
 
     const program = makeProgram()
     registerChangeEdit(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'edit',
-      'feat',
-      '--remove-spec',
-      'auth/login',
-    ])
+    await program
+      .parseAsync(['node', 'specd', 'change', 'edit', 'feat', '--remove-spec', 'auth/login'])
+      .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/i)
