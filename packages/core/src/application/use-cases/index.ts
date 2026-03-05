@@ -56,8 +56,8 @@ export {
   type WorkspaceContextConfig,
   type ContextWarning,
   type SpecSection,
-  shiftHeadings,
 } from './compile-context.js'
+export { shiftHeadings } from '../../domain/services/shift-headings.js'
 export {
   type ValidateSpecs,
   type ValidateSpecsInput,

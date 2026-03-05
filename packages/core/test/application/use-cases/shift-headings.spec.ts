@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shiftHeadings } from '../../../src/application/use-cases/compile-context.js'
+import { shiftHeadings } from '../../../src/domain/services/shift-headings.js'
 
 describe('shiftHeadings', () => {
   it('shifts headings deeper by positive delta', () => {
