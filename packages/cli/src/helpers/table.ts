@@ -4,8 +4,8 @@ import chalk from 'chalk'
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-const vlen = (s: string): number => s.normalize('NFC').length
-const pad = (s: string, w: number): string => s + ' '.repeat(Math.max(0, w - vlen(s)))
+export const vlen = (s: string): number => s.normalize('NFC').length
+export const pad = (s: string, w: number): string => s + ' '.repeat(Math.max(0, w - vlen(s)))
 
 /**
  * Truncates `text` to `width` characters, appending `…` if it was cut.

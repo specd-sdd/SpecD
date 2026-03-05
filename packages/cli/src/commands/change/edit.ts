@@ -4,17 +4,7 @@ import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
-
-/**
- * Accumulates repeated option values into an array.
- *
- * @param value - The current option value.
- * @param previous - The accumulated array so far.
- * @returns A new array with the value appended.
- */
-function collect(value: string, previous: string[]): string[] {
-  return [...previous, value]
-}
+import { collect } from '../../helpers/collect.js'
 
 /**
  * Registers the `change edit` subcommand on the given parent command.

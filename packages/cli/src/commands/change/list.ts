@@ -5,10 +5,7 @@ import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { colWidth } from '../../helpers/table.js'
-
-const vlen = (s: string): number => s.normalize('NFC').length
-const pad = (s: string, w: number): string => s + ' '.repeat(Math.max(0, w - vlen(s)))
+import { colWidth, pad } from '../../helpers/table.js'
 
 /**
  * Renders the change list as an aligned text table with an inverse-video

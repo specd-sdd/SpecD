@@ -1,35 +1,12 @@
 import { type Command } from 'commander'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import * as os from 'node:os'
 import { listSkills } from '@specd/skills'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-
-const vlen = (s: string): number => s.normalize('NFC').length
-const pad = (s: string, w: number): string => s + ' '.repeat(Math.max(0, w - vlen(s)))
-
-const KNOWN_AGENTS: Record<string, { projectDir: (root: string) => string; globalDir: string }> = {
-  claude: {
-    projectDir: (root) => path.join(root, '.claude', 'commands'),
-    globalDir: path.join(os.homedir(), '.claude', 'commands'),
-  },
-}
-
-/**
- * Checks whether a file exists at the given path.
- *
- * @param filePath - The path to check.
- * @returns True if the file exists.
- */
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await fs.stat(filePath)
-    return true
-  } catch {
-    return false
-  }
-}
+import { vlen, pad } from '../../helpers/table.js'
+import { KNOWN_AGENTS } from '../../helpers/known-agents.js'
+import { fileExists } from '../../helpers/file-exists.js'
 
 /**
  * Resolves the project root by walking up from cwd looking for specd.yaml.
