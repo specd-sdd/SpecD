@@ -95,11 +95,10 @@ describe('Change', () => {
       expect(c.history).toHaveLength(1)
       const evt = c.history[0]
       expect(evt?.type).toBe('transitioned')
-      if (evt?.type === 'transitioned') {
-        expect(evt.from).toBe('drafting')
-        expect(evt.to).toBe('designing')
-        expect(evt.by).toBe(actor)
-      }
+      if (evt?.type !== 'transitioned') throw new Error('unreachable')
+      expect(evt.from).toBe('drafting')
+      expect(evt.to).toBe('designing')
+      expect(evt.by).toBe(actor)
     })
 
     it('chains multiple valid transitions', () => {

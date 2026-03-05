@@ -34,10 +34,9 @@ describe('DraftChange', () => {
       const result = await uc.execute({ name: 'my-change', reason: 'waiting for review' })
 
       const drafted = result.history.find((e) => e.type === 'drafted')
-      expect(drafted).toBeDefined()
-      if (drafted?.type === 'drafted') {
-        expect(drafted.reason).toBe('waiting for review')
-      }
+      expect(drafted?.type).toBe('drafted')
+      if (drafted?.type !== 'drafted') throw new Error('unreachable')
+      expect(drafted.reason).toBe('waiting for review')
     })
 
     it('saves the updated change', async () => {
