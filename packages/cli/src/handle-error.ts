@@ -12,6 +12,7 @@ import {
   ParserNotRegisteredError,
   UnsupportedPatternError,
   PathTraversalError,
+  DeltaApplicationError,
 } from '@specd/core'
 import {
   InvalidStateTransitionError,
@@ -53,7 +54,8 @@ export function handleError(err: unknown): never {
     err instanceof CorruptedManifestError ||
     err instanceof ParserNotRegisteredError ||
     err instanceof UnsupportedPatternError ||
-    err instanceof PathTraversalError
+    err instanceof PathTraversalError ||
+    err instanceof DeltaApplicationError
   ) {
     process.stderr.write(`error: ${err.message}\n`)
     process.exit(1)
