@@ -53,7 +53,7 @@ export class ChangeArtifact {
     this._type = props.type
     this._filename = props.filename
     this._optional = props.optional ?? false
-    this._requires = props.requires ?? []
+    this._requires = [...(props.requires ?? [])]
     this._status = props.status ?? 'missing'
     this._validatedHash = props.validatedHash
   }
@@ -75,7 +75,7 @@ export class ChangeArtifact {
 
   /** Artifact type IDs that must be complete before this one can be validated. */
   get requires(): readonly string[] {
-    return this._requires
+    return [...this._requires]
   }
 
   /** The current validation status of this artifact. */

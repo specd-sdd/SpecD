@@ -116,15 +116,15 @@ export class ArtifactType {
     this._description = props.description
     this._template = props.template
     this._instruction = props.instruction
-    this._requires = props.requires
+    this._requires = [...props.requires]
     this._optional = props.optional ?? false
     this._format = props.format
     this._delta = props.delta ?? false
     this._deltaInstruction = props.deltaInstruction
-    this._validations = props.validations
-    this._deltaValidations = props.deltaValidations
-    this._contextSections = props.contextSections
-    this._preHashCleanup = props.preHashCleanup
+    this._validations = [...props.validations]
+    this._deltaValidations = [...props.deltaValidations]
+    this._contextSections = [...props.contextSections]
+    this._preHashCleanup = [...props.preHashCleanup]
     this._taskCompletionCheck = props.taskCompletionCheck
   }
 
