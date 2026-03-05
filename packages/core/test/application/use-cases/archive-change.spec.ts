@@ -210,7 +210,7 @@ function makeArchivableChange(
       at: createdAt,
       by: testActor,
       workspaces: ['default'],
-      specIds: opts.specIds ?? ['default/auth/oauth'],
+      specIds: opts.specIds ?? ['default:auth/oauth'],
       schemaName: '@specd/schema-std',
       schemaVersion: 1,
     },
@@ -225,7 +225,7 @@ function makeArchivableChange(
     name,
     createdAt,
     workspaces: ['default'],
-    specIds: opts.specIds ?? ['default/auth/oauth'],
+    specIds: opts.specIds ?? ['default:auth/oauth'],
     history: events,
   })
 }
@@ -418,7 +418,7 @@ describe('ArchiveChange', () => {
       const schema = makeSchema([artifactType])
       const specRepo = makeSpecRepository()
 
-      const successChange = makeArchivableChange('my-change', { specIds: ['default/auth/oauth'] })
+      const successChange = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       successChange.setArtifact(
         new ChangeArtifact({
           type: 'spec',
@@ -451,7 +451,7 @@ describe('ArchiveChange', () => {
 
       expect(result.archivedChange).toBeInstanceOf(ArchivedChange)
       expect(result.postHookFailures).toEqual([])
-      expect(result.staleMetadataSpecPaths).toContain('default/auth/oauth')
+      expect(result.staleMetadataSpecPaths).toContain('default:auth/oauth')
     })
   })
 
@@ -484,7 +484,7 @@ describe('ArchiveChange', () => {
         ],
       )
 
-      const change = makeArchivableChange('my-change', { specIds: ['default/auth/oauth'] })
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       change.setArtifact(
         new ChangeArtifact({
           type: 'spec',
@@ -594,6 +594,157 @@ describe('ArchiveChange', () => {
     })
   })
 
+  describe('given project-level hooks are configured', () => {
+    it('runs project-level pre hooks after schema pre hooks', async () => {
+      const callOrder: string[] = []
+      const hooks = {
+        async run(command: string, _variables: unknown): Promise<HookResult> {
+          callOrder.push(command)
+          return new HookResult(0, '', '')
+        },
+      }
+
+      const schema = makeSchema(
+        [],
+        [
+          {
+            step: 'archiving',
+            requires: [],
+            hooks: { pre: [{ type: 'run', command: 'schema-pre' }], post: [] },
+          },
+        ],
+      )
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        new Map(),
+        makeArchiveRepository(),
+        hooks,
+        makeGitAdapter(),
+        makeParsers(),
+        makeSchemaRegistry(schema),
+      )
+      await uc.execute({
+        name: 'my-change',
+        schemaRef: 'std',
+        workspaceSchemasPaths: new Map(),
+        hookVariables: hookVars,
+        projectHooks: {
+          pre: [{ type: 'run', command: 'project-pre' }],
+          post: [],
+        },
+      })
+
+      expect(callOrder).toEqual(['schema-pre', 'project-pre'])
+    })
+
+    it('runs project-level post hooks after schema post hooks', async () => {
+      const callOrder: string[] = []
+      const hooks = {
+        async run(command: string, _variables: unknown): Promise<HookResult> {
+          callOrder.push(command)
+          return new HookResult(0, '', '')
+        },
+      }
+
+      const schema = makeSchema(
+        [],
+        [
+          {
+            step: 'archiving',
+            requires: [],
+            hooks: { pre: [], post: [{ type: 'run', command: 'schema-post' }] },
+          },
+        ],
+      )
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        new Map(),
+        makeArchiveRepository(),
+        hooks,
+        makeGitAdapter(),
+        makeParsers(),
+        makeSchemaRegistry(schema),
+      )
+      await uc.execute({
+        name: 'my-change',
+        schemaRef: 'std',
+        workspaceSchemasPaths: new Map(),
+        hookVariables: hookVars,
+        projectHooks: {
+          pre: [],
+          post: [{ type: 'run', command: 'project-post' }],
+        },
+      })
+
+      expect(callOrder).toEqual(['schema-post', 'project-post'])
+    })
+
+    it('throws HookFailedError when project-level pre hook fails', async () => {
+      const hooks = {
+        async run(command: string, _variables: unknown): Promise<HookResult> {
+          if (command === 'project-pre') return new HookResult(1, '', 'fail')
+          return new HookResult(0, '', '')
+        },
+      }
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        new Map(),
+        makeArchiveRepository(),
+        hooks,
+        makeGitAdapter(),
+        makeParsers(),
+        makeSchemaRegistry(makeSchema([])),
+      )
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          schemaRef: 'std',
+          workspaceSchemasPaths: new Map(),
+          hookVariables: hookVars,
+          projectHooks: {
+            pre: [{ type: 'run', command: 'project-pre' }],
+            post: [],
+          },
+        }),
+      ).rejects.toThrow(HookFailedError)
+    })
+
+    it('collects project-level post hook failures without rollback', async () => {
+      const hooks = {
+        async run(command: string, _variables: unknown): Promise<HookResult> {
+          if (command === 'project-post') return new HookResult(1, '', 'fail')
+          return new HookResult(0, '', '')
+        },
+      }
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        new Map(),
+        makeArchiveRepository(),
+        hooks,
+        makeGitAdapter(),
+        makeParsers(),
+        makeSchemaRegistry(makeSchema([])),
+      )
+      const result = await uc.execute({
+        name: 'my-change',
+        schemaRef: 'std',
+        workspaceSchemasPaths: new Map(),
+        hookVariables: hookVars,
+        projectHooks: {
+          pre: [],
+          post: [{ type: 'run', command: 'project-post' }],
+        },
+      })
+
+      expect(result.postHookFailures).toEqual(['project-post'])
+    })
+  })
+
   describe('given an instruction-type pre hook entry is configured', () => {
     it('does not invoke the hook runner', async () => {
       const runSpy = vi.fn().mockResolvedValue(new HookResult(0, '', ''))
@@ -650,7 +801,7 @@ describe('ArchiveChange', () => {
       })
       const schema = makeSchema([artifactType])
 
-      const change = makeArchivableChange('my-change', { specIds: ['default/auth/oauth'] })
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       change.setArtifact(
         new ChangeArtifact({
           type: 'spec',
@@ -702,7 +853,7 @@ describe('ArchiveChange', () => {
       })
       const schema = makeSchema([artifactType])
 
-      const conflictChange = makeArchivableChange('my-change', { specIds: ['default/auth/oauth'] })
+      const conflictChange = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       conflictChange.setArtifact(
         new ChangeArtifact({
           type: 'spec',
@@ -747,7 +898,7 @@ describe('ArchiveChange', () => {
       const schema = makeSchema([artifactType])
       const specRepo = makeSpecRepository()
 
-      const change = makeArchivableChange('my-change', { specIds: ['default/auth/oauth'] })
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       change.setArtifact(
         new ChangeArtifact({
           type: 'spec',
@@ -793,7 +944,7 @@ describe('ArchiveChange', () => {
       // No change artifact set → effectiveStatus is 'missing'
       const uc = new ArchiveChange(
         makeChangeRepository([
-          makeArchivableChange('my-change', { specIds: ['default/auth/oauth'] }),
+          makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] }),
         ]),
         new Map([['default', specRepo]]),
         makeArchiveRepository(),
@@ -819,7 +970,7 @@ describe('ArchiveChange', () => {
       const schema = makeSchema([artifactType])
       const specRepo = makeSpecRepository()
 
-      const change = makeArchivableChange('my-change', { specIds: ['default/auth/oauth'] })
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       change.setArtifact(
         new ChangeArtifact({ type: 'spec', filename: 'spec.md', validatedHash: '__skipped__' }),
       )
