@@ -19,8 +19,8 @@ import {
   type CompileContextConfig,
   type ContextWarning,
   type SpecSection,
-  shiftHeadings,
 } from './compile-context.js'
+import { shiftHeadings } from '../../domain/services/shift-headings.js'
 import { type WorkspaceContext } from '../ports/workspace-context.js'
 
 /** Input for the {@link GetProjectContext} use case. */

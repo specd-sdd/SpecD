@@ -21,9 +21,6 @@ import { specMetadataSchema } from './_shared/spec-metadata-schema.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
 import { type WorkspaceContext } from '../ports/workspace-context.js'
 
-// Re-export from domain for backwards compatibility
-export { shiftHeadings } from '../../domain/services/shift-headings.js'
-
 /** A single entry in the project-level `context:` list. */
 export type ContextEntry = { instruction: string } | { file: string }
 
@@ -249,10 +246,11 @@ export class CompileContext {
     const dependsOnAdded = new Map<string, ResolvedSpec>()
     if (input.followDeps === true) {
       const depSeen = new Set<string>()
-      for (const specId of change.contextSpecIds) {
+      for (const ctxSpecId of change.contextSpecIds) {
+        const { workspace: ctxWs, capPath: ctxCapPath } = this._parseSpecId(ctxSpecId)
         await this._traverseDependsOn(
-          'default',
-          specId,
+          ctxWs,
+          ctxCapPath,
           includedSpecs,
           dependsOnAdded,
           depSeen,
@@ -925,15 +923,15 @@ export class CompileContext {
   }
 
   /**
-   * Splits a `workspace/capPath` spec ID into its components.
+   * Splits a `workspace:capPath` spec ID into its components.
    *
-   * @param specId - Spec ID in `workspace/capPath` format
+   * @param specId - Spec ID in canonical `workspace:capPath` format
    * @returns The workspace and capability path
    */
   private _parseSpecId(specId: string): { workspace: string; capPath: string } {
-    const slashIdx = specId.indexOf('/')
-    return slashIdx >= 0
-      ? { workspace: specId.slice(0, slashIdx), capPath: specId.slice(slashIdx + 1) }
-      : { workspace: specId, capPath: '' }
+    const colonIdx = specId.indexOf(':')
+    return colonIdx >= 0
+      ? { workspace: specId.slice(0, colonIdx), capPath: specId.slice(colonIdx + 1) }
+      : { workspace: 'default', capPath: specId }
   }
 }
