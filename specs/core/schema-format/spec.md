@@ -134,7 +134,7 @@ deltaValidations:
 
 ### Requirement: Per-spec approval
 
-Any spec file touched by a delta — whether created via an `added` operation or modified via a `modified` or `removed` operation — requires explicit approval before the change can be archived. Approval is tracked per spec path, not per change.
+Any spec file touched by a delta — whether created via an `added` operation or modified via a `modified` or `removed` operation — requires explicit approval before the change can be archived. Approval is tracked per spec ID, not per change.
 
 `specd archive` must refuse to proceed if any spec touched by the change has not been approved. `specd approve <spec-path>` records the approval for that spec within the current change.
 

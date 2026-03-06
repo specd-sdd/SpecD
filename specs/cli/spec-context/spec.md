@@ -15,7 +15,7 @@ specd spec context <workspace:capability-path>
   [--format text|json|toon]
 ```
 
-- `<workspace:capability-path>` — required positional; the fully-qualified spec path (e.g. `default:auth/login`)
+- `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
 - `--rules` — when present, includes only the rules sections in the output
 - `--constraints` — when present, includes only the constraints sections in the output
 - `--scenarios` — when present, includes only the scenarios sections in the output

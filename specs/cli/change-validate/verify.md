@@ -6,7 +6,7 @@
 
 #### Scenario: Missing arguments
 
-- **WHEN** `specd change validate my-change` is run without the spec path
+- **WHEN** `specd change validate my-change` is run without the spec ID
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
 ### Requirement: Output on success
@@ -34,9 +34,9 @@
 - **THEN** stdout contains `validation failed` and `error:` lines for each failure
 - **AND** the process exits with code 1
 
-### Requirement: Spec path not in change
+### Requirement: Spec ID not in change
 
-#### Scenario: Unknown spec path
+#### Scenario: Unknown spec ID
 
 - **GIVEN** a change with specId `default:auth/login`
 - **WHEN** `specd change validate my-change default:billing/invoices` is run

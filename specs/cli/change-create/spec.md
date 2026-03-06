@@ -13,7 +13,7 @@ specd change create <name> --spec <id>... [--format text|json|toon]
 ```
 
 - `<name>` — required positional; the unique slug name for the new change (e.g. `add-auth-flow`)
-- `--spec <id>` — required repeatable flag; one or more spec paths being created or modified. Each `<id>` is `[<workspace>:]<capability-path>` — the workspace qualifier is optional and defaults to `default` when omitted (e.g. `--spec auth/login` means `default:auth/login`, `--spec billing/invoices` with an explicit workspace would be `--spec billing-ws:billing/invoices`).
+- `--spec <id>` — required repeatable flag; one or more spec IDs being created or modified. Each `<id>` is `[<workspace>:]<capability-path>` — the workspace qualifier is optional and defaults to `default` when omitted (e.g. `--spec auth/login` means `default:auth/login`, `--spec billing/invoices` with an explicit workspace would be `--spec billing-ws:billing/invoices`).
 - `--description <text>` — optional; a short free-text description of the change's purpose, stored in the manifest
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
@@ -73,3 +73,4 @@ specd change create add-shared-api --spec shared-ws:api/contracts
 
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`specs/core/change/spec.md`](../../core/change/spec.md) — Change entity, identity requirements
+- [`specs/core/spec-id-format/spec.md`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, bare path shorthand

@@ -174,22 +174,22 @@
 #### Scenario: New spec requires approval
 
 - **WHEN** a delta creates a new spec via an `added` operation
-- **THEN** that spec path must be approved before archiving
+- **THEN** that spec ID must be approved before archiving
 
 #### Scenario: Modified spec requires approval
 
 - **WHEN** a delta modifies or removes nodes in an existing spec
-- **THEN** that spec path must be approved before archiving
+- **THEN** that spec ID must be approved before archiving
 
 #### Scenario: All specs approved
 
-- **WHEN** every spec path touched by the change has been approved
+- **WHEN** every spec ID touched by the change has been approved
 - **THEN** `specd archive` proceeds without an approval error
 
 #### Scenario: Partially approved
 
-- **WHEN** at least one touched spec path has not been approved
-- **THEN** `specd archive` must refuse and report which spec paths are pending approval
+- **WHEN** at least one touched spec ID has not been approved
+- **THEN** `specd archive` must refuse and report which spec IDs are pending approval
 
 ### Requirement: taskCompletionCheck
 

@@ -12,7 +12,7 @@ Defines the `specd spec metadata <workspace:capability-path>` command, which dis
 specd spec metadata <workspace:capability-path> [--infer] [--format text|json|toon]
 ```
 
-- `<workspace:capability-path>` — required positional; the fully-qualified spec path (e.g. `default:auth/login`)
+- `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
 - `--infer` — optional; when metadata is stale or absent, extract rules, constraints, and scenarios from the spec's raw artifact files using the active schema's `contextSections` definitions instead of showing the stale recorded values. Only affects the semantic sections (rules, constraints, scenarios) — all other fields (title, description, dependsOn, contentHashes) always come from the recorded metadata
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
@@ -156,3 +156,4 @@ scenarios:   3
 
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`specs/core/compile-context/spec.md`](../../core/compile-context/spec.md) — `contextSections` selectors and artifact parser infrastructure
+- [`specs/core/spec-id-format/spec.md`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format

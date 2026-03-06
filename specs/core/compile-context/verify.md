@@ -186,11 +186,11 @@
 - **THEN** `result.instructionBlock` includes `Review delta specs`
 - **AND** `pnpm test` is not included in the instruction block
 
-### Requirement: Missing spec paths emit a warning
+### Requirement: Missing spec IDs emit a warning
 
-#### Scenario: Non-existent spec path emits a warning
+#### Scenario: Non-existent spec ID emits a warning
 
-- **GIVEN** an include pattern matches a spec path that does not exist in `SpecRepository`
+- **GIVEN** an include pattern matches a spec ID that does not exist in `SpecRepository`
 - **WHEN** `CompileContext.execute` is called
 - **THEN** a warning is emitted identifying the missing path, the path is skipped, and no error is thrown
 

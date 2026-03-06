@@ -13,12 +13,12 @@ specd change validate <name> <workspace:capability-path> [--format text|json|too
 ```
 
 - `<name>` — required positional; the name of the change to validate
-- `<workspace:capability-path>` — required positional; the spec path to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`.
+- `<workspace:capability-path>` — required positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`.
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 ### Requirement: Behaviour
 
-The command invokes the `ValidateArtifacts` use case. It resolves `schemaRef` and `workspaceSchemasPaths` from the loaded `SpecdConfig` and passes them along with the change name and spec path.
+The command invokes the `ValidateArtifacts` use case. It resolves `schemaRef` and `workspaceSchemasPaths` from the loaded `SpecdConfig` and passes them along with the change name and spec ID.
 
 ### Requirement: Output on success
 
@@ -62,7 +62,7 @@ In `json` or `toon` mode, the output is (encoded in the respective format):
 
 The process exits with code 1 when `passed` is `false`, regardless of format.
 
-### Requirement: Spec path not in change
+### Requirement: Spec ID not in change
 
 If the given `<workspace:capability-path>` is not declared in the change's `specIds`, the command exits with code 1 and prints an `error:` message to stderr.
 
@@ -88,3 +88,4 @@ specd change validate update-billing default:billing/invoices
 
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`specs/core/change/spec.md`](../../core/change/spec.md) — artifact status, validation, approval invalidation
+- [`specs/core/spec-id-format/spec.md`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
