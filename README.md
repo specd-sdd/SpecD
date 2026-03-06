@@ -15,6 +15,18 @@ Key differences from earlier SDD tools:
 - **Governance built in.** Optional approval gates let teams require explicit human sign-off before implementation begins or before a change is archived.
 - **Composable packages.** Use only what you need: the core library as an SDK, the CLI for terminal workflows, the MCP server for agent-native workflows, or the full stack.
 
+## Current status (March 2026)
+
+SpecD is in active development and usable from source in this monorepo.
+
+- `@specd/core` has substantial implementation (domain entities, use cases, composition layer, fs adapters, validation, tests).
+- `@specd/cli` is implemented and exposes the main command groups (`change`, `spec`, `project`, `schema`, `skills`, `drafts`, `discarded`, `archive`, `config`).
+- `@specd/schema-std` ships a real `schema.yaml` and templates.
+- `@specd/mcp`, `@specd/schema-openspec`, and `@specd/plugin-*` are still placeholders/scaffolding.
+- `@specd/skills` API exists but currently returns an empty registry.
+
+Publishing/install flows are not finalized yet; use workspace commands for now.
+
 ## Core concepts
 
 | Concept       | Description                                                                                                                                                                                 |
@@ -36,40 +48,51 @@ Optional approval gates can require human sign-off between `ready → implementi
 
 ## Packages
 
-| Package                  | Description                                                                                          |
-| ------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `@specd/core`            | Domain library. All business logic: entities, use cases, and port interfaces. Zero I/O dependencies. |
-| `@specd/cli`             | CLI adapter. Exposes the full spec lifecycle as `specd` commands.                                    |
-| `@specd/mcp`             | MCP server adapter. Exposes the full spec lifecycle to any MCP-compatible AI agent.                  |
-| `@specd/skills`          | Canonical skill definitions installed by agent plugins.                                              |
-| `@specd/schema-std`      | The standard SpecD schema: proposal → specs → design → tasks workflow.                               |
-| `@specd/schema-openspec` | An OpenSpec-compatible schema for teams migrating from OpenSpec.                                     |
-| `@specd/plugin-claude`   | Agent plugin for Claude Code.                                                                        |
-| `@specd/plugin-copilot`  | Agent plugin for GitHub Copilot.                                                                     |
-| `@specd/plugin-codex`    | Agent plugin for OpenAI Codex.                                                                       |
+| Package                  | Description                                                                                      | Status             |
+| ------------------------ | ------------------------------------------------------------------------------------------------ | ------------------ |
+| `@specd/core`            | Domain library: entities, value objects, use cases, ports, composition, infrastructure adapters. | In progress (real) |
+| `@specd/cli`             | CLI adapter around `@specd/core` with command registration and formatting/output modes.          | In progress (real) |
+| `@specd/mcp`             | MCP server adapter package.                                                                      | Scaffolded         |
+| `@specd/skills`          | Skill registry API used by plugins and CLI skill commands.                                       | Scaffolded/empty   |
+| `@specd/schema-std`      | Standard SpecD schema package with `schema.yaml` and template files.                             | In progress (real) |
+| `@specd/schema-openspec` | OpenSpec-compatible schema package.                                                              | Scaffolded         |
+| `@specd/plugin-claude`   | Claude plugin package.                                                                           | Scaffolded         |
+| `@specd/plugin-copilot`  | GitHub Copilot plugin package.                                                                   | Scaffolded         |
+| `@specd/plugin-codex`    | OpenAI Codex plugin package.                                                                     | Scaffolded         |
 
-## Getting started
+## Getting started (workspace)
 
-> SpecD is in active development. The CLI and MCP server are not yet available for general use. The sections below describe the intended setup once they are released.
-
-**Requirements:**
+**Requirements**
 
 - Node.js >= 20
 - pnpm >= 10
 
-**Installation (upcoming):**
+Install dependencies and run quality checks:
 
 ```sh
-pnpm add -D @specd/cli
+pnpm install
+pnpm build
+pnpm test
+pnpm lint
 ```
 
-**Project setup (upcoming):**
+Build and run the CLI from source:
 
 ```sh
-pnpm specd init
+pnpm --filter @specd/cli build
+node packages/cli/dist/index.js --help
 ```
 
-`specd init` creates a `specd.yaml` at the project root, adds `specd.local.yaml` to `.gitignore`, and scaffolds the storage directories. A minimal `specd.yaml` looks like this:
+Example command groups currently wired:
+
+- `specd change ...`
+- `specd spec ...`
+- `specd project ...`
+- `specd config show`
+- `specd schema show`
+- `specd skills ...`
+
+`project init` can generate a local `specd.yaml`. A minimal config looks like:
 
 ```yaml
 schema: '@specd/schema-std'
@@ -100,21 +123,20 @@ storage:
       path: specd/archive
 ```
 
-See the [configuration reference](docs/schemas/config-reference.md) for all available options.
+See the [configuration reference](docs/config/config-reference.md) for all available options.
 
 ## Documentation
 
-| Section                          | Contents                                                                   |
-| -------------------------------- | -------------------------------------------------------------------------- |
-| [`docs/cli/`](docs/cli/)         | Reference for every `specd` command: purpose, flags, examples, exit codes. |
-| [`docs/mcp/`](docs/mcp/)         | Reference for every tool and resource exposed by `@specd/mcp`.             |
-| [`docs/core/`](docs/core/)       | Public API of `@specd/core`: entities, ports, use cases, and error types.  |
-| [`docs/schemas/`](docs/schemas/) | Schema authoring guide and `specd.yaml` configuration reference.           |
-| [`docs/adr/`](docs/adr/)         | Architecture Decision Records documenting the key design decisions.        |
+| Section                          | Contents                                                                    |
+| -------------------------------- | --------------------------------------------------------------------------- |
+| [`docs/core/`](docs/core/)       | Core API and model docs (`overview`, `domain-model`, `ports`, `use-cases`). |
+| [`docs/config/`](docs/config/)   | `specd.yaml` reference and configuration examples.                          |
+| [`docs/schemas/`](docs/schemas/) | Schema format reference and schema examples.                                |
+| [`docs/adr/`](docs/adr/)         | Architecture Decision Records.                                              |
+| [`docs/cli/`](docs/cli/)         | CLI docs directory (currently mostly pending).                              |
+| [`docs/mcp/`](docs/mcp/)         | MCP docs directory (currently mostly pending).                              |
 
-## Project status
-
-SpecD is under active development. The domain core (`@specd/core`) is being built out — the domain model, use cases, and infrastructure adapters are taking shape. The CLI, MCP server, and plugins are scaffolded but not yet implemented.
+## Development model
 
 This repository follows a spec-driven workflow: each significant area of behavior is specified in `specs/` before implementation begins.
 
