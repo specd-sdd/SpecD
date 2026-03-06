@@ -38,7 +38,7 @@
 
 #### Scenario: Spec added after creation
 
-- **WHEN** a new spec path is added to the Change's `specIds`
+- **WHEN** a new spec ID is added to the Change's `specIds`
 - **THEN** an `invalidated` event with `cause: 'spec-change'` is appended and a `transitioned` event rolling back to `designing` is appended
 
 ### Requirement: Lifecycle

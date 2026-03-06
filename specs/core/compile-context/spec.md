@@ -44,9 +44,9 @@ Each `SpecRepository` in the map must have been constructed with the matching `R
 - `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.
 - `sections` (optional) — when present, restricts the metadata content rendered for each spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, all available sections are rendered (description + rules + constraints + scenarios). `sections` applies only to spec content (step 5 of the assembled instruction block) — it does not affect schema instructions, delta context, artifact rules, step hooks, or available steps.
 
-### Requirement: Workspace resolution for spec paths
+### Requirement: Workspace resolution for spec IDs
 
-Every spec path handled by `CompileContext` carries an explicit or implicit workspace qualifier:
+Every spec ID handled by `CompileContext` carries an explicit or implicit workspace qualifier:
 
 - **Explicit qualifier** (e.g. `billing:auth/login`) — the workspace name before `:` is used to look up the corresponding `SpecRepository` in the map.
 - **No qualifier** (e.g. `auth/login`) — the workspace is inferred from context:
@@ -62,7 +62,7 @@ If a pattern or `dependsOn` entry references a workspace name that has no entry 
 
 1. **Project-level include patterns** — always applied, regardless of which workspaces are active.
 2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set.
-3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec paths appears in `change.specIds`).
+3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec IDs appears in `change.specIds`).
 4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set.
 5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.contextSpecIds`, `CompileContext` reads each spec's `.specd-metadata.yaml` and follows `dependsOn` links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely.
 
@@ -121,9 +121,9 @@ If the step is not available (one or more required artifacts are neither `comple
 
 `CompileContext` must not throw on availability failures. It must throw on `ChangeNotFoundError` (change not found) and on schema resolution errors.
 
-### Requirement: Missing spec paths emit a warning
+### Requirement: Missing spec IDs emit a warning
 
-If a spec path from an include pattern or `dependsOn` reference does not exist in the corresponding `SpecRepository`, `CompileContext` must emit a warning identifying the missing path and skip it — no error is thrown. This allows the context to be compiled even when specs are temporarily absent, while making the gap visible.
+If a spec ID from an include pattern or `dependsOn` reference does not exist in the corresponding `SpecRepository`, `CompileContext` must emit a warning identifying the missing spec ID and skip it — no error is thrown. This allows the context to be compiled even when specs are temporarily absent, while making the gap visible.
 
 ### Requirement: Unknown workspace qualifiers emit a warning
 
@@ -214,3 +214,4 @@ const result = await compileContext.execute({
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal, staleness detection
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `contextSections` (fallback path), `workflow`, `instruction`, `delta`, `format`, `deltaInstruction`
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `deltaInstructions()`, `outline()`
+- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds` and `contextSpecIds`

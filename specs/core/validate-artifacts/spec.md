@@ -22,18 +22,18 @@ class ValidateArtifacts {
 }
 ```
 
-`specs` is keyed by workspace name. When loading a base spec for delta application preview, `ValidateArtifacts` looks up the `SpecRepository` for the spec path's workspace. `ArtifactParserRegistry` maps format names to `ArtifactParser` adapters and is used for both `deltaValidations` checks and delta application preview.
+`specs` is keyed by workspace name. When loading a base spec for delta application preview, `ValidateArtifacts` looks up the `SpecRepository` for the spec ID's workspace. `ArtifactParserRegistry` maps format names to `ArtifactParser` adapters and is used for both `deltaValidations` checks and delta application preview.
 
 ### Requirement: Input
 
 `ValidateArtifacts.execute` receives:
 
 - `name` — the change name to validate
-- `specPath` — the spec path to validate (one spec per execution); must be one of the paths in `change.specIds`
+- `specPath` — the spec ID to validate (one spec per execution); must be one of the IDs in `change.specIds`
 - `schemaRef` — the schema reference string from `specd.yaml`
 - `workspaceSchemasPaths` — resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`
 
-Validating all specs in a change requires calling `execute` once per spec path. Use cases that need to validate all specs call `execute` in a loop.
+Validating all specs in a change requires calling `execute` once per spec ID. Use cases that need to validate all specs call `execute` in a loop.
 
 ### Requirement: Required artifacts check
 
@@ -135,3 +135,4 @@ After all artifacts have been evaluated, `ValidateArtifacts` must call `changeRe
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `apply()`, `DeltaApplicationError`, delta file location
 - [`specs/core/storage/spec.md`](../storage/spec.md) — `ValidateArtifacts` is the sole path to `complete`; artifact status derivation
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port-per-workspace pattern; manual DI at entry points
+- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for spec IDs

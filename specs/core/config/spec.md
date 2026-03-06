@@ -243,14 +243,14 @@ Keys are validated against the active schema's artifact IDs at startup. Unknown 
 
 **Pattern syntax:**
 
-| Pattern               | Meaning at project level                                            | Meaning at workspace level                                          |
-| --------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `*`                   | All specs in all workspaces                                         | All specs in this workspace (= `{self}:*`)                          |
-| `workspace:*`         | All specs in the named workspace                                    | All specs in the named workspace                                    |
-| `prefix/*`            | All specs under `prefix/` in `default`                              | All specs under `prefix/` in this workspace                         |
-| `workspace:prefix/*`  | All specs under `prefix/` in the named workspace                    | All specs under `prefix/` in the named workspace                    |
-| `path/name`           | Exact spec in `default` (does not match descendants)                | Exact spec in this workspace (does not match descendants)           |
-| `workspace:path/name` | Exact spec path in the named workspace (does not match descendants) | Exact spec path in the named workspace (does not match descendants) |
+| Pattern               | Meaning at project level                                          | Meaning at workspace level                                        |
+| --------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `*`                   | All specs in all workspaces                                       | All specs in this workspace (= `{self}:*`)                        |
+| `workspace:*`         | All specs in the named workspace                                  | All specs in the named workspace                                  |
+| `prefix/*`            | All specs under `prefix/` in `default`                            | All specs under `prefix/` in this workspace                       |
+| `workspace:prefix/*`  | All specs under `prefix/` in the named workspace                  | All specs under `prefix/` in the named workspace                  |
+| `path/name`           | Exact spec in `default` (does not match descendants)              | Exact spec in this workspace (does not match descendants)         |
+| `workspace:path/name` | Exact spec ID in the named workspace (does not match descendants) | Exact spec ID in the named workspace (does not match descendants) |
 
 `*` may only appear in three positions: alone (`*`), as the sole suffix after `workspace:` (`billing:*`), or as the sole suffix after a path prefix ending in `/` (`_global/*`). It may not appear in the middle of a path segment or in any other position.
 
@@ -311,7 +311,7 @@ workspaces:
     # no workspace-level context — project-level shared:_global/* covers it
 ```
 
-References to unknown workspace qualifiers produce a warning at startup but do not prevent startup — runtime is tolerant to allow working with partial workspace setups. However, `specd config validate` must fail with an error if any unknown workspace qualifier is found: a typo in a qualifier silently excludes specs from context, which is a dangerous silent failure in teams. References to non-existent spec paths are silently skipped at context-compilation time — this avoids breaking when a spec is temporarily deleted or not yet created. Invalid pattern syntax is an error caught at startup.
+References to unknown workspace qualifiers produce a warning at startup but do not prevent startup — runtime is tolerant to allow working with partial workspace setups. However, `specd config validate` must fail with an error if any unknown workspace qualifier is found: a typo in a qualifier silently excludes specs from context, which is a dangerous silent failure in teams. References to non-existent spec IDs are silently skipped at context-compilation time — this avoids breaking when a spec is temporarily deleted or not yet created. Invalid pattern syntax is an error caught at startup.
 
 `specd config validate` additionally warns when a pattern (include or exclude, at any level) matches no specs on disk at validation time. This is not a runtime error — specs may not exist yet — but the warning helps catch typos early.
 
@@ -470,7 +470,7 @@ The following conditions emit **warnings** but allow startup to proceed:
 - Include pattern order (project-level first, then active workspace declaration order) determines context order and truncation priority
 - A spec matched by multiple include patterns appears once, at the position of the first matching pattern
 - `*` in a pattern may only appear alone, as `workspace:*`, or as a path suffix `prefix/*` — any other position is a startup error
-- Unknown workspace qualifiers in patterns produce a warning, not an error; missing spec paths are silently skipped at compile time
+- Unknown workspace qualifiers in patterns produce a warning, not an error; missing spec IDs are silently skipped at compile time
 
 ## Examples
 

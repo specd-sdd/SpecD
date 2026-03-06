@@ -306,7 +306,7 @@
 - **WHEN** `contextIncludeSpecs: ['auth/*']` and `contextExcludeSpecs: ['auth/login']` are declared and both `auth/login` and `auth/register` exist
 - **THEN** `CompileContext` includes `auth/register` but not `auth/login`
 
-#### Scenario: Non-existent spec path silently skipped at compile time
+#### Scenario: Non-existent spec ID silently skipped at compile time
 
 - **WHEN** `contextIncludeSpecs: ['auth/does-not-exist']` is declared and no such spec exists on disk
 - **THEN** `CompileContext` produces no error — the missing path is silently skipped

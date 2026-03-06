@@ -67,7 +67,7 @@ scenarios:
 
 - **`keywords`** (array of strings, optional) — topic tags for this spec, used by tooling to find related specs (e.g. `specd spec find --keyword auth`). Should capture domain concepts, patterns, and cross-cutting concerns present in the spec. Lowercase, hyphen-separated.
 
-- **`dependsOn`** (array of strings, optional) — spec paths this spec depends on for context. Each path is relative to the workspace root and may include an optional workspace qualifier (e.g. `billing:payments/invoices`) for cross-workspace dependencies. An unqualified path is resolved within the same workspace as the referencing spec. An empty array or absent field means no declared dependencies.
+- **`dependsOn`** (array of strings, optional) — spec IDs this spec depends on for context. Each ID is a capability path relative to the workspace and may include an optional workspace qualifier (e.g. `billing:payments/invoices`) for cross-workspace dependencies. An unqualified ID is resolved within the same workspace as the referencing spec. An empty array or absent field means no declared dependencies.
 
 - **`contentHashes`** (map of filename → hash string, optional) — a SHA-256 hash per `requiredSpecArtifacts` file at the time the metadata was last derived. Keys are the resolved filenames: specd reads `requiredSpecArtifacts` from the active schema, looks up each artifact's `output` field, and resolves the concrete filename for this spec directory — that resolved filename is the key (e.g. `spec.md`, `verify.md`). Used to detect when any artifact file has changed and the metadata may be stale. A missing entry or absent field is treated as stale for that file.
 

@@ -23,7 +23,7 @@ class ArchiveChange {
 }
 ```
 
-`specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec path's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.
+`specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec ID's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.
 
 `ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `ArchiveChange` uses it to look up the correct adapter when applying delta files to base artifacts. The bootstrap layer constructs it and injects it here — `ArchiveChange` does not instantiate parsers directly.
 
@@ -52,7 +52,7 @@ If any pre-archive `run:` hook exits with a non-zero code, `ArchiveChange` must 
 
 After all pre-archive hooks succeed, `ArchiveChange` must merge each delta artifact into the project spec and sync the result to `SpecRepository`.
 
-For each spec path in `change.specIds`:
+For each spec ID in `change.specIds`:
 
 1. Resolve the active schema for that spec's workspace.
 2. For each artifact in the schema that declares `delta: true`:
@@ -131,3 +131,4 @@ After post-archive hooks complete, `ArchiveChange` must collect the set of spec 
 - [`specs/core/config/spec.md`](../config/spec.md) — workflow hook structure, `run:` vs `instruction:` entries, template variables
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — metadata refresh signal; `staleMetadataSpecPaths` in result
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port-per-workspace pattern; manual DI at entry points
+- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`

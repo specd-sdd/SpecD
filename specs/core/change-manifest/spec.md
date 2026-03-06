@@ -20,8 +20,8 @@ Each change is persisted as a `manifest.json` file inside its change directory. 
     "version": 2,
   },
   "workspaces": ["default"],
-  "specIds": ["auth/login", "auth/register"],
-  "contextSpecIds": ["_global/config", "_global/schema-format"],
+  "specIds": ["default:auth/login", "default:auth/register"],
+  "contextSpecIds": ["default:_global/config", "default:_global/schema-format"],
   "artifacts": [
     {
       "type": "proposal",
@@ -72,8 +72,8 @@ Field definitions:
 - **`createdAt`** — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix
 - **`schema`** — `name` (string) and `version` (integer) of the schema active at creation; written once, never updated
 - **`workspaces`** — current snapshot of active workspace IDs; mutable
-- **`specIds`** — current snapshot of spec paths; mutable
-- **`contextSpecIds`** — current snapshot of context dependency spec paths; populated at `ready` state from each spec's `.specd-metadata.yaml` `dependsOn` field (direct deps only); mutable; does not trigger approval invalidation when modified
+- **`specIds`** — current snapshot of spec IDs; mutable
+- **`contextSpecIds`** — current snapshot of context dependency spec IDs; populated at `ready` state from each spec's `.specd-metadata.yaml` `dependsOn` field (direct deps only); mutable; does not trigger approval invalidation when modified
 - **`artifacts`** — array of artifact descriptors; `validatedHash` is `null` when the artifact has not been validated, a SHA-256 string when validated, or `"__skipped__"` when an optional artifact has been explicitly marked as not produced. `ArtifactStatus` is never stored — it is derived at load time from `validatedHash` and file presence
 - **`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field.
 
@@ -130,3 +130,4 @@ The manifest must be written atomically — by writing to a temporary file and t
 - [`specs/core/change/spec.md`](../change/spec.md) — Change domain model; defines event types, lifecycle states, and derivation rules serialized in the manifest
 - [`specs/core/storage/spec.md`](../storage/spec.md) — `FsChangeRepository` reads and writes the manifest; atomic write constraint
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, source of `contextSpecIds`
+- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Defines the `specd change edit <name>` command, which modifies the spec scope of an existing change by adding or removing spec paths. Workspaces are never managed directly — they are always derived from the resulting set of `specIds` after the edit.
+Defines the `specd change edit <name>` command, which modifies the spec scope of an existing change by adding or removing spec IDs. Workspaces are never managed directly — they are always derived from the resulting set of `specIds` after the edit.
 
 ## Requirements
 
@@ -16,8 +16,8 @@ specd change edit <name>
 ```
 
 - `<name>` — required positional; the name of the change to edit
-- `--add-spec <id>` — repeatable; adds a spec path to `specIds`. `<id>` follows the same `[<workspace>/]<capability-path>` format as `change create`, defaulting to `default` workspace when prefix is omitted
-- `--remove-spec <id>` — repeatable; removes a spec path from `specIds`
+- `--add-spec <id>` — repeatable; adds a spec ID to `specIds`. `<id>` follows the same `[<workspace>:]<capability-path>` format as `change create`, defaulting to `default` workspace when prefix is omitted
+- `--remove-spec <id>` — repeatable; removes a spec ID from `specIds`
 - `--description <text>` — optional; sets or replaces the free-text description of the change
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
@@ -25,7 +25,7 @@ At least one flag must be provided; running with no flags is a CLI usage error (
 
 ### Requirement: Workspace derivation
 
-After computing the new `specIds`, the CLI derives the new `workspaces` set from the workspace prefixes of all resulting spec paths — the same logic as `change create`. Workspaces that are no longer referenced by any spec are removed automatically; new workspaces required by added specs are added automatically. The user never specifies workspace IDs directly.
+After computing the new `specIds`, the CLI derives the new `workspaces` set from the workspace prefixes of all resulting spec IDs — the same logic as `change create`. Workspaces that are no longer referenced by any spec are removed automatically; new workspaces required by added specs are added automatically. The user never specifies workspace IDs directly.
 
 ### Requirement: Invariant enforcement
 
@@ -101,3 +101,4 @@ specd change edit add-oauth-login --description "Add OAuth2 login via Google and
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`specs/core/change/spec.md`](../../core/change/spec.md) — mutable fields, approval invalidation rules
 - [`specs/cli/change-create/spec.md`](../change-create/spec.md) — spec id format and workspace derivation logic
+- [`specs/core/spec-id-format/spec.md`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format

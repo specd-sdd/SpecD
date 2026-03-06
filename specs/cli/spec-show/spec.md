@@ -12,7 +12,7 @@ Defines the `specd spec show <workspace:capability-path>` command, which prints 
 specd spec show <workspace:capability-path> [--format text|json|toon]
 ```
 
-- `<workspace:capability-path>` — required positional; the fully-qualified spec path (e.g. `default:auth/login`)
+- `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 ### Requirement: Output format

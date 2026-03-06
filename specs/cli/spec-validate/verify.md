@@ -36,7 +36,7 @@ WHEN the user runs `specd spec validate --workspace billing`
 THEN only specs in the `billing` workspace are validated
 AND output follows multi-spec format
 
-## Scenario: Unknown spec path
+## Scenario: Unknown spec ID
 
 WHEN the user runs `specd spec validate default:nonexistent`
 AND the spec does not exist

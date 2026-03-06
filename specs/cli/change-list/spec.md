@@ -26,7 +26,7 @@ Each data row shows:
   <name>  <state>  <specIds>  <schema-name>@<schema-version>
 ```
 
-where `<specIds>` is a comma-separated list of the spec paths on the change.
+where `<specIds>` is a comma-separated list of the spec IDs on the change.
 
 When a description is set on the change, a dim indented description line is printed below the main row:
 

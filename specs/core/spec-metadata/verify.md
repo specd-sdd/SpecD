@@ -99,7 +99,7 @@
 
 #### Scenario: Missing spec in dependsOn skipped with warning
 
-- **WHEN** `dependsOn` references a spec path that does not exist on disk
+- **WHEN** `dependsOn` references a spec ID that does not exist on disk
 - **THEN** specd emits a warning and skips that entry — context compilation continues
 
 #### Scenario: Cycle in dependsOn broken with warning
