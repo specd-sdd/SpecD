@@ -40,7 +40,7 @@ function makeChange(
     artifacts?: ChangeArtifact[]
   } = {},
 ): Change {
-  const { specIds = ['default/auth/login'], contextSpecIds = [], artifacts = [] } = opts
+  const { specIds = ['default:auth/login'], contextSpecIds = [], artifacts = [] } = opts
   const events: ChangeEvent[] = [
     {
       type: 'transitioned',
@@ -53,7 +53,14 @@ function makeChange(
   const change = new Change({
     name,
     createdAt: new Date('2024-01-15'),
-    workspaces: [...new Set(specIds.map((id) => id.split('/')[0] ?? id))],
+    workspaces: [
+      ...new Set(
+        specIds.map((id) => {
+          const c = id.indexOf(':')
+          return c >= 0 ? id.slice(0, c) : 'default'
+        }),
+      ),
+    ],
     specIds,
     contextSpecIds,
     history: events,
@@ -301,7 +308,7 @@ describe('CompileContext', () => {
       // Change has no _global specs, but project-level include covers them
       const globalSpec = new Spec('default', SpecPath.parse('_global/commits'), ['spec.md'])
       const specRepo = makeSpecRepo([globalSpec])
-      const change = makeChange('my-change', { specIds: ['default/auth/login'] })
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema()
 
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
@@ -326,7 +333,7 @@ describe('CompileContext', () => {
       // billing workspace is not active (no billing spec in change.specIds)
       const billingSpec = new Spec('billing', SpecPath.parse('payments'), ['spec.md'])
       const billingRepo = makeSpecRepo([billingSpec])
-      const change = makeChange('my-change', { specIds: ['default/auth/login'] })
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema()
 
       const defaultSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
@@ -364,7 +371,7 @@ describe('CompileContext', () => {
       const draftSpec = new Spec('default', SpecPath.parse('drafts/old-spec'), ['spec.md'])
       const otherSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
       const specRepo = makeSpecRepo([draftSpec, otherSpec])
-      const change = makeChange('my-change', { specIds: ['default/auth/login'] })
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema({ artifacts: [makeArtifactType('spec')] })
 
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
@@ -387,7 +394,7 @@ describe('CompileContext', () => {
       const internalSpec = new Spec('default', SpecPath.parse('internal/notes'), ['spec.md'])
       const authSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
       const specRepo = makeSpecRepo([internalSpec, authSpec])
-      const change = makeChange('my-change', { specIds: ['default/auth/login'] })
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema({ artifacts: [makeArtifactType('spec')] })
 
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
@@ -430,7 +437,7 @@ describe('CompileContext', () => {
 
       // contextSpecIds: ['auth/login'] — auth/login seeds the traversal
       const change = makeChange('my-change', {
-        specIds: ['default/auth/login'],
+        specIds: ['default:auth/login'],
         contextSpecIds: ['auth/login'],
       })
       const schema = makeSchema()
@@ -468,7 +475,7 @@ describe('CompileContext', () => {
       })
 
       const change = makeChange('my-change', {
-        specIds: ['default/auth/login'],
+        specIds: ['default:auth/login'],
         contextSpecIds: ['auth/login'],
       })
       const schema = makeSchema()
@@ -493,7 +500,7 @@ describe('CompileContext', () => {
     it('spec appears only once even if matched by multiple include patterns', async () => {
       const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
       const specRepo = makeSpecRepo([loginSpec])
-      const change = makeChange('my-change', { specIds: ['default/auth/login'] })
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema()
 
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
@@ -533,7 +540,7 @@ describe('CompileContext', () => {
       })
 
       const change = makeChange('my-change', {
-        specIds: ['default/auth/login'],
+        specIds: ['default:auth/login'],
         contextSpecIds: ['auth/login'],
       })
       const schema = makeSchema()
@@ -570,7 +577,7 @@ describe('CompileContext', () => {
       })
 
       const change = makeChange('my-change', {
-        specIds: ['default/auth/login'],
+        specIds: ['default:auth/login'],
         contextSpecIds: ['auth/jwt'],
       })
       const schema = makeSchema()
@@ -602,7 +609,7 @@ describe('CompileContext', () => {
       })
 
       const change = makeChange('my-change', {
-        specIds: ['default/auth/login'],
+        specIds: ['default:auth/login'],
         contextSpecIds: ['auth/jwt'],
       })
       const schema = makeSchema()
@@ -1127,7 +1134,7 @@ describe('CompileContext', () => {
   describe('Requirement: Missing spec paths emit a warning', () => {
     it('emits a warning and skips non-existent spec paths', async () => {
       const specRepo = makeSpecRepo([]) // empty — no specs
-      const change = makeChange('my-change', { specIds: ['default/auth/login'] })
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema()
 
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
@@ -1522,7 +1529,7 @@ describe('CompileContext', () => {
       })
 
       const change = makeChange('my-change', {
-        specIds: ['default/a'],
+        specIds: ['default:a'],
         contextSpecIds: ['a'],
       })
       const schema = makeSchema()
@@ -1568,7 +1575,7 @@ describe('CompileContext', () => {
       })
 
       const change = makeChange('my-change', {
-        specIds: ['default/a'],
+        specIds: ['default:a'],
         contextSpecIds: ['a'],
       })
       const schema = makeSchema()
@@ -1606,7 +1613,7 @@ describe('CompileContext', () => {
       })
 
       const change = makeChange('my-change', {
-        specIds: ['default/a'],
+        specIds: ['default:a'],
         contextSpecIds: ['a'],
       })
       const schema = makeSchema()
