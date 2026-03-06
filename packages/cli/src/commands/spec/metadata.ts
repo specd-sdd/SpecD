@@ -1,9 +1,9 @@
 import { type Command } from 'commander'
-import { createHash } from 'node:crypto'
 import { parse as parseYaml } from 'yaml'
 import {
   SpecPath,
   createArtifactParserRegistry,
+  checkMetadataFreshness,
   type ArtifactNode,
   type ArtifactAST,
   type Selector,
@@ -83,29 +83,11 @@ export function registerSpecMetadata(parent: Command): void {
           const specLabel = `${parsed.workspace}:${parsed.capabilityPath}`
 
           // Compute freshness for each content hash
-          const hashEntries: Array<{
-            filename: string
-            recorded: string
-            current: string
-            fresh: boolean
-          }> = []
-          let allFresh = true
-          if (metadata.contentHashes !== undefined) {
-            for (const [filename, recorded] of Object.entries(metadata.contentHashes)) {
-              const artifact = result.artifacts.get(filename)
-              if (artifact === undefined) {
-                hashEntries.push({ filename, recorded, current: '', fresh: false })
-                allFresh = false
-              } else {
-                const current = `sha256:${createHash('sha256').update(artifact.content).digest('hex')}`
-                const fresh = current === recorded
-                if (!fresh) allFresh = false
-                hashEntries.push({ filename, recorded, current, fresh })
-              }
-            }
-          } else {
-            allFresh = false
-          }
+          const freshnessResult = await checkMetadataFreshness(metadata.contentHashes, (filename) =>
+            Promise.resolve(result.artifacts.get(filename)?.content ?? null),
+          )
+          const hashEntries = freshnessResult.entries
+          const allFresh = freshnessResult.allFresh
 
           // Determine whether to infer semantic sections
           const shouldInfer = opts.infer === true && !allFresh

@@ -2,6 +2,9 @@ import { parse as parseYaml } from 'yaml'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type Spec } from '../../domain/entities/spec.js'
 import { extractSpecSummary } from '../../domain/services/spec-summary.js'
+import { type SpecMetadataStatus, checkMetadataFreshness } from './_shared/metadata-freshness.js'
+
+export type { SpecMetadataStatus }
 
 /**
  * A spec entry returned by {@link ListSpecs}, with resolved title and
@@ -24,6 +27,13 @@ export interface SpecListEntry {
    * 2. Extracted from `spec.md` via {@link extractSpecSummary}
    */
   readonly summary?: string | undefined
+  /**
+   * Metadata freshness status, present only when `includeStatus` was requested.
+   * - `fresh`: metadata exists and all content hashes match current files
+   * - `stale`: metadata exists but hashes are missing or don't match
+   * - `missing`: no `.specd-metadata.yaml` file
+   */
+  readonly status?: SpecMetadataStatus | undefined
 }
 
 /**
@@ -52,16 +62,22 @@ export class ListSpecs {
    * @param options - Execution options
    * @param options.includeSummary - When `true`, resolves a short summary for
    *   each spec in addition to the title. Default: `false`.
+   * @param options.includeStatus - When `true`, resolves metadata freshness
+   *   status for each spec. Default: `false`.
    * @returns All specs across all workspaces with resolved titles
    */
-  async execute(options?: { includeSummary?: boolean }): Promise<SpecListEntry[]> {
+  async execute(options?: {
+    includeSummary?: boolean
+    includeStatus?: boolean
+  }): Promise<SpecListEntry[]> {
     const includeSummary = options?.includeSummary ?? false
+    const includeStatus = options?.includeStatus ?? false
     const results: SpecListEntry[] = []
 
     for (const [, repo] of this._specRepos) {
       const specs = await repo.list()
       for (const spec of specs) {
-        results.push(await this._resolveEntry(repo, spec, includeSummary))
+        results.push(await this._resolveEntry(repo, spec, includeSummary, includeStatus))
       }
     }
 
@@ -73,25 +89,30 @@ export class ListSpecs {
   // ---------------------------------------------------------------------------
 
   /**
-   * Resolves title and optional summary for a single spec.
+   * Resolves title, optional summary, and optional status for a single spec.
    *
    * @param repo - Spec repository to read artifacts from
    * @param spec - The spec entity to resolve
    * @param includeSummary - Whether to resolve a summary
+   * @param includeStatus - Whether to resolve metadata freshness status
    * @returns Resolved spec list entry
    */
   private async _resolveEntry(
     repo: SpecRepository,
     spec: Spec,
     includeSummary: boolean,
+    includeStatus: boolean,
   ): Promise<SpecListEntry> {
     let title: string | undefined
     let description: string | undefined
+    let contentHashes: Record<string, string> | undefined
+    let hasMetadata = false
 
-    // Read .specd-metadata.yaml for title and description
+    // Read .specd-metadata.yaml for title, description, and contentHashes
     try {
       const artifact = await repo.artifact(spec, '.specd-metadata.yaml')
       if (artifact !== null) {
+        hasMetadata = true
         const parsed = parseYaml(artifact.content) as Record<string, unknown> | null
         if (parsed !== null && typeof parsed === 'object') {
           if (typeof parsed['title'] === 'string' && parsed['title'].trim().length > 0) {
@@ -102,6 +123,14 @@ export class ListSpecs {
             parsed['description'].trim().length > 0
           ) {
             description = parsed['description'].trim()
+          }
+          if (
+            includeStatus &&
+            parsed['contentHashes'] !== null &&
+            typeof parsed['contentHashes'] === 'object' &&
+            !Array.isArray(parsed['contentHashes'])
+          ) {
+            contentHashes = parsed['contentHashes'] as Record<string, string>
           }
         }
       }
@@ -131,11 +160,46 @@ export class ListSpecs {
       }
     }
 
+    // Status resolution (only when requested)
+    let status: SpecMetadataStatus | undefined
+    if (includeStatus) {
+      status = await this._resolveStatus(repo, spec, hasMetadata, contentHashes)
+    }
+
     return {
       workspace: spec.workspace,
       path: pathStr,
       title: resolvedTitle,
       ...(summary !== undefined ? { summary } : {}),
+      ...(status !== undefined ? { status } : {}),
     }
+  }
+
+  /**
+   * Resolves metadata freshness status for a single spec.
+   *
+   * @param repo - Spec repository to read artifacts from
+   * @param spec - The spec to check
+   * @param hasMetadata - Whether `.specd-metadata.yaml` exists
+   * @param contentHashes - Recorded content hashes from metadata, if any
+   * @returns The resolved freshness status
+   */
+  private async _resolveStatus(
+    repo: SpecRepository,
+    spec: Spec,
+    hasMetadata: boolean,
+    contentHashes: Record<string, string> | undefined,
+  ): Promise<SpecMetadataStatus> {
+    if (!hasMetadata) return 'missing'
+
+    const result = await checkMetadataFreshness(contentHashes, async (filename) => {
+      try {
+        const artifact = await repo.artifact(spec, filename)
+        return artifact?.content ?? null
+      } catch {
+        return null
+      }
+    })
+    return result.allFresh ? 'fresh' : 'stale'
   }
 }

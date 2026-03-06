@@ -1,6 +1,6 @@
 import { type Command } from 'commander'
 import chalk from 'chalk'
-import { type SpecListEntry } from '@specd/core'
+import { type SpecListEntry, type SpecMetadataStatus } from '@specd/core'
 import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
@@ -11,17 +11,22 @@ import { colWidth, renderTable } from '../../helpers/table.js'
  * Column widths shared across all workspace groups in a single `spec list` run.
  * Computed once over all entries so every group renders identically wide columns.
  */
-type GlobalWidths = { pathW: number; titleW: number; summaryW: number }
+type GlobalWidths = { pathW: number; titleW: number; statusW: number; summaryW: number }
 
 /**
  * Computes column widths from ALL entries across ALL workspaces so every
  * workspace group uses the same fixed column sizes.
  *
  * @param entries - All spec list entries.
+ * @param includeStatus - Whether a STATUS column is shown.
  * @param includeSummary - Whether a SUMMARY column is shown.
  * @returns The computed column widths.
  */
-function computeGlobalWidths(entries: SpecListEntry[], includeSummary: boolean): GlobalWidths {
+function computeGlobalWidths(
+  entries: SpecListEntry[],
+  includeStatus: boolean,
+  includeSummary: boolean,
+): GlobalWidths {
   return {
     pathW: colWidth(
       'PATH',
@@ -31,6 +36,12 @@ function computeGlobalWidths(entries: SpecListEntry[], includeSummary: boolean):
       'TITLE',
       entries.map((s) => s.title),
     ),
+    statusW: includeStatus
+      ? colWidth(
+          'STATUS',
+          entries.map((s) => s.status ?? ''),
+        )
+      : 0,
     summaryW: includeSummary
       ? Math.min(
           60,
@@ -49,6 +60,7 @@ function computeGlobalWidths(entries: SpecListEntry[], includeSummary: boolean):
  *
  * @param workspace - Workspace name used as the table title.
  * @param specs - Entries belonging to this workspace.
+ * @param includeStatus - Whether to include a STATUS column.
  * @param includeSummary - Whether to include a SUMMARY column.
  * @param widths - Column widths computed across all workspaces.
  * @returns Formatted block for this workspace group.
@@ -56,26 +68,25 @@ function computeGlobalWidths(entries: SpecListEntry[], includeSummary: boolean):
 function renderWorkspaceGroup(
   workspace: string,
   specs: SpecListEntry[],
+  includeStatus: boolean,
   includeSummary: boolean,
   widths: GlobalWidths,
 ): string {
   // Inner width = all columns + separators between them (2 spaces each)
-  const innerWidth = widths.pathW + 2 + widths.titleW + (includeSummary ? 2 + widths.summaryW : 0)
+  let innerWidth = widths.pathW + 2 + widths.titleW
+  if (includeStatus) innerWidth += 2 + widths.statusW
+  if (includeSummary) innerWidth += 2 + widths.summaryW
   const wsLabel = 'workspace: ' + workspace
   const wsHeader = chalk.inverse.bold(
     '  ' + wsLabel + ' '.repeat(Math.max(0, innerWidth - wsLabel.length)) + '  ',
   )
 
-  const columns = includeSummary
-    ? [
-        { header: 'PATH', width: widths.pathW },
-        { header: 'TITLE', width: widths.titleW },
-        { header: 'SUMMARY', width: widths.summaryW, overflow: 'wrap' as const },
-      ]
-    : [
-        { header: 'PATH', width: widths.pathW },
-        { header: 'TITLE', width: widths.titleW },
-      ]
+  const columns: Array<{ header: string; width: number; overflow?: 'wrap' }> = [
+    { header: 'PATH', width: widths.pathW },
+    { header: 'TITLE', width: widths.titleW },
+  ]
+  if (includeStatus) columns.push({ header: 'STATUS', width: widths.statusW })
+  if (includeSummary) columns.push({ header: 'SUMMARY', width: widths.summaryW, overflow: 'wrap' })
 
   if (specs.length === 0) {
     return wsHeader + '\n\n  (none)'
@@ -85,11 +96,12 @@ function renderWorkspaceGroup(
   const table = renderTable(
     null,
     columns,
-    specs.map((s) =>
-      includeSummary
-        ? [`${workspace}:${s.path}`, s.title, s.summary ?? '']
-        : [`${workspace}:${s.path}`, s.title],
-    ),
+    specs.map((s) => {
+      const row = [`${workspace}:${s.path}`, s.title]
+      if (includeStatus) row.push(s.status ?? '')
+      if (includeSummary) row.push(s.summary ?? '')
+      return row
+    }),
   )
   return wsHeader + '\n' + table
 }
@@ -104,54 +116,97 @@ export function registerSpecList(parent: Command): void {
     .command('list')
     .description('List all available specs across all workspaces')
     .option('--summary', 'include a short description for each spec')
+    .option(
+      '--status [filter]',
+      'show metadata freshness status; optionally filter by fresh,stale,missing',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
-    .action(async (opts: { summary?: boolean; format: string; config?: string }) => {
-      try {
-        const config = await loadConfig({ configPath: opts.config })
-        const kernel = createCliKernel(config)
-        const includeSummary = opts.summary === true
-        const entries = await kernel.specs.list.execute({ includeSummary })
-        const fmt = parseFormat(opts.format)
+    .action(
+      async (opts: {
+        summary?: boolean
+        status?: boolean | string
+        format: string
+        config?: string
+      }) => {
+        try {
+          const config = await loadConfig({ configPath: opts.config })
+          const kernel = createCliKernel(config)
+          const includeSummary = opts.summary === true
+          const includeStatus = opts.status !== undefined
+          const statusFilter = parseStatusFilter(opts.status)
+          let entries = await kernel.specs.list.execute({ includeSummary, includeStatus })
+          const fmt = parseFormat(opts.format)
 
-        const workspaceNames = config.workspaces.map((w) => w.name)
-
-        if (fmt === 'text') {
-          if (workspaceNames.length === 0) {
-            output('no workspaces configured', 'text')
-            return
+          // Apply status filter when a filter value is provided
+          if (statusFilter !== null) {
+            entries = entries.filter((e) => e.status !== undefined && statusFilter.has(e.status))
           }
 
-          const byWorkspace = new Map<string, SpecListEntry[]>()
-          for (const name of workspaceNames) byWorkspace.set(name, [])
-          for (const entry of entries) byWorkspace.get(entry.workspace)?.push(entry)
+          const workspaceNames = config.workspaces.map((w) => w.name)
 
-          const widths = computeGlobalWidths(entries, includeSummary)
-          const groups = workspaceNames.map((name) =>
-            renderWorkspaceGroup(name, byWorkspace.get(name) ?? [], includeSummary, widths),
-          )
-          output(groups.join('\n\n'), 'text')
-        } else {
-          const byWorkspace = new Map<string, SpecListEntry[]>()
-          for (const name of workspaceNames) byWorkspace.set(name, [])
-          for (const entry of entries) byWorkspace.get(entry.workspace)?.push(entry)
+          if (fmt === 'text') {
+            if (workspaceNames.length === 0) {
+              output('no workspaces configured', 'text')
+              return
+            }
 
-          output(
-            {
-              workspaces: [...byWorkspace.entries()].map(([name, specs]) => ({
+            const byWorkspace = new Map<string, SpecListEntry[]>()
+            for (const name of workspaceNames) byWorkspace.set(name, [])
+            for (const entry of entries) byWorkspace.get(entry.workspace)?.push(entry)
+
+            const widths = computeGlobalWidths(entries, includeStatus, includeSummary)
+            const groups = workspaceNames.map((name) =>
+              renderWorkspaceGroup(
                 name,
-                specs: specs.map((s) => ({
-                  path: `${name}:${s.path}`,
-                  title: s.title,
-                  ...(includeSummary && s.summary !== undefined ? { summary: s.summary } : {}),
+                byWorkspace.get(name) ?? [],
+                includeStatus,
+                includeSummary,
+                widths,
+              ),
+            )
+            output(groups.join('\n\n'), 'text')
+          } else {
+            const byWorkspace = new Map<string, SpecListEntry[]>()
+            for (const name of workspaceNames) byWorkspace.set(name, [])
+            for (const entry of entries) byWorkspace.get(entry.workspace)?.push(entry)
+
+            output(
+              {
+                workspaces: [...byWorkspace.entries()].map(([name, specs]) => ({
+                  name,
+                  specs: specs.map((s) => ({
+                    path: `${name}:${s.path}`,
+                    title: s.title,
+                    ...(includeStatus && s.status !== undefined ? { status: s.status } : {}),
+                    ...(includeSummary && s.summary !== undefined ? { summary: s.summary } : {}),
+                  })),
                 })),
-              })),
-            },
-            fmt,
-          )
+              },
+              fmt,
+            )
+          }
+        } catch (err) {
+          handleError(err)
         }
-      } catch (err) {
-        handleError(err)
-      }
-    })
+      },
+    )
+}
+
+const VALID_STATUSES: ReadonlySet<SpecMetadataStatus> = new Set(['fresh', 'stale', 'missing'])
+
+/**
+ * Parses the `--status` option value into a filter set.
+ *
+ * @param value - The raw option value: `undefined` (not passed), `true` (flag only), or a string
+ * @returns A set of status tokens to filter by, or `null` if no filtering
+ */
+function parseStatusFilter(value: boolean | string | undefined): Set<SpecMetadataStatus> | null {
+  if (typeof value !== 'string') return null
+  const tokens = value
+    .toLowerCase()
+    .split(',')
+    .map((t: string) => t.trim())
+    .filter((t: string): t is SpecMetadataStatus => VALID_STATUSES.has(t as SpecMetadataStatus))
+  return tokens.length > 0 ? new Set(tokens) : null
 }

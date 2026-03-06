@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { parse as parseYaml } from 'yaml'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
@@ -18,6 +17,7 @@ import { type Selector } from '../../domain/value-objects/selector.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
 import { specMetadataSchema } from './_shared/spec-metadata-schema.js'
+import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
 import { type WorkspaceContext } from '../ports/workspace-context.js'
 
@@ -815,17 +815,11 @@ export class CompileContext {
     spec: Spec,
     metadata: SpecMetadata,
   ): Promise<boolean> {
-    const hashes = metadata.contentHashes
-    if (hashes === undefined || Object.keys(hashes).length === 0) return false
-
-    for (const [filename, recordedHash] of Object.entries(hashes)) {
+    const result = await checkMetadataFreshness(metadata.contentHashes, async (filename) => {
       const artifact = await specRepo.artifact(spec, filename)
-      if (artifact === null) return false
-
-      const actualHash = `sha256:${createHash('sha256').update(artifact.content).digest('hex')}`
-      if (actualHash !== recordedHash) return false
-    }
-    return true
+      return artifact?.content ?? null
+    })
+    return result.allFresh
   }
 
   /**
