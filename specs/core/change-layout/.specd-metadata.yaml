@@ -1,140 +1,139 @@
 title: 'Change Directory Layout'
 description: >
-  Defines the internal structure of a change directory and how it organizes manifest, change-scoped artifacts, and delta files for spec modifications. This spec governs the physical layout that underpins the entire change lifecycle—where each file type lives and how they're organized across workspaces and capability paths. You need this to understand where artifacts land during change operations and how they're archived.
+  A change directory is the working area for a single in-progress change. It holds the manifest, all artifacts produced during the change lifecycle, and delta files for spec-scoped artifacts that modify existing specs. This spec defines the internal structure of a change directory and the conventions that govern where each file type lives within it.
 keywords:
-  - 'change directory'
-  - 'manifest'
-  - 'delta files'
-  - 'spec artifacts'
-  - 'file layout'
-  - 'workspace structure'
+  - 'change'
+  - 'directory'
+  - 'layout'
+  - 'root'
+  - 'files'
+  - 'new'
+  - 'scoped'
+  - 'artifacts'
+  - 'delta'
+  - 'workspace'
+  - 'segment'
+  - 'always'
 dependsOn:
-  - 'specs/core/storage/spec.md'
-  - 'specs/core/change-manifest/spec.md'
-  - 'specs/core/delta-format/spec.md'
-  - 'specs/core/schema-format/spec.md'
-  - 'specs/core/archive-change/spec.md'
+  - 'core:core/storage'
+  - 'core:core/change-manifest'
+  - 'core:core/delta-format'
+  - 'core:core/schema-format'
+  - 'core:core/archive-change'
 contentHashes:
-  spec.md: 'sha256:b4772eb2b1b34339b2598eba0cc294d1675287a240f81278c8d763f5297a9fab'
-  verify.md: 'sha256:fc3b8c843d07a25e327866775cfc07ea386523fcd23d5c969b79d33be8b2b6a8'
+  'spec.md': 'sha256:bd8f34781d0b8117b5271ef3fdc0071cd6d62302b239bb296bb6ac4c1091b578'
+  'verify.md': 'sha256:fc3b8c843d07a25e327866775cfc07ea386523fcd23d5c969b79d33be8b2b6a8'
 rules:
   - requirement: 'Root files'
     rules:
-      - 'The change directory root contains manifest.json and all change-scoped artifacts declared by the active schema.'
-      - 'Change-scoped artifacts have no workspace or capability-path prefix.'
-      - 'Change-scoped artifacts are always flat at the root.'
-      - 'The exact filenames are defined by the schema.'
-      - 'manifest.json is the source of truth for the change entity.'
-      - 'Artifact files are the working documents produced during the lifecycle.'
-      - 'No other file types live at the root.'
+      - 'The change directory root contains `manifest.json` and all change-scoped artifacts declared by the active schema. Change-scoped artifacts have no workspace or capability-path prefix — they are always flat at the root. The exact filenames are defined by the schema (e.g. `proposal.md`, `tasks.md`, `design.md` in `schema-std`).'
+      - '`manifest.json` is the source of truth for the change entity. Artifact files are the working documents produced during the lifecycle. No other file types live at the root.'
   - requirement: 'New spec-scoped artifacts'
     rules:
-      - 'When a change creates new spec-scoped artifacts, those files are placed under specs/<workspace>/<capability-path>/ within the change directory.'
-      - 'The <workspace> segment matches the workspace ID from specd.yaml.'
-      - 'The <capability-path> is the spec path within that workspace.'
-      - 'The layout mirrors the permanent spec directory structure so that the files can be synced without path transformation during ArchiveChange.'
-      - 'At archive time, the file at specs/<workspace>/<capability-path>/<filename> in the change directory is written to <workspace.specs.path>/<capability-path>/<filename> in the project.'
+      - 'When a change creates new spec-scoped artifacts (e.g. a new `spec.md` or `verify.md` for a capability that does not yet exist), those files are placed under `specs/<workspace>/<capability-path>/` within the change directory. The `<workspace>` segment matches the workspace ID from `specd.yaml` (e.g. `default`). The `<capability-path>` is the spec path within that workspace (e.g. `core/config`).'
+      - 'Examples:'
+      - '`specs/default/core/config/spec.md`'
+      - '`specs/default/auth/login/verify.md`'
+      - '`specs/billing/invoices/spec.md`'
+      - 'This layout mirrors the permanent spec directory structure so that the files can be synced without path transformation during `ArchiveChange`. At archive time, the file at `specs/<workspace>/<capability-path>/<filename>` in the change directory is written to `<workspace.specs.path>/<capability-path>/<filename>` in the project.'
   - requirement: 'Delta files'
     rules:
-      - 'When a change modifies an existing spec-scoped artifact, a delta file is produced instead of rewriting the artifact in full.'
-      - 'Delta files live under deltas/<workspace>/<capability-path>/ and are named <artifact-filename>.delta.yaml.'
-      - 'Delta files are change artifacts.'
-      - 'Delta files are never synced to the permanent spec directories.'
-      - 'The deltas/ prefix separates them unambiguously from new spec files under specs/.'
+      - 'When a change modifies an existing spec-scoped artifact, a delta file is produced instead of rewriting the artifact in full. Delta files live under `deltas/<workspace>/<capability-path>/` and are named `<artifact-filename>.delta.yaml`.'
+      - 'Examples:'
+      - '`deltas/default/core/config/spec.md.delta.yaml`'
+      - '`deltas/default/auth/login/verify.md.delta.yaml`'
+      - '`deltas/billing/invoices/spec.md.delta.yaml`'
+      - 'Delta files are change artifacts — they are never synced to the permanent spec directories. The `deltas/` prefix separates them unambiguously from new spec files under `specs/`.'
   - requirement: 'Workspace segment is always present'
     rules:
-      - 'Both specs/<workspace>/ and deltas/<workspace>/ always include an explicit workspace segment, even when only one workspace is configured.'
-      - 'Omitting the workspace segment is not valid.'
-      - 'This ensures that multi-workspace changes are unambiguous.'
-      - 'Tooling can resolve the correct SpecRepository for each file without inspecting specd.yaml at read time.'
+      - 'Both `specs/<workspace>/` and `deltas/<workspace>/` always include an explicit workspace segment, even when only one workspace is configured. Omitting the workspace segment is not valid. This ensures that multi-workspace changes are unambiguous and that tooling can resolve the correct `SpecRepository` for each file without inspecting `specd.yaml` at read time.'
   - requirement: 'Full change directory structure'
     rules:
-      - 'A change that only creates new specs has no deltas/ subtree.'
-      - 'A change that only modifies existing specs has no specs/ subtree.'
-      - 'Both specs/ and deltas/ may be present simultaneously when a change creates some new specs and modifies others.'
+      - 'A change directory at full capacity — with both new specs and delta files for multiple workspaces — has this structure:'
+      - 'A change that only creates new specs has no `deltas/` subtree. A change that only modifies existing specs has no `specs/` subtree. Both may be present simultaneously when a change creates some new specs and modifies others.'
 constraints:
-  - 'Change-scoped artifacts are always flat at the change directory root with no workspace or capability-path prefix.'
-  - 'Spec-scoped artifact files for new capabilities live under specs/<workspace>/<capability-path>/.'
-  - 'Delta files always live under deltas/<workspace>/<capability-path>/ and are named <artifact-filename>.delta.yaml.'
-  - 'The workspace segment is always present in both specs/ and deltas/ subtrees.'
-  - 'specs/ and deltas/ subtrees within a change directory are never synced to permanent spec directories.'
-  - 'No other directories or file types are valid at the change directory root besides manifest.json, schema-declared artifacts, specs/, and deltas/.'
+  - 'Change-scoped artifacts are always flat at the change directory root — no workspace or capability-path prefix'
+  - 'Spec-scoped artifact files for new capabilities live under `specs/<workspace>/<capability-path>/`'
+  - 'Delta files always live under `deltas/<workspace>/<capability-path>/` and are named `<artifact-filename>.delta.yaml`'
+  - 'The workspace segment is always present in both `specs/` and `deltas/` subtrees — it is never omitted'
+  - '`specs/` and `deltas/` subtrees within a change directory are never synced to permanent spec directories; only `ArchiveChange` may move their contents'
+  - 'No other directories or file types are valid at the change directory root besides `manifest.json`, schema-declared artifacts, `specs/`, and `deltas/`'
 scenarios:
   - requirement: 'Root files'
     name: 'Change-scoped artifacts are flat at the root'
     when:
-      - 'a change produces proposal.md and tasks.md (both scope: change)'
+      - 'a change produces `proposal.md` and `tasks.md` (both `scope: change`)'
     then:
-      - 'those files are located at <change-dir>/proposal.md and <change-dir>/tasks.md with no subdirectory prefix'
+      - 'those files are located at `<change-dir>/proposal.md` and `<change-dir>/tasks.md` with no subdirectory prefix'
   - requirement: 'Root files'
     name: 'manifest.json is always at the root'
     when:
       - 'any change directory is inspected'
     then:
-      - 'manifest.json is located directly at the change directory root, never in a subdirectory'
+      - '`manifest.json` is located directly at the change directory root, never in a subdirectory'
   - requirement: 'New spec-scoped artifacts'
     name: 'New spec in the default workspace'
     when:
-      - 'a change creates a new spec.md for capability core/config in the default workspace'
+      - 'a change creates a new `spec.md` for capability `core/config` in the `default` workspace'
     then:
-      - 'the file is located at specs/default/core/config/spec.md within the change directory'
+      - 'the file is located at `specs/default/core/config/spec.md` within the change directory'
   - requirement: 'New spec-scoped artifacts'
     name: 'New spec in a named workspace'
     when:
-      - 'a change creates a new spec.md for capability invoices in the billing workspace'
+      - 'a change creates a new `spec.md` for capability `invoices` in the `billing` workspace'
     then:
-      - 'the file is located at specs/billing/invoices/spec.md within the change directory'
+      - 'the file is located at `specs/billing/invoices/spec.md` within the change directory'
   - requirement: 'New spec-scoped artifacts'
     name: 'Spec and verify are siblings under the same capability path'
     when:
-      - 'a change creates both spec.md and verify.md for capability auth/login in the default workspace'
+      - 'a change creates both `spec.md` and `verify.md` for capability `auth/login` in the `default` workspace'
     then:
-      - 'both files are located under specs/default/auth/login/ as siblings'
+      - 'both files are located under `specs/default/auth/login/` — `spec.md` and `verify.md` as siblings'
   - requirement: 'Delta files'
     name: 'Delta file for an existing spec'
     when:
-      - 'a change modifies an existing spec.md for capability core/config in the default workspace'
+      - 'a change modifies an existing `spec.md` for capability `core/config` in the `default` workspace'
     then:
-      - 'a delta file is produced at deltas/default/core/config/spec.md.delta.yaml within the change directory'
+      - 'a delta file is produced at `deltas/default/core/config/spec.md.delta.yaml` within the change directory'
   - requirement: 'Delta files'
     name: 'Delta file naming includes the artifact filename'
     when:
-      - 'a delta file targets verify.md for capability auth/login in the default workspace'
+      - 'a delta file targets `verify.md` for capability `auth/login` in the `default` workspace'
     then:
-      - 'the delta file is located at deltas/default/auth/login/verify.md.delta.yaml'
+      - 'the delta file is located at `deltas/default/auth/login/verify.md.delta.yaml`'
   - requirement: 'Delta files'
     name: 'No delta file for a new spec'
     when:
       - 'a change creates a brand-new capability with no existing spec'
     then:
-      - 'no delta file exists for that capability — only the new spec.md under specs/<workspace>/<path>/'
+      - 'no delta file exists for that capability — only the new `spec.md` under `specs/<workspace>/<path>/`'
   - requirement: 'Workspace segment is always present'
     name: 'Single workspace — segment still required'
     when:
-      - 'a project has only one workspace named default and a change creates a new spec'
+      - 'a project has only one workspace named `default` and a change creates a new spec'
     then:
-      - 'the file is at specs/default/<capability-path>/spec.md, not specs/<capability-path>/spec.md'
+      - 'the file is at `specs/default/<capability-path>/spec.md`, not `specs/<capability-path>/spec.md`'
   - requirement: 'Workspace segment is always present'
     name: 'Multi-workspace change uses distinct prefixes'
     when:
-      - 'a change touches specs in both the default and billing workspaces'
+      - 'a change touches specs in both the `default` and `billing` workspaces'
     then:
-      - 'files for each workspace are under their respective specs/default/ and specs/billing/ subtrees with no overlap'
+      - 'files for each workspace are under their respective `specs/default/` and `specs/billing/` subtrees with no overlap'
   - requirement: 'Full change directory structure'
     name: 'Change with only new specs has no deltas/ subtree'
     when:
       - 'a change creates only new capabilities and modifies no existing specs'
     then:
-      - 'the change directory contains a specs/ subtree but no deltas/ directory'
+      - 'the change directory contains a `specs/` subtree but no `deltas/` directory'
   - requirement: 'Full change directory structure'
     name: 'Change with only modifications has no specs/ subtree'
     when:
       - 'a change modifies only existing capabilities and creates no new specs'
     then:
-      - 'the change directory contains a deltas/ subtree but no specs/ directory'
+      - 'the change directory contains a `deltas/` subtree but no `specs/` directory'
   - requirement: 'Full change directory structure'
     name: 'Mixed change has both subtrees'
     when:
       - 'a change creates one new spec and modifies one existing spec'
     then:
-      - 'the change directory contains both a specs/ and a deltas/ subtree'
+      - 'the change directory contains both a `specs/` and a `deltas/` subtree'

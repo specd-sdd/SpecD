@@ -1,0 +1,119 @@
+title: 'Change Transition'
+description: >
+  Defines the `specd change transition <name> <step>` command, which advances a change to the next lifecycle state.
+keywords:
+  - 'change'
+  - 'transition'
+  - 'command'
+  - 'signature'
+  - 'approval'
+  - 'gate'
+  - 'routing'
+  - 'pre'
+  - 'post'
+  - 'hooks'
+  - 'output'
+  - 'success'
+dependsOn:
+  - 'cli:cli/entrypoint'
+  - 'core:core/change'
+contentHashes:
+  'spec.md': 'sha256:5bf3930292c35e35aeb28f1103e2079f457c6c6dd41474ae1e79c266ece970f2'
+  'verify.md': 'sha256:a701af16254846adc9c9e1325e6f701fa816b4c8c80d5c1a3a8b91cbf5676cc3'
+rules:
+  - requirement: 'Command signature'
+    rules:
+      - '`<name>` — required positional; the name of the change to transition'
+      - '`<step>` — required positional; the target lifecycle state (e.g. `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`)'
+      - '`--format text|json|toon` — optional; output format, defaults to `text`'
+  - requirement: 'Approval-gate routing'
+    rules:
+      - 'The CLI passes the `approvalsSpec` and `approvalsSignoff` flags from the loaded `SpecdConfig` to the `TransitionChange` use case. The use case then applies smart routing:'
+      - 'When the change is in `ready` and `approvalsSpec: true`, `implementing` is silently routed to `pending-spec-approval`'
+      - 'When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`'
+      - 'The user always specifies the logical target state; routing is transparent.'
+  - requirement: 'Pre- and post-hooks'
+    rules:
+      - 'When transitioning to a step that has `run:` hooks declared (in the schema or project-level workflow), the CLI runs them in order before or after the transition (as declared). If a hook exits with a non-zero status, the CLI exits with code 2.'
+  - requirement: 'Output on success'
+    rules:
+      - 'On success, output depends on `--format`:'
+      - '`text` (default): prints a single line to stdout:'
+      - '`json` or `toon`: outputs the following to stdout (encoded in the respective format):'
+      - 'where `<to>` is the effective target state after routing.'
+  - requirement: 'Invalid transition error'
+    rules:
+      - 'If the transition is not valid from the current state, the command exits with code 1 and prints an `error:` message to stderr.'
+  - requirement: 'Incomplete tasks error'
+    rules:
+      - 'If transitioning `implementing → verifying` and any artifact has incomplete task items (matching `taskCompletionCheck.incompletePattern`), the command exits with code 1 and prints an `error:` message to stderr naming the blocking artifact.'
+constraints:
+  - 'The user specifies the logical target state; the CLI never exposes the routing logic in its help text'
+  - 'Hook failures (exit code 2) take precedence over transition success'
+  - "`contextSpecIds` for the `designing → ready` transition are resolved by the CLI from `.specd-metadata.yaml` `dependsOn` fields of the change's `specIds`"
+scenarios:
+  - requirement: 'Command signature'
+    name: 'Missing arguments'
+    when:
+      - '`specd change transition my-change` is run without the target state'
+    then:
+      - 'the command exits with code 1 and prints a usage error to stderr'
+  - requirement: 'Approval-gate routing'
+    name: 'Spec approval gate active'
+    given:
+      - '`approvals.spec: true` and the change is in `ready` state'
+    when:
+      - '`specd change transition my-change implementing` is run'
+    then:
+      - 'the change transitions to `pending-spec-approval`'
+      - 'stdout shows `transitioned my-change: ready → pending-spec-approval`'
+  - requirement: 'Approval-gate routing'
+    name: 'Signoff gate active'
+    given:
+      - '`approvals.signoff: true` and the change is in `done` state'
+    when:
+      - '`specd change transition my-change archivable` is run'
+    then:
+      - 'the change transitions to `pending-signoff`'
+      - 'stdout shows `transitioned my-change: done → pending-signoff`'
+  - requirement: 'Pre- and post-hooks'
+    name: 'Hook failure'
+    given:
+      - 'the target step has a `run:` pre-hook that exits with code 1'
+    when:
+      - '`specd change transition my-change implementing` is run'
+    then:
+      - 'the process exits with code 2'
+      - "the hook's output is forwarded"
+  - requirement: 'Output on success'
+    name: 'Successful direct transition'
+    when:
+      - '`specd change transition my-change designing` succeeds'
+    then:
+      - 'stdout contains `transitioned my-change: drafting → designing`'
+      - 'the process exits with code 0'
+  - requirement: 'Invalid transition error'
+    name: 'Illegal state transition'
+    given:
+      - 'the change is in `drafting` state'
+    when:
+      - '`specd change transition my-change done` is run'
+    then:
+      - 'the command exits with code 1'
+      - 'stderr contains an `error:` message'
+  - requirement: 'Incomplete tasks error'
+    name: 'Unchecked checkboxes block verifying'
+    given:
+      - 'the change is in `implementing` and a task artifact has unchecked checkboxes'
+    when:
+      - '`specd change transition my-change verifying` is run'
+    then:
+      - 'the command exits with code 1'
+      - 'stderr contains an `error:` message naming the blocking artifact'
+  - requirement: 'Incomplete tasks error'
+    name: 'JSON output on successful transition'
+    when:
+      - '`specd change transition my-change designing --format json` succeeds and the change was in `drafting` state'
+    then:
+      - 'stdout is valid JSON with `result` equal to `"ok"`, `name` equal to `"my-change"`, `from` equal to `"drafting"`, and `to` equal to `"designing"`'
+      - 'the process exits with code 0'

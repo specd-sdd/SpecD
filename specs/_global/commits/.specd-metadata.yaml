@@ -1,187 +1,148 @@
 title: 'Commit Conventions'
 description: >
-  Defines the Conventional Commits format that all commits in the specd
-  monorepo must follow, enabling machine-parseable changelogs and release
-  automation.
+  specd uses Conventional Commits. Every commit message must be machine-parseable for changelog generation and release automation.
 keywords:
-  - 'conventional-commits'
-  - 'git'
-  - 'changelog'
-  - 'commit-message'
-  - 'release-automation'
-dependsOn: []
+  - 'commit'
+  - 'conventions'
+  - 'conventional'
+  - 'format'
+  - 'allowed'
+  - 'types'
+  - 'scope'
+  - 'package'
+  - 'name'
+  - 'description'
+  - 'imperative'
+  - 'mood'
 contentHashes:
-  spec.md: 'sha256:0660ed94b800922d5db1075a1995230399e2f4d99c24cb38b63eb73989d80cbd'
-  verify.md: 'sha256:8353f0bd3f445bc84ff816668adc1cacd22bb3d5733060829d73ff848c0980f6'
+  'spec.md': 'sha256:0660ed94b800922d5db1075a1995230399e2f4d99c24cb38b63eb73989d80cbd'
+  'verify.md': 'sha256:8353f0bd3f445bc84ff816668adc1cacd22bb3d5733060829d73ff848c0980f6'
 rules:
   - requirement: 'Conventional commit format'
     rules:
-      - 'All commits follow the format: <type>(<scope>): <description> with optional body and footer.'
+      - 'All commits follow the format:'
   - requirement: 'Allowed types'
     rules:
-      - 'Type must be one of: feat, fix, refactor, test, docs, chore, perf, build.'
-      - 'feat is used for new features or capabilities.'
-      - 'fix is used for bug fixes.'
-      - 'refactor is used for code changes that neither fix a bug nor add a feature.'
-      - 'test is used for adding or updating tests.'
-      - 'docs is used for documentation only changes.'
-      - 'chore is used for tooling, config, dependency updates.'
-      - 'perf is used for performance improvements.'
-      - 'build is used for changes to build system or external dependencies.'
+      - '| Type | When to use | | ---------- | ------------------------------------------------------- | | `feat` | New feature or capability | | `fix` | Bug fix | | `refactor` | Code change that neither fixes a bug nor adds a feature | | `test` | Adding or updating tests | | `docs` | Documentation only changes | | `chore` | Tooling, config, dependency updates | | `perf` | Performance improvement | | `build` | Changes to build system or external dependencies |'
   - requirement: 'Scope is the package name'
     rules:
-      - 'Scope must match the short package name without @specd/ prefix.'
-      - 'Valid scopes are: core, cli, mcp, skills, schema-std, schema-openspec, plugin-claude, plugin-copilot, plugin-codex, root, all.'
-      - 'Use root for changes at the monorepo root.'
-      - 'Use all only for changes that genuinely touch all packages.'
+      - 'Scope must match the short package name (without `@specd/` prefix):'
+      - 'Use `root` for changes at the monorepo root. Use `all` only for changes that genuinely touch all packages.'
   - requirement: 'Description in imperative mood'
     rules:
-      - 'Description uses imperative mood, present tense: add, fix, remove — not added, fixes, removed.'
+      - 'The description uses the imperative mood, present tense: "add", "fix", "remove" — not "added", "fixes", "removed".'
   - requirement: 'Commit granularity'
     rules:
-      - 'Each commit must represent a single coherent change.'
-      - 'Unrelated modifications must never be combined into one commit, even if made in the same session.'
-      - 'The guiding question is: can this commit be reverted or cherry-picked without affecting anything else?'
-      - 'Group changes by the smallest meaningful unit — a single fix, feature addition, refactor, or documentation update.'
+      - 'Each commit must represent a single coherent change. Unrelated modifications must never be combined into one commit, even if they were made in the same session. The guiding question is: can this commit be reverted or cherry-picked without affecting anything else?'
+      - 'Group changes by the smallest meaningful unit — a single fix, a single feature addition, a single refactor, a documentation update for one spec. When a session produces changes across multiple files for different reasons, they must be staged and committed separately.'
   - requirement: 'Breaking changes'
     rules:
-      - 'Breaking changes are marked with ! after the type/scope.'
-      - 'Breaking changes must be explained in the footer: BREAKING CHANGE: <explanation>.'
+      - 'Breaking changes are marked with `!` after the type/scope and explained in the footer:'
   - requirement: 'Automated enforcement'
     rules:
-      - 'Commit conventions must be automatically enforced by commitlint via a husky commit-msg hook.'
-      - 'Commits that violate the format are rejected at commit time before reaching the repository.'
-      - 'commitlint configuration must extend @commitlint/config-conventional as the base.'
-      - 'commitlint must restrict scope-enum to known specd package names: core, cli, mcp, skills, schema-std, schema-openspec, plugin-claude, plugin-copilot, plugin-codex, root, all.'
-      - 'commitlint must enforce subject-case: lower-case.'
-      - 'commitlint must enforce header-max-length: 72.'
-      - 'commitlint must enforce body-max-line-length: 100.'
-      - 'commitlint must reject commits that include AI co-author trailers with @anthropic.com email.'
+      - 'Commit conventions must be automatically enforced by commitlint via a husky `commit-msg` hook. Commits that violate the format are rejected at commit time before they reach the repository.'
+      - 'commitlint configuration must:'
+      - 'Extend `@commitlint/config-conventional` as the base'
+      - 'Restrict `scope-enum` to the known specd package names: `core`, `cli`, `mcp`, `skills`, `schema-std`, `schema-openspec`, `plugin-claude`, `plugin-copilot`, `plugin-codex`, `root`, `all`'
+      - 'Enforce `subject-case: lower-case`'
+      - 'Enforce `header-max-length: 72`'
+      - 'Enforce `body-max-line-length: 100`'
+      - 'Reject commits that include AI co-author trailers (`Co-Authored-By: ... @anthropic.com`)'
   - requirement: 'Commit body format'
     rules:
-      - 'Commit bodies are optional and used only when the subject line and diff cannot fully explain the change.'
-      - 'When a body is present, use setext-style section headers: === for primary, --- for secondary.'
-      - 'Never use ATX headers (###) in bodies as they conflict with git comment syntax.'
-      - 'Wrap all technical terms in backticks: filenames, symbols, types, commands.'
-      - 'Limit body lines to 100 characters.'
-      - 'Include at minimum a Context and Changes section when a body is present.'
-      - 'Add Impact or Breaking sections when they add value.'
+      - 'Commit bodies are optional and used only when the subject line and diff cannot fully explain the change. When a body is present it must follow a consistent structure.'
+      - 'Use setext-style section headers (`===` for primary, `---` for secondary) — never ATX headers (`###`), which conflict with git comment syntax'
+      - 'Wrap all technical terms in backticks: filenames (`spec.md`), symbols (`mergeSpecs`), types (`DeltaConfig`), commands (`pnpm test`)'
+      - 'Limit body lines to 100 characters'
+      - 'Include at minimum a `Context` and `Changes` section when a body is present; add `Impact` or `Breaking` when they add value'
 constraints:
-  - 'Every commit message must match: ^(feat|fix|refactor|test|docs|chore|perf|build)(\\(.+\\))?: .+'
-  - 'Scope must be present and match a known package name or root / all.'
-  - 'Description must not end with a period.'
-  - 'Breaking changes must use the ! marker and include a BREAKING CHANGE: footer.'
-  - 'No Co-Authored-By footer unless explicitly requested.'
+  - 'Every commit message must match: `^(feat|fix|refactor|test|docs|chore|perf|build)(\(.+\))?: .+`'
+  - 'Scope must be present and match a known package name or `root` / `all`'
+  - 'Description must not end with a period'
+  - 'Breaking changes must use the `!` marker and include a `BREAKING CHANGE:` footer'
+  - 'No `Co-Authored-By` footer unless explicitly requested'
 scenarios:
   - requirement: 'Conventional commit format'
     name: 'Missing scope'
-    given:
-      - 'A commit message being prepared'
     when:
-      - 'The message reads fix: handle missing file'
+      - 'a commit message reads `fix: handle missing file`'
     then:
-      - 'It must be rejected — scope is required'
+      - 'it must be rejected — scope is required'
   - requirement: 'Conventional commit format'
     name: 'Valid commit'
-    given:
-      - 'A commit message being prepared'
     when:
-      - 'The message reads feat(core): add ChangeState value object'
+      - 'a commit message reads `feat(core): add ChangeState value object`'
     then:
-      - 'It is accepted'
+      - 'it is accepted'
   - requirement: 'Allowed types'
     name: 'Unknown type'
-    given:
-      - 'A commit message being prepared'
     when:
-      - 'The message reads update(core): change delta merger'
+      - 'a commit message reads `update(core): change delta merger`'
     then:
-      - 'It must be rejected — update is not a valid type'
+      - 'it must be rejected — `update` is not a valid type'
   - requirement: 'Scope is the package name'
     name: 'Full package name used as scope'
-    given:
-      - 'A commit message being prepared'
     when:
-      - 'The message reads feat(@specd/core): add entity'
+      - 'a commit message reads `feat(@specd/core): add entity`'
     then:
-      - 'It must be rejected — scope must be the short name core, not @specd/core'
+      - 'it must be rejected — scope must be the short name `core`, not `@specd/core`'
   - requirement: 'Description in imperative mood'
     name: 'Past tense description'
-    given:
-      - 'A commit message being prepared'
     when:
-      - 'The message reads feat(core): added delta merger'
+      - 'a commit message reads `feat(core): added delta merger`'
     then:
-      - 'It must be rejected — description must use imperative mood'
+      - 'it must be rejected — description must use imperative mood'
   - requirement: 'Description in imperative mood'
     name: 'Trailing period'
-    given:
-      - 'A commit message being prepared'
     when:
-      - 'The message reads fix(cli): handle missing file.'
+      - 'a commit message reads `fix(cli): handle missing file.`'
     then:
-      - 'It must be rejected — description must not end with a period'
+      - 'it must be rejected — description must not end with a period'
   - requirement: 'Commit granularity'
     name: 'Unrelated changes in one commit'
-    given:
-      - 'A development session with multiple unrelated changes'
     when:
-      - 'A commit touches a spec file for documentation reasons and a source file for a bug fix'
+      - 'a commit touches a spec file for documentation reasons and a source file for a bug fix'
     then:
-      - 'They must be split into two separate commits — one docs, one fix'
+      - 'they must be split into two separate commits — one `docs`, one `fix`'
   - requirement: 'Commit granularity'
     name: 'Multiple files, single concern'
-    given:
-      - 'A development session with refactoring across multiple files'
     when:
-      - 'A refactor touches five files but all for the same reason'
+      - 'a refactor touches five files but all for the same reason'
     then:
-      - 'A single commit is correct — the grouping criterion is the reason, not the file count'
+      - 'a single commit is correct — the grouping criterion is the reason, not the file count'
   - requirement: 'Breaking changes'
     name: 'Breaking change without marker'
-    given:
-      - 'A commit being prepared with an incompatible API change'
     when:
-      - 'The commit introduces an incompatible API change but has no ! marker'
+      - 'a commit introduces an incompatible API change but has no `!` marker'
     then:
-      - 'It must be flagged as missing the breaking change marker'
+      - 'it must be flagged as missing the breaking change marker'
   - requirement: 'Breaking changes'
     name: 'Breaking change without footer'
-    given:
-      - 'A commit being prepared with a breaking change marker'
     when:
-      - 'The commit uses ! but has no BREAKING CHANGE: footer'
+      - 'a commit uses `!` but has no `BREAKING CHANGE:` footer'
     then:
-      - 'It must be rejected — the footer is required to explain the breaking change'
+      - 'it must be rejected — the footer is required to explain the breaking change'
   - requirement: 'Automated enforcement'
     name: 'commitlint rejects unknown scope'
-    given:
-      - 'A commit-msg hook running commitlint'
     when:
-      - 'A commit message reads feat(sdk): add client'
+      - 'a commit message reads `feat(sdk): add client`'
     then:
-      - 'The commit-msg hook must reject it — sdk is not a known scope'
+      - 'the `commit-msg` hook must reject it — `sdk` is not a known scope'
   - requirement: 'Automated enforcement'
     name: 'commitlint rejects AI co-author'
-    given:
-      - 'A commit-msg hook running commitlint'
     when:
-      - 'A commit body includes Co-Authored-By: Claude <noreply@anthropic.com>'
+      - 'a commit body includes `Co-Authored-By: Claude <noreply@anthropic.com>`'
     then:
-      - 'The commit-msg hook must reject it'
+      - 'the `commit-msg` hook must reject it'
   - requirement: 'Commit body format'
     name: 'Body not needed'
-    given:
-      - 'A simple commit being prepared'
     when:
-      - 'The commit reads fix(cli): correct typo in error message'
+      - 'a commit reads `fix(cli): correct typo in error message`'
     then:
-      - 'No body is needed — the change is self-explanatory from the subject and diff'
+      - 'no body is needed — the change is self-explanatory from the subject and diff'
   - requirement: 'Commit body format'
     name: 'ATX header in body'
-    given:
-      - 'A commit body being written'
     when:
-      - 'The body uses ### Context as a section header'
+      - 'a commit body uses `### Context` as a section header'
     then:
-      - 'It must be changed to setext style — ATX headers conflict with git comment markers'
+      - 'it must be changed to setext style — ATX headers conflict with git comment markers'

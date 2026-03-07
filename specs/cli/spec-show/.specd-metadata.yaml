@@ -1,0 +1,89 @@
+title: 'Spec Show'
+description: >
+  Defines the `specd spec show <workspace:capability-path>` command, which prints the content of a spec's artifact files to stdout.
+keywords:
+  - 'show'
+  - 'command'
+  - 'signature'
+  - 'output'
+  - 'format'
+  - 'error'
+  - 'cases'
+  - 'workspace'
+  - 'always'
+  - 'explicit'
+  - 'path'
+  - 'there'
+dependsOn:
+  - 'cli:cli/entrypoint'
+contentHashes:
+  'spec.md': 'sha256:fa9c0ccc1e566405dffe2efac7bd9a0b779836b1809af8f96d99f0057a4919f1'
+  'verify.md': 'sha256:1fc71844e505eec0709742b16e7bf3cbf6b325be196fb9b238ab8cc7e41b1b35'
+rules:
+  - requirement: 'Command signature'
+    rules:
+      - '`<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)'
+      - '`--format text|json|toon` — optional; output format, defaults to `text`'
+  - requirement: 'Output format'
+    rules:
+      - 'In `text` mode (default), the command prints each artifact file for the spec in schema-declared order. Each file is preceded by a header line:'
+      - 'All artifact files declared by the schema with scope `spec` are printed. Files that do not exist on disk are skipped silently.'
+      - 'In `json` or `toon` mode, the output is an array (encoded in the respective format):'
+      - 'Each entry corresponds to one artifact file present on disk, in schema-declared order. Files that do not exist on disk are omitted.'
+  - requirement: 'Error cases'
+    rules:
+      - 'If the spec does not exist (no artifact files found at the given path), the command exits with code 1 and prints an `error:` message to stderr.'
+      - 'If the workspace portion of the path is not a configured workspace, exits with code 1.'
+constraints:
+  - 'The workspace is always explicit in the path — there is no default-workspace inference for this command'
+  - 'Only spec-scoped artifacts are printed; change artifacts are not included'
+  - '`.specd-metadata.yaml` is excluded from the output — it is internal metadata, not user-facing spec content'
+scenarios:
+  - requirement: 'Command signature'
+    name: 'Missing path argument'
+    when:
+      - '`specd spec show` is run without a path'
+    then:
+      - 'the command exits with code 1 and prints a usage error to stderr'
+  - requirement: 'Output format'
+    name: 'Multiple artifact files printed with headers'
+    given:
+      - '`default:auth/login` has `spec.md` and `verify.md`'
+    when:
+      - '`specd spec show default:auth/login` is run'
+    then:
+      - 'stdout contains `--- spec.md ---` followed by the spec content, then `--- verify.md ---` followed by the verify content'
+      - 'the process exits with code 0'
+  - requirement: 'Output format'
+    name: 'Missing artifact file skipped silently'
+    given:
+      - '`default:auth/login` has `spec.md` but no `verify.md`'
+    when:
+      - '`specd spec show default:auth/login` is run'
+    then:
+      - 'only the `spec.md` section is printed; no error for the missing file'
+      - 'the process exits with code 0'
+  - requirement: 'Error cases'
+    name: 'Spec does not exist'
+    when:
+      - '`specd spec show default:nonexistent/path` is run and no artifact files exist at that path'
+    then:
+      - 'the command exits with code 1'
+      - 'stderr contains an `error:` message'
+  - requirement: 'Error cases'
+    name: 'Unknown workspace'
+    when:
+      - '`specd spec show unknown-ws:some/path` is run'
+    then:
+      - 'the command exits with code 1'
+      - 'stderr contains an `error:` message'
+  - requirement: 'Output format'
+    name: 'JSON output structure'
+    given:
+      - '`default:auth/login` has `spec.md` with content `# Auth Login` and `verify.md` with content `# Verification: Auth Login`'
+    when:
+      - '`specd spec show default:auth/login --format json` is run'
+    then:
+      - 'stdout is a valid JSON array with two entries, each having `filename` and `content`'
+      - 'the first entry has `filename` equal to `"spec.md"` and `content` equal to `"# Auth Login"`'
+      - 'the process exits with code 0'

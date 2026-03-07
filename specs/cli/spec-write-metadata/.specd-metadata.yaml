@@ -1,0 +1,109 @@
+title: 'Spec Write-Metadata'
+description: >
+  The `specd spec write-metadata` command writes a `.specd-metadata.yaml` file for a given spec. It accepts YAML content from stdin or a file and persists it through the `SaveSpecMetadata` use case, which delegates to `SpecRepository.save()` for conflict detection and atomic writes.
+keywords:
+  - 'write'
+  - 'metadata'
+  - 'command'
+  - 'signature'
+  - 'content'
+  - 'source'
+  - 'yaml'
+  - 'validation'
+  - 'text'
+  - 'output'
+  - 'json'
+  - 'error'
+dependsOn:
+  - 'default:_global/architecture'
+  - 'default:_global/conventions'
+contentHashes:
+  'spec.md': 'sha256:ff5a19d078c29e97ad6282cd6094fb0b053689816896be159ea285057cb36567'
+  'verify.md': 'sha256:d906e0adaf1cf679f24e9f49a64039cf57315391e24c55a03881ee8507126f05'
+rules:
+  - requirement: 'Command signature'
+    rules:
+      - 'The command is registered as `write-metadata <specPath>` on the `spec` parent command. It accepts:'
+      - '`--input <file>` — read YAML content from a file path instead of stdin'
+      - '`--force` — skip conflict detection and overwrite unconditionally'
+      - '`--format <fmt>` — output format: `text|json|toon` (default `text`)'
+      - '`--config <path>` — path to `specd.yaml`'
+      - 'The `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands.'
+  - requirement: 'Content source'
+    rules:
+      - 'Without `--input`, the command reads all of stdin until EOF. With `--input <file>`, it reads the file at the given path. In both cases the result is a raw YAML string passed to the use case.'
+  - requirement: 'YAML validation'
+    rules:
+      - 'Before calling the use case, the command parses the content with `yaml.parse()` to verify it is valid YAML. If parsing fails, the command writes an error to stderr and exits with code 1.'
+  - requirement: 'Text output'
+    rules:
+      - 'On success, text format outputs: `wrote .specd-metadata.yaml for <workspace:path>`'
+  - requirement: 'JSON output'
+    rules:
+      - 'On success, JSON format outputs: `{ "result": "ok", "spec": "<workspace:path>" }`'
+  - requirement: 'Error — spec not found'
+    rules:
+      - "If the spec does not exist in the given workspace, the command writes `error: spec '<specPath>' not found` to stderr and exits with code 1."
+  - requirement: 'Error — invalid YAML'
+    rules:
+      - 'If the content is not valid YAML, the command writes `error: invalid YAML: <parse error message>` to stderr and exits with code 1.'
+  - requirement: 'Error — conflict detected'
+    rules:
+      - 'If `--force` is not set and the repository detects a concurrent modification (hash mismatch), the command writes the conflict error to stderr and exits with code 1.'
+constraints:
+  - 'The command contains no business logic — all writing is delegated to the `SaveSpecMetadata` use case'
+  - 'YAML validation happens at the CLI boundary before the use case is invoked'
+  - 'The command never reads or writes the filesystem directly for spec content — it uses the kernel'
+scenarios:
+  - requirement: 'Content source'
+    name: 'Reads YAML from stdin'
+    when:
+      - '`specd spec write-metadata auth/login` is invoked without `--input`'
+    then:
+      - 'the command reads all of stdin until EOF and passes the content to the use case'
+  - requirement: 'Content source'
+    name: 'Reads YAML from file'
+    when:
+      - '`specd spec write-metadata auth/login --input /tmp/metadata.yaml` is invoked'
+    then:
+      - 'the command reads `/tmp/metadata.yaml` and passes its content to the use case'
+  - requirement: 'YAML validation'
+    name: 'Rejects invalid YAML'
+    when:
+      - 'the content is not valid YAML (e.g. `{{{`)'
+    then:
+      - 'the command writes `error: invalid YAML: ...` to stderr and exits with code 1'
+  - requirement: 'Text output'
+    name: 'Successful write in text format'
+    when:
+      - 'the write succeeds and format is `text`'
+    then:
+      - 'the command outputs `wrote .specd-metadata.yaml for default:auth/login`'
+  - requirement: 'JSON output'
+    name: 'Successful write in JSON format'
+    when:
+      - 'the write succeeds and format is `json`'
+    then:
+      - 'the command outputs `{ "result": "ok", "spec": "default:auth/login" }`'
+  - requirement: 'Error — spec not found'
+    name: 'Unknown spec exits 1'
+    when:
+      - 'the spec does not exist in the workspace'
+    then:
+      - "the command writes `error: spec '<specPath>' not found` to stderr and exits with code 1"
+  - requirement: 'Error — conflict detected'
+    name: 'Conflict without --force exits 1'
+    given:
+      - 'the `.specd-metadata.yaml` file was modified since it was last read'
+    when:
+      - '`specd spec write-metadata auth/login` is invoked without `--force`'
+    then:
+      - 'the command exits with code 1 and reports the conflict'
+  - requirement: 'Error — conflict detected'
+    name: 'Force flag bypasses conflict'
+    given:
+      - 'the `.specd-metadata.yaml` file was modified since it was last read'
+    when:
+      - '`specd spec write-metadata auth/login --force` is invoked'
+    then:
+      - 'the write succeeds and the conflict is ignored'
