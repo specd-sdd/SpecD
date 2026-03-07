@@ -32,23 +32,28 @@ When this skill is invoked:
    The command returns `{ workspace, specPath, specId }`. Use the returned `specId` as
    `<spec-id>`. If the command fails, tell the user the path could not be resolved.
    c. Launch a single subagent (see "Subagent prompt" below) with `<spec-id>` substituted.
+   Single-spec mode: the subagent runs Step 1 (freshness check via `specd spec metadata`) and
+   may skip if the spec is already fresh.
 
 3. **If all specs:**
 
-   a. Run `specd spec list --format json` to get every spec across all workspaces.
+   a. Run `specd spec list --metadata-status stale,missing --format json` to get only specs that need updating.
    b. Parse the JSON. For each workspace, collect the spec paths (they come as `workspace:path`).
+   If the result is empty (no stale or missing specs), report that all metadata is fresh and stop.
    c. Launch subagents **in parallel batches** — up to 5 concurrent subagents at a time.
-   Each subagent receives its own `<spec-id>`.
+   Each subagent receives its own `<spec-id>`. These specs are already known to need updating,
+   so subagents skip the freshness check (Step 1) and go directly to Step 2.
    d. After all subagents complete, report a summary:
-   - How many specs were processed
-   - How many were already fresh (skipped)
-   - How many were updated
+   - How many specs needed updating (stale + missing)
+   - How many were updated successfully
    - Any errors
 
 4. Each subagent uses the Agent tool with:
    - `subagent_type: general-purpose`
    - `model: haiku`
    - The full prompt below, substituting `<spec-id>` with the target spec identifier.
+   - When launching from batch mode (all specs), prepend this line to the prompt:
+     `BATCH MODE: This spec is already known to be stale/missing. Skip the freshness check in Step 1.`
 
 5. The subagents use `specd` CLI commands — they do not access the filesystem directly for spec content.
 
@@ -77,10 +82,14 @@ Mark each in_progress when you start it and completed when done. Skip = complete
 
 Mark "Check content freshness" in_progress.
 
+**If launched from batch mode** (the master told you this spec is already stale/missing):
+Skip freshness check — treat all files as stale and continue. Mark completed immediately.
+
+**If launched for a single spec:**
 Run:
 ```bash
 specd spec metadata <spec-id> --format json
-````
+```
 
 Parse the JSON response. If `fresh` is `true` → mark all tasks completed and stop. No update needed.
 
@@ -103,19 +112,21 @@ Get the spec content:
 specd spec show <spec-id> --format json
 ```
 
-This returns an array of `{ filename, content }` objects. For each file whose hash was stale
-(or all files if no prior metadata), determine its role from the content:
+This returns an array of `{ filename, content }` objects.
 
-- rules — requirement definitions, normative prose, constraints, field definitions, state machines
-- scenarios — WHEN/THEN verification scenarios
-- both — contains both
-- ignore — auxiliary content (examples, ADRs, diagrams)
+Do section-based classification (not free-form role guessing):
+
+- requirements-source: content under `## Requirements` in `spec.md`
+- constraints-source: content under `## Constraints` in `spec.md`
+- deps-source: content under `## Spec Dependencies` in `spec.md`
+- scenarios-source: requirement/scenario blocks in `verify.md`
+- ignore: examples, ADRs, pending, and any section not listed above
 
 Mark "Read and classify changed files" completed.
 
 ### Step 3 — Count and create per-item tasks
 
-Count named requirements across all rules/both files and named scenarios across all scenarios/both files. Create:
+Count named requirements from requirements-source and named scenarios from scenarios-source. Create:
 
 - "Extract metadata fields" (activeForm: "Extracting title, description, keywords, dependsOn, constraints")
 - One task per requirement: "Requirement: <name>" (activeForm: "Extracting rules for <name>")
@@ -125,13 +136,35 @@ Count named requirements across all rules/both files and named scenarios across 
 
 Mark "Extract content" in_progress.
 
-**DO NOT write any file during extraction. The Write tool and Bash write commands must not be
-called until the single write step below. Only TaskUpdate calls are allowed during extraction.**
+**During extraction (Steps 4a–4c below), do NOT write any file — store everything in memory.
+Only Bash commands may write files, and only in the "Single write" step (Step 4d).
+Do NOT use the Write tool at any point. You MUST execute the Single write step once extraction is complete.**
 
 #### Metadata fields
 
 Mark "Extract metadata fields" in_progress.
 Extract title, description, keywords, dependsOn, constraints, contentHashes into memory.
+
+#### Extraction boundaries (STRICT)
+
+Use ONLY these sources:
+
+- `title`, `description`: from `# ...` and `## Overview` in `spec.md`
+- `dependsOn`: ONLY from `## Spec Dependencies` in `spec.md`
+- `constraints`: ONLY from `## Constraints` in `spec.md`
+- `rules`: ONLY from `## Requirements` in `spec.md`, grouped by each `### Requirement: ...`
+- `scenarios`: ONLY from `verify.md` under `## Requirements` / `### Requirement` / `#### Scenario`
+
+Hard exclusions for `rules`:
+
+- Never include content from `## Spec Dependencies`
+- Never include content from `## Constraints`
+- Never include links to `.../spec.md` as rule entries unless they are part of a normative sentence inside `## Requirements`
+
+Deduplication:
+
+- Remove exact duplicates across all `rules[*].rules`
+- Remove any `rules[*].rules` entry that is identical to an entry in `constraints`
 
 For `dependsOn`: the `## Spec Dependencies` section in `spec.md` lists dependencies as relative
 markdown links (e.g. `[...](../../_global/architecture/spec.md)`). To get workspace-qualified IDs:
@@ -159,7 +192,7 @@ Mark "Extract metadata fields" completed.
 
 #### Rules — one requirement at a time (in memory only)
 
-For each named requirement in rules/both files:
+For each named requirement in requirements-source:
 
 - Mark its task in_progress
 - Extract every normative statement as a single plain-text sentence. Preserve named functions, APIs,
@@ -171,7 +204,7 @@ For each named requirement in rules/both files:
 
 #### Scenarios — all at once (in memory only)
 
-Extract all scenarios from scenarios/both files in one pass. Store in memory. Do NOT write to disk.
+Extract all scenarios from scenarios-source in one pass. Store in memory. Do NOT write to disk.
 Mark each scenario task in_progress and completed as you process it (for progress visibility only).
 
 **Format rules for scenarios:**
@@ -181,9 +214,9 @@ Mark each scenario task in_progress and completed as you process it (for progres
   same `requirement` value repeated — do NOT group them under a shared parent.
 - `name` is the scenario title exactly as it appears in the verify file.
 
-#### Single write — only here
+#### Single write — only here (Bash only, never the Write tool)
 
-Once ALL extraction is complete, write the full YAML result to a temporary file:
+Once ALL extraction is complete, write the full YAML result to a temporary file using Bash:
 
 ```bash
 cat > /tmp/specd-metadata-tmp.yaml << 'YAMLEOF'
@@ -191,7 +224,7 @@ cat > /tmp/specd-metadata-tmp.yaml << 'YAMLEOF'
 YAMLEOF
 ```
 
-Then write it to the spec:
+Then write it to the spec using Bash:
 
 ```bash
 specd spec write-metadata <spec-id> --force --input /tmp/specd-metadata-tmp.yaml
@@ -225,40 +258,46 @@ When in doubt — quote it. Over-quoting is never a bug; under-quoting breaks th
 
 ## Output format
 
-title: <short name>
-description: >
-<2–3 sentences: what it covers, why it exists, when you need it — written for discovery, not documentation>
-keywords:
+Use this YAML structure exactly:
 
-- <keyword>
-  dependsOn:
-- <spec-path>
-  contentHashes:
-    spec.md: 'sha256:<hex>'
-    verify.md: 'sha256:<hex>'
-  rules:
-- requirement: <requirement name>
-  rules: - <normative statement, plain text>
-  constraints:
-- <constraint statement, plain text>
-  scenarios:
-- requirement: <requirement name>
-  name: <scenario name>
-  given:
-  - <precondition>
+```yaml
+title: '<short name>'
+description: >
+  <2–3 sentences: what it covers, why it exists, when you need it>
+keywords:
+  - '<keyword>'
+dependsOn:
+  - '<workspace:spec/path>'
+contentHashes:
+  'spec.md': 'sha256:<hex>'
+  'verify.md': 'sha256:<hex>'
+rules:
+  - requirement: '<requirement name>'
+    rules:
+      - '<normative statement>'
+constraints:
+  - '<constraint statement>'
+scenarios:
+  - requirement: '<requirement name>'
+    name: '<scenario name>'
+    given:
+      - '<precondition>'
     when:
-  - <condition>
+      - '<condition>'
     then:
-  - <expected outcome>
+      - '<expected outcome>'
+```
 
 ## Notes
 
 - contentHashes is always rewritten — never copy from previous version
-- When in doubt about a dependency or keyword, include it
-- constraints are invariants — if in doubt, put in rules
+- If a statement comes from `## Constraints`, it MUST go to `constraints`, never to `rules`
+- If a dependency is not in `## Spec Dependencies`, do not add it to `dependsOn`
+- Prefer omission over guessing when section ownership is unclear
 - Omit constraints if no ## Constraints section exists
 - Omit scenarios if no scenarios exist
 
 ```
 
 ```
+````
