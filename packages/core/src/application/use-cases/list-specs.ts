@@ -28,12 +28,12 @@ export interface SpecListEntry {
    */
   readonly summary?: string | undefined
   /**
-   * Metadata freshness status, present only when `includeStatus` was requested.
+   * Metadata freshness status, present only when `includeMetadataStatus` was requested.
    * - `fresh`: metadata exists and all content hashes match current files
    * - `stale`: metadata exists but hashes are missing or don't match
    * - `missing`: no `.specd-metadata.yaml` file
    */
-  readonly status?: SpecMetadataStatus | undefined
+  readonly metadataStatus?: SpecMetadataStatus | undefined
 }
 
 /**
@@ -62,22 +62,22 @@ export class ListSpecs {
    * @param options - Execution options
    * @param options.includeSummary - When `true`, resolves a short summary for
    *   each spec in addition to the title. Default: `false`.
-   * @param options.includeStatus - When `true`, resolves metadata freshness
+   * @param options.includeMetadataStatus - When `true`, resolves metadata freshness
    *   status for each spec. Default: `false`.
    * @returns All specs across all workspaces with resolved titles
    */
   async execute(options?: {
     includeSummary?: boolean
-    includeStatus?: boolean
+    includeMetadataStatus?: boolean
   }): Promise<SpecListEntry[]> {
     const includeSummary = options?.includeSummary ?? false
-    const includeStatus = options?.includeStatus ?? false
+    const includeMetadataStatus = options?.includeMetadataStatus ?? false
     const results: SpecListEntry[] = []
 
     for (const [, repo] of this._specRepos) {
       const specs = await repo.list()
       for (const spec of specs) {
-        results.push(await this._resolveEntry(repo, spec, includeSummary, includeStatus))
+        results.push(await this._resolveEntry(repo, spec, includeSummary, includeMetadataStatus))
       }
     }
 
@@ -94,14 +94,14 @@ export class ListSpecs {
    * @param repo - Spec repository to read artifacts from
    * @param spec - The spec entity to resolve
    * @param includeSummary - Whether to resolve a summary
-   * @param includeStatus - Whether to resolve metadata freshness status
+   * @param includeMetadataStatus - Whether to resolve metadata freshness status
    * @returns Resolved spec list entry
    */
   private async _resolveEntry(
     repo: SpecRepository,
     spec: Spec,
     includeSummary: boolean,
-    includeStatus: boolean,
+    includeMetadataStatus: boolean,
   ): Promise<SpecListEntry> {
     let title: string | undefined
     let description: string | undefined
@@ -125,7 +125,7 @@ export class ListSpecs {
             description = parsed['description'].trim()
           }
           if (
-            includeStatus &&
+            includeMetadataStatus &&
             parsed['contentHashes'] !== null &&
             typeof parsed['contentHashes'] === 'object' &&
             !Array.isArray(parsed['contentHashes'])
@@ -161,9 +161,9 @@ export class ListSpecs {
     }
 
     // Status resolution (only when requested)
-    let status: SpecMetadataStatus | undefined
-    if (includeStatus) {
-      status = await this._resolveStatus(repo, spec, hasMetadata, contentHashes)
+    let metadataStatus: SpecMetadataStatus | undefined
+    if (includeMetadataStatus) {
+      metadataStatus = await this._resolveStatus(repo, spec, hasMetadata, contentHashes)
     }
 
     return {
@@ -171,7 +171,7 @@ export class ListSpecs {
       path: pathStr,
       title: resolvedTitle,
       ...(summary !== undefined ? { summary } : {}),
-      ...(status !== undefined ? { status } : {}),
+      ...(metadataStatus !== undefined ? { metadataStatus } : {}),
     }
   }
 

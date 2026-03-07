@@ -21,42 +21,52 @@ function setup() {
 afterEach(() => vi.restoreAllMocks())
 
 const entries = [
-  { workspace: 'default', path: 'auth/login', title: 'Login', status: 'fresh' as const },
-  { workspace: 'default', path: 'auth/register', title: 'Register', status: 'stale' as const },
-  { workspace: 'default', path: 'billing/invoices', title: 'Invoices', status: 'missing' as const },
+  { workspace: 'default', path: 'auth/login', title: 'Login', metadataStatus: 'fresh' as const },
+  {
+    workspace: 'default',
+    path: 'auth/register',
+    title: 'Register',
+    metadataStatus: 'stale' as const,
+  },
+  {
+    workspace: 'default',
+    path: 'billing/invoices',
+    title: 'Invoices',
+    metadataStatus: 'missing' as const,
+  },
 ]
 
-describe('spec list --status', () => {
+describe('spec list --metadata-status', () => {
   it('shows STATUS column in text mode', async () => {
     const { kernel, stdout } = setup()
     kernel.specs.list.execute.mockResolvedValue(entries)
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'list', '--status'])
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--metadata-status'])
 
     const out = stdout()
-    expect(out).toContain('STATUS')
+    expect(out).toContain('METADATA STATUS')
     expect(out).toContain('fresh')
     expect(out).toContain('stale')
     expect(out).toContain('missing')
   })
 
-  it('passes includeStatus true to use case when --status is present', async () => {
+  it('passes includeMetadataStatus true to use case when --metadata-status is present', async () => {
     const { kernel } = setup()
     kernel.specs.list.execute.mockResolvedValue([])
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'list', '--status'])
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--metadata-status'])
 
     expect(kernel.specs.list.execute).toHaveBeenCalledWith({
       includeSummary: false,
-      includeStatus: true,
+      includeMetadataStatus: true,
     })
   })
 
-  it('does not pass includeStatus when --status is absent', async () => {
+  it('does not pass includeMetadataStatus when --metadata-status is absent', async () => {
     const { kernel } = setup()
     kernel.specs.list.execute.mockResolvedValue([])
 
@@ -66,7 +76,7 @@ describe('spec list --status', () => {
 
     expect(kernel.specs.list.execute).toHaveBeenCalledWith({
       includeSummary: false,
-      includeStatus: false,
+      includeMetadataStatus: false,
     })
   })
 
@@ -76,7 +86,7 @@ describe('spec list --status', () => {
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'list', '--status', 'stale'])
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--metadata-status', 'stale'])
 
     const out = stdout()
     expect(out).toContain('Register')
@@ -91,7 +101,14 @@ describe('spec list --status', () => {
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'list', '--status', 'stale,missing'])
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'list',
+      '--metadata-status',
+      'stale,missing',
+    ])
 
     const out = stdout()
     expect(out).toContain('Register')
@@ -105,18 +122,26 @@ describe('spec list --status', () => {
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'list', '--status', '--format', 'json'])
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'list',
+      '--metadata-status',
+      '--format',
+      'json',
+    ])
 
     const json = JSON.parse(stdout())
     const specs = json.workspaces[0].specs
-    expect(specs[0].status).toBe('fresh')
-    expect(specs[1].status).toBe('stale')
-    expect(specs[2].status).toBe('missing')
+    expect(specs[0].metadataStatus).toBe('fresh')
+    expect(specs[1].metadataStatus).toBe('stale')
+    expect(specs[2].metadataStatus).toBe('missing')
   })
 
-  it('omits status from JSON when --status is not passed', async () => {
+  it('omits status from JSON when --metadata-status is not passed', async () => {
     const { kernel, stdout } = setup()
-    const noStatusEntries = entries.map(({ status: _, ...rest }) => rest)
+    const noStatusEntries = entries.map(({ metadataStatus: _, ...rest }) => rest)
     kernel.specs.list.execute.mockResolvedValue(noStatusEntries)
 
     const program = makeProgram()
@@ -125,12 +150,12 @@ describe('spec list --status', () => {
 
     const json = JSON.parse(stdout())
     const specs = json.workspaces[0].specs
-    expect(specs[0]).not.toHaveProperty('status')
+    expect(specs[0]).not.toHaveProperty('metadataStatus')
   })
 
-  it('does not show STATUS column when --status is absent', async () => {
+  it('does not show STATUS column when --metadata-status is absent', async () => {
     const { kernel, stdout } = setup()
-    const noStatusEntries = entries.map(({ status: _, ...rest }) => rest)
+    const noStatusEntries = entries.map(({ metadataStatus: _, ...rest }) => rest)
     kernel.specs.list.execute.mockResolvedValue(noStatusEntries)
 
     const program = makeProgram()
@@ -138,6 +163,6 @@ describe('spec list --status', () => {
     await program.parseAsync(['node', 'specd', 'spec', 'list'])
 
     const out = stdout()
-    expect(out).not.toContain('STATUS')
+    expect(out).not.toContain('METADATA STATUS')
   })
 })
