@@ -55,63 +55,13 @@ interface ArtifactParser {
 
 ### Requirement: Selector model
 
-A selector identifies one or more nodes in an artifact's AST. Selectors are used in delta entries (to target nodes for modification or removal), in `after`/`before` hints (for positioned insertion), and in validation rules (to assert structural constraints).
+The selector model is defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md). Selectors are used in delta entries to target nodes for modification or removal, and in `position.after`/`position.before` hints for positioned insertion.
 
-A selector is a YAML object with the following fields:
+In the context of delta application, the following additional constraints apply to the selector model:
 
-- `type` (string, required) — the node type; must be one of the values returned by `ArtifactParser.nodeTypes()` for the target file format
-- `matches` (string, optional) — a regular expression matched case-insensitively against the node's `label` (heading text for markdown sections, key name for JSON/YAML pairs, etc.); a plain string like `"Login"` matches any label containing that text; anchors and special characters work as expected (`"^Requirement:"`, `"^Requirements$"`)
-- `contains` (string, optional) — a regular expression matched case-insensitively against the node's `value` (paragraph text, scalar pair value, etc.); useful for finding leaf nodes by content rather than by identity
-- `parent` (selector, optional) — constrains the search to nodes whose nearest ancestor matches this selector; used to disambiguate nodes with the same identifier at different nesting levels
-- `index` (integer, optional) — for `array-item` and `sequence-item` nodes, targets the item at this zero-based index; mutually exclusive with `where`
-- `where` (object, optional) — for `array-item` and `sequence-item` nodes where items are objects, targets the item whose fields match all key–value pairs in `where`; values are matched as case-insensitive regular expressions (same as `matches`); mutually exclusive with `index`
-
-When multiple nodes match a selector, `apply` must reject with a `DeltaApplicationError` unless the caller explicitly expects multiple matches (as in validation rules, where each matched node is checked individually).
-
-**Identifying property examples:**
-
-| Value                                  | Behaviour                                                      |
-| -------------------------------------- | -------------------------------------------------------------- |
-| `"Login"`                              | Matches any identifier containing `"Login"` (case-insensitive) |
-| `"^Requirement: Login$"`               | Matches only the exact string `"Requirement: Login"`           |
-| `"^Requirement:"`                      | Matches any identifier starting with `"Requirement:"`          |
-| `"^Requirement: .+ \\(deprecated\\)$"` | Matches `"Requirement: Old thing (deprecated)"`                |
-
-```yaml
-# Finds any section whose identifier contains "Login" (case-insensitive)
-selector:
-  type: section
-  matches: "Login"
-
-# Finds sections whose identifier starts with "Requirement:"
-selector:
-  type: section
-  matches: "^Requirement:"
-
-# Finds a YAML pair whose key ends with "_url"
-selector:
-  type: pair
-  matches: "_url$"
-
-# In deltaValidations / validations — matches every Requirement section inside Requirements
-selector:
-  type: section
-  matches: "^Requirement:"
-  parent:
-    type: section
-    matches: "^Requirements$"
-```
-
-**Node types by file format:**
-
-All adapters normalize to the AST format defined in [`specs/core/artifact-ast/spec.md`](../artifact-ast/spec.md). The node types addressable by selectors are the same types produced by each adapter:
-
-- Markdown: `document`, `section`, `paragraph`, `list`, `list-item`, `code-block`, `thematic-break`
-- JSON: `document`, `object`, `property`, `array`, `array-item`
-- YAML: `document`, `mapping`, `pair`, `sequence`, `sequence-item`
-- Plain text: `document`, `paragraph`, `line`
-
-The `label` field on a node is the identifying value evaluated by `matches`; the `value` field is the scalar content evaluated by `contains`.
+- When a `selector` in a `modified` or `removed` entry matches zero nodes — `apply` rejects with `DeltaApplicationError`.
+- When a `selector` in a `modified` or `removed` entry matches more than one node — `apply` rejects with `DeltaApplicationError`.
+- `position.after` and `position.before` selectors in `added` entries are warnings on no match, not errors — insertion falls back to the end of the parent scope.
 
 **Array merge strategies:**
 
@@ -599,3 +549,4 @@ workflow:
 ## Spec Dependencies
 
 - [`specs/core/artifact-ast/spec.md`](../artifact-ast/spec.md) — normalized AST format produced and consumed by all adapters; defines node types, `label`/`value` semantics, and round-trip contract
+- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields, node type vocabulary, and multi/no-match semantics

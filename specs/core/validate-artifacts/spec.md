@@ -60,7 +60,7 @@ The delta file is parsed by the YAML adapter to produce a normalized YAML AST. E
 For each rule in `deltaValidations[]`, apply the rule evaluation algorithm (identical for both `validations` and `deltaValidations`; only the document root differs):
 
 1. Select candidate nodes from the document root using one of:
-   - **Selector fields** (`type`, `matches`, `contains`, `parent`, `index`, `where`): apply the selector model defined in `delta-format/spec.md` against the AST.
+   - **Selector fields** (`type`, `matches`, `contains`, `parent`, `index`, `where`): apply the selector model defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md) against the AST.
    - **`path`** (JSONPath string): evaluate the JSONPath expression against the document root.
 2. If zero nodes are selected: if `required: true`, record a failure; if `required: false`, record a warning. Skip `children` and `contentMatches` evaluation.
 3. If one or more nodes are selected: for each matched node:
@@ -133,6 +133,7 @@ After all artifacts have been evaluated, `ValidateArtifacts` must call `changeRe
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, artifact model, approval invalidation, `effectiveStatus`
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — artifact definition, `validations[]`, `deltaValidations[]`, `delta`, `format`, `preHashCleanup`
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `apply()`, `DeltaApplicationError`, delta file location
+- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `validations[]` and `deltaValidations[]`
 - [`specs/core/storage/spec.md`](../storage/spec.md) — `ValidateArtifacts` is the sole path to `complete`; artifact status derivation
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port-per-workspace pattern; manual DI at entry points
 - [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for spec IDs

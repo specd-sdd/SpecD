@@ -214,4 +214,5 @@ const result = await compileContext.execute({
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal, staleness detection
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `contextSections` (fallback path), `workflow`, `instruction`, `delta`, `format`, `deltaInstruction`
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `deltaInstructions()`, `outline()`
+- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `contextSections[]`
 - [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds` and `contextSpecIds`
