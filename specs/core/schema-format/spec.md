@@ -67,7 +67,7 @@ A validation rule is an object with:
 
 **Node identification** — one of two mutually exclusive approaches:
 
-- **Selector fields** — the same fields defined in [`specs/core/delta-format/spec.md` — Requirement: Selector model](../delta-format/spec.md): `type`, `matches`, `contains`, `parent`, `index`, `where`. Identifies nodes by type, label pattern, value pattern, ancestry, or position.
+- **Selector fields** — the selector fields defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md): `type`, `matches`, `contains`, `parent`, `index`, `where`. Identifies nodes by type, label pattern, value pattern, ancestry, or position.
 - **`path`** (string) — a JSONPath expression (RFC 9535) evaluated against the normalized AST. Use when the structural query requires more expressive power than the selector fields provide.
 
 **Additional fields** — compatible with both identification styles:
@@ -413,7 +413,8 @@ workflow:
 
 ## Spec Dependencies
 
-- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta file format, selector model, ArtifactParser port, and structural validation rules
+- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta file format, ArtifactParser port, and structural validation rules
+- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `validations`, `deltaValidations`, and `contextSections`
 
 ## ADRs
 

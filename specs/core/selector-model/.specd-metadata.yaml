@@ -1,0 +1,178 @@
+title: 'Selector Model'
+description: >
+  Defines how nodes in an artifact AST are identified and addressed across delta entries, validation rules, and context sections. Selectors are format-agnostic YAML objects with fields for type, label matching, value matching, ancestry constraints, and positional targeting. Multi-match and no-match behaviours differ depending on the calling context.
+keywords:
+  - 'selector'
+  - 'ast'
+  - 'node-targeting'
+  - 'delta'
+  - 'validation'
+  - 'context'
+  - 'regex'
+  - 'format-agnostic'
+dependsOn:
+  - 'core:core/artifact-ast'
+  - 'core:core/delta-format'
+  - 'core:core/schema-format'
+contentHashes:
+  'spec.md': 'sha256:84a5704191fc24a378e166c48a2053310ea49bd2d33f3e943b695283ff44925e'
+  'verify.md': 'sha256:eda7f248264c140eca62f780feda5b031ee14d426b4fa300435d33111c89c307'
+rules:
+  - requirement: 'Selector fields'
+    rules:
+      - '`type` (string, required) must be one of the values returned by `ArtifactParser.nodeTypes()` for the target file format'
+      - '`matches` (string, optional) is a regular expression matched case-insensitively against the node label'
+      - '`contains` (string, optional) is a regular expression matched case-insensitively against the node value'
+      - '`parent` (selector, optional) constrains the search to nodes whose nearest ancestor matches the given selector'
+      - '`index` (integer, optional) targets an array-item or sequence-item by zero-based position; mutually exclusive with `where`'
+      - '`where` (object, optional) targets an array-item or sequence-item by matching all key-value pairs as case-insensitive regular expressions; mutually exclusive with `index`'
+  - requirement: 'Node types by file format'
+    rules:
+      - 'Markdown node types are: `document`, `section`, `paragraph`, `list`, `list-item`, `code-block`, `thematic-break`'
+      - 'JSON node types are: `document`, `object`, `property`, `array`, `array-item`'
+      - 'YAML node types are: `document`, `mapping`, `pair`, `sequence`, `sequence-item`'
+      - 'Plain text node types are: `document`, `paragraph`, `line`'
+      - 'The `label` field is evaluated by `matches`; the `value` field is evaluated by `contains`'
+  - requirement: 'Multi-match behaviour'
+    rules:
+      - 'In delta `modified` and `removed` entries, `apply` must reject with `DeltaApplicationError` when a selector matches more than one node'
+      - 'In validation rules and context sections, multiple matches are expected and each matched node is processed individually'
+  - requirement: 'No-match behaviour'
+    rules:
+      - 'In delta `modified` and `removed` entries, `apply` must reject with `DeltaApplicationError` when the selector matches zero nodes'
+      - 'In delta `added` entries, a `position.after` or `position.before` selector that matches zero nodes emits a warning and falls back to the end of the parent scope — no error'
+      - 'In validation rules, a selector that matches zero nodes causes the rule to pass vacuously — no error or warning is produced'
+constraints:
+  - '`selector.index` and `selector.where` are mutually exclusive'
+  - '`type` must be one of the node types produced by `ArtifactParser.nodeTypes()` for the target file format; unknown types are a validation error at parse time'
+  - '`where` values are matched as case-insensitive regular expressions — the same semantics as `matches`'
+  - '`parent` is recursive — it is itself a full selector including optional `parent`, enabling multi-level ancestry constraints'
+scenarios:
+  - requirement: 'Selector fields'
+    name: 'Match by type and label'
+    given:
+      - 'a selector with `type: section` and `matches: "^Requirement:"`'
+    when:
+      - 'the selector is evaluated against a markdown AST'
+    then:
+      - 'it matches all section nodes whose label starts with "Requirement:" (case-insensitive)'
+  - requirement: 'Selector fields'
+    name: 'Match is case-insensitive'
+    given:
+      - 'a selector with `matches: "login"`'
+    when:
+      - 'the selector is evaluated against nodes with labels "Login", "LOGIN", and "login"'
+    then:
+      - 'all three nodes are matched'
+  - requirement: 'Selector fields'
+    name: 'Plain string matches substring'
+    given:
+      - 'a selector with `matches: "Login"`'
+    when:
+      - 'the selector is evaluated against a node whose label contains "Login" as a substring'
+    then:
+      - 'the node is matched'
+  - requirement: 'Selector fields'
+    name: 'Match by value with contains'
+    given:
+      - 'a selector with `type: paragraph` and `contains: "SHALL"`'
+    when:
+      - 'the selector is evaluated against paragraph nodes'
+    then:
+      - 'it matches paragraph nodes whose scalar value contains "SHALL" (case-insensitive)'
+  - requirement: 'Selector fields'
+    name: 'Constrain by parent'
+    given:
+      - 'a selector with `type: section`, `matches: "^Requirement:"`, and `parent: { type: section, matches: "^Requirements$" }`'
+    when:
+      - 'the selector is evaluated against a markdown AST with Requirement sections at multiple nesting levels'
+    then:
+      - 'only Requirement sections that are direct children of a Requirements section are matched'
+  - requirement: 'Selector fields'
+    name: 'Target sequence item by where'
+    given:
+      - 'a selector with `type: sequence-item` and `where: { step: implementing }`'
+    when:
+      - 'the selector is evaluated against a YAML sequence'
+    then:
+      - 'the sequence item whose `step` field value matches "implementing" (case-insensitive regex) is matched'
+  - requirement: 'Selector fields'
+    name: 'Target sequence item by index'
+    given:
+      - 'a selector with `type: sequence-item` and `index: 0`'
+    when:
+      - 'the selector is evaluated against a sequence'
+    then:
+      - 'the first item in the sequence is matched'
+  - requirement: 'Selector fields'
+    name: 'index and where are mutually exclusive'
+    given:
+      - 'a selector declaring both `index` and `where`'
+    when:
+      - 'the selector is parsed or applied'
+    then:
+      - 'a `SchemaValidationError` or `DeltaApplicationError` is produced — they cannot be combined'
+  - requirement: 'Node types by file format'
+    name: 'Unknown type is rejected'
+    given:
+      - 'a selector with a `type` value not in `ArtifactParser.nodeTypes()` for the target format'
+    when:
+      - 'the selector is parsed'
+    then:
+      - 'the selector is rejected with a validation error before any operation is attempted'
+  - requirement: 'Node types by file format'
+    name: 'YAML sequence-item with where'
+    given:
+      - 'a delta targeting a YAML file with a selector using `type: sequence-item` and `where: { name: "Run tests" }`'
+    when:
+      - 'the selector is evaluated against the YAML sequence'
+    then:
+      - 'the sequence item whose `name` field equals "Run tests" (case-insensitive) is matched'
+  - requirement: 'Multi-match behaviour'
+    name: 'Delta rejects ambiguous selector'
+    given:
+      - 'a delta `modified` or `removed` entry whose selector matches more than one node'
+    when:
+      - '`apply` is called'
+    then:
+      - '`apply` rejects the entire delta with `DeltaApplicationError` without applying any operation'
+  - requirement: 'Multi-match behaviour'
+    name: 'Validation rule processes each match'
+    given:
+      - 'a validation rule whose selector matches multiple nodes'
+    when:
+      - 'the rule is evaluated'
+    then:
+      - 'the rule is evaluated against each matched node individually — no error is produced for multiple matches'
+  - requirement: 'No-match behaviour'
+    name: 'Delta rejects unresolved selector on modified'
+    given:
+      - 'a delta `modified` entry whose selector matches zero nodes'
+    when:
+      - '`apply` is called'
+    then:
+      - '`apply` rejects with `DeltaApplicationError`'
+  - requirement: 'No-match behaviour'
+    name: 'Delta rejects unresolved selector on removed'
+    given:
+      - 'a delta `removed` entry whose selector matches zero nodes'
+    when:
+      - '`apply` is called'
+    then:
+      - '`apply` rejects with `DeltaApplicationError`'
+  - requirement: 'No-match behaviour'
+    name: 'position.after fallback on no match'
+    given:
+      - 'a delta `added` entry whose `position.after` selector matches zero nodes'
+    when:
+      - '`apply` is called'
+    then:
+      - 'a warning is emitted and the new node is appended at the end of the parent scope — no error'
+  - requirement: 'No-match behaviour'
+    name: 'Validation rule passes vacuously on no match'
+    given:
+      - 'a validation rule whose selector matches zero nodes'
+    when:
+      - 'the rule is evaluated'
+    then:
+      - 'the rule passes — no error or warning is produced'
