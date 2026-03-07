@@ -1,0 +1,106 @@
+title: 'Change Archive'
+description: >
+  Defines the `specd change archive <name>` command, which finalises a change by merging spec deltas into the permanent spec directories and moving the change to the archive.
+keywords:
+  - 'change'
+  - 'archive'
+  - 'command'
+  - 'signature'
+  - 'prerequisites'
+  - 'behaviour'
+  - 'post'
+  - 'hooks'
+  - 'output'
+  - 'success'
+  - 'error'
+  - 'cases'
+dependsOn:
+  - 'cli:cli/entrypoint'
+  - 'core:core/change'
+contentHashes:
+  'spec.md': 'sha256:925f3bbb9a9446c2ba4e4d156aa8d318f1a145a9ca91fb87c71e12f4319b6d68'
+  'verify.md': 'sha256:9bdfc08eee69a987836597dc57debc5d5bfc26e5e9d227d50ce59b6cef863acb'
+rules:
+  - requirement: 'Command signature'
+    rules:
+      - '`<name>` — required positional; the name of the change to archive'
+      - '`--format text|json|toon` — optional; output format, defaults to `text`'
+  - requirement: 'Prerequisites'
+    rules:
+      - 'The change must be in `archivable` state. If the change is in any other state, the command exits with code 1 and prints an `error:` message to stderr naming the current state.'
+  - requirement: 'Behaviour'
+    rules:
+      - 'The command delegates to the `ArchiveChange` use case, which:'
+      - '1. Merges all spec delta artifacts into the permanent spec directories 2. Moves the change directory to the archive location determined by `storage.archivePattern` 3. Records the archive operation in the change history'
+  - requirement: 'Post-archive hooks'
+    rules:
+      - "After a successful archive, any `post:` hooks declared on the schema's `archivable` step or the project-level workflow are run. If a hook fails, the CLI exits with code 2."
+  - requirement: 'Output on success'
+    rules:
+      - 'On success, output depends on `--format`:'
+      - '`text` (default): prints to stdout:'
+      - '`json` or `toon`: outputs the following to stdout (encoded in the respective format):'
+      - 'where `<archive-path>` is the path to the archived change directory relative to the project root.'
+  - requirement: 'Error cases'
+    rules:
+      - 'If the change does not exist, exits with code 1.'
+      - 'If the change is not in `archivable` state, exits with code 1.'
+      - 'If a delta merge fails (conflict or parse error), exits with code 1 and prints a descriptive error.'
+constraints:
+  - 'Only changes in `archivable` state may be archived'
+  - 'The archive path is determined by `storage.archivePattern` in `specd.yaml`'
+scenarios:
+  - requirement: 'Command signature'
+    name: 'Missing name argument'
+    when:
+      - '`specd change archive` is run without a name'
+    then:
+      - 'the command exits with code 1 and prints a usage error to stderr'
+  - requirement: 'Prerequisites'
+    name: 'Change not in archivable state'
+    given:
+      - 'a change `my-change` in `done` state (not yet `archivable`)'
+    when:
+      - '`specd change archive my-change` is run'
+    then:
+      - 'the command exits with code 1'
+      - 'stderr contains an `error:` message mentioning the current state'
+  - requirement: 'Behaviour'
+    name: 'Successful archive'
+    given:
+      - 'a change `my-change` in `archivable` state'
+    when:
+      - '`specd change archive my-change` is run'
+    then:
+      - 'spec deltas are merged into the permanent spec directories'
+      - 'the change directory is moved to the archive path'
+      - 'the process exits with code 0'
+  - requirement: 'Post-archive hooks'
+    name: 'Post-hook failure'
+    given:
+      - 'a `run:` post-hook that exits with code 1 is declared on the archivable step'
+    when:
+      - '`specd change archive my-change` is run after successful merge'
+    then:
+      - 'the process exits with code 2'
+  - requirement: 'Output on success'
+    name: 'Archive path in output'
+    when:
+      - '`specd change archive my-change` succeeds'
+    then:
+      - 'stdout contains `archived change my-change →` followed by the archive path'
+      - 'the process exits with code 0'
+  - requirement: 'Error cases'
+    name: 'Change not found'
+    when:
+      - '`specd change archive nonexistent` is run'
+    then:
+      - 'the command exits with code 1'
+      - 'stderr contains an `error:` message'
+  - requirement: 'Output on success'
+    name: 'JSON output on success'
+    when:
+      - '`specd change archive my-change --format json` succeeds'
+    then:
+      - 'stdout is valid JSON with `result` equal to `"ok"`, `name` equal to `"my-change"`, and `archivePath` containing the archive path'
+      - 'the process exits with code 0'

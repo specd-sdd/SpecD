@@ -1,0 +1,99 @@
+title: 'Change List'
+description: >
+  Defines the `specd change list` command, which lists all active changes in the project (those in `changes/`).
+keywords:
+  - 'change'
+  - 'list'
+  - 'command'
+  - 'signature'
+  - 'output'
+  - 'format'
+  - 'empty'
+  - 'only'
+  - 'active'
+  - 'changes'
+  - 'are'
+  - 'listed'
+dependsOn:
+  - 'cli:cli/entrypoint'
+  - 'core:core/change'
+contentHashes:
+  'spec.md': 'sha256:7c3577023c36563a63d53cce2eb20c14c6a8135cf48586da2ef442e2834d89a4'
+  'verify.md': 'sha256:6eb6fb8cc8224a15511e5b06a9f353c1d58d93bcb278fca51b6be4b8a8587ffe'
+rules:
+  - requirement: 'Command signature'
+    rules:
+      - '`--format text|json|toon` — optional; output format, defaults to `text`'
+  - requirement: 'Output format'
+    rules:
+      - 'The command prints a human-readable table to stdout showing only active changes (in `changes/`). Changes are sorted by `createdAt` ascending (oldest first).'
+      - 'The output has an inverse-video column header row `NAME STATE SPECS SCHEMA` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group).'
+      - 'Each data row shows:'
+      - 'where `<specIds>` is a comma-separated list of the spec IDs on the change.'
+      - 'When a description is set on the change, a dim indented description line is printed below the main row:'
+      - 'Description sub-rows are NOT part of the column structure — they are printed outside the fixed-width grid.'
+      - 'In `json` or `toon` format, the output is an array of objects:'
+      - '`description` is omitted from the JSON object when not set.'
+  - requirement: 'Empty output'
+    rules:
+      - 'If there are no active changes, the command prints `no changes` to stdout in `text` mode, or `[]` as valid JSON in `json`/`toon` mode. The process exits with code 0.'
+constraints:
+  - 'Only active changes (in `changes/`) are listed; drafted and discarded changes have their own noun groups'
+  - 'No filtering by state or workspace in v1'
+scenarios:
+  - requirement: 'Command signature'
+    name: 'Extra arguments rejected'
+    when:
+      - '`specd change list some-name` is run with an unexpected positional argument'
+    then:
+      - 'the command exits with code 1 and prints a usage error to stderr'
+  - requirement: 'Output format'
+    name: 'Only active changes shown'
+    given:
+      - 'the project has one active change in `changes/` and one drafted change in `drafts/`'
+    when:
+      - '`specd change list` is run'
+    then:
+      - 'stdout shows only the active change'
+      - 'the drafted change is not shown'
+  - requirement: 'Output format'
+    name: 'Discarded changes not shown'
+    given:
+      - 'the project has one discarded change in `discarded/` and no active changes'
+    when:
+      - '`specd change list` is run'
+    then:
+      - 'stdout does not show the discarded change'
+      - 'stdout contains `no changes`'
+  - requirement: 'Output format'
+    name: 'Rows contain name, state, specIds, and schema'
+    given:
+      - "a change named `add-login` in state `designing` with specIds `['auth/login']` and schema `std` version `1`"
+    when:
+      - '`specd change list` is run'
+    then:
+      - 'the row for `add-login` shows `add-login`, `designing`, `auth/login`, and `std@1`'
+  - requirement: 'Output format'
+    name: 'JSON format output'
+    given:
+      - 'one active change `add-login` in state `designing` with specId `auth/login` and schema `std` version `1`'
+    when:
+      - '`specd change list --format json` is run'
+    then:
+      - 'stdout is a valid JSON array containing one object with `name`, `state`, `specIds`, and `schema`'
+      - '`schema` has `name` equal to `"std"` and `version` equal to `1`'
+      - 'the process exits with code 0'
+  - requirement: 'Empty output'
+    name: 'No active changes — text mode'
+    when:
+      - '`specd change list` is run with no active changes in `changes/`'
+    then:
+      - 'stdout contains `no changes`'
+      - 'the process exits with code 0'
+  - requirement: 'Empty output'
+    name: 'No active changes — JSON mode'
+    when:
+      - '`specd change list --format json` is run with no active changes'
+    then:
+      - 'stdout is `[]`'
+      - 'the process exits with code 0'

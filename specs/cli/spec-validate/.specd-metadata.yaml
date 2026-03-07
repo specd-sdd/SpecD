@@ -1,0 +1,134 @@
+title: 'Spec Validate'
+description: >
+  Validates spec artifacts against the active schema's structural rules. Supports validating a single spec, all specs in a workspace, or all specs across all workspaces.
+keywords:
+  - 'validate'
+  - 'command'
+  - 'signature'
+  - 'scope'
+  - 'resolution'
+  - 'artifact'
+  - 'filename'
+  - 'derivation'
+  - 'missing'
+  - 'handling'
+  - 'structural'
+  - 'validation'
+dependsOn:
+  - 'cli:specs/\_global/architecture/spec.md — adapter packages contain no business logic'
+  - 'cli:specs/\_global/conventions/spec.md — error types, named exports'
+contentHashes:
+  'spec.md': 'sha256:6ee3ea9d90089ab151a49548b7cdd52377acd31ef4f8c667d030e3a42b765a38'
+  'verify.md': 'sha256:da52f6c42b913130352afd7082e766d4de70dc99ad0eb094da5459ef45e89989'
+rules:
+  - requirement: 'Command signature'
+    rules:
+      - '`specd spec validate [specPath] [--all] [--workspace <name>] [--format text|json|toon] [--config <path>]`'
+      - 'Exactly one scope must be provided:'
+      - '`<specPath>` — validate a single spec'
+      - '`--all` — validate all specs across all workspaces'
+      - '`--workspace <name>` — validate all specs in a workspace'
+  - requirement: 'Scope resolution'
+    rules:
+      - "Only `scope: 'spec'` artifacts from the active schema are validated. Change-scoped artifacts are ignored."
+  - requirement: 'Artifact filename derivation'
+    rules:
+      - 'The filename to load from the spec directory is derived from `artifactType.output()` by extracting the basename (e.g. `specs/**/spec.md` → `spec.md`).'
+  - requirement: 'Missing artifact handling'
+    rules:
+      - 'If a required (`optional: false`) artifact file is absent from the spec directory, it counts as a validation failure.'
+  - requirement: 'Structural validation'
+    rules:
+      - 'If an artifact type defines `validations`, the file content is parsed with the appropriate format parser and the validation rules are evaluated against the AST.'
+  - requirement: 'Text output — single spec'
+    rules:
+      - 'Pass: `validated <workspace:path>: all artifacts pass` Fail: `validation failed <workspace:path>:` followed by indented error lines.'
+  - requirement: 'Text output — multiple specs'
+    rules:
+      - 'Summary line: `validated N specs: X passed, Y failed` Followed by each failed spec with indented errors.'
+  - requirement: 'JSON output'
+    rules:
+      - 'Returns the full `ValidateSpecsResult` object.'
+  - requirement: 'Exit code'
+    rules:
+      - 'Exit 0 when all specs pass. Exit 1 when any spec has failures or when the spec/workspace is not found.'
+  - requirement: 'Error — spec not found'
+    rules:
+      - 'If a single `<specPath>` does not exist, write error to stderr, exit 1.'
+  - requirement: 'Error — workspace not found'
+    rules:
+      - 'If `--workspace <name>` references an unknown workspace, write error to stderr, exit 1.'
+constraints:
+  - 'The command contains no validation logic — all rules are evaluated by the `ValidateSpecs` use case'
+  - "Only `scope: 'spec'` artifacts are checked"
+scenarios:
+  - requirement: 'Command signature'
+    name: 'No scope argument provided'
+    when:
+      - 'the user runs `specd spec validate` without any scope argument'
+    then:
+      - 'stderr contains an error message about specifying a scope'
+      - 'exit code is 1'
+  - requirement: 'Command signature'
+    name: '--workspace filters to one workspace'
+    when:
+      - 'the user runs `specd spec validate --workspace billing`'
+    then:
+      - 'only specs in the `billing` workspace are validated'
+      - 'output follows the multi-spec format'
+  - requirement: 'Text output — single spec'
+    name: 'Single spec passes validation'
+    when:
+      - 'the user runs `specd spec validate default:auth/login`'
+      - 'all required spec-scoped artifacts exist and pass structural rules'
+    then:
+      - 'stdout contains `validated default:auth/login: all artifacts pass`'
+      - 'exit code is 0'
+  - requirement: 'Text output — single spec'
+    name: 'Single spec fails validation'
+    when:
+      - 'the user runs `specd spec validate default:auth/login`'
+      - 'a required artifact is missing or a structural rule fails'
+    then:
+      - 'stdout contains `validation failed default:auth/login:`'
+      - 'indented error lines follow'
+      - 'exit code is 1'
+  - requirement: 'Text output — multiple specs'
+    name: '--all with all specs passing'
+    when:
+      - 'the user runs `specd spec validate --all`'
+      - 'every spec across all workspaces passes'
+    then:
+      - 'stdout contains `validated N specs: N passed, 0 failed`'
+      - 'exit code is 0'
+  - requirement: 'Text output — multiple specs'
+    name: '--all with some specs failing'
+    when:
+      - 'the user runs `specd spec validate --all`'
+      - 'at least one spec has a validation failure'
+    then:
+      - 'stdout contains `validated N specs: X passed, Y failed`'
+      - 'each failing spec is listed with a `FAIL` prefix and indented errors'
+      - 'exit code is 1'
+  - requirement: 'JSON output'
+    name: 'JSON output contains expected keys'
+    when:
+      - 'the user runs `specd spec validate --all --format json`'
+    then:
+      - 'the JSON output contains `entries`, `totalSpecs`, `passed`, and `failed` keys'
+  - requirement: 'Error — spec not found'
+    name: 'Unknown spec ID'
+    when:
+      - 'the user runs `specd spec validate default:nonexistent`'
+      - 'the spec does not exist'
+    then:
+      - 'stderr contains `error: spec not found`'
+      - 'exit code is 1'
+  - requirement: 'Error — workspace not found'
+    name: 'Unknown workspace'
+    when:
+      - 'the user runs `specd spec validate --workspace nonexistent`'
+      - 'the workspace does not exist in config'
+    then:
+      - 'stderr contains `error: unknown workspace`'
+      - 'exit code is 1'

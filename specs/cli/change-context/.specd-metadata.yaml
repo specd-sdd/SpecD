@@ -1,0 +1,163 @@
+title: 'Change Context'
+description: >
+  Defines the `specd change context <name> <step> [--artifact <id>]` command, which compiles and prints the full instruction block an AI agent receives when entering a lifecycle step for a named change.
+keywords:
+  - 'change'
+  - 'context'
+  - 'command'
+  - 'signature'
+  - 'behaviour'
+  - 'output'
+  - 'step'
+  - 'availability'
+  - 'warning'
+  - 'warnings'
+  - 'error'
+  - 'cases'
+dependsOn:
+  - 'cli:cli/entrypoint'
+  - 'core:core/change'
+contentHashes:
+  'spec.md': 'sha256:34c83977c4e856db363a0e209fc11e2c7372f7ea47a83b26ad1d679c4a72e9a3'
+  'verify.md': 'sha256:5416bd02524183c7e4a75902ee3f7640dcca4c52d72fc4277d240cf5a8757f7d'
+rules:
+  - requirement: 'Command signature'
+    rules:
+      - '`<name>` — required positional; the name of the change to compile context for'
+      - '`<step>` — required positional; the lifecycle step being entered (e.g. `designing`, `implementing`, `verifying`)'
+      - "`--artifact <id>` — optional; the artifact ID currently being generated. When present, only that artifact's instruction and rules are injected."
+      - '`--rules` — when present, includes only the rules sections of spec content in the output'
+      - '`--constraints` — when present, includes only the constraints sections of spec content in the output'
+      - '`--scenarios` — when present, includes only the scenarios sections of spec content in the output'
+      - '`--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs. By default (without this flag) `dependsOn` traversal is **not** performed.'
+      - '`--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`'
+      - '`--format text|json|toon` — optional; output format, defaults to `text`'
+      - "When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block."
+  - requirement: 'Behaviour'
+    rules:
+      - 'The command invokes the `CompileContext` use case. `schemaRef`, `workspaceSchemasPaths`, and the full `CompileContextConfig` are resolved from the loaded `SpecdConfig`. The `followDeps`, `depth`, and `sections` fields are populated from the corresponding CLI flags.'
+  - requirement: 'Output'
+    rules:
+      - 'In `text` or `toon` mode (default `text`), the compiled instruction block is printed to stdout verbatim. No framing or additional headers are added by the CLI.'
+      - 'In `json` mode, the output is:'
+      - 'where `instructionBlock` contains the full compiled instruction text, `stepAvailable` reflects whether the requested step is currently available, `blockingArtifacts` lists any blocking artifact IDs, and `warnings` lists any warning strings from the use case.'
+  - requirement: 'Step availability warning'
+    rules:
+      - 'If the requested step is not currently available (i.e. `stepAvailable: false`), the command prints a warning to stderr listing the blocking artifacts and still prints the instruction block to stdout. The process exits with code 0.'
+  - requirement: 'Context warnings'
+    rules:
+      - 'Any warnings from the `CompileContext` use case (stale metadata, missing specs, unknown workspaces, cycles) are printed to stderr as `warning:` lines. The instruction block is still printed to stdout and the process exits with code 0.'
+  - requirement: 'Error cases'
+    rules:
+      - 'If the change does not exist, exits with code 1.'
+      - 'If the schema cannot be resolved, exits with code 3.'
+constraints:
+  - 'The raw instruction block is the sole stdout output — no wrapping, no summary header'
+  - 'All warnings go to stderr; the instruction block goes to stdout'
+  - '`schemaRef` and `workspaceSchemasPaths` are resolved from the loaded config — the user never supplies them'
+  - '`dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed'
+  - '`--depth` without `--follow-deps` is a CLI usage error (exit code 1)'
+  - 'Section flags (`--rules`, `--constraints`, `--scenarios`) only filter spec content; schema instructions, delta context, artifact rules, step hooks, and available steps are unaffected'
+scenarios:
+  - requirement: 'Command signature'
+    name: 'Missing step argument'
+    when:
+      - '`specd change context my-change` is run without the step'
+    then:
+      - 'the command exits with code 1 and prints a usage error to stderr'
+  - requirement: 'Command signature'
+    name: '--depth without --follow-deps'
+    when:
+      - '`specd change context my-change designing --depth 2` is run without `--follow-deps`'
+    then:
+      - 'the command exits with code 1 and prints a usage error to stderr'
+  - requirement: 'Output'
+    name: 'Instruction block printed verbatim'
+    when:
+      - '`specd change context my-change designing` is run'
+    then:
+      - 'stdout contains the compiled instruction block exactly as returned by CompileContext'
+      - 'no framing headers are added'
+      - 'the process exits with code 0'
+  - requirement: 'Output'
+    name: 'With artifact flag'
+    when:
+      - '`specd change context my-change designing --artifact spec` is run'
+    then:
+      - 'stdout includes only the `spec` artifact instruction (not all artifact instructions)'
+  - requirement: 'Output'
+    name: 'dependsOn not followed by default'
+    given:
+      - "a spec in the change's context has `.specd-metadata.yaml` with `dependsOn` entries pointing to other specs"
+    when:
+      - '`specd change context my-change implementing` is run without `--follow-deps`'
+    then:
+      - 'the dependent specs are not included in the output'
+  - requirement: 'Output'
+    name: '--follow-deps includes transitive dependencies'
+    given:
+      - 'a spec in context has `dependsOn` entries pointing to other specs'
+    when:
+      - '`specd change context my-change implementing --follow-deps` is run'
+    then:
+      - 'the instruction block includes content from the dependent specs as well'
+  - requirement: 'Output'
+    name: '--depth limits traversal'
+    given:
+      - 'spec A depends on spec B which depends on spec C'
+    when:
+      - '`specd change context my-change implementing --follow-deps --depth 1` is run'
+    then:
+      - 'the output includes content from spec B but not spec C'
+  - requirement: 'Output'
+    name: 'Section flags filter spec content'
+    given:
+      - 'specs in context have description, rules, constraints, and scenarios in their metadata'
+    when:
+      - '`specd change context my-change implementing --rules --constraints` is run'
+    then:
+      - 'the instruction block contains rules and constraints sections from each spec'
+      - 'description and scenarios sections are not present'
+  - requirement: 'Output'
+    name: 'No section flags includes all sections'
+    given:
+      - 'specs in context have all metadata sections populated'
+    when:
+      - '`specd change context my-change implementing` is run without section flags'
+    then:
+      - 'the instruction block contains description, rules, constraints, and scenarios from each spec'
+  - requirement: 'Step availability warning'
+    name: 'Step not yet available'
+    given:
+      - 'the step `implementing` has blocking artifacts'
+    when:
+      - '`specd change context my-change implementing` is run'
+    then:
+      - 'stderr contains a `warning:` line listing the blocking artifacts'
+      - 'stdout still contains the instruction block'
+      - 'the process exits with code 0'
+  - requirement: 'Context warnings'
+    name: 'Stale metadata warning'
+    given:
+      - 'a spec included in context has stale metadata'
+    when:
+      - '`specd change context my-change designing` is run'
+    then:
+      - 'stderr contains a `warning:` line for the stale spec'
+      - 'the instruction block is still printed to stdout'
+      - 'the process exits with code 0'
+  - requirement: 'Error cases'
+    name: 'Change not found'
+    when:
+      - '`specd change context nonexistent designing` is run'
+    then:
+      - 'the command exits with code 1'
+      - 'stderr contains an `error:` message'
+  - requirement: 'Output'
+    name: 'JSON output contains instructionBlock and warnings'
+    when:
+      - '`specd change context my-change designing --format json` is run'
+    then:
+      - 'stdout is valid JSON with `instructionBlock`, `stepAvailable`, `blockingArtifacts`, and `warnings`'
+      - '`instructionBlock` contains the compiled instruction text'
+      - 'the process exits with code 0'

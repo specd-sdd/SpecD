@@ -1,161 +1,139 @@
 title: 'Change Manifest'
 description: >
-  The change manifest (manifest.json) is the single source of truth for a change
-  that persists the full state of the Change domain entity including identity,
-  workspaces, specs, artifacts, and complete event history from which lifecycle
-  state is derived. Read this spec when implementing or modifying how changes
-  persist their state.
+  The change manifest (`manifest.json`) is the single source of truth for a change. It lives inside the change's directory and persists the full state of the Change domain entity — identity, workspaces, specs, artifacts, and the complete event history from which lifecycle state is derived. It is written and read exclusively by `FsChangeRepository`.
 keywords:
-  - 'manifest.json'
-  - 'event sourcing'
-  - 'state derivation'
-  - 'artifact validation'
-  - 'atomic writes'
-  - 'schema versioning'
+  - 'change'
+  - 'manifest'
+  - 'structure'
+  - 'schema'
+  - 'version'
+  - 'atomic'
+  - 'writes'
+  - 'artifactstatus'
+  - 'never'
+  - 'stored'
+  - 'always'
+  - 'derived'
 dependsOn:
-  - 'specs/core/change/spec.md'
-  - 'specs/core/storage/spec.md'
-  - 'specs/core/spec-metadata/spec.md'
+  - 'core:core/change'
+  - 'core:core/storage'
+  - 'core:core/spec-metadata'
+  - 'core:core/spec-id-format'
 contentHashes:
-  spec.md: 'sha256:51329410dc9e09feaabb760fcdf3b903d225b074d40cf8c76178041cdbb0f023'
-  verify.md: 'sha256:da0edcc679f5ba5a2c5cbcab2d8844597474c5aa21305fb4c1b2ff2d36b1590c'
+  'spec.md': 'sha256:2c5b59db379248c7c727c6df0b2771b2b59a755d23b85f7cea9666f3aa6f6b2c'
+  'verify.md': 'sha256:da0edcc679f5ba5a2c5cbcab2d8844597474c5aa21305fb4c1b2ff2d36b1590c'
 rules:
   - requirement: 'Manifest structure'
     rules:
-      - 'Change is persisted as manifest.json inside its change directory'
-      - 'Top-level structure includes name, createdAt, schema, workspaces, specIds, contextSpecIds, artifacts, and history'
-      - 'name is the change slug; immutable after creation'
-      - 'createdAt is ISO 8601 timestamp; immutable after creation; source of truth for directory prefix'
-      - 'schema contains name (string) and version (integer) of the schema active at creation; written once, never updated'
-      - 'workspaces is current snapshot of active workspace IDs; mutable'
-      - 'specIds is current snapshot of spec paths; mutable'
-      - "contextSpecIds is current snapshot of context dependency spec paths; populated at ready state from each spec's .specd-metadata.yaml dependsOn field (direct deps only); mutable; does not trigger approval invalidation when modified"
-      - 'artifacts is array of artifact descriptors; validatedHash is null when artifact has not been validated, a SHA-256 string when validated, or "__skipped__" when an optional artifact has been explicitly marked as not produced'
-      - 'ArtifactStatus is never stored; it is derived at load time from validatedHash and file presence'
-      - "history is append-only array of typed events; current lifecycle state is derived from the most recent transitioned event's to field"
-      - 'Event types serialized: transitioned, spec-approved, signed-off, invalidated, drafted, restored, artifact-skipped, discarded'
-      - 'transitioned event contains type, at, by (name and email), from, and to fields'
-      - 'spec-approved event contains type, at, by, reason, and artifactHashes fields'
-      - 'signed-off event contains type, at, by, reason, and artifactHashes fields'
-      - 'invalidated event contains type, at, by, cause fields (cause values: workspace-change, spec-change, artifact-change)'
-      - 'drafted event contains type, at, by, and reason fields'
-      - 'restored event contains type, at, and by fields'
-      - 'artifact-skipped event contains type, at, by, artifactId, and reason fields'
-      - 'discarded event contains type, at, by, reason, and supersededBy fields'
+      - 'Each change is persisted as a `manifest.json` file inside its change directory. Its top-level structure is:'
+      - 'Field definitions:'
+      - '**`name`** — the change slug; immutable after creation'
+      - '**`createdAt`** — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix'
+      - '**`schema`** — `name` (string) and `version` (integer) of the schema active at creation; written once, never updated'
+      - '**`workspaces`** — current snapshot of active workspace IDs; mutable'
+      - '**`specIds`** — current snapshot of spec IDs; mutable'
+      - "**`contextSpecIds`** — current snapshot of context dependency spec IDs; populated at `ready` state from each spec's `.specd-metadata.yaml` `dependsOn` field (direct deps only); mutable; does not trigger approval invalidation when modified"
+      - '**`artifacts`** — array of artifact descriptors; `validatedHash` is `null` when the artifact has not been validated, a SHA-256 string when validated, or `"__skipped__"` when an optional artifact has been explicitly marked as not produced. `ArtifactStatus` is never stored — it is derived at load time from `validatedHash` and file presence'
+      - "**`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field."
+      - 'The JSON serialization of each event type is:'
   - requirement: 'Schema version'
     rules:
-      - 'schema.name is the value of the schema field from specd.yaml at creation time; written once and never updated'
-      - "schema.version is the version integer from the schema's schema.yaml; written once and never updated"
-      - "When a change is loaded and the active schema's name or version differs from what is recorded in the manifest, specd must emit a warning"
-      - 'The change remains usable when there is a schema version mismatch; the warning is advisory, not a hard error'
-      - 'Archiving a change with a schema version mismatch must still be possible; the warning surfaces the mismatch so the user can decide whether to proceed'
+      - "`schema.name` is the value of the `schema` field from `specd.yaml` at creation time. `schema.version` is the `version` integer from the schema's `schema.yaml`. Both are written once at change creation and never updated."
+      - "When a change is loaded and the active schema's name or version differs from what is recorded in the manifest, specd must emit a warning. The change remains usable — the warning is advisory, not a hard error. Archiving a change with a schema version mismatch must still be possible; the warning surfaces the mismatch so the user can decide whether to proceed."
   - requirement: 'Atomic writes'
     rules:
-      - 'The manifest must be written atomically by writing to a temporary file and then renaming it into place to prevent partial reads if the process is interrupted mid-write'
+      - 'The manifest must be written atomically — by writing to a temporary file and then renaming it into place — to prevent partial reads if the process is interrupted mid-write.'
 constraints:
-  - 'ArtifactStatus is never stored in the manifest; it is always derived from validatedHash and file presence at load time'
-  - 'validatedHash has three valid values: null (not yet validated), a SHA-256 string (validated), or "__skipped__" (optional artifact explicitly not produced)'
-  - 'The manifest has no state field; the current lifecycle state is always derived from the history array at load time'
-  - 'The history array is append-only; existing events must never be modified or removed by any operation'
-  - 'The schema field is written once at creation and must never be updated by subsequent operations'
-  - 'contextSpecIds modifications do not append an invalidated event and do not trigger approval invalidation'
+  - '`ArtifactStatus` is never stored in the manifest — it is always derived from `validatedHash` and file presence at load time'
+  - '`validatedHash` has three valid values: `null` (not yet validated), a SHA-256 string (validated), or `"__skipped__"` (optional artifact explicitly not produced)'
+  - 'The manifest has no `state` field; the current lifecycle state is always derived from the `history` array at load time'
+  - 'The `history` array is append-only — existing events must never be modified or removed by any operation'
+  - 'The `schema` field is written once at creation and must never be updated by subsequent operations'
+  - '`contextSpecIds` modifications do not append an `invalidated` event and do not trigger approval invalidation'
 scenarios:
   - requirement: 'Manifest structure'
     name: 'Manifest written on creation'
-    given: []
     when:
-      - 'a new change add-auth-flow is created'
+      - 'a new change `add-auth-flow` is created'
     then:
-      - 'a manifest.json is written containing name, createdAt, schema, workspaces, specIds, contextSpecIds, artifacts, and a history array with a single created event'
+      - 'a `manifest.json` is written containing `name`, `createdAt`, `schema`, `workspaces`, `specIds`, `contextSpecIds`, `artifacts`, and a `history` array with a single `created` event'
   - requirement: 'Manifest structure'
     name: 'No state field in manifest'
-    given: []
     when:
       - 'a manifest is read from disk'
     then:
-      - 'there is no top-level state field; the current state is derived by reading the to field of the last transitioned event in history'
+      - 'there is no top-level `state` field; the current state is derived by reading the `to` field of the last `transitioned` event in `history`'
   - requirement: 'Manifest structure'
     name: 'History never shrinks'
-    given: []
     when:
       - 'a manifest is loaded, modified (e.g. workspace added), and saved'
     then:
-      - 'the history array on disk has more entries than before; no existing events are missing or reordered'
+      - 'the `history` array on disk has more entries than before — no existing events are missing or reordered'
   - requirement: 'Manifest structure'
     name: 'Artifact validated hash stored'
-    given: []
     when:
-      - 'ValidateArtifacts marks an artifact complete with hash sha256:abc'
+      - '`ValidateArtifacts` marks an artifact complete with hash `sha256:abc`'
     then:
-      - 'the manifest''s artifacts entry for that type has validatedHash: "sha256:abc" and no status field'
+      - 'the manifest''s `artifacts` entry for that type has `validatedHash: "sha256:abc"` and no `status` field'
   - requirement: 'Manifest structure'
     name: 'validatedHash is null for unvalidated artifact'
-    given: []
     when:
-      - 'an artifact exists in artifacts but has never been validated'
+      - 'an artifact exists in `artifacts` but has never been validated'
     then:
-      - 'its validatedHash is null in the manifest'
+      - 'its `validatedHash` is `null` in the manifest'
   - requirement: 'Manifest structure'
     name: 'validatedHash is sentinel for skipped artifact'
-    given: []
     when:
       - 'an optional artifact is explicitly marked as not produced'
     then:
-      - 'its validatedHash is "__skipped__" in the manifest and no status field is stored'
+      - 'its `validatedHash` is `"__skipped__"` in the manifest and no `status` field is stored'
   - requirement: 'Manifest structure'
     name: 'artifact-skipped event serialized in history'
-    given: []
     when:
-      - 'an optional artifact is skipped with reason "not needed for this change"'
+      - 'an optional artifact is skipped with reason `"not needed for this change"`'
     then:
-      - 'the history contains { "type": "artifact-skipped", "artifactId": "design", "reason": "not needed for this change", "at": "...", "by": { ... } }'
+      - 'the history contains `{ "type": "artifact-skipped", "artifactId": "design", "reason": "not needed for this change", "at": "...", "by": { ... } }`'
   - requirement: 'Manifest structure'
     name: 'validatedHash cleared on invalidation'
     given:
-      - 'one artifact with validatedHash: "sha256:abc" and one with validatedHash: "__skipped__"'
+      - 'one artifact with `validatedHash: "sha256:abc"` and one with `validatedHash: "__skipped__"`'
     when:
-      - 'an invalidated event is appended'
+      - 'an `invalidated` event is appended'
     then:
-      - 'both validatedHash values are set to null in the manifest; rollback is uniform'
+      - 'both `validatedHash` values are set to `null` in the manifest — rollback is uniform'
   - requirement: 'Manifest structure'
     name: 'contextSpecIds does not invalidate approvals'
-    given: []
     when:
-      - 'contextSpecIds is updated on a change that has an active spec-approved event'
+      - '`contextSpecIds` is updated on a change that has an active `spec-approved` event'
     then:
-      - 'no invalidated event is appended and the approval remains active'
+      - 'no `invalidated` event is appended and the approval remains active'
   - requirement: 'Schema version'
     name: 'Schema unchanged'
-    given: []
     when:
       - 'a change is loaded and its manifest schema matches the active schema name and version'
     then:
       - 'no warning is emitted'
   - requirement: 'Schema version'
     name: 'Schema version bumped'
-    given: []
     when:
       - 'a change is loaded and the active schema has a higher version than recorded in the manifest'
     then:
       - 'specd emits a warning indicating the schema has changed since the change was created and the user should review whether the change artifacts are still compatible'
   - requirement: 'Schema version'
     name: 'Schema name changed'
-    given: []
     when:
       - 'a change is loaded and the active schema name differs from the one recorded in the manifest'
     then:
       - 'specd emits a warning indicating the change was created under a different schema'
   - requirement: 'Schema version'
     name: 'Archiving with schema mismatch'
-    given: []
     when:
-      - 'specd archive is run on a change with a schema version mismatch'
+      - '`specd archive` is run on a change with a schema version mismatch'
     then:
       - 'the warning is shown and the user is asked to confirm before proceeding; archiving is not blocked'
   - requirement: 'Atomic writes'
     name: 'History events appended atomically'
-    given: []
     when:
       - 'a state transition occurs'
     then:
-      - 'the new transitioned event is appended to history and the entire manifest is written atomically (temp file + rename); no partial writes are visible'
+      - 'the new `transitioned` event is appended to `history` and the entire manifest is written atomically (temp file + rename); no partial writes are visible'

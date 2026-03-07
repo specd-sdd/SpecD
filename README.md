@@ -14,6 +14,7 @@ Key differences from earlier SDD tools:
 - **Schema-driven format.** The spec file format, section headers, artifact names, and dependency order are defined in a `schema.yaml` you control. SpecD does not hardcode any particular convention.
 - **Governance built in.** Optional approval gates let teams require explicit human sign-off before implementation begins or before a change is archived.
 - **Composable packages.** Use only what you need: the core library as an SDK, the CLI for terminal workflows, the MCP server for agent-native workflows, or the full stack.
+- **Context compiled, not discovered.** At every lifecycle step, SpecD computes which specs are relevant to the current change and delivers their content as a structured, ready-to-consume block. The agent does not decide what to read — SpecD resolves it.
 
 ## Current status (March 2026)
 
@@ -45,6 +46,20 @@ drafting → designing → ready → implementing ⇄ verifying → done → arc
 ```
 
 Optional approval gates can require human sign-off between `ready → implementing` and `done → archivable`.
+
+## Context compilation
+
+Most SDD tools give the agent a list of files and leave it to figure out which specs are relevant. SpecD takes a different approach: at every lifecycle step, `specd context` computes and delivers the full instruction block the agent needs.
+
+The resolution works in five steps:
+
+1. **Project-level include patterns** — which specs always apply to every change in this project.
+2. **Project-level exclude patterns** — specs explicitly excluded from context.
+3. **Workspace-level include/exclude patterns** — applied only for workspaces active in the current change.
+4. **`dependsOn` traversal** — starting from the specs a change touches, SpecD follows declared dependencies transitively to pull in related specs automatically.
+5. **Assembly** — for each resolved spec, SpecD injects structured metadata (rules, constraints, scenarios) when available, with a raw-content fallback when metadata is stale or absent.
+
+The output is a single, ordered instruction block combining project context, schema instructions for the active artifact, spec content, and lifecycle hooks — ready to inject into the agent's context window. The agent doesn't search, doesn't guess, and doesn't miss a spec that wasn't mentioned by name.
 
 ## Packages
 

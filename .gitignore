@@ -11,6 +11,9 @@ dist/
 # Claude Code
 .claude/
 
+# Codex
+.codex/
+
 # Environment
 .env
 .env.local

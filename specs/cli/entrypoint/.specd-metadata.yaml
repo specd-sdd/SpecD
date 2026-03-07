@@ -1,0 +1,165 @@
+title: 'CLI Entrypoint'
+description: >
+  Defines the global behaviour of the `specd` CLI that applies to every command: configuration discovery, the `--config` override flag, output conventions (stdout vs stderr), and process exit codes.
+keywords:
+  - 'cli'
+  - 'entrypoint'
+  - 'configuration'
+  - 'discovery'
+  - 'config'
+  - 'flag'
+  - 'override'
+  - 'output'
+  - 'conventions'
+  - 'exit'
+  - 'codes'
+  - 'error'
+dependsOn:
+  - 'core:core/config'
+contentHashes:
+  'spec.md': 'sha256:6800cffc851957342b8a8bb4c985057be8b30ac37bce9f3e89dfabf7e48a41e7'
+  'verify.md': 'sha256:a2d5c1dccf6ca82c4fb549764d92d29a2cbe2d363283f0a0658eccc69d111373'
+rules:
+  - requirement: 'Configuration discovery'
+    rules:
+      - 'When no `--config` flag is provided, `specd` discovers `specd.yaml` by walking up the directory tree from CWD toward the git repository root. The first `specd.yaml` found is loaded. If no `specd.yaml` is found before reaching the git root (or the filesystem root when not inside a git repo), the command fails with exit code 1 and a descriptive error on stderr.'
+  - requirement: 'Config flag override'
+    rules:
+      - 'Every `specd` command accepts a `--config <path>` flag. When provided, config discovery is skipped and `specd.yaml` is loaded directly from `<path>`. If the file does not exist or cannot be parsed, the command fails with exit code 1 and a descriptive error on stderr.'
+  - requirement: 'Output conventions'
+    rules:
+      - 'Normal output (tables, structured text, success messages) is written to stdout. All errors, warnings, and diagnostic messages are written to stderr. These streams must not be mixed.'
+  - requirement: 'Exit codes'
+    rules:
+      - '`specd` uses the following exit codes uniformly across all commands:'
+      - '| Code | Meaning | | ---- | --------------------------------------------------------------------------------------------------- | | 0 | Success | | 1 | User or domain error (change not found, invalid state transition, validation failure, config error) | | 2 | Hook failure (a `run:` hook exited with a non-zero status) | | 3 | System error (unhandled exception, I/O error, schema resolution failure) |'
+      - "No other exit codes are used. When a hook fails, the hook's own stdout/stderr is forwarded verbatim and `specd` exits with code 2."
+  - requirement: 'Error message format'
+    rules:
+      - 'User and domain errors (exit code 1) are printed to stderr as a single human-readable line prefixed with `error:`. System errors (exit code 3) are printed to stderr with a `fatal:` prefix followed by the error message; a stack trace is included only when the `SPECD_DEBUG=1` environment variable is set.'
+  - requirement: 'Output format flag'
+    rules:
+      - 'Every `specd` command accepts a `--format text|json|toon` flag at the end of its flag list, defaulting to `text`. The three values are:'
+      - '`text` — human-readable visual output (the default behaviour)'
+      - '`json` — machine-friendly JSON written to stdout'
+      - '`toon` — LLM-friendly Token-Oriented Object Notation (TOON) encoding of the same data model as `json`, written to stdout'
+      - 'Errors always go to stderr as plain `error:` or `fatal:` text regardless of the `--format` value. The `--format` flag affects stdout output only.'
+constraints:
+  - '`--config` must be the first flag processed, before any sub-command-specific flag parsing'
+  - 'Config discovery halts at the git repository root; it does not cross repository boundaries'
+  - 'Stdout and stderr must be independent streams — no interleaving of normal output and error messages'
+  - 'Exit code 2 is reserved exclusively for hook failures; domain errors from hooks (e.g. the hook emits an error message and exits 1) still yield exit code 2'
+  - '`--format` never affects stderr — errors are always plain text on stderr regardless of format'
+scenarios:
+  - requirement: 'Configuration discovery'
+    name: 'Config found by walking up from CWD'
+    given:
+      - 'CWD is a subdirectory of a project containing `specd.yaml` at the project root'
+    when:
+      - 'any `specd` command is run without `--config`'
+    then:
+      - '`specd.yaml` at the project root is loaded'
+  - requirement: 'Configuration discovery'
+    name: 'No config found'
+    given:
+      - 'CWD is not under any directory containing `specd.yaml`'
+    when:
+      - 'any `specd` command is run without `--config`'
+    then:
+      - 'the command exits with code 1 and prints an `error:` message to stderr'
+  - requirement: 'Config flag override'
+    name: 'Valid explicit config'
+    when:
+      - '`specd --config /abs/path/specd.yaml change list` is run and the file exists'
+    then:
+      - 'that file is loaded regardless of whether a `specd.yaml` exists in the CWD tree'
+  - requirement: 'Config flag override'
+    name: 'Explicit config file missing'
+    when:
+      - '`specd --config /nonexistent/specd.yaml change list` is run'
+    then:
+      - 'the command exits with code 1 and prints an `error:` message to stderr'
+  - requirement: 'Output conventions'
+    name: 'Normal output goes to stdout'
+    when:
+      - 'a command succeeds and produces output'
+    then:
+      - 'the output is written to stdout only; stderr is empty'
+  - requirement: 'Output conventions'
+    name: 'Error goes to stderr'
+    when:
+      - 'a command encounters a domain error'
+    then:
+      - 'the error message is written to stderr only; stdout is empty'
+  - requirement: 'Exit codes'
+    name: 'Successful command'
+    when:
+      - 'a command completes without error'
+    then:
+      - 'the process exits with code 0'
+  - requirement: 'Exit codes'
+    name: 'Change not found'
+    when:
+      - 'a command references a change name that does not exist'
+    then:
+      - 'the process exits with code 1'
+  - requirement: 'Exit codes'
+    name: 'Hook failure'
+    when:
+      - 'a `run:` hook exits with a non-zero status during a transition'
+    then:
+      - "the process exits with code 2 and the hook's output is forwarded to stdout/stderr"
+  - requirement: 'Exit codes'
+    name: 'Unhandled system error'
+    when:
+      - 'an unexpected I/O error occurs'
+    then:
+      - 'the process exits with code 3 and prints a `fatal:` message to stderr'
+  - requirement: 'Error message format'
+    name: 'Domain error prefix'
+    when:
+      - 'a domain error occurs (e.g. change not found)'
+    then:
+      - 'stderr contains a line starting with `error:`'
+  - requirement: 'Error message format'
+    name: 'System error prefix'
+    when:
+      - 'a system error occurs'
+    then:
+      - 'stderr contains a line starting with `fatal:`'
+  - requirement: 'Error message format'
+    name: 'Stack trace gated on SPECD_DEBUG'
+    given:
+      - '`SPECD_DEBUG` is not set'
+    when:
+      - 'a system error occurs'
+    then:
+      - 'no stack trace is printed to stderr'
+  - requirement: 'Output format flag'
+    name: 'Text format produces human-readable output'
+    when:
+      - 'a command is run with `--format text` (or without `--format`)'
+    then:
+      - 'stdout contains human-readable text output'
+  - requirement: 'Output format flag'
+    name: 'JSON format produces valid JSON to stdout'
+    when:
+      - 'a command is run with `--format json`'
+    then:
+      - 'stdout contains valid JSON'
+      - 'the JSON can be parsed by a standard JSON parser'
+  - requirement: 'Output format flag'
+    name: 'TOON format produces TOON encoding to stdout'
+    when:
+      - 'a command is run with `--format toon`'
+    then:
+      - 'stdout contains a TOON-encoded representation of the same data model as the JSON output'
+  - requirement: 'Output format flag'
+    name: 'Errors always go to stderr regardless of format'
+    given:
+      - 'a domain error occurs during a command run with `--format json`'
+    when:
+      - 'the command fails'
+    then:
+      - 'stderr contains an `error:` line in plain text'
+      - 'stdout is empty'
