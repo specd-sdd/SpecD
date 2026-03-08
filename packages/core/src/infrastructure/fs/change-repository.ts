@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { Change } from '../../domain/entities/change.js'
@@ -17,6 +16,7 @@ import {
 import { changeDirName } from './dir-name.js'
 import { sha256 } from './hash.js'
 import { isEnoent } from './is-enoent.js'
+import { writeFileAtomic } from './write-atomic.js'
 import {
   type ChangeManifest,
   type ManifestArtifact,
@@ -350,10 +350,7 @@ export class FsChangeRepository extends ChangeRepository {
    */
   private async _writeManifestAtomic(dir: string, manifest: ChangeManifest): Promise<void> {
     const manifestPath = path.join(dir, 'manifest.json')
-    const tmpPath = path.join(dir, `manifest.json.tmp-${process.pid.toString()}-${randomUUID()}`)
-    const content = JSON.stringify(manifest, null, 2)
-    await fs.writeFile(tmpPath, content, 'utf8')
-    await fs.rename(tmpPath, manifestPath)
+    await writeFileAtomic(manifestPath, JSON.stringify(manifest, null, 2))
   }
 
   /**
