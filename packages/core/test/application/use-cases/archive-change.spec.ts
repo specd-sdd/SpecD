@@ -7,63 +7,27 @@ import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-
 import { DeltaApplicationError } from '../../../src/application/ports/artifact-parser.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
-import { ArtifactType } from '../../../src/domain/value-objects/artifact-type.js'
-import { Schema } from '../../../src/domain/value-objects/schema.js'
-import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
 import { type ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
-import {
-  type ArtifactParser,
-  type ArtifactParserRegistry,
-} from '../../../src/application/ports/artifact-parser.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
-import { makeChangeRepository, makeGitAdapter, makeSpecRepository, testActor } from './helpers.js'
+import {
+  makeChangeRepository,
+  makeGitAdapter,
+  makeHookRunner,
+  makeSchemaRegistry,
+  makeSpecRepository,
+  makeArtifactType,
+  makeSchema,
+  makeParser,
+  makeParsers,
+  testActor,
+} from './helpers.js'
 
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
-
-function makeArtifactType(
-  id: string,
-  opts: {
-    optional?: boolean
-    delta?: boolean
-    format?: 'markdown' | 'json' | 'yaml' | 'plaintext'
-    output?: string
-    scope?: 'change' | 'spec'
-  } = {},
-): ArtifactType {
-  return new ArtifactType({
-    id,
-    scope: opts.scope ?? 'change',
-    output: opts.output ?? `${id}.md`,
-    requires: [],
-    validations: [],
-    deltaValidations: [],
-    contextSections: [],
-    preHashCleanup: [],
-    ...(opts.optional !== undefined && { optional: opts.optional }),
-    ...(opts.delta !== undefined && { delta: opts.delta }),
-    ...(opts.format !== undefined && { format: opts.format }),
-  })
-}
-
-function makeSchema(artifactTypes: ArtifactType[], workflow: WorkflowStep[] = []): Schema {
-  return new Schema('test-schema', 1, artifactTypes, workflow)
-}
-
-function makeSchemaRegistry(schema: Schema | null = null) {
-  return {
-    async resolve(_ref: string, _paths: ReadonlyMap<string, string>): Promise<Schema | null> {
-      return schema
-    },
-    async list(_paths: ReadonlyMap<string, string>) {
-      return []
-    },
-  }
-}
 
 function makeArchiveRepository(override?: (change: Change) => ArchivedChange): ArchiveRepository {
   const repo = {
@@ -105,61 +69,6 @@ function makeArchiveRepository(override?: (change: Change) => ArchivedChange): A
     async reindex() {},
   }
   return repo as unknown as ArchiveRepository
-}
-
-function makeHookRunner(exitCode = 0, stderr = '') {
-  return {
-    async run(_command: string, _variables: unknown): Promise<HookResult> {
-      return new HookResult(exitCode, '', stderr)
-    },
-  }
-}
-
-function makeParser(
-  opts: {
-    parseDelta?: () => Array<{ op: 'added' | 'modified' | 'removed' }>
-    apply?: (ast: unknown) => unknown
-  } = {},
-): ArtifactParser {
-  const stubAst = { root: { type: 'doc' } }
-  return {
-    fileExtensions: ['.md'],
-    parse(_content: string) {
-      return stubAst
-    },
-    apply(ast: unknown, _delta: unknown) {
-      if (opts.apply) return opts.apply(ast) as typeof stubAst
-      return stubAst
-    },
-    serialize(_ast: unknown) {
-      return 'merged-content'
-    },
-    renderSubtree(_node: unknown) {
-      return ''
-    },
-    nodeTypes() {
-      return []
-    },
-    outline(_ast: unknown) {
-      return []
-    },
-    deltaInstructions() {
-      return ''
-    },
-    parseDelta(_content: string) {
-      return opts.parseDelta?.() ?? []
-    },
-  }
-}
-
-function makeParsers(
-  formatParser?: ArtifactParser,
-  yamlParser?: ArtifactParser,
-): ArtifactParserRegistry {
-  const map = new Map<string, ArtifactParser>()
-  map.set('markdown', formatParser ?? makeParser())
-  map.set('yaml', yamlParser ?? makeParser())
-  return map
 }
 
 /** Creates a Change in `archivable` state. */

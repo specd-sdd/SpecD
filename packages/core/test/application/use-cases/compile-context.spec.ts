@@ -24,7 +24,12 @@ import {
   type ArtifactParser,
 } from '../../../src/application/ports/artifact-parser.js'
 import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
-import { makeChangeRepository, makeSpecRepository } from './helpers.js'
+import {
+  makeChangeRepository,
+  makeSpecRepository,
+  makeArtifactType as makeArtifactTypeBase,
+  makeSchema as makeSchemaBase,
+} from './helpers.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -72,21 +77,11 @@ function makeChange(
 }
 
 function makeSchema(opts: { artifacts?: ArtifactType[]; workflow?: WorkflowStep[] } = {}): Schema {
-  return new Schema('@specd/schema-std', 1, opts.artifacts ?? [], opts.workflow ?? [])
+  return makeSchemaBase({ ...opts, name: '@specd/schema-std' })
 }
 
 function makeArtifactType(id: string, extra: Partial<ArtifactTypeProps> = {}): ArtifactType {
-  return new ArtifactType({
-    id,
-    scope: 'spec',
-    output: `${id}.md`,
-    requires: [],
-    validations: [],
-    deltaValidations: [],
-    contextSections: [],
-    preHashCleanup: [],
-    ...extra,
-  })
+  return makeArtifactTypeBase(id, { scope: 'spec', ...extra })
 }
 
 /** Returns a spec repo serving the given specs and artifact content lookup. */
