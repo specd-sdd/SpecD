@@ -57,6 +57,22 @@ interface IndexEntry {
   name: string
   /** Forward-slash-separated path relative to the archive root. */
   path: string
+  /** ISO 8601 creation timestamp. */
+  createdAt?: string
+  /** ISO 8601 archive timestamp. */
+  archivedAt?: string | undefined
+  /** Git identity of the archiving actor. */
+  archivedBy?: { name: string; email: string }
+  /** First workspace ID. */
+  workspace?: string
+  /** Artifact type IDs. */
+  artifacts?: string[]
+  /** Spec path strings. */
+  specIds?: string[]
+  /** Schema name. */
+  schemaName?: string
+  /** Schema version. */
+  schemaVersion?: number
 }
 
 /**
@@ -157,8 +173,8 @@ export class FsArchiveRepository extends ArchiveRepository {
     // Build the domain record
     const archivedChange = this._buildArchivedChange(archivedManifest, archivedName, archivedAt)
 
-    // Append index entry (O(1))
-    await this._appendIndex({ name: change.name, path: relPath })
+    // Append enriched index entry (O(1))
+    await this._appendIndex(this._buildIndexEntry(archivedManifest, relPath))
 
     return { archivedChange, archiveDirPath: archiveDir }
   }
@@ -178,11 +194,34 @@ export class FsArchiveRepository extends ArchiveRepository {
     for (const line of lines) {
       try {
         const entry = JSON.parse(line) as IndexEntry
-        const archiveDir = path.join(this._archivePath, ...entry.path.split('/'))
-        const manifest = await this._loadManifest(archiveDir)
-        const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
-        const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
-        map.set(entry.name, this._buildArchivedChange(manifest, archivedName, archivedAt))
+
+        if (entry.createdAt !== undefined) {
+          // Enriched index entry — build ArchivedChange without reading manifest
+          const createdAt = new Date(entry.createdAt)
+          const archivedAt = new Date(entry.archivedAt ?? entry.createdAt)
+          const archivedName = changeDirName(entry.name, createdAt)
+          map.set(
+            entry.name,
+            new ArchivedChange({
+              name: entry.name,
+              archivedName,
+              workspace: SpecPath.parse(entry.workspace ?? 'default'),
+              archivedAt,
+              ...(entry.archivedBy !== undefined ? { archivedBy: entry.archivedBy } : {}),
+              artifacts: entry.artifacts ?? [],
+              specIds: entry.specIds ?? [],
+              schemaName: entry.schemaName ?? 'unknown',
+              schemaVersion: entry.schemaVersion ?? 0,
+            }),
+          )
+        } else {
+          // Legacy index entry — fall back to reading manifest
+          const archiveDir = path.join(this._archivePath, ...entry.path.split('/'))
+          const manifest = await this._loadManifest(archiveDir)
+          const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
+          const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
+          map.set(entry.name, this._buildArchivedChange(manifest, archivedName, archivedAt))
+        }
       } catch (err) {
         // Skip malformed JSON lines, missing manifest directories (ENOENT), or
         // invalid manifest structure (SyntaxError). Re-throw unexpected I/O errors.
@@ -235,8 +274,8 @@ export class FsArchiveRepository extends ArchiveRepository {
     const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
     const archivedChange = this._buildArchivedChange(manifest, archivedName, archivedAt)
 
-    // Recover: append to index so future lookups are O(1)
-    await this._appendIndex({ name, path: found.relPath })
+    // Recover: append enriched entry to index so future lookups are O(1)
+    await this._appendIndex(this._buildIndexEntry(manifest, found.relPath))
 
     return archivedChange
   }
@@ -251,7 +290,7 @@ export class FsArchiveRepository extends ArchiveRepository {
     await this._collectManifests(this._archivePath, entries)
     entries.sort((a, b) => a.archivedAt.getTime() - b.archivedAt.getTime())
 
-    const lines = entries.map((e) => JSON.stringify({ name: e.manifest.name, path: e.relPath }))
+    const lines = entries.map((e) => JSON.stringify(this._buildIndexEntry(e.manifest, e.relPath)))
     const indexPath = path.join(this._archivePath, INDEX_FILE)
     const content = lines.length > 0 ? lines.join('\n') + '\n' : ''
     await fs.mkdir(this._archivePath, { recursive: true })
@@ -331,6 +370,28 @@ export class FsArchiveRepository extends ArchiveRepository {
       schemaName: manifest.schema.name,
       schemaVersion: manifest.schema.version,
     })
+  }
+
+  /**
+   * Builds an enriched `IndexEntry` from a manifest and its relative path.
+   *
+   * @param manifest - The parsed manifest
+   * @param relPath - Forward-slash-separated path relative to the archive root
+   * @returns An enriched index entry that can reconstruct `ArchivedChange` without I/O
+   */
+  private _buildIndexEntry(manifest: ChangeManifest, relPath: string): IndexEntry {
+    return {
+      name: manifest.name,
+      path: relPath,
+      createdAt: manifest.createdAt,
+      archivedAt: manifest.archivedAt,
+      ...(manifest.archivedBy !== undefined ? { archivedBy: manifest.archivedBy } : {}),
+      workspace: manifest.workspaces[0] ?? 'default',
+      artifacts: manifest.artifacts.map((a) => a.type),
+      specIds: manifest.specIds,
+      schemaName: manifest.schema.name,
+      schemaVersion: manifest.schema.version,
+    }
   }
 
   /**
