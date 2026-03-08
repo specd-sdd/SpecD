@@ -54,6 +54,16 @@ describe('evaluateRules', () => {
     expect(result.failures).toHaveLength(0)
   })
 
+  it('defaults required to true when omitted', () => {
+    const root: RuleEvaluatorNode = { type: 'document', children: [] }
+    const rules: ValidationRule[] = [{ selector: { type: 'section', matches: 'Missing' } }]
+
+    const result = evaluateRules(rules, root, 'specs', mockParser)
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0]!.description).toContain('Required rule not satisfied')
+    expect(result.warnings).toHaveLength(0)
+  })
+
   it('evaluates contentMatches against rendered subtree', () => {
     const root: RuleEvaluatorNode = { type: 'section', label: 'Overview' }
     const rules: ValidationRule[] = [
