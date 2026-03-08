@@ -63,6 +63,19 @@ export {
   type ContentHashEntry,
   type MetadataFreshnessResult,
 } from './_shared/metadata-freshness.js'
+export { computeArtifactHash, buildCleanupMap } from './_shared/compute-artifact-hash.js'
+export {
+  type InferSpecSections,
+  type InferSpecSectionsInput,
+  type InferSpecSectionsResult,
+} from './infer-spec-sections.js'
+export {
+  type GetSpecContext,
+  type GetSpecContextInput,
+  type GetSpecContextResult,
+  type SpecContextEntry,
+  type SpecContextSectionFlag,
+} from './get-spec-context.js'
 export {
   type ValidateSpecs,
   type ValidateSpecsInput,
