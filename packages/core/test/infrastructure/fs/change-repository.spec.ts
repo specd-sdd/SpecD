@@ -302,12 +302,29 @@ describe('FsChangeRepository', () => {
       expect(loaded?.getArtifact('proposal')?.status).toBe('in-progress')
     })
 
-    it('given validatedHash is __skipped__, when get is called, then artifact status is skipped', async () => {
-      const change = makeChangeWithArtifact('c1', '__skipped__')
+    it('given validatedHash is __skipped__ and optional, when get is called, then artifact status is skipped', async () => {
+      const change = makeChange('c1')
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          filename: 'proposal.md',
+          optional: true,
+          requires: [],
+          validatedHash: '__skipped__',
+        }),
+      )
       await ctx.repo.save(change)
 
       const loaded = await ctx.repo.get('c1')
       expect(loaded?.getArtifact('proposal')?.status).toBe('skipped')
+    })
+
+    it('given validatedHash is __skipped__ but not optional, when get is called, then artifact status is in-progress', async () => {
+      const change = makeChangeWithArtifact('c1', '__skipped__')
+      await ctx.repo.save(change)
+
+      const loaded = await ctx.repo.get('c1')
+      expect(loaded?.getArtifact('proposal')?.status).toBe('in-progress')
     })
   })
 
