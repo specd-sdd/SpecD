@@ -17,7 +17,7 @@ export interface ChangeRepositoryContext {
 }
 
 /**
- * Filesystem adapter options for `createChangeRepository('fs', ...)`..
+ * Filesystem adapter options for `createChangeRepository('fs', ...)`.
  */
 export interface FsChangeRepositoryOptions {
   /** Absolute path to the `changes/` directory for active changes. */

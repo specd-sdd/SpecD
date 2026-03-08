@@ -89,7 +89,7 @@ export {
 } from './validate-artifacts.js'
 export {
   createCompileContext,
-  type CompileContextContext,
+  type CompileContextWorkspace,
   type FsCompileContextOptions,
 } from './compile-context.js'
 export { createValidateSpecs, type FsValidateSpecsOptions } from './validate-specs.js'
