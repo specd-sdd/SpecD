@@ -5,7 +5,6 @@ import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { handleError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
-import { renderBanner } from '../../banner.js'
 
 /** Width of each stat column box. */
 const COL_WIDTH = 28
@@ -156,8 +155,7 @@ export function registerProjectOverview(parent: Command): void {
           borderColor: 'cyan',
         })
 
-        const banner = renderBanner()
-        process.stdout.write(banner + '\n\n' + dashboard + '\n')
+        process.stdout.write(dashboard + '\n')
       } catch (err) {
         handleError(err)
       }
