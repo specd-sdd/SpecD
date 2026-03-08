@@ -409,7 +409,8 @@ export class FsChangeRepository extends ChangeRepository {
     artifact: ManifestArtifact,
     dir: string,
   ): Promise<ArtifactStatus> {
-    if (artifact.validatedHash === SKIPPED_SENTINEL) return 'skipped'
+    if (artifact.validatedHash === SKIPPED_SENTINEL && artifact.optional) return 'skipped'
+    if (artifact.validatedHash === SKIPPED_SENTINEL) return 'in-progress'
 
     const filePath = path.join(dir, artifact.filename)
     let content: string
@@ -559,9 +560,7 @@ const CHANGE_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
 
 /** All valid `InvalidatedEvent` cause values. */
 const INVALIDATED_CAUSES = ['workspace-change', 'spec-change', 'artifact-change'] as const
-/**
- *
- */
+/** Union of valid `InvalidatedEvent` cause strings. */
 type InvalidatedCause = (typeof INVALIDATED_CAUSES)[number]
 
 /**
