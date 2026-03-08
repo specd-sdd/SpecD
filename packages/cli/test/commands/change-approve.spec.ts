@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { ChangeNotFoundError, ApprovalGateDisabledError } from '@specd/core'
 import {
@@ -149,7 +149,7 @@ describe('change approve spec', () => {
     ])
 
     expect(hashChangeArtifacts).toHaveBeenCalled()
-    const call = kernel.specs.approveSpec.execute.mock.calls[0][0]
+    const call = kernel.specs.approveSpec.execute.mock.calls[0]![0]
     expect(call.artifactHashes).toEqual({ 'spec.md': 'sha256:abc123' })
   })
 
@@ -172,7 +172,7 @@ describe('change approve spec', () => {
       'ok',
     ])
 
-    const call = kernel.specs.approveSpec.execute.mock.calls[0][0]
+    const call = kernel.specs.approveSpec.execute.mock.calls[0]![0]
     expect(call.artifactHashes).toEqual({})
   })
 })

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { ChangeNotFoundError } from '@specd/core'
 import {
@@ -105,7 +105,7 @@ describe('change context', () => {
       'spec',
     ])
 
-    const call = kernel.changes.compile.execute.mock.calls[0][0]
+    const call = kernel.changes.compile.execute.mock.calls[0]![0]
     expect(call.activeArtifact).toBe('spec')
   })
 
@@ -125,7 +125,7 @@ describe('change context', () => {
       '--follow-deps',
     ])
 
-    const call = kernel.changes.compile.execute.mock.calls[0][0]
+    const call = kernel.changes.compile.execute.mock.calls[0]![0]
     expect(call.followDeps).toBe(true)
   })
 
@@ -147,7 +147,7 @@ describe('change context', () => {
       '2',
     ])
 
-    const call = kernel.changes.compile.execute.mock.calls[0][0]
+    const call = kernel.changes.compile.execute.mock.calls[0]![0]
     expect(call.followDeps).toBe(true)
     expect(call.depth).toBe(2)
   })
@@ -182,7 +182,7 @@ describe('change context', () => {
       '--constraints',
     ])
 
-    const call = kernel.changes.compile.execute.mock.calls[0][0]
+    const call = kernel.changes.compile.execute.mock.calls[0]![0]
     expect(call.sections).toContain('rules')
     expect(call.sections).toContain('constraints')
     expect(call.sections).not.toContain('scenarios')
@@ -238,7 +238,7 @@ describe('change context', () => {
     registerChangeContext(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'context', 'my-change', 'implementing'])
 
-    const call = kernel.changes.compile.execute.mock.calls[0][0]
+    const call = kernel.changes.compile.execute.mock.calls[0]![0]
     expect(call.sections).toBeUndefined()
   })
 

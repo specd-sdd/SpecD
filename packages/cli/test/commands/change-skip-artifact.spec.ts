@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { ChangeNotFoundError, ArtifactNotFoundError, ArtifactNotOptionalError } from '@specd/core'
 import {
@@ -84,7 +84,7 @@ describe('change skip-artifact', () => {
       'not needed',
     ])
 
-    const call = kernel.changes.skipArtifact.execute.mock.calls[0][0]
+    const call = kernel.changes.skipArtifact.execute.mock.calls[0]![0]
     expect(call.reason).toBe('not needed')
   })
 
@@ -97,7 +97,7 @@ describe('change skip-artifact', () => {
     registerChangeSkipArtifact(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'skip-artifact', 'my-change', 'proposal'])
 
-    const call = kernel.changes.skipArtifact.execute.mock.calls[0][0]
+    const call = kernel.changes.skipArtifact.execute.mock.calls[0]![0]
     expect('reason' in call).toBe(false)
   })
 

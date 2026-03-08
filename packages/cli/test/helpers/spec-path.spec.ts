@@ -10,9 +10,9 @@ function makeConfig(workspaceNames: string[]): SpecdConfig {
       name,
       specsPath: `/project/specs/${name}`,
       schemasPath: null,
-      storagePath: `/project/.specd/${name}`,
-      ownership: [],
-      contextIncludeSpecs: false,
+      codeRoot: '/project',
+      ownership: 'owned' as const,
+      isExternal: false,
     })),
     storage: {
       changesPath: '/project/.specd/changes',
@@ -20,10 +20,8 @@ function makeConfig(workspaceNames: string[]): SpecdConfig {
       discardedPath: '/project/.specd/discarded',
       archivePath: '/project/.specd/archive',
     },
-    context: [],
     approvals: { spec: false, signoff: false },
-    hooks: {},
-  } as unknown as SpecdConfig
+  }
 }
 
 describe('parseSpecId', () => {
