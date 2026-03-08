@@ -10,7 +10,7 @@ import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
-import { type ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
+import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import {
   makeChangeRepository,
@@ -29,46 +29,48 @@ import {
 // Test helpers
 // ---------------------------------------------------------------------------
 
-function makeArchiveRepository(override?: (change: Change) => ArchivedChange): ArchiveRepository {
-  const repo = {
-    workspace() {
-      return 'default'
-    },
-    ownership() {
-      return 'project' as const
-    },
-    isExternal() {
-      return false
-    },
-    async archive(
-      change: Change,
-    ): Promise<{ archivedChange: ArchivedChange; archiveDirPath: string }> {
-      const ts = change.createdAt
-      const p = (n: number) => String(n).padStart(2, '0')
-      const archivedName = `${ts.getUTCFullYear()}${p(ts.getUTCMonth() + 1)}${p(ts.getUTCDate())}-${p(ts.getUTCHours())}${p(ts.getUTCMinutes())}${p(ts.getUTCSeconds())}-${change.name}`
-      const archivedChange = override
-        ? override(change)
-        : new ArchivedChange({
-            name: change.name,
-            archivedName,
-            workspace: SpecPath.parse(change.workspaces[0] ?? 'default'),
-            archivedAt: new Date(),
-            artifacts: [],
-            specIds: [...change.specIds],
-            schemaName: change.schemaName,
-            schemaVersion: change.schemaVersion,
-          })
-      return { archivedChange, archiveDirPath: `/archive/${archivedName}` }
-    },
-    async list() {
-      return []
-    },
-    async get() {
-      return null
-    },
-    async reindex() {},
+class StubArchiveRepository extends ArchiveRepository {
+  private readonly _override: ((change: Change) => ArchivedChange) | undefined
+
+  constructor(override?: (change: Change) => ArchivedChange) {
+    super({ workspace: 'default', ownership: 'owned', isExternal: false })
+    this._override = override
   }
-  return repo as unknown as ArchiveRepository
+
+  override async archive(
+    change: Change,
+  ): Promise<{ archivedChange: ArchivedChange; archiveDirPath: string }> {
+    const ts = change.createdAt
+    const p = (n: number) => String(n).padStart(2, '0')
+    const archivedName = `${ts.getUTCFullYear()}${p(ts.getUTCMonth() + 1)}${p(ts.getUTCDate())}-${p(ts.getUTCHours())}${p(ts.getUTCMinutes())}${p(ts.getUTCSeconds())}-${change.name}`
+    const archivedChange = this._override
+      ? this._override(change)
+      : new ArchivedChange({
+          name: change.name,
+          archivedName,
+          workspace: SpecPath.parse(change.workspaces[0] ?? 'default'),
+          archivedAt: new Date(),
+          artifacts: [],
+          specIds: [...change.specIds],
+          schemaName: change.schemaName,
+          schemaVersion: change.schemaVersion,
+        })
+    return { archivedChange, archiveDirPath: `/archive/${archivedName}` }
+  }
+
+  override async list(): Promise<ArchivedChange[]> {
+    return []
+  }
+
+  override async get(): Promise<ArchivedChange | null> {
+    return null
+  }
+
+  override async reindex(): Promise<void> {}
+}
+
+function makeArchiveRepository(override?: (change: Change) => ArchivedChange): ArchiveRepository {
+  return new StubArchiveRepository(override)
 }
 
 /** Creates a Change in `archivable` state. */
