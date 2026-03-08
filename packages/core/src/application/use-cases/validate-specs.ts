@@ -5,6 +5,7 @@ import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ValidationFailure, type ValidationWarning } from './validate-artifacts.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { type WorkspaceContext } from '../ports/workspace-context.js'
@@ -85,9 +86,7 @@ export class ValidateSpecs {
     const entries: SpecValidationEntry[] = []
 
     if (input.specPath !== undefined) {
-      const colonIdx = input.specPath.indexOf(':')
-      const workspace = colonIdx >= 0 ? input.specPath.slice(0, colonIdx) : 'default'
-      const capabilityPath = colonIdx >= 0 ? input.specPath.slice(colonIdx + 1) : input.specPath
+      const { workspace, capPath: capabilityPath } = parseSpecId(input.specPath)
       const specRepo = this._specs.get(workspace)
       if (specRepo === undefined) {
         return { entries: [], totalSpecs: 0, passed: 0, failed: 0 }
