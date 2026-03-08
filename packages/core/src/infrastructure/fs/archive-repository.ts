@@ -299,11 +299,11 @@ export class FsArchiveRepository extends ArchiveRepository {
     const month = (archivedAt.getUTCMonth() + 1).toString().padStart(2, '0')
     const day = archivedAt.getUTCDate().toString().padStart(2, '0')
     return this._pattern
-      .replace('{{year}}', year)
-      .replace('{{month}}', month)
-      .replace('{{day}}', day)
-      .replace('{{change.name}}', name)
-      .replace('{{change.archivedName}}', archivedName)
+      .replaceAll('{{year}}', year)
+      .replaceAll('{{month}}', month)
+      .replaceAll('{{day}}', day)
+      .replaceAll('{{change.name}}', name)
+      .replaceAll('{{change.archivedName}}', archivedName)
   }
 
   /**
