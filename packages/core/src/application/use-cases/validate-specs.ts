@@ -2,6 +2,7 @@ import path from 'node:path'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
+import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
 import { type ValidationFailure, type ValidationWarning } from './validate-artifacts.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
@@ -160,7 +161,7 @@ export class ValidateSpecs {
     workspace: string,
     capabilityPath: string,
     filenames: readonly string[],
-    specArtifactTypes: readonly import('../../domain/value-objects/artifact-type.js').ArtifactType[],
+    specArtifactTypes: readonly ArtifactType[],
   ): Promise<SpecValidationEntry> {
     const label = `${workspace}:${capabilityPath}`
     const failures: ValidationFailure[] = []

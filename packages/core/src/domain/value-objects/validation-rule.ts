@@ -2,10 +2,15 @@ import { type Selector } from './selector.js'
 
 /** A structural validation constraint applied to an artifact's content. */
 export interface ValidationRule {
+  /** AST node selector that identifies the target node(s) to validate. */
   readonly selector?: Selector
+  /** JSONPath expression targeting a value within the artifact (JSON/YAML formats). */
   readonly path?: string
+  /** Whether the matched node must exist. Defaults to `true` when omitted. */
   readonly required?: boolean
+  /** Regex pattern the rendered node content must match. */
   readonly contentMatches?: string
+  /** Nested rules evaluated against the matched node's children. */
   readonly children?: readonly ValidationRule[]
 }
 
