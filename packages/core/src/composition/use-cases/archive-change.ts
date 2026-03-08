@@ -47,6 +47,8 @@ export interface FsArchiveChangeOptions {
   readonly specRepositories: ReadonlyMap<string, SpecRepository>
   /** Absolute path to the `node_modules` directory for schema resolution. */
   readonly nodeModulesPaths: readonly string[]
+  /** Project root directory for resolving relative schema paths. */
+  readonly configDir: string
 }
 
 /**
@@ -123,6 +125,7 @@ export function createArchiveChange(
           path.join(config.projectRoot, 'node_modules'),
           ...(kernelOpts?.extraNodeModulesPaths ?? []),
         ],
+        configDir: config.projectRoot,
       },
     )
   }
@@ -138,7 +141,10 @@ export function createArchiveChange(
     archivePath: opts.archivePath,
     ...(opts.archivePattern !== undefined ? { pattern: opts.archivePattern } : {}),
   })
-  const schemas = createSchemaRegistry('fs', { nodeModulesPaths: opts.nodeModulesPaths })
+  const schemas = createSchemaRegistry('fs', {
+    nodeModulesPaths: opts.nodeModulesPaths,
+    configDir: opts.configDir,
+  })
   const parsers = createArtifactParserRegistry()
   const hooks = new NodeHookRunner()
   const git = new GitCLIAdapter()

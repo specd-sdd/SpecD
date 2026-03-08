@@ -21,6 +21,7 @@ export function createInferSpecSections(
       path.join(config.projectRoot, 'node_modules'),
       ...(kernelOpts?.extraNodeModulesPaths ?? []),
     ],
+    configDir: config.projectRoot,
   })
   const parsers = createArtifactParserRegistry()
   return new InferSpecSections(schemas, parsers)
