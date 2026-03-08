@@ -484,6 +484,32 @@ contextIncludeSpecs:
   })
 
   // ---------------------------------------------------------------------------
+  // Requirement: CWD only when outside git repo
+  // ---------------------------------------------------------------------------
+
+  describe('Requirement: CWD only when not inside a git repo', () => {
+    it('finds specd.yaml in startDir when no .git exists', async () => {
+      // tmpDir has no .git — outside any git repo
+      await writeConfig(minimalYaml())
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const config = await loader.load()
+
+      expect(config.projectRoot).toBe(tmpDir)
+    })
+
+    it('does not walk up when outside a git repo', async () => {
+      // Place specd.yaml in parent, start from child
+      await writeConfig(minimalYaml())
+      const childDir = path.join(tmpDir, 'nested')
+      await fs.mkdir(childDir, { recursive: true })
+
+      const loader = new FsConfigLoader({ startDir: childDir })
+      await expect(loader.load()).rejects.toThrow('no specd.yaml found')
+    })
+  })
+
+  // ---------------------------------------------------------------------------
   // Requirement: Context entries
   // ---------------------------------------------------------------------------
 

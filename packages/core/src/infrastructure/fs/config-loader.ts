@@ -157,6 +157,28 @@ async function findConfigFile(startDir: string): Promise<string | null> {
   const gitRoot = await findGitRoot(startDir)
   let dir = path.resolve(startDir)
 
+  if (gitRoot === null) {
+    // Not inside a git repo — check CWD only, do not walk up
+    const localPath = path.join(dir, 'specd.local.yaml')
+    try {
+      await fs.access(localPath)
+      return localPath
+    } catch {
+      // no local file
+    }
+
+    const mainPath = path.join(dir, 'specd.yaml')
+    try {
+      await fs.access(mainPath)
+      return mainPath
+    } catch {
+      // no main file
+    }
+
+    return null
+  }
+
+  // Inside a git repo — walk up bounded by gitRoot
   while (true) {
     // Local override takes precedence — no specd.yaml required
     const localPath = path.join(dir, 'specd.local.yaml')
@@ -175,8 +197,7 @@ async function findConfigFile(startDir: string): Promise<string | null> {
       // no main file at this level
     }
 
-    // Stop at git root (or filesystem root when outside a repo)
-    if (gitRoot !== null && dir === gitRoot) break
+    if (dir === gitRoot) break
     const parent = path.dirname(dir)
     if (parent === dir) break // filesystem root
     dir = parent
