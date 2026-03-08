@@ -21,6 +21,12 @@ export function registerDiscardedShow(parent: Command): void {
         const kernel = createCliKernel(config)
         const { change } = await kernel.changes.status.execute({ name })
 
+        const isDiscarded = change.history.some((e: { type: string }) => e.type === 'discarded')
+        if (!isDiscarded) {
+          process.stderr.write(`error: change '${name}' is not in discarded\n`)
+          process.exit(1)
+        }
+
         // Find the discarded event for reason
         const discardedEvent = change.history
           .slice()
