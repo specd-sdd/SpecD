@@ -1,5 +1,6 @@
 import { EditChange } from '../../application/use-cases/edit-change.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
@@ -30,8 +31,7 @@ export interface FsEditChangeOptions {
 function deriveWorkspaces(specIds: readonly string[]): string[] {
   const workspaces = new Set<string>()
   for (const specId of specIds) {
-    const colon = specId.indexOf(':')
-    workspaces.add(colon !== -1 ? specId.slice(0, colon) : 'default')
+    workspaces.add(parseSpecId(specId).workspace)
   }
   return [...workspaces]
 }
