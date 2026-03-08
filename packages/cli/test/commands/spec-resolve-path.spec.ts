@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
@@ -70,7 +69,9 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({ isDirectory: () => true } as any)
+    vi.mocked(mockStat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as import('node:fs').Stats)
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -96,7 +97,9 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({ isDirectory: () => true } as any)
+    vi.mocked(mockStat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as import('node:fs').Stats)
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -127,7 +130,9 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({ isDirectory: () => true } as any)
+    vi.mocked(mockStat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as import('node:fs').Stats)
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -161,7 +166,9 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({ isDirectory: () => true } as any)
+    vi.mocked(mockStat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as import('node:fs').Stats)
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -193,7 +200,9 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({ isDirectory: () => true } as any)
+    vi.mocked(mockStat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as import('node:fs').Stats)
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -229,7 +238,9 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({ isDirectory: () => false } as any)
+    vi.mocked(mockStat).mockResolvedValue({
+      isDirectory: () => false,
+    } as unknown as import('node:fs').Stats)
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -275,7 +286,9 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({ isDirectory: () => true } as any)
+    vi.mocked(mockStat).mockResolvedValue({
+      isDirectory: () => true,
+    } as unknown as import('node:fs').Stats)
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
