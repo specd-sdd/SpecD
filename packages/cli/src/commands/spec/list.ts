@@ -198,7 +198,11 @@ export function registerSpecList(parent: Command): void {
     )
 }
 
-const VALID_STATUSES: ReadonlySet<SpecMetadataStatus> = new Set(['fresh', 'stale', 'missing'])
+const VALID_METADATA_STATUSES: ReadonlySet<SpecMetadataStatus> = new Set([
+  'fresh',
+  'stale',
+  'missing',
+])
 
 /**
  * Parses the `--metadata-status` option value into a filter set.
@@ -214,6 +218,8 @@ function parseMetadataStatusFilter(
     .toLowerCase()
     .split(',')
     .map((t: string) => t.trim())
-    .filter((t: string): t is SpecMetadataStatus => VALID_STATUSES.has(t as SpecMetadataStatus))
+    .filter((t: string): t is SpecMetadataStatus =>
+      VALID_METADATA_STATUSES.has(t as SpecMetadataStatus),
+    )
   return tokens.length > 0 ? new Set(tokens) : null
 }
