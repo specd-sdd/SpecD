@@ -1,0 +1,315 @@
+import { parse as parseYaml } from 'yaml'
+import { type SpecRepository } from '../ports/spec-repository.js'
+import { SpecPath } from '../../domain/value-objects/spec-path.js'
+import { type ContextWarning } from './compile-context.js'
+import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
+import { specMetadataSchema } from './_shared/spec-metadata-schema.js'
+
+/** Valid section filter flags for spec context queries. */
+export type SpecContextSectionFlag = 'rules' | 'constraints' | 'scenarios'
+
+/** Input for the {@link GetSpecContext} use case. */
+export interface GetSpecContextInput {
+  /** The workspace name (e.g. `'default'`, `'billing'`). */
+  readonly workspace: string
+  /** The spec path within the workspace. */
+  readonly specPath: SpecPath
+  /** When `true`, follows `dependsOn` links transitively. */
+  readonly followDeps?: boolean
+  /** Limits dependency traversal depth. Only meaningful when `followDeps` is `true`. */
+  readonly depth?: number
+  /** When present, restricts output to the listed section types. */
+  readonly sections?: ReadonlyArray<SpecContextSectionFlag>
+}
+
+/** A resolved spec entry in the context result. */
+export interface SpecContextEntry {
+  /** Display label for the spec (e.g. `'default:auth/login'`). */
+  readonly spec: string
+  /** Spec title from metadata. */
+  readonly title?: string
+  /** Spec description from metadata. */
+  readonly description?: string
+  /** Extracted rules from metadata. */
+  readonly rules?: ReadonlyArray<{ readonly requirement: string; readonly rules: string[] }>
+  /** Extracted constraints from metadata. */
+  readonly constraints?: readonly string[]
+  /** Extracted scenarios from metadata. */
+  readonly scenarios?: ReadonlyArray<{
+    readonly requirement: string
+    readonly name: string
+    readonly given?: string[]
+    readonly when?: string[]
+    readonly then?: string[]
+  }>
+  /** Whether the metadata is stale or absent. */
+  readonly stale: boolean
+}
+
+/** Result returned by the {@link GetSpecContext} use case. */
+export interface GetSpecContextResult {
+  /** Resolved context entries for the spec and its dependencies. */
+  readonly entries: readonly SpecContextEntry[]
+  /** Advisory warnings encountered during resolution. */
+  readonly warnings: readonly ContextWarning[]
+}
+
+/** Parsed `.specd-metadata.yaml` content (internal). */
+interface SpecMetadata {
+  readonly title?: string
+  readonly description?: string
+  readonly dependsOn?: string[]
+  readonly contentHashes?: Record<string, string>
+  readonly rules?: Array<{ readonly requirement: string; readonly rules: string[] }>
+  readonly constraints?: string[]
+  readonly scenarios?: Array<{
+    readonly requirement: string
+    readonly name: string
+    readonly given?: string[]
+    readonly when?: string[]
+    readonly then?: string[]
+  }>
+}
+
+/**
+ * Builds structured context entries for a single spec, optionally following
+ * `dependsOn` links transitively.
+ *
+ * Checks metadata freshness using SHA-256 content hashes. When metadata is
+ * stale or absent, returns a minimal stale entry. Dependency traversal uses
+ * DFS with cycle detection.
+ */
+export class GetSpecContext {
+  private readonly _specs: ReadonlyMap<string, SpecRepository>
+
+  /**
+   * Creates a new `GetSpecContext` use case instance.
+   *
+   * @param specs - Spec repositories keyed by workspace name
+   */
+  constructor(specs: ReadonlyMap<string, SpecRepository>) {
+    this._specs = specs
+  }
+
+  /**
+   * Executes the use case.
+   *
+   * @param input - Query parameters
+   * @returns Structured context entries and warnings
+   */
+  async execute(input: GetSpecContextInput): Promise<GetSpecContextResult> {
+    const warnings: ContextWarning[] = []
+    const entries: SpecContextEntry[] = []
+
+    const repo = this._specs.get(input.workspace)
+    if (repo === undefined) {
+      return {
+        entries: [],
+        warnings: [
+          { type: 'unknown-workspace', message: `Workspace '${input.workspace}' not found` },
+        ],
+      }
+    }
+
+    const spec = await repo.get(input.specPath)
+    if (spec === null) {
+      return {
+        entries: [],
+        warnings: [
+          {
+            type: 'missing-spec',
+            path: input.specPath.toString(),
+            message: `Spec '${input.workspace}:${input.specPath.toString()}' not found`,
+          },
+        ],
+      }
+    }
+
+    const artifacts = new Map<string, { content: string }>()
+    for (const filename of spec.filenames) {
+      const artifact = await repo.artifact(spec, filename)
+      if (artifact !== null) {
+        artifacts.set(filename, { content: artifact.content })
+      }
+    }
+
+    const rootLabel = `${input.workspace}:${input.specPath.toString()}`
+    entries.push(await this._buildEntry(rootLabel, artifacts, input.sections, warnings))
+
+    if (input.followDeps) {
+      const maxDepth = input.depth
+      const seen = new Set<string>([rootLabel])
+      await this._traverseDeps(
+        artifacts,
+        input.workspace,
+        entries,
+        seen,
+        warnings,
+        input.sections,
+        maxDepth,
+        0,
+      )
+    }
+
+    return { entries, warnings }
+  }
+
+  /**
+   * Builds a context entry from a spec's artifacts and metadata.
+   *
+   * @param specLabel - Display label for the spec
+   * @param artifacts - Map of filename to artifact content
+   * @param sections - Optional section filter flags
+   * @param warnings - Mutable array to collect warnings
+   * @returns The constructed context entry
+   */
+  private async _buildEntry(
+    specLabel: string,
+    artifacts: ReadonlyMap<string, { readonly content: string }>,
+    sections: ReadonlyArray<SpecContextSectionFlag> | undefined,
+    warnings: ContextWarning[],
+  ): Promise<SpecContextEntry> {
+    const metadataContent = artifacts.get('.specd-metadata.yaml')?.content
+    const showAll = sections === undefined || sections.length === 0
+
+    if (metadataContent !== undefined) {
+      const metadata = this._parseMetadata(metadataContent)
+      const freshnessResult = await checkMetadataFreshness(metadata.contentHashes, (filename) =>
+        Promise.resolve(artifacts.get(filename)?.content ?? null),
+      )
+
+      if (!freshnessResult.allFresh) {
+        warnings.push({
+          type: 'stale-metadata',
+          path: specLabel,
+          message: `Metadata for '${specLabel}' is stale`,
+        })
+      }
+
+      if (freshnessResult.allFresh) {
+        return {
+          spec: specLabel,
+          stale: false,
+          ...(showAll && metadata.title !== undefined ? { title: metadata.title } : {}),
+          ...(showAll && metadata.description !== undefined
+            ? { description: metadata.description }
+            : {}),
+          ...((showAll || sections?.includes('rules')) &&
+          metadata.rules !== undefined &&
+          metadata.rules.length > 0
+            ? { rules: metadata.rules }
+            : {}),
+          ...((showAll || sections?.includes('constraints')) &&
+          metadata.constraints !== undefined &&
+          metadata.constraints.length > 0
+            ? { constraints: metadata.constraints }
+            : {}),
+          ...((showAll || sections?.includes('scenarios')) &&
+          metadata.scenarios !== undefined &&
+          metadata.scenarios.length > 0
+            ? { scenarios: metadata.scenarios }
+            : {}),
+        }
+      }
+    }
+
+    return { spec: specLabel, stale: true }
+  }
+
+  /**
+   * Parses a `.specd-metadata.yaml` string into a SpecMetadata object.
+   *
+   * @param content - Raw YAML string to parse
+   * @returns The parsed metadata object, or empty object on parse failure
+   */
+  private _parseMetadata(content: string): SpecMetadata {
+    try {
+      const parsed = parseYaml(content) as unknown
+      const result = specMetadataSchema.safeParse(parsed)
+      return result.success ? (result.data as SpecMetadata) : {}
+    } catch {
+      return {}
+    }
+  }
+
+  /**
+   * Recursively traverses `dependsOn` links from a spec's metadata.
+   *
+   * @param artifacts - Artifacts of the current spec
+   * @param defaultWorkspace - Workspace to assume when deps omit one
+   * @param entries - Mutable array collecting resolved entries
+   * @param seen - Set of already-visited spec labels for cycle detection
+   * @param warnings - Mutable array to collect warnings
+   * @param sections - Optional section filter flags
+   * @param maxDepth - Maximum traversal depth, or undefined for unlimited
+   * @param currentDepth - Current recursion depth
+   */
+  private async _traverseDeps(
+    artifacts: ReadonlyMap<string, { readonly content: string }>,
+    defaultWorkspace: string,
+    entries: SpecContextEntry[],
+    seen: Set<string>,
+    warnings: ContextWarning[],
+    sections: ReadonlyArray<SpecContextSectionFlag> | undefined,
+    maxDepth: number | undefined,
+    currentDepth: number,
+  ): Promise<void> {
+    const metadataContent = artifacts.get('.specd-metadata.yaml')?.content
+    if (metadataContent === undefined) return
+
+    const metadata = this._parseMetadata(metadataContent)
+    if (metadata.dependsOn === undefined || metadata.dependsOn.length === 0) return
+
+    if (maxDepth !== undefined && currentDepth >= maxDepth) return
+
+    for (const dep of metadata.dependsOn) {
+      const colonIdx = dep.indexOf(':')
+      const depWorkspace = colonIdx >= 0 ? dep.slice(0, colonIdx) : defaultWorkspace
+      const depCapPath = colonIdx >= 0 ? dep.slice(colonIdx + 1) : dep
+      const depLabel = `${depWorkspace}:${depCapPath}`
+
+      if (seen.has(depLabel)) continue
+      seen.add(depLabel)
+
+      const repo = this._specs.get(depWorkspace)
+      if (repo === undefined) {
+        warnings.push({
+          type: 'unknown-workspace',
+          message: `Dependency workspace '${depWorkspace}' not found`,
+        })
+        continue
+      }
+
+      const depSpec = await repo.get(SpecPath.parse(depCapPath))
+      if (depSpec === null) {
+        warnings.push({
+          type: 'missing-spec',
+          path: depLabel,
+          message: `Dependency '${depLabel}' not found`,
+        })
+        continue
+      }
+
+      const depArtifacts = new Map<string, { content: string }>()
+      for (const filename of depSpec.filenames) {
+        const artifact = await repo.artifact(depSpec, filename)
+        if (artifact !== null) {
+          depArtifacts.set(filename, { content: artifact.content })
+        }
+      }
+
+      entries.push(await this._buildEntry(depLabel, depArtifacts, sections, warnings))
+
+      await this._traverseDeps(
+        depArtifacts,
+        depWorkspace,
+        entries,
+        seen,
+        warnings,
+        sections,
+        maxDepth,
+        currentDepth + 1,
+      )
+    }
+  }
+}

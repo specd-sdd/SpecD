@@ -127,9 +127,20 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     get: { execute: vi.fn() },
     saveMetadata: { execute: vi.fn() },
     getActiveSchema: {
-      execute: vi.fn().mockResolvedValue({ name: () => '@specd/schema-std', version: () => 1 }),
+      execute: vi.fn().mockResolvedValue({
+        name: () => '@specd/schema-std',
+        version: () => 1,
+        artifacts: () => [],
+        workflow: () => [],
+      }),
     },
     validate: { execute: vi.fn() },
+    inferSections: {
+      execute: vi.fn().mockResolvedValue({ rules: [], constraints: [], scenarios: [] }),
+    },
+    getContext: {
+      execute: vi.fn().mockResolvedValue({ entries: [], warnings: [] }),
+    },
   }
 
   const project = {
