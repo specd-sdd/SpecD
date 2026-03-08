@@ -15,7 +15,6 @@ import {
 } from '../../../src/domain/value-objects/artifact-type.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
-import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { type ChangeRepository } from '../../../src/application/ports/change-repository.js'
 import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
 import { type SchemaRegistry } from '../../../src/application/ports/schema-registry.js'
@@ -25,6 +24,7 @@ import {
   type ArtifactParser,
 } from '../../../src/application/ports/artifact-parser.js'
 import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
+import { makeChangeRepository, makeSpecRepository } from './helpers.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -95,28 +95,7 @@ function makeSpecRepo(
   /** key = `'capPath/filename'` */
   artifacts: Record<string, string | null> = {},
 ): SpecRepository {
-  return {
-    workspace: () => specs[0]?.workspace ?? 'default',
-    list: async (prefix?: SpecPath) => {
-      if (prefix === undefined) return specs
-      const prefixStr = prefix.toString()
-      return specs.filter((s) => {
-        const p = s.name.toString()
-        return p === prefixStr || p.startsWith(`${prefixStr}/`)
-      })
-    },
-    get: async (path: SpecPath) => specs.find((s) => s.name.toString() === path.toString()) ?? null,
-    artifact: async (spec: Spec, filename: string) => {
-      const key = `${spec.name.toString()}/${filename}`
-      const content = artifacts[key]
-      if (content === undefined || content === null) return null
-      return new SpecArtifact(filename, content)
-    },
-    save: async () => {},
-    delete: async () => {},
-    ownership: () => 'owned' as const,
-    isExternal: () => false,
-  } as unknown as SpecRepository
+  return makeSpecRepository({ specs, artifacts })
 }
 
 function sha256Hex(content: string): string {
@@ -231,21 +210,8 @@ function makeSut(opts: {
   return { sut, changeRepo, schemaRegistry }
 }
 
-function makeStubChangeRepo(change?: Change): ChangeRepository {
-  const repo = {
-    workspace: () => 'default',
-    ownership: () => 'owned' as const,
-    isExternal: () => false,
-    get: async (name: string) => (name === (change?.name ?? 'my-change') ? (change ?? null) : null),
-    list: async () => [],
-    listDrafts: async () => [],
-    listDiscarded: async () => [],
-    save: async () => {},
-    delete: async () => {},
-    artifact: async () => null,
-    saveArtifact: async () => {},
-  }
-  return repo as unknown as ChangeRepository
+function makeStubChangeRepo(change?: Change) {
+  return makeChangeRepository(change ? [change] : [])
 }
 
 function makeStubSchemaRegistry(schema: Schema | null): SchemaRegistry {

@@ -12,16 +12,14 @@ import { Schema } from '../../../src/domain/value-objects/schema.js'
 import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
-import { Spec } from '../../../src/domain/entities/spec.js'
 import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
 import { type ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
-import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
 import {
   type ArtifactParser,
   type ArtifactParserRegistry,
 } from '../../../src/application/ports/artifact-parser.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
-import { makeChangeRepository, makeGitAdapter, testActor } from './helpers.js'
+import { makeChangeRepository, makeGitAdapter, makeSpecRepository, testActor } from './helpers.js'
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -115,40 +113,6 @@ function makeHookRunner(exitCode = 0, stderr = '') {
       return new HookResult(exitCode, '', stderr)
     },
   }
-}
-
-function makeSpecRepository(
-  existing: Map<string, string> = new Map(),
-): SpecRepository & { saved: Map<string, string> } {
-  const saved = new Map<string, string>()
-  const repo = {
-    saved,
-    workspace() {
-      return 'default'
-    },
-    ownership() {
-      return 'owned' as const
-    },
-    isExternal() {
-      return false
-    },
-    async get(name: SpecPath): Promise<Spec | null> {
-      return new Spec('default', name, [])
-    },
-    async list() {
-      return []
-    },
-    async artifact(_spec: Spec, filename: string): Promise<SpecArtifact | null> {
-      const content = existing.get(filename)
-      if (content === undefined) return null
-      return new SpecArtifact(filename, content)
-    },
-    async save(_spec: Spec, artifact: SpecArtifact): Promise<void> {
-      saved.set(artifact.filename, artifact.content)
-    },
-    async delete() {},
-  }
-  return repo as unknown as SpecRepository & { saved: Map<string, string> }
 }
 
 function makeParser(
@@ -793,7 +757,7 @@ describe('ArchiveChange', () => {
       const serializeSpy = vi.spyOn(mdParser, 'serialize').mockReturnValue(mergedContent)
       const yamlParser = makeParser({ parseDelta: () => [{ op: 'modified' as const }] })
 
-      const specRepo = makeSpecRepository(new Map([['spec.md', baseContent]]))
+      const specRepo = makeSpecRepository({ artifacts: { 'auth/oauth/spec.md': baseContent } })
       const artifactType = makeArtifactType('spec', {
         delta: true,
         format: 'markdown',
