@@ -123,6 +123,7 @@ class StubSpecRepository extends SpecRepository {
     | ((spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>)
     | undefined
   private readonly _deleteFn: ((spec: Spec) => Promise<void>) | undefined
+  readonly saved = new Map<string, string>()
 
   constructor(opts: {
     specs?: Spec[]
@@ -162,6 +163,7 @@ class StubSpecRepository extends SpecRepository {
     artifact: SpecArtifact,
     options?: { force?: boolean },
   ): Promise<void> {
+    this.saved.set(artifact.filename, artifact.content)
     if (this._saveFn) return this._saveFn(spec, artifact, options)
   }
 
@@ -180,7 +182,7 @@ export function makeSpecRepository(
     save?: (spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>
     delete?: (spec: Spec) => Promise<void>
   } = {},
-): SpecRepository {
+): SpecRepository & { saved: Map<string, string> } {
   return new StubSpecRepository(overrides)
 }
 
