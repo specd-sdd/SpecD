@@ -212,6 +212,11 @@ export class FsSpecRepository extends SpecRepository {
   private _specDir(name: SpecPath): string {
     if (this._prefixSegments.length > 0) {
       const nameSegments = name.toString().split('/')
+      const namePrefix = nameSegments.slice(0, this._prefixSegments.length)
+      if (namePrefix.join('/') !== this._prefixSegments.join('/')) {
+        // prefix doesn't match — use full name
+        return path.join(this._specsPath, name.toFsPath(path.sep))
+      }
       const stripped = nameSegments.slice(this._prefixSegments.length)
       return path.join(this._specsPath, ...stripped)
     }
