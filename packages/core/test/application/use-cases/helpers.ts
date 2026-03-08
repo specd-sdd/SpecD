@@ -1,9 +1,22 @@
 import { Change, type GitIdentity } from '../../../src/domain/entities/change.js'
 import { type Spec } from '../../../src/domain/entities/spec.js'
 import { type SpecPath } from '../../../src/domain/value-objects/spec-path.js'
+import {
+  ArtifactType,
+  type ArtifactTypeProps,
+} from '../../../src/domain/value-objects/artifact-type.js'
+import { Schema } from '../../../src/domain/value-objects/schema.js'
+import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
 import { ChangeRepository } from '../../../src/application/ports/change-repository.js'
 import { SpecRepository } from '../../../src/application/ports/spec-repository.js'
-import { type SchemaRegistry, type Schema } from '../../../src/application/ports/schema-registry.js'
+import { type SchemaRegistry } from '../../../src/application/ports/schema-registry.js'
+import {
+  type ArtifactParser,
+  type ArtifactParserRegistry,
+  type ArtifactAST,
+  type ArtifactNode,
+  type DeltaEntry,
+} from '../../../src/application/ports/artifact-parser.js'
 import { type FileReader } from '../../../src/application/ports/file-reader.js'
 import { type HookRunner } from '../../../src/application/ports/hook-runner.js'
 import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
@@ -220,4 +233,88 @@ export function makeHookRunner(exitCode = 0, stderr = ''): HookRunner {
       return new HookResult(exitCode, '', stderr)
     },
   }
+}
+
+/**
+ * Creates an `ArtifactType` with sensible defaults for testing.
+ *
+ * All required fields are populated with empty arrays / safe fallbacks.
+ * Pass any `ArtifactTypeProps` partial to override.
+ */
+export function makeArtifactType(id: string, extra: Partial<ArtifactTypeProps> = {}): ArtifactType {
+  return new ArtifactType({
+    id,
+    scope: 'change',
+    output: `${id}.md`,
+    requires: [],
+    validations: [],
+    deltaValidations: [],
+    contextSections: [],
+    preHashCleanup: [],
+    ...extra,
+  })
+}
+
+/**
+ * Creates a `Schema` with the given artifact types and workflow steps.
+ *
+ * Accepts either an options object or a plain array of artifact types.
+ */
+export function makeSchema(
+  optsOrArtifacts:
+    | { artifacts?: ArtifactType[]; workflow?: WorkflowStep[]; name?: string }
+    | ArtifactType[] = {},
+  workflow: WorkflowStep[] = [],
+): Schema {
+  if (Array.isArray(optsOrArtifacts)) {
+    return new Schema('test-schema', 1, optsOrArtifacts, workflow)
+  }
+  return new Schema(
+    optsOrArtifacts.name ?? 'test-schema',
+    1,
+    optsOrArtifacts.artifacts ?? [],
+    optsOrArtifacts.workflow ?? [],
+  )
+}
+
+/**
+ * Creates a stub `ArtifactParser` with no-op defaults.
+ *
+ * Override individual operations as needed.
+ */
+export function makeParser(
+  opts: {
+    parse?: (content: string) => ArtifactAST
+    apply?: (ast: ArtifactAST, delta: readonly DeltaEntry[]) => ArtifactAST
+    serialize?: (ast: ArtifactAST) => string
+    renderSubtree?: (node: ArtifactNode) => string
+    parseDelta?: (content: string) => readonly DeltaEntry[]
+  } = {},
+): ArtifactParser {
+  const trivialNode: ArtifactNode = { type: 'root' }
+  const trivialAST: ArtifactAST = { root: trivialNode }
+  return {
+    fileExtensions: ['.md'],
+    parse: opts.parse ?? (() => trivialAST),
+    apply: opts.apply ?? ((ast) => ast),
+    serialize: opts.serialize ?? (() => 'serialized'),
+    renderSubtree: opts.renderSubtree ?? (() => 'rendered'),
+    nodeTypes: () => [],
+    outline: () => [],
+    deltaInstructions: () => '',
+    parseDelta: opts.parseDelta ?? (() => []),
+  }
+}
+
+/**
+ * Creates an `ArtifactParserRegistry` with stub parsers for markdown and yaml.
+ */
+export function makeParsers(
+  markdown: ArtifactParser = makeParser(),
+  yaml: ArtifactParser = makeParser(),
+): ArtifactParserRegistry {
+  return new Map([
+    ['markdown', markdown],
+    ['yaml', yaml],
+  ])
 }

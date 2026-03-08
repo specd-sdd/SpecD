@@ -6,19 +6,25 @@ import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
-import { ArtifactType } from '../../../src/domain/value-objects/artifact-type.js'
-import { Schema } from '../../../src/domain/value-objects/schema.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import {
   DeltaApplicationError,
-  type ArtifactParser,
-  type ArtifactParserRegistry,
   type ArtifactAST,
   type ArtifactNode,
 } from '../../../src/application/ports/artifact-parser.js'
-import { makeChangeRepository, makeGitAdapter, testActor } from './helpers.js'
+import {
+  makeChangeRepository,
+  makeGitAdapter,
+  makeSchemaRegistry,
+  makeSpecRepository,
+  makeArtifactType,
+  makeSchema,
+  makeParser,
+  makeParsers,
+  testActor,
+} from './helpers.js'
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -26,114 +32,6 @@ import { makeChangeRepository, makeGitAdapter, testActor } from './helpers.js'
 
 function sha256(content: string): string {
   return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`
-}
-
-function makeArtifactType(
-  id: string,
-  opts: {
-    optional?: boolean
-    requires?: string[]
-    delta?: boolean
-    validations?: readonly import('../../../src/domain/value-objects/validation-rule.js').ValidationRule[]
-    deltaValidations?: readonly import('../../../src/domain/value-objects/validation-rule.js').ValidationRule[]
-    preHashCleanup?: readonly import('../../../src/domain/value-objects/validation-rule.js').PreHashCleanup[]
-    format?: 'markdown' | 'json' | 'yaml' | 'plaintext'
-  } = {},
-): ArtifactType {
-  return new ArtifactType({
-    id,
-    scope: 'change',
-    output: `${id}.md`,
-    requires: opts.requires ?? [],
-    validations: opts.validations ?? [],
-    deltaValidations: opts.deltaValidations ?? [],
-    contextSections: [],
-    preHashCleanup: opts.preHashCleanup ?? [],
-    ...(opts.optional !== undefined && { optional: opts.optional }),
-    ...(opts.delta !== undefined && { delta: opts.delta }),
-    ...(opts.format !== undefined && { format: opts.format }),
-  })
-}
-
-function makeSchema(artifactTypes: ArtifactType[]): Schema {
-  return new Schema('test-schema', 1, artifactTypes, [])
-}
-
-function makeSchemaRegistry(schema: Schema | null = null) {
-  return {
-    async resolve(_ref: string, _paths: ReadonlyMap<string, string>): Promise<Schema | null> {
-      return schema
-    },
-    async list(_paths: ReadonlyMap<string, string>) {
-      return []
-    },
-  }
-}
-
-function makeSpecRepository(artifacts: Map<string, string> = new Map()) {
-  return {
-    workspace() {
-      return 'default'
-    },
-    ownership() {
-      return 'owned' as const
-    },
-    isExternal() {
-      return false
-    },
-    async get(name: SpecPath): Promise<Spec | null> {
-      return new Spec('default', name, [])
-    },
-    async list() {
-      return []
-    },
-    async artifact(_spec: Spec, filename: string): Promise<SpecArtifact | null> {
-      const content = artifacts.get(filename)
-      if (content === undefined) return null
-      return new SpecArtifact(filename, content)
-    },
-    async save() {},
-    async delete() {},
-  }
-}
-
-function makeParser(
-  opts: {
-    parse?: (content: string) => ArtifactAST
-    apply?: (
-      ast: ArtifactAST,
-      delta: readonly import('../../../src/application/ports/artifact-parser.js').DeltaEntry[],
-    ) => ArtifactAST
-    serialize?: (ast: ArtifactAST) => string
-    renderSubtree?: (node: ArtifactNode) => string
-    parseDelta?: (
-      content: string,
-    ) => readonly import('../../../src/application/ports/artifact-parser.js').DeltaEntry[]
-  } = {},
-): ArtifactParser {
-  const trivialNode: ArtifactNode = { type: 'root' }
-  const trivialAST: ArtifactAST = { root: trivialNode }
-  return {
-    fileExtensions: ['.md'],
-    parse: opts.parse ?? ((_content) => trivialAST),
-    apply: opts.apply ?? ((ast, _delta) => ast),
-    serialize: opts.serialize ?? ((_ast) => 'serialized'),
-    renderSubtree: opts.renderSubtree ?? ((_node) => 'rendered'),
-    nodeTypes: () => [],
-    outline: () => [],
-    deltaInstructions: () => '',
-    parseDelta: opts.parseDelta ?? ((_content) => []),
-  }
-}
-
-function makeParsers(
-  markdown: ArtifactParser = makeParser(),
-  yaml: ArtifactParser = makeParser(),
-): ArtifactParserRegistry {
-  return new Map([
-    ['markdown', markdown],
-    ['yaml', yaml],
-  ])
 }
 
 function makeChangeWithArtifacts(
@@ -882,12 +780,14 @@ describe('ValidateArtifacts', () => {
         },
       })
 
-      const specArtifacts = new Map([['spec.md', 'base content']])
-      const specsRepo = makeSpecRepository(specArtifacts)
+      const specsRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth'), [])],
+        artifacts: { 'auth/spec.md': 'base content' },
+      })
 
       const uc = new ValidateArtifacts(
         repo,
-        new Map([['default', specsRepo as never]]),
+        new Map([['default', specsRepo]]),
         makeSchemaRegistry(schema),
         makeParsers(parser, yamlParser),
         makeGitAdapter(),
