@@ -49,7 +49,8 @@ function expandVariables(command: string, variables: HookVariables): string {
  * Node.js `child_process` implementation of the {@link HookRunner} port.
  *
  * Expands template variables in the command string before spawning a shell
- * subprocess. Captures stdout and stderr, and returns them along with the
+ * subprocess. Uses `$SHELL` (Unix) or `%COMSPEC%` (Windows) with sensible
+ * fallbacks. Captures stdout and stderr, and returns them along with the
  * process exit code in a {@link HookResult}.
  */
 export class NodeHookRunner implements HookRunner {
@@ -63,7 +64,12 @@ export class NodeHookRunner implements HookRunner {
   run(command: string, variables: HookVariables): Promise<HookResult> {
     const expanded = expandVariables(command, variables)
     return new Promise((resolve) => {
-      execFile('/bin/sh', ['-c', expanded], (error, stdout, stderr) => {
+      const shell =
+        process.platform === 'win32'
+          ? (process.env['COMSPEC'] ?? 'cmd.exe')
+          : (process.env['SHELL'] ?? '/bin/sh')
+      const shellFlag = process.platform === 'win32' ? '/c' : '-c'
+      execFile(shell, [shellFlag, expanded], (error, stdout, stderr) => {
         const exitCode = error?.code != null ? (typeof error.code === 'number' ? error.code : 1) : 0
         resolve(new HookResult(exitCode, stdout, stderr))
       })
