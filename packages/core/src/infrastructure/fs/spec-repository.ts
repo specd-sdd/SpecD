@@ -9,6 +9,7 @@ import {
   type SpecRepositoryConfig,
 } from '../../application/ports/spec-repository.js'
 import { isEnoent } from './is-enoent.js'
+import { writeFileAtomic } from './write-atomic.js'
 import { sha256 } from './hash.js'
 
 /**
@@ -177,7 +178,7 @@ export class FsSpecRepository extends SpecRepository {
       }
     }
 
-    await fs.writeFile(filePath, artifact.content, 'utf8')
+    await writeFileAtomic(filePath, artifact.content)
   }
 
   /**

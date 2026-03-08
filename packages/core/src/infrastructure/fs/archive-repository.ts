@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { ArchivedChange } from '../../domain/entities/archived-change.js'
@@ -13,6 +12,7 @@ import { UnsupportedPatternError } from '../../domain/errors/unsupported-pattern
 import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
 import { changeDirName } from './dir-name.js'
 import { isEnoent } from './is-enoent.js'
+import { writeFileAtomic } from './write-atomic.js'
 import { type ChangeManifest, changeManifestSchema } from './manifest.js'
 
 /** Filename of the append-only archive index at the archive root. */
@@ -255,7 +255,7 @@ export class FsArchiveRepository extends ArchiveRepository {
     const indexPath = path.join(this._archivePath, INDEX_FILE)
     const content = lines.length > 0 ? lines.join('\n') + '\n' : ''
     await fs.mkdir(this._archivePath, { recursive: true })
-    await fs.writeFile(indexPath, content, 'utf8')
+    await writeFileAtomic(indexPath, content)
   }
 
   // ---- Private helpers ----
@@ -357,9 +357,7 @@ export class FsArchiveRepository extends ArchiveRepository {
    */
   private async _writeManifestAtomic(dir: string, manifest: ChangeManifest): Promise<void> {
     const manifestPath = path.join(dir, 'manifest.json')
-    const tmpPath = path.join(dir, `manifest.json.tmp-${process.pid.toString()}-${randomUUID()}`)
-    await fs.writeFile(tmpPath, JSON.stringify(manifest, null, 2), 'utf8')
-    await fs.rename(tmpPath, manifestPath)
+    await writeFileAtomic(manifestPath, JSON.stringify(manifest, null, 2))
   }
 
   /**

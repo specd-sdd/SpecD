@@ -11,6 +11,7 @@ import {
 import { AlreadyInitialisedError } from '../../application/errors/already-initialised-error.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
 import { isEnoent } from './is-enoent.js'
+import { writeFileAtomic } from './write-atomic.js'
 
 /**
  * Filesystem implementation of {@link ConfigWriter}.
@@ -60,7 +61,7 @@ export class FsConfigWriter implements ConfigWriter {
     }
 
     const yamlContent = yamlStringify(configDoc, { lineWidth: 0 })
-    await fs.writeFile(configPath, yamlContent, 'utf8')
+    await writeFileAtomic(configPath, yamlContent)
 
     // Create storage directories
     const storageBase = path.join(options.projectRoot, '.specd')
@@ -107,7 +108,7 @@ export class FsConfigWriter implements ConfigWriter {
     skills[agent] = merged
     doc.set('skills', skills)
 
-    await fs.writeFile(configPath, doc.toString(), 'utf8')
+    await writeFileAtomic(configPath, doc.toString())
   }
 
   /**
@@ -189,6 +190,6 @@ async function appendToGitignore(gitignorePath: string, entry: string): Promise<
       existing.endsWith('\n') || existing === ''
         ? `${existing}${entry}\n`
         : `${existing}\n${entry}\n`
-    await fs.writeFile(gitignorePath, newContent, 'utf8')
+    await writeFileAtomic(gitignorePath, newContent)
   }
 }
