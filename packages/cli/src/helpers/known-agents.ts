@@ -14,4 +14,12 @@ export const KNOWN_AGENTS: Record<string, AgentDirs> = {
     projectDir: (root) => path.join(root, '.claude', 'commands'),
     globalDir: path.join(os.homedir(), '.claude', 'commands'),
   },
+  copilot: {
+    projectDir: (root) => path.join(root, '.github'),
+    globalDir: path.join(os.homedir(), '.github'),
+  },
+  codex: {
+    projectDir: (root) => path.join(root, '.codex'),
+    globalDir: path.join(os.homedir(), '.codex'),
+  },
 }
