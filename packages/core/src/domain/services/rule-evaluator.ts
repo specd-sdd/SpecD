@@ -308,9 +308,10 @@ function evaluateRule(
   const nodes = selectNodes(root, rule)
   if (nodes.length === 0) {
     const desc = JSON.stringify(rule.selector ?? rule.path ?? {})
-    if (rule.required === true) {
+    const isRequired = rule.required ?? true
+    if (isRequired) {
       failures.push({ artifactId, description: `Required rule not satisfied: ${desc}` })
-    } else if (rule.required === false) {
+    } else {
       warnings.push({ artifactId, description: `Optional rule not satisfied: ${desc}` })
     }
     return
