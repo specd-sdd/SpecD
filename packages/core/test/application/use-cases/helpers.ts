@@ -1,7 +1,14 @@
 import { Change, type GitIdentity } from '../../../src/domain/entities/change.js'
+import { type Spec } from '../../../src/domain/entities/spec.js'
+import { type SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { type ChangeRepository } from '../../../src/application/ports/change-repository.js'
+import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
+import { type SchemaRegistry, type Schema } from '../../../src/application/ports/schema-registry.js'
+import { type FileReader } from '../../../src/application/ports/file-reader.js'
+import { type HookRunner } from '../../../src/application/ports/hook-runner.js'
+import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
 import { type GitAdapter } from '../../../src/application/ports/git-adapter.js'
-import { type SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
+import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 
 /** Default git identity for test actors. */
 export const testActor: GitIdentity = { name: 'Test User', email: 'test@example.com' }
@@ -99,4 +106,94 @@ export function makeChange(
     specIds: opts.specIds ?? ['auth/login'],
     history: [],
   })
+}
+
+/**
+ * Creates a mock `SpecRepository` backed by in-memory arrays.
+ *
+ * All abstract methods are implemented. `save` and `delete` are no-ops by
+ * default — override via the `overrides` parameter for specific tests.
+ */
+export function makeSpecRepository(
+  overrides: {
+    specs?: Spec[]
+    artifacts?: Record<string, string | null>
+    save?: (spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>
+    delete?: (spec: Spec) => Promise<void>
+  } = {},
+): SpecRepository {
+  const specs = overrides.specs ?? []
+  const artifacts = overrides.artifacts ?? {}
+
+  const repo = {
+    workspace() {
+      return 'default'
+    },
+    ownership() {
+      return 'owned' as const
+    },
+    isExternal() {
+      return false
+    },
+    async get(name: SpecPath): Promise<Spec | null> {
+      return specs.find((s) => s.name.toString() === name.toString()) ?? null
+    },
+    async list(prefix?: SpecPath): Promise<Spec[]> {
+      if (prefix === undefined) return specs
+      const prefixStr = prefix.toString()
+      return specs.filter((s) => {
+        const p = s.name.toString()
+        return p === prefixStr || p.startsWith(`${prefixStr}/`)
+      })
+    },
+    async artifact(_spec: Spec, filename: string): Promise<SpecArtifact | null> {
+      const key = `${_spec.name.toString()}/${filename}`
+      const content = artifacts[key]
+      if (content === undefined || content === null) return null
+      return new SpecArtifact(filename, content)
+    },
+    async save(spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }): Promise<void> {
+      if (overrides.save) return overrides.save(spec, artifact, options)
+    },
+    async delete(spec: Spec): Promise<void> {
+      if (overrides.delete) return overrides.delete(spec)
+    },
+  }
+  return repo as unknown as SpecRepository
+}
+
+/**
+ * Creates a mock `SchemaRegistry` that returns a fixed schema on `resolve()`.
+ */
+export function makeSchemaRegistry(schema: Schema | null = null): SchemaRegistry {
+  return {
+    async resolve(): Promise<Schema | null> {
+      return schema
+    },
+    async list() {
+      return []
+    },
+  }
+}
+
+/**
+ * Creates a mock `FileReader` backed by an in-memory map.
+ */
+export function makeFileReader(files: Record<string, string> = {}): FileReader {
+  return {
+    async read(absolutePath: string): Promise<string | null> {
+      return files[absolutePath] ?? null
+    },
+  }
+}
+
+/**
+ * Creates a mock `HookRunner` with a fixed exit code and stderr.
+ */
+export function makeHookRunner(exitCode = 0, stderr = ''): HookRunner {
+  return {
+    async run(): Promise<HookResult> {
+      return new HookResult(exitCode, '', stderr)
+    },
+  }
 }

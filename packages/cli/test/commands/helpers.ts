@@ -10,6 +10,19 @@ import { Command } from 'commander'
 import type { SpecdConfig, Kernel } from '@specd/core'
 
 /**
+ * Mirrors the {@link Kernel} shape but with every `execute` replaced by a
+ * Vitest mock, so callers can use `.mockResolvedValue()` etc. without casts.
+ *
+ * Uses `ReturnType<typeof vi.fn>` rather than `Mock` to preserve the widened
+ * mock API while keeping the intersection with `Kernel` compatible.
+ */
+export type MockKernel = {
+  [G in keyof Kernel]: {
+    [K in keyof Kernel[G]]: { execute: ReturnType<typeof vi.fn> }
+  }
+}
+
+/**
  * Sentinel thrown by the `mockProcessExit` mock so code under test does
  * not keep executing after a `process.exit()` call.
  */
@@ -45,9 +58,8 @@ export function makeMockConfig(overrides: Partial<SpecdConfig> = {}): SpecdConfi
         name: 'default',
         specsPath: '/project/specs',
         schemasPath: null,
-        storagePath: '/project/.specd/default',
-        ownership: [],
-        contextIncludeSpecs: false,
+        codeRoot: '/project',
+        ownership: 'owned' as const,
         isExternal: false,
       },
     ],
@@ -57,11 +69,9 @@ export function makeMockConfig(overrides: Partial<SpecdConfig> = {}): SpecdConfi
       discardedPath: '/project/.specd/discarded',
       archivePath: '/project/.specd/archive',
     },
-    context: [],
     approvals: { spec: false, signoff: false },
-    hooks: {},
     ...overrides,
-  } as unknown as SpecdConfig
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +100,7 @@ export function makeMockChange(overrides: Record<string, unknown> = {}): Record<
 // Mock kernel factory
 // ---------------------------------------------------------------------------
 
-export function makeMockKernel(overrides: Record<string, unknown> = {}): any {
+export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel & MockKernel {
   const changes = {
     create: { execute: vi.fn() },
     list: { execute: vi.fn().mockResolvedValue([]) },
@@ -131,7 +141,7 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): any {
     },
   }
 
-  return { changes, specs, project, ...overrides }
+  return { changes, specs, project, ...overrides } as unknown as Kernel & MockKernel
 }
 
 // ---------------------------------------------------------------------------

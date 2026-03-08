@@ -217,23 +217,48 @@ function makeSut(opts: {
   schemaRegistry: SchemaRegistry
 } {
   const { change, schema, specRepos, fileReader, parsers } = opts
-  const changeRepo = {
-    get: async (name: string) => (name === (change?.name ?? 'my-change') ? (change ?? null) : null),
-  } as unknown as ChangeRepository
-
-  const schemaRegistry = {
-    resolve: async () => schema ?? null,
-  } as unknown as SchemaRegistry
+  const changeRepo = makeStubChangeRepo(change)
+  const schemaRegistry = makeStubSchemaRegistry(schema ?? null)
 
   const sut = new CompileContext(
     changeRepo,
     specRepos ?? new Map(),
     schemaRegistry,
-    fileReader ?? ({ read: async () => null } as unknown as FileReader),
+    fileReader ?? makeStubFileReader(),
     parsers ?? (new Map() as ArtifactParserRegistry),
   )
 
   return { sut, changeRepo, schemaRegistry }
+}
+
+function makeStubChangeRepo(change?: Change): ChangeRepository {
+  const repo = {
+    workspace: () => 'default',
+    ownership: () => 'owned' as const,
+    isExternal: () => false,
+    get: async (name: string) => (name === (change?.name ?? 'my-change') ? (change ?? null) : null),
+    list: async () => [],
+    listDrafts: async () => [],
+    listDiscarded: async () => [],
+    save: async () => {},
+    delete: async () => {},
+    artifact: async () => null,
+    saveArtifact: async () => {},
+  }
+  return repo as unknown as ChangeRepository
+}
+
+function makeStubSchemaRegistry(schema: Schema | null): SchemaRegistry {
+  return {
+    resolve: async () => schema,
+    list: async () => [],
+  }
+}
+
+function makeStubFileReader(files: Record<string, string> = {}): FileReader {
+  return {
+    read: async (path: string) => files[path] ?? null,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -246,10 +271,10 @@ describe('CompileContext', () => {
       expect(
         () =>
           new CompileContext(
-            {} as unknown as ChangeRepository,
+            makeStubChangeRepo(),
             new Map(),
-            {} as unknown as SchemaRegistry,
-            {} as unknown as FileReader,
+            makeStubSchemaRegistry(null),
+            makeStubFileReader(),
             new Map() as ArtifactParserRegistry,
           ),
       ).not.toThrow()
@@ -258,14 +283,11 @@ describe('CompileContext', () => {
 
   describe('Requirement: Input — error handling', () => {
     it('throws ChangeNotFoundError when change is not found', async () => {
-      const changeRepo = {
-        get: async () => null,
-      } as unknown as ChangeRepository
       const sut = new CompileContext(
-        changeRepo,
+        makeStubChangeRepo(),
         new Map(),
-        { resolve: async () => makeSchema() } as unknown as SchemaRegistry,
-        { read: async () => null } as unknown as FileReader,
+        makeStubSchemaRegistry(makeSchema()),
+        makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
       )
       await expect(
@@ -281,14 +303,11 @@ describe('CompileContext', () => {
 
     it('throws SchemaNotFoundError when schema cannot be resolved', async () => {
       const change = makeChange('my-change')
-      const changeRepo = {
-        get: async () => change,
-      } as unknown as ChangeRepository
       const sut = new CompileContext(
-        changeRepo,
+        makeStubChangeRepo(change),
         new Map(),
-        { resolve: async () => null } as unknown as SchemaRegistry,
-        { read: async () => null } as unknown as FileReader,
+        makeStubSchemaRegistry(null),
+        makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
       )
       await expect(
@@ -745,7 +764,7 @@ describe('CompileContext', () => {
       })
       const fileReader: FileReader = {
         read: async (path: string) => (path === 'specd-bootstrap.md' ? '# specd Bootstrap' : null),
-      } as unknown as FileReader
+      }
 
       const { sut } = makeSut({ change, schema, fileReader })
 
@@ -772,7 +791,7 @@ describe('CompileContext', () => {
       const schema = makeSchema()
       const fileReader: FileReader = {
         read: async () => null,
-      } as unknown as FileReader
+      }
 
       const { sut } = makeSut({ change, schema, fileReader })
 
@@ -1104,7 +1123,7 @@ describe('CompileContext', () => {
           if (path === 'specd-bootstrap.md') return 'Bootstrap content'
           return null
         },
-      } as unknown as FileReader
+      }
 
       const { sut } = makeSut({ change, schema, fileReader })
 

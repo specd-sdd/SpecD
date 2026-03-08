@@ -10,7 +10,7 @@ function makeConfig(
     schemaRef: '@specd/schema-std',
     workspaces: workspaces.map((ws) => ({
       name: ws.name,
-      prefix: ws.prefix,
+      ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
       specsPath: ws.specsPath,
       schemasPath: null,
       codeRoot: '/project',
@@ -24,7 +24,7 @@ function makeConfig(
       archivePath: '/project/.specd/archive',
     },
     approvals: { spec: false, signoff: false },
-  } as unknown as SpecdConfig
+  }
 }
 
 describe('resolveSpecPath', () => {

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { EmptySpecIdsError } from '@specd/core'
 import {
@@ -162,7 +162,7 @@ describe('change edit', () => {
     ])
 
     expect(stdout()).toContain('updated change feat')
-    const call = kernel.changes.edit.execute.mock.calls[0][0]
+    const call = kernel.changes.edit.execute.mock.calls[0]![0]
     expect(call).toBeDefined()
   })
 

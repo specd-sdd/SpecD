@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Command } from 'commander'
 import { ChangeNotFoundError, InvalidStateTransitionError } from '@specd/core'
@@ -225,7 +225,7 @@ describe('change create', () => {
       'auth/logout',
     ])
 
-    const call = kernel.changes.create.execute.mock.calls[0][0]
+    const call = kernel.changes.create.execute.mock.calls[0]![0]
     expect(call.specIds).toContain('default:auth/login')
     expect(call.specIds).toContain('default:auth/logout')
     expect(call.name).toBe('feat')
@@ -274,7 +274,7 @@ describe('change create', () => {
       'auth/login',
     ])
 
-    const call = kernel.changes.create.execute.mock.calls[0][0]
+    const call = kernel.changes.create.execute.mock.calls[0]![0]
     expect(call.workspaces).toContain('default')
   })
 
@@ -567,7 +567,7 @@ describe('change transition', () => {
     registerChangeTransition(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'transition', 'feat', 'implementing'])
 
-    const call = kernel.changes.transition.execute.mock.calls[0][0]
+    const call = kernel.changes.transition.execute.mock.calls[0]![0]
     expect(call.approvalsSpec).toBe(true)
     expect(call.approvalsSignoff).toBe(false)
   })
@@ -614,7 +614,7 @@ describe('change draft', () => {
       'pausing work',
     ])
 
-    const call = kernel.changes.draft.execute.mock.calls[0][0]
+    const call = kernel.changes.draft.execute.mock.calls[0]![0]
     expect(call.reason).toBe('pausing work')
   })
 
@@ -627,7 +627,7 @@ describe('change draft', () => {
     registerChangeDraft(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'draft', 'my-change'])
 
-    const call = kernel.changes.draft.execute.mock.calls[0][0]
+    const call = kernel.changes.draft.execute.mock.calls[0]![0]
     expect('reason' in call).toBe(false)
   })
 
@@ -752,7 +752,7 @@ describe('change discard', () => {
       'duplicate work',
     ])
 
-    const call = kernel.changes.discard.execute.mock.calls[0][0]
+    const call = kernel.changes.discard.execute.mock.calls[0]![0]
     expect(call.reason).toBe('duplicate work')
   })
 
@@ -834,7 +834,7 @@ describe('drafts restore', () => {
     registerDraftsRestore(program.command('drafts'))
     await program.parseAsync(['node', 'specd', 'drafts', 'restore', 'feat-xyz'])
 
-    expect(kernel.changes.restore.execute.mock.calls[0][0].name).toBe('feat-xyz')
+    expect(kernel.changes.restore.execute.mock.calls[0]![0].name).toBe('feat-xyz')
   })
 
   it('exits 1 when change not found', async () => {
