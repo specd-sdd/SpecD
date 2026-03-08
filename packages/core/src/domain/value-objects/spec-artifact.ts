@@ -23,6 +23,7 @@ export class SpecArtifact {
   private readonly _filename: string
   private readonly _content: string
   private readonly _originalHash: string | undefined
+  private _sections: Map<string, string> | undefined
 
   /**
    * Creates a new `SpecArtifact`.
@@ -73,6 +74,17 @@ export class SpecArtifact {
    * @returns A `Map` from section name to trimmed section content
    */
   sections(): Map<string, string> {
+    if (this._sections !== undefined) return new Map(this._sections)
+    this._sections = this._parseSections()
+    return new Map(this._sections)
+  }
+
+  /**
+   * Parses `## Section` headings into a map of name → body.
+   *
+   * @returns A `Map` from section name to trimmed section content
+   */
+  private _parseSections(): Map<string, string> {
     const result = new Map<string, string>()
     const lines = this._content.split('\n')
 
