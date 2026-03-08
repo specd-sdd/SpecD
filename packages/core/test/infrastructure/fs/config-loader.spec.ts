@@ -540,4 +540,57 @@ context:
       expect(config.context).toBeUndefined()
     })
   })
+
+  describe('Requirement: Storage paths must remain within repo root', () => {
+    it('throws ConfigValidationError when a storage path resolves outside the git root', async () => {
+      // Create a fake git repo so findGitRoot returns tmpDir
+      await fs.mkdir(path.join(tmpDir, '.git'), { recursive: true })
+
+      const yaml = `
+schema: "@specd/schema-std"
+
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: ../../outside-repo/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim()
+
+      const configPath = await writeConfig(yaml)
+      const loader = new FsConfigLoader({ configPath })
+
+      await expect(loader.load()).rejects.toThrow(
+        /storage path 'changes' resolves outside repo root/,
+      )
+    })
+
+    it('accepts storage paths that are within the git root', async () => {
+      await fs.mkdir(path.join(tmpDir, '.git'), { recursive: true })
+
+      const configPath = await writeConfig(minimalYaml())
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.storage.changesPath).toContain('.specd')
+    })
+  })
 })
