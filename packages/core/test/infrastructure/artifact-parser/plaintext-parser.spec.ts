@@ -25,25 +25,27 @@ describe('PlaintextParser', () => {
       expect(ast.root.children).toEqual([])
     })
 
-    it('parses single paragraph', () => {
+    it('parses single paragraph with line children', () => {
       const ast = parser.parse('Hello world')
       expect(ast.root.children).toHaveLength(1)
-      expect(ast.root.children![0]).toMatchObject({ type: 'paragraph', value: 'Hello world' })
+      expect(ast.root.children![0]!.type).toBe('paragraph')
+      expect(ast.root.children![0]!.children).toEqual([{ type: 'line', value: 'Hello world' }])
     })
 
     it('parses multiple paragraphs separated by double newlines', () => {
       const ast = parser.parse('First paragraph.\n\nSecond paragraph.')
       expect(ast.root.children).toHaveLength(2)
-      expect(ast.root.children![0]).toMatchObject({ type: 'paragraph', value: 'First paragraph.' })
-      expect(ast.root.children![1]).toMatchObject({ type: 'paragraph', value: 'Second paragraph.' })
+      expect(ast.root.children![0]!.type).toBe('paragraph')
+      expect(ast.root.children![1]!.type).toBe('paragraph')
     })
 
-    it('preserves internal newlines within a paragraph', () => {
+    it('creates line children for multi-line paragraphs', () => {
       const ast = parser.parse('Line one\nLine two')
-      expect(ast.root.children![0]).toMatchObject({
-        type: 'paragraph',
-        value: 'Line one\nLine two',
-      })
+      const para = ast.root.children![0]!
+      expect(para.type).toBe('paragraph')
+      expect(para.children).toHaveLength(2)
+      expect(para.children![0]).toMatchObject({ type: 'line', value: 'Line one' })
+      expect(para.children![1]).toMatchObject({ type: 'line', value: 'Line two' })
     })
   })
 
@@ -77,7 +79,7 @@ describe('PlaintextParser', () => {
         },
       ])
       expect(result.root.children).toHaveLength(2)
-      expect(result.root.children![1]).toMatchObject({ type: 'paragraph', value: 'Second.' })
+      expect(parser.serialize(result)).toBe('First.\n\nSecond.')
     })
 
     it('removed: detaches a matched paragraph', () => {

@@ -32,6 +32,7 @@ export class PlaintextParser implements ArtifactParser {
       .map((p) => ({
         type: 'paragraph',
         value: p,
+        children: p.split('\n').map((line) => ({ type: 'line', value: line })),
       }))
     return { root: { type: 'document', children } }
   }
@@ -65,7 +66,7 @@ export class PlaintextParser implements ArtifactParser {
    */
   serialize(ast: ArtifactAST): string {
     const children = ast.root.children ?? []
-    return children.map((c) => (typeof c.value === 'string' ? c.value : '')).join('\n\n')
+    return children.map((c) => this._serializeParagraph(c)).join('\n\n')
   }
 
   /**
@@ -78,9 +79,10 @@ export class PlaintextParser implements ArtifactParser {
     switch (node.type) {
       case 'document': {
         const children = node.children ?? []
-        return children.map((c) => (typeof c.value === 'string' ? c.value : '')).join('\n\n')
+        return children.map((c) => this._serializeParagraph(c)).join('\n\n')
       }
       case 'paragraph':
+        return this._serializeParagraph(node)
       case 'line':
         return typeof node.value === 'string' ? node.value : ''
       default:
@@ -172,5 +174,18 @@ Plain text files are parsed into paragraph nodes separated by blank lines.
    */
   parseDelta(): readonly DeltaEntry[] {
     return []
+  }
+
+  /**
+   * Serializes a paragraph node by joining its `line` children, falling back to `value`.
+   *
+   * @param node - The paragraph node to serialize
+   * @returns The plain text of the paragraph
+   */
+  private _serializeParagraph(node: ArtifactNode): string {
+    if (node.children && node.children.length > 0) {
+      return node.children.map((l) => (typeof l.value === 'string' ? l.value : '')).join('\n')
+    }
+    return typeof node.value === 'string' ? node.value : ''
   }
 }
