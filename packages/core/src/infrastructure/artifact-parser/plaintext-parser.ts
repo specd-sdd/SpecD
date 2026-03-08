@@ -25,7 +25,8 @@ export class PlaintextParser implements ArtifactParser {
     if (content.trim() === '') {
       return { root: { type: 'document', children: [] } }
     }
-    const paragraphs = content.split(/\n\n/)
+    const normalized = content.replace(/\r\n/g, '\n')
+    const paragraphs = normalized.split(/\n\n/)
     const children: ArtifactNode[] = paragraphs
       .filter((p) => p.trim() !== '')
       .map((p) => ({
