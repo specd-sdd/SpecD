@@ -33,6 +33,7 @@ export function createGetProjectContext(
       path.join(config.projectRoot, 'node_modules'),
       ...(kernelOpts?.extraNodeModulesPaths ?? []),
     ],
+    configDir: config.projectRoot,
   })
   const files = new FsFileReader()
   const parsers = createArtifactParserRegistry()

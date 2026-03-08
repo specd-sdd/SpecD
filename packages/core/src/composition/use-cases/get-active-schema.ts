@@ -6,6 +6,7 @@ import { createSchemaRegistry } from '../schema-registry.js'
 /** Filesystem adapter options for `createGetActiveSchema(options)`. */
 export interface FsGetActiveSchemaOptions {
   readonly nodeModulesPaths: readonly string[]
+  readonly configDir: string
 }
 
 /** Extra options when constructing from a `SpecdConfig`. */
@@ -48,9 +49,13 @@ export function createGetActiveSchema(
         path.join(configOrOptions.projectRoot, 'node_modules'),
         ...(kernelOpts?.extraNodeModulesPaths ?? []),
       ],
+      configDir: configOrOptions.projectRoot,
     })
     return new GetActiveSchema(schemas)
   }
-  const schemas = createSchemaRegistry('fs', { nodeModulesPaths: configOrOptions.nodeModulesPaths })
+  const schemas = createSchemaRegistry('fs', {
+    nodeModulesPaths: configOrOptions.nodeModulesPaths,
+    configDir: configOrOptions.configDir,
+  })
   return new GetActiveSchema(schemas)
 }

@@ -10,6 +10,7 @@ import { createArtifactParserRegistry } from '../../infrastructure/artifact-pars
 export interface FsValidateSpecsOptions {
   readonly specRepositories: ReadonlyMap<string, SpecRepository>
   readonly nodeModulesPaths: readonly string[]
+  readonly configDir: string
 }
 
 /**
@@ -61,9 +62,13 @@ export function createValidateSpecs(
         path.join(config.projectRoot, 'node_modules'),
         ...(kernelOpts?.extraNodeModulesPaths ?? []),
       ],
+      configDir: config.projectRoot,
     })
   }
-  const schemas = createSchemaRegistry('fs', { nodeModulesPaths: configOrOptions.nodeModulesPaths })
+  const schemas = createSchemaRegistry('fs', {
+    nodeModulesPaths: configOrOptions.nodeModulesPaths,
+    configDir: configOrOptions.configDir,
+  })
   const parsers = createArtifactParserRegistry()
   return new ValidateSpecs(configOrOptions.specRepositories, schemas, parsers)
 }

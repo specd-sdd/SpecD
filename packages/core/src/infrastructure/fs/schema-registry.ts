@@ -33,6 +33,12 @@ export interface FsSchemaRegistryConfig {
    * has no local copy.
    */
   readonly nodeModulesPaths: readonly string[]
+
+  /**
+   * The project root directory (i.e. the directory containing `specd.yaml`).
+   * Relative schema paths (`./foo`, `../bar`) are resolved against this.
+   */
+  readonly configDir: string
 }
 
 // ---------------------------------------------------------------------------
@@ -314,6 +320,7 @@ function formatZodPath(issuePath: ReadonlyArray<string | number>): string {
  */
 export class FsSchemaRegistry implements SchemaRegistry {
   private readonly _nodeModulesPaths: readonly string[]
+  private readonly _configDir: string
 
   /**
    * Creates a new `FsSchemaRegistry`.
@@ -322,6 +329,7 @@ export class FsSchemaRegistry implements SchemaRegistry {
    */
   constructor(config: FsSchemaRegistryConfig) {
     this._nodeModulesPaths = config.nodeModulesPaths
+    this._configDir = config.configDir
   }
 
   /**
@@ -497,6 +505,7 @@ export class FsSchemaRegistry implements SchemaRegistry {
    * @param ref - The schema reference string
    * @param workspaceSchemasPaths - Map of workspace name to its resolved `schemasPath`
    * @returns Absolute path to the schema YAML file
+   * @throws {SchemaValidationError} When a `#workspace:name` ref references an unknown workspace
    */
   private _resolveFilePath(
     ref: string,
@@ -507,8 +516,10 @@ export class FsSchemaRegistry implements SchemaRegistry {
       const colonIdx = inner.indexOf(':')
       const workspace = colonIdx >= 0 ? inner.slice(0, colonIdx) : 'default'
       const name = colonIdx >= 0 ? inner.slice(colonIdx + 1) : inner
-      const schemasPath =
-        workspaceSchemasPaths.get(workspace) ?? workspaceSchemasPaths.get('default') ?? ''
+      const schemasPath = workspaceSchemasPaths.get(workspace)
+      if (schemasPath === undefined) {
+        throw new SchemaValidationError(ref, `workspace '${workspace}' not found in schema paths`)
+      }
       return path.join(schemasPath, name, 'schema.yaml')
     }
 
@@ -517,7 +528,7 @@ export class FsSchemaRegistry implements SchemaRegistry {
     }
 
     if (ref.startsWith('./') || ref.startsWith('../')) {
-      return path.resolve(ref)
+      return path.resolve(this._configDir, ref)
     }
 
     const schemasPath = workspaceSchemasPaths.get('default') ?? ''

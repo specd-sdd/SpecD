@@ -21,7 +21,7 @@ async function setupRegistry(): Promise<RegistryContext> {
   const defaultSchemasPath = path.join(tmpDir, 'schemas', 'default')
   await fs.mkdir(nodeModulesPath, { recursive: true })
   await fs.mkdir(defaultSchemasPath, { recursive: true })
-  const registry = new FsSchemaRegistry({ nodeModulesPaths: [nodeModulesPath] })
+  const registry = new FsSchemaRegistry({ nodeModulesPaths: [nodeModulesPath], configDir: tmpDir })
   const workspaceSchemasPaths = new Map([['default', defaultSchemasPath]])
   return { registry, tmpDir, nodeModulesPath, defaultSchemasPath, workspaceSchemasPaths }
 }
@@ -501,5 +501,29 @@ describe('list — missing schemas path returns empty', () => {
     const paths = new Map([['default', path.join(ctx.tmpDir, 'nonexistent')]])
     const entries = await ctx.registry.list(paths)
     expect(entries).toHaveLength(0)
+  })
+})
+
+describe('resolve — workspace-qualified ref with unknown workspace', () => {
+  it('throws SchemaValidationError for unknown workspace in # ref', async () => {
+    await expect(
+      ctx.registry.resolve('#nonexistent:my-schema', ctx.workspaceSchemasPaths),
+    ).rejects.toThrow(/workspace 'nonexistent' not found/)
+  })
+})
+
+describe('resolve — relative path resolves from configDir', () => {
+  it('resolves ./ paths relative to configDir, not cwd', async () => {
+    const schemaContent = `
+name: relative-schema
+version: 1
+artifacts: []
+`.trim()
+    await fs.mkdir(path.join(ctx.tmpDir, 'custom'), { recursive: true })
+    await fs.writeFile(path.join(ctx.tmpDir, 'custom', 'schema.yaml'), schemaContent, 'utf-8')
+
+    const result = await ctx.registry.resolve('./custom/schema.yaml', ctx.workspaceSchemasPaths)
+    expect(result).not.toBeNull()
+    expect(result!.name()).toBe('relative-schema')
   })
 })

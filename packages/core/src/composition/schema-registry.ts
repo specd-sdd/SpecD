@@ -12,6 +12,12 @@ export interface FsSchemaRegistryOptions {
    * as a fallback.
    */
   readonly nodeModulesPaths: readonly string[]
+
+  /**
+   * The project root directory (directory containing `specd.yaml`).
+   * Relative schema paths are resolved against this.
+   */
+  readonly configDir: string
 }
 
 /**
@@ -27,6 +33,9 @@ export interface FsSchemaRegistryOptions {
 export function createSchemaRegistry(type: 'fs', options: FsSchemaRegistryOptions): SchemaRegistry {
   switch (type) {
     case 'fs':
-      return new FsSchemaRegistry({ nodeModulesPaths: options.nodeModulesPaths })
+      return new FsSchemaRegistry({
+        nodeModulesPaths: options.nodeModulesPaths,
+        configDir: options.configDir,
+      })
   }
 }

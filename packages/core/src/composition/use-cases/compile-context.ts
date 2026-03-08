@@ -40,6 +40,8 @@ export interface FsCompileContextOptions {
   readonly specRepositories: ReadonlyMap<string, SpecRepository>
   /** Absolute path to the `node_modules` directory for schema resolution. */
   readonly nodeModulesPaths: readonly string[]
+  /** Project root directory for resolving relative schema paths. */
+  readonly configDir: string
 }
 
 /**
@@ -105,6 +107,7 @@ export function createCompileContext(
           path.join(config.projectRoot, 'node_modules'),
           ...(kernelOpts?.extraNodeModulesPaths ?? []),
         ],
+        configDir: config.projectRoot,
       },
     )
   }
@@ -114,7 +117,10 @@ export function createCompileContext(
     draftsPath: opts.draftsPath,
     discardedPath: opts.discardedPath,
   })
-  const schemas = createSchemaRegistry('fs', { nodeModulesPaths: opts.nodeModulesPaths })
+  const schemas = createSchemaRegistry('fs', {
+    nodeModulesPaths: opts.nodeModulesPaths,
+    configDir: opts.configDir,
+  })
   const files = new FsFileReader()
   const parsers = createArtifactParserRegistry()
   return new CompileContext(changeRepo, opts.specRepositories, schemas, files, parsers)
