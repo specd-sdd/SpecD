@@ -1,4 +1,5 @@
 export { applyPreHashCleanup } from './pre-hash-cleanup.js'
+export { parseSpecId } from './parse-spec-id.js'
 export { extractSpecSummary } from './spec-summary.js'
 export { inferFormat } from './format-inference.js'
 export { safeRegex } from './safe-regex.js'

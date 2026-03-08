@@ -14,6 +14,7 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type Selector } from '../../domain/value-objects/selector.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { specMetadataSchema } from './_shared/spec-metadata-schema.js'
 import {
   type CompileContextConfig,
@@ -626,9 +627,7 @@ export class GetProjectContext {
     const newAncestors = new Set([...ancestors, key])
 
     for (const dep of metadata.dependsOn ?? []) {
-      const colonIdx = dep.indexOf(':')
-      const depWorkspace = colonIdx >= 0 ? dep.slice(0, colonIdx) : workspace
-      const depCapPath = colonIdx >= 0 ? dep.slice(colonIdx + 1) : dep
+      const { workspace: depWorkspace, capPath: depCapPath } = parseSpecId(dep, workspace)
 
       await this._traverseDependsOn(
         depWorkspace,

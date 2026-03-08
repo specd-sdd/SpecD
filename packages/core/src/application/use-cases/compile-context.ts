@@ -16,6 +16,7 @@ import { type WorkflowStep } from '../../domain/value-objects/workflow-step.js'
 import { type Selector } from '../../domain/value-objects/selector.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { specMetadataSchema } from './_shared/spec-metadata-schema.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
@@ -247,7 +248,7 @@ export class CompileContext {
     if (input.followDeps === true) {
       const depSeen = new Set<string>()
       for (const ctxSpecId of change.contextSpecIds) {
-        const { workspace: ctxWs, capPath: ctxCapPath } = this._parseSpecId(ctxSpecId)
+        const { workspace: ctxWs, capPath: ctxCapPath } = parseSpecId(ctxSpecId)
         await this._traverseDependsOn(
           ctxWs,
           ctxCapPath,
@@ -341,7 +342,7 @@ export class CompileContext {
         // Existing artifact outlines
         const outlineParts: string[] = []
         for (const specId of change.specIds) {
-          const { workspace, capPath } = this._parseSpecId(specId)
+          const { workspace, capPath } = parseSpecId(specId)
           if (!capPath) continue
 
           const specRepo = this._specs.get(workspace)
@@ -766,9 +767,7 @@ export class CompileContext {
     const newAncestors = new Set([...ancestors, key])
 
     for (const dep of metadata.dependsOn ?? []) {
-      const colonIdx = dep.indexOf(':')
-      const depWorkspace = colonIdx >= 0 ? dep.slice(0, colonIdx) : workspace
-      const depCapPath = colonIdx >= 0 ? dep.slice(colonIdx + 1) : dep
+      const { workspace: depWorkspace, capPath: depCapPath } = parseSpecId(dep, workspace)
 
       await this._traverseDependsOn(
         depWorkspace,
@@ -914,18 +913,5 @@ export class CompileContext {
     }
     render(entries, 0)
     return lines.join('\n')
-  }
-
-  /**
-   * Splits a `workspace:capPath` spec ID into its components.
-   *
-   * @param specId - Spec ID in canonical `workspace:capPath` format
-   * @returns The workspace and capability path
-   */
-  private _parseSpecId(specId: string): { workspace: string; capPath: string } {
-    const colonIdx = specId.indexOf(':')
-    return colonIdx >= 0
-      ? { workspace: specId.slice(0, colonIdx), capPath: specId.slice(colonIdx + 1) }
-      : { workspace: 'default', capPath: specId }
   }
 }

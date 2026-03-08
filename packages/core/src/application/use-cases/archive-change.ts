@@ -13,6 +13,7 @@ import { type SchemaRegistry } from '../ports/schema-registry.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
@@ -144,9 +145,7 @@ export class ArchiveChange {
     const yamlParser = this._parsers.get('yaml')
 
     for (const specId of change.specIds) {
-      const colonIdx = specId.indexOf(':')
-      const workspace = colonIdx >= 0 ? specId.slice(0, colonIdx) : 'default'
-      const capabilityPath = colonIdx >= 0 ? specId.slice(colonIdx + 1) : specId
+      const { workspace, capPath: capabilityPath } = parseSpecId(specId)
       const specRepo = this._specs.get(workspace)
       if (specRepo === undefined) continue
 

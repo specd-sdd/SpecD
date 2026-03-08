@@ -1,6 +1,7 @@
 import { parse as parseYaml } from 'yaml'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { type ContextWarning } from './compile-context.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { specMetadataSchema } from './_shared/spec-metadata-schema.js'
@@ -263,9 +264,7 @@ export class GetSpecContext {
     if (maxDepth !== undefined && currentDepth >= maxDepth) return
 
     for (const dep of metadata.dependsOn) {
-      const colonIdx = dep.indexOf(':')
-      const depWorkspace = colonIdx >= 0 ? dep.slice(0, colonIdx) : defaultWorkspace
-      const depCapPath = colonIdx >= 0 ? dep.slice(colonIdx + 1) : dep
+      const { workspace: depWorkspace, capPath: depCapPath } = parseSpecId(dep, defaultWorkspace)
       const depLabel = `${depWorkspace}:${depCapPath}`
 
       if (seen.has(depLabel)) continue
