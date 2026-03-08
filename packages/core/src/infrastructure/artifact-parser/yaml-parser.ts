@@ -10,6 +10,7 @@ import {
   type OutlineEntry,
 } from '../../application/ports/artifact-parser.js'
 import { SchemaValidationError } from '../../domain/errors/schema-validation-error.js'
+import { ArtifactParseError } from '../../domain/errors/artifact-parse-error.js'
 import { applyDelta } from './_shared/apply-delta.js'
 
 const selectorSchema: z.ZodType<unknown> = z.lazy(() =>
@@ -305,9 +306,15 @@ export class YamlParser implements ArtifactParser {
    *
    * @param content - The YAML content to parse
    * @returns The normalized AST with a `document` root node
+   * @throws {ArtifactParseError} When the content is not valid YAML
    */
   parse(content: string): ArtifactAST {
-    const doc = parseDocument(content)
+    let doc: Document
+    try {
+      doc = parseDocument(content)
+    } catch (err) {
+      throw new ArtifactParseError('yaml', (err as Error).message)
+    }
     return documentToArtifactAST(doc, content)
   }
 
