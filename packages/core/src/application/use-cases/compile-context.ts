@@ -9,6 +9,7 @@ import {
   type ArtifactParserRegistry,
   type ArtifactNode,
   type ArtifactAST,
+  type OutlineEntry,
 } from '../ports/artifact-parser.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
@@ -898,14 +899,9 @@ export class CompileContext {
    * @param entries - Outline entries from `ArtifactParser.outline()`
    * @returns Indented text representation
    */
-  private _renderOutline(
-    entries: readonly import('../ports/artifact-parser.js').OutlineEntry[],
-  ): string {
+  private _renderOutline(entries: readonly OutlineEntry[]): string {
     const lines: string[] = []
-    const render = (
-      items: readonly import('../ports/artifact-parser.js').OutlineEntry[],
-      indent: number,
-    ): void => {
+    const render = (items: readonly OutlineEntry[], indent: number): void => {
       for (const item of items) {
         lines.push(`${'  '.repeat(indent)}- ${item.label} (${item.type})`)
         if (item.children) render(item.children, indent + 1)

@@ -1,5 +1,4 @@
-import { createKernel, type Kernel } from '@specd/core'
-import { type SpecdConfig } from '@specd/core'
+import { createKernel, type Kernel, type SpecdConfig } from '@specd/core'
 import { fileURLToPath } from 'node:url'
 import * as path from 'node:path'
 
