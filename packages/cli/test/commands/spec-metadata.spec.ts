@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { createHash } from 'node:crypto'
 import {
@@ -13,14 +12,8 @@ import {
 
 vi.mock('../../src/load-config.js', () => ({ loadConfig: vi.fn() }))
 vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
-vi.mock('@specd/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@specd/core')>()
-  return { ...actual, createArtifactParserRegistry: vi.fn() }
-})
-
 import { loadConfig } from '../../src/load-config.js'
 import { createCliKernel } from '../../src/kernel.js'
-import { createArtifactParserRegistry } from '@specd/core'
 import { registerSpecMetadata } from '../../src/commands/spec/metadata.js'
 
 function setup() {
@@ -212,66 +205,6 @@ describe('spec metadata', () => {
   })
 
   describe('--infer', () => {
-    function makeMockSchema() {
-      const mockArtifactType = {
-        scope: () => 'spec',
-        format: () => 'markdown',
-        output: () => 'spec.md',
-        contextSections: () => [
-          {
-            selector: { type: 'section', matches: '^Requirements$' },
-            role: 'rules' as const,
-            extract: 'content' as const,
-          },
-          {
-            selector: { type: 'section', matches: '^Constraints$' },
-            role: 'constraints' as const,
-            extract: 'content' as const,
-          },
-          {
-            selector: { type: 'section', matches: '^Scenarios$' },
-            role: 'scenarios' as const,
-            extract: 'content' as const,
-          },
-        ],
-      }
-      return {
-        artifacts: () => [mockArtifactType],
-        artifact: (id: string) => (id === 'spec' ? mockArtifactType : null),
-      }
-    }
-
-    function makeMockParser() {
-      return {
-        parse: (content: string) => ({
-          root: {
-            type: 'document',
-            children: [
-              {
-                type: 'section',
-                label: 'Requirements',
-                children: [{ type: 'paragraph', value: 'Must validate input' }],
-              },
-              {
-                type: 'section',
-                label: 'Constraints',
-                children: [{ type: 'paragraph', value: 'Must use HTTPS' }],
-              },
-              {
-                type: 'section',
-                label: 'Scenarios',
-                children: [
-                  { type: 'paragraph', value: 'Valid input accepted' },
-                  { type: 'paragraph', value: 'Invalid input rejected' },
-                ],
-              },
-            ],
-          },
-        }),
-        renderSubtree: (node: { value?: string; label?: string }) => node.value ?? node.label ?? '',
-      }
-    }
-
     it('shows source: recorded when --infer passed but metadata is fresh', async () => {
       const { kernel, stdout } = setup()
       kernel.specs.get.execute.mockResolvedValue({
@@ -299,13 +232,11 @@ describe('spec metadata', () => {
         ]),
       })
 
-      const mockSchema = makeMockSchema()
-      kernel.specs.getActiveSchema.execute.mockResolvedValue(mockSchema)
-
-      const mockParser = makeMockParser()
-      vi.mocked(createArtifactParserRegistry).mockReturnValue(
-        new Map([['markdown', mockParser]]) as never,
-      )
+      kernel.specs.inferSections.execute.mockResolvedValue({
+        rules: ['Must validate input'],
+        constraints: ['Must use HTTPS'],
+        scenarios: ['Valid input accepted', 'Invalid input rejected'],
+      })
 
       const program = makeProgram()
       registerSpecMetadata(program.command('spec'))
@@ -328,13 +259,11 @@ describe('spec metadata', () => {
         artifacts: new Map([['spec.md', { content: '# Some spec content' }]]),
       })
 
-      const mockSchema = makeMockSchema()
-      kernel.specs.getActiveSchema.execute.mockResolvedValue(mockSchema)
-
-      const mockParser = makeMockParser()
-      vi.mocked(createArtifactParserRegistry).mockReturnValue(
-        new Map([['markdown', mockParser]]) as never,
-      )
+      kernel.specs.inferSections.execute.mockResolvedValue({
+        rules: [],
+        constraints: [],
+        scenarios: [],
+      })
 
       const program = makeProgram()
       registerSpecMetadata(program.command('spec'))
@@ -361,12 +290,6 @@ describe('spec metadata', () => {
         artifacts: new Map([['.specd-metadata.yaml', { content: staleMetadata }]]),
       })
 
-      const mockSchema = makeMockSchema()
-      kernel.specs.getActiveSchema.execute.mockResolvedValue(mockSchema)
-      vi.mocked(createArtifactParserRegistry).mockReturnValue(
-        new Map([['markdown', makeMockParser()]]) as never,
-      )
-
       const program = makeProgram()
       registerSpecMetadata(program.command('spec'))
       await program
@@ -386,13 +309,11 @@ describe('spec metadata', () => {
         ]),
       })
 
-      const mockSchema = makeMockSchema()
-      kernel.specs.getActiveSchema.execute.mockResolvedValue(mockSchema)
-
-      const mockParser = makeMockParser()
-      vi.mocked(createArtifactParserRegistry).mockReturnValue(
-        new Map([['markdown', mockParser]]) as never,
-      )
+      kernel.specs.inferSections.execute.mockResolvedValue({
+        rules: ['Must validate input'],
+        constraints: ['Must use HTTPS'],
+        scenarios: ['Valid input accepted'],
+      })
 
       const program = makeProgram()
       registerSpecMetadata(program.command('spec'))

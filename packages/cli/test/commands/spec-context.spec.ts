@@ -1,6 +1,4 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-import { createHash } from 'node:crypto'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
@@ -31,50 +29,30 @@ function setup() {
 
 afterEach(() => vi.restoreAllMocks())
 
-const specContent = '# Auth Spec\n\nContent here.'
-const verifyContent = '## Scenarios'
-const metadataYaml = [
-  'title: Auth Login',
-  'description: Handles user authentication',
-  'contentHashes:',
-  '  spec.md: sha256:placeholder',
-  '  verify.md: sha256:placeholder',
-  'rules:',
-  '  - requirement: Must validate email',
-  '    rules:',
-  '      - email must contain @',
-  'constraints:',
-  '  - Must use HTTPS',
-  'scenarios:',
-  '  - requirement: Must validate email',
-  '    name: valid email accepted',
-  '    given:',
-  '      - user enters valid email',
-  '    when:',
-  '      - form is submitted',
-  '    then:',
-  '      - login succeeds',
-].join('\n')
-
-function makeFreshMetadata(): Map<string, { content: string }> {
-  const specHash = `sha256:${createHash('sha256').update(specContent).digest('hex')}`
-  const verifyHash = `sha256:${createHash('sha256').update(verifyContent).digest('hex')}`
-  const freshYaml = metadataYaml
-    .replace('sha256:placeholder', specHash)
-    .replace('sha256:placeholder', verifyHash)
-  return new Map([
-    ['spec.md', { content: specContent }],
-    ['verify.md', { content: verifyContent }],
-    ['.specd-metadata.yaml', { content: freshYaml }],
-  ])
-}
-
 describe('spec context', () => {
   it('renders spec header with workspace:path in text mode', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.get.execute.mockResolvedValue({
-      spec: { workspace: 'default' },
-      artifacts: makeFreshMetadata(),
+    kernel.specs.getContext.execute.mockResolvedValue({
+      entries: [
+        {
+          spec: 'default:auth/login',
+          title: 'Auth Login',
+          description: 'Handles user authentication',
+          rules: [{ requirement: 'Must validate email', rules: ['email must contain @'] }],
+          constraints: ['Must use HTTPS'],
+          scenarios: [
+            {
+              requirement: 'Must validate email',
+              name: 'valid email accepted',
+              given: ['user enters valid email'],
+              when: ['form is submitted'],
+              then: ['login succeeds'],
+            },
+          ],
+          stale: false,
+        },
+      ],
+      warnings: [],
     })
 
     const program = makeProgram()
@@ -86,9 +64,26 @@ describe('spec context', () => {
 
   it('includes description and all sections when no flags', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.get.execute.mockResolvedValue({
-      spec: { workspace: 'default' },
-      artifacts: makeFreshMetadata(),
+    kernel.specs.getContext.execute.mockResolvedValue({
+      entries: [
+        {
+          spec: 'default:auth/login',
+          description: 'Handles user authentication',
+          rules: [{ requirement: 'Must validate email', rules: ['email must contain @'] }],
+          constraints: ['Must use HTTPS'],
+          scenarios: [
+            {
+              requirement: 'Must validate email',
+              name: 'valid email accepted',
+              given: ['user enters valid email'],
+              when: ['form is submitted'],
+              then: ['login succeeds'],
+            },
+          ],
+          stale: false,
+        },
+      ],
+      warnings: [],
     })
 
     const program = makeProgram()
@@ -104,9 +99,15 @@ describe('spec context', () => {
 
   it('filters to only --rules when flag provided', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.get.execute.mockResolvedValue({
-      spec: { workspace: 'default' },
-      artifacts: makeFreshMetadata(),
+    kernel.specs.getContext.execute.mockResolvedValue({
+      entries: [
+        {
+          spec: 'default:auth/login',
+          rules: [{ requirement: 'Must validate email', rules: ['email must contain @'] }],
+          stale: false,
+        },
+      ],
+      warnings: [],
     })
 
     const program = makeProgram()
@@ -122,9 +123,14 @@ describe('spec context', () => {
 
   it('outputs JSON with specs array and warnings', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.get.execute.mockResolvedValue({
-      spec: { workspace: 'default' },
-      artifacts: makeFreshMetadata(),
+    kernel.specs.getContext.execute.mockResolvedValue({
+      entries: [
+        {
+          spec: 'default:auth/login',
+          stale: false,
+        },
+      ],
+      warnings: [],
     })
 
     const program = makeProgram()
@@ -140,7 +146,16 @@ describe('spec context', () => {
 
   it('exits 1 when spec not found', async () => {
     const { kernel } = setup()
-    kernel.specs.get.execute.mockResolvedValue(null)
+    kernel.specs.getContext.execute.mockResolvedValue({
+      entries: [],
+      warnings: [
+        {
+          type: 'missing-spec',
+          path: 'missing/spec',
+          message: "Spec 'default:missing/spec' not found",
+        },
+      ],
+    })
 
     const program = makeProgram()
     registerSpecContext(program.command('spec'))
@@ -162,14 +177,17 @@ describe('spec context', () => {
     expect(stderr()).toContain('--depth requires --follow-deps')
   })
 
-  it('warns to stderr when metadata is stale', async () => {
+  it('warns to stderr when use case returns warnings', async () => {
     const { kernel, stderr } = setup()
-    kernel.specs.get.execute.mockResolvedValue({
-      spec: { workspace: 'default' },
-      artifacts: new Map([
-        ['spec.md', { content: specContent }],
-        ['.specd-metadata.yaml', { content: metadataYaml }],
-      ]),
+    kernel.specs.getContext.execute.mockResolvedValue({
+      entries: [{ spec: 'default:auth/login', stale: true }],
+      warnings: [
+        {
+          type: 'stale-metadata',
+          path: 'default:auth/login',
+          message: "Metadata for 'default:auth/login' is stale",
+        },
+      ],
     })
 
     const program = makeProgram()
