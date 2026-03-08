@@ -1,13 +1,15 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { z } from 'zod'
-import { stringify as yamlStringify, parse as yamlParse } from 'yaml'
+import { stringify as yamlStringify, parseDocument } from 'yaml'
+import type { Document } from 'yaml'
 import {
   type ConfigWriter,
   type InitProjectOptions,
   type InitProjectResult,
 } from '../../application/ports/config-writer.js'
 import { AlreadyInitialisedError } from '../../application/errors/already-initialised-error.js'
+import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
 import { isEnoent } from './is-enoent.js'
 
 /**
@@ -91,16 +93,21 @@ export class FsConfigWriter implements ConfigWriter {
     skillNames: readonly string[],
   ): Promise<void> {
     const content = await fs.readFile(configPath, 'utf8')
-    const doc = (yamlParse(content) ?? {}) as Record<string, unknown>
+    let doc: Document
+    try {
+      doc = parseDocument(content)
+    } catch (err) {
+      throw new ConfigValidationError(configPath, `invalid YAML: ${(err as Error).message}`)
+    }
 
-    const skills = parseSkills(doc['skills'])
+    const raw = (doc.toJSON() ?? {}) as Record<string, unknown>
+    const skills = parseSkills(raw['skills'])
     const existing = skills[agent] ?? []
     const merged = [...new Set([...existing, ...skillNames])]
     skills[agent] = merged
-    doc['skills'] = skills
+    doc.set('skills', skills)
 
-    const updated = yamlStringify(doc, { lineWidth: 0 })
-    await fs.writeFile(configPath, updated, 'utf8')
+    await fs.writeFile(configPath, doc.toString(), 'utf8')
   }
 
   /**
@@ -118,8 +125,14 @@ export class FsConfigWriter implements ConfigWriter {
       throw err
     }
 
-    const doc = (yamlParse(content) ?? {}) as Record<string, unknown>
-    return parseSkills(doc['skills'])
+    let doc: Document
+    try {
+      doc = parseDocument(content)
+    } catch {
+      return {}
+    }
+    const raw = (doc.toJSON() ?? {}) as Record<string, unknown>
+    return parseSkills(raw['skills'])
   }
 }
 
