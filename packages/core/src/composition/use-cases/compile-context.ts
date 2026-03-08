@@ -5,7 +5,7 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createSpecRepository } from '../spec-repository.js'
-import { createArtifactParserRegistry } from '../artifact-parser-registry.js'
+import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
 
