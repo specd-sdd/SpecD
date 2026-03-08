@@ -5,9 +5,11 @@
  * provides factory functions for minimal-valid mock objects so individual
  * test files stay focused on what they're testing.
  */
+import type { Stats } from 'node:fs'
 import { vi } from 'vitest'
 import { Command } from 'commander'
 import type { SpecdConfig, Kernel } from '@specd/core'
+import type { Skill } from '@specd/skills'
 
 /**
  * Mirrors the {@link Kernel} shape but with every `execute` replaced by a
@@ -189,4 +191,68 @@ export function captureStderr(): () => string {
     return true
   })
   return () => calls.join('')
+}
+
+// ---------------------------------------------------------------------------
+// Typed mock factories for external dependencies
+// ---------------------------------------------------------------------------
+
+/**
+ * Creates a mock `Skill` with sensible defaults.
+ */
+export function makeMockSkill(overrides: Partial<Skill> = {}): Skill {
+  return {
+    name: 'test-skill',
+    description: 'A test skill',
+    content: '# Test Skill',
+    ...overrides,
+  }
+}
+
+/**
+ * Creates a minimal mock `Stats` object for `fs.stat` assertions.
+ *
+ * Only the structurally required fields are populated — extend with
+ * overrides when your test inspects specific stat properties.
+ */
+export function makeMockStats(overrides: Partial<Stats> = {}): Stats {
+  return {
+    isFile: () => true,
+    isDirectory: () => false,
+    isBlockDevice: () => false,
+    isCharacterDevice: () => false,
+    isSymbolicLink: () => false,
+    isFIFO: () => false,
+    isSocket: () => false,
+    dev: 0,
+    ino: 0,
+    mode: 0,
+    nlink: 0,
+    uid: 0,
+    gid: 0,
+    rdev: 0,
+    size: 0,
+    blksize: 0,
+    blocks: 0,
+    atimeMs: 0,
+    mtimeMs: 0,
+    ctimeMs: 0,
+    birthtimeMs: 0,
+    atime: new Date(0),
+    mtime: new Date(0),
+    ctime: new Date(0),
+    birthtime: new Date(0),
+    ...overrides,
+  } as Stats
+}
+
+/**
+ * Creates a mock use-case object with a vitest mock `execute` function.
+ *
+ * Use with `vi.mocked(factory).mockReturnValue(makeMockUseCase())`.
+ */
+export function makeMockUseCase(execute: ReturnType<typeof vi.fn> = vi.fn()): {
+  execute: ReturnType<typeof vi.fn>
+} {
+  return { execute }
 }

@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { makeProgram, mockProcessExit, captureStdout, captureStderr } from './helpers.js'
+import {
+  makeMockUseCase,
+  makeProgram,
+  mockProcessExit,
+  captureStdout,
+  captureStderr,
+} from './helpers.js'
 
 vi.mock('@specd/core', async (importOriginal) => {
   const original = await importOriginal<typeof import('@specd/core')>()
@@ -36,10 +42,14 @@ function setup() {
     schemaRef: '@specd/schema-std',
     workspaces: [{ name: 'default', specsPath: 'specs/' }],
   })
-  vi.mocked(createInitProject).mockReturnValue({ execute: mockExecute } as never)
+  vi.mocked(createInitProject).mockReturnValue(
+    makeMockUseCase(mockExecute) as unknown as ReturnType<typeof createInitProject>,
+  )
 
   const mockRecordExecute = vi.fn().mockResolvedValue(undefined)
-  vi.mocked(createRecordSkillInstall).mockReturnValue({ execute: mockRecordExecute } as never)
+  vi.mocked(createRecordSkillInstall).mockReturnValue(
+    makeMockUseCase(mockRecordExecute) as unknown as ReturnType<typeof createRecordSkillInstall>,
+  )
 
   const stdout = captureStdout()
   const stderr = captureStderr()

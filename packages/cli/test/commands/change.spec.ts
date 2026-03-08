@@ -549,7 +549,7 @@ describe('change transition', () => {
   })
 
   it('passes approvals flags from config', async () => {
-    const config = makeMockConfig({ approvals: { spec: true, signoff: false } } as never)
+    const config = makeMockConfig({ approvals: { spec: true, signoff: false } })
     vi.mocked(loadConfig).mockResolvedValue(config)
     const kernel = makeMockKernel()
     vi.mocked(createCliKernel).mockReturnValue(kernel)

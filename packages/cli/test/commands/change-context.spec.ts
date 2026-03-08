@@ -35,12 +35,12 @@ function setup() {
         name: 'default',
         specsPath: '/project/specs',
         schemasPath: null,
-        storagePath: '/project/.specd/default',
-        ownership: [],
+        codeRoot: '/project',
+        ownership: 'owned' as const,
         isExternal: false,
       },
     ],
-  } as never)
+  })
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
   vi.mocked(createCliKernel).mockReturnValue(kernel)

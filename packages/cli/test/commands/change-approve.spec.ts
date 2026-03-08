@@ -24,7 +24,7 @@ import { findChangeDir } from '../../src/helpers/change-dir.js'
 import { registerChangeApprove } from '../../src/commands/change/approve.js'
 
 function setup() {
-  const config = makeMockConfig({ approvals: { spec: true, signoff: true } } as never)
+  const config = makeMockConfig({ approvals: { spec: true, signoff: true } })
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
   vi.mocked(createCliKernel).mockReturnValue(kernel)

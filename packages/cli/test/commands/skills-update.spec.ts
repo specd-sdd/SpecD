@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
   makeMockKernel,
+  makeMockSkill,
   makeProgram,
   mockProcessExit,
   captureStdout,
@@ -45,8 +46,8 @@ describe('skills update', () => {
       claude: ['my-skill', 'other-skill'],
     })
     vi.mocked(getSkill)
-      .mockReturnValueOnce({ content: '# My Skill' } as never)
-      .mockReturnValueOnce({ content: '# Other Skill' } as never)
+      .mockReturnValueOnce(makeMockSkill({ content: '# My Skill' }))
+      .mockReturnValueOnce(makeMockSkill({ content: '# Other Skill' }))
 
     const program = makeProgram()
     registerSkillsUpdate(program.command('skills'))
@@ -62,7 +63,7 @@ describe('skills update', () => {
     kernel.project.getSkillsManifest.execute.mockResolvedValue({
       claude: ['my-skill'],
     })
-    vi.mocked(getSkill).mockReturnValue({ content: '# My Skill' } as never)
+    vi.mocked(getSkill).mockReturnValue(makeMockSkill({ content: '# My Skill' }))
 
     const program = makeProgram()
     registerSkillsUpdate(program.command('skills'))
@@ -88,7 +89,7 @@ describe('skills update', () => {
     kernel.project.getSkillsManifest.execute.mockResolvedValue({
       claude: ['old-skill'],
     })
-    vi.mocked(getSkill).mockReturnValue(undefined as never)
+    vi.mocked(getSkill).mockReturnValue(undefined)
     captureStdout()
 
     const program = makeProgram()
@@ -105,7 +106,7 @@ describe('skills update', () => {
       claude: ['my-skill'],
       copilot: ['other-skill'],
     })
-    vi.mocked(getSkill).mockReturnValue({ content: '# My Skill' } as never)
+    vi.mocked(getSkill).mockReturnValue(makeMockSkill({ content: '# My Skill' }))
 
     const program = makeProgram()
     registerSkillsUpdate(program.command('skills'))
@@ -133,7 +134,7 @@ describe('skills update', () => {
     kernel.project.getSkillsManifest.execute.mockResolvedValue({
       claude: ['my-skill'],
     })
-    vi.mocked(getSkill).mockReturnValue({ content: '# Skill' } as never)
+    vi.mocked(getSkill).mockReturnValue(makeMockSkill({ content: '# Skill' }))
 
     const program = makeProgram()
     registerSkillsUpdate(program.command('skills'))
