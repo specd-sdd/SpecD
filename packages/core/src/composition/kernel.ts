@@ -25,6 +25,8 @@ import { type RecordSkillInstall } from '../application/use-cases/record-skill-i
 import { type GetSkillsManifest } from '../application/use-cases/get-skills-manifest.js'
 import { type GetProjectContext } from '../application/use-cases/get-project-context.js'
 import { type ValidateSpecs } from '../application/use-cases/validate-specs.js'
+import { type InferSpecSections } from '../application/use-cases/infer-spec-sections.js'
+import { type GetSpecContext } from '../application/use-cases/get-spec-context.js'
 import { type SpecdConfig } from '../application/specd-config.js'
 import { createCreateChange } from './use-cases/create-change.js'
 import { createGetStatus } from './use-cases/get-status.js'
@@ -53,6 +55,8 @@ import { createRecordSkillInstall } from './use-cases/record-skill-install.js'
 import { createGetSkillsManifest } from './use-cases/get-skills-manifest.js'
 import { createGetProjectContext } from './use-cases/get-project-context.js'
 import { createValidateSpecs } from './use-cases/validate-specs.js'
+import { createInferSpecSections } from './use-cases/infer-spec-sections.js'
+import { createGetSpecContext } from './use-cases/get-spec-context.js'
 
 /**
  * All use cases instantiated from a single `SpecdConfig`, grouped by domain area.
@@ -114,6 +118,10 @@ export interface Kernel {
     getActiveSchema: GetActiveSchema
     /** Validates spec artifacts against the active schema's structural rules. */
     validate: ValidateSpecs
+    /** Infers semantic sections (rules, constraints, scenarios) from spec artifacts. */
+    inferSections: InferSpecSections
+    /** Builds structured context entries for a spec with optional dependency traversal. */
+    getContext: GetSpecContext
   }
   /** Use cases that operate on the project configuration. */
   project: {
@@ -181,6 +189,8 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       saveMetadata: createSaveSpecMetadata(config),
       getActiveSchema: createGetActiveSchema(config, schemaOpts),
       validate: createValidateSpecs(config, schemaOpts),
+      inferSections: createInferSpecSections(config, schemaOpts),
+      getContext: createGetSpecContext(config),
     },
     project: {
       init: createInitProject(),
