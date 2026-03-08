@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 /**
  * Tests for config show, schema show, and project commands.
  */
@@ -7,6 +7,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
   makeMockKernel,
+  makeMockSkill,
   makeProgram,
   mockProcessExit,
   captureStdout,
@@ -72,7 +73,7 @@ describe('config show', () => {
   })
 
   it('shows approval settings', async () => {
-    const config = makeMockConfig({ approvals: { spec: true, signoff: false } } as never)
+    const config = makeMockConfig({ approvals: { spec: true, signoff: false } })
     vi.mocked(loadConfig).mockResolvedValue(config)
     vi.mocked(createCliKernel).mockReturnValue(makeMockKernel())
     const stdout = captureStdout()
@@ -108,22 +109,20 @@ describe('config show', () => {
           name: 'default',
           specsPath: '/project/specs',
           schemasPath: null,
-          storagePath: '/project/.specd/default',
-          ownership: [],
-          contextIncludeSpecs: false,
+          codeRoot: '/project',
+          ownership: 'owned' as const,
           isExternal: false,
         },
         {
           name: 'billing-ws',
           specsPath: '/project/billing/specs',
           schemasPath: null,
-          storagePath: '/project/.specd/billing-ws',
-          ownership: ['team-billing'],
-          contextIncludeSpecs: false,
+          codeRoot: '/project/billing',
+          ownership: 'shared' as const,
           isExternal: false,
         },
       ],
-    } as never)
+    })
     vi.mocked(loadConfig).mockResolvedValue(config)
     vi.mocked(createCliKernel).mockReturnValue(makeMockKernel())
     const stdout = captureStdout()
@@ -489,7 +488,7 @@ describe('project update', () => {
     kernel.project.getSkillsManifest.execute.mockResolvedValue({
       claude: ['my-skill'],
     })
-    vi.mocked(getSkill).mockReturnValue({ content: '# My Skill' } as never)
+    vi.mocked(getSkill).mockReturnValue(makeMockSkill({ content: '# My Skill' }))
 
     const program = makeProgram()
     registerProjectUpdate(program.command('project'))

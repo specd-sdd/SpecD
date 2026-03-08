@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 /**
  * Tests for list-only commands:
  * drafts list, discarded list, archive list, spec list
@@ -721,7 +721,7 @@ describe('spec list', () => {
   })
 
   it('shows "no workspaces configured" when no workspaces', async () => {
-    const config = makeMockConfig({ workspaces: [] } as never)
+    const config = makeMockConfig({ workspaces: [] })
     vi.mocked(loadConfig).mockResolvedValue(config)
     vi.mocked(createCliKernel).mockReturnValue(makeMockKernel())
     const stdout = captureStdout()

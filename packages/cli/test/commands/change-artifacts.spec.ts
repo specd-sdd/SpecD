@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { ChangeNotFoundError } from '@specd/core'
 import {
   makeMockConfig,
   makeMockChange,
   makeMockKernel,
+  makeMockStats,
   makeProgram,
   mockProcessExit,
   captureStdout,
@@ -56,7 +57,7 @@ describe('change artifacts', () => {
       ],
     })
     vi.mocked(stat)
-      .mockResolvedValueOnce({} as never)
+      .mockResolvedValueOnce(makeMockStats())
       .mockRejectedValueOnce(new Error('ENOENT'))
 
     const program = makeProgram()
@@ -110,7 +111,7 @@ describe('change artifacts', () => {
       }),
       artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
     })
-    vi.mocked(stat).mockResolvedValue({} as never)
+    vi.mocked(stat).mockResolvedValue(makeMockStats())
 
     const program = makeProgram()
     registerChangeArtifacts(program.command('change'))
@@ -178,7 +179,7 @@ describe('change artifacts', () => {
       }),
       artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
     })
-    vi.mocked(stat).mockResolvedValue({} as never)
+    vi.mocked(stat).mockResolvedValue(makeMockStats())
 
     const program = makeProgram()
     registerChangeArtifacts(program.command('change'))
