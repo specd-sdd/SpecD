@@ -12,7 +12,7 @@ import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
 /**
  * Domain context for the primary (default) workspace used by `CompileContext`.
  */
-export interface CompileContextContext {
+export interface CompileContextWorkspace {
   /** The workspace name from `specd.yaml` (e.g. `'default'`). */
   readonly workspace: string
   /** Ownership level of this workspace. */
@@ -62,7 +62,7 @@ export function createCompileContext(
  * @returns The pre-wired use case instance
  */
 export function createCompileContext(
-  context: CompileContextContext,
+  context: CompileContextWorkspace,
   options: FsCompileContextOptions,
 ): CompileContext
 /**
@@ -73,7 +73,7 @@ export function createCompileContext(
  * @returns The pre-wired use case instance
  */
 export function createCompileContext(
-  configOrContext: SpecdConfig | CompileContextContext,
+  configOrContext: SpecdConfig | CompileContextWorkspace,
   options?: FsCompileContextOptions | { extraNodeModulesPaths?: readonly string[] },
 ): CompileContext {
   if (isSpecdConfig(configOrContext)) {

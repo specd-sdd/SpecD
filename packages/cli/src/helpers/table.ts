@@ -4,7 +4,20 @@ import chalk from 'chalk'
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Returns the visual character length of a string after NFC normalisation.
+ *
+ * @param s - The string to measure
+ * @returns The NFC-normalised character count
+ */
 export const vlen = (s: string): number => s.normalize('NFC').length
+/**
+ * Right-pads a string to `w` characters using spaces.
+ *
+ * @param s - The string to pad
+ * @param w - Target width in characters
+ * @returns The padded string
+ */
 export const pad = (s: string, w: number): string => s + ' '.repeat(Math.max(0, w - vlen(s)))
 
 /**

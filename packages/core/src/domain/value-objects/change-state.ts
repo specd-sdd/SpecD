@@ -47,5 +47,5 @@ export const VALID_TRANSITIONS: Record<ChangeState, readonly ChangeState[]> = {
  * @returns `true` if the transition is permitted, `false` otherwise
  */
 export function isValidTransition(from: ChangeState, to: ChangeState): boolean {
-  return VALID_TRANSITIONS[from].some((s) => s === to)
+  return VALID_TRANSITIONS[from].includes(to)
 }
