@@ -423,18 +423,96 @@ export class FsArchiveRepository extends ArchiveRepository {
   }
 
   /**
-   * Rebuilds `index.jsonl` if the file does not exist.
+   * Rebuilds the index when it is missing or stale.
    *
    * The index is a derived cache — if it's missing (e.g. after a fresh clone
-   * or because it's gitignored), it is rebuilt from the manifest files on disk.
+   * or because it's gitignored), or if it contains fewer manifest paths than
+   * exist on disk (e.g. after pulling new archives), it is rebuilt.
    */
   private async _ensureIndex(): Promise<void> {
     const indexPath = path.join(this._archivePath, INDEX_FILE)
+
+    let indexExists = true
     try {
       await fs.access(indexPath)
     } catch {
+      indexExists = false
+    }
+
+    if (!indexExists) {
+      await this.reindex()
+      return
+    }
+
+    // Compare manifest paths on disk against indexed paths
+    const diskPaths = await this._collectManifestPaths(this._archivePath)
+    const lines = await this._readIndexLines()
+    const indexedPaths = new Set<string>()
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line) as IndexEntry
+        indexedPaths.add(entry.path)
+      } catch {
+        // corrupt line — reindex
+        await this.reindex()
+        return
+      }
+    }
+
+    const needsRebuild = diskPaths.some((p) => !indexedPaths.has(p))
+    if (needsRebuild) {
       await this.reindex()
     }
+  }
+
+  /**
+   * Recursively collects relative paths of directories containing `manifest.json`.
+   *
+   * Only performs `readdir` and `stat` calls — does not read file contents.
+   *
+   * @param dir - The directory to scan
+   * @param base - The base archive path (for computing relative paths)
+   * @returns Relative paths from the archive root to each manifest directory
+   */
+  private async _collectManifestPaths(dir: string, base?: string): Promise<string[]> {
+    const root = base ?? dir
+    let entries: string[]
+    try {
+      entries = await fs.readdir(dir)
+    } catch (err) {
+      if (isEnoent(err)) return []
+      throw err
+    }
+
+    const results: string[] = []
+
+    // If this directory contains a manifest, record it
+    if (dir !== root && entries.includes('manifest.json')) {
+      results.push(path.relative(root, dir))
+    }
+
+    // Recurse into subdirectories
+    const statResults = await Promise.all(
+      entries
+        .filter((e) => e !== INDEX_FILE && e !== 'manifest.json')
+        .map(async (entry) => {
+          const fullPath = path.join(dir, entry)
+          try {
+            const stat = await fs.stat(fullPath)
+            return { fullPath, isDir: stat.isDirectory() }
+          } catch {
+            return { fullPath, isDir: false }
+          }
+        }),
+    )
+
+    for (const { fullPath, isDir } of statResults) {
+      if (!isDir) continue
+      const nested = await this._collectManifestPaths(fullPath, root)
+      results.push(...nested)
+    }
+
+    return results
   }
 
   /**

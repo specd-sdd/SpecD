@@ -336,6 +336,29 @@ describe('FsArchiveRepository', () => {
       expect(results).toHaveLength(1)
       expect(results[0]!.name).toBe('dedup-change')
     })
+
+    it('auto-rebuilds index when new manifests appear on disk', async () => {
+      // Archive one change — this creates the index
+      const first = await makeArchivableChange(ctx, 'first-change')
+      await ctx.archive.archive(first)
+
+      // Simulate another developer archiving: create manifest on disk without updating the index
+      const second = await makeArchivableChange(ctx, 'second-change')
+      const secondArchived = await ctx.archive.archive(second)
+
+      // Remove the second entry from the index (simulate stale index after git pull)
+      const indexPath = path.join(ctx.archivePath, '.specd-index.jsonl')
+      const lines = (await fs.readFile(indexPath, 'utf8')).trim().split('\n')
+      // Keep only the first line
+      await fs.writeFile(indexPath, lines[0]! + '\n', 'utf8')
+
+      // list() should detect staleness and rebuild
+      const results = await ctx.archive.list()
+      expect(results).toHaveLength(2)
+      const names = results.map((r) => r.name)
+      expect(names).toContain('first-change')
+      expect(names).toContain('second-change')
+    })
   })
 
   // ---- get ----
