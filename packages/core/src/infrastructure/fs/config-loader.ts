@@ -353,11 +353,29 @@ export class FsConfigLoader implements ConfigLoader {
       }
     })
 
+    const storagePaths = {
+      changes: path.resolve(configDir, data.storage.changes.fs.path),
+      drafts: path.resolve(configDir, data.storage.drafts.fs.path),
+      discarded: path.resolve(configDir, data.storage.discarded.fs.path),
+      archive: path.resolve(configDir, data.storage.archive.fs.path),
+    }
+
+    if (gitRoot !== null) {
+      for (const [key, storagePath] of Object.entries(storagePaths)) {
+        if (!storagePath.startsWith(gitRoot + path.sep) && storagePath !== gitRoot) {
+          throw new ConfigValidationError(
+            configPath,
+            `storage path '${key}' resolves outside repo root`,
+          )
+        }
+      }
+    }
+
     const storage: SpecdStorageConfig = {
-      changesPath: path.resolve(configDir, data.storage.changes.fs.path),
-      draftsPath: path.resolve(configDir, data.storage.drafts.fs.path),
-      discardedPath: path.resolve(configDir, data.storage.discarded.fs.path),
-      archivePath: path.resolve(configDir, data.storage.archive.fs.path),
+      changesPath: storagePaths.changes,
+      draftsPath: storagePaths.drafts,
+      discardedPath: storagePaths.discarded,
+      archivePath: storagePaths.archive,
       ...(data.storage.archive.fs.pattern !== undefined
         ? { archivePattern: data.storage.archive.fs.pattern }
         : {}),
