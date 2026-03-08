@@ -175,6 +175,8 @@ All four sub-keys (`changes`, `drafts`, `discarded`, `archive`) are required. `a
 
 **`discarded`** — permanently abandoned changes. A change can be discarded from `changes/` or `drafts/`. A discarded change must include a reason; it cannot be recovered. `specd init` adds `specd/drafts/` and `specd/discarded/` to `.gitignore` by default — local-only directories unless the team opts in.
 
+**`archive` index** — the archive directory contains a `.specd-index.jsonl` file that caches metadata from individual manifests for fast listing. This file is a **derived cache**, not a source of truth — the manifests inside each archived change directory are authoritative. `specd init` gitignores `.specd-index.jsonl` inside the archive directory (via a local `.gitignore`), so the index is never committed. When the index is missing (e.g. after a fresh clone), it is automatically rebuilt from the manifest files on disk.
+
 ### Requirement: Template variables
 
 Several fields in `specd.yaml` support template variable interpolation using `{{variable}}` syntax. Template variables are resolved at runtime by the application layer before the value is used.
@@ -398,7 +400,7 @@ Plugin declarations are used by `specd project init`, `specd plugin add`, and `s
 
 The port defines the following operations:
 
-- **`initProject(options)`** — writes a new `specd.yaml` at the given path with the provided schema reference, workspace id, and workspace specs path. Fails if the file already exists and `force` is false. Also creates the standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`) and appends `specd.local.yaml` to `.gitignore`.
+- **`initProject(options)`** — writes a new `specd.yaml` at the given path with the provided schema reference, workspace id, and workspace specs path. Fails if the file already exists and `force` is false. Also creates the standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`), appends `specd.local.yaml` to `.gitignore`, and creates a `.gitignore` inside the archive directory to exclude `index.jsonl`.
 - **`recordSkillInstall(configPath, agent, skillNames)`** — adds the given skill names to `specd.yaml`'s `skills.<agent>` array, deduplicating existing entries.
 - **`readSkillsManifest(configPath)`** — returns the `skills` section of `specd.yaml` as a typed map `{ [agent: string]: string[] }`. This is a targeted read that does not require a fully validated `SpecdConfig`.
 

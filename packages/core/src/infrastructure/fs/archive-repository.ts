@@ -16,7 +16,7 @@ import { writeFileAtomic } from './write-atomic.js'
 import { type ChangeManifest, changeManifestSchema } from './manifest.js'
 
 /** Filename of the append-only archive index at the archive root. */
-const INDEX_FILE = 'index.jsonl'
+const INDEX_FILE = '.specd-index.jsonl'
 
 /** Default archive pattern when none is configured. */
 const DEFAULT_PATTERN = '{{change.archivedName}}'
@@ -188,6 +188,7 @@ export class FsArchiveRepository extends ArchiveRepository {
    * @returns All archived changes in chronological order
    */
   override async list(): Promise<ArchivedChange[]> {
+    await this._ensureIndex()
     const lines = await this._readIndexLines()
     const map = new Map<string, ArchivedChange>()
 
@@ -422,7 +423,22 @@ export class FsArchiveRepository extends ArchiveRepository {
   }
 
   /**
-   * Appends one line to `index.jsonl`, creating the file if needed.
+   * Rebuilds `index.jsonl` if the file does not exist.
+   *
+   * The index is a derived cache — if it's missing (e.g. after a fresh clone
+   * or because it's gitignored), it is rebuilt from the manifest files on disk.
+   */
+  private async _ensureIndex(): Promise<void> {
+    const indexPath = path.join(this._archivePath, INDEX_FILE)
+    try {
+      await fs.access(indexPath)
+    } catch {
+      await this.reindex()
+    }
+  }
+
+  /**
+   * Appends one line to the index file, creating it if needed.
    *
    * @param entry - The index entry to append
    */
