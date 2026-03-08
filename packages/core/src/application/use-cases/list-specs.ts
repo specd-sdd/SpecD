@@ -1,7 +1,7 @@
-import { parse as parseYaml } from 'yaml'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type Spec } from '../../domain/entities/spec.js'
 import { extractSpecSummary } from '../../domain/services/spec-summary.js'
+import { parseMetadata } from '../../domain/services/parse-metadata.js'
 import { type SpecMetadataStatus, checkMetadataFreshness } from './_shared/metadata-freshness.js'
 
 export type { SpecMetadataStatus }
@@ -113,25 +113,15 @@ export class ListSpecs {
       const artifact = await repo.artifact(spec, '.specd-metadata.yaml')
       if (artifact !== null) {
         hasMetadata = true
-        const parsed = parseYaml(artifact.content) as Record<string, unknown> | null
-        if (parsed !== null && typeof parsed === 'object') {
-          if (typeof parsed['title'] === 'string' && parsed['title'].trim().length > 0) {
-            title = parsed['title'].trim()
-          }
-          if (
-            typeof parsed['description'] === 'string' &&
-            parsed['description'].trim().length > 0
-          ) {
-            description = parsed['description'].trim()
-          }
-          if (
-            includeMetadataStatus &&
-            parsed['contentHashes'] !== null &&
-            typeof parsed['contentHashes'] === 'object' &&
-            !Array.isArray(parsed['contentHashes'])
-          ) {
-            contentHashes = parsed['contentHashes'] as Record<string, string>
-          }
+        const meta = parseMetadata(artifact.content)
+        if (meta.title !== undefined && meta.title.trim().length > 0) {
+          title = meta.title.trim()
+        }
+        if (meta.description !== undefined && meta.description.trim().length > 0) {
+          description = meta.description.trim()
+        }
+        if (includeMetadataStatus && meta.contentHashes !== undefined) {
+          contentHashes = meta.contentHashes
         }
       }
     } catch {

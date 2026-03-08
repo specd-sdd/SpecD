@@ -1,4 +1,4 @@
-import { parse as parseYaml } from 'yaml'
+import { parseMetadata, type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
@@ -18,7 +18,6 @@ import { type Selector } from '../../domain/value-objects/selector.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
-import { specMetadataSchema } from './_shared/spec-metadata-schema.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
 import { type WorkspaceContext } from '../ports/workspace-context.js'
@@ -120,24 +119,6 @@ export interface CompileContextResult {
 interface ResolvedSpec {
   readonly workspace: string
   readonly capPath: string
-}
-
-/** Parsed `.specd-metadata.yaml` content. */
-interface SpecMetadata {
-  readonly title?: string
-  readonly description?: string
-  readonly keywords?: string[]
-  readonly dependsOn?: string[]
-  readonly contentHashes?: Record<string, string>
-  readonly rules?: Array<{ readonly requirement: string; readonly rules: string[] }>
-  readonly constraints?: string[]
-  readonly scenarios?: Array<{
-    readonly requirement: string
-    readonly name: string
-    readonly given?: string[]
-    readonly when?: string[]
-    readonly then?: string[]
-  }>
 }
 
 /**
@@ -792,13 +773,7 @@ export class CompileContext {
    * @returns Parsed metadata
    */
   private _parseMetadata(content: string): SpecMetadata {
-    try {
-      const parsed = parseYaml(content) as unknown
-      const result = specMetadataSchema.safeParse(parsed)
-      return result.success ? (result.data as SpecMetadata) : {}
-    } catch {
-      return {}
-    }
+    return parseMetadata(content)
   }
 
   /**

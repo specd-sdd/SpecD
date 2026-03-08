@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { contentHash } from '../../../domain/services/content-hash.js'
 
 /** Metadata freshness status for a spec. */
 export type SpecMetadataStatus = 'fresh' | 'stale' | 'missing'
@@ -45,7 +45,7 @@ export async function checkMetadataFreshness(
       entries.push({ filename, recorded, current: '', fresh: false })
       allFresh = false
     } else {
-      const current = `sha256:${createHash('sha256').update(content).digest('hex')}`
+      const current = contentHash(content)
       const fresh = current === recorded
       if (!fresh) allFresh = false
       entries.push({ filename, recorded, current, fresh })
