@@ -12,7 +12,7 @@ export function shiftHeadings(markdown: string, delta: number): string {
   let inFence = false
   const result: string[] = []
   for (const line of lines) {
-    if (/^```/.test(line)) {
+    if (/^(?:```|~~~)/.test(line)) {
       inFence = !inFence
       result.push(line)
       continue
