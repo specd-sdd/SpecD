@@ -98,6 +98,25 @@ describe('YamlParser', () => {
     })
   })
 
+  describe('renderSubtree', () => {
+    it('returns same content as serialize for unchanged root node', () => {
+      const content = 'schema: spec-driven\n# important comment\nmodel: claude-opus-4-6\n'
+      const ast = parser.parse(content)
+      expect(parser.renderSubtree(ast.root)).toBe(parser.serialize(ast))
+    })
+
+    it('reconstructs YAML when _yaml is absent', () => {
+      const ast = parser.parse('key: value')
+      const rootWithout: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(ast.root)) {
+        if (k !== '_yaml') rootWithout[k] = v
+      }
+      const rendered = parser.renderSubtree(rootWithout as typeof ast.root)
+      expect(rendered).toContain('key')
+      expect(rendered).toContain('value')
+    })
+  })
+
   describe('apply', () => {
     it('modified: changes a scalar pair value', () => {
       const ast = parser.parse('model: claude-sonnet-4-6')

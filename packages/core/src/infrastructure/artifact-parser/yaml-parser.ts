@@ -351,6 +351,10 @@ export class YamlParser implements ArtifactParser {
    * @returns The YAML string representation of the node
    */
   renderSubtree(node: ArtifactNode): string {
+    const yamlStr = (node as Record<string, unknown>)['_yaml']
+    if (typeof yamlStr === 'string') {
+      return yamlStr
+    }
     const jsValue = artifactNodeToJsValue(node)
     return stringify(jsValue)
   }
