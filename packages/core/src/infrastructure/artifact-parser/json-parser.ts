@@ -6,6 +6,7 @@ import {
   type NodeTypeDescriptor,
   type OutlineEntry,
 } from '../../application/ports/artifact-parser.js'
+import { ArtifactParseError } from '../../domain/errors/artifact-parse-error.js'
 import { applyDelta } from './_shared/apply-delta.js'
 
 /** A JSON-compatible scalar value type. */
@@ -135,9 +136,15 @@ export class JsonParser implements ArtifactParser {
    *
    * @param content - The JSON content to parse
    * @returns The normalized AST with a `document` root node
+   * @throws {ArtifactParseError} When the content is not valid JSON
    */
   parse(content: string): ArtifactAST {
-    const jsValue = JSON.parse(content) as unknown
+    let jsValue: unknown
+    try {
+      jsValue = JSON.parse(content) as unknown
+    } catch (err) {
+      throw new ArtifactParseError('json', (err as Error).message)
+    }
     const rootNode = jsValueToNode(jsValue)
     return { root: { type: 'document', children: [rootNode] } }
   }
