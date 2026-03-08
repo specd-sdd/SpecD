@@ -116,11 +116,11 @@ export interface ChangeProps {
   /** Optional free-text description of the change's purpose. */
   readonly description?: string
   /** Current snapshot of active workspace IDs. */
-  readonly workspaces: string[]
+  readonly workspaces: readonly string[]
   /** Current snapshot of spec paths being modified. */
-  readonly specIds: string[]
+  readonly specIds: readonly string[]
   /** Context spec paths; populated at `ready` state; does not trigger invalidation. */
-  readonly contextSpecIds?: string[]
+  readonly contextSpecIds?: readonly string[]
   /** Append-only event history from which lifecycle state is derived. */
   readonly history: readonly ChangeEvent[]
   /** Pre-loaded artifact map; defaults to an empty map. */
@@ -282,10 +282,20 @@ export class Change {
    * artifact dependencies.
    *
    * @param type - The artifact type ID to evaluate
-   * @param visited - Set of already-visited artifact IDs (for cycle detection)
    * @returns The effective `ArtifactStatus` after dependency resolution
    */
-  effectiveStatus(type: string, visited: Set<string> = new Set()): ArtifactStatus {
+  effectiveStatus(type: string): ArtifactStatus {
+    return this._effectiveStatus(type, new Set())
+  }
+
+  /**
+   * Internal recursive helper for `effectiveStatus` with cycle detection.
+   *
+   * @param type - The artifact type ID to evaluate
+   * @param visited - Set of already-visited artifact IDs for cycle detection
+   * @returns The effective `ArtifactStatus` after dependency resolution
+   */
+  private _effectiveStatus(type: string, visited: Set<string>): ArtifactStatus {
     const artifact = this._artifacts.get(type)
     if (!artifact) return 'missing'
     if (artifact.status === 'missing') return 'missing'
@@ -293,7 +303,7 @@ export class Change {
 
     visited.add(type)
     for (const req of artifact.requires) {
-      const reqStatus = this.effectiveStatus(req, visited)
+      const reqStatus = this._effectiveStatus(req, visited)
       if (reqStatus !== 'complete' && reqStatus !== 'skipped') return 'in-progress'
     }
 
