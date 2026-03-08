@@ -1,29 +1,11 @@
 import { type Command } from 'commander'
-import { parse as parseYaml } from 'yaml'
-import { SpecPath, checkMetadataFreshness } from '@specd/core'
+import { SpecPath, checkMetadataFreshness, parseMetadata } from '@specd/core'
 import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
-
-/** Parsed `.specd-metadata.yaml` content. */
-interface SpecMetadata {
-  title?: string
-  description?: string
-  dependsOn?: string[]
-  contentHashes?: Record<string, string>
-  rules?: Array<{ requirement: string; rules: string[] }>
-  constraints?: string[]
-  scenarios?: Array<{
-    requirement: string
-    name: string
-    given?: string[]
-    when?: string[]
-    then?: string[]
-  }>
-}
 
 /**
  * Registers the `spec metadata` subcommand on the given parent command.
@@ -63,14 +45,7 @@ export function registerSpecMetadata(parent: Command): void {
             return
           }
 
-          const metadata: SpecMetadata = (() => {
-            if (!hasMetadata) return {}
-            try {
-              return (parseYaml(metadataArtifact.content) as SpecMetadata) ?? {}
-            } catch {
-              return {}
-            }
-          })()
+          const metadata = hasMetadata ? parseMetadata(metadataArtifact.content) : {}
 
           const specLabel = `${parsed.workspace}:${parsed.capabilityPath}`
 
