@@ -1,7 +1,7 @@
 import * as path from 'node:path'
 import { InferSpecSections } from '../../application/use-cases/infer-spec-sections.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
-import { createArtifactParserRegistry } from '../artifact-parser-registry.js'
+import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 
 /**

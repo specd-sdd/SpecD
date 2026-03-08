@@ -2,7 +2,7 @@ import * as path from 'node:path'
 import { GetProjectContext } from '../../application/use-cases/get-project-context.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { createSpecRepository } from '../spec-repository.js'
-import { createArtifactParserRegistry } from '../artifact-parser-registry.js'
+import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
 
