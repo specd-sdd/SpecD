@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto'
-import { parse as parseYaml } from 'yaml'
+import { contentHash } from '../../domain/services/content-hash.js'
+import { parseMetadata, type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
@@ -15,7 +15,6 @@ import { type Selector } from '../../domain/value-objects/selector.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
-import { specMetadataSchema } from './_shared/spec-metadata-schema.js'
 import {
   type CompileContextConfig,
   type ContextWarning,
@@ -71,24 +70,6 @@ export interface GetProjectContextResult {
 interface ResolvedSpec {
   readonly workspace: string
   readonly capPath: string
-}
-
-/** Parsed `.specd-metadata.yaml` content. */
-interface SpecMetadata {
-  readonly title?: string
-  readonly description?: string
-  readonly keywords?: string[]
-  readonly dependsOn?: string[]
-  readonly contentHashes?: Record<string, string>
-  readonly rules?: Array<{ readonly requirement: string; readonly rules: string[] }>
-  readonly constraints?: string[]
-  readonly scenarios?: Array<{
-    readonly requirement: string
-    readonly name: string
-    readonly given?: string[]
-    readonly when?: string[]
-    readonly then?: string[]
-  }>
 }
 
 /**
@@ -453,13 +434,7 @@ export class GetProjectContext {
    * @returns Parsed metadata, or empty object on parse failure
    */
   private _parseMetadata(content: string): SpecMetadata {
-    try {
-      const parsed = parseYaml(content) as unknown
-      const result = specMetadataSchema.safeParse(parsed)
-      return result.success ? (result.data as SpecMetadata) : {}
-    } catch {
-      return {}
-    }
+    return parseMetadata(content)
   }
 
   /**
@@ -482,7 +457,7 @@ export class GetProjectContext {
       const artifact = await specRepo.artifact(spec, filename)
       if (artifact === null) return false
 
-      const actualHash = `sha256:${createHash('sha256').update(artifact.content).digest('hex')}`
+      const actualHash = contentHash(artifact.content)
       if (actualHash !== recordedHash) return false
     }
     return true

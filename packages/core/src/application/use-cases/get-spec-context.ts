@@ -1,10 +1,9 @@
-import { parse as parseYaml } from 'yaml'
+import { parseMetadata, type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { type ContextWarning } from './compile-context.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
-import { specMetadataSchema } from './_shared/spec-metadata-schema.js'
 
 /** Valid section filter flags for spec context queries. */
 export type SpecContextSectionFlag = 'rules' | 'constraints' | 'scenarios'
@@ -53,23 +52,6 @@ export interface GetSpecContextResult {
   readonly entries: readonly SpecContextEntry[]
   /** Advisory warnings encountered during resolution. */
   readonly warnings: readonly ContextWarning[]
-}
-
-/** Parsed `.specd-metadata.yaml` content (internal). */
-interface SpecMetadata {
-  readonly title?: string
-  readonly description?: string
-  readonly dependsOn?: string[]
-  readonly contentHashes?: Record<string, string>
-  readonly rules?: Array<{ readonly requirement: string; readonly rules: string[] }>
-  readonly constraints?: string[]
-  readonly scenarios?: Array<{
-    readonly requirement: string
-    readonly name: string
-    readonly given?: string[]
-    readonly when?: string[]
-    readonly then?: string[]
-  }>
 }
 
 /**
@@ -224,13 +206,7 @@ export class GetSpecContext {
    * @returns The parsed metadata object, or empty object on parse failure
    */
   private _parseMetadata(content: string): SpecMetadata {
-    try {
-      const parsed = parseYaml(content) as unknown
-      const result = specMetadataSchema.safeParse(parsed)
-      return result.success ? (result.data as SpecMetadata) : {}
-    } catch {
-      return {}
-    }
+    return parseMetadata(content)
   }
 
   /**

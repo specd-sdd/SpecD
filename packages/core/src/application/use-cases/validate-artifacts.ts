@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { contentHash } from '../../domain/services/content-hash.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
@@ -284,7 +284,7 @@ export class ValidateArtifacts {
    * @returns A hex digest prefixed with `sha256:`
    */
   private _sha256(content: string): string {
-    return `sha256:${createHash('sha256').update(content, 'utf8').digest('hex')}`
+    return contentHash(content)
   }
 
   /**

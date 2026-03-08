@@ -1,7 +1,7 @@
-import { createHash } from 'node:crypto'
 import { type PreHashCleanup } from '../../../domain/value-objects/validation-rule.js'
 import { type Schema } from '../../../domain/value-objects/schema.js'
 import { applyPreHashCleanup } from '../../../domain/services/pre-hash-cleanup.js'
+import { contentHash } from '../../../domain/services/content-hash.js'
 
 /**
  * Computes a SHA-256 hash of artifact content after applying pre-hash cleanup rules.
@@ -18,7 +18,7 @@ export function computeArtifactHash(
   cleanups: readonly PreHashCleanup[] = [],
 ): string {
   const cleaned = cleanups.length > 0 ? applyPreHashCleanup(content, cleanups) : content
-  return `sha256:${createHash('sha256').update(cleaned, 'utf8').digest('hex')}`
+  return contentHash(cleaned)
 }
 
 /**
