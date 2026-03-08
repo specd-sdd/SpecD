@@ -173,12 +173,15 @@ describe('FsArchiveRepository', () => {
       expect(typeof manifest['archivedAt']).toBe('string')
     })
 
-    it('appends an entry to index.jsonl', async () => {
+    it('appends an entry to .specd-index.jsonl', async () => {
       const change = await makeArchivableChange(ctx, 'add-auth')
 
       await ctx.archive.archive(change)
 
-      const indexContent = await fs.readFile(path.join(ctx.archivePath, 'index.jsonl'), 'utf8')
+      const indexContent = await fs.readFile(
+        path.join(ctx.archivePath, '.specd-index.jsonl'),
+        'utf8',
+      )
       const lines = indexContent.trim().split('\n')
       expect(lines).toHaveLength(1)
       const entry = JSON.parse(lines[0]!) as Record<string, unknown>
@@ -278,7 +281,7 @@ describe('FsArchiveRepository', () => {
         await localCtx.archive.archive(change)
 
         const indexContent = await fs.readFile(
-          path.join(localCtx.archivePath, 'index.jsonl'),
+          path.join(localCtx.archivePath, '.specd-index.jsonl'),
           'utf8',
         )
         const entry = JSON.parse(indexContent.trim()) as Record<string, unknown>
@@ -325,7 +328,7 @@ describe('FsArchiveRepository', () => {
       await ctx.archive.archive(change)
 
       // Append a duplicate entry pointing to same path
-      const indexPath = path.join(ctx.archivePath, 'index.jsonl')
+      const indexPath = path.join(ctx.archivePath, '.specd-index.jsonl')
       const existing = await fs.readFile(indexPath, 'utf8')
       await fs.appendFile(indexPath, existing.trim() + '\n', 'utf8')
 
@@ -358,7 +361,7 @@ describe('FsArchiveRepository', () => {
       await ctx.archive.archive(change)
 
       // Duplicate index entry — both point to same path, last should win
-      const indexPath = path.join(ctx.archivePath, 'index.jsonl')
+      const indexPath = path.join(ctx.archivePath, '.specd-index.jsonl')
       const line = (await fs.readFile(indexPath, 'utf8')).trim()
       await fs.appendFile(indexPath, line + '\n', 'utf8')
 
@@ -403,7 +406,10 @@ describe('FsArchiveRepository', () => {
       await ctx.archive.get('recovered')
 
       // Index should now exist with a recovered entry
-      const indexContent = await fs.readFile(path.join(ctx.archivePath, 'index.jsonl'), 'utf8')
+      const indexContent = await fs.readFile(
+        path.join(ctx.archivePath, '.specd-index.jsonl'),
+        'utf8',
+      )
       const entry = JSON.parse(indexContent.trim()) as Record<string, unknown>
       expect(entry['name']).toBe('recovered')
     })
@@ -427,7 +433,7 @@ describe('FsArchiveRepository', () => {
       await ctx.archive.archive(newer)
 
       // Corrupt the index
-      await fs.writeFile(path.join(ctx.archivePath, 'index.jsonl'), '', 'utf8')
+      await fs.writeFile(path.join(ctx.archivePath, '.specd-index.jsonl'), '', 'utf8')
 
       await ctx.archive.reindex()
 
@@ -440,7 +446,10 @@ describe('FsArchiveRepository', () => {
     it('creates an empty index file when archive is empty', async () => {
       await ctx.archive.reindex()
 
-      const indexContent = await fs.readFile(path.join(ctx.archivePath, 'index.jsonl'), 'utf8')
+      const indexContent = await fs.readFile(
+        path.join(ctx.archivePath, '.specd-index.jsonl'),
+        'utf8',
+      )
       expect(indexContent).toBe('')
     })
 
@@ -452,10 +461,10 @@ describe('FsArchiveRepository', () => {
       await ctx.archive.archive(newer)
 
       // Corrupt the index to force reindex to rebuild from manifests
-      await fs.writeFile(path.join(ctx.archivePath, 'index.jsonl'), '', 'utf8')
+      await fs.writeFile(path.join(ctx.archivePath, '.specd-index.jsonl'), '', 'utf8')
       await ctx.archive.reindex()
 
-      const lines = (await fs.readFile(path.join(ctx.archivePath, 'index.jsonl'), 'utf8'))
+      const lines = (await fs.readFile(path.join(ctx.archivePath, '.specd-index.jsonl'), 'utf8'))
         .trim()
         .split('\n')
         .map((l) => JSON.parse(l) as Record<string, unknown>)

@@ -74,6 +74,10 @@ export class FsConfigWriter implements ConfigWriter {
     const gitignorePath = path.join(options.projectRoot, '.gitignore')
     await appendToGitignore(gitignorePath, 'specd.local.yaml')
 
+    // Gitignore the archive index — it is a derived cache rebuilt on demand
+    const archiveGitignorePath = path.join(storageBase, 'archive', '.gitignore')
+    await appendToGitignore(archiveGitignorePath, '.specd-index.jsonl')
+
     return {
       configPath,
       schemaRef: options.schemaRef,
