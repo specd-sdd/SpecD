@@ -573,19 +573,16 @@ export class CompileContext {
     allWorkspacesOnBareStar: boolean,
     warnings: ContextWarning[],
   ): Promise<ResolvedSpec[]> {
-    const colonIdx = pattern.indexOf(':')
     let wsName: string
     let pathPat: string
 
-    if (colonIdx >= 0) {
-      wsName = pattern.slice(0, colonIdx)
-      pathPat = pattern.slice(colonIdx + 1)
-    } else if (pattern === '*' && allWorkspacesOnBareStar) {
+    if (pattern === '*' && allWorkspacesOnBareStar) {
       wsName = 'ALL'
       pathPat = '*'
     } else {
-      wsName = defaultWorkspace
-      pathPat = pattern
+      const parsed = parseSpecId(pattern, defaultWorkspace)
+      wsName = parsed.workspace
+      pathPat = parsed.capPath
     }
 
     const workspacesToSearch: Array<{ name: string; repo: SpecRepository }> = []

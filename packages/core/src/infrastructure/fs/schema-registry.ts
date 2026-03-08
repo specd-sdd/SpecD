@@ -20,6 +20,7 @@ import {
 } from '../../domain/value-objects/validation-rule.js'
 import { type Selector } from '../../domain/value-objects/selector.js'
 import { SchemaValidationError } from '../../domain/errors/schema-validation-error.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 
 /** Construction configuration for {@link FsSchemaRegistry}. */
 export interface FsSchemaRegistryConfig {
@@ -513,9 +514,7 @@ export class FsSchemaRegistry implements SchemaRegistry {
   ): string {
     if (ref.startsWith('#')) {
       const inner = ref.slice(1)
-      const colonIdx = inner.indexOf(':')
-      const workspace = colonIdx >= 0 ? inner.slice(0, colonIdx) : 'default'
-      const name = colonIdx >= 0 ? inner.slice(colonIdx + 1) : inner
+      const { workspace, capPath: name } = parseSpecId(inner)
       const schemasPath = workspaceSchemasPaths.get(workspace)
       if (schemasPath === undefined) {
         throw new SchemaValidationError(ref, `workspace '${workspace}' not found in schema paths`)
