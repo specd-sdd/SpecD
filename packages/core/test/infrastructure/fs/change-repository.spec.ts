@@ -132,15 +132,6 @@ describe('FsChangeRepository', () => {
       const loaded = await ctx.repo.get('add-auth')
       expect(loaded?.state).toBe('designing')
     })
-
-    it('given a change with contextSpecIds, when saved and loaded, then contextSpecIds are preserved', async () => {
-      const change = makeChange('add-auth')
-      change.updateContextSpecIds(['_global/config', '_global/schema-format'])
-      await ctx.repo.save(change)
-
-      const loaded = await ctx.repo.get('add-auth')
-      expect(loaded?.contextSpecIds).toEqual(['_global/config', '_global/schema-format'])
-    })
   })
 
   describe('save — directory movement', () => {

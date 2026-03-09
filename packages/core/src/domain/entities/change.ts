@@ -120,8 +120,6 @@ export interface ChangeProps {
   readonly workspaces: readonly string[]
   /** Current snapshot of spec paths being modified. */
   readonly specIds: readonly string[]
-  /** Context spec paths; populated at `ready` state; does not trigger invalidation. */
-  readonly contextSpecIds?: readonly string[]
   /** Append-only event history from which lifecycle state is derived. */
   readonly history: readonly ChangeEvent[]
   /** Pre-loaded artifact map; defaults to an empty map. */
@@ -143,7 +141,6 @@ export class Change {
   private readonly _description: string | undefined
   private _workspaces: string[]
   private _specIds: string[]
-  private _contextSpecIds: string[]
   private _history: ChangeEvent[]
   private _artifacts: Map<string, ChangeArtifact>
 
@@ -164,7 +161,6 @@ export class Change {
     this._description = props.description
     this._workspaces = [...props.workspaces]
     this._specIds = [...props.specIds]
-    this._contextSpecIds = [...(props.contextSpecIds ?? [])]
     this._history = [...props.history]
     this._artifacts =
       props.artifacts !== undefined ? new Map(props.artifacts) : new Map<string, ChangeArtifact>()
@@ -203,11 +199,6 @@ export class Change {
   /** Current snapshot of spec paths being created or modified. */
   get specIds(): readonly string[] {
     return [...this._specIds]
-  }
-
-  /** Context spec paths that provide context but are not being modified. */
-  get contextSpecIds(): readonly string[] {
-    return [...this._contextSpecIds]
   }
 
   /** Read-only view of the append-only event history. */
@@ -466,17 +457,6 @@ export class Change {
   updateSpecIds(specIds: readonly string[], actor: GitIdentity): void {
     this._specIds = [...specIds]
     this.invalidate('spec-change', actor)
-  }
-
-  /**
-   * Updates the context spec IDs without appending any event.
-   *
-   * Modifications to `contextSpecIds` alone do not trigger invalidation.
-   *
-   * @param contextSpecIds - The new context spec paths
-   */
-  updateContextSpecIds(contextSpecIds: readonly string[]): void {
-    this._contextSpecIds = [...contextSpecIds]
   }
 
   /**

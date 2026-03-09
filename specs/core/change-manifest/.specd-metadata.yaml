@@ -18,19 +18,18 @@ dependsOn:
   - 'core:core/spec-id-format'
   - 'core:core/workspace'
 contentHashes:
-  'spec.md': 'sha256:537ccdf2728c466a268fec5369615441c0e16b714a9970c1899dd89f581e5bb5'
+  'spec.md': 'sha256:f7e148b8c82a7c66b9dfe37e2e2b05146fcc1ad61740e5459eca7af83fd42c27'
   'verify.md': 'sha256:da0edcc679f5ba5a2c5cbcab2d8844597474c5aa21305fb4c1b2ff2d36b1590c'
 rules:
   - requirement: 'Manifest structure'
     rules:
       - 'Each change is persisted as a manifest.json file inside its change directory.'
-      - 'The top-level fields are name, createdAt, schema, workspaces, specIds, contextSpecIds, artifacts, and history.'
+      - 'The top-level fields are name, createdAt, schema, workspaces, specIds, artifacts, and history.'
       - 'The name field is the change slug and is immutable after creation.'
       - 'The createdAt field is an ISO 8601 timestamp, immutable after creation, and is the source of truth for the directory prefix.'
       - 'The schema field contains name (string) and version (integer) of the schema active at creation; written once, never updated.'
       - 'The workspaces field is the current snapshot of active workspace IDs and is mutable.'
       - 'The specIds field is the current snapshot of spec IDs and is mutable.'
-      - 'The contextSpecIds field is populated at ready state from each spec .specd-metadata.yaml dependsOn field (direct deps only); mutable; does not trigger approval invalidation when modified.'
       - 'The artifacts array contains descriptors with type, filename, optional, requires, and validatedHash fields.'
       - 'validatedHash is null when the artifact has not been validated, a SHA-256 string when validated, or __skipped__ when an optional artifact has been explicitly marked as not produced.'
       - 'ArtifactStatus is never stored in the manifest; it is derived at load time from validatedHash and file presence.'
@@ -58,7 +57,6 @@ constraints:
   - 'The manifest has no state field; the current lifecycle state is always derived from the history array at load time.'
   - 'The history array is append-only; existing events must never be modified or removed by any operation.'
   - 'The schema field is written once at creation and must never be updated by subsequent operations.'
-  - 'contextSpecIds modifications do not append an invalidated event and do not trigger approval invalidation.'
 scenarios:
   - requirement: 'Manifest structure'
     name: 'Manifest written on creation'
@@ -66,7 +64,7 @@ scenarios:
     when:
       - 'A new change add-auth-flow is created.'
     then:
-      - 'A manifest.json is written containing name, createdAt, schema, workspaces, specIds, contextSpecIds, artifacts, and a history array with a single created event.'
+      - 'A manifest.json is written containing name, createdAt, schema, workspaces, specIds, artifacts, and a history array with a single created event.'
   - requirement: 'Manifest structure'
     name: 'No state field in manifest'
     given: []
@@ -117,13 +115,6 @@ scenarios:
       - 'An invalidated event is appended.'
     then:
       - 'Both validatedHash values are set to null in the manifest; rollback is uniform.'
-  - requirement: 'Manifest structure'
-    name: 'contextSpecIds does not invalidate approvals'
-    given: []
-    when:
-      - 'contextSpecIds is updated on a change that has an active spec-approved event.'
-    then:
-      - 'No invalidated event is appended and the approval remains active.'
   - requirement: 'Schema version'
     name: 'Schema unchanged'
     given: []

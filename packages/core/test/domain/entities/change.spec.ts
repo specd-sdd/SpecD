@@ -37,22 +37,6 @@ describe('Change', () => {
       expect(c.specIds).toEqual(['auth/login'])
     })
 
-    it('defaults contextSpecIds to empty array', () => {
-      expect(makeChange().contextSpecIds).toEqual([])
-    })
-
-    it('accepts contextSpecIds', () => {
-      const c = new Change({
-        name: 'x',
-        createdAt: new Date(),
-        workspaces: ['default'],
-        specIds: ['auth/login'],
-        contextSpecIds: ['auth/jwt'],
-        history: [],
-      })
-      expect(c.contextSpecIds).toEqual(['auth/jwt'])
-    })
-
     it('defaults artifacts to empty map', () => {
       expect(makeChange().artifacts.size).toBe(0)
     })
@@ -428,16 +412,6 @@ describe('Change', () => {
       expect(c.state).toBe('designing')
       const invalidated = c.history.find((e) => e.type === 'invalidated')
       expect(invalidated?.type === 'invalidated' && invalidated.cause).toBe('spec-change')
-    })
-  })
-
-  describe('updateContextSpecIds', () => {
-    it('updates contextSpecIds without appending any event', () => {
-      const c = makeChange()
-      const historyBefore = c.history.length
-      c.updateContextSpecIds(['auth/jwt', 'auth/config'])
-      expect(c.contextSpecIds).toEqual(['auth/jwt', 'auth/config'])
-      expect(c.history).toHaveLength(historyBefore)
     })
   })
 
