@@ -488,7 +488,7 @@ export class FsArchiveRepository extends ArchiveRepository {
 
     // If this directory contains a manifest, record it
     if (dir !== root && entries.includes('manifest.json')) {
-      results.push(path.relative(root, dir))
+      results.push(path.relative(root, dir).split(path.sep).join('/'))
     }
 
     // Recurse into subdirectories
