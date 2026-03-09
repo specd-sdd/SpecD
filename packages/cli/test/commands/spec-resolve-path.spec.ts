@@ -3,6 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
   makeMockKernel,
+  makeMockStats,
   makeProgram,
   mockProcessExit,
   captureStdout,
@@ -69,9 +70,7 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({
-      isDirectory: () => true,
-    } as unknown as import('node:fs').Stats)
+    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => true }))
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -97,9 +96,7 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({
-      isDirectory: () => true,
-    } as unknown as import('node:fs').Stats)
+    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => true }))
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -130,9 +127,7 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({
-      isDirectory: () => true,
-    } as unknown as import('node:fs').Stats)
+    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => true }))
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -166,9 +161,7 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({
-      isDirectory: () => true,
-    } as unknown as import('node:fs').Stats)
+    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => true }))
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -200,9 +193,7 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({
-      isDirectory: () => true,
-    } as unknown as import('node:fs').Stats)
+    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => true }))
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -238,9 +229,7 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({
-      isDirectory: () => false,
-    } as unknown as import('node:fs').Stats)
+    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => false }))
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -286,9 +275,7 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue({
-      isDirectory: () => true,
-    } as unknown as import('node:fs').Stats)
+    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => true }))
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()

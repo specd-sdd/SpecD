@@ -43,12 +43,12 @@ function setup() {
     workspaces: [{ name: 'default', specsPath: 'specs/' }],
   })
   vi.mocked(createInitProject).mockReturnValue(
-    makeMockUseCase(mockExecute) as unknown as ReturnType<typeof createInitProject>,
+    makeMockUseCase<ReturnType<typeof createInitProject>>(mockExecute),
   )
 
   const mockRecordExecute = vi.fn().mockResolvedValue(undefined)
   vi.mocked(createRecordSkillInstall).mockReturnValue(
-    makeMockUseCase(mockRecordExecute) as unknown as ReturnType<typeof createRecordSkillInstall>,
+    makeMockUseCase<ReturnType<typeof createRecordSkillInstall>>(mockRecordExecute),
   )
 
   const stdout = captureStdout()

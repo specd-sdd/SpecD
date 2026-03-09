@@ -154,7 +154,10 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     },
   }
 
-  return { changes, specs, project, ...overrides } as unknown as Kernel & MockKernel
+  // The mock satisfies Kernel structurally at runtime (every group has every
+  // key with an { execute } stub). A single cast is enough — MockKernel
+  // mirrors Kernel's shape with mock execute functions.
+  return { changes, specs, project, ...overrides } as Kernel & MockKernel
 }
 
 // ---------------------------------------------------------------------------
@@ -249,10 +252,16 @@ export function makeMockStats(overrides: Partial<Stats> = {}): Stats {
 /**
  * Creates a mock use-case object with a vitest mock `execute` function.
  *
- * Use with `vi.mocked(factory).mockReturnValue(makeMockUseCase())`.
+ * When called with a type parameter, the returned object is typed to match
+ * the expected use-case shape (e.g. `makeMockUseCase<ReturnType<typeof createFoo>>()`),
+ * avoiding `as unknown as` double casts at call sites.
+ *
+ * @param execute - Optional pre-configured mock function
+ * @returns A mock object with an `execute` property
  */
-export function makeMockUseCase(execute: ReturnType<typeof vi.fn> = vi.fn()): {
-  execute: ReturnType<typeof vi.fn>
-} {
-  return { execute }
+export function makeMockUseCase<
+  T extends { execute: (...args: never[]) => unknown } = { execute: ReturnType<typeof vi.fn> },
+>(execute: ReturnType<typeof vi.fn> = vi.fn()): T {
+  // Single-point cast: the mock structurally satisfies any use-case with an execute method
+  return { execute } as unknown as T
 }
