@@ -149,7 +149,12 @@ export class FsArchiveRepository extends ArchiveRepository {
 
     const archivedAt = new Date()
     const archivedName = changeDirName(change.name, change.createdAt)
-    const relPath = this._expandPattern(change.name, archivedName, archivedAt)
+    const relPath = this._expandPattern(
+      change.name,
+      archivedName,
+      archivedAt,
+      change.workspaces[0] ?? 'default',
+    )
     const archiveDir = path.join(this._archivePath, ...relPath.split('/'))
 
     const sourceDir = await this._resolveChangeDir(change.name)
@@ -331,19 +336,28 @@ export class FsArchiveRepository extends ArchiveRepository {
    *
    * @param name - The change slug name (for `{{change.name}}`)
    * @param archivedName - The timestamped directory name (for `{{change.archivedName}}`)
-   * @param archivedAt - The archive timestamp (for `{{year}}`, `{{month}}`, `{{day}}`)
+   * @param archivedAt - The archive timestamp (for `{{year}}`, `{{month}}`, `{{day}}`, `{{date}}`)
+   * @param workspace - The primary workspace of the change (for `{{change.workspace}}`)
    * @returns The expanded forward-slash-separated path relative to the archive root
    */
-  private _expandPattern(name: string, archivedName: string, archivedAt: Date): string {
+  private _expandPattern(
+    name: string,
+    archivedName: string,
+    archivedAt: Date,
+    workspace: string,
+  ): string {
     const year = archivedAt.getUTCFullYear().toString()
     const month = (archivedAt.getUTCMonth() + 1).toString().padStart(2, '0')
     const day = archivedAt.getUTCDate().toString().padStart(2, '0')
+    const date = `${year}-${month}-${day}`
     return this._pattern
       .replaceAll('{{year}}', year)
       .replaceAll('{{month}}', month)
       .replaceAll('{{day}}', day)
+      .replaceAll('{{date}}', date)
       .replaceAll('{{change.name}}', name)
       .replaceAll('{{change.archivedName}}', archivedName)
+      .replaceAll('{{change.workspace}}', workspace)
   }
 
   /**
