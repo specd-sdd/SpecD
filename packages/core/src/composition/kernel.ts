@@ -1,64 +1,36 @@
-import { type CreateChange } from '../application/use-cases/create-change.js'
-import { type GetStatus } from '../application/use-cases/get-status.js'
-import { type TransitionChange } from '../application/use-cases/transition-change.js'
-import { type DraftChange } from '../application/use-cases/draft-change.js'
-import { type RestoreChange } from '../application/use-cases/restore-change.js'
-import { type DiscardChange } from '../application/use-cases/discard-change.js'
-import { type ArchiveChange } from '../application/use-cases/archive-change.js'
-import { type ValidateArtifacts } from '../application/use-cases/validate-artifacts.js'
-import { type CompileContext } from '../application/use-cases/compile-context.js'
-import { type ApproveSpec } from '../application/use-cases/approve-spec.js'
-import { type ApproveSignoff } from '../application/use-cases/approve-signoff.js'
-import { type ListChanges } from '../application/use-cases/list-changes.js'
-import { type ListDrafts } from '../application/use-cases/list-drafts.js'
-import { type ListDiscarded } from '../application/use-cases/list-discarded.js'
-import { type ListArchived } from '../application/use-cases/list-archived.js'
-import { type GetArchivedChange } from '../application/use-cases/get-archived-change.js'
-import { type EditChange } from '../application/use-cases/edit-change.js'
-import { type SkipArtifact } from '../application/use-cases/skip-artifact.js'
-import { type ListSpecs } from '../application/use-cases/list-specs.js'
-import { type GetSpec } from '../application/use-cases/get-spec.js'
-import { type SaveSpecMetadata } from '../application/use-cases/save-spec-metadata.js'
-import { type InvalidateSpecMetadata } from '../application/use-cases/invalidate-spec-metadata.js'
-import { type GetActiveSchema } from '../application/use-cases/get-active-schema.js'
-import { type InitProject } from '../application/use-cases/init-project.js'
-import { type RecordSkillInstall } from '../application/use-cases/record-skill-install.js'
-import { type GetSkillsManifest } from '../application/use-cases/get-skills-manifest.js'
-import { type GetProjectContext } from '../application/use-cases/get-project-context.js'
-import { type ValidateSpecs } from '../application/use-cases/validate-specs.js'
-import { type InferSpecSections } from '../application/use-cases/infer-spec-sections.js'
-import { type GetSpecContext } from '../application/use-cases/get-spec-context.js'
+import { CreateChange } from '../application/use-cases/create-change.js'
+import { GetStatus } from '../application/use-cases/get-status.js'
+import { TransitionChange } from '../application/use-cases/transition-change.js'
+import { DraftChange } from '../application/use-cases/draft-change.js'
+import { RestoreChange } from '../application/use-cases/restore-change.js'
+import { DiscardChange } from '../application/use-cases/discard-change.js'
+import { ArchiveChange } from '../application/use-cases/archive-change.js'
+import { ValidateArtifacts } from '../application/use-cases/validate-artifacts.js'
+import { CompileContext } from '../application/use-cases/compile-context.js'
+import { ApproveSpec } from '../application/use-cases/approve-spec.js'
+import { ApproveSignoff } from '../application/use-cases/approve-signoff.js'
+import { ListChanges } from '../application/use-cases/list-changes.js'
+import { ListDrafts } from '../application/use-cases/list-drafts.js'
+import { ListDiscarded } from '../application/use-cases/list-discarded.js'
+import { ListArchived } from '../application/use-cases/list-archived.js'
+import { GetArchivedChange } from '../application/use-cases/get-archived-change.js'
+import { EditChange } from '../application/use-cases/edit-change.js'
+import { SkipArtifact } from '../application/use-cases/skip-artifact.js'
+import { ListSpecs } from '../application/use-cases/list-specs.js'
+import { GetSpec } from '../application/use-cases/get-spec.js'
+import { SaveSpecMetadata } from '../application/use-cases/save-spec-metadata.js'
+import { InvalidateSpecMetadata } from '../application/use-cases/invalidate-spec-metadata.js'
+import { GetActiveSchema } from '../application/use-cases/get-active-schema.js'
+import { InitProject } from '../application/use-cases/init-project.js'
+import { RecordSkillInstall } from '../application/use-cases/record-skill-install.js'
+import { GetSkillsManifest } from '../application/use-cases/get-skills-manifest.js'
+import { GetProjectContext } from '../application/use-cases/get-project-context.js'
+import { ValidateSpecs } from '../application/use-cases/validate-specs.js'
+import { InferSpecSections } from '../application/use-cases/infer-spec-sections.js'
+import { GetSpecContext } from '../application/use-cases/get-spec-context.js'
 import { type SpecdConfig } from '../application/specd-config.js'
-import { createCreateChange } from './use-cases/create-change.js'
-import { createGetStatus } from './use-cases/get-status.js'
-import { createTransitionChange } from './use-cases/transition-change.js'
-import { createDraftChange } from './use-cases/draft-change.js'
-import { createRestoreChange } from './use-cases/restore-change.js'
-import { createDiscardChange } from './use-cases/discard-change.js'
-import { createArchiveChange } from './use-cases/archive-change.js'
-import { createValidateArtifacts } from './use-cases/validate-artifacts.js'
-import { createCompileContext } from './use-cases/compile-context.js'
-import { createApproveSpec } from './use-cases/approve-spec.js'
-import { createApproveSignoff } from './use-cases/approve-signoff.js'
-import { createListChanges } from './use-cases/list-changes.js'
-import { createListDrafts } from './use-cases/list-drafts.js'
-import { createListDiscarded } from './use-cases/list-discarded.js'
-import { createListArchived } from './use-cases/list-archived.js'
-import { createGetArchivedChange } from './use-cases/get-archived-change.js'
-import { createEditChange } from './use-cases/edit-change.js'
-import { createSkipArtifact } from './use-cases/skip-artifact.js'
-import { createListSpecs } from './use-cases/list-specs.js'
-import { createGetSpec } from './use-cases/get-spec.js'
-import { createSaveSpecMetadata } from './use-cases/save-spec-metadata.js'
-import { createInvalidateSpecMetadata } from './use-cases/invalidate-spec-metadata.js'
-import { createGetActiveSchema } from './use-cases/get-active-schema.js'
-import { createInitProject } from './use-cases/init-project.js'
-import { createRecordSkillInstall } from './use-cases/record-skill-install.js'
-import { createGetSkillsManifest } from './use-cases/get-skills-manifest.js'
-import { createGetProjectContext } from './use-cases/get-project-context.js'
-import { createValidateSpecs } from './use-cases/validate-specs.js'
-import { createInferSpecSections } from './use-cases/infer-spec-sections.js'
-import { createGetSpecContext } from './use-cases/get-spec-context.js'
+import { parseSpecId } from '../domain/services/parse-spec-id.js'
+import { createKernelInternals } from './kernel-internals.js'
 
 /**
  * All use cases instantiated from a single `SpecdConfig`, grouped by domain area.
@@ -155,53 +127,65 @@ export interface KernelOptions {
  * Constructs all use cases from the fully-resolved project configuration and
  * returns them grouped into a {@link Kernel}.
  *
- * All internal ports (repositories, git adapter, hook runner, file reader,
- * schema registry, parser registry) are constructed internally. The delivery
- * mechanism receives a ready-to-use kernel and never imports concrete adapter
- * classes or use case constructors directly.
+ * Shared adapter instances (repositories, git adapter, hook runner, etc.) are
+ * built once via {@link createKernelInternals} and reused across all use cases,
+ * avoiding redundant construction of identical adapters.
  *
  * @param config - The fully-resolved project configuration from `ConfigLoader`
  * @param options - Optional kernel construction options
  * @returns A fully-wired kernel with all use cases
  */
 export function createKernel(config: SpecdConfig, options?: KernelOptions): Kernel {
-  const schemaOpts = { extraNodeModulesPaths: options?.extraNodeModulesPaths ?? [] }
+  const i = createKernelInternals(config, options)
+
   return {
     changes: {
-      create: createCreateChange(config),
-      status: createGetStatus(config),
-      transition: createTransitionChange(config),
-      draft: createDraftChange(config),
-      restore: createRestoreChange(config),
-      discard: createDiscardChange(config),
-      archive: createArchiveChange(config, schemaOpts),
-      validate: createValidateArtifacts(config, schemaOpts),
-      compile: createCompileContext(config, schemaOpts),
-      list: createListChanges(config),
-      listDrafts: createListDrafts(config),
-      listDiscarded: createListDiscarded(config),
-      edit: createEditChange(config),
-      skipArtifact: createSkipArtifact(config),
-      listArchived: createListArchived(config),
-      getArchived: createGetArchivedChange(config),
+      create: new CreateChange(i.changes, i.git),
+      status: new GetStatus(i.changes),
+      transition: new TransitionChange(i.changes, i.git),
+      draft: new DraftChange(i.changes, i.git),
+      restore: new RestoreChange(i.changes, i.git),
+      discard: new DiscardChange(i.changes, i.git),
+      archive: new ArchiveChange(
+        i.changes,
+        i.specs,
+        i.archive,
+        i.hooks,
+        i.git,
+        i.parsers,
+        i.schemas,
+      ),
+      validate: new ValidateArtifacts(i.changes, i.specs, i.schemas, i.parsers, i.git, i.hasher),
+      compile: new CompileContext(i.changes, i.specs, i.schemas, i.files, i.parsers, i.hasher),
+      list: new ListChanges(i.changes),
+      listDrafts: new ListDrafts(i.changes),
+      listDiscarded: new ListDiscarded(i.changes),
+      edit: new EditChange(i.changes, i.git, (specIds) => {
+        const workspaces = new Set<string>()
+        for (const specId of specIds) workspaces.add(parseSpecId(specId).workspace)
+        return [...workspaces]
+      }),
+      skipArtifact: new SkipArtifact(i.changes, i.git),
+      listArchived: new ListArchived(i.archive),
+      getArchived: new GetArchivedChange(i.archive),
     },
     specs: {
-      approveSpec: createApproveSpec(config),
-      approveSignoff: createApproveSignoff(config),
-      list: createListSpecs(config),
-      get: createGetSpec(config),
-      saveMetadata: createSaveSpecMetadata(config),
-      invalidateMetadata: createInvalidateSpecMetadata(config),
-      getActiveSchema: createGetActiveSchema(config, schemaOpts),
-      validate: createValidateSpecs(config, schemaOpts),
-      inferSections: createInferSpecSections(config, schemaOpts),
-      getContext: createGetSpecContext(config),
+      approveSpec: new ApproveSpec(i.changes, i.git),
+      approveSignoff: new ApproveSignoff(i.changes, i.git),
+      list: new ListSpecs(i.specs, i.hasher, i.yaml),
+      get: new GetSpec(i.specs),
+      saveMetadata: new SaveSpecMetadata(i.specs, i.yaml),
+      invalidateMetadata: new InvalidateSpecMetadata(i.specs, i.yaml),
+      getActiveSchema: new GetActiveSchema(i.schemas),
+      validate: new ValidateSpecs(i.specs, i.schemas, i.parsers),
+      inferSections: new InferSpecSections(i.schemas, i.parsers),
+      getContext: new GetSpecContext(i.specs, i.hasher),
     },
     project: {
-      init: createInitProject(),
-      recordSkillInstall: createRecordSkillInstall(),
-      getSkillsManifest: createGetSkillsManifest(),
-      getProjectContext: createGetProjectContext(config, schemaOpts),
+      init: new InitProject(i.configWriter),
+      recordSkillInstall: new RecordSkillInstall(i.configWriter),
+      getSkillsManifest: new GetSkillsManifest(i.configWriter),
+      getProjectContext: new GetProjectContext(i.specs, i.schemas, i.files, i.parsers, i.hasher),
     },
   }
 }
