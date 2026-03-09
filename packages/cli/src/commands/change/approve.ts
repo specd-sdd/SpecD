@@ -1,9 +1,6 @@
 import { type Command } from 'commander'
-import { buildCleanupMap } from '@specd/core'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { hashChangeArtifacts } from '../../helpers/artifact-hash.js'
-import { findChangeDir } from '../../helpers/change-dir.js'
 import { resolveChangeContext } from '../../helpers/change-context.js'
 
 /**
@@ -28,20 +25,11 @@ export function registerChangeApprove(parent: Command): void {
           configPath: opts.config,
         })
 
-        const { change } = await kernel.changes.status.execute({ name })
-        const changeDir = await findChangeDir(config.storage.changesPath, name)
-        const schema = await kernel.specs.getActiveSchema.execute({
-          schemaRef: config.schemaRef,
-          workspaceSchemasPaths,
-        })
-        const cleanupMap = buildCleanupMap(schema)
-        const artifactHashes =
-          changeDir !== null ? await hashChangeArtifacts(changeDir, change, cleanupMap) : {}
-
         await kernel.specs.approveSpec.execute({
           name,
           reason: opts.reason,
-          artifactHashes,
+          schemaRef: config.schemaRef,
+          workspaceSchemasPaths,
           approvalsSpec: config.approvals.spec,
         })
 
@@ -68,20 +56,11 @@ export function registerChangeApprove(parent: Command): void {
           configPath: opts.config,
         })
 
-        const { change } = await kernel.changes.status.execute({ name })
-        const changeDir = await findChangeDir(config.storage.changesPath, name)
-        const schema = await kernel.specs.getActiveSchema.execute({
-          schemaRef: config.schemaRef,
-          workspaceSchemasPaths,
-        })
-        const cleanupMap = buildCleanupMap(schema)
-        const artifactHashes =
-          changeDir !== null ? await hashChangeArtifacts(changeDir, change, cleanupMap) : {}
-
         await kernel.specs.approveSignoff.execute({
           name,
           reason: opts.reason,
-          artifactHashes,
+          schemaRef: config.schemaRef,
+          workspaceSchemasPaths,
           approvalsSignoff: config.approvals.signoff,
         })
 

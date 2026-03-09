@@ -423,6 +423,83 @@ describe('FsSpecRepository', () => {
     })
   })
 
+  // ---- resolveFromPath ----
+
+  describe('resolveFromPath', () => {
+    it('given a path under specsPath, returns specPath and specId', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login')
+
+      const result = await ctx.repo.resolveFromPath(path.join(ctx.specsPath, 'auth', 'login'))
+
+      expect(result).not.toBeNull()
+      expect(result!.specPath.toString()).toBe('auth/login')
+      expect(result!.specId).toBe('default:auth/login')
+    })
+
+    it('given a file path, resolves to the parent directory', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login')
+
+      const result = await ctx.repo.resolveFromPath(
+        path.join(ctx.specsPath, 'auth', 'login', 'spec.md'),
+      )
+
+      expect(result).not.toBeNull()
+      expect(result!.specPath.toString()).toBe('auth/login')
+    })
+
+    it('given a path not under specsPath, returns null', async () => {
+      const result = await ctx.repo.resolveFromPath('/some/other/path')
+
+      expect(result).toBeNull()
+    })
+
+    it('given specsPath itself, returns null', async () => {
+      const result = await ctx.repo.resolveFromPath(ctx.specsPath)
+
+      expect(result).toBeNull()
+    })
+
+    it('given a non-existent path, returns null', async () => {
+      const result = await ctx.repo.resolveFromPath(path.join(ctx.specsPath, 'nonexistent', 'spec'))
+
+      expect(result).toBeNull()
+    })
+
+    it('given a prefix-configured repo, prepends prefix segments', async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-spec-resolve-'))
+      const specsPath = path.join(tmpDir, 'specs')
+      await fs.mkdir(specsPath, { recursive: true })
+
+      const repo = new FsSpecRepository({
+        workspace: 'core',
+        ownership: 'owned',
+        isExternal: false,
+        specsPath,
+        prefix: 'core',
+      })
+
+      // Write a spec at specs/change/
+      const specDir = path.join(specsPath, 'change')
+      await fs.mkdir(specDir, { recursive: true })
+      await fs.writeFile(path.join(specDir, 'spec.md'), '# Change', 'utf8')
+
+      const result = await repo.resolveFromPath(path.join(specsPath, 'change'))
+
+      expect(result).not.toBeNull()
+      expect(result!.specPath.toString()).toBe('core/change')
+      expect(result!.specId).toBe('core:core/change')
+
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+
+    it('given a partial match of specsPath (e.g. specs-extra), returns null', async () => {
+      // The specsPath is <tmpDir>/specs, so <tmpDir>/specs-extra should NOT match
+      const result = await ctx.repo.resolveFromPath(ctx.specsPath + '-extra/something')
+
+      expect(result).toBeNull()
+    })
+  })
+
   // ---- delete ----
 
   describe('delete', () => {

@@ -279,6 +279,43 @@ export class FsChangeRepository extends ChangeRepository {
     await fs.writeFile(filePath, artifact.content, 'utf8')
   }
 
+  /**
+   * Checks whether an artifact file exists for a change, without loading content.
+   *
+   * @param change - The change containing the artifact
+   * @param filename - The artifact filename to check
+   * @returns `true` if the file exists, `false` otherwise
+   */
+  override async artifactExists(change: Change, filename: string): Promise<boolean> {
+    const dir = await this._resolveDir(change.name)
+    if (dir === null) return false
+    try {
+      await fs.lstat(path.join(dir, filename))
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Checks whether a delta file exists for a change + specId pair.
+   *
+   * @param change - The change containing the delta
+   * @param specId - The spec identifier
+   * @param filename - The delta filename to check
+   * @returns `true` if the file exists, `false` otherwise
+   */
+  override async deltaExists(change: Change, specId: string, filename: string): Promise<boolean> {
+    const dir = await this._resolveDir(change.name)
+    if (dir === null) return false
+    try {
+      await fs.lstat(path.join(dir, 'deltas', specId, filename))
+      return true
+    } catch {
+      return false
+    }
+  }
+
   // ---- Private helpers ----
 
   /**

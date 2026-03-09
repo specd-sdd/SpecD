@@ -77,4 +77,18 @@ export abstract class SpecRepository extends Repository {
    * @param spec - The spec to delete
    */
   abstract delete(spec: Spec): Promise<void>
+
+  /**
+   * Resolves an absolute storage path to a spec identity within this workspace.
+   *
+   * Returns `null` if the path does not belong to this workspace or does not
+   * point to a valid spec. Implementations that do not support path-based
+   * resolution (e.g. HTTP) may always return `null`.
+   *
+   * @param absolutePath - The absolute path to resolve
+   * @returns The resolved spec path and ID, or `null` if no match
+   */
+  abstract resolveFromPath(
+    absolutePath: string,
+  ): Promise<{ specPath: SpecPath; specId: string } | null>
 }
