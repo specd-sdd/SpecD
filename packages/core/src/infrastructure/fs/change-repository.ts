@@ -332,7 +332,12 @@ export class FsChangeRepository extends ChangeRepository {
    */
   private async _loadManifest(dir: string): Promise<ChangeManifest> {
     const content = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
-    const raw: unknown = JSON.parse(content)
+    let raw: unknown
+    try {
+      raw = JSON.parse(content)
+    } catch {
+      throw new CorruptedManifestError(`invalid JSON in manifest.json in ${dir}`)
+    }
     const result = changeManifestSchema.safeParse(raw)
     if (!result.success) {
       throw new CorruptedManifestError(
