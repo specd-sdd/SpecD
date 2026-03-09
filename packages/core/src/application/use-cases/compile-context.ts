@@ -1,4 +1,5 @@
-import { parseMetadata, type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { parseMetadata } from './_shared/parse-metadata.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'

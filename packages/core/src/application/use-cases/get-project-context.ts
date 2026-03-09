@@ -1,4 +1,5 @@
-import { parseMetadata, type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { parseMetadata } from './_shared/parse-metadata.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { type SpecRepository } from '../ports/spec-repository.js'

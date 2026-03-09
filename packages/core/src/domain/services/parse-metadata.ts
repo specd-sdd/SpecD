@@ -1,4 +1,3 @@
-import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 
 /**
@@ -116,22 +115,4 @@ export interface SpecMetadata {
     readonly when?: string[]
     readonly then?: string[]
   }>
-}
-
-/**
- * Parses a `.specd-metadata.yaml` content string into a typed object.
- *
- * Returns an empty object on YAML syntax errors or validation failures.
- *
- * @param content - The raw YAML string
- * @returns Parsed and validated metadata
- */
-export function parseMetadata(content: string): SpecMetadata {
-  try {
-    const parsed = parseYaml(content) as unknown
-    const result = specMetadataSchema.safeParse(parsed)
-    return result.success ? (result.data as SpecMetadata) : {}
-  } catch {
-    return {}
-  }
 }

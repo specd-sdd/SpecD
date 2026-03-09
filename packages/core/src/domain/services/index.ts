@@ -1,7 +1,6 @@
 export { applyPreHashCleanup } from './pre-hash-cleanup.js'
 export { hashFiles } from './hash-files.js'
 export {
-  parseMetadata,
   specMetadataSchema,
   strictSpecMetadataSchema,
   type SpecMetadata,

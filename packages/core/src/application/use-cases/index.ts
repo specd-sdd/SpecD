@@ -69,6 +69,7 @@ export {
   type MetadataFreshnessResult,
 } from './_shared/metadata-freshness.js'
 export { computeArtifactHash, buildCleanupMap } from './_shared/compute-artifact-hash.js'
+export { parseMetadata } from './_shared/parse-metadata.js'
 export {
   type InferSpecSections,
   type InferSpecSectionsInput,

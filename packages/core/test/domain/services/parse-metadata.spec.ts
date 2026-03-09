@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import {
-  parseMetadata,
-  strictSpecMetadataSchema,
-} from '../../../src/domain/services/parse-metadata.js'
+import { strictSpecMetadataSchema } from '../../../src/domain/services/parse-metadata.js'
+import { parseMetadata } from '../../../src/application/use-cases/_shared/parse-metadata.js'
 
 const VALID_HASH = 'sha256:' + 'a'.repeat(64)
 const VALID_BASE = {
