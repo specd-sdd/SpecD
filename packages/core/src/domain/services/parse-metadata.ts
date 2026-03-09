@@ -1,7 +1,29 @@
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 
-/** Zod schema for `.specd-metadata.yaml` content. */
+/**
+ * Workspace name: lowercase, starts with letter, letters/digits/hyphens.
+ * Capability path segment: lowercase, starts with letter/digit/underscore, letters/digits/underscores/hyphens.
+ */
+const WORKSPACE_RE = /^[a-z][a-z0-9-]*$/
+const CAP_SEGMENT_RE = /^[a-z0-9_][a-z0-9_-]*$/
+const HASH_RE = /^sha256:[0-9a-f]{64}$/
+
+/** Validates a spec ID: `capPath` or `workspace:capPath`. */
+const specIdString = z.string().refine(
+  (val) => {
+    const colonIdx = val.indexOf(':')
+    if (colonIdx >= 0) {
+      const ws = val.slice(0, colonIdx)
+      const cap = val.slice(colonIdx + 1)
+      return WORKSPACE_RE.test(ws) && cap.split('/').every((s) => CAP_SEGMENT_RE.test(s))
+    }
+    return val.split('/').every((s) => CAP_SEGMENT_RE.test(s))
+  },
+  { message: 'must be a valid spec ID (capabilityPath or workspace:capabilityPath)' },
+)
+
+/** Lenient schema for reading `.specd-metadata.yaml` — used by {@link parseMetadata}. */
 export const specMetadataSchema = z
   .object({
     title: z.string().optional(),
@@ -26,6 +48,52 @@ export const specMetadataSchema = z
           given: z.array(z.string()).optional(),
           when: z.array(z.string()).optional(),
           then: z.array(z.string()).optional(),
+        }),
+      )
+      .optional(),
+  })
+  .passthrough()
+
+/**
+ * Strict schema for writing `.specd-metadata.yaml` — used by {@link SaveSpecMetadata}.
+ * All fields are optional, but when present they must conform to format constraints.
+ */
+export const strictSpecMetadataSchema = z
+  .object({
+    title: z.string().min(1).optional(),
+    description: z.string().optional(),
+    keywords: z
+      .array(
+        z
+          .string()
+          .min(1)
+          .regex(/^[a-z]/, { message: 'must be lowercase' }),
+      )
+      .optional(),
+    dependsOn: z.array(specIdString).optional(),
+    contentHashes: z
+      .record(
+        z.string(),
+        z.string().regex(HASH_RE, { message: 'must match sha256:<64 hex chars>' }),
+      )
+      .optional(),
+    rules: z
+      .array(
+        z.object({
+          requirement: z.string().min(1),
+          rules: z.array(z.string().min(1)).nonempty(),
+        }),
+      )
+      .optional(),
+    constraints: z.array(z.string().min(1)).nonempty().optional(),
+    scenarios: z
+      .array(
+        z.object({
+          requirement: z.string().min(1),
+          name: z.string().min(1),
+          given: z.array(z.string()).optional(),
+          when: z.array(z.string()).nonempty(),
+          then: z.array(z.string()).nonempty(),
         }),
       )
       .optional(),

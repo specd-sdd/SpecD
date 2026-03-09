@@ -46,6 +46,67 @@
 - **WHEN** a spec in the `default` workspace has `dependsOn: [auth/login]`
 - **THEN** specd resolves `auth/login` within the `default` workspace
 
+### Requirement: Write-time structural validation
+
+#### Scenario: Valid metadata accepted
+
+- **GIVEN** a YAML string with `title: 'Config'`, `keywords: ['lifecycle']`, `dependsOn: ['core:storage']`, and `contentHashes: { 'spec.md': 'sha256:a3f1...64hex' }`
+- **WHEN** `SaveSpecMetadata` is executed with that content
+- **THEN** the file is written successfully
+
+#### Scenario: Invalid keywords rejected
+
+- **GIVEN** a YAML string with `keywords: ['Valid', 123]`
+- **WHEN** `SaveSpecMetadata` is executed with that content
+- **THEN** a `MetadataValidationError` is thrown indicating keywords must be lowercase strings
+- **AND** the file is not written
+
+#### Scenario: Invalid dependsOn format rejected
+
+- **GIVEN** a YAML string with `dependsOn: ['not a valid id!']`
+- **WHEN** `SaveSpecMetadata` is executed with that content
+- **THEN** a `MetadataValidationError` is thrown indicating the spec ID format is invalid
+- **AND** the file is not written
+
+#### Scenario: Invalid contentHashes format rejected
+
+- **GIVEN** a YAML string with `contentHashes: { 'spec.md': 'md5:abc' }`
+- **WHEN** `SaveSpecMetadata` is executed with that content
+- **THEN** a `MetadataValidationError` is thrown indicating the hash format is invalid
+- **AND** the file is not written
+
+#### Scenario: Invalid rules structure rejected
+
+- **GIVEN** a YAML string with `rules: [{ requirement: '' }]`
+- **WHEN** `SaveSpecMetadata` is executed with that content
+- **THEN** a `MetadataValidationError` is thrown
+- **AND** the file is not written
+
+#### Scenario: Invalid scenarios structure rejected
+
+- **GIVEN** a YAML string with `scenarios: [{ requirement: 'X', name: 'Y' }]` (missing `when` and `then`)
+- **WHEN** `SaveSpecMetadata` is executed with that content
+- **THEN** a `MetadataValidationError` is thrown
+- **AND** the file is not written
+
+#### Scenario: Unknown top-level keys allowed
+
+- **GIVEN** a YAML string with `title: 'Test'` and `customField: 'value'`
+- **WHEN** `SaveSpecMetadata` is executed with that content
+- **THEN** the file is written successfully — unknown keys are passed through
+
+#### Scenario: Empty file accepted
+
+- **GIVEN** an empty YAML string (no fields)
+- **WHEN** `SaveSpecMetadata` is executed with that content
+- **THEN** the file is written successfully — all fields are optional
+
+#### Scenario: Read path remains lenient
+
+- **GIVEN** a `.specd-metadata.yaml` on disk with `keywords: [123, true]` (invalid types)
+- **WHEN** `parseMetadata` reads the file
+- **THEN** it returns `{}` without throwing — read path never blocks operations
+
 ### Requirement: LLM authorship
 
 #### Scenario: Agent writes metadata after creating spec

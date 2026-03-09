@@ -41,6 +41,10 @@ If the spec does not exist in the given workspace, the command writes `error: sp
 
 If the content is not valid YAML, the command writes `error: invalid YAML: <parse error message>` to stderr and exits with code 1.
 
+### Requirement: Error — invalid metadata structure
+
+If the use case throws a `MetadataValidationError` (content is valid YAML but fails structural validation), the error propagates through `handleError` which writes `error: <message>` to stderr and exits with code 1.
+
 ### Requirement: Error — conflict detected
 
 If `--force` is not set and the repository detects a concurrent modification (hash mismatch), the command writes the conflict error to stderr and exits with code 1.

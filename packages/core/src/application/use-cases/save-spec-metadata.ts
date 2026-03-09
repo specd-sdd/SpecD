@@ -1,6 +1,9 @@
+import { parse as parseYaml } from 'yaml'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
+import { strictSpecMetadataSchema } from '../../domain/services/parse-metadata.js'
+import { MetadataValidationError } from '../../domain/errors/metadata-validation-error.js'
 
 /** Input for the {@link SaveSpecMetadata} use case. */
 export interface SaveSpecMetadataInput {
@@ -43,9 +46,20 @@ export class SaveSpecMetadata {
    *
    * @param input - The metadata content and target spec
    * @returns The spec label on success, or `null` if the spec does not exist
+   * @throws {MetadataValidationError} When the content fails structural validation
    * @throws {ArtifactConflictError} When a concurrent modification is detected and `force` is not set
    */
   async execute(input: SaveSpecMetadataInput): Promise<SaveSpecMetadataResult | null> {
+    // Validate content against the strict schema before doing anything else
+    const parsed = parseYaml(input.content) as unknown
+    const validation = strictSpecMetadataSchema.safeParse(parsed ?? {})
+    if (!validation.success) {
+      const issues = validation.error.issues
+        .map((i) => `${i.path.join('.')}: ${i.message}`)
+        .join('; ')
+      throw new MetadataValidationError(issues)
+    }
+
     const repo = this._specRepos.get(input.workspace)
     if (repo === undefined) {
       return null

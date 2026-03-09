@@ -22,6 +22,7 @@ import {
   HookFailedError,
   SchemaValidationError,
   ConfigValidationError,
+  MetadataValidationError,
 } from '@specd/core'
 
 /**
@@ -55,7 +56,8 @@ export function handleError(err: unknown): never {
     err instanceof ParserNotRegisteredError ||
     err instanceof UnsupportedPatternError ||
     err instanceof PathTraversalError ||
-    err instanceof DeltaApplicationError
+    err instanceof DeltaApplicationError ||
+    err instanceof MetadataValidationError
   ) {
     process.stderr.write(`error: ${err.message}\n`)
     process.exit(1)

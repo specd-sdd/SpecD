@@ -1,6 +1,11 @@
 export { applyPreHashCleanup } from './pre-hash-cleanup.js'
 export { contentHash } from './content-hash.js'
-export { parseMetadata, specMetadataSchema, type SpecMetadata } from './parse-metadata.js'
+export {
+  parseMetadata,
+  specMetadataSchema,
+  strictSpecMetadataSchema,
+  type SpecMetadata,
+} from './parse-metadata.js'
 export { parseSpecId } from './parse-spec-id.js'
 export { extractSpecSummary } from './spec-summary.js'
 export { inferFormat } from './format-inference.js'

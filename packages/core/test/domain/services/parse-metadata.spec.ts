@@ -1,0 +1,159 @@
+import { describe, it, expect } from 'vitest'
+import {
+  parseMetadata,
+  strictSpecMetadataSchema,
+} from '../../../src/domain/services/parse-metadata.js'
+
+describe('parseMetadata (lenient read path)', () => {
+  it('returns {} on invalid YAML', () => {
+    expect(parseMetadata('{{{bad')).toEqual({})
+  })
+
+  it('returns {} on structurally invalid content', () => {
+    expect(parseMetadata('keywords: 123')).toEqual({})
+  })
+
+  it('parses valid metadata', () => {
+    const yaml = `
+title: Config
+keywords:
+  - lifecycle
+dependsOn:
+  - core/storage
+`
+    const result = parseMetadata(yaml)
+    expect(result.title).toBe('Config')
+    expect(result.keywords).toEqual(['lifecycle'])
+    expect(result.dependsOn).toEqual(['core/storage'])
+  })
+})
+
+describe('strictSpecMetadataSchema', () => {
+  it('accepts empty object', () => {
+    expect(strictSpecMetadataSchema.safeParse({}).success).toBe(true)
+  })
+
+  it('accepts valid complete metadata', () => {
+    const result = strictSpecMetadataSchema.safeParse({
+      title: 'Config',
+      description: 'Some description',
+      keywords: ['lifecycle', 'approval'],
+      dependsOn: ['core:storage', 'core/delta-format'],
+      contentHashes: {
+        'spec.md': 'sha256:' + 'a'.repeat(64),
+      },
+      rules: [{ requirement: 'Lifecycle', rules: ['A change must be open'] }],
+      constraints: ['No self-reference'],
+      scenarios: [
+        {
+          requirement: 'Lifecycle',
+          name: 'Open cannot merge',
+          when: ['merge is attempted'],
+          then: ['error is returned'],
+        },
+      ],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('allows unknown top-level keys', () => {
+    const result = strictSpecMetadataSchema.safeParse({ customField: 'value' })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects empty title', () => {
+    const result = strictSpecMetadataSchema.safeParse({ title: '' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects non-lowercase keywords', () => {
+    const result = strictSpecMetadataSchema.safeParse({ keywords: ['Valid'] })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects non-string keywords', () => {
+    const result = strictSpecMetadataSchema.safeParse({ keywords: [123] })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects invalid spec ID in dependsOn', () => {
+    const result = strictSpecMetadataSchema.safeParse({ dependsOn: ['not a valid id!'] })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts workspace-qualified spec ID', () => {
+    const result = strictSpecMetadataSchema.safeParse({ dependsOn: ['billing:payments/invoices'] })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts unqualified capability path', () => {
+    const result = strictSpecMetadataSchema.safeParse({ dependsOn: ['core/storage'] })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects invalid contentHashes format', () => {
+    const result = strictSpecMetadataSchema.safeParse({
+      contentHashes: { 'spec.md': 'md5:abc' },
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts valid sha256 hash', () => {
+    const result = strictSpecMetadataSchema.safeParse({
+      contentHashes: { 'spec.md': 'sha256:' + 'f'.repeat(64) },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects rules with empty requirement', () => {
+    const result = strictSpecMetadataSchema.safeParse({
+      rules: [{ requirement: '', rules: ['statement'] }],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects rules with empty rules array', () => {
+    const result = strictSpecMetadataSchema.safeParse({
+      rules: [{ requirement: 'Name', rules: [] }],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects scenarios missing when', () => {
+    const result = strictSpecMetadataSchema.safeParse({
+      scenarios: [{ requirement: 'X', name: 'Y', then: ['outcome'] }],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects scenarios missing then', () => {
+    const result = strictSpecMetadataSchema.safeParse({
+      scenarios: [{ requirement: 'X', name: 'Y', when: ['action'] }],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts scenarios with optional given', () => {
+    const result = strictSpecMetadataSchema.safeParse({
+      scenarios: [
+        {
+          requirement: 'X',
+          name: 'Y',
+          when: ['action'],
+          then: ['outcome'],
+        },
+      ],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects dependsOn with underscore-starting workspace', () => {
+    const result = strictSpecMetadataSchema.safeParse({ dependsOn: ['_bad:path'] })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts dependsOn with underscore-starting capability segment', () => {
+    const result = strictSpecMetadataSchema.safeParse({ dependsOn: ['_global/architecture'] })
+    expect(result.success).toBe(true)
+  })
+})

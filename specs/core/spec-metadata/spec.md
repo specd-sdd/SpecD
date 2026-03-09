@@ -83,6 +83,23 @@ scenarios:
   - `then` (array of strings) — expected outcomes
     Omitted if the spec has no verification scenarios.
 
+### Requirement: Write-time structural validation
+
+The `SaveSpecMetadata` use case validates the YAML content against the `specMetadataSchema` Zod schema before writing. All fields are optional, but when present they must conform to their declared types and formats:
+
+- `title` must be a non-empty string
+- `description` must be a string
+- `keywords` must be an array of non-empty lowercase strings
+- `dependsOn` must be an array of strings, each matching a valid spec ID pattern (`capabilityPath` or `workspace:capabilityPath` where workspace matches `/^[a-z][a-z0-9-]*$/` and capability path segments match `/^[a-z0-9_][a-z0-9_-]*$/`)
+- `contentHashes` must be a record of filename to hash string, where each hash matches `sha256:<64 hex chars>`
+- `rules` must be an array of objects with `requirement` (non-empty string) and `rules` (non-empty array of non-empty strings)
+- `constraints` must be a non-empty array of non-empty strings
+- `scenarios` must be an array of objects with `requirement` (non-empty string), `name` (non-empty string), `when` (non-empty array of strings), `then` (non-empty array of strings), and `given` (optional array of strings)
+
+If validation fails, `SaveSpecMetadata` throws a `MetadataValidationError` (a domain error extending `SpecdError`) with the Zod issues formatted as a human-readable message. The file is not written.
+
+Unknown top-level keys are allowed (`.passthrough()`) to support forward-compatible extensions.
+
 ### Requirement: LLM authorship
 
 `.specd-metadata.yaml` is written and maintained by the LLM agent. It is generated once per spec at archive time: when `ArchiveChange` completes, it signals which specs were modified via `staleMetadataSpecPaths`, and the caller (CLI or MCP layer) triggers the extraction agent for each of those specs.
@@ -122,6 +139,8 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 - `dependsOn` paths must not form cycles; if a cycle is detected during traversal, specd breaks the cycle and emits a warning
 - Staleness warnings are advisory only — they do not block any operation
 - The LLM must not include the spec itself in its own `dependsOn` list
+- `SaveSpecMetadata` must validate content against `specMetadataSchema` before writing — structurally invalid content is rejected with `MetadataValidationError`
+- Reading metadata (`parseMetadata`) remains lenient — it returns `{}` on invalid input so that downstream operations are never blocked by a malformed file on disk
 
 ## Spec Dependencies
 
