@@ -251,7 +251,7 @@ export class FsSpecRepository extends SpecRepository {
     const stats = await Promise.all(
       entries.map(async (entry) => {
         try {
-          const stat = await fs.stat(path.join(dir, entry))
+          const stat = await fs.lstat(path.join(dir, entry))
           return { entry, isDir: stat.isDirectory(), isFile: stat.isFile() }
         } catch {
           return { entry, isDir: false, isFile: false }
@@ -291,7 +291,7 @@ async function filterFiles(dir: string, entries: string[]): Promise<string[]> {
   const checks = await Promise.all(
     entries.map(async (entry) => {
       try {
-        const stat = await fs.stat(path.join(dir, entry))
+        const stat = await fs.lstat(path.join(dir, entry))
         return { entry, isFile: stat.isFile() }
       } catch {
         return { entry, isFile: false }
