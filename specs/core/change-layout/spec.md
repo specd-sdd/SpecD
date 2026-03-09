@@ -101,3 +101,4 @@ A change that only creates new specs has no `deltas/` subtree. A change that onl
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta file format and application
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `artifact.scope`, `artifact.output`, `artifact.delta`
 - [`specs/core/archive-change/spec.md`](../archive-change/spec.md) — how files in `specs/` and `deltas/` are consumed at archive time
+- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace directory segment in change artifact paths

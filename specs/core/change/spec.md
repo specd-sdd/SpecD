@@ -191,3 +191,4 @@ A change may be moved between storage locations without affecting its lifecycle 
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta operations, `ArtifactParser` port
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal
 - [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds` and `contextSpecIds`
+- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace identity, primary workspace, active workspace semantics

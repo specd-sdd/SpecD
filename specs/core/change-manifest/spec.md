@@ -131,3 +131,4 @@ The manifest must be written atomically — by writing to a temporary file and t
 - [`specs/core/storage/spec.md`](../storage/spec.md) — `FsChangeRepository` reads and writes the manifest; atomic write constraint
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, source of `contextSpecIds`
 - [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
+- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace list serialization in manifest

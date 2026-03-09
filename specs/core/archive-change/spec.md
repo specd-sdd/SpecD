@@ -131,4 +131,5 @@ After post-archive hooks complete, `ArchiveChange` must collect the set of spec 
 - [`specs/core/config/spec.md`](../config/spec.md) — workflow hook structure, `run:` vs `instruction:` entries, template variables
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — metadata refresh signal; `staleMetadataSpecPaths` in result
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port-per-workspace pattern; manual DI at entry points
+- [`specs/core/workspace/spec.md`](../workspace/spec.md) — primary workspace for archive path template resolution
 - [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
