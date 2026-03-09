@@ -4,13 +4,14 @@ import { MetadataValidationError } from '../../../src/domain/errors/metadata-val
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { makeSpecRepository } from './helpers.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
+import { NodeYamlSerializer } from '../../../src/infrastructure/node/yaml-serializer.js'
 
 const VALID_HASH = 'sha256:' + 'a'.repeat(64)
 const VALID_BASE = `title: 'Auth Login'\ndescription: 'Handles login'\ncontentHashes:\n  spec.md: '${VALID_HASH}'\n`
 
 function makeUseCase(specs: Spec[] = []) {
   const repo = makeSpecRepository({ specs })
-  const uc = new SaveSpecMetadata(new Map([['default', repo]]))
+  const uc = new SaveSpecMetadata(new Map([['default', repo]]), new NodeYamlSerializer())
   return { uc, repo }
 }
 

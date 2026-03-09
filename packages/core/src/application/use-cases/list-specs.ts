@@ -1,9 +1,9 @@
 import { type SpecRepository } from '../ports/spec-repository.js'
+import { type YamlSerializer } from '../ports/yaml-serializer.js'
 import { type Spec } from '../../domain/entities/spec.js'
 import { extractSpecSummary } from '../../domain/services/spec-summary.js'
 import { strictSpecMetadataSchema } from '../../domain/services/parse-metadata.js'
 import { parseMetadata } from './_shared/parse-metadata.js'
-import { parse as parseYaml } from 'yaml'
 import { type SpecMetadataStatus, checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 
@@ -51,16 +51,23 @@ export interface SpecListEntry {
 export class ListSpecs {
   private readonly _specRepos: ReadonlyMap<string, SpecRepository>
   private readonly _hasher: ContentHasher
+  private readonly _yaml: YamlSerializer
 
   /**
    * Creates a new `ListSpecs` use case instance.
    *
    * @param specRepos - Map of workspace name to its spec repository
    * @param hasher - Content hasher for metadata freshness checks
+   * @param yaml - YAML serializer for parsing metadata content
    */
-  constructor(specRepos: ReadonlyMap<string, SpecRepository>, hasher: ContentHasher) {
+  constructor(
+    specRepos: ReadonlyMap<string, SpecRepository>,
+    hasher: ContentHasher,
+    yaml: YamlSerializer,
+  ) {
     this._specRepos = specRepos
     this._hasher = hasher
+    this._yaml = yaml
   }
 
   /**
@@ -125,7 +132,7 @@ export class ListSpecs {
         // Check structural validity when status is requested
         if (includeMetadataStatus) {
           try {
-            const raw = parseYaml(artifact.content) as unknown
+            const raw = this._yaml.parse(artifact.content)
             metadataValid = strictSpecMetadataSchema.safeParse(raw ?? {}).success
           } catch {
             metadataValid = false

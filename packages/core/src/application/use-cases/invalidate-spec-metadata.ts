@@ -1,5 +1,5 @@
-import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { type SpecRepository } from '../ports/spec-repository.js'
+import { type YamlSerializer } from '../ports/yaml-serializer.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 
@@ -26,14 +26,17 @@ export interface InvalidateSpecMetadataResult {
  */
 export class InvalidateSpecMetadata {
   private readonly _specRepos: ReadonlyMap<string, SpecRepository>
+  private readonly _yaml: YamlSerializer
 
   /**
    * Creates a new `InvalidateSpecMetadata` use case instance.
    *
    * @param specRepos - Map of workspace name to its spec repository
+   * @param yaml - YAML serializer for parsing and stringifying metadata
    */
-  constructor(specRepos: ReadonlyMap<string, SpecRepository>) {
+  constructor(specRepos: ReadonlyMap<string, SpecRepository>, yaml: YamlSerializer) {
     this._specRepos = specRepos
+    this._yaml = yaml
   }
 
   /**
@@ -58,14 +61,14 @@ export class InvalidateSpecMetadata {
       return null
     }
 
-    const parsed = parseYaml(existing.content) as Record<string, unknown> | null
+    const parsed = this._yaml.parse(existing.content) as Record<string, unknown> | null
     if (parsed === null || typeof parsed !== 'object') {
       return null
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { contentHashes: _discarded, ...withoutHashes } = parsed
-    const content = stringifyYaml(withoutHashes, { lineWidth: 0 })
+    const content = this._yaml.stringify(withoutHashes)
 
     const artifact = new SpecArtifact('.specd-metadata.yaml', content)
     await repo.save(spec, artifact, { force: true })

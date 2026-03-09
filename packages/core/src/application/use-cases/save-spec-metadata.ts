@@ -1,5 +1,5 @@
-import { parse as parseYaml } from 'yaml'
 import { type SpecRepository } from '../ports/spec-repository.js'
+import { type YamlSerializer } from '../ports/yaml-serializer.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { strictSpecMetadataSchema } from '../../domain/services/parse-metadata.js'
@@ -31,14 +31,17 @@ export interface SaveSpecMetadataResult {
  */
 export class SaveSpecMetadata {
   private readonly _specRepos: ReadonlyMap<string, SpecRepository>
+  private readonly _yaml: YamlSerializer
 
   /**
    * Creates a new `SaveSpecMetadata` use case instance.
    *
    * @param specRepos - Map of workspace name to its spec repository
+   * @param yaml - YAML serializer for parsing input content
    */
-  constructor(specRepos: ReadonlyMap<string, SpecRepository>) {
+  constructor(specRepos: ReadonlyMap<string, SpecRepository>, yaml: YamlSerializer) {
     this._specRepos = specRepos
+    this._yaml = yaml
   }
 
   /**
@@ -51,7 +54,7 @@ export class SaveSpecMetadata {
    */
   async execute(input: SaveSpecMetadataInput): Promise<SaveSpecMetadataResult | null> {
     // Validate content against the strict schema before doing anything else
-    const parsed = parseYaml(input.content) as unknown
+    const parsed = this._yaml.parse(input.content)
     if (parsed === null || parsed === undefined || typeof parsed !== 'object') {
       throw new MetadataValidationError('content must be a YAML mapping')
     }
