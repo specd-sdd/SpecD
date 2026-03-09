@@ -208,24 +208,46 @@ export class CompileContext {
       }
     }
 
-    // Step 5: dependsOn traversal from change.contextSpecIds (only when followDeps is true)
+    // Step 5: dependsOn traversal from change.specIds (only when followDeps is true)
     const dependsOnAdded = new Map<string, ResolvedSpec>()
     if (input.followDeps === true) {
       const depSeen = new Set<string>()
-      for (const ctxSpecId of change.contextSpecIds) {
-        const { workspace: ctxWs, capPath: ctxCapPath } = parseSpecId(ctxSpecId)
-        await traverseDependsOn(
-          ctxWs,
-          ctxCapPath,
-          includedSpecs,
-          dependsOnAdded,
-          depSeen,
-          new Set<string>(),
-          this._specs,
-          warnings,
-          input.depth,
-          0,
-        )
+      for (const specId of change.specIds) {
+        const { workspace, capPath } = parseSpecId(specId)
+        const repo = this._specs.get(workspace)
+        if (!repo) continue
+        let specPathObj: SpecPath
+        try {
+          specPathObj = SpecPath.parse(capPath)
+        } catch {
+          continue
+        }
+        const spec = await repo.get(specPathObj)
+        if (!spec) continue
+        const metaArtifact = await repo.artifact(spec, '.specd-metadata.yaml')
+        if (!metaArtifact) continue
+        try {
+          const meta = parseMetadata(metaArtifact.content)
+          if (meta.dependsOn) {
+            for (const dep of meta.dependsOn) {
+              const { workspace: dw, capPath: dp } = parseSpecId(dep)
+              await traverseDependsOn(
+                dw,
+                dp,
+                includedSpecs,
+                dependsOnAdded,
+                depSeen,
+                new Set<string>(),
+                this._specs,
+                warnings,
+                input.depth,
+                0,
+              )
+            }
+          }
+        } catch {
+          // Skip specs with unparseable metadata
+        }
       }
     }
 

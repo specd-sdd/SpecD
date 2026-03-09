@@ -393,7 +393,6 @@ export class FsChangeRepository extends ChangeRepository {
       ...(manifest.description !== undefined ? { description: manifest.description } : {}),
       workspaces: manifest.workspaces,
       specIds: manifest.specIds,
-      contextSpecIds: manifest.contextSpecIds ?? [],
       history,
       artifacts: artifactMap,
     })
@@ -452,7 +451,6 @@ function changeToManifest(change: Change): ChangeManifest {
     schema,
     workspaces: [...change.workspaces],
     specIds: [...change.specIds],
-    contextSpecIds: [...change.contextSpecIds],
     artifacts: [...change.artifacts.values()].map(serializeArtifact),
     history: change.history.map(serializeEvent),
   }

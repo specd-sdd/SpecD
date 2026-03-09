@@ -5,16 +5,14 @@ description: >
   resolution and optional dependsOn traversal, evaluates step availability, and combines schema
   instructions, delta context, artifact rules, spec content, and step hooks into a single structured output.
 keywords:
-  - 'context compilation'
-  - 'instruction block'
-  - 'lifecycle step'
-  - 'spec collection'
-  - 'dependsOn traversal'
-  - 'staleness detection'
-  - 'step availability'
-  - 'delta context'
-  - 'artifact rules'
-  - 'step hooks'
+  - 'context-compilation'
+  - 'instruction-block'
+  - 'lifecycle-step'
+  - 'spec-collection'
+  - 'depends-on-traversal'
+  - 'staleness-detection'
+  - 'step-availability'
+  - 'delta-context'
 dependsOn:
   - 'core:core/change'
   - 'core:core/config'
@@ -25,7 +23,7 @@ dependsOn:
   - 'core:core/spec-id-format'
   - 'core:core/workspace'
 contentHashes:
-  'spec.md': 'sha256:04aee639b435e1f92b8ccb8acd04a245f5415423802d341cab3ad6df3b0d149a'
+  'spec.md': 'sha256:b81c6bb9175421dd4d3389cf2bb79c1ea7f39ecdd765e68ce895b7a376a27de4'
   'verify.md': 'sha256:5558daf7218656254520ba0a227d04060d1a14f58311cc538bb91ef076f9c346'
 rules:
   - requirement: 'Ports and constructor'
@@ -52,6 +50,7 @@ rules:
     rules:
       - 'CompileContext must collect specs via five steps: project-level includes, project-level excludes, workspace-level includes (active workspaces only), workspace-level excludes (active workspaces only), and optional dependsOn traversal when followDeps is true.'
       - 'A workspace is active if any of its spec IDs appears in change.specIds.'
+      - 'dependsOn traversal starts from change.specIds, resolves each spec .specd-metadata.yaml dependsOn entries, then follows links transitively. This works in all change states — not gated on reaching ready.'
       - 'Specs added via dependsOn traversal are not subject to exclude rules from steps 2 or 4.'
       - 'A spec matched by multiple include patterns appears exactly once at the position of the first match.'
       - 'Specs added via dependsOn traversal that are already in the set also appear once at their earlier position.'
@@ -149,11 +148,11 @@ scenarios:
   - requirement: 'Context spec collection'
     name: 'dependsOn traversal adds specs beyond include set'
     given:
-      - 'change.contextSpecIds is [auth/login]'
+      - 'change.specIds includes default:auth/login'
       - 'auth/login/.specd-metadata.yaml declares dependsOn: [auth/jwt]'
       - 'auth/jwt was not matched by any include pattern'
     when:
-      - 'CompileContext.execute applies dependsOn traversal'
+      - 'CompileContext.execute applies dependsOn traversal with followDeps: true'
     then:
       - 'auth/jwt is added to the context set'
   - requirement: 'Context spec collection'

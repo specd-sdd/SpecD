@@ -42,11 +42,10 @@ function makeChange(
   name: string,
   opts: {
     specIds?: string[]
-    contextSpecIds?: string[]
     artifacts?: ChangeArtifact[]
   } = {},
 ): Change {
-  const { specIds = ['default:auth/login'], contextSpecIds = [], artifacts = [] } = opts
+  const { specIds = ['default:auth/login'], artifacts = [] } = opts
   const events: ChangeEvent[] = [
     {
       type: 'transitioned',
@@ -68,7 +67,6 @@ function makeChange(
       ),
     ],
     specIds,
-    contextSpecIds,
     history: events,
   })
   for (const artifact of artifacts) {
@@ -420,10 +418,9 @@ describe('CompileContext', () => {
         'auth/jwt/spec.md': jwtContent,
       })
 
-      // contextSpecIds: ['auth/login'] — auth/login seeds the traversal
+      // specIds: ['default:auth/login'] — auth/login's dependsOn seeds the traversal
       const change = makeChange('my-change', {
         specIds: ['default:auth/login'],
-        contextSpecIds: ['auth/login'],
       })
       const schema = makeSchema()
 
@@ -461,7 +458,6 @@ describe('CompileContext', () => {
 
       const change = makeChange('my-change', {
         specIds: ['default:auth/login'],
-        contextSpecIds: ['auth/login'],
       })
       const schema = makeSchema()
 
@@ -526,7 +522,6 @@ describe('CompileContext', () => {
 
       const change = makeChange('my-change', {
         specIds: ['default:auth/login'],
-        contextSpecIds: ['auth/login'],
       })
       const schema = makeSchema()
 
@@ -551,19 +546,23 @@ describe('CompileContext', () => {
 
   describe('Requirement: Staleness detection and content fallback', () => {
     it('emits staleness warning when contentHash does not match current file', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
       const jwtSpec = new Spec('default', SpecPath.parse('auth/jwt'), ['spec.md'])
+      const loginContent = '# Login\n'
       const jwtContent = '# JWT\n'
+      const loginMetadata = freshMetadata(loginContent, { dependsOn: ['auth/jwt'] })
       // Deliberately wrong hash → stale metadata
       const staleMetadata = `title: 'JWT'\ndescription: 'Old JWT spec.'\ncontentHashes:\n  'spec.md': 'sha256:deadbeef'`
 
-      const specRepo = makeSpecRepo([jwtSpec], {
+      const specRepo = makeSpecRepo([loginSpec, jwtSpec], {
+        'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec.md': loginContent,
         'auth/jwt/.specd-metadata.yaml': staleMetadata,
         'auth/jwt/spec.md': jwtContent,
       })
 
       const change = makeChange('my-change', {
         specIds: ['default:auth/login'],
-        contextSpecIds: ['auth/jwt'],
       })
       const schema = makeSchema()
 
@@ -584,18 +583,22 @@ describe('CompileContext', () => {
     })
 
     it('emits no staleness warning when all contentHashes match', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
       const jwtSpec = new Spec('default', SpecPath.parse('auth/jwt'), ['spec.md'])
+      const loginContent = '# Login\n'
       const jwtContent = '# JWT\n'
+      const loginMetadata = freshMetadata(loginContent, { dependsOn: ['auth/jwt'] })
       const metadata = freshMetadata(jwtContent, { description: 'JWT auth spec.' })
 
-      const specRepo = makeSpecRepo([jwtSpec], {
+      const specRepo = makeSpecRepo([loginSpec, jwtSpec], {
+        'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec.md': loginContent,
         'auth/jwt/.specd-metadata.yaml': metadata,
         'auth/jwt/spec.md': jwtContent,
       })
 
       const change = makeChange('my-change', {
         specIds: ['default:auth/login'],
-        contextSpecIds: ['auth/jwt'],
       })
       const schema = makeSchema()
 
@@ -997,7 +1000,7 @@ describe('CompileContext', () => {
         'auth/login/spec.md': loginContent,
       })
 
-      const change = makeChange('my-change', { contextSpecIds: ['auth/login'] })
+      const change = makeChange('my-change')
       const schema = makeSchema()
 
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
@@ -1007,8 +1010,7 @@ describe('CompileContext', () => {
         step: 'designing',
         schemaRef: '@specd/schema-std',
         workspaceSchemasPaths: new Map(),
-        config: noOp,
-        followDeps: true,
+        config: { contextIncludeSpecs: ['default:auth/login'] },
       })
 
       expect(result.instructionBlock).toContain('Handles user authentication flows.')
@@ -1043,7 +1045,7 @@ describe('CompileContext', () => {
 
       const parsers: ArtifactParserRegistry = new Map([['markdown', parser]])
 
-      const change = makeChange('my-change', { contextSpecIds: ['auth/login'] })
+      const change = makeChange('my-change')
       const schema = makeSchema({
         artifacts: [
           makeArtifactType('spec', {
@@ -1070,8 +1072,7 @@ describe('CompileContext', () => {
         step: 'designing',
         schemaRef: '@specd/schema-std',
         workspaceSchemasPaths: new Map(),
-        config: noOp,
-        followDeps: true,
+        config: { contextIncludeSpecs: ['default:auth/login'] },
       })
 
       // Should emit a staleness warning (no metadata) and include content from contextSections
@@ -1176,7 +1177,6 @@ describe('CompileContext', () => {
         createdAt: new Date(),
         workspaces: ['default'],
         specIds: ['billing/payments'], // first segment is 'billing', but workspace is NOT active
-        contextSpecIds: [],
         history: [
           {
             type: 'transitioned',
@@ -1492,30 +1492,35 @@ describe('CompileContext', () => {
 
   describe('Requirement: depth limiting', () => {
     it('depth 1 includes direct deps only, not transitive deps', async () => {
+      // Chain: A → B → C → D. A is in specIds, so traversal starts from B.
       const specA = new Spec('default', SpecPath.parse('a'), ['spec.md'])
       const specB = new Spec('default', SpecPath.parse('b'), ['spec.md'])
       const specC = new Spec('default', SpecPath.parse('c'), ['spec.md'])
+      const specD = new Spec('default', SpecPath.parse('d'), ['spec.md'])
 
       const contentA = '# A\n'
       const contentB = '# B\n'
       const contentC = '# C\n'
+      const contentD = '# D\n'
 
       const metadataA = freshMetadata(contentA, { dependsOn: ['b'], description: 'Spec A' })
       const metadataB = freshMetadata(contentB, { dependsOn: ['c'], description: 'Spec B' })
-      const metadataC = freshMetadata(contentC, { description: 'Spec C' })
+      const metadataC = freshMetadata(contentC, { dependsOn: ['d'], description: 'Spec C' })
+      const metadataD = freshMetadata(contentD, { description: 'Spec D' })
 
-      const specRepo = makeSpecRepo([specA, specB, specC], {
+      const specRepo = makeSpecRepo([specA, specB, specC, specD], {
         'a/.specd-metadata.yaml': metadataA,
         'a/spec.md': contentA,
         'b/.specd-metadata.yaml': metadataB,
         'b/spec.md': contentB,
         'c/.specd-metadata.yaml': metadataC,
         'c/spec.md': contentC,
+        'd/.specd-metadata.yaml': metadataD,
+        'd/spec.md': contentD,
       })
 
       const change = makeChange('my-change', {
         specIds: ['default:a'],
-        contextSpecIds: ['a'],
       })
       const schema = makeSchema()
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
@@ -1530,11 +1535,13 @@ describe('CompileContext', () => {
         depth: 1,
       })
 
-      // A (seed at depth 0) and B (direct dep at depth 1) should appear
-      expect(result.instructionBlock).toContain('Spec A')
+      // B is the direct dep seed (depth 0), C is at depth 1 — both appear
       expect(result.instructionBlock).toContain('Spec B')
-      // C (transitive dep at depth 2) should NOT appear
-      expect(result.instructionBlock).not.toContain('Spec C')
+      expect(result.instructionBlock).toContain('Spec C')
+      // D is at depth 2 — should NOT appear
+      expect(result.instructionBlock).not.toContain('Spec D')
+      // A is a specId, not a dependsOn target — not included via step 5
+      expect(result.instructionBlock).not.toContain('Spec A')
     })
 
     it('unlimited depth includes all transitive deps', async () => {
@@ -1561,7 +1568,6 @@ describe('CompileContext', () => {
 
       const change = makeChange('my-change', {
         specIds: ['default:a'],
-        contextSpecIds: ['a'],
       })
       const schema = makeSchema()
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
@@ -1575,12 +1581,14 @@ describe('CompileContext', () => {
         followDeps: true,
       })
 
-      expect(result.instructionBlock).toContain('Spec A')
+      // B and C are transitive deps of A and should appear
       expect(result.instructionBlock).toContain('Spec B')
       expect(result.instructionBlock).toContain('Spec C')
+      // A is a specId, not a dependsOn target — not included via step 5
+      expect(result.instructionBlock).not.toContain('Spec A')
     })
 
-    it('followDeps false skips traversal even with contextSpecIds', async () => {
+    it('followDeps false skips traversal even with specIds that have dependsOn', async () => {
       const specA = new Spec('default', SpecPath.parse('a'), ['spec.md'])
       const specB = new Spec('default', SpecPath.parse('b'), ['spec.md'])
 
@@ -1599,7 +1607,6 @@ describe('CompileContext', () => {
 
       const change = makeChange('my-change', {
         specIds: ['default:a'],
-        contextSpecIds: ['a'],
       })
       const schema = makeSchema()
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
@@ -1613,7 +1620,7 @@ describe('CompileContext', () => {
         // followDeps omitted → false by default
       })
 
-      // Neither A nor B should appear — contextSpecIds require followDeps to be included
+      // Neither A nor B should appear — dependsOn traversal requires followDeps to be included
       expect(result.instructionBlock).not.toContain('Spec A')
       expect(result.instructionBlock).not.toContain('Spec B')
     })

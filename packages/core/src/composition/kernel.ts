@@ -142,7 +142,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
     changes: {
       create: new CreateChange(i.changes, i.git),
       status: new GetStatus(i.changes),
-      transition: new TransitionChange(i.changes, i.specs, i.git),
+      transition: new TransitionChange(i.changes, i.git),
       draft: new DraftChange(i.changes, i.git),
       restore: new RestoreChange(i.changes, i.git),
       discard: new DiscardChange(i.changes, i.git),

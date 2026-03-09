@@ -205,7 +205,6 @@ export const changeManifestSchema = z.object({
   }),
   workspaces: z.array(z.string()),
   specIds: z.array(z.string()),
-  contextSpecIds: z.array(z.string()).optional(),
   artifacts: z.array(manifestArtifactSchema),
   history: z.array(rawChangeEventSchema),
 })
@@ -242,8 +241,6 @@ export interface ChangeManifest {
   readonly workspaces: string[]
   /** Current snapshot of spec paths being modified. */
   readonly specIds: string[]
-  /** Current snapshot of context spec paths. */
-  readonly contextSpecIds: string[]
   /** Artifact descriptors including their validation hashes. */
   readonly artifacts: ManifestArtifact[]
   /** Append-only event history. */

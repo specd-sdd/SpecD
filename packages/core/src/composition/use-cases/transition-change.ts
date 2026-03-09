@@ -1,9 +1,7 @@
 import { TransitionChange } from '../../application/use-cases/transition-change.js'
-import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
-import { createSpecRepository } from '../spec-repository.js'
 import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
 
 /**
@@ -28,12 +26,6 @@ export interface FsTransitionChangeOptions {
   readonly draftsPath: string
   /** Absolute path to the `discarded/` directory. */
   readonly discardedPath: string
-  /**
-   * Pre-built spec repositories keyed by workspace name.
-   *
-   * Must include entries for every workspace declared in the project config.
-   */
-  readonly specRepositories: ReadonlyMap<string, SpecRepository>
 }
 
 /**
@@ -68,23 +60,12 @@ export function createTransitionChange(
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
-    const specRepos = new Map(
-      config.workspaces.map((w) => [
-        w.name,
-        createSpecRepository(
-          'fs',
-          { workspace: w.name, ownership: w.ownership, isExternal: w.isExternal },
-          { specsPath: w.specsPath, ...(w.prefix !== undefined ? { prefix: w.prefix } : {}) },
-        ),
-      ]),
-    )
     return createTransitionChange(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,
         discardedPath: config.storage.discardedPath,
-        specRepositories: specRepos,
       },
     )
   }
@@ -95,5 +76,5 @@ export function createTransitionChange(
     discardedPath: opts.discardedPath,
   })
   const git = new GitCLIAdapter()
-  return new TransitionChange(changeRepo, opts.specRepositories, git)
+  return new TransitionChange(changeRepo, git)
 }

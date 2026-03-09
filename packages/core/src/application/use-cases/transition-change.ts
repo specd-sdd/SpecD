@@ -1,14 +1,10 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ChangeState } from '../../domain/value-objects/change-state.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type SpecRepository } from '../ports/spec-repository.js'
 import { type GitAdapter } from '../ports/git-adapter.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
-import { parseSpecId } from '../../domain/services/parse-spec-id.js'
-import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
-import { parseMetadata } from './_shared/parse-metadata.js'
 
 /** A single task completion check for the `implementing → verifying` transition. */
 export interface TaskCompletionCheck {
@@ -58,15 +54,6 @@ export interface TransitionChangeInput {
    */
   readonly approvalsSignoff: boolean
   /**
-   * Context spec paths to set when transitioning `designing → ready`.
-   *
-   * When omitted, the use case resolves them automatically from
-   * `.specd-metadata.yaml` `dependsOn` entries of the change's `specIds`.
-   * When provided, the caller's value is used as-is.
-   * Ignored on all other transitions.
-   */
-  readonly contextSpecIds?: string[]
-  /**
    * Artifact IDs whose validation is cleared when transitioning
    * `verifying → implementing`.
    *
@@ -104,28 +91,19 @@ export interface TransitionChangeInput {
  * in `implementingTaskChecks` for incomplete task items. Throws
  * `InvalidStateTransitionError` if any incomplete item is found.
  *
- * When transitioning from `designing` to `ready`, any provided `contextSpecIds`
- * are applied to the change before the transition is recorded.
  */
 export class TransitionChange {
   private readonly _changes: ChangeRepository
-  private readonly _specs: ReadonlyMap<string, SpecRepository>
   private readonly _git: GitAdapter
 
   /**
    * Creates a new `TransitionChange` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
-   * @param specs - Spec repositories keyed by workspace name, for resolving dependsOn metadata
    * @param git - Adapter for resolving the actor identity
    */
-  constructor(
-    changes: ChangeRepository,
-    specs: ReadonlyMap<string, SpecRepository>,
-    git: GitAdapter,
-  ) {
+  constructor(changes: ChangeRepository, git: GitAdapter) {
     this._changes = changes
-    this._specs = specs
     this._git = git
   }
 
@@ -146,13 +124,6 @@ export class TransitionChange {
     const actor = await this._git.identity()
 
     const effectiveTarget = this._resolveTarget(change.state, input)
-
-    if (change.state === 'designing' && effectiveTarget === 'ready') {
-      const contextSpecIds = input.contextSpecIds ?? (await this._resolveContextSpecIds(change))
-      if (contextSpecIds.length > 0) {
-        change.updateContextSpecIds(contextSpecIds)
-      }
-    }
 
     if (change.state === 'implementing' && effectiveTarget === 'verifying') {
       await this._checkTaskCompletion(change, input.implementingTaskChecks ?? [])
@@ -188,38 +159,6 @@ export class TransitionChange {
         throw new InvalidStateTransitionError('implementing', 'verifying')
       }
     }
-  }
-
-  /**
-   * Resolves context spec IDs by collecting `dependsOn` entries from each
-   * spec's `.specd-metadata.yaml`.
-   *
-   * @param change - The change whose specIds are resolved
-   * @returns Deduplicated list of context spec IDs from dependsOn metadata
-   */
-  private async _resolveContextSpecIds(change: Change): Promise<string[]> {
-    const deps = new Set<string>()
-    for (const specId of change.specIds) {
-      const { workspace, capPath } = parseSpecId(specId)
-      const repo = this._specs.get(workspace)
-      if (repo === undefined) continue
-
-      const spec = await repo.get(SpecPath.parse(capPath))
-      if (spec === null) continue
-
-      const metadataArtifact = await repo.artifact(spec, '.specd-metadata.yaml')
-      if (metadataArtifact === null) continue
-
-      try {
-        const metadata = parseMetadata(metadataArtifact.content)
-        if (metadata.dependsOn) {
-          for (const dep of metadata.dependsOn) deps.add(dep)
-        }
-      } catch {
-        // Skip specs with unparseable metadata
-      }
-    }
-    return [...deps]
   }
 
   /**

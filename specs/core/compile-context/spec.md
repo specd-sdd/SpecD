@@ -64,7 +64,7 @@ If a pattern or `dependsOn` entry references a workspace name that has no entry 
 2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set.
 3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec IDs appears in `change.specIds`).
 4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set.
-5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.contextSpecIds`, `CompileContext` reads each spec's `.specd-metadata.yaml` and follows `dependsOn` links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely.
+5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's `.specd-metadata.yaml` `dependsOn` entries, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.
 
 A spec matched by multiple include patterns appears exactly once, at the position of the first matching include pattern. Specs added via `dependsOn` traversal that were already included in steps 1–4 also appear once (at their earlier position).
 
@@ -209,11 +209,11 @@ const result = await compileContext.execute({
 
 ## Spec Dependencies
 
-- [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `contextSpecIds`, `effectiveStatus`, active workspaces
+- [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `effectiveStatus`, active workspaces
 - [`specs/core/config/spec.md`](../config/spec.md) — 5-step context spec resolution, include/exclude patterns, workspace-level patterns, `artifactRules`, workflow hooks
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal, staleness detection
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `contextSections` (fallback path), `workflow`, `instruction`, `delta`, `format`, `deltaInstruction`
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `deltaInstructions()`, `outline()`
 - [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `contextSections[]`
-- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds` and `contextSpecIds`
+- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds`
 - [`specs/core/workspace/spec.md`](../workspace/spec.md) — active workspace determination, workspace-level context patterns, port-per-workspace pattern

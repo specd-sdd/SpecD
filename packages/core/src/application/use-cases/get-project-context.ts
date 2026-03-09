@@ -70,7 +70,7 @@ export interface GetProjectContextResult {
  * Performs steps 1–4 of the context compilation pipeline (project `context:` entries,
  * project-level include/exclude patterns, workspace-level include/exclude patterns)
  * with ALL configured workspaces treated as active. Step 5 (dependsOn traversal from
- * a change's `contextSpecIds`) is not performed — that requires a specific change.
+ * a change's `specIds` dependsOn metadata) is not performed — that requires a specific change.
  */
 export class GetProjectContext {
   private readonly _specs: ReadonlyMap<string, SpecRepository>

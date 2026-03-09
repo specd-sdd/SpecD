@@ -16,11 +16,10 @@ A Change declares:
 
 - **`workspaces`** — one or more workspace IDs it belongs to (e.g. `['default', 'billing']`). Workspace IDs reference keys declared in `specd.yaml`. At least one is required.
 - **`specIds`** — one or more spec IDs being created or modified by this change (e.g. `['auth/login', 'billing:invoices']`). At least one is required.
-- **`contextSpecIds`** — spec IDs that provide context for this change but are not being modified. Populated when the change reaches `ready` state by taking the union of `dependsOn` from each spec's `.specd-metadata.yaml` (direct dependencies only). May be empty. Mutable — can be updated manually without triggering approval invalidation.
 
-`workspaces` and `specIds` are validated against `specd.yaml` and the spec filesystem at creation time. Both are **mutable** after creation — workspaces and specs can be added or removed as the change scope evolves. Any modification to `workspaces` or `specIds` triggers approval invalidation (see Requirement: History and event sourcing). Modifications to `contextSpecIds` alone do not invalidate approvals — at most a warning is emitted if context specs change after an approval has been recorded.
+`workspaces` and `specIds` are validated against `specd.yaml` and the spec filesystem at creation time. Both are **mutable** after creation — workspaces and specs can be added or removed as the change scope evolves. Any modification to `workspaces` or `specIds` triggers approval invalidation (see Requirement: History and event sourcing).
 
-`CompileContext` reads `workspaces` from the change manifest to determine which workspaces are active — it does not infer this from spec IDs at compile time. It uses `contextSpecIds` as the starting point for context graph traversal, following `dependsOn` links in each spec's `.specd-metadata.yaml` transitively. See [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
+`CompileContext` reads `workspaces` from the change manifest to determine which workspaces are active — it does not infer this from spec IDs at compile time. It resolves `dependsOn` entries directly from `change.specIds` by reading each spec's `.specd-metadata.yaml`, then follows links transitively. This resolution happens dynamically on every execution, not as a snapshot. See [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
 
 ### Requirement: Lifecycle
 
@@ -190,5 +189,5 @@ A change may be moved between storage locations without affecting its lifecycle 
 - [`specs/core/storage/spec.md`](../storage/spec.md) — persistence mechanics, directory naming
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta operations, `ArtifactParser` port
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal
-- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds` and `contextSpecIds`
+- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
 - [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace identity, primary workspace, active workspace semantics
