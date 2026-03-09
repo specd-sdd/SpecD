@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import * as path from 'node:path'
 import { type HookRunner } from '../../application/ports/hook-runner.js'
 import { HookResult, type HookVariables } from '../../domain/value-objects/hook-result.js'
 
@@ -64,10 +65,9 @@ export class NodeHookRunner implements HookRunner {
   run(command: string, variables: HookVariables): Promise<HookResult> {
     const expanded = expandVariables(command, variables)
     return new Promise((resolve) => {
-      const shell =
-        process.platform === 'win32'
-          ? (process.env['COMSPEC'] ?? 'cmd.exe')
-          : (process.env['SHELL'] ?? '/bin/sh')
+      const defaultShell = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh'
+      const envShell = process.platform === 'win32' ? process.env['COMSPEC'] : process.env['SHELL']
+      const shell = envShell !== undefined && path.isAbsolute(envShell) ? envShell : defaultShell
       const shellFlag = process.platform === 'win32' ? '/c' : '-c'
       execFile(shell, [shellFlag, expanded], (error, stdout, stderr) => {
         const exitCode = error?.code != null ? (typeof error.code === 'number' ? error.code : 1) : 0
