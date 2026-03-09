@@ -1,7 +1,7 @@
 import { contentHash } from '../../../domain/services/content-hash.js'
 
 /** Metadata freshness status for a spec. */
-export type SpecMetadataStatus = 'fresh' | 'stale' | 'missing'
+export type SpecMetadataStatus = 'fresh' | 'stale' | 'missing' | 'invalid'
 
 /** Per-file hash comparison entry. */
 export interface ContentHashEntry {

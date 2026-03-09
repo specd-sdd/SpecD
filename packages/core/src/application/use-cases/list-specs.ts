@@ -1,7 +1,8 @@
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type Spec } from '../../domain/entities/spec.js'
 import { extractSpecSummary } from '../../domain/services/spec-summary.js'
-import { parseMetadata } from '../../domain/services/parse-metadata.js'
+import { parseMetadata, strictSpecMetadataSchema } from '../../domain/services/parse-metadata.js'
+import { parse as parseYaml } from 'yaml'
 import { type SpecMetadataStatus, checkMetadataFreshness } from './_shared/metadata-freshness.js'
 
 export type { SpecMetadataStatus }
@@ -29,8 +30,9 @@ export interface SpecListEntry {
   readonly summary?: string | undefined
   /**
    * Metadata freshness status, present only when `includeMetadataStatus` was requested.
-   * - `fresh`: metadata exists and all content hashes match current files
-   * - `stale`: metadata exists but hashes are missing or don't match
+   * - `fresh`: metadata exists, is structurally valid, and all content hashes match current files
+   * - `stale`: metadata exists and is valid but hashes are missing or don't match
+   * - `invalid`: metadata file exists but fails structural validation
    * - `missing`: no `.specd-metadata.yaml` file
    */
   readonly metadataStatus?: SpecMetadataStatus | undefined
@@ -107,12 +109,24 @@ export class ListSpecs {
     let description: string | undefined
     let contentHashes: Record<string, string> | undefined
     let hasMetadata = false
+    let metadataValid = true
 
     // Read .specd-metadata.yaml for title, description, and contentHashes
     try {
       const artifact = await repo.artifact(spec, '.specd-metadata.yaml')
       if (artifact !== null) {
         hasMetadata = true
+
+        // Check structural validity when status is requested
+        if (includeMetadataStatus) {
+          try {
+            const raw = parseYaml(artifact.content) as unknown
+            metadataValid = strictSpecMetadataSchema.safeParse(raw ?? {}).success
+          } catch {
+            metadataValid = false
+          }
+        }
+
         const meta = parseMetadata(artifact.content)
         if (meta.title !== undefined && meta.title.trim().length > 0) {
           title = meta.title.trim()
@@ -153,7 +167,13 @@ export class ListSpecs {
     // Status resolution (only when requested)
     let metadataStatus: SpecMetadataStatus | undefined
     if (includeMetadataStatus) {
-      metadataStatus = await this._resolveStatus(repo, spec, hasMetadata, contentHashes)
+      metadataStatus = await this._resolveStatus(
+        repo,
+        spec,
+        hasMetadata,
+        metadataValid,
+        contentHashes,
+      )
     }
 
     return {
@@ -171,6 +191,7 @@ export class ListSpecs {
    * @param repo - Spec repository to read artifacts from
    * @param spec - The spec to check
    * @param hasMetadata - Whether `.specd-metadata.yaml` exists
+   * @param metadataValid - Whether the metadata passes structural validation
    * @param contentHashes - Recorded content hashes from metadata, if any
    * @returns The resolved freshness status
    */
@@ -178,9 +199,11 @@ export class ListSpecs {
     repo: SpecRepository,
     spec: Spec,
     hasMetadata: boolean,
+    metadataValid: boolean,
     contentHashes: Record<string, string> | undefined,
   ): Promise<SpecMetadataStatus> {
     if (!hasMetadata) return 'missing'
+    if (!metadataValid) return 'invalid'
 
     const result = await checkMetadataFreshness(contentHashes, async (filename) => {
       try {

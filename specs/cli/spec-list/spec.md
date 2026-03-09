@@ -16,7 +16,7 @@ specd spec list [--summary] [--metadata-status [filter]] [--format text|json|too
 - `--metadata-status` — optional flag with optional filter value; when present, a metadata-freshness METADATA STATUS column is included for each spec
   - Without a filter value (`--metadata-status`), all specs are shown with their status
   - With a comma-separated filter value (`--metadata-status stale`, `--metadata-status stale,missing`), only specs matching at least one of the listed statuses are shown
-  - Valid filter tokens: `fresh`, `stale`, `missing`
+  - Valid filter tokens: `fresh`, `stale`, `missing`, `invalid`
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 ### Requirement: Title resolution
@@ -45,10 +45,11 @@ Summary extraction from `spec.md` is performed by `@specd/core` as a pure functi
 When `--metadata-status` is passed, each spec receives a metadata-freshness status, determined as follows:
 
 1. If the spec has no `.specd-metadata.yaml` file → `missing`
-2. If the metadata exists but has no `contentHashes` field (or it is empty) → `stale`
-3. If any recorded hash in `contentHashes` does not match the SHA-256 hash of the current artifact file → `stale`
-4. If a file listed in `contentHashes` no longer exists → `stale`
-5. Otherwise → `fresh`
+2. If the metadata file exists but fails structural validation against `specMetadataSchema` → `invalid`
+3. If the metadata exists but has no `contentHashes` field (or it is empty) → `stale`
+4. If any recorded hash in `contentHashes` does not match the SHA-256 hash of the current artifact file → `stale`
+5. If a file listed in `contentHashes` no longer exists → `stale`
+6. Otherwise → `fresh`
 
 When a filter value is provided (e.g. `--metadata-status stale,missing`), only specs whose status matches at least one of the filter tokens are included in the output. Tokens are case-insensitive and comma-separated.
 
@@ -62,7 +63,7 @@ In `text` mode (default), specs are grouped by workspace. Each group is rendered
 - Each workspace group begins with an inverse-video workspace header row: `  workspace: <name>  `, padded to the same inner width as the column header row below it.
 - Immediately below the workspace header is an inverse-video column header row. The header includes columns depending on which flags are passed: `PATH  TITLE` (default), with `METADATA STATUS` appended when `--metadata-status` is present, and `SUMMARY` appended when `--summary` is present.
 - Data rows list one spec per line. The PATH column displays the fully-qualified spec identifier `workspace:capability-path` (e.g. `default:auth/login`). All columns are aligned to globally fixed widths (computed across all entries in all workspaces).
-- When `--metadata-status` is passed, a `METADATA STATUS` column appears after `TITLE`, showing `fresh`, `stale`, or `missing`.
+- When `--metadata-status` is passed, a `METADATA STATUS` column appears after `TITLE`, showing `fresh`, `stale`, `missing`, or `invalid`.
 - When `--summary` is passed, `SUMMARY` follows as an additional aligned column using wrap overflow (capped at 60 characters).
 - Workspace groups are separated by a blank line.
 
@@ -106,7 +107,7 @@ In `json` or `toon` mode, each spec entry is an object. The `path` field uses th
 
 When `--summary` is not passed, `summary` is omitted from text rows and from JSON/toon objects. When `--summary` is passed but no summary is available for a spec, the text row shows the title only and the JSON/toon object omits `summary` (does not include `null`).
 
-When `--metadata-status` is not passed, `status` is omitted from JSON/toon objects. When `--metadata-status` is passed, `status` is always present as a string (`"fresh"`, `"stale"`, or `"missing"`).
+When `--metadata-status` is not passed, `status` is omitted from JSON/toon objects. When `--metadata-status` is passed, `status` is always present as a string (`"fresh"`, `"stale"`, `"missing"`, or `"invalid"`).
 
 ### Requirement: Empty output
 
