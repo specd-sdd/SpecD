@@ -1,5 +1,3 @@
-import { contentHash } from '../../../domain/services/content-hash.js'
-
 /** Metadata freshness status for a spec. */
 export type SpecMetadataStatus = 'fresh' | 'stale' | 'missing' | 'invalid'
 
@@ -26,11 +24,13 @@ export interface MetadataFreshnessResult {
  *   When `undefined` or empty, the result is `{ allFresh: false, entries: [] }`.
  * @param resolveContent - Async function that returns the current content of a file by filename,
  *   or `null` if the file does not exist.
+ * @param hashContent - Function that computes a content hash string (e.g. `sha256:…`).
  * @returns Freshness result with per-file details
  */
 export async function checkMetadataFreshness(
   contentHashes: Record<string, string> | undefined,
   resolveContent: (filename: string) => Promise<string | null>,
+  hashContent: (content: string) => string,
 ): Promise<MetadataFreshnessResult> {
   if (contentHashes === undefined || Object.keys(contentHashes).length === 0) {
     return { allFresh: false, entries: [] }
@@ -45,7 +45,7 @@ export async function checkMetadataFreshness(
       entries.push({ filename, recorded, current: '', fresh: false })
       allFresh = false
     } else {
-      const current = contentHash(content)
+      const current = hashContent(content)
       const fresh = current === recorded
       if (!fresh) allFresh = false
       entries.push({ filename, recorded, current, fresh })

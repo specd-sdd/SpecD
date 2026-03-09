@@ -8,6 +8,7 @@ import { createSpecRepository } from '../spec-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
+import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
 /**
  * Domain context for the primary (default) workspace used by `ValidateArtifacts`.
@@ -123,5 +124,6 @@ export function createValidateArtifacts(
   })
   const parsers = createArtifactParserRegistry()
   const git = new GitCLIAdapter()
-  return new ValidateArtifacts(changeRepo, opts.specRepositories, schemas, parsers, git)
+  const hasher = new NodeContentHasher()
+  return new ValidateArtifacts(changeRepo, opts.specRepositories, schemas, parsers, git, hasher)
 }

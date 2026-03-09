@@ -1,4 +1,3 @@
-import { contentHash } from '../../domain/services/content-hash.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
@@ -19,6 +18,7 @@ import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { type WorkspaceContext } from '../ports/workspace-context.js'
+import { type ContentHasher } from '../ports/content-hasher.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
 export interface ValidateArtifactsInput extends WorkspaceContext {
@@ -74,6 +74,7 @@ export class ValidateArtifacts {
   private readonly _schemas: SchemaRegistry
   private readonly _parsers: ArtifactParserRegistry
   private readonly _git: GitAdapter
+  private readonly _hasher: ContentHasher
 
   /**
    * Creates a new `ValidateArtifacts` use case instance.
@@ -83,6 +84,7 @@ export class ValidateArtifacts {
    * @param schemas - Registry for resolving schema references
    * @param parsers - Registry of artifact format parsers
    * @param git - Adapter for resolving the actor identity
+   * @param hasher - Content hasher for computing artifact hashes
    */
   constructor(
     changes: ChangeRepository,
@@ -90,12 +92,14 @@ export class ValidateArtifacts {
     schemas: SchemaRegistry,
     parsers: ArtifactParserRegistry,
     git: GitAdapter,
+    hasher: ContentHasher,
   ) {
     this._changes = changes
     this._specs = specs
     this._schemas = schemas
     this._parsers = parsers
     this._git = git
+    this._hasher = hasher
   }
 
   /**
@@ -278,13 +282,13 @@ export class ValidateArtifacts {
   }
 
   /**
-   * Computes a SHA-256 hash of the given content string.
+   * Computes a content hash of the given string.
    *
    * @param content - The content to hash
-   * @returns A hex digest prefixed with `sha256:`
+   * @returns A hash string in `algorithm:hex` format
    */
   private _sha256(content: string): string {
-    return contentHash(content)
+    return this._hasher.hash(content)
   }
 
   /**

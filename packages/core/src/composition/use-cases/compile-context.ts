@@ -8,6 +8,7 @@ import { createSpecRepository } from '../spec-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
+import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
 /**
  * Domain context for the primary (default) workspace used by `CompileContext`.
@@ -123,5 +124,6 @@ export function createCompileContext(
   })
   const files = new FsFileReader()
   const parsers = createArtifactParserRegistry()
-  return new CompileContext(changeRepo, opts.specRepositories, schemas, files, parsers)
+  const hasher = new NodeContentHasher()
+  return new CompileContext(changeRepo, opts.specRepositories, schemas, files, parsers, hasher)
 }

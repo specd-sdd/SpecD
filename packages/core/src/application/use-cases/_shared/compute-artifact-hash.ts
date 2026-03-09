@@ -1,24 +1,26 @@
 import { type PreHashCleanup } from '../../../domain/value-objects/validation-rule.js'
 import { type Schema } from '../../../domain/value-objects/schema.js'
 import { applyPreHashCleanup } from '../../../domain/services/pre-hash-cleanup.js'
-import { contentHash } from '../../../domain/services/content-hash.js'
 
 /**
- * Computes a SHA-256 hash of artifact content after applying pre-hash cleanup rules.
+ * Computes a hash of artifact content after applying pre-hash cleanup rules.
  *
- * Returns a `sha256:`-prefixed hex string consistent with the hash format used
- * in `.specd-metadata.yaml` content hashes.
+ * Returns a hash string in the format produced by the supplied `hashContent`
+ * function (e.g. `sha256:<hex>`), consistent with the format used in
+ * `.specd-metadata.yaml` content hashes.
  *
  * @param content - The raw artifact content
+ * @param hashContent - Function that computes a content hash string
  * @param cleanups - Pre-hash cleanup rules to apply before hashing
- * @returns The `sha256:`-prefixed hex hash string
+ * @returns The hash string
  */
 export function computeArtifactHash(
   content: string,
+  hashContent: (content: string) => string,
   cleanups: readonly PreHashCleanup[] = [],
 ): string {
   const cleaned = cleanups.length > 0 ? applyPreHashCleanup(content, cleanups) : content
-  return contentHash(cleaned)
+  return hashContent(cleaned)
 }
 
 /**

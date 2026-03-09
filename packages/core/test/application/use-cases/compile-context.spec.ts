@@ -29,6 +29,7 @@ import {
   makeSpecRepository,
   makeArtifactType as makeArtifactTypeBase,
   makeSchema as makeSchemaBase,
+  makeContentHasher,
 } from './helpers.js'
 
 // ---------------------------------------------------------------------------
@@ -200,6 +201,7 @@ function makeSut(opts: {
     schemaRegistry,
     fileReader ?? makeStubFileReader(),
     parsers ?? (new Map() as ArtifactParserRegistry),
+    makeContentHasher(),
   )
 
   return { sut, changeRepo, schemaRegistry }
@@ -237,6 +239,7 @@ describe('CompileContext', () => {
             makeStubSchemaRegistry(null),
             makeStubFileReader(),
             new Map() as ArtifactParserRegistry,
+            makeContentHasher(),
           ),
       ).not.toThrow()
     })
@@ -250,6 +253,7 @@ describe('CompileContext', () => {
         makeStubSchemaRegistry(makeSchema()),
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
+        makeContentHasher(),
       )
       await expect(
         sut.execute({
@@ -270,6 +274,7 @@ describe('CompileContext', () => {
         makeStubSchemaRegistry(null),
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
+        makeContentHasher(),
       )
       await expect(
         sut.execute({

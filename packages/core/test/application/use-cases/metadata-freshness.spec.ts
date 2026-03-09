@@ -9,8 +9,10 @@ function sha256(content: string): string {
 describe('checkMetadataFreshness', () => {
   it('returns allFresh true when all hashes match', async () => {
     const content = '# Hello'
-    const result = await checkMetadataFreshness({ 'spec.md': sha256(content) }, async (f) =>
-      f === 'spec.md' ? content : null,
+    const result = await checkMetadataFreshness(
+      { 'spec.md': sha256(content) },
+      async (f) => (f === 'spec.md' ? content : null),
+      sha256,
     )
 
     expect(result.allFresh).toBe(true)
@@ -30,6 +32,7 @@ describe('checkMetadataFreshness', () => {
     const result = await checkMetadataFreshness(
       { 'spec.md': sha256(specContent), 'verify.md': sha256(verifyContent) },
       async (f) => contents.get(f) ?? null,
+      sha256,
     )
 
     expect(result.allFresh).toBe(true)
@@ -41,6 +44,7 @@ describe('checkMetadataFreshness', () => {
     const result = await checkMetadataFreshness(
       { 'spec.md': sha256('old content') },
       async () => 'new content',
+      sha256,
     )
 
     expect(result.allFresh).toBe(false)
@@ -50,7 +54,11 @@ describe('checkMetadataFreshness', () => {
   })
 
   it('returns allFresh false when a recorded file is missing', async () => {
-    const result = await checkMetadataFreshness({ 'spec.md': sha256('content') }, async () => null)
+    const result = await checkMetadataFreshness(
+      { 'spec.md': sha256('content') },
+      async () => null,
+      sha256,
+    )
 
     expect(result.allFresh).toBe(false)
     expect(result.entries[0]!.fresh).toBe(false)
@@ -58,14 +66,14 @@ describe('checkMetadataFreshness', () => {
   })
 
   it('returns allFresh false when contentHashes is undefined', async () => {
-    const result = await checkMetadataFreshness(undefined, async () => 'content')
+    const result = await checkMetadataFreshness(undefined, async () => 'content', sha256)
 
     expect(result.allFresh).toBe(false)
     expect(result.entries).toHaveLength(0)
   })
 
   it('returns allFresh false when contentHashes is empty', async () => {
-    const result = await checkMetadataFreshness({}, async () => 'content')
+    const result = await checkMetadataFreshness({}, async () => 'content', sha256)
 
     expect(result.allFresh).toBe(false)
     expect(result.entries).toHaveLength(0)
@@ -78,6 +86,7 @@ describe('checkMetadataFreshness', () => {
     const result = await checkMetadataFreshness(
       { 'spec.md': sha256(specContent), 'verify.md': sha256('old verify') },
       async (f) => contents.get(f) ?? null,
+      sha256,
     )
 
     expect(result.allFresh).toBe(false)

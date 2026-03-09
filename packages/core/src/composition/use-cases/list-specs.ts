@@ -2,6 +2,7 @@ import { ListSpecs } from '../../application/use-cases/list-specs.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { createSpecRepository } from '../spec-repository.js'
+import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
 /** Filesystem adapter options for `createListSpecs(context, options)`. */
 export interface FsListSpecsOptions {
@@ -41,7 +42,9 @@ export function createListSpecs(configOrOptions: SpecdConfig | FsListSpecsOption
         ),
       ]),
     )
-    return new ListSpecs(specRepos)
+    const hasher = new NodeContentHasher()
+    return new ListSpecs(specRepos, hasher)
   }
-  return new ListSpecs(configOrOptions.specRepositories)
+  const hasher = new NodeContentHasher()
+  return new ListSpecs(configOrOptions.specRepositories, hasher)
 }

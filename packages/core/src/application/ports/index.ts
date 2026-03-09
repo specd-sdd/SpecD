@@ -1,3 +1,4 @@
+export { ContentHasher } from './content-hasher.js'
 export { Repository, type RepositoryConfig } from './repository.js'
 export { SpecRepository, type SpecRepositoryConfig } from './spec-repository.js'
 export { ChangeRepository, type ChangeRepositoryConfig } from './change-repository.js'

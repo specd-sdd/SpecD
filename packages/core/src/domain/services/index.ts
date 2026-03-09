@@ -1,5 +1,5 @@
 export { applyPreHashCleanup } from './pre-hash-cleanup.js'
-export { contentHash } from './content-hash.js'
+export { hashFiles } from './hash-files.js'
 export {
   parseMetadata,
   specMetadataSchema,
