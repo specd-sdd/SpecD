@@ -216,3 +216,4 @@ const result = await compileContext.execute({
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `deltaInstructions()`, `outline()`
 - [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `contextSections[]`
 - [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds` and `contextSpecIds`
+- [`specs/core/workspace/spec.md`](../workspace/spec.md) — active workspace determination, workspace-level context patterns, port-per-workspace pattern

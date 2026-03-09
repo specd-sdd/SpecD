@@ -636,6 +636,7 @@ artifactRules:
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port and adapter design
 - [`specs/core/storage/spec.md`](../storage/spec.md) — storage adapter behavior
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal in step 5
+- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace identity, properties, ownership, and prefix semantics
 
 ## ADRs
 

@@ -66,3 +66,4 @@ Functions that accept spec IDs SHOULD normalize bare paths to fully-qualified fo
 - [change-manifest](../change-manifest/spec.md) — defines manifest serialization of `specIds`
 - [spec-metadata](../spec-metadata/spec.md) — defines `dependsOn` field that uses colon-qualified format
 - [compile-context](../compile-context/spec.md) — uses `_parseSpecId` to split canonical spec IDs
+- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace-qualified spec ID format definition
