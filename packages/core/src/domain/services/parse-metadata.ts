@@ -66,7 +66,7 @@ export const strictSpecMetadataSchema = z
         z
           .string()
           .min(1)
-          .regex(/^[a-z]/, { message: 'must be lowercase' }),
+          .regex(/^[a-z][a-z0-9-]*$/, { message: 'must be lowercase with hyphens only' }),
       )
       .optional(),
     dependsOn: z.array(specIdString).optional(),
