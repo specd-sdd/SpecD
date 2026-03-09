@@ -692,7 +692,7 @@ async function filterDirectories(basePath: string, entries: string[]): Promise<s
   const checks = await Promise.all(
     entries.map(async (entry) => {
       try {
-        const stat = await fs.stat(path.join(basePath, entry))
+        const stat = await fs.lstat(path.join(basePath, entry))
         return { entry, isDir: stat.isDirectory() }
       } catch {
         return { entry, isDir: false }
