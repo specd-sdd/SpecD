@@ -63,8 +63,9 @@ export class InvalidateSpecMetadata {
       return null
     }
 
-    delete parsed['contentHashes']
-    const content = stringifyYaml(parsed, { lineWidth: 0 })
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { contentHashes: _discarded, ...withoutHashes } = parsed
+    const content = stringifyYaml(withoutHashes, { lineWidth: 0 })
 
     const artifact = new SpecArtifact('.specd-metadata.yaml', content)
     await repo.save(spec, artifact, { force: true })
