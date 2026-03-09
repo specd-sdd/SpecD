@@ -1,4 +1,5 @@
 import { parseMetadata, type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
@@ -451,17 +452,15 @@ export class GetProjectContext {
     spec: Spec,
     metadata: SpecMetadata,
   ): Promise<boolean> {
-    const hashes = metadata.contentHashes
-    if (hashes === undefined || Object.keys(hashes).length === 0) return false
-
-    for (const [filename, recordedHash] of Object.entries(hashes)) {
-      const artifact = await specRepo.artifact(spec, filename)
-      if (artifact === null) return false
-
-      const actualHash = this._hasher.hash(artifact.content)
-      if (actualHash !== recordedHash) return false
-    }
-    return true
+    const result = await checkMetadataFreshness(
+      metadata.contentHashes,
+      async (filename) => {
+        const artifact = await specRepo.artifact(spec, filename)
+        return artifact?.content ?? null
+      },
+      (c) => this._hasher.hash(c),
+    )
+    return result.allFresh
   }
 
   /**
