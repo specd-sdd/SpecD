@@ -1,257 +1,277 @@
 title: 'Workspace'
 description: >
-  A workspace is the fundamental organizational unit in specd. It groups a set of specs, a code location, optional local schemas, and ownership semantics into a single named context. Every spec belongs to exactly one workspace, every change targets one or more workspaces, and context compilation, archiving, and validation all resolve resources through workspace-qualified lookups.
+  Governs how specd organizes specs, code locations, schemas, and ownership into named workspaces
+  within a project. Read this when working on multi-workspace configuration, cross-workspace
+  references, context compilation scoping, or change artifact path resolution.
 keywords:
-  - 'core'
   - 'workspace'
-  - 'identity'
-  - 'properties'
-  - 'external'
-  - 'inference'
+  - 'configuration'
   - 'ownership'
-  - 'semantics'
   - 'prefix'
-  - 'qualified'
-  - 'spec'
-  - 'active'
+  - 'spec-id'
+  - 'context-patterns'
+  - 'cross-workspace'
+  - 'multi-workspace'
+dependsOn:
+  - 'core:core/config'
+  - 'core:core/spec-id-format'
 contentHashes:
   'spec.md': 'sha256:530840acb50450767e54fb1a59f9cd821789a311bbed56386f2d9f78db6aa67b'
   'verify.md': 'sha256:90850de8eef3bc31e4be14a77c9a1c318821919cc6da70fada534aa4cf0e0a76'
 rules:
   - requirement: 'Workspace identity'
     rules:
-      - "A workspace is identified by a unique name within a project's specd.yaml. Names must match /^[a-z][a-z0-9-]*$/. The name default is reserved for the local project workspace — every project must declare a default workspace. No two workspaces in the same configuration may share the same name."
+      - 'A workspace is identified by a unique name within a project specd.yaml.'
+      - 'Workspace names must match /^[a-z][a-z0-9-]*$/.'
+      - 'The name default is reserved for the local project workspace.'
+      - 'Every project must declare a default workspace.'
+      - 'No two workspaces in the same configuration may share the same name.'
   - requirement: 'Workspace properties'
     rules:
-      - 'A workspace declares the following properties:'
-      - '| Property | Required | Default (default ws) | Default (non-default ws) | Description |'
-      - '| --------------------- | ------------------ | ---------------------- | ------------------------------------- | ---------------------------------------------------------------------- |'
-      - "| specs | always | — | — | Storage adapter and path where this workspace's spec files live |"
-      - '| codeRoot | non-default only | project root | (none — must be explicit) | Directory where the implementation code for this workspace lives |'
-      - '| schemas | no | specd/schemas | (none — no local schemas) | Storage adapter and path for named local schemas |'
-      - "| ownership | no | owned | readOnly | The project's relationship to this workspace's specs |"
-      - '| prefix | no | (none) | (none) | Logical path prefix prepended to all capability paths |'
-      - "| contextIncludeSpecs | no | — | ['*'] (all specs in this workspace) | Workspace-level include patterns applied when this workspace is active |"
-      - '| contextExcludeSpecs | no | — | (none) | Workspace-level exclude patterns applied when this workspace is active |'
+      - 'The specs property is always required and specifies the storage adapter and path where the workspace spec files live.'
+      - 'The codeRoot property is required for non-default workspaces; for the default workspace it resolves to the project root.'
+      - 'The schemas property defaults to specd/schemas for the default workspace; non-default workspaces have no local schemas by default.'
+      - 'The ownership property defaults to owned for the default workspace and readOnly for non-default workspaces.'
+      - 'The prefix property is optional with no default for any workspace.'
+      - 'The contextIncludeSpecs property defaults to all specs in this workspace for non-default workspaces.'
+      - 'The contextExcludeSpecs property has no default.'
       - 'All relative paths resolve from the directory containing specd.yaml.'
   - requirement: 'External workspace inference'
     rules:
-      - "A workspace is considered external when its specs storage path resolves to a location outside the project's repository root. This property (isExternal) is inferred from the resolved path at configuration load time — it is never declared explicitly. External workspaces affect ownership defaults and change validation behavior."
+      - 'A workspace is considered external when its specs storage path resolves to a location outside the project repository root.'
+      - 'The isExternal property is inferred from the resolved path at configuration load time and is never declared explicitly.'
+      - 'External workspaces affect ownership defaults and change validation behavior.'
   - requirement: 'Ownership semantics'
     rules:
-      - "Ownership describes the project's relationship to a workspace's specs:"
-      - '| Ownership | Meaning |'
-      - '| ---------- | ----------------------------------------------------------------- |'
-      - '| owned | The project owns these specs; changes are freely proposed |'
-      - '| shared | The project co-owns these specs; changes may require coordination |'
-      - '| readOnly | The project reads but does not modify these specs |'
-      - 'Ownership defaults to owned for the default workspace and readOnly for non-default workspaces. Ownership affects whether changes can target specs in the workspace and whether approval gates apply.'
+      - 'Ownership value owned means the project owns these specs and changes are freely proposed.'
+      - 'Ownership value shared means the project co-owns these specs and changes may require coordination.'
+      - 'Ownership value readOnly means the project reads but does not modify these specs.'
+      - 'Ownership defaults to owned for the default workspace and readOnly for non-default workspaces.'
+      - 'Ownership affects whether changes can target specs in the workspace and whether approval gates apply.'
   - requirement: 'Prefix semantics'
     rules:
-      - 'When a workspace declares a prefix, the prefix is prepended to all capability paths in that workspace. A spec stored at architecture/ on disk becomes <prefix>/architecture in the specd model. When no prefix is declared, specs use bare capability paths.'
-      - 'Prefixes may be single-segment (_global) or multi-segment (team/shared/core). Two workspaces may share the same prefix — the prefix is not a unique identifier; the workspace name is.'
+      - 'When a workspace declares a prefix, the prefix is prepended to all capability paths in that workspace.'
+      - 'A spec stored at architecture/ on disk becomes prefix/architecture in the specd model.'
+      - 'When no prefix is declared, specs use bare capability paths.'
+      - 'Prefixes may be single-segment or multi-segment.'
+      - 'Two workspaces may share the same prefix; the prefix is not a unique identifier, the workspace name is.'
       - 'Invalid prefix syntax produces a ConfigValidationError at startup.'
   - requirement: 'Workspace-qualified spec IDs'
     rules:
-      - 'Every spec is identified by a fully-qualified spec ID in the format workspace:capabilityPath. The colon separates the workspace name from the capability path; / always belongs to the capability path.'
-      - 'A bare path (no colon) is shorthand for default:path. An unknown workspace qualifier in a spec ID is rejected with an error.'
-      - 'Internally, specd always uses the fully-qualified form. The bare-path shorthand is a user-facing convenience only.'
+      - 'Every spec is identified by a fully-qualified spec ID in the format workspace:capabilityPath.'
+      - 'The colon separates the workspace name from the capability path; / always belongs to the capability path.'
+      - 'A bare path (no colon) is shorthand for default:path.'
+      - 'An unknown workspace qualifier in a spec ID is rejected with an error.'
+      - 'Internally, specd always uses the fully-qualified form; the bare-path shorthand is a user-facing convenience only.'
   - requirement: 'Active workspace determination'
     rules:
-      - "A workspace is considered active in the context of a change when at least one of the change's specIds belongs to that workspace. Active workspaces determine which workspace-level context patterns are applied during context compilation."
-      - 'The set of active workspaces is read from the change manifest (change.workspaces) — it is not inferred from specIds at compile time.'
+      - 'A workspace is considered active in the context of a change when at least one of the change specIds belongs to that workspace.'
+      - 'Active workspaces determine which workspace-level context patterns are applied during context compilation.'
+      - 'The set of active workspaces is read from the change manifest (change.workspaces) and is not inferred from specIds at compile time.'
   - requirement: 'Primary workspace'
     rules:
-      - 'The primary workspace of a change is the first entry in change.workspaces. It is used for:'
-      - 'Archive path template resolution ({{change.workspace}})'
-      - 'Default metadata attribution when archiving'
+      - 'The primary workspace of a change is the first entry in change.workspaces.'
+      - 'The primary workspace is used for archive path template resolution (change.workspace) and default metadata attribution when archiving.'
   - requirement: 'Port-per-workspace pattern'
     rules:
-      - "Use cases that operate across workspaces receive a ReadonlyMap<string, RepositoryInstance> keyed by workspace name. The composition layer constructs one repository instance per workspace declared in configuration and passes the complete map. Use cases look up the repository for a spec's workspace to resolve paths, load content, or write artifacts."
+      - 'Use cases that operate across workspaces receive a ReadonlyMap of string to RepositoryInstance keyed by workspace name.'
+      - 'The composition layer constructs one repository instance per workspace declared in configuration and passes the complete map.'
+      - 'Use cases look up the repository for a spec workspace to resolve paths, load content, or write artifacts.'
   - requirement: 'Workspace-level context patterns'
     rules:
-      - 'Each workspace may declare contextIncludeSpecs and contextExcludeSpecs patterns. These are applied only when the workspace is active:'
-      - 'Omitting the workspace qualifier in a workspace-level pattern means "this workspace" (not default)'
-      - "['*'] means all specs in this workspace"
-      - "['auth/*'] means specs under auth/ in this workspace"
-      - 'Workspace-level patterns are evaluated after project-level patterns. Specs added via dependsOn traversal are never subject to exclude patterns.'
+      - 'Each workspace may declare contextIncludeSpecs and contextExcludeSpecs patterns.'
+      - 'These patterns are applied only when the workspace is active.'
+      - 'Omitting the workspace qualifier in a workspace-level pattern means this workspace, not default.'
+      - 'The pattern * means all specs in this workspace.'
+      - 'Workspace-level patterns are evaluated after project-level patterns.'
+      - 'Specs added via dependsOn traversal are never subject to exclude patterns.'
   - requirement: 'Cross-workspace references'
     rules:
-      - "Specs may reference other specs in different workspaces using the qualified form (billing:payments/invoices) in dependsOn, context patterns, and delta targets. Schema references use #workspace:name syntax to resolve schemas from another workspace's local schema directory."
-      - 'References to unknown workspaces are handled differently by context:'
-      - 'At configuration validation time: error (abort)'
-      - 'At runtime (context compilation): warning and skip'
+      - 'Specs may reference other specs in different workspaces using the qualified form (e.g. billing:payments/invoices) in dependsOn, context patterns, and delta targets.'
+      - 'Schema references use #workspace:name syntax to resolve schemas from another workspace local schema directory.'
+      - 'References to unknown workspaces at configuration validation time produce an error and abort.'
+      - 'References to unknown workspaces at runtime (context compilation) produce a warning and skip.'
   - requirement: 'Workspace directory structure in changes'
     rules:
-      - 'Change artifacts always include an explicit workspace segment in the path, even for single-workspace changes:'
-      - 'New spec artifacts: specs/<workspace>/<capability-path>/<artifact-filename>'
-      - 'Delta files: deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml'
+      - 'Change artifacts always include an explicit workspace segment in the path, even for single-workspace changes.'
+      - 'New spec artifacts use the path specs/workspace/capability-path/artifact-filename.'
+      - 'Delta files use the path deltas/workspace/capability-path/artifact-filename.delta.yaml.'
       - 'This ensures multi-workspace changes are unambiguous and tooling can resolve the correct repository without inspecting configuration.'
   - requirement: 'Sole source of truth'
     rules:
-      - "Each project's specd.yaml is the sole source of truth for that project's view of workspaces. When a workspace's specs path points to an external repository, specd never reads the external repository's specd.yaml. All properties — paths, schemas, ownership, prefix — must be independently declared in the consuming project's configuration."
+      - 'Each project specd.yaml is the sole source of truth for that project view of workspaces.'
+      - 'When a workspace specs path points to an external repository, specd never reads the external repository specd.yaml.'
+      - 'All properties (paths, schemas, ownership, prefix) must be independently declared in the consuming project configuration.'
 constraints:
-  - 'Every project must declare a default workspace'
-  - 'Workspace names must match /^[a-z][a-z0-9-]*$/'
-  - 'codeRoot is required for non-default workspaces'
-  - 'isExternal is inferred, never declared'
-  - 'Spec IDs are always workspace-qualified internally'
-  - 'A change must belong to at least one workspace'
-  - "Modifications to a change's workspaces trigger approval invalidation"
-  - 'Workspace-level exclude patterns do not apply to specs reached via dependsOn'
-  - 'External repository configurations are never read — each project declares its own view'
-  - 'Change artifacts always include the workspace segment in their path'
+  - 'Every project must declare a default workspace.'
+  - 'Workspace names must match /^[a-z][a-z0-9-]*$/.'
+  - 'codeRoot is required for non-default workspaces.'
+  - 'isExternal is inferred, never declared.'
+  - 'Spec IDs are always workspace-qualified internally.'
+  - 'A change must belong to at least one workspace.'
+  - 'Modifications to a change workspaces trigger approval invalidation.'
+  - 'Workspace-level exclude patterns do not apply to specs reached via dependsOn.'
+  - 'External repository configurations are never read; each project declares its own view.'
+  - 'Change artifacts always include the workspace segment in their path.'
 scenarios:
   - requirement: 'Workspace identity'
     name: 'Valid workspace names accepted'
+    given: []
     when:
-      - 'a workspace is declared with name billing, my-service, or default'
+      - 'A workspace is declared with name billing, my-service, or default.'
     then:
-      - 'configuration loads successfully'
+      - 'Configuration loads successfully.'
   - requirement: 'Workspace identity'
     name: 'Invalid workspace name rejected'
+    given: []
     when:
-      - 'a workspace is declared with name Billing, my_service, or 123abc'
+      - 'A workspace is declared with name Billing, my_service, or 123abc.'
     then:
-      - 'a ConfigValidationError is thrown at startup'
+      - 'A ConfigValidationError is thrown at startup.'
   - requirement: 'Workspace identity'
     name: 'Missing default workspace'
+    given: []
     when:
-      - 'specd.yaml declares workspaces but none is named default'
+      - 'specd.yaml declares workspaces but none is named default.'
     then:
-      - 'a ConfigValidationError is thrown at startup'
+      - 'A ConfigValidationError is thrown at startup.'
   - requirement: 'Workspace identity'
     name: 'Duplicate workspace name'
+    given: []
     when:
-      - 'specd.yaml declares two workspaces with the same name'
+      - 'specd.yaml declares two workspaces with the same name.'
     then:
-      - 'a ConfigValidationError is thrown at startup'
+      - 'A ConfigValidationError is thrown at startup.'
   - requirement: 'Workspace properties'
     name: 'Default workspace inherits defaults'
     given:
-      - 'a default workspace with only specs declared'
+      - 'A default workspace with only specs declared.'
     when:
-      - 'configuration is loaded'
+      - 'Configuration is loaded.'
     then:
-      - 'codeRoot resolves to the project root'
-      - 'ownership is owned'
-      - 'schemas resolves to specd/schemas'
+      - 'codeRoot resolves to the project root.'
+      - 'ownership is owned.'
+      - 'schemas resolves to specd/schemas.'
   - requirement: 'Workspace properties'
     name: 'Non-default workspace requires codeRoot'
+    given: []
     when:
-      - 'a non-default workspace omits codeRoot'
+      - 'A non-default workspace omits codeRoot.'
     then:
-      - 'a ConfigValidationError is thrown at startup'
+      - 'A ConfigValidationError is thrown at startup.'
   - requirement: 'Workspace properties'
     name: 'Non-default workspace defaults'
     given:
-      - 'a non-default workspace with specs and codeRoot declared'
+      - 'A non-default workspace with specs and codeRoot declared.'
     when:
-      - 'configuration is loaded'
+      - 'Configuration is loaded.'
     then:
-      - 'ownership defaults to readOnly'
-      - 'schemas is absent (no local schemas)'
+      - 'ownership defaults to readOnly.'
+      - 'schemas is absent (no local schemas).'
   - requirement: 'External workspace inference'
     name: 'Workspace with path inside repo root'
     given:
-      - 'project root is /project and workspace specs path is ./specs'
+      - 'Project root is /project and workspace specs path is ./specs.'
     when:
-      - 'configuration is loaded'
+      - 'Configuration is loaded.'
     then:
-      - 'isExternal is false'
+      - 'isExternal is false.'
   - requirement: 'External workspace inference'
     name: 'Workspace with path outside repo root'
     given:
-      - 'project root is /project and workspace specs path is ../external-repo/specs'
+      - 'Project root is /project and workspace specs path is ../external-repo/specs.'
     when:
-      - 'configuration is loaded'
+      - 'Configuration is loaded.'
     then:
-      - 'isExternal is true'
+      - 'isExternal is true.'
   - requirement: 'Prefix semantics'
     name: 'Prefix prepended to capability path'
     given:
-      - 'workspace shared declares prefix: team/core'
+      - 'Workspace shared declares prefix: team/core.'
+      - 'A spec stored at architecture/ on disk.'
     when:
-      - 'the spec ID is resolved'
+      - 'The spec ID is resolved.'
     then:
-      - 'a spec stored at architecture/ on disk'
-      - 'it becomes shared:team/core/architecture'
+      - 'It becomes shared:team/core/architecture.'
   - requirement: 'Prefix semantics'
     name: 'No prefix uses bare path'
     given:
-      - 'workspace default declares no prefix'
+      - 'Workspace default declares no prefix.'
+      - 'A spec stored at architecture/ on disk.'
     when:
-      - 'the spec ID is resolved'
+      - 'The spec ID is resolved.'
     then:
-      - 'a spec stored at architecture/ on disk'
-      - 'it becomes default:architecture'
+      - 'It becomes default:architecture.'
   - requirement: 'Prefix semantics'
     name: 'Invalid prefix rejected'
+    given: []
     when:
-      - 'a workspace declares a prefix with invalid syntax'
+      - 'A workspace declares a prefix with invalid syntax.'
     then:
-      - 'a ConfigValidationError is thrown at startup'
+      - 'A ConfigValidationError is thrown at startup.'
   - requirement: 'Workspace-qualified spec IDs'
     name: 'Bare path resolves to default workspace'
+    given: []
     when:
-      - 'a user specifies auth/login without a colon'
+      - 'A user specifies auth/login without a colon.'
     then:
-      - 'it resolves to default:auth/login'
+      - 'It resolves to default:auth/login.'
   - requirement: 'Workspace-qualified spec IDs'
     name: 'Unknown workspace rejected'
+    given: []
     when:
-      - 'a spec ID nonexistent:auth/login is used'
+      - 'A spec ID nonexistent:auth/login is used.'
     then:
-      - 'an error is thrown indicating the workspace is unknown'
+      - 'An error is thrown indicating the workspace is unknown.'
   - requirement: 'Active workspace determination'
     name: 'Workspace active when change has spec in it'
     given:
-      - "a change with specIds: ['billing:invoices']"
+      - "A change with specIds: ['billing:invoices']."
     when:
-      - 'context compilation determines active workspaces'
+      - 'Context compilation determines active workspaces.'
     then:
-      - 'workspace billing is active'
+      - 'Workspace billing is active.'
   - requirement: 'Active workspace determination'
     name: 'Workspace inactive when no specs target it'
     given:
-      - "a change with specIds: ['default:auth/login']"
+      - "A change with specIds: ['default:auth/login']."
     when:
-      - 'context compilation determines active workspaces'
+      - 'Context compilation determines active workspaces.'
     then:
-      - 'workspace billing is not active'
-      - 'its workspace-level patterns are not applied'
+      - 'Workspace billing is not active.'
+      - 'Its workspace-level patterns are not applied.'
   - requirement: 'Workspace-level context patterns'
     name: 'Unqualified pattern resolves to own workspace'
     given:
-      - "workspace billing declares contextIncludeSpecs: ['payments/*']"
+      - "Workspace billing declares contextIncludeSpecs: ['payments/*']."
     when:
-      - 'context patterns are resolved'
+      - 'Context patterns are resolved.'
     then:
-      - 'the pattern matches billing:payments/, not default:payments/'
+      - 'The pattern matches billing:payments/*, not default:payments/*.'
   - requirement: 'Workspace-level context patterns'
     name: 'DependsOn specs exempt from excludes'
     given:
-      - "workspace billing declares contextExcludeSpecs: ['internal/*']"
+      - "Workspace billing declares contextExcludeSpecs: ['internal/*']."
+      - 'A spec reached via dependsOn traversal matches billing:internal/utils.'
     when:
-      - 'context is compiled'
+      - 'Context is compiled.'
     then:
-      - 'a spec reached via dependsOn traversal matches billing:internal/utils'
-      - 'billing:internal/utils is included (not excluded)'
+      - 'billing:internal/utils is included (not excluded).'
   - requirement: 'Workspace directory structure in changes'
     name: 'Single-workspace change includes workspace segment'
     given:
-      - 'a change targeting only default workspace'
+      - 'A change targeting only default workspace.'
     when:
-      - 'a new spec artifact is stored'
+      - 'A new spec artifact is stored.'
     then:
-      - 'the path includes the workspace segment: specs/default/<capability-path>/<filename>'
+      - 'The path includes the workspace segment: specs/default/capability-path/filename.'
   - requirement: 'Sole source of truth'
     name: 'External workspace config is never read'
     given:
-      - 'workspace billing points to ../billing-repo/specs'
+      - 'Workspace billing points to ../billing-repo/specs.'
+      - '../billing-repo/specd.yaml exists with its own workspace configuration.'
     when:
-      - 'specd loads configuration'
+      - 'specd loads configuration.'
     then:
-      - '../billing-repo/specd.yaml exists with its own workspace configuration'
-      - '../billing-repo/specd.yaml is never read'
-      - 'all workspace properties come from the local specd.yaml'
+      - '../billing-repo/specd.yaml is never read.'
+      - 'All workspace properties come from the local specd.yaml.'
