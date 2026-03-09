@@ -16,9 +16,9 @@ An empty input produces an empty result.
 
 ### Parameters
 
-| Parameter | Type | Description |
-|---|---|---|
-| `files` | `Record<string, string>` | A map of file path → UTF-8 file content. |
+| Parameter | Type                     | Description                              |
+| --------- | ------------------------ | ---------------------------------------- |
+| `files`   | `Record<string, string>` | A map of file path → UTF-8 file content. |
 
 ### Returns
 
