@@ -18,19 +18,19 @@ import { Repository, type RepositoryConfig } from '@specd/core'
 
 ```typescript
 interface RepositoryConfig {
-  workspace: string                          // workspace name from specd.yaml
+  workspace: string // workspace name from specd.yaml
   ownership: 'owned' | 'shared' | 'readOnly'
-  isExternal: boolean                        // true if specs live outside the git root
+  isExternal: boolean // true if specs live outside the git root
 }
 ```
 
 ### Methods inherited by all repositories
 
-| Method | Returns | Description |
-|---|---|---|
-| `workspace()` | `string` | The workspace name this repository is bound to. |
-| `ownership()` | `'owned' \| 'shared' \| 'readOnly'` | The ownership level declared in `specd.yaml`. |
-| `isExternal()` | `boolean` | Whether this repository points to data outside the current git root. |
+| Method         | Returns                             | Description                                                          |
+| -------------- | ----------------------------------- | -------------------------------------------------------------------- |
+| `workspace()`  | `string`                            | The workspace name this repository is bound to.                      |
+| `ownership()`  | `'owned' \| 'shared' \| 'readOnly'` | The ownership level declared in `specd.yaml`.                        |
+| `isExternal()` | `boolean`                           | Whether this repository points to data outside the current git root. |
 
 ---
 
@@ -56,7 +56,9 @@ Returns the spec metadata for the given path, or `null` if no such spec exists.
 
 ```typescript
 const spec = await specRepo.get(SpecPath.parse('auth/oauth'))
-if (spec === null) { /* spec does not exist */ }
+if (spec === null) {
+  /* spec does not exist */
+}
 ```
 
 #### `list(prefix?: SpecPath): Promise<Spec[]>`
@@ -202,12 +204,12 @@ Returns `null` if the resolved file does not exist. The caller is responsible fo
 
 Resolution is prefix-driven — no implicit fallback:
 
-| `ref` form | Resolves from |
-|---|---|
-| `'@scope/name'` | `node_modules/@scope/name/schema.yaml` |
-| `'#workspace:name'` | `workspaceSchemasPaths.get('workspace')/name/schema.yaml` |
-| `'#name'` or bare name | `workspaceSchemasPaths.get('default')/name/schema.yaml` |
-| relative or absolute path | directly from that path |
+| `ref` form                | Resolves from                                             |
+| ------------------------- | --------------------------------------------------------- |
+| `'@scope/name'`           | `node_modules/@scope/name/schema.yaml`                    |
+| `'#workspace:name'`       | `workspaceSchemasPaths.get('workspace')/name/schema.yaml` |
+| `'#name'` or bare name    | `workspaceSchemasPaths.get('default')/name/schema.yaml`   |
+| relative or absolute path | directly from that path                                   |
 
 #### `list(workspaceSchemasPaths: ReadonlyMap<string, string>): Promise<SchemaEntry[]>`
 
@@ -215,10 +217,10 @@ Lists all schemas discoverable from the given workspace paths and installed npm 
 
 ```typescript
 interface SchemaEntry {
-  ref: string              // pass this to resolve()
-  name: string             // display name
+  ref: string // pass this to resolve()
+  name: string // display name
   source: 'npm' | 'workspace'
-  workspace?: string       // present when source === 'workspace'
+  workspace?: string // present when source === 'workspace'
 }
 ```
 
@@ -242,7 +244,7 @@ Executes `command` in a subprocess, substituting template variables from `variab
 interface HookVariables {
   'change.name': string
   'change.workspace': string
-  'codeRoot': string
+  codeRoot: string
   [key: string]: string
 }
 
@@ -326,8 +328,8 @@ import {
 
 ### Properties
 
-| Property | Type | Description |
-|---|---|---|
+| Property         | Type                | Description                                            |
+| ---------------- | ------------------- | ------------------------------------------------------ |
 | `fileExtensions` | `readonly string[]` | File extensions this adapter handles (e.g. `['.md']`). |
 
 ### Methods
@@ -356,9 +358,9 @@ Returns a static description of all addressable node types for this format. `Com
 
 ```typescript
 interface NodeTypeDescriptor {
-  type: string                   // e.g. 'section', 'property'
+  type: string // e.g. 'section', 'property'
   identifiedBy: readonly string[] // selector properties, e.g. ['matches']
-  description: string            // human-readable, for LLM context
+  description: string // human-readable, for LLM context
 }
 ```
 
@@ -369,8 +371,8 @@ Returns a simplified navigable summary of the artifact's addressable nodes. `Com
 ```typescript
 interface OutlineEntry {
   type: string
-  label: string   // e.g. heading text or key name
-  depth: number   // 0 = root children
+  label: string // e.g. heading text or key name
+  depth: number // 0 = root children
   children?: readonly OutlineEntry[]
 }
 ```

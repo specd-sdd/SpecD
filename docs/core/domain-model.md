@@ -8,16 +8,16 @@ This document describes the entities and value objects that `@specd/core` use ca
 
 ### Readable properties
 
-| Property | Type | Description |
-|---|---|---|
-| `name` | `string` | Unique slug name. Immutable after creation. |
-| `createdAt` | `Date` | Timestamp when the change was created. Immutable. |
-| `state` | `ChangeState` | Current lifecycle state, derived from history. |
-| `workspaces` | `readonly string[]` | Workspace IDs this change belongs to. |
-| `specIds` | `readonly string[]` | Spec paths being created or modified. |
-| `contextSpecIds` | `readonly string[]` | Spec paths providing context but not being modified. |
-| `history` | `readonly ChangeEvent[]` | Append-only event log. |
-| `artifacts` | `ReadonlyMap<string, ChangeArtifact>` | Artifacts tracked in this change, keyed by artifact type ID. |
+| Property         | Type                                  | Description                                                  |
+| ---------------- | ------------------------------------- | ------------------------------------------------------------ |
+| `name`           | `string`                              | Unique slug name. Immutable after creation.                  |
+| `createdAt`      | `Date`                                | Timestamp when the change was created. Immutable.            |
+| `state`          | `ChangeState`                         | Current lifecycle state, derived from history.               |
+| `workspaces`     | `readonly string[]`                   | Workspace IDs this change belongs to.                        |
+| `specIds`        | `readonly string[]`                   | Spec paths being created or modified.                        |
+| `contextSpecIds` | `readonly string[]`                   | Spec paths providing context but not being modified.         |
+| `history`        | `readonly ChangeEvent[]`              | Append-only event log.                                       |
+| `artifacts`      | `ReadonlyMap<string, ChangeArtifact>` | Artifacts tracked in this change, keyed by artifact type ID. |
 
 ### state
 
@@ -89,8 +89,8 @@ All events share three common fields: `type`, `at: Date`, and `by: GitIdentity`.
 
 ```typescript
 interface GitIdentity {
-  readonly name: string   // git user.name
-  readonly email: string  // git user.email
+  readonly name: string // git user.name
+  readonly email: string // git user.email
 }
 ```
 
@@ -104,15 +104,15 @@ interface GitIdentity {
 
 ### Readable properties
 
-| Property | Type | Description |
-|---|---|---|
-| `type` | `string` | Artifact type ID from the schema (e.g. `'proposal'`, `'specs'`). |
-| `filename` | `string` | Artifact filename relative to the change directory (e.g. `'proposal.md'`). |
-| `optional` | `boolean` | Whether the artifact is optional in the schema. |
-| `requires` | `readonly string[]` | Artifact type IDs that must be complete before this one. |
-| `status` | `ArtifactStatus` | Current validation status. |
-| `validatedHash` | `string \| undefined` | SHA-256 hash recorded at last validation, or `undefined`. |
-| `isComplete` | `boolean` | Shorthand for `status === 'complete'`. |
+| Property        | Type                  | Description                                                                |
+| --------------- | --------------------- | -------------------------------------------------------------------------- |
+| `type`          | `string`              | Artifact type ID from the schema (e.g. `'proposal'`, `'specs'`).           |
+| `filename`      | `string`              | Artifact filename relative to the change directory (e.g. `'proposal.md'`). |
+| `optional`      | `boolean`             | Whether the artifact is optional in the schema.                            |
+| `requires`      | `readonly string[]`   | Artifact type IDs that must be complete before this one.                   |
+| `status`        | `ArtifactStatus`      | Current validation status.                                                 |
+| `validatedHash` | `string \| undefined` | SHA-256 hash recorded at last validation, or `undefined`.                  |
+| `isComplete`    | `boolean`             | Shorthand for `status === 'complete'`.                                     |
 
 ### ArtifactStatus
 
@@ -120,12 +120,12 @@ interface GitIdentity {
 type ArtifactStatus = 'missing' | 'in-progress' | 'complete' | 'skipped'
 ```
 
-| Status | Meaning |
-|---|---|
-| `missing` | The artifact file has not been created yet. |
+| Status        | Meaning                                                                      |
+| ------------- | ---------------------------------------------------------------------------- |
+| `missing`     | The artifact file has not been created yet.                                  |
 | `in-progress` | The file exists but has not been validated, or a dependency is not complete. |
-| `complete` | The file has been validated and its hash recorded. |
-| `skipped` | The artifact is optional and was explicitly marked as not produced. |
+| `complete`    | The file has been validated and its hash recorded.                           |
+| `skipped`     | The artifact is optional and was explicitly marked as not produced.          |
 
 Status is always derived from the artifact's `validatedHash` and the presence of its file on disk — it is never stored as a raw field. `'skipped'` is only reachable for `optional: true` artifacts.
 
@@ -135,11 +135,11 @@ Status is always derived from the artifact's `validatedHash` and the presence of
 
 ### Readable properties
 
-| Property | Type | Description |
-|---|---|---|
-| `workspace` | `string` | The workspace name this spec belongs to (from `specd.yaml`). |
-| `name` | `SpecPath` | The spec's identity path within the workspace (e.g. `auth/oauth`). |
-| `filenames` | `readonly string[]` | Artifact filenames present in this spec directory. |
+| Property    | Type                | Description                                                        |
+| ----------- | ------------------- | ------------------------------------------------------------------ |
+| `workspace` | `string`            | The workspace name this spec belongs to (from `specd.yaml`).       |
+| `name`      | `SpecPath`          | The spec's identity path within the workspace (e.g. `auth/oauth`). |
+| `filenames` | `readonly string[]` | Artifact filenames present in this spec directory.                 |
 
 ### hasArtifact
 
@@ -153,13 +153,13 @@ spec.hasArtifact('spec.md') // true | false
 
 ### Readable properties
 
-| Property | Type | Description |
-|---|---|---|
-| `name` | `string` | The original change name. |
-| `archivedName` | `string` | The directory name used in the archive (may differ from `name`). |
-| `workspace` | `SpecPath` | The workspace under which the change's specs lived. |
-| `archivedAt` | `Date` | Timestamp when the change was archived. |
-| `artifacts` | `readonly string[]` | Artifact type IDs present when the change was archived. |
+| Property       | Type                | Description                                                      |
+| -------------- | ------------------- | ---------------------------------------------------------------- |
+| `name`         | `string`            | The original change name.                                        |
+| `archivedName` | `string`            | The directory name used in the archive (may differ from `name`). |
+| `workspace`    | `SpecPath`          | The workspace under which the change's specs lived.              |
+| `archivedAt`   | `Date`              | Timestamp when the change was archived.                          |
+| `artifacts`    | `readonly string[]` | Artifact type IDs present when the change was archived.          |
 
 ## SpecPath
 
@@ -168,10 +168,10 @@ spec.hasArtifact('spec.md') // true | false
 ```typescript
 import { SpecPath } from '@specd/core'
 
-const path = SpecPath.parse('auth/oauth')    // throws InvalidSpecPathError if invalid
-path.toString()                              // 'auth/oauth'
-path.segments                                // ['auth', 'oauth']
-path.child('flows')                          // SpecPath('auth/oauth/flows')
+const path = SpecPath.parse('auth/oauth') // throws InvalidSpecPathError if invalid
+path.toString() // 'auth/oauth'
+path.segments // ['auth', 'oauth']
+path.child('flows') // SpecPath('auth/oauth/flows')
 ```
 
 You typically receive `SpecPath` values from `Spec.name` or `ArchivedChange.workspace` and pass them to `SpecRepository` methods. You rarely need to construct them yourself unless building your own adapter.
@@ -182,11 +182,11 @@ You typically receive `SpecPath` values from `Spec.name` or `ArchivedChange.work
 import { type ChangeState, VALID_TRANSITIONS, isValidTransition } from '@specd/core'
 
 // Check whether a transition is permitted
-isValidTransition('ready', 'implementing')       // true
-isValidTransition('archivable', 'designing')     // false
+isValidTransition('ready', 'implementing') // true
+isValidTransition('archivable', 'designing') // false
 
 // Inspect valid targets from a given state
-VALID_TRANSITIONS['ready']   // ['implementing', 'pending-spec-approval']
+VALID_TRANSITIONS['ready'] // ['implementing', 'pending-spec-approval']
 ```
 
 Use `isValidTransition` when you want to present available actions to a user without attempting the transition and catching an error.
