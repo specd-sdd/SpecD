@@ -65,10 +65,13 @@ const program = new Command('specd')
   .option('--hide-banner', 'suppress the SpecD banner')
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
-  const fmt = actionCommand.opts().format as string | undefined
   const hideBanner = (program.opts().hideBanner as boolean | undefined) === true
-  const isContextCmd = actionCommand.name() === 'context'
-  if (!hideBanner && !isContextCmd && (fmt === undefined || fmt === 'text')) {
+  const parent = actionCommand.parent?.name()
+  const cmd = actionCommand.name()
+  const isInit = parent === 'project' && cmd === 'init'
+  const isOverview = parent === 'project' && cmd === 'overview'
+  const showBanner = isInit || isOverview
+  if (!hideBanner && showBanner && (actionCommand.opts().format ?? 'text') === 'text') {
     process.stdout.write(
       renderBanner({ cliVersion: CLI_VERSION, coreVersion: CORE_VERSION }) + '\n\n',
     )
