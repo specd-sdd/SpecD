@@ -183,6 +183,10 @@ const ArtifactZodSchema = z
     message: "'deltaValidations' is only valid when 'delta' is true",
     path: ['deltaValidations'],
   })
+  .refine((a) => !(a.delta === true && a.scope === 'change'), {
+    message: "'delta' is not valid when 'scope' is 'change'",
+    path: ['delta'],
+  })
 
 const SchemaYamlZodSchema = z.object({
   name: z.string(),

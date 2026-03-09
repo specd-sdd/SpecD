@@ -91,8 +91,14 @@ describe('PlaintextParser', () => {
         },
       ])
       expect(result.root.children).toHaveLength(2)
-      expect(result.root.children![0]).toMatchObject({ type: 'paragraph', value: 'Keep me.' })
-      expect(result.root.children![1]).toMatchObject({ type: 'paragraph', value: 'Also keep.' })
+      expect(result.root.children![0]).toMatchObject({
+        type: 'paragraph',
+        children: [{ type: 'line', value: 'Keep me.' }],
+      })
+      expect(result.root.children![1]).toMatchObject({
+        type: 'paragraph',
+        children: [{ type: 'line', value: 'Also keep.' }],
+      })
     })
 
     it('throws DeltaApplicationError when selector resolves to no node', () => {
