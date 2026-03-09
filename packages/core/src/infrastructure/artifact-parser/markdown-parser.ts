@@ -520,9 +520,11 @@ Delta files live at \`deltas/<workspace>/<capability-path>/<filename>.md.delta.y
   /**
    * Markdown files do not serve as delta files; always returns an empty array.
    *
+   * @param _content - Unused; accepted for interface conformance
    * @returns An empty array
    */
-  parseDelta(): readonly DeltaEntry[] {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  parseDelta(_content: string): readonly DeltaEntry[] {
     return []
   }
 }
