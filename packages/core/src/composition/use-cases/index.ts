@@ -41,10 +41,13 @@ export {
   type FsInvalidateSpecMetadataOptions,
 } from './invalidate-spec-metadata.js'
 export { createGetActiveSchema, type FsGetActiveSchemaOptions } from './get-active-schema.js'
-export { createInitProject } from './init-project.js'
-export { createRecordSkillInstall } from './record-skill-install.js'
-export { createGetSkillsManifest } from './get-skills-manifest.js'
-export { createGetProjectContext } from './get-project-context.js'
+export { createInitProject, type FsInitProjectOptions } from './init-project.js'
+export {
+  createRecordSkillInstall,
+  type FsRecordSkillInstallOptions,
+} from './record-skill-install.js'
+export { createGetSkillsManifest, type FsGetSkillsManifestOptions } from './get-skills-manifest.js'
+export { createGetProjectContext, type FsGetProjectContextOptions } from './get-project-context.js'
 export {
   createCreateChange,
   type CreateChangeContext,
@@ -97,5 +100,5 @@ export {
   type FsCompileContextOptions,
 } from './compile-context.js'
 export { createValidateSpecs, type FsValidateSpecsOptions } from './validate-specs.js'
-export { createInferSpecSections } from './infer-spec-sections.js'
-export { createGetSpecContext } from './get-spec-context.js'
+export { createInferSpecSections, type FsInferSpecSectionsOptions } from './infer-spec-sections.js'
+export { createGetSpecContext, type FsGetSpecContextOptions } from './get-spec-context.js'
