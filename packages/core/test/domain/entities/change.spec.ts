@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
+import { InvalidChangeError } from '../../../src/domain/errors/invalid-change-error.js'
 import type { GitIdentity, ChangeEvent } from '../../../src/domain/entities/change.js'
 import type { ArtifactStatus } from '../../../src/domain/value-objects/artifact-status.js'
 
@@ -58,6 +59,32 @@ describe('Change', () => {
 
     it('defaults history to empty', () => {
       expect(makeChange().history).toHaveLength(0)
+    })
+
+    it('throws InvalidChangeError when workspaces is empty', () => {
+      expect(
+        () =>
+          new Change({
+            name: 'x',
+            createdAt: new Date(),
+            workspaces: [],
+            specIds: ['auth/login'],
+            history: [],
+          }),
+      ).toThrow(InvalidChangeError)
+    })
+
+    it('throws InvalidChangeError when specIds is empty', () => {
+      expect(
+        () =>
+          new Change({
+            name: 'x',
+            createdAt: new Date(),
+            workspaces: ['default'],
+            specIds: [],
+            history: [],
+          }),
+      ).toThrow(InvalidChangeError)
     })
   })
 

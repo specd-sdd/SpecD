@@ -2,6 +2,7 @@ import { type ChangeState, isValidTransition } from '../value-objects/change-sta
 import { type ArtifactStatus } from '../value-objects/artifact-status.js'
 import { InvalidStateTransitionError } from '../errors/invalid-state-transition-error.js'
 import { CorruptedManifestError } from '../errors/corrupted-manifest-error.js'
+import { InvalidChangeError } from '../errors/invalid-change-error.js'
 import { type ChangeArtifact } from './change-artifact.js'
 
 /** Git identity of the actor performing an operation. */
@@ -152,6 +153,12 @@ export class Change {
    * @param props - Change construction properties
    */
   constructor(props: ChangeProps) {
+    if (props.workspaces.length === 0) {
+      throw new InvalidChangeError('A Change must have at least one workspace')
+    }
+    if (props.specIds.length === 0) {
+      throw new InvalidChangeError('A Change must have at least one specId')
+    }
     this._name = props.name
     this._createdAt = new Date(props.createdAt.getTime())
     this._description = props.description
