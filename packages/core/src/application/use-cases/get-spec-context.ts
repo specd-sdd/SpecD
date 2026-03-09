@@ -3,7 +3,7 @@ import { parseMetadata } from './_shared/parse-metadata.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
-import { type ContextWarning } from './compile-context.js'
+import { type ContextWarning } from './_shared/context-warning.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 

@@ -1,9 +1,8 @@
 import { type SchemaRegistry } from '../ports/schema-registry.js'
-import { type ArtifactParserRegistry, type ArtifactNode } from '../ports/artifact-parser.js'
-import { type Selector } from '../../domain/value-objects/selector.js'
+import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
-import { safeRegex } from '../../domain/services/safe-regex.js'
+import { findNodes } from './_shared/selector-matching.js'
 
 /** Input for the {@link InferSpecSections} use case. */
 export interface InferSpecSectionsInput {
@@ -80,7 +79,7 @@ export class InferSpecSections {
       const ast = parser.parse(artifact.content)
 
       for (const section of artifactType.contextSections()) {
-        const nodes = this._findNodes(ast.root, section.selector)
+        const nodes = findNodes(ast.root, section.selector)
         for (const node of nodes) {
           const extracted =
             section.extract === 'label'
@@ -107,75 +106,5 @@ export class InferSpecSections {
     }
 
     return { rules, constraints, scenarios }
-  }
-
-  /**
-   * Finds all AST nodes matching the given selector.
-   *
-   * @param root - The root node to search from
-   * @param selector - The selector criteria to match
-   * @returns Array of matching nodes
-   */
-  private _findNodes(root: ArtifactNode, selector: Selector): ArtifactNode[] {
-    const results: ArtifactNode[] = []
-    this._collectNodes(root, selector, [], results)
-    return results
-  }
-
-  /**
-   * Recursively collects nodes matching the selector, tracking ancestors.
-   *
-   * @param node - The current node being examined
-   * @param selector - The selector criteria to match
-   * @param ancestors - Chain of ancestor nodes from root
-   * @param results - Mutable array to collect matches
-   */
-  private _collectNodes(
-    node: ArtifactNode,
-    selector: Selector,
-    ancestors: readonly ArtifactNode[],
-    results: ArtifactNode[],
-  ): void {
-    if (this._selectorMatches(node, selector, ancestors)) {
-      results.push(node)
-    }
-    const newAncestors = [...ancestors, node]
-    for (const child of node.children ?? []) {
-      this._collectNodes(child, selector, newAncestors, results)
-    }
-  }
-
-  /**
-   * Returns `true` if `node` matches all criteria in `selector`.
-   *
-   * @param node - The node to test
-   * @param selector - The selector criteria
-   * @param ancestors - Chain of ancestor nodes for parent matching
-   * @returns True if the node matches
-   */
-  private _selectorMatches(
-    node: ArtifactNode,
-    selector: Selector,
-    ancestors: readonly ArtifactNode[],
-  ): boolean {
-    if (node.type !== selector.type) return false
-
-    if (selector.matches !== undefined) {
-      const regex = safeRegex(selector.matches, 'i')
-      if (regex === null || !regex.test(node.label ?? '')) return false
-    }
-
-    if (selector.contains !== undefined) {
-      const regex = safeRegex(selector.contains, 'i')
-      if (regex === null || !regex.test(String(node.value ?? ''))) return false
-    }
-
-    if (selector.parent !== undefined) {
-      const nearestOfType = [...ancestors].reverse().find((a) => a.type === selector.parent!.type)
-      if (nearestOfType === undefined) return false
-      if (!this._selectorMatches(nearestOfType, selector.parent, [])) return false
-    }
-
-    return true
   }
 }
