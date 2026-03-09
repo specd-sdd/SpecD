@@ -59,7 +59,6 @@ If transitioning `implementing → verifying` and any artifact has incomplete ta
 
 - The user specifies the logical target state; the CLI never exposes the routing logic in its help text
 - Hook failures (exit code 2) take precedence over transition success
-- `contextSpecIds` for the `designing → ready` transition are resolved by the CLI from `.specd-metadata.yaml` `dependsOn` fields of the change's `specIds`
 
 ## Examples
 

@@ -1,10 +1,9 @@
 import { type Command } from 'commander'
-import { type ChangeState, VALID_TRANSITIONS, SpecPath, parseMetadata } from '@specd/core'
+import { type ChangeState, VALID_TRANSITIONS } from '@specd/core'
 import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { parseSpecId } from '../../helpers/spec-path.js'
 
 /** All valid `ChangeState` values. */
 const VALID_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
@@ -35,37 +34,11 @@ export function registerChangeTransition(parent: Command): void {
         const { change: statusBefore } = await kernel.changes.status.execute({ name })
         const fromState = statusBefore.state
 
-        // Resolve contextSpecIds for designing → ready from dependsOn metadata
-        let contextSpecIds: string[] | undefined
-        if (fromState === 'designing') {
-          const deps = new Set<string>()
-          for (const specId of statusBefore.specIds) {
-            const parsed = parseSpecId(specId, config)
-            const result = await kernel.specs.get.execute({
-              workspace: parsed.workspace,
-              specPath: SpecPath.parse(parsed.capabilityPath),
-            })
-            if (result === null || result === undefined) continue
-            const metadataArtifact = result.artifacts.get('.specd-metadata.yaml')
-            if (metadataArtifact === undefined) continue
-            try {
-              const metadata = parseMetadata(metadataArtifact.content)
-              if (metadata.dependsOn) {
-                for (const dep of metadata.dependsOn) deps.add(dep)
-              }
-            } catch {
-              // Skip specs with unparseable metadata
-            }
-          }
-          if (deps.size > 0) contextSpecIds = [...deps]
-        }
-
         const change = await kernel.changes.transition.execute({
           name,
           to: step as ChangeState,
           approvalsSpec: config.approvals.spec,
           approvalsSignoff: config.approvals.signoff,
-          ...(contextSpecIds !== undefined ? { contextSpecIds } : {}),
         })
 
         const fmt = parseFormat(opts.format)
