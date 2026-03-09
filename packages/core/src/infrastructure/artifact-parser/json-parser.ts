@@ -330,9 +330,11 @@ JSON files are parsed into a normalized AST with \`object\`, \`property\`, \`arr
   /**
    * JSON files do not serve as delta files; always returns an empty array.
    *
+   * @param _content - Unused; accepted for interface conformance
    * @returns An empty array
    */
-  parseDelta(): readonly DeltaEntry[] {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  parseDelta(_content: string): readonly DeltaEntry[] {
     return []
   }
 }

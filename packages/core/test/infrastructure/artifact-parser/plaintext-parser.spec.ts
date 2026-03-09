@@ -166,7 +166,7 @@ describe('PlaintextParser', () => {
 
   describe('parseDelta', () => {
     it('returns empty array', () => {
-      expect(parser.parseDelta()).toEqual([])
+      expect(parser.parseDelta('')).toEqual([])
     })
   })
 })

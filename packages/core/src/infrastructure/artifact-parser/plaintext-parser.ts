@@ -169,9 +169,11 @@ Plain text files are parsed into paragraph nodes separated by blank lines.
   /**
    * Plain text files do not serve as delta files; always returns an empty array.
    *
+   * @param _content - Unused; accepted for interface conformance
    * @returns An empty array
    */
-  parseDelta(): readonly DeltaEntry[] {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  parseDelta(_content: string): readonly DeltaEntry[] {
     return []
   }
 
