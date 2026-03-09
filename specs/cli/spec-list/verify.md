@@ -111,7 +111,7 @@
 
 - **GIVEN** workspace `default` has spec `auth/login` with `fresh` metadata
 - **WHEN** `specd spec list --metadata-status --format json` is run
-- **THEN** the entry for `default:auth/login` has `"status": "fresh"`
+- **THEN** the entry for `default:auth/login` has `"metadataStatus": "fresh"`
 
 ### Requirement: Output format
 

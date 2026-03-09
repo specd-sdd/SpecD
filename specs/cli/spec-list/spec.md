@@ -98,7 +98,12 @@ In `json` or `toon` mode, each spec entry is an object. The `path` field uses th
     {
       "name": "...",
       "specs": [
-        { "path": "workspace:cap/path", "title": "...", "status": "fresh", "summary": "..." }
+        {
+          "path": "workspace:cap/path",
+          "title": "...",
+          "metadataStatus": "fresh",
+          "summary": "..."
+        }
       ]
     }
   ]
@@ -107,7 +112,7 @@ In `json` or `toon` mode, each spec entry is an object. The `path` field uses th
 
 When `--summary` is not passed, `summary` is omitted from text rows and from JSON/toon objects. When `--summary` is passed but no summary is available for a spec, the text row shows the title only and the JSON/toon object omits `summary` (does not include `null`).
 
-When `--metadata-status` is not passed, `status` is omitted from JSON/toon objects. When `--metadata-status` is passed, `status` is always present as a string (`"fresh"`, `"stale"`, `"missing"`, or `"invalid"`).
+When `--metadata-status` is not passed, `metadataStatus` is omitted from JSON/toon objects. When `--metadata-status` is passed, `metadataStatus` is always present as a string (`"fresh"`, `"stale"`, `"missing"`, or `"invalid"`).
 
 ### Requirement: Empty output
 
@@ -167,7 +172,7 @@ $ specd spec list --metadata-status stale,missing
   default:billing/invoices  Invoices  missing
 
 $ specd spec list --metadata-status --format json
-{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","status":"fresh"},{"path":"default:auth/register","title":"Register","status":"stale"}]}]}
+{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","metadataStatus":"fresh"},{"path":"default:auth/register","title":"Register","metadataStatus":"stale"}]}]}
 ```
 
 ## Spec Dependencies
