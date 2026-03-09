@@ -51,6 +51,41 @@ describe('SpecArtifact', () => {
       const sections = a.sections()
       expect(sections.get('Requirements')).toBe('')
     })
+
+    it('ignores ## headings inside backtick fenced code blocks', () => {
+      const content = [
+        '## Requirements',
+        'some text',
+        '```markdown',
+        '## This is not a heading',
+        '```',
+        '## Constraints',
+        'constraint text',
+      ].join('\n')
+      const a = new SpecArtifact('spec.md', content)
+      const sections = a.sections()
+      expect(sections.size).toBe(2)
+      expect(sections.get('Requirements')).toBe(
+        'some text\n```markdown\n## This is not a heading\n```',
+      )
+      expect(sections.get('Constraints')).toBe('constraint text')
+    })
+
+    it('ignores ## headings inside tilde fenced code blocks', () => {
+      const content = [
+        '## Requirements',
+        '~~~',
+        '## Not a heading',
+        '~~~',
+        '## Constraints',
+        'c',
+      ].join('\n')
+      const a = new SpecArtifact('spec.md', content)
+      const sections = a.sections()
+      expect(sections.size).toBe(2)
+      expect(sections.get('Requirements')).toBe('~~~\n## Not a heading\n~~~')
+      expect(sections.get('Constraints')).toBe('c')
+    })
   })
 
   describe('section', () => {

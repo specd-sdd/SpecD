@@ -90,8 +90,20 @@ export class SpecArtifact {
 
     let currentHeading: string | null = null
     let currentLines: string[] = []
+    let inFence = false
 
     for (const line of lines) {
+      if (/^(?:```|~~~)/.test(line)) {
+        inFence = !inFence
+        if (currentHeading !== null) currentLines.push(line)
+        continue
+      }
+
+      if (inFence) {
+        if (currentHeading !== null) currentLines.push(line)
+        continue
+      }
+
       const match = /^##\s+(.+)$/.exec(line)
       if (match?.[1] !== undefined) {
         if (currentHeading !== null) {
