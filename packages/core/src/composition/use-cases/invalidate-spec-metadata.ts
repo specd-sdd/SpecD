@@ -2,6 +2,7 @@ import { InvalidateSpecMetadata } from '../../application/use-cases/invalidate-s
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { createSpecRepository } from '../spec-repository.js'
+import { NodeYamlSerializer } from '../../infrastructure/node/yaml-serializer.js'
 
 /** Filesystem adapter options for `createInvalidateSpecMetadata(options)`. */
 export interface FsInvalidateSpecMetadataOptions {
@@ -45,7 +46,7 @@ export function createInvalidateSpecMetadata(
         ),
       ]),
     )
-    return new InvalidateSpecMetadata(specRepos)
+    return new InvalidateSpecMetadata(specRepos, new NodeYamlSerializer())
   }
-  return new InvalidateSpecMetadata(configOrOptions.specRepositories)
+  return new InvalidateSpecMetadata(configOrOptions.specRepositories, new NodeYamlSerializer())
 }

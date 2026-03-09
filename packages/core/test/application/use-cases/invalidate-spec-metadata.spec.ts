@@ -3,6 +3,7 @@ import { InvalidateSpecMetadata } from '../../../src/application/use-cases/inval
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { makeSpecRepository } from './helpers.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
+import { NodeYamlSerializer } from '../../../src/infrastructure/node/yaml-serializer.js'
 
 const specPath = SpecPath.parse('auth/login')
 const spec = new Spec('default', specPath, ['spec.md'])
@@ -21,7 +22,7 @@ const METADATA_WITHOUT_HASHES = ['title: Auth Login', "description: 'Handles log
 
 function makeUseCase(opts: { specs?: Spec[]; artifacts?: Record<string, string | null> } = {}) {
   const repo = makeSpecRepository(opts)
-  const uc = new InvalidateSpecMetadata(new Map([['default', repo]]))
+  const uc = new InvalidateSpecMetadata(new Map([['default', repo]]), new NodeYamlSerializer())
   return { uc, repo }
 }
 

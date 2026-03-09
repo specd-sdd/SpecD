@@ -3,6 +3,7 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { createSpecRepository } from '../spec-repository.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
+import { NodeYamlSerializer } from '../../infrastructure/node/yaml-serializer.js'
 
 /** Filesystem adapter options for `createListSpecs(context, options)`. */
 export interface FsListSpecsOptions {
@@ -43,8 +44,10 @@ export function createListSpecs(configOrOptions: SpecdConfig | FsListSpecsOption
       ]),
     )
     const hasher = new NodeContentHasher()
-    return new ListSpecs(specRepos, hasher)
+    const yaml = new NodeYamlSerializer()
+    return new ListSpecs(specRepos, hasher, yaml)
   }
   const hasher = new NodeContentHasher()
-  return new ListSpecs(configOrOptions.specRepositories, hasher)
+  const yaml = new NodeYamlSerializer()
+  return new ListSpecs(configOrOptions.specRepositories, hasher, yaml)
 }
