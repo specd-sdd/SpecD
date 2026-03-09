@@ -31,7 +31,6 @@ export class PlaintextParser implements ArtifactParser {
       .filter((p) => p.trim() !== '')
       .map((p) => ({
         type: 'paragraph',
-        value: p,
         children: p.split('\n').map((line) => ({ type: 'line', value: line })),
       }))
     return { root: { type: 'document', children } }
@@ -125,7 +124,7 @@ export class PlaintextParser implements ArtifactParser {
     const children = ast.root.children ?? []
     return children.map((c) => ({
       type: 'paragraph',
-      label: (typeof c.value === 'string' ? c.value : '').slice(0, 50),
+      label: this._serializeParagraph(c).slice(0, 50),
       depth: 0,
     }))
   }

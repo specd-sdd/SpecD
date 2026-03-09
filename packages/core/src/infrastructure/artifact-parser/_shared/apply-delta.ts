@@ -88,7 +88,12 @@ function matchesSelector(ctx: NodeCtx, sel: Selector): boolean {
   }
 
   if (sel.contains !== undefined) {
-    const value = typeof ctx.node.value === 'string' ? ctx.node.value : String(ctx.node.value ?? '')
+    const value =
+      typeof ctx.node.value === 'string'
+        ? ctx.node.value
+        : ctx.node.children
+          ? ctx.node.children.map((c) => (typeof c.value === 'string' ? c.value : '')).join('\n')
+          : String(ctx.node.value ?? '')
     if (isSafePattern(sel.contains)) {
       try {
         const regex = new RegExp(sel.contains, 'i')
