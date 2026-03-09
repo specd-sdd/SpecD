@@ -3,6 +3,7 @@ import { type ArtifactParserRegistry, type ArtifactNode } from '../ports/artifac
 import { type Selector } from '../../domain/value-objects/selector.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
+import { safeRegex } from '../../domain/services/safe-regex.js'
 
 /** Input for the {@link InferSpecSections} use case. */
 export interface InferSpecSectionsInput {
@@ -160,13 +161,13 @@ export class InferSpecSections {
     if (node.type !== selector.type) return false
 
     if (selector.matches !== undefined) {
-      const regex = new RegExp(selector.matches, 'i')
-      if (!regex.test(node.label ?? '')) return false
+      const regex = safeRegex(selector.matches, 'i')
+      if (regex === null || !regex.test(node.label ?? '')) return false
     }
 
     if (selector.contains !== undefined) {
-      const regex = new RegExp(selector.contains, 'i')
-      if (!regex.test(String(node.value ?? ''))) return false
+      const regex = safeRegex(selector.contains, 'i')
+      if (regex === null || !regex.test(String(node.value ?? ''))) return false
     }
 
     if (selector.parent !== undefined) {
