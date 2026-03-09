@@ -13,15 +13,14 @@ const VALID_FORMATS: readonly string[] = ['text', 'json', 'toon']
 
 /**
  * Parses and validates a raw format string from the CLI `--format` flag.
- * Exits with code 1 and an `error:` message on stderr if the value is not recognised.
  *
  * @param raw - The raw string value provided via `--format`
  * @returns A validated `OutputFormat`
+ * @throws {Error} If the value is not a recognised format
  */
 export function parseFormat(raw: string): OutputFormat {
   if (!VALID_FORMATS.includes(raw)) {
-    process.stderr.write(`error: invalid format '${raw}' — must be one of: text, json, toon\n`)
-    process.exit(1)
+    throw new Error(`invalid format '${raw}' — must be one of: text, json, toon`)
   }
   return raw as OutputFormat
 }
