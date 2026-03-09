@@ -35,7 +35,7 @@ export class Schema {
     this._name = name
     this._version = version
     this._artifacts = artifacts
-    this._artifactIndex = new Map(artifacts.map((a) => [a.id(), a]))
+    this._artifactIndex = new Map(artifacts.map((a) => [a.id, a]))
     this._workflow = workflow
     this._workflowIndex = new Map(workflow.map((s) => [s.step, s]))
   }

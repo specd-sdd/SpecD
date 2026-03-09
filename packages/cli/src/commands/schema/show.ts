@@ -30,10 +30,10 @@ export function registerSchemaShow(parent: Command): void {
         const fmt = parseFormat(opts.format)
         if (fmt === 'text') {
           const artifactLines = schema.artifacts().map((a) => {
-            const label = a.optional() ? 'optional' : 'required'
-            const requires = a.requires()
+            const label = a.optional ? 'optional' : 'required'
+            const requires = a.requires
             const reqStr = requires.length > 0 ? `  requires=[${requires.join(',')}]` : ''
-            return `  ${a.id()}  ${a.scope()}  ${label}${reqStr}`
+            return `  ${a.id}  ${a.scope}  ${label}${reqStr}`
           })
           const workflowLines = schema.workflow().map((s) => {
             const reqStr = `requires=[${s.requires.join(',')}]`
@@ -54,12 +54,12 @@ export function registerSchemaShow(parent: Command): void {
             {
               schema: { name: schema.name(), version: schema.version() },
               artifacts: schema.artifacts().map((a) => ({
-                id: a.id(),
-                scope: a.scope(),
-                optional: a.optional(),
-                requires: [...a.requires()],
-                format: a.format(),
-                delta: a.delta(),
+                id: a.id,
+                scope: a.scope,
+                optional: a.optional,
+                requires: [...a.requires],
+                format: a.format,
+                delta: a.delta,
               })),
               workflow: schema.workflow().map((s) => ({
                 step: s.step,

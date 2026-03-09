@@ -276,16 +276,16 @@ export class CompileContext {
       input.activeArtifact !== undefined ? schema.artifact(input.activeArtifact) : null
 
     if (activeArtifactType !== null) {
-      const instruction = activeArtifactType.instruction()
+      const instruction = activeArtifactType.instruction
       if (instruction !== undefined) {
-        parts.push(`## Artifact instruction: ${activeArtifactType.id()}\n\n${instruction}`)
+        parts.push(`## Artifact instruction: ${activeArtifactType.id}\n\n${instruction}`)
       }
     }
 
     // Part 3: Delta context (only when activeArtifact has delta: true)
-    if (activeArtifactType !== null && activeArtifactType.delta()) {
+    if (activeArtifactType !== null && activeArtifactType.delta) {
       const format =
-        activeArtifactType.format() ?? inferFormat(activeArtifactType.output()) ?? 'plaintext'
+        activeArtifactType.format ?? inferFormat(activeArtifactType.output) ?? 'plaintext'
       const parser = this._parsers.get(format)
       if (parser === undefined) {
         warnings.push({
@@ -300,7 +300,7 @@ export class CompileContext {
         deltaContextParts.push(`### Format instructions\n\n${parser.deltaInstructions()}`)
 
         // Domain instructions
-        const domainInstr = activeArtifactType.deltaInstruction()
+        const domainInstr = activeArtifactType.deltaInstruction
         if (domainInstr !== undefined) {
           deltaContextParts.push(`### Domain instructions\n\n${domainInstr}`)
         }
@@ -322,7 +322,7 @@ export class CompileContext {
           }
 
           const spec = new Spec(workspace, specPathObj, [])
-          const deltaOutputFilename = activeArtifactType.output().split('/').pop()!
+          const deltaOutputFilename = activeArtifactType.output.split('/').pop()!
           const artifactFile = await specRepo.artifact(spec, deltaOutputFilename)
           if (artifactFile === null) continue
 
@@ -331,7 +331,7 @@ export class CompileContext {
           if (outlineEntries.length > 0) {
             const outlineText = this._renderOutline(outlineEntries)
             outlineParts.push(
-              `**${workspace}:${capPath}/${activeArtifactType.output()}**\n${outlineText}`,
+              `**${workspace}:${capPath}/${activeArtifactType.output}**\n${outlineText}`,
             )
           }
         }
@@ -341,17 +341,17 @@ export class CompileContext {
         }
 
         parts.push(
-          `## Delta context: ${activeArtifactType.id()}\n\n${deltaContextParts.join('\n\n')}`,
+          `## Delta context: ${activeArtifactType.id}\n\n${deltaContextParts.join('\n\n')}`,
         )
       }
     }
 
     // Part 4: Project artifact rules for active artifact
     if (activeArtifactType !== null) {
-      const rules = input.config.artifactRules?.[activeArtifactType.id()]
+      const rules = input.config.artifactRules?.[activeArtifactType.id]
       if (rules !== undefined && rules.length > 0) {
         const ruleLines = rules.map((r) => `- ${r}`).join('\n')
-        parts.push(`## Artifact rules: ${activeArtifactType.id()}\n\n${ruleLines}`)
+        parts.push(`## Artifact rules: ${activeArtifactType.id}\n\n${ruleLines}`)
       }
     }
 
@@ -434,15 +434,15 @@ export class CompileContext {
 
         const fallbackParts: string[] = []
         for (const artifactType of schema.artifacts()) {
-          if (artifactType.scope() !== 'spec') continue
-          const contextSections = artifactType.contextSections()
+          if (artifactType.scope !== 'spec') continue
+          const contextSections = artifactType.contextSections
           if (contextSections.length === 0) continue
 
-          const outputFilename = artifactType.output().split('/').pop()!
+          const outputFilename = artifactType.output.split('/').pop()!
           const artifactFile = await specRepo.artifact(spec, outputFilename)
           if (artifactFile === null) continue
 
-          const format = artifactType.format() ?? inferFormat(outputFilename) ?? 'plaintext'
+          const format = artifactType.format ?? inferFormat(outputFilename) ?? 'plaintext'
           const parser = this._parsers.get(format)
           if (parser === undefined) continue
 

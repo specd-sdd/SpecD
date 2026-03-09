@@ -128,147 +128,83 @@ export class ArtifactType {
     this._taskCompletionCheck = props.taskCompletionCheck
   }
 
-  /**
-   * Stable identifier for this artifact type (e.g. `"specs"`, `"tasks"`).
-   *
-   * @returns The artifact type ID
-   */
-  id(): string {
+  /** Stable identifier for this artifact type (e.g. `"specs"`, `"tasks"`). */
+  get id(): string {
     return this._id
   }
 
-  /**
-   * Where this artifact lives after archiving: `"spec"` or `"change"`.
-   *
-   * @returns The artifact scope
-   */
-  scope(): ArtifactScope {
+  /** Where this artifact lives after archiving: `"spec"` or `"change"`. */
+  get scope(): ArtifactScope {
     return this._scope
   }
 
-  /**
-   * Glob pattern for the artifact's output files.
-   *
-   * @returns The output glob pattern
-   */
-  output(): string {
+  /** Glob pattern for the artifact's output files. */
+  get output(): string {
     return this._output
   }
 
-  /**
-   * Human-readable summary for tooling, or `undefined` if not set.
-   *
-   * @returns The description string, or `undefined`
-   */
-  description(): string | undefined {
+  /** Human-readable summary for tooling, or `undefined` if not set. */
+  get description(): string | undefined {
     return this._description
   }
 
-  /**
-   * Path to a template file relative to the schema directory, or `undefined`.
-   *
-   * @returns The template path, or `undefined`
-   */
-  template(): string | undefined {
+  /** Path to a template file relative to the schema directory, or `undefined`. */
+  get template(): string | undefined {
     return this._template
   }
 
-  /**
-   * The LLM instruction text for generating this artifact, or `undefined`.
-   *
-   * @returns The instruction text, or `undefined`
-   */
-  instruction(): string | undefined {
+  /** The LLM instruction text for generating this artifact, or `undefined`. */
+  get instruction(): string | undefined {
     return this._instruction
   }
 
-  /**
-   * IDs of artifact types that must be resolved before this one.
-   *
-   * @returns Array of prerequisite artifact type IDs
-   */
-  requires(): readonly string[] {
+  /** IDs of artifact types that must be resolved before this one. */
+  get requires(): readonly string[] {
     return this._requires
   }
 
-  /**
-   * `true` if this artifact may be absent without failing validation.
-   *
-   * @returns Whether the artifact is optional
-   */
-  optional(): boolean {
+  /** `true` if this artifact may be absent without failing validation. */
+  get optional(): boolean {
     return this._optional
   }
 
-  /**
-   * The declared file format, or `undefined` if inferred from the output extension.
-   *
-   * @returns The artifact format, or `undefined`
-   */
-  format(): ArtifactFormat | undefined {
+  /** The declared file format, or `undefined` if inferred from the output extension. */
+  get format(): ArtifactFormat | undefined {
     return this._format
   }
 
-  /**
-   * `true` if this artifact supports delta files.
-   *
-   * @returns Whether delta files are supported
-   */
-  delta(): boolean {
+  /** `true` if this artifact supports delta files. */
+  get delta(): boolean {
     return this._delta
   }
 
-  /**
-   * Domain-specific delta guidance injected by `CompileContext`, or `undefined`.
-   *
-   * @returns The delta instruction text, or `undefined`
-   */
-  deltaInstruction(): string | undefined {
+  /** Domain-specific delta guidance injected by `CompileContext`, or `undefined`. */
+  get deltaInstruction(): string | undefined {
     return this._deltaInstruction
   }
 
-  /**
-   * Structural validation rules applied to the base artifact after delta application.
-   *
-   * @returns Post-merge validation rules
-   */
-  validations(): readonly ValidationRule[] {
+  /** Structural validation rules applied to the base artifact after delta application. */
+  get validations(): readonly ValidationRule[] {
     return this._validations
   }
 
-  /**
-   * Structural validation rules applied to the delta file before application.
-   *
-   * @returns Pre-merge delta validation rules
-   */
-  deltaValidations(): readonly ValidationRule[] {
+  /** Structural validation rules applied to the delta file before application. */
+  get deltaValidations(): readonly ValidationRule[] {
     return this._deltaValidations
   }
 
-  /**
-   * Spec sections extracted and injected into the compiled instruction block.
-   *
-   * @returns Context section configurations
-   */
-  contextSections(): readonly ContextSection[] {
+  /** Spec sections extracted and injected into the compiled instruction block. */
+  get contextSections(): readonly ContextSection[] {
     return this._contextSections
   }
 
-  /**
-   * Regex substitutions applied to artifact content before computing any hash.
-   *
-   * @returns Pre-hash cleanup substitutions
-   */
-  preHashCleanup(): readonly PreHashCleanup[] {
+  /** Regex substitutions applied to artifact content before computing any hash. */
+  get preHashCleanup(): readonly PreHashCleanup[] {
     return this._preHashCleanup
   }
 
-  /**
-   * Task completion detection config, or `undefined` if using defaults.
-   *
-   * @returns The task completion check config, or `undefined`
-   */
-  taskCompletionCheck(): TaskCompletionCheck | undefined {
+  /** Task completion detection config, or `undefined` if using defaults. */
+  get taskCompletionCheck(): TaskCompletionCheck | undefined {
     return this._taskCompletionCheck
   }
 }
