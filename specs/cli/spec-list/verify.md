@@ -82,6 +82,12 @@
 - **WHEN** `specd spec list --metadata-status` is run
 - **THEN** the row for `default:auth/login` shows `stale` as its status
 
+#### Scenario: Status invalid when metadata fails structural validation
+
+- **GIVEN** `default:auth/login` has `.specd-metadata.yaml` with `keywords: [123]` (invalid type per strict schema)
+- **WHEN** `specd spec list --metadata-status` is run
+- **THEN** the row for `default:auth/login` shows `invalid` as its status
+
 #### Scenario: Status not shown without flag
 
 - **GIVEN** `default:auth/login` has `.specd-metadata.yaml`

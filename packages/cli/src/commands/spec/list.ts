@@ -119,7 +119,7 @@ export function registerSpecList(parent: Command): void {
     .option('--summary', 'include a short description for each spec')
     .option(
       '--metadata-status [filter]',
-      'show metadata freshness status; optionally filter by fresh,stale,missing',
+      'show metadata freshness status; optionally filter by fresh,stale,missing,invalid',
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -202,6 +202,7 @@ const VALID_METADATA_STATUSES: ReadonlySet<SpecMetadataStatus> = new Set([
   'fresh',
   'stale',
   'missing',
+  'invalid',
 ])
 
 /**
