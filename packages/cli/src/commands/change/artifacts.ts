@@ -1,11 +1,8 @@
 import { type Command } from 'commander'
-import * as fs from 'node:fs/promises'
-import * as path from 'node:path'
 import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { findChangeDir } from '../../helpers/change-dir.js'
 import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
 import { vlen, pad } from '../../helpers/table.js'
 
@@ -26,9 +23,6 @@ export function registerChangeArtifacts(parent: Command): void {
         const kernel = createCliKernel(config)
         const { change, artifactStatuses } = await kernel.changes.status.execute({ name })
 
-        const changeDir = await findChangeDir(config.storage.changesPath, name)
-        const resolvedChangeDir = changeDir ?? path.join(config.storage.changesPath, name)
-
         // Resolve schema for delta info
         let schemaArtifacts: ReadonlyMap<string, { delta: boolean; output: string }> = new Map()
         try {
@@ -38,7 +32,12 @@ export function registerChangeArtifacts(parent: Command): void {
             workspaceSchemasPaths,
           })
           schemaArtifacts = new Map(
-            schema.artifacts().map((a) => [a.id, { delta: a.delta, output: a.output }]),
+            schema
+              .artifacts()
+              .map((a: { id: string; delta: boolean; output: string }) => [
+                a.id,
+                { delta: a.delta, output: a.output },
+              ]),
           )
         } catch {
           // If schema resolution fails, skip delta entries
@@ -48,7 +47,6 @@ export function registerChangeArtifacts(parent: Command): void {
         type ArtifactRow = {
           id: string
           filename: string
-          path: string
           effectiveStatus: string
           exists: boolean
         }
@@ -59,18 +57,10 @@ export function registerChangeArtifacts(parent: Command): void {
           const artifact = change.artifacts.get(a.type)
           const schemaArtifact = schemaArtifacts.get(a.type)
           const filename = artifact?.filename ?? schemaArtifact?.output ?? `${a.type}.md`
-          const absPath = path.join(resolvedChangeDir, filename)
-          let exists = false
-          try {
-            await fs.stat(absPath)
-            exists = true
-          } catch {
-            exists = false
-          }
+          const exists = await kernel.changes.repo.artifactExists(change, filename)
           artifactRows.push({
             id: a.type,
             filename,
-            path: absPath,
             effectiveStatus: a.effectiveStatus,
             exists,
           })
@@ -79,18 +69,14 @@ export function registerChangeArtifacts(parent: Command): void {
           if (schemaArtifact?.delta) {
             for (const specId of change.specIds) {
               const deltaFilename = `${filename.replace(/\.[^.]+$/, '')}.delta.yaml`
-              const deltaPath = path.join(resolvedChangeDir, 'deltas', specId, deltaFilename)
-              let deltaExists = false
-              try {
-                await fs.stat(deltaPath)
-                deltaExists = true
-              } catch {
-                deltaExists = false
-              }
+              const deltaExists = await kernel.changes.repo.deltaExists(
+                change,
+                specId,
+                deltaFilename,
+              )
               artifactRows.push({
                 id: `${a.type}.delta`,
                 filename: deltaFilename,
-                path: deltaPath,
                 effectiveStatus: deltaExists ? 'complete' : 'missing',
                 exists: deltaExists,
               })
@@ -109,16 +95,13 @@ export function registerChangeArtifacts(parent: Command): void {
               '  ' +
               pad(r.effectiveStatus, maxStatus) +
               '  ' +
-              pad(r.exists ? 'yes' : 'no', maxExists) +
-              '  ' +
-              r.path,
+              pad(r.exists ? 'yes' : 'no', maxExists),
           )
           output(lines.join('\n'), 'text')
         } else {
           output(
             {
               name,
-              changeDir: resolvedChangeDir,
               artifacts: artifactRows,
             },
             fmt,

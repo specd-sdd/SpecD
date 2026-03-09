@@ -6,7 +6,6 @@ import {
   makeMockConfig,
   makeMockChange,
   makeMockKernel,
-  makeMockStats,
   makeProgram,
   mockProcessExit,
   captureStdout,
@@ -15,15 +14,9 @@ import {
 
 vi.mock('../../src/load-config.js', () => ({ loadConfig: vi.fn() }))
 vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
-vi.mock('../../src/helpers/change-dir.js', () => ({ findChangeDir: vi.fn() }))
-vi.mock('node:fs/promises', () => ({
-  stat: vi.fn(),
-}))
 
 import { loadConfig } from '../../src/load-config.js'
 import { createCliKernel } from '../../src/kernel.js'
-import { findChangeDir } from '../../src/helpers/change-dir.js'
-import { stat } from 'node:fs/promises'
 import { registerChangeArtifacts } from '../../src/commands/change/artifacts.js'
 
 function setup() {
@@ -31,7 +24,6 @@ function setup() {
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
   vi.mocked(createCliKernel).mockReturnValue(kernel)
-  vi.mocked(findChangeDir).mockResolvedValue('/project/.specd/changes/20260115-100000-my-change')
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -56,9 +48,9 @@ describe('change artifacts', () => {
         { type: 'spec', effectiveStatus: 'missing' },
       ],
     })
-    vi.mocked(stat)
-      .mockResolvedValueOnce(makeMockStats())
-      .mockRejectedValueOnce(new Error('ENOENT'))
+    vi.mocked(kernel.changes.repo.artifactExists)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
 
     const program = makeProgram()
     registerChangeArtifacts(program.command('change'))
@@ -90,7 +82,7 @@ describe('change artifacts', () => {
         { type: 'tasks', effectiveStatus: 'missing' },
       ],
     })
-    vi.mocked(stat).mockRejectedValue(new Error('ENOENT'))
+    vi.mocked(kernel.changes.repo.artifactExists).mockResolvedValue(false)
 
     const program = makeProgram()
     registerChangeArtifacts(program.command('change'))
@@ -102,7 +94,7 @@ describe('change artifacts', () => {
     expect(out).toContain('tasks')
   })
 
-  it('outputs JSON with name, changeDir, and artifacts array', async () => {
+  it('outputs JSON with name and artifacts array', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({
@@ -111,7 +103,7 @@ describe('change artifacts', () => {
       }),
       artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
     })
-    vi.mocked(stat).mockResolvedValue(makeMockStats())
+    vi.mocked(kernel.changes.repo.artifactExists).mockResolvedValue(true)
 
     const program = makeProgram()
     registerChangeArtifacts(program.command('change'))
@@ -127,39 +119,10 @@ describe('change artifacts', () => {
 
     const parsed = JSON.parse(stdout())
     expect(parsed.name).toBe('my-change')
-    expect(typeof parsed.changeDir).toBe('string')
     expect(Array.isArray(parsed.artifacts)).toBe(true)
     expect(parsed.artifacts[0].id).toBe('proposal')
     expect(parsed.artifacts[0].effectiveStatus).toBe('complete')
     expect(parsed.artifacts[0].exists).toBe(true)
-  })
-
-  it('outputs absolute paths', async () => {
-    const { kernel, stdout } = setup()
-    kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({
-        name: 'my-change',
-        artifacts: new Map([['spec', { filename: 'spec.md' }]]),
-      }),
-      artifactStatuses: [{ type: 'spec', effectiveStatus: 'missing' }],
-    })
-    vi.mocked(stat).mockRejectedValue(new Error('ENOENT'))
-
-    const program = makeProgram()
-    registerChangeArtifacts(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'artifacts',
-      'my-change',
-      '--format',
-      'json',
-    ])
-
-    const parsed = JSON.parse(stdout())
-    expect(parsed.artifacts[0].path.startsWith('/')).toBe(true)
-    expect(parsed.changeDir.startsWith('/')).toBe(true)
   })
 
   it('exits 1 when name argument is missing', async () => {
@@ -179,7 +142,7 @@ describe('change artifacts', () => {
       }),
       artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
     })
-    vi.mocked(stat).mockResolvedValue(makeMockStats())
+    vi.mocked(kernel.changes.repo.artifactExists).mockResolvedValue(true)
 
     const program = makeProgram()
     registerChangeArtifacts(program.command('change'))

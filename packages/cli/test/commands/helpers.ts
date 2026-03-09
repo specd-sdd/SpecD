@@ -8,7 +8,7 @@
 import type { Stats } from 'node:fs'
 import { vi } from 'vitest'
 import { Command } from 'commander'
-import type { SpecdConfig, Kernel } from '@specd/core'
+import type { SpecdConfig, Kernel, SpecRepository, ChangeRepository } from '@specd/core'
 import type { Skill } from '@specd/skills'
 
 /**
@@ -20,7 +20,9 @@ import type { Skill } from '@specd/skills'
  */
 export type MockKernel = {
   [G in keyof Kernel]: {
-    [K in keyof Kernel[G]]: { execute: ReturnType<typeof vi.fn> }
+    [K in keyof Kernel[G]]: Kernel[G][K] extends { execute: (...args: never[]) => unknown }
+      ? { execute: ReturnType<typeof vi.fn> }
+      : Kernel[G][K]
   }
 }
 
@@ -104,6 +106,10 @@ export function makeMockChange(overrides: Record<string, unknown> = {}): Record<
 
 export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel & MockKernel {
   const changes = {
+    repo: {
+      artifactExists: vi.fn().mockResolvedValue(false),
+      deltaExists: vi.fn().mockResolvedValue(false),
+    } as unknown as ChangeRepository,
     create: { execute: vi.fn() },
     list: { execute: vi.fn().mockResolvedValue([]) },
     listDrafts: { execute: vi.fn().mockResolvedValue([]) },
@@ -123,6 +129,12 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
   }
 
   const specs = {
+    repos: new Map([
+      [
+        'default',
+        { resolveFromPath: vi.fn().mockResolvedValue(null) } as unknown as SpecRepository,
+      ],
+    ]),
     approveSpec: { execute: vi.fn() },
     approveSignoff: { execute: vi.fn() },
     list: { execute: vi.fn().mockResolvedValue([]) },
@@ -157,7 +169,7 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
   // The mock satisfies Kernel structurally at runtime (every group has every
   // key with an { execute } stub). A single cast is enough — MockKernel
   // mirrors Kernel's shape with mock execute functions.
-  return { changes, specs, project, ...overrides } as Kernel & MockKernel
+  return { changes, specs, project, ...overrides } as unknown as Kernel & MockKernel
 }
 
 // ---------------------------------------------------------------------------

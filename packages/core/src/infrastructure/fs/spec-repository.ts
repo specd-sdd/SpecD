@@ -198,6 +198,43 @@ export class FsSpecRepository extends SpecRepository {
     }
   }
 
+  /**
+   * Resolves an absolute storage path to a spec identity within this workspace.
+   *
+   * Validates the path exists, resolves files to their parent directory, and
+   * computes the spec path relative to this workspace's `specsPath`. Returns
+   * `null` if the path does not belong to this workspace.
+   *
+   * @param absolutePath - The absolute path to resolve
+   * @returns The resolved spec path and ID, or `null` if no match
+   */
+  override async resolveFromPath(
+    absolutePath: string,
+  ): Promise<{ specPath: SpecPath; specId: string } | null> {
+    if (absolutePath !== this._specsPath && !absolutePath.startsWith(this._specsPath + path.sep)) {
+      return null
+    }
+
+    let dir: string
+    try {
+      const stat = await fs.lstat(absolutePath)
+      dir = stat.isDirectory() ? absolutePath : path.dirname(absolutePath)
+    } catch {
+      return null
+    }
+
+    if (dir === this._specsPath) return null
+
+    const relative = path.relative(this._specsPath, dir)
+    const segments = relative.split(path.sep).filter((s) => s.length > 0)
+    if (segments.length === 0) return null
+
+    const prefixed = [...this._prefixSegments, ...segments]
+    const specPath = SpecPath.fromSegments(prefixed)
+    const specId = this.workspace() + ':' + specPath.toString()
+    return { specPath, specId }
+  }
+
   // ---- Private helpers ----
 
   /**

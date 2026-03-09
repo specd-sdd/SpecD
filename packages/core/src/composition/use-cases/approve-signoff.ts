@@ -2,7 +2,9 @@ import { ApproveSignoff } from '../../application/use-cases/approve-signoff.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
+import { createSchemaRegistry } from '../schema-registry.js'
 import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
+import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
@@ -26,6 +28,8 @@ export interface FsApproveSignoffOptions {
   readonly draftsPath: string
   /** Absolute path to the `discarded/` directory. */
   readonly discardedPath: string
+  /** Absolute path to the project root (for schema resolution). */
+  readonly projectRoot: string
 }
 
 /**
@@ -66,10 +70,16 @@ export function createApproveSignoff(
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,
         discardedPath: config.storage.discardedPath,
+        projectRoot: config.projectRoot,
       },
     )
   }
   const changeRepo = createChangeRepository('fs', configOrContext, options!)
   const git = new GitCLIAdapter()
-  return new ApproveSignoff(changeRepo, git)
+  const schemas = createSchemaRegistry('fs', {
+    nodeModulesPaths: [options!.projectRoot + '/node_modules'],
+    configDir: options!.projectRoot,
+  })
+  const hasher = new NodeContentHasher()
+  return new ApproveSignoff(changeRepo, git, schemas, hasher)
 }

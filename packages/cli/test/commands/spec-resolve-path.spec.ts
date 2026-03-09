@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { describe, it, expect, vi, afterEach } from 'vitest'
+import { SpecPath, type SpecRepository } from '@specd/core'
 import {
   makeMockConfig,
   makeMockKernel,
-  makeMockStats,
   makeProgram,
   mockProcessExit,
   captureStdout,
@@ -12,15 +12,10 @@ import {
 
 vi.mock('../../src/load-config.js', () => ({ loadConfig: vi.fn() }))
 vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
-vi.mock('node:fs/promises', async () => {
-  const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
-  return { ...actual, stat: vi.fn() }
-})
 
 import { loadConfig } from '../../src/load-config.js'
 import { createCliKernel } from '../../src/kernel.js'
 import { registerSpecResolvePath } from '../../src/commands/spec/resolve-path.js'
-import { stat as mockStat } from 'node:fs/promises'
 
 function setup() {
   const config = makeMockConfig()
@@ -48,14 +43,13 @@ describe('spec resolve-path', () => {
       // Commander throws with exitOverride
     }
 
-    // Commander exits or throws when required arg is missing
     const out = stderr()
     const exitCalled = vi.mocked(process.exit).mock.calls.length > 0
     expect(exitCalled || out.length > 0).toBe(true)
   })
 
   it('resolves relative path from cwd', async () => {
-    const { config, stdout } = setup()
+    const { config, kernel, stdout } = setup()
     Object.assign(config, {
       workspaces: [
         {
@@ -70,7 +64,13 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => true }))
+    const mockRepo = {
+      resolveFromPath: vi.fn().mockResolvedValue({
+        specPath: SpecPath.parse('core/change'),
+        specId: 'core:core/change',
+      }),
+    }
+    kernel.specs.repos = new Map([['core', mockRepo as unknown as SpecRepository]])
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -81,7 +81,7 @@ describe('spec resolve-path', () => {
   })
 
   it('resolves absolute path and outputs specId in text mode', async () => {
-    const { config, stdout } = setup()
+    const { config, kernel, stdout } = setup()
     Object.assign(config, {
       workspaces: [
         {
@@ -96,7 +96,13 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => true }))
+    const mockRepo = {
+      resolveFromPath: vi.fn().mockResolvedValue({
+        specPath: SpecPath.parse('core/change'),
+        specId: 'core:core/change',
+      }),
+    }
+    kernel.specs.repos = new Map([['core', mockRepo as unknown as SpecRepository]])
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -113,7 +119,7 @@ describe('spec resolve-path', () => {
   })
 
   it('outputs bare specId when workspace has no prefix', async () => {
-    const { config, stdout } = setup()
+    const { config, kernel, stdout } = setup()
     Object.assign(config, {
       workspaces: [
         {
@@ -127,7 +133,13 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => true }))
+    const mockRepo = {
+      resolveFromPath: vi.fn().mockResolvedValue({
+        specPath: SpecPath.parse('auth/login'),
+        specId: 'default:auth/login',
+      }),
+    }
+    kernel.specs.repos = new Map([['default', mockRepo as unknown as SpecRepository]])
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -138,7 +150,7 @@ describe('spec resolve-path', () => {
   })
 
   it('picks most specific workspace when multiple match', async () => {
-    const { config, stdout } = setup()
+    const { config, kernel, stdout } = setup()
     Object.assign(config, {
       workspaces: [
         {
@@ -161,7 +173,22 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => true }))
+    const defaultRepo = {
+      resolveFromPath: vi.fn().mockResolvedValue({
+        specPath: SpecPath.parse('core/change'),
+        specId: 'default:core/change',
+      }),
+    }
+    const coreRepo = {
+      resolveFromPath: vi.fn().mockResolvedValue({
+        specPath: SpecPath.parse('core/change'),
+        specId: 'core:core/change',
+      }),
+    }
+    kernel.specs.repos = new Map([
+      ['default', defaultRepo as unknown as SpecRepository],
+      ['core', coreRepo as unknown as SpecRepository],
+    ])
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -174,11 +201,12 @@ describe('spec resolve-path', () => {
       '/project/specs/core/change',
     ])
 
+    // Core workspace has longer specsPath, so it wins
     expect(stdout()).toContain('core:core/change')
   })
 
   it('outputs JSON with workspace, specPath, specId', async () => {
-    const { config, stdout } = setup()
+    const { config, kernel, stdout } = setup()
     Object.assign(config, {
       workspaces: [
         {
@@ -193,7 +221,13 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => true }))
+    const mockRepo = {
+      resolveFromPath: vi.fn().mockResolvedValue({
+        specPath: SpecPath.parse('core/change'),
+        specId: 'core:core/change',
+      }),
+    }
+    kernel.specs.repos = new Map([['core', mockRepo as unknown as SpecRepository]])
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()
@@ -214,54 +248,8 @@ describe('spec resolve-path', () => {
     expect(parsed.specId).toBe('core:core/change')
   })
 
-  it('resolves file path to parent directory', async () => {
-    const { config, stdout } = setup()
-    Object.assign(config, {
-      workspaces: [
-        {
-          name: 'default',
-          specsPath: '/project/specs',
-          schemasPath: null,
-          codeRoot: '/project',
-          ownership: 'owned',
-          isExternal: false,
-        },
-      ],
-    })
-
-    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => false }))
-    vi.spyOn(process, 'cwd').mockReturnValue('/project')
-
-    const program = makeProgram()
-    registerSpecResolvePath(program.command('spec'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'spec',
-      'resolve-path',
-      '/project/specs/auth/login/spec.md',
-    ])
-
-    expect(stdout()).toContain('default:auth/login')
-  })
-
-  it('exits 1 when path does not exist', async () => {
-    setup()
-
-    vi.mocked(mockStat).mockRejectedValue(new Error('ENOENT'))
-    vi.spyOn(process, 'cwd').mockReturnValue('/project')
-
-    const program = makeProgram()
-    registerSpecResolvePath(program.command('spec'))
-    await program
-      .parseAsync(['node', 'specd', 'spec', 'resolve-path', '/nonexistent/path'])
-      .catch(() => {})
-
-    expect(process.exit).toHaveBeenCalledWith(1)
-  })
-
   it('exits 1 when path is not under any workspace', async () => {
-    const { config, stderr } = setup()
+    const { config, kernel, stderr } = setup()
     Object.assign(config, {
       workspaces: [
         {
@@ -275,7 +263,10 @@ describe('spec resolve-path', () => {
       ],
     })
 
-    vi.mocked(mockStat).mockResolvedValue(makeMockStats({ isDirectory: () => true }))
+    const mockRepo = {
+      resolveFromPath: vi.fn().mockResolvedValue(null),
+    }
+    kernel.specs.repos = new Map([['default', mockRepo as unknown as SpecRepository]])
     vi.spyOn(process, 'cwd').mockReturnValue('/project')
 
     const program = makeProgram()

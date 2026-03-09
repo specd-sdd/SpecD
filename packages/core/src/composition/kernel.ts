@@ -28,6 +28,8 @@ import { GetProjectContext } from '../application/use-cases/get-project-context.
 import { ValidateSpecs } from '../application/use-cases/validate-specs.js'
 import { InferSpecSections } from '../application/use-cases/infer-spec-sections.js'
 import { GetSpecContext } from '../application/use-cases/get-spec-context.js'
+import { type ChangeRepository } from '../application/ports/change-repository.js'
+import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SpecdConfig } from '../application/specd-config.js'
 import { parseSpecId } from '../domain/services/parse-spec-id.js'
 import { createKernelInternals } from './kernel-internals.js'
@@ -43,6 +45,8 @@ import { createKernelInternals } from './kernel-internals.js'
 export interface Kernel {
   /** Use cases that operate on changes. */
   changes: {
+    /** The change repository — exposes existence checks for artifacts and deltas. */
+    repo: ChangeRepository
     /** Creates a new change. */
     create: CreateChange
     /** Reports the current lifecycle state and artifact statuses. */
@@ -78,6 +82,8 @@ export interface Kernel {
   }
   /** Use cases that operate on specs and approval gates. */
   specs: {
+    /** Spec repositories keyed by workspace name — exposes path resolution. */
+    repos: ReadonlyMap<string, SpecRepository>
     /** Records a spec approval and transitions to `spec-approved`. */
     approveSpec: ApproveSpec
     /** Records a sign-off and transitions to `signed-off`. */
@@ -140,6 +146,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
 
   return {
     changes: {
+      repo: i.changes,
       create: new CreateChange(i.changes, i.git),
       status: new GetStatus(i.changes),
       transition: new TransitionChange(i.changes, i.git),
@@ -170,8 +177,9 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       getArchived: new GetArchivedChange(i.archive),
     },
     specs: {
-      approveSpec: new ApproveSpec(i.changes, i.git),
-      approveSignoff: new ApproveSignoff(i.changes, i.git),
+      repos: i.specs,
+      approveSpec: new ApproveSpec(i.changes, i.git, i.schemas, i.hasher),
+      approveSignoff: new ApproveSignoff(i.changes, i.git, i.schemas, i.hasher),
       list: new ListSpecs(i.specs, i.hasher, i.yaml),
       get: new GetSpec(i.specs),
       saveMetadata: new SaveSpecMetadata(i.specs, i.yaml),

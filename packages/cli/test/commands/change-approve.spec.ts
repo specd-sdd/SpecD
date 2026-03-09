@@ -14,13 +14,9 @@ import {
 
 vi.mock('../../src/load-config.js', () => ({ loadConfig: vi.fn() }))
 vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
-vi.mock('../../src/helpers/artifact-hash.js', () => ({ hashChangeArtifacts: vi.fn() }))
-vi.mock('../../src/helpers/change-dir.js', () => ({ findChangeDir: vi.fn() }))
 
 import { loadConfig } from '../../src/load-config.js'
 import { createCliKernel } from '../../src/kernel.js'
-import { hashChangeArtifacts } from '../../src/helpers/artifact-hash.js'
-import { findChangeDir } from '../../src/helpers/change-dir.js'
 import { registerChangeApprove } from '../../src/commands/change/approve.js'
 
 function setup() {
@@ -28,8 +24,6 @@ function setup() {
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
   vi.mocked(createCliKernel).mockReturnValue(kernel)
-  vi.mocked(findChangeDir).mockResolvedValue('/project/.specd/changes/20260115-100000-my-change')
-  vi.mocked(hashChangeArtifacts).mockResolvedValue({ 'spec.md': 'sha256:abc123' })
   kernel.changes.status.execute.mockResolvedValue({
     change: makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
     artifactStatuses: [],
@@ -104,7 +98,7 @@ describe('change approve spec', () => {
 
   it('exits 1 when change not found', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.status.execute.mockRejectedValue(new ChangeNotFoundError('nonexistent'))
+    kernel.specs.approveSpec.execute.mockRejectedValue(new ChangeNotFoundError('nonexistent'))
 
     const program = makeProgram()
     registerChangeApprove(program.command('change'))
@@ -130,7 +124,7 @@ describe('change approve spec', () => {
     expect(stderr()).toMatch(/error:/)
   })
 
-  it('computes artifact hashes from disk', async () => {
+  it('passes schemaRef and workspaceSchemasPaths to use case', async () => {
     const { kernel } = setup()
     kernel.specs.approveSpec.execute.mockResolvedValue(undefined)
     captureStdout()
@@ -148,32 +142,9 @@ describe('change approve spec', () => {
       'ok',
     ])
 
-    expect(hashChangeArtifacts).toHaveBeenCalled()
     const call = kernel.specs.approveSpec.execute.mock.calls[0]![0]
-    expect(call.artifactHashes).toEqual({ 'spec.md': 'sha256:abc123' })
-  })
-
-  it('passes empty hashes when changeDir not found', async () => {
-    const { kernel } = setup()
-    vi.mocked(findChangeDir).mockResolvedValue(null)
-    kernel.specs.approveSpec.execute.mockResolvedValue(undefined)
-    captureStdout()
-
-    const program = makeProgram()
-    registerChangeApprove(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'approve',
-      'spec',
-      'my-change',
-      '--reason',
-      'ok',
-    ])
-
-    const call = kernel.specs.approveSpec.execute.mock.calls[0]![0]
-    expect(call.artifactHashes).toEqual({})
+    expect(call.schemaRef).toBe('@specd/schema-std')
+    expect(call.workspaceSchemasPaths).toBeInstanceOf(Map)
   })
 })
 

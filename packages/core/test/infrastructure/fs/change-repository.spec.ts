@@ -459,6 +459,57 @@ describe('FsChangeRepository', () => {
     })
   })
 
+  describe('artifactExists', () => {
+    it('given a saved change with an artifact file, returns true', async () => {
+      const change = makeChange('add-auth')
+      await ctx.repo.save(change)
+
+      // Write a file directly to simulate an artifact
+      const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
+      await fs.writeFile(path.join(dir, 'spec.md'), '# Spec', 'utf8')
+
+      expect(await ctx.repo.artifactExists(change, 'spec.md')).toBe(true)
+    })
+
+    it('given a saved change without the artifact file, returns false', async () => {
+      const change = makeChange('add-auth')
+      await ctx.repo.save(change)
+
+      expect(await ctx.repo.artifactExists(change, 'spec.md')).toBe(false)
+    })
+
+    it('given no change directory, returns false', async () => {
+      const change = makeChange('nonexistent')
+      expect(await ctx.repo.artifactExists(change, 'spec.md')).toBe(false)
+    })
+  })
+
+  describe('deltaExists', () => {
+    it('given a saved change with a delta file, returns true', async () => {
+      const change = makeChange('add-auth')
+      await ctx.repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
+      const deltaDir = path.join(dir, 'deltas', 'auth/login')
+      await fs.mkdir(deltaDir, { recursive: true })
+      await fs.writeFile(path.join(deltaDir, 'spec.delta.yaml'), 'delta: true', 'utf8')
+
+      expect(await ctx.repo.deltaExists(change, 'auth/login', 'spec.delta.yaml')).toBe(true)
+    })
+
+    it('given a saved change without the delta file, returns false', async () => {
+      const change = makeChange('add-auth')
+      await ctx.repo.save(change)
+
+      expect(await ctx.repo.deltaExists(change, 'auth/login', 'spec.delta.yaml')).toBe(false)
+    })
+
+    it('given no change directory, returns false', async () => {
+      const change = makeChange('nonexistent')
+      expect(await ctx.repo.deltaExists(change, 'auth/login', 'spec.delta.yaml')).toBe(false)
+    })
+  })
+
   describe('event serialization', () => {
     it('given a change with optional event fields, when saved and loaded, then optional fields are preserved', async () => {
       const change = makeChange('add-auth')

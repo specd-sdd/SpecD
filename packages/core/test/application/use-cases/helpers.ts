@@ -78,6 +78,18 @@ class StubChangeRepository extends ChangeRepository {
   ): Promise<void> {
     throw new Error('not implemented')
   }
+
+  override async artifactExists(_change: Change, _filename: string): Promise<boolean> {
+    return false
+  }
+
+  override async deltaExists(
+    _change: Change,
+    _specId: string,
+    _filename: string,
+  ): Promise<boolean> {
+    return false
+  }
 }
 
 /**
@@ -184,6 +196,12 @@ class StubSpecRepository extends SpecRepository {
 
   override async delete(spec: Spec): Promise<void> {
     if (this._deleteFn) return this._deleteFn(spec)
+  }
+
+  override async resolveFromPath(
+    _absolutePath: string,
+  ): Promise<{ specPath: SpecPath; specId: string } | null> {
+    return null
   }
 }
 

@@ -124,6 +124,25 @@ export abstract class ChangeRepository extends Repository {
     artifact: SpecArtifact,
     options?: { force?: boolean },
   ): Promise<void>
+
+  /**
+   * Checks whether an artifact file exists for a change, without loading content.
+   *
+   * @param change - The change containing the artifact
+   * @param filename - The artifact filename to check (e.g. `"proposal.md"`)
+   * @returns `true` if the file exists, `false` otherwise
+   */
+  abstract artifactExists(change: Change, filename: string): Promise<boolean>
+
+  /**
+   * Checks whether a delta file exists for a change + specId pair.
+   *
+   * @param change - The change containing the delta
+   * @param specId - The spec identifier (e.g. `"auth/login"`)
+   * @param filename - The delta filename to check (e.g. `"spec.delta.yaml"`)
+   * @returns `true` if the file exists, `false` otherwise
+   */
+  abstract deltaExists(change: Change, specId: string, filename: string): Promise<boolean>
 }
 
 export type { ArtifactConflictError }
