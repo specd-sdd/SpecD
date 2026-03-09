@@ -64,21 +64,21 @@ export class InferSpecSections {
     const scenarios: string[] = []
 
     for (const artifactType of schema.artifacts()) {
-      if (artifactType.scope() !== 'spec') continue
+      if (artifactType.scope !== 'spec') continue
 
-      const format = artifactType.format() ?? inferFormat(artifactType.output())
+      const format = artifactType.format ?? inferFormat(artifactType.output)
       if (format === undefined) continue
 
       const parser = this._parsers.get(format)
       if (parser === undefined) continue
 
-      const filename = artifactType.output()
+      const filename = artifactType.output
       const artifact = input.artifacts.get(filename)
       if (artifact === undefined) continue
 
       const ast = parser.parse(artifact.content)
 
-      for (const section of artifactType.contextSections()) {
+      for (const section of artifactType.contextSections) {
         const nodes = findNodes(ast.root, section.selector)
         for (const node of nodes) {
           const extracted =

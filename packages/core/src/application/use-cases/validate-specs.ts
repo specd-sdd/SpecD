@@ -83,7 +83,7 @@ export class ValidateSpecs {
     const schema = await this._schemas.resolve(input.schemaRef, input.workspaceSchemasPaths)
     if (schema === null) throw new SchemaNotFoundError(input.schemaRef)
 
-    const specArtifactTypes = schema.artifacts().filter((a) => a.scope() === 'spec')
+    const specArtifactTypes = schema.artifacts().filter((a) => a.scope === 'spec')
     const entries: SpecValidationEntry[] = []
 
     if (input.specPath !== undefined) {
@@ -170,31 +170,31 @@ export class ValidateSpecs {
     const spec = await specRepo.get(specPath)
 
     for (const artifactType of specArtifactTypes) {
-      const filename = path.basename(artifactType.output())
+      const filename = path.basename(artifactType.output)
       const hasFile = filenames.includes(filename)
 
       if (!hasFile) {
-        if (!artifactType.optional()) {
+        if (!artifactType.optional) {
           failures.push({
-            artifactId: artifactType.id(),
-            description: `Required artifact '${artifactType.id()}' is missing`,
+            artifactId: artifactType.id,
+            description: `Required artifact '${artifactType.id}' is missing`,
           })
         }
         continue
       }
 
-      if (artifactType.validations().length === 0) continue
+      if (artifactType.validations.length === 0) continue
       if (spec === null) continue
 
       const artifact = await specRepo.artifact(spec, filename)
       if (artifact === null) continue
 
-      const format = artifactType.format() ?? inferFormat(filename)
+      const format = artifactType.format ?? inferFormat(filename)
       const parser = format !== undefined ? this._parsers.get(format) : undefined
       if (parser === undefined) continue
 
       const ast = parser.parse(artifact.content)
-      const result = evaluateRules(artifactType.validations(), ast.root, artifactType.id(), parser)
+      const result = evaluateRules(artifactType.validations, ast.root, artifactType.id, parser)
       failures.push(...result.failures)
       warnings.push(...result.warnings)
     }

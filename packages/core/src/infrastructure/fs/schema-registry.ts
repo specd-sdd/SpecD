@@ -666,22 +666,22 @@ export class FsSchemaRegistry implements SchemaRegistry {
    * @throws {@link SchemaValidationError} When the graph contains violations
    */
   private _validateArtifactGraph(ref: string, artifacts: ArtifactType[]): void {
-    const allIds = new Set(artifacts.map((a) => a.id()))
-    const optionalIds = new Set(artifacts.filter((a) => a.optional()).map((a) => a.id()))
-    const requiresMap = new Map(artifacts.map((a) => [a.id(), a.requires()] as const))
+    const allIds = new Set(artifacts.map((a) => a.id))
+    const optionalIds = new Set(artifacts.filter((a) => a.optional).map((a) => a.id))
+    const requiresMap = new Map(artifacts.map((a) => [a.id, a.requires] as const))
 
     for (const artifact of artifacts) {
-      for (const dep of artifact.requires()) {
+      for (const dep of artifact.requires) {
         if (!allIds.has(dep)) {
           throw new SchemaValidationError(
             ref,
-            `artifact '${artifact.id()}' requires unknown artifact '${dep}'`,
+            `artifact '${artifact.id}' requires unknown artifact '${dep}'`,
           )
         }
-        if (optionalIds.has(dep) && !artifact.optional()) {
+        if (optionalIds.has(dep) && !artifact.optional) {
           throw new SchemaValidationError(
             ref,
-            `non-optional artifact '${artifact.id()}' requires optional artifact '${dep}'`,
+            `non-optional artifact '${artifact.id}' requires optional artifact '${dep}'`,
           )
         }
       }

@@ -153,19 +153,19 @@ export class ArchiveChange {
       let synced = false
 
       for (const artifactType of schema.artifacts()) {
-        if (artifactType.scope() !== 'spec') continue
+        if (artifactType.scope !== 'spec') continue
 
-        const effectiveStatus = change.effectiveStatus(artifactType.id())
+        const effectiveStatus = change.effectiveStatus(artifactType.id)
         if (effectiveStatus === 'skipped' || effectiveStatus === 'missing') continue
 
-        const outputBasename = path.basename(artifactType.output())
+        const outputBasename = path.basename(artifactType.output)
 
-        if (artifactType.delta()) {
+        if (artifactType.delta) {
           // Delta artifact: parse and apply delta file onto base spec
-          const format = artifactType.format() ?? inferFormat(outputBasename) ?? 'plaintext'
+          const format = artifactType.format ?? inferFormat(outputBasename) ?? 'plaintext'
           const formatParser = this._parsers.get(format)
           if (formatParser === undefined) {
-            throw new ParserNotRegisteredError(format, `artifact '${artifactType.id()}'`)
+            throw new ParserNotRegisteredError(format, `artifact '${artifactType.id}'`)
           }
           if (yamlParser === undefined) {
             throw new ParserNotRegisteredError('yaml', 'required for delta file parsing')

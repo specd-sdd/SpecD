@@ -258,15 +258,15 @@ export class GetProjectContext {
 
         const fallbackParts: string[] = []
         for (const artifactType of schema.artifacts()) {
-          if (artifactType.scope() !== 'spec') continue
-          const contextSections = artifactType.contextSections()
+          if (artifactType.scope !== 'spec') continue
+          const contextSections = artifactType.contextSections
           if (contextSections.length === 0) continue
 
-          const outputFilename = artifactType.output().split('/').pop()!
+          const outputFilename = artifactType.output.split('/').pop()!
           const artifactFile = await specRepo.artifact(spec, outputFilename)
           if (artifactFile === null) continue
 
-          const format = artifactType.format() ?? inferFormat(outputFilename) ?? 'plaintext'
+          const format = artifactType.format ?? inferFormat(outputFilename) ?? 'plaintext'
           const parser = this._parsers.get(format)
           if (parser === undefined) continue
 

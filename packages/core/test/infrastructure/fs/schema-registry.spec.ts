@@ -180,7 +180,7 @@ describe('Schema validation on load — minimal valid schema', () => {
     const schema = await ctx.registry.resolve('minimal', ctx.workspaceSchemasPaths)
     expect(schema).not.toBeNull()
     expect(schema?.artifacts()).toHaveLength(1)
-    expect(schema?.artifacts()[0]!.id()).toBe('spec')
+    expect(schema?.artifacts()[0]!.id).toBe('spec')
     expect(schema?.workflow()).toHaveLength(0)
   })
 })
@@ -395,7 +395,7 @@ artifacts:
     const schema = await ctx.registry.resolve('with-template', ctx.workspaceSchemasPaths)
     expect(schema).not.toBeNull()
     const artifact = schema?.artifact('spec')
-    expect(artifact?.template()).toBe('# Spec Template\n<!-- Fill this in -->')
+    expect(artifact?.template).toBe('# Spec Template\n<!-- Fill this in -->')
   })
 })
 
@@ -424,7 +424,7 @@ describe('Template resolution — no template declared', () => {
   it('leaves template undefined when no template field is declared', async () => {
     await writeSchemaFile(ctx.defaultSchemasPath, 'no-template', MINIMAL_SCHEMA)
     const schema = await ctx.registry.resolve('no-template', ctx.workspaceSchemasPaths)
-    expect(schema?.artifact('spec')?.template()).toBeUndefined()
+    expect(schema?.artifact('spec')?.template).toBeUndefined()
   })
 })
 

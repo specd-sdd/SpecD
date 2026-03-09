@@ -130,10 +130,10 @@ export class ValidateArtifacts {
 
     // --- Required artifacts check ---
     for (const artifactType of schema.artifacts()) {
-      if (!artifactType.optional() && change.effectiveStatus(artifactType.id()) === 'missing') {
+      if (!artifactType.optional && change.effectiveStatus(artifactType.id) === 'missing') {
         failures.push({
-          artifactId: artifactType.id(),
-          description: `Required artifact '${artifactType.id()}' is missing`,
+          artifactId: artifactType.id,
+          description: `Required artifact '${artifactType.id}' is missing`,
         })
       }
     }
@@ -145,7 +145,7 @@ export class ValidateArtifacts {
       let invalidated = false
       for (const artifactType of schema.artifacts()) {
         if (invalidated) break
-        const changeArtifact = change.getArtifact(artifactType.id())
+        const changeArtifact = change.getArtifact(artifactType.id)
         if (
           changeArtifact === null ||
           changeArtifact.status === 'missing' ||
@@ -155,13 +155,10 @@ export class ValidateArtifacts {
         }
         const artifactFile = await this._changes.artifact(change, changeArtifact.filename)
         if (artifactFile === null) continue
-        const cleanedContent = this._applyCleanup(
-          artifactFile.content,
-          artifactType.preHashCleanup(),
-        )
+        const cleanedContent = this._applyCleanup(artifactFile.content, artifactType.preHashCleanup)
         const cleanedHash = this._sha256(cleanedContent)
-        const approvalHash = approval?.artifactHashes[artifactType.id()]
-        const signoffHash = signoff?.artifactHashes[artifactType.id()]
+        const approvalHash = approval?.artifactHashes[artifactType.id]
+        const signoffHash = signoff?.artifactHashes[artifactType.id]
         if (
           (approvalHash !== undefined && approvalHash !== cleanedHash) ||
           (signoffHash !== undefined && signoffHash !== cleanedHash)
@@ -174,27 +171,27 @@ export class ValidateArtifacts {
 
     // --- Per-artifact validation ---
     for (const artifactType of schema.artifacts()) {
-      const effectiveStatus = change.effectiveStatus(artifactType.id())
+      const effectiveStatus = change.effectiveStatus(artifactType.id)
       if (effectiveStatus === 'skipped' || effectiveStatus === 'missing') continue
 
-      const blockedBy = artifactType.requires().find((reqId) => {
+      const blockedBy = artifactType.requires.find((reqId) => {
         const depStatus = change.effectiveStatus(reqId)
         return depStatus !== 'complete' && depStatus !== 'skipped'
       })
       if (blockedBy !== undefined) {
         failures.push({
-          artifactId: artifactType.id(),
-          description: `Artifact '${artifactType.id()}' is blocked by incomplete dependency '${blockedBy}'`,
+          artifactId: artifactType.id,
+          description: `Artifact '${artifactType.id}' is blocked by incomplete dependency '${blockedBy}'`,
         })
         continue
       }
 
-      const changeArtifact = change.getArtifact(artifactType.id())
+      const changeArtifact = change.getArtifact(artifactType.id)
       if (changeArtifact === null) continue
       const artifactFile = await this._changes.artifact(change, changeArtifact.filename)
       if (artifactFile === null) continue
 
-      const format = artifactType.format() ?? inferFormat(changeArtifact.filename)
+      const format = artifactType.format ?? inferFormat(changeArtifact.filename)
       const parser = format !== undefined ? this._parsers.get(format) : undefined
       const yamlParser = this._parsers.get('yaml')
 
@@ -202,7 +199,7 @@ export class ValidateArtifacts {
       let artifactFailed = false
 
       // --- Delta processing ---
-      if (artifactType.delta()) {
+      if (artifactType.delta) {
         const deltaFilename =
           capabilityPath.length > 0
             ? `deltas/${workspace}/${capabilityPath}/${changeArtifact.filename}.delta.yaml`
@@ -210,12 +207,12 @@ export class ValidateArtifacts {
         const deltaFile = await this._changes.artifact(change, deltaFilename)
 
         if (deltaFile !== null) {
-          if (artifactType.deltaValidations().length > 0 && yamlParser !== undefined) {
+          if (artifactType.deltaValidations.length > 0 && yamlParser !== undefined) {
             const deltaAST = yamlParser.parse(deltaFile.content)
             const result = evaluateRules(
-              artifactType.deltaValidations(),
+              artifactType.deltaValidations,
               deltaAST.root,
-              artifactType.id(),
+              artifactType.id,
               yamlParser,
             )
             failures.push(...result.failures)
@@ -240,7 +237,7 @@ export class ValidateArtifacts {
               } catch (err) {
                 if (err instanceof DeltaApplicationError) {
                   failures.push({
-                    artifactId: artifactType.id(),
+                    artifactId: artifactType.id,
                     description: `Delta application failed: ${err.message}`,
                   })
                   artifactFailed = true
@@ -254,14 +251,9 @@ export class ValidateArtifacts {
       }
 
       // --- Structural validation ---
-      if (!artifactFailed && artifactType.validations().length > 0 && parser !== undefined) {
+      if (!artifactFailed && artifactType.validations.length > 0 && parser !== undefined) {
         const ast = parser.parse(validationContent)
-        const result = evaluateRules(
-          artifactType.validations(),
-          ast.root,
-          artifactType.id(),
-          parser,
-        )
+        const result = evaluateRules(artifactType.validations, ast.root, artifactType.id, parser)
         failures.push(...result.failures)
         warnings.push(...result.warnings)
         if (result.failures.length > 0) artifactFailed = true
@@ -269,10 +261,7 @@ export class ValidateArtifacts {
 
       // --- Mark complete ---
       if (!artifactFailed) {
-        const cleanedContent = this._applyCleanup(
-          artifactFile.content,
-          artifactType.preHashCleanup(),
-        )
+        const cleanedContent = this._applyCleanup(artifactFile.content, artifactType.preHashCleanup)
         changeArtifact.markComplete(this._sha256(cleanedContent))
       }
     }

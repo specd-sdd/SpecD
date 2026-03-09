@@ -38,7 +38,7 @@ export function registerChangeArtifacts(parent: Command): void {
             workspaceSchemasPaths,
           })
           schemaArtifacts = new Map(
-            schema.artifacts().map((a) => [a.id(), { delta: a.delta(), output: a.output() }]),
+            schema.artifacts().map((a) => [a.id, { delta: a.delta, output: a.output }]),
           )
         } catch {
           // If schema resolution fails, skip delta entries

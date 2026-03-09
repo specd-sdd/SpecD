@@ -34,9 +34,9 @@ export function computeArtifactHash(
 export function buildCleanupMap(schema: Schema): ReadonlyMap<string, readonly PreHashCleanup[]> {
   const map = new Map<string, readonly PreHashCleanup[]>()
   for (const a of schema.artifacts()) {
-    const cleanups = a.preHashCleanup()
+    const cleanups = a.preHashCleanup
     if (cleanups.length > 0) {
-      map.set(a.id(), cleanups)
+      map.set(a.id, cleanups)
     }
   }
   return map
