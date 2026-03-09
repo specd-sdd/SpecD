@@ -1,18 +1,18 @@
 title: 'Schema Format'
 description: >
-  Defines the YAML structure of a specd schema file, including artifact definitions,
-  workflow lifecycle phases, validation rules, delta support, template resolution, and
-  schema resolution logic. Governs how SchemaRegistry loads, validates, and constructs
-  Schema objects from schema.yaml files.
+  Defines the structure and semantics of a specd schema YAML file, which controls the artifact
+  workflow for a project. It specifies artifact definitions, template resolution, validation rules,
+  delta validation, context sections, workflow phases, and schema resolution. Read this spec when
+  implementing or modifying schema loading, parsing, or validation.
 keywords:
-  - 'schema'
-  - 'artifact'
-  - 'workflow'
-  - 'validation'
-  - 'delta'
-  - 'template'
+  - 'schema-format'
+  - 'artifact-definition'
+  - 'schema-validation'
+  - 'template-resolution'
+  - 'delta-validation'
   - 'context-sections'
-  - 'SchemaRegistry'
+  - 'workflow-phases'
+  - 'schema-registry'
 dependsOn:
   - 'core:core/delta-format'
   - 'core:core/selector-model'
@@ -25,195 +25,582 @@ rules:
       - 'A schema file must be a valid YAML document with top-level fields: name (string, required), version (integer, required), description (string, optional), artifacts (array, required), workflow (array, optional).'
   - requirement: 'Artifact definition'
     rules:
-      - 'Each artifact entry must include: id, scope, output; optional fields include optional, description, template, instruction, requires, format, delta, deltaInstruction, deltaValidations, validations, contextSections, preHashCleanup, taskCompletionCheck.'
-      - 'The output filename is derived from the last literal glob segment; if the last segment is a wildcard, the template filename is used; if neither yields a determinate name, SchemaRegistry.resolve() must throw a SchemaValidationError.'
-      - 'delta: true is only valid when scope is spec; combining delta: true with scope: change must throw a SchemaValidationError.'
-      - 'format is inferred from the derived output filename extension when omitted (.md -> markdown, .json -> json, .yaml/.yml -> yaml, other -> plaintext).'
+      - 'Each artifact entry must include id, scope, output, and supports optional fields: description, template, instruction, requires, format, delta, deltaInstruction, deltaValidations, validations, contextSections, preHashCleanup, taskCompletionCheck.'
   - requirement: 'Template resolution'
     rules:
-      - 'Template files are loaded at resolve time from the path relative to the schema directory.'
-      - 'If the declared template file does not exist, SchemaRegistry.resolve() must throw a SchemaValidationError.'
-      - 'Template content is plain text with no interpolation; HTML comments are preserved as-is.'
+      - 'Template files are bundled alongside schema.yaml in a templates/ subdirectory.'
+      - 'The template field is a path relative to the schema.yaml directory.'
+      - 'SchemaRegistry.resolve() reads all referenced templates at load time.'
+      - 'Template content is plain text with no interpolation.'
   - requirement: 'Validation rules'
     rules:
-      - 'Each validation rule uses either selector fields (type, matches, contains, parent, index, where) or a JSONPath path expression to identify AST nodes.'
-      - 'A rule passes vacuously when it matches zero nodes; no error or warning is produced.'
-      - 'required: false produces a warning rather than an error when no nodes match.'
-      - 'children sub-rules are evaluated with each matched node as root.'
-      - 'contentMatches is matched case-insensitively against the serialized text of the matched node subtree.'
+      - 'validations on an artifact defines structural constraints checked by ValidateArtifacts against the artifact content.'
+      - 'Rules use selector fields or JSONPath for node identification, plus required, contentMatches, and children fields.'
   - requirement: 'Delta validation rules'
     rules:
-      - 'deltaValidations rules are evaluated against the normalized YAML AST of the delta file before application.'
-      - 'deltaValidations uses the same rule structure and evaluation semantics as validations.'
-      - 'deltaValidations is only valid on artifacts with delta: true; declaring it on a non-delta artifact is a SchemaValidationError.'
+      - 'deltaValidations defines rules checked against the delta file before application, using the same structure and evaluation semantics as validations but against the normalized YAML AST of the delta file.'
+      - 'deltaValidations is only valid when delta: true.'
   - requirement: 'Per-spec approval'
     rules:
       - 'Any spec file touched by a delta requires explicit approval before the change can be archived.'
-      - 'specd archive must refuse if any spec touched by the change has not been approved.'
-      - 'A spec created by an added operation also requires approval.'
+      - 'Approval is tracked per spec ID.'
+      - 'specd archive must refuse if any touched spec has not been approved.'
   - requirement: 'Context sections'
     rules:
-      - 'Each contextSections entry must include a selector; role defaults to context; extract defaults to content; contextTitle defaults to the matched node label.'
-      - 'CompileContext uses contextSections as a fallback when .specd-metadata.yaml is absent or stale.'
-      - 'When the selector matches no node, CompileContext skips the entry without error.'
+      - 'contextSections declares which nodes of an artifact spec files are relevant context for workflow steps.'
+      - 'CompileContext uses these declarations to extract and inject matched nodes with a selector, role, extract mode, and optional contextTitle.'
   - requirement: 'Artifact scope'
     rules:
-      - 'scope: spec artifacts are synced to the SpecRepository during ArchiveChange; scope: change artifacts are validated in the change but never synced.'
-      - 'Non-optional scope: spec artifacts must be present in every spec directory; specd validate reports missing files as errors.'
-      - 'ValidateArtifacts requires all non-optional artifacts (regardless of scope) to be present in the change.'
+      - 'scope on an artifact determines spec directory layout, existing spec validation, and change validation.'
+      - 'scope: spec artifacts are synced to the SpecRepository during ArchiveChange.'
+      - 'scope: change artifacts are validated but never synced.'
   - requirement: 'Workflow'
     rules:
-      - 'Each workflow entry must include step (string, required); requires (array of artifact IDs, optional); hooks (object with pre/post arrays, optional).'
-      - 'Each hook entry is either { instruction: string } or { run: string }.'
-      - 'A pre run: hook that exits non-zero aborts the step; a post run: hook that exits non-zero prompts the user to continue or stop.'
-      - 'Schema hooks fire first, then project hooks, within the same pre/post event.'
-      - 'requires is not valid in specd.yaml workflow entries and must be rejected at load time.'
+      - 'workflow is an array of named lifecycle phase definitions.'
+      - 'Each entry has step (required), requires (optional), and hooks (optional with pre/post arrays of instruction or run entries).'
+      - 'Schema and project hooks are merged by step name.'
   - requirement: 'Project-level artifactRules'
     rules:
-      - 'artifactRules keys are validated against active schema artifact IDs on load; unknown keys produce a warning but do not prevent startup.'
-      - 'Rules are additive — they extend the schema instruction, not replace it.'
+      - 'artifactRules in specd.yaml allows teams to add per-artifact constraints without forking the schema.'
+      - 'Rules are validated against active schema artifact IDs on load.'
+      - 'Unknown keys produce a warning.'
+      - 'Rules are additive.'
   - requirement: 'Schema resolution'
     rules:
-      - 'Prefix @scope/name loads from node_modules/@scope/name/schema.yaml.'
-      - 'Prefix #workspace:name loads from workspaces.<workspace>.schemas.fs.path/<name>/schema.yaml.'
-      - 'Bare name or #name is equivalent to #default:name.'
-      - 'Relative or absolute path is resolved directly; relative paths are resolved from the specd.yaml directory.'
-      - 'If the resolved file does not exist, resolve() must return null; the caller converts null to SchemaNotFoundError.'
+      - 'SchemaRegistry.resolve(ref) interprets the schema value using a prefix convention: @ for npm packages, #workspace:name for workspace-qualified, #name or bare name for default workspace, and relative/absolute paths for direct file references.'
   - requirement: 'Schema validation on load'
     rules:
-      - 'SchemaRegistry.resolve() must validate parsed YAML via Zod before constructing the Schema object.'
-      - 'Unknown top-level fields must be ignored for forward compatibility.'
-      - 'Structural mismatches must produce a SchemaValidationError before any domain object construction.'
-      - 'Validation checks: duplicate artifact.id, duplicate workflow[].step, artifact.id not matching /^[a-z][a-z0-9-]*$/, unknown artifact ID in requires, circular requires dependency, non-optional artifact hard-depending on optional artifact, deltaValidations on delta: false artifact, requires in specd.yaml workflow entry.'
+      - 'SchemaRegistry.resolve() must validate parsed YAML against a Zod schema.'
+      - 'Structural mismatches and semantic errors produce a SchemaValidationError.'
+      - 'Covers duplicate IDs, invalid requires references, circular dependencies, and other structural constraints.'
   - requirement: 'verify.md format'
     rules:
-      - 'verify.md groups scenarios under ### Requirement: <name> headings matching the spec.md structure.'
-      - 'Only scenarios that add information beyond what the requirement prose already states are included.'
-      - 'The verify artifact should declare requires: [spec]; the workflow verify step should declare requires: [verify].'
+      - 'verify.md is the verification artifact for a spec containing WHEN/THEN scenarios grouped under Requirement headings that mirror spec.md structure.'
+      - 'Only scenarios that add information beyond requirement prose are included.'
 constraints:
-  - 'artifact.id must match /^[a-z][a-z0-9-]*$/ and must be unique within a schema.'
-  - 'artifact.scope must be spec or change; it is required and has no default.'
-  - 'artifact.optional defaults to false; a non-optional scope: spec artifact must be present in every spec directory and every change.'
-  - 'workflow[].step must be unique — duplicate step names in the same workflow array are a schema validation error.'
-  - 'requires must not contain cycles; circular dependencies in the artifact graph are a schema validation error.'
-  - 'If artifact A is optional: true, any artifact that lists A in its requires must also be optional: true.'
-  - 'deltaValidations is only valid on artifacts with delta: true; declaring it on a non-delta artifact is a schema validation error.'
-  - 'requires in specd.yaml workflow entries is invalid and must be rejected at load time; only step and hooks are accepted.'
-  - 'The order of entries in workflow is the intended display order for tooling; it does not enforce sequential blocking between consecutive steps.'
-  - 'Delta file format, selector model, and application constraints are defined in specs/core/delta-format/spec.md.'
+  - 'artifact.id must match /^[a-z][a-z0-9-]*$/ and must be unique within a schema'
+  - 'artifact.scope must be spec or change; it is required and has no default'
+  - 'artifact.optional defaults to false; a non-optional artifact with scope: spec must be present in every spec directory and every change'
+  - 'workflow[].step must be unique — duplicate step names in the same workflow array are a schema validation error'
+  - 'requires must not contain cycles; circular dependencies in the artifact graph are a schema validation error'
+  - 'If artifact A is optional: true, any artifact that lists A in its requires must also be optional: true'
+  - 'deltaValidations is only valid on artifacts with delta: true; declaring deltaValidations on a non-delta artifact is a schema validation error'
+  - 'requires in specd.yaml workflow entries is invalid and must be rejected at load time; only step and hooks are accepted'
+  - 'The order of entries in workflow is the intended display order for tooling; it does not enforce sequential blocking between consecutive steps'
+  - 'Delta file format, selector model, and application constraints are defined in specs/core/delta-format/spec.md'
 scenarios:
   - requirement: 'Schema file structure'
     name: 'Minimal valid schema'
+    given:
+      - 'a schema file'
     when:
-      - 'a schema file contains name, version, and at least one artifact'
+      - 'the schema file contains name, version, and at least one artifact'
     then:
       - 'SchemaRegistry.resolve() must return the parsed schema without error'
   - requirement: 'Schema file structure'
     name: 'Missing required field'
+    given:
+      - 'a schema file'
     when:
-      - 'a schema file is missing name or version'
+      - 'the schema file is missing name or version'
     then:
       - 'SchemaRegistry.resolve() must throw a validation error'
   - requirement: 'Artifact definition'
     name: 'Filename derived from glob literal segment'
+    given:
+      - 'an artifact declares output: "specs/**/spec.md"'
     when:
-      - 'an artifact declares output: "specs/**/spec.md" and a new file is created within the change'
+      - 'a new file is created within the change'
     then:
       - 'the file is named spec.md; the subdirectory path is chosen by the user'
   - requirement: 'Artifact definition'
-    name: 'Filename indeterminate — no literal segment and no template'
+    name: 'Filename derived from template when glob segment is a wildcard'
+    given:
+      - 'an artifact declares output: "specs/**/*.md" and template: "templates/spec.md"'
     when:
+      - 'a new file is created within the change'
+    then:
+      - 'the file is named spec.md, taken from the template filename'
+  - requirement: 'Artifact definition'
+    name: 'Filename indeterminate — no literal segment and no template'
+    given:
       - 'an artifact declares output: "specs/**/*.md" and omits template'
+    when:
+      - 'SchemaRegistry.resolve() processes the artifact'
     then:
       - 'SchemaRegistry.resolve() must throw a SchemaValidationError identifying the artifact'
   - requirement: 'Artifact definition'
-    name: 'Circular dependency in artifact graph'
+    name: 'Artifact with no requirements'
+    given:
+      - 'an artifact omits requires'
     when:
+      - 'effective status is computed'
+    then:
+      - 'its effective status depends only on its own validated hash'
+  - requirement: 'Artifact definition'
+    name: 'Artifact with dependency chain'
+    given:
+      - 'artifact B declares requires: [a] and artifact A is in-progress'
+    when:
+      - 'Change.effectiveStatus("b") is called'
+    then:
+      - 'it must return in-progress'
+  - requirement: 'Artifact definition'
+    name: 'Circular dependency in artifact graph'
+    given:
       - 'artifact A declares requires: [b] and artifact B declares requires: [a]'
+    when:
+      - 'SchemaRegistry.resolve() processes the schema'
     then:
       - 'SchemaRegistry.resolve() must throw a SchemaValidationError identifying the cycle'
   - requirement: 'Artifact definition'
     name: 'Non-optional artifact requires optional artifact'
-    when:
+    given:
       - 'artifact A is optional: true and artifact B is optional: false and declares requires: [a]'
+    when:
+      - 'SchemaRegistry.resolve() processes the schema'
     then:
       - 'SchemaRegistry.resolve() must throw a SchemaValidationError'
   - requirement: 'Artifact definition'
-    name: 'deltaValidations on non-delta artifact'
+    name: 'Optional artifact requiring optional artifact is valid'
+    given:
+      - 'artifact A is optional: true and artifact B is also optional: true and declares requires: [a]'
     when:
+      - 'SchemaRegistry.resolve() processes the schema'
+    then:
+      - 'SchemaRegistry.resolve() loads successfully'
+  - requirement: 'Artifact definition'
+    name: 'deltaValidations on non-delta artifact'
+    given:
       - 'an artifact declares delta: false and also declares deltaValidations'
+    when:
+      - 'SchemaRegistry.resolve() processes the schema'
     then:
       - 'SchemaRegistry.resolve() must throw a SchemaValidationError'
   - requirement: 'Delta validation rules'
-    name: 'delta on scope:change artifact'
+    name: 'where rule matches correlated entry in delta AST'
+    given:
+      - 'a deltaValidations rule { type: sequence-item, where: { op: "added|modified" }, contentMatches: "#### Scenario:", required: true }'
+      - 'the delta file contains at least one entry with op: added whose content includes "#### Scenario:"'
     when:
-      - 'an artifact declares delta: true and scope: change'
+      - 'ValidateArtifacts evaluates the rule against the normalized delta YAML AST'
     then:
-      - 'SchemaRegistry.resolve() must throw a SchemaValidationError'
+      - 'the rule passes — at least one matching node was found'
+  - requirement: 'Delta validation rules'
+    name: 'where rule fails when no entry matches correlated condition'
+    given:
+      - 'a deltaValidations rule { type: sequence-item, where: { op: "added|modified" }, contentMatches: "#### Scenario:", required: true }'
+      - 'the delta file contains only entries with op: removed'
+    when:
+      - 'ValidateArtifacts evaluates the rule'
+    then:
+      - 'the rule fails — zero nodes matched — and ValidateArtifacts reports a validation failure'
   - requirement: 'Delta validation rules'
     name: 'Rule passes vacuously when no nodes match'
+    given:
+      - 'a deltaValidations rule that matches no nodes in the delta YAML AST'
     when:
-      - 'a deltaValidations rule matches no nodes in the delta YAML AST'
+      - 'ValidateArtifacts evaluates the rule'
     then:
       - 'the rule passes without error regardless of required'
-  - requirement: 'Template resolution'
-    name: 'Template file not found'
+  - requirement: 'Delta validation rules'
+    name: 'Warning on required false with no match'
+    given:
+      - 'a deltaValidations rule with required: false that matches zero nodes in the delta YAML AST'
     when:
-      - 'an artifact declares a template path that does not exist relative to the schema directory'
+      - 'ValidateArtifacts evaluates the rule'
+    then:
+      - 'ValidateArtifacts records a warning, not a failure'
+  - requirement: 'Delta validation rules'
+    name: 'Children constraint checked for each matched node'
+    given:
+      - 'a deltaValidations rule that matches two nodes, and a children constraint that matches zero nodes relative to one of those matched nodes'
+    when:
+      - 'ValidateArtifacts evaluates the rule'
+    then:
+      - 'the failing child check produces a validation failure for that matched node'
+  - requirement: 'Delta validation rules'
+    name: 'delta on scope:change artifact'
+    given:
+      - 'an artifact declares delta: true and scope: change'
+    when:
+      - 'SchemaRegistry.resolve() processes the schema'
     then:
       - 'SchemaRegistry.resolve() must throw a SchemaValidationError'
+  - requirement: 'Delta validation rules'
+    name: 'format inferred from output extension'
+    given:
+      - 'an artifact omits format and its derived output filename ends in .md'
+    when:
+      - 'the artifact is resolved'
+    then:
+      - 'the resolved artifact has format: markdown'
+  - requirement: 'Delta validation rules'
+    name: 'format indeterminate requires explicit declaration'
+    given:
+      - 'an artifact omits format and its derived output filename has an extension not in .md, .json, .yaml, .yml'
+    when:
+      - 'the artifact is resolved'
+    then:
+      - 'the resolved artifact uses format: plaintext'
+  - requirement: 'Template resolution'
+    name: 'Template loaded at resolve time'
+    given:
+      - 'an artifact declares template: templates/proposal.md and the file exists in the schema directory'
+    when:
+      - 'SchemaRegistry.resolve() processes the artifact'
+    then:
+      - 'SchemaRegistry.resolve() returns the artifact with the template content populated'
+  - requirement: 'Template resolution'
+    name: 'Template file not found'
+    given:
+      - 'an artifact declares a template path that does not exist relative to the schema directory'
+    when:
+      - 'SchemaRegistry.resolve() processes the artifact'
+    then:
+      - 'SchemaRegistry.resolve() must throw a SchemaValidationError'
+  - requirement: 'Template resolution'
+    name: 'No template declared'
+    given:
+      - 'an artifact omits template'
+    when:
+      - 'scaffolding is performed'
+    then:
+      - 'no template content is provided for that artifact; scaffolding falls back to an empty file'
   - requirement: 'Validation rules'
     name: 'Required section missing'
-    when:
-      - 'a validations rule { type: section, matches: "^Requirements$", required: true } is evaluated'
+    given:
+      - 'a validations rule { type: section, matches: "^Requirements$", required: true }'
       - 'the artifact has no section whose label matches Requirements'
+    when:
+      - 'ValidateArtifacts evaluates the rule against the normalized artifact AST'
     then:
       - 'ValidateArtifacts reports an error'
+  - requirement: 'Validation rules'
+    name: 'Required section missing — warning'
+    given:
+      - 'a validations rule with required: false that matches no node in the artifact AST'
+    when:
+      - 'ValidateArtifacts evaluates the rule'
+    then:
+      - 'ValidateArtifacts reports a warning, not an error'
+  - requirement: 'Validation rules'
+    name: 'children narrows scope to matched node'
+    given:
+      - 'a validations rule { type: section, matches: "^Requirements$", children: [{ type: section, matches: "^Requirement:" }] }'
+      - 'a Requirement: section exists both inside Requirements and outside it'
+    when:
+      - 'ValidateArtifacts evaluates the rule'
+    then:
+      - 'only the Requirement: section inside Requirements is checked against the child rule; the outer one is not'
+  - requirement: 'Validation rules'
+    name: 'Children constraint fails on one node'
+    given:
+      - 'a validations rule { type: section, matches: "^Requirement:" } with a children constraint { type: section, matches: "^Scenario:", required: true }'
+      - 'one Requirement: section has no Scenario: child'
+    when:
+      - 'ValidateArtifacts evaluates the rule'
+    then:
+      - 'ValidateArtifacts reports an error identifying the offending Requirement'
+  - requirement: 'Validation rules'
+    name: 'contentMatches checked against serialized subtree'
+    given:
+      - 'a validations rule { type: section, matches: "^Requirement:", contentMatches: "SHALL|MUST", required: false }'
+      - 'one Requirement: section whose serialized markdown body contains no SHALL or MUST'
+    when:
+      - 'ValidateArtifacts evaluates the rule'
+    then:
+      - 'ValidateArtifacts records a warning for that section'
+  - requirement: 'Validation rules'
+    name: 'Rule passes vacuously when no nodes match'
+    given:
+      - 'a validations rule with a children constraint, whose top-level identification matches zero nodes in the artifact AST'
+    when:
+      - 'ValidateArtifacts evaluates the rule'
+    then:
+      - 'the rule passes without error — the children constraint is never evaluated'
+  - requirement: 'Per-spec approval'
+    name: 'New spec requires approval'
+    given:
+      - 'a delta creates a new spec via an added operation'
+    when:
+      - 'specd archive is attempted'
+    then:
+      - 'that spec ID must be approved before archiving'
+  - requirement: 'Per-spec approval'
+    name: 'Modified spec requires approval'
+    given:
+      - 'a delta modifies or removes nodes in an existing spec'
+    when:
+      - 'specd archive is attempted'
+    then:
+      - 'that spec ID must be approved before archiving'
+  - requirement: 'Per-spec approval'
+    name: 'All specs approved'
+    given:
+      - 'every spec ID touched by the change has been approved'
+    when:
+      - 'specd archive is attempted'
+    then:
+      - 'specd archive proceeds without an approval error'
   - requirement: 'Per-spec approval'
     name: 'Partially approved'
-    when:
+    given:
       - 'at least one touched spec ID has not been approved'
+    when:
+      - 'specd archive is attempted'
     then:
       - 'specd archive must refuse and report which spec IDs are pending approval'
+  - requirement: 'taskCompletionCheck'
+    name: 'Default patterns detect markdown checkboxes'
+    given:
+      - 'an artifact with no taskCompletionCheck declared'
+      - 'its file contains "- [ ] pending" and "- [x] done"'
+    when:
+      - 'the CLI checks task completion'
+    then:
+      - 'incompletePattern defaults to "^\s*-\s+\[ \]" and matches "- [ ] pending"'
+      - 'completePattern defaults to "^\s*-\s+\[x\]" (case-insensitive) and matches "- [x] done"'
+  - requirement: 'taskCompletionCheck'
+    name: 'Custom patterns override defaults'
+    given:
+      - 'an artifact declares taskCompletionCheck.incompletePattern: "^\s*TODO:" and taskCompletionCheck.completePattern: "^\s*DONE:"'
+      - 'its file contains "TODO: implement login" and "DONE: implement logout"'
+    when:
+      - 'the CLI checks task completion'
+    then:
+      - 'incompletePattern matches "TODO: implement login" and the transition is blocked'
+  - requirement: 'taskCompletionCheck'
+    name: 'All tasks complete — no incomplete matches'
+    given:
+      - 'an artifact file where all checkboxes are checked and none are unchecked'
+    when:
+      - 'the implementing to verifying transition is attempted'
+    then:
+      - 'incompletePattern matches zero lines and the transition is allowed'
+  - requirement: 'preHashCleanup'
+    name: 'Substitution applied before hashing'
+    given:
+      - 'an artifact with preHashCleanup: [{ pattern: "^\s*-\s+\[x\]", replacement: "- [ ]" }]'
+      - 'its file contains "- [x] implement logout"'
+    when:
+      - 'the hash is computed'
+    then:
+      - 'the substitution is applied first and the hash reflects the normalised content'
+  - requirement: 'preHashCleanup'
+    name: 'Checking a task off does not invalidate approval'
+    given:
+      - 'an artifact with preHashCleanup that normalises checked boxes to unchecked'
+      - 'the artifact was approved with some tasks unchecked'
+    when:
+      - 'tasks are marked complete'
+    then:
+      - 'the approval hash still matches'
+  - requirement: 'preHashCleanup'
+    name: 'Multiple substitutions applied in order'
+    given:
+      - 'an artifact with two preHashCleanup entries'
+    when:
+      - 'the hash is computed'
+    then:
+      - 'the first substitution is applied to the full content, then the second is applied to the result of the first'
+  - requirement: 'Context sections'
+    name: 'Section injected'
+    given:
+      - 'an artifact has a contextSections entry and the selector matches a node in the spec'
+    when:
+      - 'CompileContext compiles context for the artifact'
+    then:
+      - 'CompileContext includes the extracted content in the compiled context under the given contextTitle, labelled with the declared role'
+  - requirement: 'Context sections'
+    name: 'contextTitle omitted'
+    given:
+      - 'a contextSections entry has no contextTitle'
+    when:
+      - 'CompileContext compiles context for the artifact'
+    then:
+      - 'CompileContext uses the matched node label as the context section title'
+  - requirement: 'Context sections'
+    name: 'Section not present in spec'
+    given:
+      - 'the selector matches no node in the spec'
+    when:
+      - 'CompileContext compiles context for the artifact'
+    then:
+      - 'CompileContext skips that entry without error'
+  - requirement: 'Context sections'
+    name: 'extract label only'
+    given:
+      - 'a contextSections entry declares extract: label'
+    when:
+      - 'CompileContext compiles context for the artifact'
+    then:
+      - 'CompileContext injects only the matched node identifying value, not its subtree content'
+  - requirement: 'Context sections'
+    name: 'extract both'
+    given:
+      - 'a contextSections entry declares extract: both and the selector matches multiple nodes'
+    when:
+      - 'CompileContext compiles context for the artifact'
+    then:
+      - 'CompileContext injects the label followed by the serialized content for each matched node separately'
+  - requirement: 'Artifact scope'
+    name: 'Missing non-optional artifact in change'
+    given:
+      - 'a change is missing an artifact with optional: false'
+    when:
+      - 'ValidateArtifacts evaluates the change'
+    then:
+      - 'ValidateArtifacts must report a validation error'
+  - requirement: 'Artifact scope'
+    name: 'Optional artifact absent from change'
+    given:
+      - 'a change is missing an artifact with optional: true'
+    when:
+      - 'ValidateArtifacts evaluates the change'
+    then:
+      - 'ValidateArtifacts does not report a validation error for that artifact'
   - requirement: 'Artifact scope'
     name: 'Missing scope:spec artifact file in spec directory'
-    when:
+    given:
       - 'a spec directory at specs/<name>/ is missing a file for a non-optional scope: spec artifact'
+    when:
+      - 'specd validate is run'
     then:
       - 'specd validate must report that spec as incomplete'
+  - requirement: 'Artifact scope'
+    name: 'scope:change artifact not present in spec directory'
+    given:
+      - 'a scope: change artifact is present in the change'
+    when:
+      - 'the change is archived'
+    then:
+      - 'it is validated but never synced to the spec directory'
   - requirement: 'Workflow'
     name: 'Pre hook failure aborts step'
+    given:
+      - 'a pre run: hook for a step'
     when:
-      - 'a pre run: hook exits with a non-zero code'
+      - 'the hook exits with a non-zero code'
     then:
       - 'the step is aborted, the user is informed, and the agent offers to fix the problem before retrying'
   - requirement: 'Workflow'
-    name: 'requires in specd.yaml workflow entry rejected'
+    name: 'Post hook failure prompts user'
+    given:
+      - 'a post run: hook for a step'
     when:
+      - 'the hook exits with a non-zero code'
+    then:
+      - 'the user is prompted to continue or stop; the completed step is not rolled back'
+  - requirement: 'Workflow'
+    name: 'Step with unsatisfied prerequisites'
+    given:
+      - 'a step whose requires lists an artifact that is not complete'
+    when:
+      - 'CompileContext processes the step'
+    then:
+      - 'CompileContext must report that the step is blocked'
+  - requirement: 'Workflow'
+    name: 'Schema and project hooks merged'
+    given:
+      - 'both the schema and specd.yaml define workflow entries for the same step'
+    when:
+      - 'hooks are executed for that step'
+    then:
+      - 'schema hooks fire first, followed by project hooks, within the same pre/post event'
+  - requirement: 'Workflow'
+    name: 'requires in specd.yaml workflow entry rejected'
+    given:
       - 'a specd.yaml workflow entry includes a requires field'
+    when:
+      - 'the config loader processes the entry'
     then:
       - 'the config loader must reject it with a validation error'
+  - requirement: 'Project-level artifactRules'
+    name: 'Rules injected into compiled context'
+    given:
+      - 'specd.yaml defines artifactRules for artifact specs'
+    when:
+      - 'CompileContext compiles context for the specs artifact'
+    then:
+      - 'CompileContext includes those rules in the compiled instruction block for the specs artifact'
+  - requirement: 'Project-level artifactRules'
+    name: 'Unknown artifact ID in artifactRules'
+    given:
+      - 'specd.yaml defines artifactRules for an artifact ID not present in the active schema'
+    when:
+      - 'SchemaRegistry loads the config'
+    then:
+      - 'SchemaRegistry emits a warning at load time and ignores those rules'
+  - requirement: 'Schema resolution'
+    name: 'npm package resolved'
+    given:
+      - 'schema: "@specd/schema-std" is declared'
+    when:
+      - 'SchemaRegistry.resolve() processes the ref'
+    then:
+      - 'SchemaRegistry.resolve() loads node_modules/@specd/schema-std/schema.yaml'
+  - requirement: 'Schema resolution'
+    name: 'Bare name resolved from default workspace'
+    given:
+      - 'schema: "spec-driven" is declared and workspaces.default.schemas.fs.path is specd/schemas'
+    when:
+      - 'SchemaRegistry.resolve() processes the ref'
+    then:
+      - 'SchemaRegistry.resolve() loads specd/schemas/spec-driven/schema.yaml'
+  - requirement: 'Schema resolution'
+    name: 'Direct path resolved'
+    given:
+      - 'schema: "./custom/schema.yaml" is declared'
+    when:
+      - 'SchemaRegistry.resolve() processes the ref'
+    then:
+      - 'SchemaRegistry.resolve() loads that file relative to the specd.yaml directory'
   - requirement: 'Schema resolution'
     name: 'Schema not found'
-    when:
+    given:
       - 'the resolved path does not exist on disk'
+    when:
+      - 'SchemaRegistry.resolve() processes the ref'
     then:
       - 'SchemaRegistry.resolve() returns null'
   - requirement: 'Schema validation on load'
-    name: 'Duplicate artifact ID'
+    name: 'Unknown field ignored'
+    given:
+      - 'a schema file includes a top-level field not in the current spec'
     when:
+      - 'SchemaRegistry.resolve() processes the schema'
+    then:
+      - 'the schema loads successfully and the unknown field is ignored'
+  - requirement: 'Schema validation on load'
+    name: 'Duplicate artifact ID'
+    given:
       - 'a schema file declares two artifacts with the same id'
+    when:
+      - 'SchemaRegistry.resolve() processes the schema'
     then:
       - 'SchemaRegistry.resolve() must throw a SchemaValidationError'
   - requirement: 'Schema validation on load'
-    name: 'Unknown field ignored'
+    name: 'Duplicate workflow step'
+    given:
+      - 'the workflow array contains two entries with the same step name'
     when:
-      - 'a schema file includes a top-level field not in the current spec'
+      - 'SchemaRegistry.resolve() processes the schema'
     then:
-      - 'the schema loads successfully and the unknown field is ignored'
+      - 'SchemaRegistry.resolve() must throw a SchemaValidationError'
+  - requirement: 'Schema validation on load'
+    name: 'Unknown artifact ID in requires'
+    given:
+      - 'an artifact declares requires: [unknown-id]'
+    when:
+      - 'SchemaRegistry.resolve() processes the schema'
+    then:
+      - 'SchemaRegistry.resolve() must throw a SchemaValidationError'
   - requirement: 'verify.md format'
     name: 'verify.md compiled with spec.md'
+    given:
+      - 'a spec that has both spec and verify artifacts with scope: spec'
     when:
-      - 'specd compiles context for a spec that has both spec and verify artifacts with scope: spec'
+      - 'specd compiles context for the spec'
     then:
       - 'both spec.md and verify.md are read and included together in the LLM context'
