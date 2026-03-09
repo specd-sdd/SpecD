@@ -250,25 +250,13 @@ export class FsArchiveRepository extends ArchiveRepository {
    * @returns The archived change, or `null` if not found anywhere in the archive
    */
   override async get(name: string): Promise<ArchivedChange | null> {
-    const lines = await this._readIndexLines()
-
-    for (let i = lines.length - 1; i >= 0; i--) {
-      try {
-        const line = lines[i]
-        if (line === undefined) continue
-        const entry = JSON.parse(line) as IndexEntry
-        if (entry.name !== name) continue
-
-        const archiveDir = path.join(this._archivePath, ...entry.path.split('/'))
-        const manifest = await this._loadManifest(archiveDir)
-        const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
-        const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
-        return this._buildArchivedChange(manifest, archivedName, archivedAt)
-      } catch (err) {
-        if (err instanceof SyntaxError || isEnoent(err) || err instanceof CorruptedManifestError)
-          continue
-        throw err
-      }
+    const entry = await this._findInIndexReverse(name)
+    if (entry !== null) {
+      const archiveDir = path.join(this._archivePath, ...entry.path.split('/'))
+      const manifest = await this._loadManifest(archiveDir)
+      const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
+      const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
+      return this._buildArchivedChange(manifest, archivedName, archivedAt)
     }
 
     // Fallback: scan directory tree
@@ -557,6 +545,73 @@ export class FsArchiveRepository extends ArchiveRepository {
       throw err
     }
     return content.split('\n').filter((l) => l.trim().length > 0)
+  }
+
+  /**
+   * Scans `index.jsonl` from the end without loading the full file into memory.
+   *
+   * Reads the file in reverse chunks, parsing lines from newest to oldest.
+   * Returns the first {@link IndexEntry} whose `name` matches, or `null`.
+   *
+   * @param name - The change slug name to search for
+   * @returns The matching index entry, or `null` if not found
+   */
+  private async _findInIndexReverse(name: string): Promise<IndexEntry | null> {
+    const indexPath = path.join(this._archivePath, INDEX_FILE)
+    let fh: fs.FileHandle
+    try {
+      fh = await fs.open(indexPath, 'r')
+    } catch (err) {
+      if (isEnoent(err)) return null
+      throw err
+    }
+
+    try {
+      const { size } = await fh.stat()
+      if (size === 0) return null
+
+      const chunkSize = 4096
+      let offset = size
+      let trailing = '' // leftover bytes from the previous chunk (incomplete line at chunk start)
+
+      while (offset > 0) {
+        const readSize = Math.min(chunkSize, offset)
+        offset -= readSize
+        const buf = Buffer.alloc(readSize)
+        await fh.read(buf, 0, readSize, offset)
+        const chunk = buf.toString('utf8') + trailing
+
+        const lines = chunk.split('\n')
+        // First element may be a partial line (split at chunk boundary) — carry it forward
+        trailing = lines[0] ?? ''
+
+        // Process complete lines from end to start (skip index 0 which is the partial)
+        for (let i = lines.length - 1; i >= 1; i--) {
+          const line = lines[i]!.trim()
+          if (line.length === 0) continue
+          try {
+            const entry = JSON.parse(line) as IndexEntry
+            if (entry.name === name) return entry
+          } catch {
+            // Skip malformed JSON lines
+          }
+        }
+      }
+
+      // Process the final trailing fragment (first line of the file)
+      if (trailing.trim().length > 0) {
+        try {
+          const entry = JSON.parse(trailing) as IndexEntry
+          if (entry.name === name) return entry
+        } catch {
+          // Skip malformed JSON
+        }
+      }
+
+      return null
+    } finally {
+      await fh.close()
+    }
   }
 
   /**
