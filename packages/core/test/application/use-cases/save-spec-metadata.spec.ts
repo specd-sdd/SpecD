@@ -5,6 +5,9 @@ import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { makeSpecRepository } from './helpers.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 
+const VALID_HASH = 'sha256:' + 'a'.repeat(64)
+const VALID_BASE = `title: 'Auth Login'\ndescription: 'Handles login'\ncontentHashes:\n  spec.md: '${VALID_HASH}'\n`
+
 function makeUseCase(specs: Spec[] = []) {
   const repo = makeSpecRepository({ specs })
   const uc = new SaveSpecMetadata(new Map([['default', repo]]))
@@ -17,28 +20,45 @@ const spec = new Spec('default', specPath, ['spec.md'])
 describe('SaveSpecMetadata — write-time validation', () => {
   it('accepts valid metadata', async () => {
     const { uc } = makeUseCase([spec])
-    const content = `title: 'Auth Login'\nkeywords:\n  - 'auth'\n`
+    const content = VALID_BASE + "keywords:\n  - 'auth'\n"
     const result = await uc.execute({ workspace: 'default', specPath, content, force: true })
     expect(result).not.toBeNull()
     expect(result!.spec).toBe('default:auth/login')
   })
 
-  it('accepts empty metadata', async () => {
+  it('rejects empty content', async () => {
     const { uc } = makeUseCase([spec])
-    const result = await uc.execute({ workspace: 'default', specPath, content: '', force: true })
-    expect(result).not.toBeNull()
+    await expect(
+      uc.execute({ workspace: 'default', specPath, content: '', force: true }),
+    ).rejects.toThrow(MetadataValidationError)
+  })
+
+  it('rejects content missing title', async () => {
+    const { uc } = makeUseCase([spec])
+    const content = "description: 'Some description'\n"
+    await expect(
+      uc.execute({ workspace: 'default', specPath, content, force: true }),
+    ).rejects.toThrow(MetadataValidationError)
+  })
+
+  it('rejects content missing description', async () => {
+    const { uc } = makeUseCase([spec])
+    const content = "title: 'Test'\n"
+    await expect(
+      uc.execute({ workspace: 'default', specPath, content, force: true }),
+    ).rejects.toThrow(MetadataValidationError)
   })
 
   it('accepts unknown top-level keys', async () => {
     const { uc } = makeUseCase([spec])
-    const content = `customField: 'value'\ntitle: 'Test'\n`
+    const content = VALID_BASE + "customField: 'value'\n"
     const result = await uc.execute({ workspace: 'default', specPath, content, force: true })
     expect(result).not.toBeNull()
   })
 
   it('rejects non-lowercase keywords', async () => {
     const { uc } = makeUseCase([spec])
-    const content = `keywords:\n  - 'Valid'\n`
+    const content = VALID_BASE + "keywords:\n  - 'Valid'\n"
     await expect(
       uc.execute({ workspace: 'default', specPath, content, force: true }),
     ).rejects.toThrow(MetadataValidationError)
@@ -46,7 +66,7 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('rejects invalid spec ID in dependsOn', async () => {
     const { uc } = makeUseCase([spec])
-    const content = `dependsOn:\n  - 'not a valid id!'\n`
+    const content = VALID_BASE + "dependsOn:\n  - 'not a valid id!'\n"
     await expect(
       uc.execute({ workspace: 'default', specPath, content, force: true }),
     ).rejects.toThrow(MetadataValidationError)
@@ -54,7 +74,8 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('rejects invalid contentHashes format', async () => {
     const { uc } = makeUseCase([spec])
-    const content = `contentHashes:\n  spec.md: 'md5:abc'\n`
+    const content =
+      "title: 'Auth Login'\ndescription: 'Handles login'\ncontentHashes:\n  spec.md: 'md5:abc'\n"
     await expect(
       uc.execute({ workspace: 'default', specPath, content, force: true }),
     ).rejects.toThrow(MetadataValidationError)
@@ -62,7 +83,7 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('rejects rules with empty rules array', async () => {
     const { uc } = makeUseCase([spec])
-    const content = `rules:\n  - requirement: 'Name'\n    rules: []\n`
+    const content = VALID_BASE + "rules:\n  - requirement: 'Name'\n    rules: []\n"
     await expect(
       uc.execute({ workspace: 'default', specPath, content, force: true }),
     ).rejects.toThrow(MetadataValidationError)
@@ -70,7 +91,7 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('rejects scenarios missing when and then', async () => {
     const { uc } = makeUseCase([spec])
-    const content = `scenarios:\n  - requirement: 'X'\n    name: 'Y'\n`
+    const content = VALID_BASE + "scenarios:\n  - requirement: 'X'\n    name: 'Y'\n"
     await expect(
       uc.execute({ workspace: 'default', specPath, content, force: true }),
     ).rejects.toThrow(MetadataValidationError)
@@ -78,7 +99,7 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('includes validation issues in error message', async () => {
     const { uc } = makeUseCase([spec])
-    const content = `keywords:\n  - 123\n`
+    const content = 'keywords:\n  - 123\n'
     try {
       await uc.execute({ workspace: 'default', specPath, content, force: true })
       expect.fail('should have thrown')
@@ -90,8 +111,12 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('returns null for unknown workspace (validation passes first)', async () => {
     const { uc } = makeUseCase([spec])
-    const content = `title: 'Test'\n`
-    const result = await uc.execute({ workspace: 'unknown', specPath, content, force: true })
+    const result = await uc.execute({
+      workspace: 'unknown',
+      specPath,
+      content: VALID_BASE,
+      force: true,
+    })
     expect(result).toBeNull()
   })
 })

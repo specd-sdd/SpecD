@@ -52,7 +52,10 @@ export class SaveSpecMetadata {
   async execute(input: SaveSpecMetadataInput): Promise<SaveSpecMetadataResult | null> {
     // Validate content against the strict schema before doing anything else
     const parsed = parseYaml(input.content) as unknown
-    const validation = strictSpecMetadataSchema.safeParse(parsed ?? {})
+    if (parsed === null || parsed === undefined || typeof parsed !== 'object') {
+      throw new MetadataValidationError('content must be a YAML mapping')
+    }
+    const validation = strictSpecMetadataSchema.safeParse(parsed)
     if (!validation.success) {
       const issues = validation.error.issues
         .map((i) => `${i.path.join('.')}: ${i.message}`)
