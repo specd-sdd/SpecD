@@ -1,122 +1,121 @@
 title: 'Spec ID Format'
 description: >
-  A spec ID is the canonical string that identifies a spec within a specd project. Every spec belongs to exactly one workspace and has a capability path within that workspace. This spec defines the canonical format, parsing rules, and storage conventions for spec IDs to eliminate ambiguity between workspace prefixes and capability path segments.
+  Defines the canonical string format for identifying specs within a specd project.
+  A spec ID uses the format workspace:capabilityPath, with colon as the sole separator
+  between workspace and capability path. Covers parsing rules, bare path shorthand,
+  unknown workspace rejection, and normalization at system boundaries.
 keywords:
-  - 'core'
-  - 'spec-id-format'
-  - 'canonical'
-  - 'format'
-  - 'bare'
-  - 'path'
-  - 'shorthand'
-  - 'unknown'
-  - 'workspace'
-  - 'rejection'
+  - 'spec-id'
   - 'parsing'
-  - 'rules'
+  - 'workspace'
+  - 'capability-path'
+  - 'normalization'
+dependsOn:
+  - 'core:core/change'
+  - 'core:core/change-manifest'
+  - 'core:core/spec-metadata'
+  - 'core:core/compile-context'
+  - 'core:core/workspace'
 contentHashes:
   'spec.md': 'sha256:4017d4913a83c0b0d3c05d8b7db8e0c10f890b7358791d23b8d8efbb2e6d22e4'
   'verify.md': 'sha256:adf59befa729ab466749d249ff8fb8537ff444283a19642494d7c5676858d6e7'
 rules:
   - requirement: 'Canonical format'
     rules:
-      - 'The canonical spec ID format SHALL be workspace:capabilityPath, where:'
-      - 'workspace is the workspace name (e.g. default, billing)'
-      - 'capabilityPath is the slash-separated path to the spec within the workspace (e.g. auth/login, _global/architecture)'
-      - 'The workspace and capability path are separated by : (colon). All / characters belong to the capability path.'
-      - 'This format is used everywhere: internal storage (change.specIds, manifest), domain-layer references, CLI input, metadata dependsOn, and user-facing output. There is a single format — no internal vs external distinction.'
+      - 'The canonical spec ID format SHALL be workspace:capabilityPath, where workspace is the workspace name and capabilityPath is the slash-separated path to the spec within the workspace.'
+      - 'The workspace and capability path are separated by colon. All slash characters belong to the capability path.'
+      - 'This format is used everywhere including internal storage (change.specIds, manifest), domain-layer references, CLI input, metadata dependsOn, and user-facing output. There is no internal vs external distinction.'
   - requirement: 'Bare path shorthand'
     rules:
-      - 'When no : is present, the spec ID SHALL be interpreted as a capability path in the default workspace.'
-      - 'For example, auth/login with no colon resolves to workspace default, capability path auth/login. Its fully-qualified form is default:auth/login.'
+      - 'When no colon is present in a spec ID string, it SHALL be interpreted as a capability path in the default workspace.'
+      - 'For example, auth/login with no colon resolves to workspace default with capability path auth/login, fully-qualified as default:auth/login.'
   - requirement: 'Unknown workspace rejection'
     rules:
       - 'When a colon-qualified spec ID specifies a workspace name that does not exist in the project configuration, the parser SHALL reject the input with an error.'
   - requirement: 'Parsing rules'
     rules:
-      - 'Parsing a spec ID string SHALL follow these steps:'
-      - 'Find the first : in the string.'
-      - 'If found: everything before : is the workspace, everything after is the capability path. Validate the workspace exists.'
-      - 'If not found: workspace is default, the entire string is the capability path.'
-      - 'There is no slash-based workspace detection. The / character is never used as a workspace separator.'
+      - 'Parsing SHALL find the first colon in the string. If found, everything before the colon is the workspace and everything after is the capability path, then validate the workspace exists.'
+      - 'If no colon is found, workspace is default and the entire string is the capability path.'
+      - 'There is no slash-based workspace detection. The slash character is never used as a workspace separator.'
   - requirement: 'Normalization'
     rules:
-      - 'Functions that accept spec IDs SHOULD normalize bare paths to fully-qualified form (default:capPath) at the system boundary. Domain-layer code MAY assume spec IDs are already qualified.'
+      - 'Functions that accept spec IDs SHOULD normalize bare paths to fully-qualified form (default:capPath) at the system boundary.'
+      - 'Domain-layer code MAY assume spec IDs are already qualified.'
 constraints:
-  - 'Workspace names MUST NOT contain / or : characters'
-  - 'Capability paths MUST NOT contain : characters'
-  - 'The separator is always : (colon) — / is never a workspace separator'
-  - 'The default workspace is implicit when no colon is present'
+  - 'Workspace names MUST NOT contain slash or colon characters.'
+  - 'Capability paths MUST NOT contain colon characters.'
+  - 'The separator is always colon. Slash is never a workspace separator.'
+  - 'The default workspace is implicit when no colon is present.'
 scenarios:
   - requirement: 'Canonical format'
     name: 'Simple spec ID with default workspace'
     when:
-      - 'parsing default:auth/login'
+      - 'Parsing default:auth/login'
     then:
-      - 'workspace is default and capability path is auth/login'
+      - 'Workspace is default and capability path is auth/login'
   - requirement: 'Canonical format'
     name: 'Non-default workspace'
     when:
-      - 'parsing billing:invoices/create'
+      - 'Parsing billing:invoices/create'
     then:
-      - 'workspace is billing and capability path is invoices/create'
+      - 'Workspace is billing and capability path is invoices/create'
   - requirement: 'Canonical format'
     name: 'Multi-segment capability path'
     when:
-      - 'parsing default:common/conventions'
+      - 'Parsing default:common/conventions'
     then:
-      - 'workspace is default and capability path is common/conventions'
+      - 'Workspace is default and capability path is common/conventions'
   - requirement: 'Bare path shorthand'
     name: 'Bare path defaults to default workspace'
     when:
-      - 'parsing auth/login (no colon present)'
+      - 'Parsing auth/login with no colon present'
     then:
-      - 'workspace is default and capability path is auth/login'
+      - 'Workspace is default and capability path is auth/login'
   - requirement: 'Bare path shorthand'
     name: 'Single-segment bare path'
     when:
-      - 'parsing architecture (no colon, no slash)'
+      - 'Parsing architecture with no colon and no slash'
     then:
-      - 'workspace is default and capability path is architecture'
+      - 'Workspace is default and capability path is architecture'
   - requirement: 'Unknown workspace rejection'
     name: 'Colon syntax with unknown workspace'
     given:
       - 'nonexistent is not a configured workspace'
     when:
-      - 'parsing nonexistent:auth/login'
+      - 'Parsing nonexistent:auth/login'
     then:
-      - 'an error is raised indicating the workspace is unknown'
+      - 'An error is raised indicating the workspace is unknown'
   - requirement: 'Parsing rules'
     name: 'Colon takes precedence over slash'
     given:
       - 'billing is a configured workspace'
     when:
-      - 'parsing billing:auth/login'
+      - 'Parsing billing:auth/login'
     then:
-      - 'workspace is billing and capability path is auth/login'
-      - 'the / in auth/login is never interpreted as a workspace separator'
+      - 'Workspace is billing and capability path is auth/login'
+      - 'The slash in auth/login is never interpreted as a workspace separator'
   - requirement: 'Parsing rules'
     name: 'Slash is never a workspace separator'
     given:
       - 'billing is a configured workspace'
     when:
-      - 'parsing billing/auth/login (no colon)'
+      - 'Parsing billing/auth/login with no colon'
     then:
-      - 'workspace is default and capability path is billing/auth/login'
+      - 'Workspace is default and capability path is billing/auth/login'
   - requirement: 'contextSpecIds format'
     name: 'contextSpecIds use canonical format'
     given:
-      - "a spec at default:auth/login with dependsOn: ['auth/session']"
+      - 'A spec at default:auth/login with dependsOn containing auth/session'
     when:
-      - 'context spec IDs are resolved'
+      - 'Context spec IDs are resolved'
     then:
       - 'contextSpecIds contains default:auth/session in fully-qualified format'
   - requirement: 'contextSpecIds format'
     name: 'Cross-workspace contextSpecIds'
     given:
-      - "a spec at billing:invoices/create with dependsOn: ['billing:invoices/shared']"
+      - 'A spec at billing:invoices/create with dependsOn containing billing:invoices/shared'
     when:
-      - 'context spec IDs are resolved'
+      - 'Context spec IDs are resolved'
     then:
       - 'contextSpecIds contains billing:invoices/shared and traversal uses workspace billing'
   - requirement: 'Normalization'
@@ -124,4 +123,4 @@ scenarios:
     when:
       - 'auth/login enters the system boundary'
     then:
-      - 'it is normalized to default:auth/login before reaching the domain layer'
+      - 'It is normalized to default:auth/login before reaching the domain layer'
