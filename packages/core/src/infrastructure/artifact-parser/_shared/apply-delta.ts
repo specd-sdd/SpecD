@@ -7,6 +7,21 @@ import {
 import { type Selector } from '../../../domain/value-objects/selector.js'
 
 /**
+ * Returns `true` if two number arrays are element-wise equal.
+ *
+ * @param a - First array
+ * @param b - Second array
+ * @returns Whether the arrays have the same length and identical elements
+ */
+function pathsEqual(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
+/**
  * Returns `true` if `pattern` is safe to compile as a `RegExp`.
  *
  * Rejects patterns longer than 500 characters and patterns containing nested
@@ -460,7 +475,7 @@ export function applyDelta(
           if (other.entry === entry) continue
           if (other.entry.op !== 'modified' || other.entry.rename === undefined) continue
           const otherParentPath = other.path.slice(0, -1)
-          const sameScope = JSON.stringify(otherParentPath) === JSON.stringify(parentPath)
+          const sameScope = pathsEqual(otherParentPath, parentPath)
           if (sameScope && other.entry.rename === entry.rename) {
             throw new DeltaApplicationError(
               `Two modified entries rename to the same target "${entry.rename}" within the same scope`,
@@ -486,7 +501,7 @@ export function applyDelta(
     for (let j = i + 1; j < resolvedModifiedRemoved.length; j++) {
       const a = resolvedModifiedRemoved[i]!
       const b = resolvedModifiedRemoved[j]!
-      if (JSON.stringify(a.path) === JSON.stringify(b.path)) {
+      if (pathsEqual(a.path, b.path)) {
         throw new DeltaApplicationError(
           `Two delta entries resolve to the same node at path ${JSON.stringify(a.path)}`,
         )
