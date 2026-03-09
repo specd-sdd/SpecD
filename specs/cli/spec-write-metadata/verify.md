@@ -35,6 +35,14 @@
 - **WHEN** the write succeeds and format is `json`
 - **THEN** the command outputs `{ "result": "ok", "spec": "default:auth/login" }`
 
+### Requirement: Error — invalid metadata structure
+
+#### Scenario: Structurally invalid metadata exits 1
+
+- **GIVEN** valid YAML content with `keywords: [123]` (invalid type)
+- **WHEN** `specd spec write-metadata auth/login --input /tmp/bad.yaml` is invoked
+- **THEN** the command writes `error: Metadata validation failed: ...` to stderr and exits with code 1
+
 ### Requirement: Error — spec not found
 
 #### Scenario: Unknown spec exits 1
