@@ -19,6 +19,7 @@ import { type SkipArtifact } from '../application/use-cases/skip-artifact.js'
 import { type ListSpecs } from '../application/use-cases/list-specs.js'
 import { type GetSpec } from '../application/use-cases/get-spec.js'
 import { type SaveSpecMetadata } from '../application/use-cases/save-spec-metadata.js'
+import { type InvalidateSpecMetadata } from '../application/use-cases/invalidate-spec-metadata.js'
 import { type GetActiveSchema } from '../application/use-cases/get-active-schema.js'
 import { type InitProject } from '../application/use-cases/init-project.js'
 import { type RecordSkillInstall } from '../application/use-cases/record-skill-install.js'
@@ -49,6 +50,7 @@ import { createSkipArtifact } from './use-cases/skip-artifact.js'
 import { createListSpecs } from './use-cases/list-specs.js'
 import { createGetSpec } from './use-cases/get-spec.js'
 import { createSaveSpecMetadata } from './use-cases/save-spec-metadata.js'
+import { createInvalidateSpecMetadata } from './use-cases/invalidate-spec-metadata.js'
 import { createGetActiveSchema } from './use-cases/get-active-schema.js'
 import { createInitProject } from './use-cases/init-project.js'
 import { createRecordSkillInstall } from './use-cases/record-skill-install.js'
@@ -114,6 +116,8 @@ export interface Kernel {
     get: GetSpec
     /** Writes a `.specd-metadata.yaml` file for a spec. */
     saveMetadata: SaveSpecMetadata
+    /** Invalidates a spec's metadata by removing its contentHashes. */
+    invalidateMetadata: InvalidateSpecMetadata
     /** Resolves and returns the active schema for the project. */
     getActiveSchema: GetActiveSchema
     /** Validates spec artifacts against the active schema's structural rules. */
@@ -187,6 +191,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       list: createListSpecs(config),
       get: createGetSpec(config),
       saveMetadata: createSaveSpecMetadata(config),
+      invalidateMetadata: createInvalidateSpecMetadata(config),
       getActiveSchema: createGetActiveSchema(config, schemaOpts),
       validate: createValidateSpecs(config, schemaOpts),
       inferSections: createInferSpecSections(config, schemaOpts),

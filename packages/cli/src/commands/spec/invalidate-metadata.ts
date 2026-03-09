@@ -1,0 +1,47 @@
+import { type Command } from 'commander'
+import { SpecPath } from '@specd/core'
+import { createCliKernel } from '../../kernel.js'
+import { loadConfig } from '../../load-config.js'
+import { output, parseFormat } from '../../formatter.js'
+import { handleError } from '../../handle-error.js'
+import { parseSpecId } from '../../helpers/spec-path.js'
+
+/**
+ * Registers the `spec invalidate-metadata` subcommand on the given parent command.
+ *
+ * @param parent - The parent Commander command to attach the subcommand to.
+ */
+export function registerSpecInvalidateMetadata(parent: Command): void {
+  parent
+    .command('invalidate-metadata <specPath>')
+    .description('Invalidate .specd-metadata.yaml by removing contentHashes (marks as stale)')
+    .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .option('--config <path>', 'path to specd.yaml')
+    .action(async (specPath: string, opts: { format: string; config?: string }) => {
+      try {
+        const config = await loadConfig({ configPath: opts.config })
+        const kernel = createCliKernel(config)
+        const parsed = parseSpecId(specPath, config)
+
+        const result = await kernel.specs.invalidateMetadata.execute({
+          workspace: parsed.workspace,
+          specPath: SpecPath.parse(parsed.capabilityPath),
+        })
+
+        if (result === null) {
+          process.stderr.write(`error: spec '${specPath}' not found or has no metadata\n`)
+          process.exit(1)
+          return
+        }
+
+        const fmt = parseFormat(opts.format)
+        if (fmt === 'text') {
+          output(`invalidated .specd-metadata.yaml for ${result.spec}`, 'text')
+        } else {
+          output({ result: 'ok', spec: result.spec }, fmt)
+        }
+      } catch (err) {
+        handleError(err)
+      }
+    })
+}
