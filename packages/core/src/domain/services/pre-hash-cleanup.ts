@@ -1,4 +1,5 @@
 import { type PreHashCleanup } from '../value-objects/validation-rule.js'
+import { safeRegex } from './safe-regex.js'
 
 /**
  * Applies pre-hash cleanup substitutions to artifact content.
@@ -15,7 +16,10 @@ import { type PreHashCleanup } from '../value-objects/validation-rule.js'
 export function applyPreHashCleanup(content: string, cleanups: readonly PreHashCleanup[]): string {
   let result = content
   for (const cleanup of cleanups) {
-    result = result.replace(new RegExp(cleanup.pattern, 'g'), cleanup.replacement)
+    const re = safeRegex(cleanup.pattern, 'g')
+    if (re !== null) {
+      result = result.replace(re, cleanup.replacement)
+    }
   }
   return result
 }
