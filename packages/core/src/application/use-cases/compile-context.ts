@@ -6,23 +6,22 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
 import { type FileReader } from '../ports/file-reader.js'
-import {
-  type ArtifactParserRegistry,
-  type ArtifactNode,
-  type ArtifactAST,
-  type OutlineEntry,
-} from '../ports/artifact-parser.js'
+import { type ArtifactParserRegistry, type OutlineEntry } from '../ports/artifact-parser.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type WorkflowStep } from '../../domain/value-objects/workflow-step.js'
-import { type Selector } from '../../domain/value-objects/selector.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
-import { safeRegex } from '../../domain/services/safe-regex.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
 import { type WorkspaceContext } from '../ports/workspace-context.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
+import { type ContextWarning } from './_shared/context-warning.js'
+import { findNodes } from './_shared/selector-matching.js'
+import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
+import { traverseDependsOn } from './_shared/depends-on-traversal.js'
+
+export { type ContextWarning } from './_shared/context-warning.js'
 
 /** A single entry in the project-level `context:` list. */
 export type ContextEntry = { instruction: string } | { file: string }
@@ -89,22 +88,6 @@ export interface CompileContextInput extends WorkspaceContext {
   readonly sections?: ReadonlyArray<SpecSection>
 }
 
-/** Advisory warning emitted during context compilation. */
-export interface ContextWarning {
-  /** The warning category. */
-  readonly type:
-    | 'stale-metadata'
-    | 'missing-spec'
-    | 'unknown-workspace'
-    | 'missing-file'
-    | 'cycle'
-    | 'missing-parser'
-  /** The affected spec path, workspace name, or file path. */
-  readonly path?: string
-  /** Human-readable description of the warning. */
-  readonly message: string
-}
-
 /** Result returned by a successful {@link CompileContext} execution. */
 export interface CompileContextResult {
   /** Whether the requested step is currently available. */
@@ -115,12 +98,6 @@ export interface CompileContextResult {
   readonly instructionBlock: string
   /** Stale metadata warnings and other advisory conditions. */
   readonly warnings: ContextWarning[]
-}
-
-/** Internal resolved spec reference. */
-interface ResolvedSpec {
-  readonly workspace: string
-  readonly capPath: string
 }
 
 /**
@@ -186,7 +163,7 @@ export class CompileContext {
 
     // Step 1: Project-level include patterns (all workspaces, bare * = all)
     for (const pattern of input.config.contextIncludeSpecs ?? []) {
-      const matches = await this._listMatchingSpecs(pattern, 'default', true, warnings)
+      const matches = await listMatchingSpecs(pattern, 'default', true, this._specs, warnings)
       for (const spec of matches) {
         const key = `${spec.workspace}:${spec.capPath}`
         if (!includedSpecs.has(key)) includedSpecs.set(key, spec)
@@ -196,7 +173,7 @@ export class CompileContext {
     // Step 2: Project-level exclude patterns
     const projectExcludedKeys = new Set<string>()
     for (const pattern of input.config.contextExcludeSpecs ?? []) {
-      const matches = await this._listMatchingSpecs(pattern, 'default', true, warnings)
+      const matches = await listMatchingSpecs(pattern, 'default', true, this._specs, warnings)
       for (const spec of matches) {
         projectExcludedKeys.add(`${spec.workspace}:${spec.capPath}`)
       }
@@ -212,7 +189,7 @@ export class CompileContext {
       if (!activeWorkspaces.has(wsName)) continue
       for (const pattern of wsConfig.contextIncludeSpecs ?? []) {
         // At workspace level, unqualified path = that workspace; bare * = just that workspace
-        const matches = await this._listMatchingSpecs(pattern, wsName, false, warnings)
+        const matches = await listMatchingSpecs(pattern, wsName, false, this._specs, warnings)
         for (const spec of matches) {
           const key = `${spec.workspace}:${spec.capPath}`
           if (!includedSpecs.has(key)) includedSpecs.set(key, spec)
@@ -224,7 +201,7 @@ export class CompileContext {
     for (const [wsName, wsConfig] of Object.entries(input.config.workspaces ?? {})) {
       if (!activeWorkspaces.has(wsName)) continue
       for (const pattern of wsConfig.contextExcludeSpecs ?? []) {
-        const matches = await this._listMatchingSpecs(pattern, wsName, false, warnings)
+        const matches = await listMatchingSpecs(pattern, wsName, false, this._specs, warnings)
         for (const spec of matches) {
           includedSpecs.delete(`${spec.workspace}:${spec.capPath}`)
         }
@@ -237,13 +214,14 @@ export class CompileContext {
       const depSeen = new Set<string>()
       for (const ctxSpecId of change.contextSpecIds) {
         const { workspace: ctxWs, capPath: ctxCapPath } = parseSpecId(ctxSpecId)
-        await this._traverseDependsOn(
+        await traverseDependsOn(
           ctxWs,
           ctxCapPath,
           includedSpecs,
           dependsOnAdded,
           depSeen,
           new Set<string>(),
+          this._specs,
           warnings,
           input.depth,
           0,
@@ -397,7 +375,7 @@ export class CompileContext {
       let metadata: SpecMetadata | null = null
 
       if (metadataArtifact !== null) {
-        metadata = this._parseMetadata(metadataArtifact.content)
+        metadata = parseMetadata(metadataArtifact.content)
         isFresh = await this._isMetadataFresh(specRepo, spec, metadata)
       }
 
@@ -474,7 +452,7 @@ export class CompileContext {
             const role = section.role ?? 'context'
             if (!showAll && !sectionsFilter.includes(role as SpecSection)) continue
 
-            const nodes = this._findNodes(ast, section.selector)
+            const nodes = findNodes(ast.root, section.selector)
             for (const node of nodes) {
               let content: string
               const extract = section.extract ?? 'content'
@@ -557,229 +535,6 @@ export class CompileContext {
   }
 
   /**
-   * Lists all spec paths matching a glob-like pattern within the appropriate workspace(s).
-   *
-   * Pattern syntax: `[workspace:]path[/*]`
-   * - `*` → all specs (workspace depends on `allWorkspacesOnBareStar`)
-   * - `workspace:*` → all specs in named workspace
-   * - `prefix/*` → all specs under prefix in `defaultWorkspace`
-   * - `workspace:prefix/*` → all specs under prefix in named workspace
-   * - `path/name` → exact spec in `defaultWorkspace`
-   * - `workspace:path/name` → exact spec in named workspace
-   *
-   * @param pattern - The include/exclude pattern
-   * @param defaultWorkspace - Workspace to use for unqualified paths
-   * @param allWorkspacesOnBareStar - When `true`, bare `*` matches all workspaces
-   * @param warnings - Accumulator for advisory warnings
-   * @returns Resolved spec references matching the pattern
-   */
-  private async _listMatchingSpecs(
-    pattern: string,
-    defaultWorkspace: string,
-    allWorkspacesOnBareStar: boolean,
-    warnings: ContextWarning[],
-  ): Promise<ResolvedSpec[]> {
-    let wsName: string
-    let pathPat: string
-
-    if (pattern === '*' && allWorkspacesOnBareStar) {
-      wsName = 'ALL'
-      pathPat = '*'
-    } else {
-      const parsed = parseSpecId(pattern, defaultWorkspace)
-      wsName = parsed.workspace
-      pathPat = parsed.capPath
-    }
-
-    const workspacesToSearch: Array<{ name: string; repo: SpecRepository }> = []
-
-    if (wsName === 'ALL') {
-      for (const [name, repo] of this._specs) {
-        workspacesToSearch.push({ name, repo })
-      }
-    } else {
-      const repo = this._specs.get(wsName)
-      if (repo === undefined) {
-        warnings.push({
-          type: 'unknown-workspace',
-          path: wsName,
-          message: `Unknown workspace '${wsName}' in pattern '${pattern}'`,
-        })
-        return []
-      }
-      workspacesToSearch.push({ name: wsName, repo })
-    }
-
-    const results: ResolvedSpec[] = []
-    for (const { name: ws, repo } of workspacesToSearch) {
-      const capPaths = await this._listByPattern(repo, pathPat, ws, pattern, warnings)
-      for (const capPath of capPaths) {
-        results.push({ workspace: ws, capPath })
-      }
-    }
-    return results
-  }
-
-  /**
-   * Returns spec capability paths matching `pathPat` within a single workspace repo.
-   *
-   * @param repo - The spec repository to search
-   * @param pathPat - Path pattern: `'*'`, `'prefix/*'`, or `'exact/path'`
-   * @param workspace - Workspace name (for warning messages)
-   * @param fullPattern - The original full pattern (for warning messages)
-   * @param warnings - Accumulator for advisory warnings
-   * @returns Array of matching capability paths
-   */
-  private async _listByPattern(
-    repo: SpecRepository,
-    pathPat: string,
-    workspace: string,
-    fullPattern: string,
-    warnings: ContextWarning[],
-  ): Promise<string[]> {
-    if (pathPat === '*') {
-      const specs = await repo.list()
-      return specs.map((s) => s.name.toString())
-    }
-
-    if (pathPat.endsWith('/*')) {
-      const prefix = pathPat.slice(0, -2)
-      try {
-        const prefixPath = SpecPath.parse(prefix)
-        const specs = await repo.list(prefixPath)
-        return specs.map((s) => s.name.toString())
-      } catch {
-        warnings.push({
-          type: 'missing-spec',
-          path: `${workspace}:${pathPat}`,
-          message: `Invalid prefix in pattern '${fullPattern}'`,
-        })
-        return []
-      }
-    }
-
-    // Exact path
-    try {
-      const specPath = SpecPath.parse(pathPat)
-      const spec = await repo.get(specPath)
-      if (spec === null) {
-        warnings.push({
-          type: 'missing-spec',
-          path: `${workspace}:${pathPat}`,
-          message: `Spec '${workspace}:${pathPat}' not found`,
-        })
-        return []
-      }
-      return [spec.name.toString()]
-    } catch {
-      warnings.push({
-        type: 'missing-spec',
-        path: `${workspace}:${pathPat}`,
-        message: `Invalid path in pattern '${fullPattern}'`,
-      })
-      return []
-    }
-  }
-
-  /**
-   * Recursively follows `dependsOn` links from a spec's `.specd-metadata.yaml`,
-   * adding newly discovered specs to `dependsOnAdded`. Uses DFS with ancestor
-   * tracking to detect and break cycles.
-   *
-   * @param workspace - The workspace of the spec to process
-   * @param capPath - The capability path of the spec to process
-   * @param includedSpecs - Specs already included via steps 1–4 (not re-added)
-   * @param dependsOnAdded - Accumulates specs found only via dependsOn traversal
-   * @param allSeen - All spec keys ever visited (prevents re-processing)
-   * @param ancestors - Current DFS ancestry set for cycle detection
-   * @param warnings - Accumulator for advisory warnings
-   * @param maxDepth - Maximum traversal depth; `undefined` = unlimited
-   * @param currentDepth - Current traversal depth (0 = starting spec)
-   */
-  private async _traverseDependsOn(
-    workspace: string,
-    capPath: string,
-    includedSpecs: Map<string, ResolvedSpec>,
-    dependsOnAdded: Map<string, ResolvedSpec>,
-    allSeen: Set<string>,
-    ancestors: Set<string>,
-    warnings: ContextWarning[],
-    maxDepth: number | undefined,
-    currentDepth: number,
-  ): Promise<void> {
-    const key = `${workspace}:${capPath}`
-
-    if (ancestors.has(key)) {
-      warnings.push({
-        type: 'cycle',
-        path: key,
-        message: `Cycle detected in dependsOn traversal at '${key}'`,
-      })
-      return
-    }
-
-    if (allSeen.has(key)) return
-    allSeen.add(key)
-
-    if (!includedSpecs.has(key)) {
-      dependsOnAdded.set(key, { workspace, capPath })
-    }
-
-    if (maxDepth !== undefined && currentDepth >= maxDepth) return
-
-    const specRepo = this._specs.get(workspace)
-    if (specRepo === undefined) {
-      warnings.push({
-        type: 'unknown-workspace',
-        path: workspace,
-        message: `Unknown workspace '${workspace}' in dependsOn traversal`,
-      })
-      return
-    }
-
-    let specPathObj: SpecPath
-    try {
-      specPathObj = SpecPath.parse(capPath)
-    } catch {
-      return
-    }
-
-    const spec = new Spec(workspace, specPathObj, [])
-    const metadataArtifact = await specRepo.artifact(spec, '.specd-metadata.yaml')
-    if (metadataArtifact === null) return
-
-    const metadata = this._parseMetadata(metadataArtifact.content)
-    const newAncestors = new Set([...ancestors, key])
-
-    for (const dep of metadata.dependsOn ?? []) {
-      const { workspace: depWorkspace, capPath: depCapPath } = parseSpecId(dep, workspace)
-
-      await this._traverseDependsOn(
-        depWorkspace,
-        depCapPath,
-        includedSpecs,
-        dependsOnAdded,
-        allSeen,
-        newAncestors,
-        warnings,
-        maxDepth,
-        currentDepth + 1,
-      )
-    }
-  }
-
-  /**
-   * Parses a `.specd-metadata.yaml` content string into a `SpecMetadata` object.
-   * Returns an empty object on parse failure.
-   *
-   * @param content - The YAML content of the metadata file
-   * @returns Parsed metadata
-   */
-  private _parseMetadata(content: string): SpecMetadata {
-    return parseMetadata(content)
-  }
-
-  /**
    * Checks whether a spec's `.specd-metadata.yaml` is fresh by comparing
    * SHA-256 hashes of current spec artifact files against the recorded hashes.
    *
@@ -802,77 +557,6 @@ export class CompileContext {
       (c) => this._hasher.hash(c),
     )
     return result.allFresh
-  }
-
-  /**
-   * Finds all AST nodes matching the given selector within an artifact AST.
-   *
-   * @param ast - The artifact AST to search
-   * @param selector - The selector criteria to match against
-   * @returns All matching nodes in document order
-   */
-  private _findNodes(ast: ArtifactAST, selector: Selector): ArtifactNode[] {
-    const results: ArtifactNode[] = []
-    this._collectNodes(ast.root, selector, [], results)
-    return results
-  }
-
-  /**
-   * Recursively collects nodes matching the selector, tracking the ancestor chain.
-   *
-   * @param node - Current node being evaluated
-   * @param selector - Selector to match
-   * @param ancestors - Ordered list of ancestor nodes (root to parent)
-   * @param results - Accumulator for matched nodes
-   */
-  private _collectNodes(
-    node: ArtifactNode,
-    selector: Selector,
-    ancestors: readonly ArtifactNode[],
-    results: ArtifactNode[],
-  ): void {
-    if (this._selectorMatches(node, selector, ancestors)) {
-      results.push(node)
-    }
-    const newAncestors = [...ancestors, node]
-    for (const child of node.children ?? []) {
-      this._collectNodes(child, selector, newAncestors, results)
-    }
-  }
-
-  /**
-   * Returns `true` if `node` matches all criteria in `selector`.
-   *
-   * @param node - The node to evaluate
-   * @param selector - The selector criteria
-   * @param ancestors - Ancestor nodes from root to the node's parent
-   * @returns Whether the node matches
-   */
-  private _selectorMatches(
-    node: ArtifactNode,
-    selector: Selector,
-    ancestors: readonly ArtifactNode[],
-  ): boolean {
-    if (node.type !== selector.type) return false
-
-    if (selector.matches !== undefined) {
-      const regex = safeRegex(selector.matches, 'i')
-      if (regex === null || !regex.test(node.label ?? '')) return false
-    }
-
-    if (selector.contains !== undefined) {
-      const regex = safeRegex(selector.contains, 'i')
-      if (regex === null || !regex.test(String(node.value ?? ''))) return false
-    }
-
-    if (selector.parent !== undefined) {
-      // Find the nearest ancestor whose type matches the parent selector's type
-      const nearestOfType = [...ancestors].reverse().find((a) => a.type === selector.parent!.type)
-      if (nearestOfType === undefined) return false
-      if (!this._selectorMatches(nearestOfType, selector.parent, [])) return false
-    }
-
-    return true
   }
 
   /**
