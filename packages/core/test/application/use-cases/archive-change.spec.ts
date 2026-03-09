@@ -164,14 +164,14 @@ describe('ArchiveChange', () => {
         name: 'my-change',
         createdAt: new Date(),
         workspaces: ['default'],
-        specIds: [],
+        specIds: ['core/some-spec'],
         history: [
           {
             type: 'created',
             at: new Date(),
             by: testActor,
             workspaces: ['default'],
-            specIds: [],
+            specIds: ['core/some-spec'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
           },
@@ -223,7 +223,7 @@ describe('ArchiveChange', () => {
 
   describe('given the change is in archivable state', () => {
     it('proceeds without error', async () => {
-      const change = makeArchivableChange('my-change', { specIds: [] })
+      const change = makeArchivableChange('my-change')
       const uc = new ArchiveChange(
         makeChangeRepository([change]),
         new Map(),
@@ -244,7 +244,6 @@ describe('ArchiveChange', () => {
 
     it('derives archivedName from change.createdAt', async () => {
       const change = makeArchivableChange('add-auth-flow', {
-        specIds: [],
         createdAt: new Date('2024-01-15T12:00:00Z'),
       })
 
@@ -269,7 +268,7 @@ describe('ArchiveChange', () => {
 
     it('returns an ArchivedChange with no approval or wasStructural fields', async () => {
       const uc = new ArchiveChange(
-        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
         makeHookRunner(),
@@ -449,7 +448,7 @@ describe('ArchiveChange', () => {
       )
 
       const uc = new ArchiveChange(
-        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
         makeHookRunner(1, 'error'),
@@ -491,7 +490,7 @@ describe('ArchiveChange', () => {
       )
 
       const uc = new ArchiveChange(
-        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
         hooks,
@@ -534,7 +533,7 @@ describe('ArchiveChange', () => {
       )
 
       const uc = new ArchiveChange(
-        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
         hooks,
@@ -565,7 +564,7 @@ describe('ArchiveChange', () => {
       }
 
       const uc = new ArchiveChange(
-        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
         hooks,
@@ -597,7 +596,7 @@ describe('ArchiveChange', () => {
       }
 
       const uc = new ArchiveChange(
-        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
         hooks,
@@ -640,7 +639,7 @@ describe('ArchiveChange', () => {
       )
 
       const uc = new ArchiveChange(
-        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
         hooks,
@@ -900,7 +899,7 @@ describe('ArchiveChange', () => {
       )
 
       const uc = new ArchiveChange(
-        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         archiveRepo,
         hooks,
@@ -946,7 +945,7 @@ describe('ArchiveChange', () => {
       )
 
       const uc = new ArchiveChange(
-        makeChangeRepository([makeArchivableChange('my-change', { specIds: [] })]),
+        makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         archiveRepo,
         hooks,
