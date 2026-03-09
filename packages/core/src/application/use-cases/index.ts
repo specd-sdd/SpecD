@@ -62,7 +62,6 @@ export {
   type ContextWarning,
   type SpecSection,
 } from './compile-context.js'
-export { shiftHeadings } from '../../domain/services/shift-headings.js'
 export {
   checkMetadataFreshness,
   type ContentHashEntry,
