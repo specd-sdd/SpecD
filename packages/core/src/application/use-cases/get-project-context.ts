@@ -1,4 +1,3 @@
-import { contentHash } from '../../domain/services/content-hash.js'
 import { parseMetadata, type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
@@ -22,6 +21,7 @@ import {
 } from './compile-context.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
 import { type WorkspaceContext } from '../ports/workspace-context.js'
+import { type ContentHasher } from '../ports/content-hasher.js'
 
 /** Input for the {@link GetProjectContext} use case. */
 export interface GetProjectContextInput extends WorkspaceContext {
@@ -85,6 +85,7 @@ export class GetProjectContext {
   private readonly _schemas: SchemaRegistry
   private readonly _files: FileReader
   private readonly _parsers: ArtifactParserRegistry
+  private readonly _hasher: ContentHasher
 
   /**
    * Creates a new `GetProjectContext` use case instance.
@@ -93,17 +94,20 @@ export class GetProjectContext {
    * @param schemas - Registry for resolving schema references
    * @param files - Reader for project-level context file entries
    * @param parsers - Registry of artifact format parsers
+   * @param hasher - Content hasher for metadata freshness checks
    */
   constructor(
     specs: ReadonlyMap<string, SpecRepository>,
     schemas: SchemaRegistry,
     files: FileReader,
     parsers: ArtifactParserRegistry,
+    hasher: ContentHasher,
   ) {
     this._specs = specs
     this._schemas = schemas
     this._files = files
     this._parsers = parsers
+    this._hasher = hasher
   }
 
   /**
@@ -454,7 +458,7 @@ export class GetProjectContext {
       const artifact = await specRepo.artifact(spec, filename)
       if (artifact === null) return false
 
-      const actualHash = contentHash(artifact.content)
+      const actualHash = this._hasher.hash(artifact.content)
       if (actualHash !== recordedHash) return false
     }
     return true

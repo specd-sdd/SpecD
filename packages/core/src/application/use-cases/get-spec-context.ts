@@ -4,6 +4,7 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { type ContextWarning } from './compile-context.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
+import { type ContentHasher } from '../ports/content-hasher.js'
 
 /** Valid section filter flags for spec context queries. */
 export type SpecContextSectionFlag = 'rules' | 'constraints' | 'scenarios'
@@ -64,14 +65,17 @@ export interface GetSpecContextResult {
  */
 export class GetSpecContext {
   private readonly _specs: ReadonlyMap<string, SpecRepository>
+  private readonly _hasher: ContentHasher
 
   /**
    * Creates a new `GetSpecContext` use case instance.
    *
    * @param specs - Spec repositories keyed by workspace name
+   * @param hasher - Content hasher for metadata freshness checks
    */
-  constructor(specs: ReadonlyMap<string, SpecRepository>) {
+  constructor(specs: ReadonlyMap<string, SpecRepository>, hasher: ContentHasher) {
     this._specs = specs
+    this._hasher = hasher
   }
 
   /**
@@ -157,8 +161,10 @@ export class GetSpecContext {
 
     if (metadataContent !== undefined) {
       const metadata = this._parseMetadata(metadataContent)
-      const freshnessResult = await checkMetadataFreshness(metadata.contentHashes, (filename) =>
-        Promise.resolve(artifacts.get(filename)?.content ?? null),
+      const freshnessResult = await checkMetadataFreshness(
+        metadata.contentHashes,
+        (filename) => Promise.resolve(artifacts.get(filename)?.content ?? null),
+        (c) => this._hasher.hash(c),
       )
 
       if (!freshnessResult.allFresh) {

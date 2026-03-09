@@ -24,6 +24,7 @@ import {
   makeParser,
   makeParsers,
   testActor,
+  makeContentHasher,
 } from './helpers.js'
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(makeSchema([])),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
       await expect(
         uc.execute({
@@ -89,6 +91,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(makeSchema([])),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
       await expect(
         uc.execute({
@@ -110,6 +113,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(null),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
       await expect(
         uc.execute({
@@ -134,6 +138,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({
@@ -165,6 +170,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({
@@ -188,6 +194,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({
@@ -236,6 +243,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({
@@ -287,6 +295,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({
@@ -336,6 +345,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({
@@ -388,6 +398,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       await uc.execute({
@@ -442,6 +453,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       await uc.execute({
@@ -493,6 +505,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       await uc.execute({
@@ -535,6 +548,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       await uc.execute({
@@ -581,6 +595,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       await uc.execute({
@@ -631,6 +646,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(parser),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({
@@ -684,6 +700,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(parser),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({
@@ -730,6 +747,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(parser),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({
@@ -791,6 +809,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(parser, yamlParser),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({
@@ -835,6 +854,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({
@@ -885,6 +905,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       await uc.execute({
@@ -926,6 +947,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({
@@ -949,6 +971,7 @@ describe('ValidateArtifacts', () => {
         makeSchemaRegistry(schema),
         makeParsers(),
         makeGitAdapter(),
+        makeContentHasher(),
       )
 
       const result = await uc.execute({

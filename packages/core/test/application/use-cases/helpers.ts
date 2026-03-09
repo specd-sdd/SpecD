@@ -18,6 +18,8 @@ import {
   type DeltaEntry,
 } from '../../../src/application/ports/artifact-parser.js'
 import { type FileReader } from '../../../src/application/ports/file-reader.js'
+import { ContentHasher } from '../../../src/application/ports/content-hasher.js'
+import { NodeContentHasher } from '../../../src/infrastructure/node/content-hasher.js'
 import { type HookRunner } from '../../../src/application/ports/hook-runner.js'
 import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
 import { type GitAdapter } from '../../../src/application/ports/git-adapter.js'
@@ -304,6 +306,15 @@ export function makeParser(
     deltaInstructions: () => '',
     parseDelta: opts.parseDelta ?? (() => []),
   }
+}
+
+/**
+ * Creates a `ContentHasher` for use in tests.
+ *
+ * Uses the real `NodeContentHasher` since hashing is deterministic and cheap.
+ */
+export function makeContentHasher(): ContentHasher {
+  return new NodeContentHasher()
 }
 
 /**

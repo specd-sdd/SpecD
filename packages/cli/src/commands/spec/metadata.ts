@@ -1,5 +1,7 @@
 import { type Command } from 'commander'
-import { SpecPath, checkMetadataFreshness, parseMetadata } from '@specd/core'
+import { SpecPath, checkMetadataFreshness, parseMetadata, NodeContentHasher } from '@specd/core'
+
+const hasher = new NodeContentHasher()
 import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
@@ -50,8 +52,10 @@ export function registerSpecMetadata(parent: Command): void {
           const specLabel = `${parsed.workspace}:${parsed.capabilityPath}`
 
           // Compute freshness for each content hash
-          const freshnessResult = await checkMetadataFreshness(metadata.contentHashes, (filename) =>
-            Promise.resolve(result.artifacts.get(filename)?.content ?? null),
+          const freshnessResult = await checkMetadataFreshness(
+            metadata.contentHashes,
+            (filename) => Promise.resolve(result.artifacts.get(filename)?.content ?? null),
+            (c) => hasher.hash(c),
           )
           const hashEntries = freshnessResult.entries
           const allFresh = freshnessResult.allFresh

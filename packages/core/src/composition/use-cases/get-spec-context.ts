@@ -1,6 +1,7 @@
 import { GetSpecContext } from '../../application/use-cases/get-spec-context.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { createSpecRepository } from '../spec-repository.js'
+import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
 /**
  * Constructs a `GetSpecContext` use case wired to all configured workspaces.
@@ -19,5 +20,6 @@ export function createGetSpecContext(config: SpecdConfig): GetSpecContext {
       ),
     ]),
   )
-  return new GetSpecContext(specRepos)
+  const hasher = new NodeContentHasher()
+  return new GetSpecContext(specRepos, hasher)
 }

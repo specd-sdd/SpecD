@@ -1,6 +1,13 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { type Change, type PreHashCleanup, computeArtifactHash } from '@specd/core'
+import {
+  type Change,
+  type PreHashCleanup,
+  computeArtifactHash,
+  NodeContentHasher,
+} from '@specd/core'
+
+const hasher = new NodeContentHasher()
 
 /**
  * Reads artifact files from a change directory and computes sha256 hashes.
@@ -30,7 +37,7 @@ export async function hashChangeArtifacts(
       continue
     }
     const cleanups = cleanupMap?.get(type) ?? []
-    result[artifact.filename] = computeArtifactHash(content, cleanups)
+    result[artifact.filename] = computeArtifactHash(content, (c) => hasher.hash(c), cleanups)
   }
 
   return result

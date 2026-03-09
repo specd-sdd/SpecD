@@ -4,6 +4,7 @@ import { extractSpecSummary } from '../../domain/services/spec-summary.js'
 import { parseMetadata, strictSpecMetadataSchema } from '../../domain/services/parse-metadata.js'
 import { parse as parseYaml } from 'yaml'
 import { type SpecMetadataStatus, checkMetadataFreshness } from './_shared/metadata-freshness.js'
+import { type ContentHasher } from '../ports/content-hasher.js'
 
 export type { SpecMetadataStatus }
 
@@ -48,14 +49,17 @@ export interface SpecListEntry {
  */
 export class ListSpecs {
   private readonly _specRepos: ReadonlyMap<string, SpecRepository>
+  private readonly _hasher: ContentHasher
 
   /**
    * Creates a new `ListSpecs` use case instance.
    *
    * @param specRepos - Map of workspace name to its spec repository
+   * @param hasher - Content hasher for metadata freshness checks
    */
-  constructor(specRepos: ReadonlyMap<string, SpecRepository>) {
+  constructor(specRepos: ReadonlyMap<string, SpecRepository>, hasher: ContentHasher) {
     this._specRepos = specRepos
+    this._hasher = hasher
   }
 
   /**
@@ -205,14 +209,18 @@ export class ListSpecs {
     if (!hasMetadata) return 'missing'
     if (!metadataValid) return 'invalid'
 
-    const result = await checkMetadataFreshness(contentHashes, async (filename) => {
-      try {
-        const artifact = await repo.artifact(spec, filename)
-        return artifact?.content ?? null
-      } catch {
-        return null
-      }
-    })
+    const result = await checkMetadataFreshness(
+      contentHashes,
+      async (filename) => {
+        try {
+          const artifact = await repo.artifact(spec, filename)
+          return artifact?.content ?? null
+        } catch {
+          return null
+        }
+      },
+      (c) => this._hasher.hash(c),
+    )
     return result.allFresh ? 'fresh' : 'stale'
   }
 }

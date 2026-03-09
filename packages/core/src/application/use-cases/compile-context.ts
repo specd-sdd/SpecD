@@ -21,6 +21,7 @@ import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
 import { type WorkspaceContext } from '../ports/workspace-context.js'
+import { type ContentHasher } from '../ports/content-hasher.js'
 
 /** A single entry in the project-level `context:` list. */
 export type ContextEntry = { instruction: string } | { file: string }
@@ -134,6 +135,7 @@ export class CompileContext {
   private readonly _schemas: SchemaRegistry
   private readonly _files: FileReader
   private readonly _parsers: ArtifactParserRegistry
+  private readonly _hasher: ContentHasher
 
   /**
    * Creates a new `CompileContext` use case instance.
@@ -143,6 +145,7 @@ export class CompileContext {
    * @param schemas - Registry for resolving schema references
    * @param files - Reader for project-level context file entries
    * @param parsers - Registry of artifact format parsers
+   * @param hasher - Content hasher for metadata freshness checks
    */
   constructor(
     changes: ChangeRepository,
@@ -150,12 +153,14 @@ export class CompileContext {
     schemas: SchemaRegistry,
     files: FileReader,
     parsers: ArtifactParserRegistry,
+    hasher: ContentHasher,
   ) {
     this._changes = changes
     this._specs = specs
     this._schemas = schemas
     this._files = files
     this._parsers = parsers
+    this._hasher = hasher
   }
 
   /**
@@ -787,10 +792,14 @@ export class CompileContext {
     spec: Spec,
     metadata: SpecMetadata,
   ): Promise<boolean> {
-    const result = await checkMetadataFreshness(metadata.contentHashes, async (filename) => {
-      const artifact = await specRepo.artifact(spec, filename)
-      return artifact?.content ?? null
-    })
+    const result = await checkMetadataFreshness(
+      metadata.contentHashes,
+      async (filename) => {
+        const artifact = await specRepo.artifact(spec, filename)
+        return artifact?.content ?? null
+      },
+      (c) => this._hasher.hash(c),
+    )
     return result.allFresh
   }
 
