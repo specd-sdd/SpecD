@@ -50,9 +50,23 @@
 
 #### Scenario: Valid metadata accepted
 
-- **GIVEN** a YAML string with `title: 'Config'`, `keywords: ['lifecycle']`, `dependsOn: ['core:storage']`, and `contentHashes: { 'spec.md': 'sha256:a3f1...64hex' }`
+- **GIVEN** a YAML string with `title: 'Config'`, `description: 'Handles config'`, `keywords: ['lifecycle']`, `dependsOn: ['core:storage']`, and `contentHashes: { 'spec.md': 'sha256:a3f1...64hex' }`
 - **WHEN** `SaveSpecMetadata` is executed with that content
 - **THEN** the file is written successfully
+
+#### Scenario: Missing title rejected
+
+- **GIVEN** a YAML string with `description: 'Some description'` but no `title`
+- **WHEN** `SaveSpecMetadata` is executed with that content
+- **THEN** a `MetadataValidationError` is thrown
+- **AND** the file is not written
+
+#### Scenario: Missing description rejected
+
+- **GIVEN** a YAML string with `title: 'Test'` but no `description`
+- **WHEN** `SaveSpecMetadata` is executed with that content
+- **THEN** a `MetadataValidationError` is thrown
+- **AND** the file is not written
 
 #### Scenario: Invalid keywords rejected
 
@@ -91,15 +105,15 @@
 
 #### Scenario: Unknown top-level keys allowed
 
-- **GIVEN** a YAML string with `title: 'Test'` and `customField: 'value'`
+- **GIVEN** a YAML string with `title: 'Test'`, `description: 'A test'`, and `customField: 'value'`
 - **WHEN** `SaveSpecMetadata` is executed with that content
 - **THEN** the file is written successfully — unknown keys are passed through
 
-#### Scenario: Empty file accepted
+#### Scenario: Empty content rejected
 
 - **GIVEN** an empty YAML string (no fields)
 - **WHEN** `SaveSpecMetadata` is executed with that content
-- **THEN** the file is written successfully — all fields are optional
+- **THEN** a `MetadataValidationError` is thrown — content must be a YAML mapping with at least `title` and `description`
 
 #### Scenario: Read path remains lenient
 

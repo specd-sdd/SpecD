@@ -56,12 +56,12 @@ export const specMetadataSchema = z
 
 /**
  * Strict schema for writing `.specd-metadata.yaml` — used by {@link SaveSpecMetadata}.
- * All fields are optional, but when present they must conform to format constraints.
+ * `title` and `description` are required; other fields are optional but validated when present.
  */
 export const strictSpecMetadataSchema = z
   .object({
-    title: z.string().min(1).optional(),
-    description: z.string().optional(),
+    title: z.string().min(1),
+    description: z.string().min(1),
     keywords: z
       .array(
         z
@@ -76,7 +76,7 @@ export const strictSpecMetadataSchema = z
         z.string(),
         z.string().regex(HASH_RE, { message: 'must match sha256:<64 hex chars>' }),
       )
-      .optional(),
+      .refine((r) => Object.keys(r).length > 0, { message: 'must have at least one entry' }),
     rules: z
       .array(
         z.object({

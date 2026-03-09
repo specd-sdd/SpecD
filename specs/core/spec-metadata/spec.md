@@ -31,10 +31,10 @@ description: >
   creates, transitions, or archives a unit of spec work — it defines the lifecycle,
   approval gates, and event history model that everything else depends on.
 dependsOn:
-  - core/storage
-  - core/delta-format
-  - core/config
-  - core/schema-format
+  - core:core/storage
+  - core:core/delta-format
+  - core:core/config
+  - core:core/schema-format
 keywords:
   - lifecycle
   - approval
@@ -85,13 +85,13 @@ scenarios:
 
 ### Requirement: Write-time structural validation
 
-The `SaveSpecMetadata` use case validates the YAML content against the `specMetadataSchema` Zod schema before writing. All fields are optional, but when present they must conform to their declared types and formats:
+The `SaveSpecMetadata` use case validates the YAML content against the `strictSpecMetadataSchema` Zod schema before writing. The content must be a YAML mapping (not empty, not a scalar). `title` and `description` are required; other fields are optional but when present must conform to their declared types and formats:
 
-- `title` must be a non-empty string
-- `description` must be a string
+- `title` (required) must be a non-empty string
+- `description` (required) must be a non-empty string
 - `keywords` must be an array of non-empty lowercase strings
 - `dependsOn` must be an array of strings, each matching a valid spec ID pattern (`capabilityPath` or `workspace:capabilityPath` where workspace matches `/^[a-z][a-z0-9-]*$/` and capability path segments match `/^[a-z0-9_][a-z0-9_-]*$/`)
-- `contentHashes` must be a record of filename to hash string, where each hash matches `sha256:<64 hex chars>`
+- `contentHashes` (required) must be a non-empty record of filename to hash string, where each hash matches `sha256:<64 hex chars>`
 - `rules` must be an array of objects with `requirement` (non-empty string) and `rules` (non-empty array of non-empty strings)
 - `constraints` must be a non-empty array of non-empty strings
 - `scenarios` must be an array of objects with `requirement` (non-empty string), `name` (non-empty string), `when` (non-empty array of strings), `then` (non-empty array of strings), and `given` (optional array of strings)
