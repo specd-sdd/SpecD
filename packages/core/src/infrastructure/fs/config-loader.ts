@@ -53,15 +53,17 @@ const HookEntryRawZodSchema = z.union([
   z.object({ instruction: z.string() }),
 ])
 
-const WorkflowStepRawZodSchema = z.object({
-  step: z.string(),
-  hooks: z
-    .object({
-      pre: z.array(HookEntryRawZodSchema).optional(),
-      post: z.array(HookEntryRawZodSchema).optional(),
-    })
-    .optional(),
-})
+const WorkflowStepRawZodSchema = z
+  .object({
+    step: z.string(),
+    hooks: z
+      .object({
+        pre: z.array(HookEntryRawZodSchema).optional(),
+        post: z.array(HookEntryRawZodSchema).optional(),
+      })
+      .optional(),
+  })
+  .strict()
 
 const ContextEntryRawZodSchema = z.union([
   z.object({ file: z.string() }),
