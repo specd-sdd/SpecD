@@ -6,12 +6,14 @@ import { Repository, type RepositoryConfig } from './repository.js'
 export { type RepositoryConfig as ChangeRepositoryConfig }
 
 /**
- * Port for reading and writing changes within a single workspace.
+ * Port for reading and writing changes.
  *
- * Extends {@link Repository} — `workspace()`, `ownership()`, and `isExternal()`
- * are set at construction time. A change always belongs to the workspace it was
- * created in; use cases that coordinate across workspaces receive one instance
- * per workspace.
+ * Extends {@link Repository} for interface consistency with {@link SpecRepository}
+ * and {@link ArchiveRepository}, but changes are stored globally (one `changes/`
+ * directory), not per-workspace. The inherited `workspace()`, `ownership()`, and
+ * `isExternal()` fields carry the default workspace values and are not used by
+ * any use case. They exist solely to satisfy the shared `Repository` base
+ * contract.
  *
  * `list` and `get` return {@link Change} objects with artifact state
  * (status, validatedHash) but without artifact content. Content is loaded
