@@ -80,34 +80,55 @@ export default tseslint.config(
   {
     files: ['packages/*/src/domain/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', {
-        patterns: [
-          { group: ['**/application/**'], message: 'domain/ must not import from application/' },
-          { group: ['**/infrastructure/**'], message: 'domain/ must not import from infrastructure/' },
-          { group: ['**/composition/**'], message: 'domain/ must not import from composition/' },
-        ],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['**/application/**'], message: 'domain/ must not import from application/' },
+            {
+              group: ['**/infrastructure/**'],
+              message: 'domain/ must not import from infrastructure/',
+            },
+            { group: ['**/composition/**'], message: 'domain/ must not import from composition/' },
+          ],
+        },
+      ],
     },
   },
   {
     files: ['packages/*/src/application/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', {
-        patterns: [
-          { group: ['**/infrastructure/**'], message: 'application/ must not import from infrastructure/' },
-          { group: ['**/composition/**'], message: 'application/ must not import from composition/' },
-        ],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/infrastructure/**'],
+              message: 'application/ must not import from infrastructure/',
+            },
+            {
+              group: ['**/composition/**'],
+              message: 'application/ must not import from composition/',
+            },
+          ],
+        },
+      ],
     },
   },
   {
     files: ['packages/*/src/infrastructure/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', {
-        patterns: [
-          { group: ['**/composition/**'], message: 'infrastructure/ must not import from composition/' },
-        ],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/composition/**'],
+              message: 'infrastructure/ must not import from composition/',
+            },
+          ],
+        },
+      ],
     },
   },
 
