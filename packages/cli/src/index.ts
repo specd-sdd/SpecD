@@ -39,6 +39,7 @@ import { registerSpecContext } from './commands/spec/context.js'
 import { registerSpecMetadata } from './commands/spec/metadata.js'
 import { registerSpecResolvePath } from './commands/spec/resolve-path.js'
 import { registerSpecWriteMetadata } from './commands/spec/write-metadata.js'
+import { registerSpecInvalidateMetadata } from './commands/spec/invalidate-metadata.js'
 import { registerSpecValidate } from './commands/spec/validate.js'
 
 // project
@@ -118,6 +119,7 @@ registerSpecContext(specCmd)
 registerSpecMetadata(specCmd)
 registerSpecResolvePath(specCmd)
 registerSpecWriteMetadata(specCmd)
+registerSpecInvalidateMetadata(specCmd)
 registerSpecValidate(specCmd)
 
 // ---- project ----

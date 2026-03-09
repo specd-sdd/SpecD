@@ -12,6 +12,11 @@ export {
   type SaveSpecMetadataInput,
   type SaveSpecMetadataResult,
 } from './save-spec-metadata.js'
+export {
+  type InvalidateSpecMetadata,
+  type InvalidateSpecMetadataInput,
+  type InvalidateSpecMetadataResult,
+} from './invalidate-spec-metadata.js'
 export { type GetActiveSchema, type GetActiveSchemaInput } from './get-active-schema.js'
 export { type InitProject } from './init-project.js'
 export { type RecordSkillInstall, type RecordSkillInstallInput } from './record-skill-install.js'

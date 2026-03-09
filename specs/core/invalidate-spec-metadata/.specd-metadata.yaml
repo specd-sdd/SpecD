@@ -1,0 +1,101 @@
+title: 'Invalidate Spec Metadata'
+description: >
+  Defines the InvalidateSpecMetadata use case, which marks a spec's .specd-metadata.yaml as stale
+  by stripping its contentHashes field while preserving all other metadata. The use case writes
+  directly through SpecRepository without strict validation and returns null when the spec,
+  workspace, or metadata file is missing or non-mapping.
+keywords:
+  - 'invalidate-metadata'
+  - 'content-hashes'
+  - 'staleness-detection'
+  - 'spec-metadata'
+  - 'spec-repository'
+  - 'metadata-regeneration'
+  - 'force-write'
+dependsOn:
+  - 'core:core/spec-metadata'
+  - 'core:core/storage'
+contentHashes:
+  'spec.md': 'sha256:22c2a7b488c0a1b8f073a3e6d7ed05ff97d615e1f81793e1e418ecf010708b7e'
+  'verify.md': 'sha256:10ffd4cf879b541fe5aad2dda454acae39c2c19d793369d151d4b2df9a997ace'
+rules:
+  - requirement: 'Removes contentHashes'
+    rules:
+      - 'The use case reads the existing .specd-metadata.yaml, removes the contentHashes key from the parsed YAML, and writes the result back.'
+      - 'The write uses force: true to skip conflict detection.'
+  - requirement: 'Preserves other fields'
+    rules:
+      - 'All fields other than contentHashes remain unchanged in the rewritten file.'
+      - 'The use case does not validate the remaining content against the strict schema.'
+  - requirement: 'Returns null when not applicable'
+    rules:
+      - 'The use case returns null when the workspace does not exist in the configured repositories.'
+      - 'The use case returns null when the spec does not exist in the workspace.'
+      - 'The use case returns null when the spec has no .specd-metadata.yaml file.'
+      - 'The use case returns null when the file content is not a YAML mapping.'
+      - 'In all other cases it returns { spec: "<workspace>:<path>" }.'
+  - requirement: 'No strict validation on write'
+    rules:
+      - 'The use case bypasses SaveSpecMetadata and writes directly through SpecRepository.save() because it intentionally removes contentHashes, a required field in strictSpecMetadataSchema.'
+      - 'This is the only use case that writes .specd-metadata.yaml without strict validation.'
+constraints:
+  - 'The use case contains no CLI or delivery logic — it operates purely through the SpecRepository port.'
+  - 'The write is always forced (force: true) — there is no conflict detection for invalidation.'
+  - 'The use case never deletes the metadata file — it only strips contentHashes.'
+scenarios:
+  - requirement: 'Removes contentHashes'
+    name: 'Existing metadata with contentHashes'
+    given:
+      - 'A spec with .specd-metadata.yaml containing title, description, contentHashes, and rules'
+    when:
+      - 'InvalidateSpecMetadata is executed for that spec'
+    then:
+      - 'The rewritten file has no contentHashes field'
+      - 'The spec appears as stale in staleness detection'
+  - requirement: 'Removes contentHashes'
+    name: 'Existing metadata without contentHashes'
+    given:
+      - 'A spec with .specd-metadata.yaml that has no contentHashes field'
+    when:
+      - 'InvalidateSpecMetadata is executed for that spec'
+    then:
+      - 'The file is rewritten unchanged (no-op content-wise)'
+      - 'The result is still returned (not null)'
+  - requirement: 'Preserves other fields'
+    name: 'Title, description, rules survive invalidation'
+    given:
+      - "A spec with .specd-metadata.yaml containing title: 'Auth', description: 'Handles auth', rules, and contentHashes"
+    when:
+      - 'InvalidateSpecMetadata is executed'
+    then:
+      - "The rewritten file contains title: 'Auth', description: 'Handles auth', and rules exactly as before"
+  - requirement: 'Returns null when not applicable'
+    name: 'Unknown workspace'
+    given: []
+    when:
+      - 'InvalidateSpecMetadata is executed with a workspace that does not exist'
+    then:
+      - 'The result is null'
+  - requirement: 'Returns null when not applicable'
+    name: 'Unknown spec'
+    given: []
+    when:
+      - 'InvalidateSpecMetadata is executed for a spec path that does not exist'
+    then:
+      - 'The result is null'
+  - requirement: 'Returns null when not applicable'
+    name: 'No metadata file'
+    given:
+      - 'A spec that exists but has no .specd-metadata.yaml'
+    when:
+      - 'InvalidateSpecMetadata is executed for that spec'
+    then:
+      - 'The result is null — no file is created'
+  - requirement: 'Returns null when not applicable'
+    name: 'Non-mapping content'
+    given:
+      - 'A spec with .specd-metadata.yaml containing a scalar value (e.g. "hello")'
+    when:
+      - 'InvalidateSpecMetadata is executed'
+    then:
+      - 'The result is null — the file is not modified'

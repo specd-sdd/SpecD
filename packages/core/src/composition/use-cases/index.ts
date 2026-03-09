@@ -36,6 +36,10 @@ export {
 export { createListSpecs, type FsListSpecsOptions } from './list-specs.js'
 export { createGetSpec, type FsGetSpecOptions } from './get-spec.js'
 export { createSaveSpecMetadata, type FsSaveSpecMetadataOptions } from './save-spec-metadata.js'
+export {
+  createInvalidateSpecMetadata,
+  type FsInvalidateSpecMetadataOptions,
+} from './invalidate-spec-metadata.js'
 export { createGetActiveSchema, type FsGetActiveSchemaOptions } from './get-active-schema.js'
 export { createInitProject } from './init-project.js'
 export { createRecordSkillInstall } from './record-skill-install.js'
