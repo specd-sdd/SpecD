@@ -13,5 +13,10 @@ import * as fs from 'node:fs/promises'
 export async function writeFileAtomic(filePath: string, content: string): Promise<void> {
   const tmpPath = `${filePath}.tmp-${process.pid.toString()}-${randomUUID()}`
   await fs.writeFile(tmpPath, content, 'utf8')
-  await fs.rename(tmpPath, filePath)
+  try {
+    await fs.rename(tmpPath, filePath)
+  } catch (err: unknown) {
+    await fs.unlink(tmpPath).catch(() => {})
+    throw err
+  }
 }
