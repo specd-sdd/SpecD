@@ -39,8 +39,8 @@ import { createKernelInternals } from './kernel-internals.js'
  *
  * Delivery mechanisms (`@specd/cli`, `@specd/mcp`) receive a `Kernel` from
  * `createKernel()` and invoke individual use cases via `kernel.changes.*`,
- * `kernel.specs.*`, or `kernel.project.*`. Runtime inputs (e.g. `schemaRef`,
- * `workspaceSchemasPaths`) are still passed at `execute()` time.
+ * `kernel.specs.*`, or `kernel.project.*`. Config-derived inputs (e.g.
+ * `schemaRef`, `workspaceSchemasPaths`) are injected at construction time.
  */
 export interface Kernel {
   /** Use cases that operate on changes. */
@@ -144,6 +144,10 @@ export interface KernelOptions {
 export function createKernel(config: SpecdConfig, options?: KernelOptions): Kernel {
   const i = createKernelInternals(config, options)
 
+  // Resolve project-level archiving hooks from config workflow
+  const archivingStep = config.workflow?.find((s) => s.step === 'archiving')
+  const projectHooks = archivingStep !== undefined ? archivingStep.hooks : undefined
+
   return {
     changes: {
       repo: i.changes,
@@ -161,9 +165,32 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
         i.git,
         i.parsers,
         i.schemas,
+        i.schemaRef,
+        i.workspaceSchemasPaths,
+        config.projectRoot,
+        config.storage.changesPath,
+        projectHooks,
       ),
-      validate: new ValidateArtifacts(i.changes, i.specs, i.schemas, i.parsers, i.git, i.hasher),
-      compile: new CompileContext(i.changes, i.specs, i.schemas, i.files, i.parsers, i.hasher),
+      validate: new ValidateArtifacts(
+        i.changes,
+        i.specs,
+        i.schemas,
+        i.parsers,
+        i.git,
+        i.hasher,
+        i.schemaRef,
+        i.workspaceSchemasPaths,
+      ),
+      compile: new CompileContext(
+        i.changes,
+        i.specs,
+        i.schemas,
+        i.files,
+        i.parsers,
+        i.hasher,
+        i.schemaRef,
+        i.workspaceSchemasPaths,
+      ),
       list: new ListChanges(i.changes),
       listDrafts: new ListDrafts(i.changes),
       listDiscarded: new ListDiscarded(i.changes),
@@ -178,22 +205,55 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
     },
     specs: {
       repos: i.specs,
-      approveSpec: new ApproveSpec(i.changes, i.git, i.schemas, i.hasher),
-      approveSignoff: new ApproveSignoff(i.changes, i.git, i.schemas, i.hasher),
+      approveSpec: new ApproveSpec(
+        i.changes,
+        i.git,
+        i.schemas,
+        i.hasher,
+        i.schemaRef,
+        i.workspaceSchemasPaths,
+      ),
+      approveSignoff: new ApproveSignoff(
+        i.changes,
+        i.git,
+        i.schemas,
+        i.hasher,
+        i.schemaRef,
+        i.workspaceSchemasPaths,
+      ),
       list: new ListSpecs(i.specs, i.hasher, i.yaml),
       get: new GetSpec(i.specs),
       saveMetadata: new SaveSpecMetadata(i.specs, i.yaml),
       invalidateMetadata: new InvalidateSpecMetadata(i.specs, i.yaml),
-      getActiveSchema: new GetActiveSchema(i.schemas),
-      validate: new ValidateSpecs(i.specs, i.schemas, i.parsers),
-      inferSections: new InferSpecSections(i.schemas, i.parsers),
+      getActiveSchema: new GetActiveSchema(i.schemas, i.schemaRef, i.workspaceSchemasPaths),
+      validate: new ValidateSpecs(
+        i.specs,
+        i.schemas,
+        i.parsers,
+        i.schemaRef,
+        i.workspaceSchemasPaths,
+      ),
+      inferSections: new InferSpecSections(
+        i.schemas,
+        i.parsers,
+        i.schemaRef,
+        i.workspaceSchemasPaths,
+      ),
       getContext: new GetSpecContext(i.specs, i.hasher),
     },
     project: {
       init: new InitProject(i.configWriter),
       recordSkillInstall: new RecordSkillInstall(i.configWriter),
       getSkillsManifest: new GetSkillsManifest(i.configWriter),
-      getProjectContext: new GetProjectContext(i.specs, i.schemas, i.files, i.parsers, i.hasher),
+      getProjectContext: new GetProjectContext(
+        i.specs,
+        i.schemas,
+        i.files,
+        i.parsers,
+        i.hasher,
+        i.schemaRef,
+        i.workspaceSchemasPaths,
+      ),
     },
   }
 }

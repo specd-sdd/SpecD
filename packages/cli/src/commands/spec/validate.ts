@@ -3,7 +3,6 @@ import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
@@ -32,8 +31,6 @@ export function registerSpecValidate(parent: Command): void {
 
           const config = await loadConfig({ configPath: opts.config })
           const kernel = createCliKernel(config)
-          const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
-
           let inputSpecPath: string | undefined
           let inputWorkspace: string | undefined
 
@@ -53,8 +50,6 @@ export function registerSpecValidate(parent: Command): void {
           const result = await kernel.specs.validate.execute({
             ...(inputSpecPath !== undefined ? { specPath: inputSpecPath } : {}),
             ...(inputWorkspace !== undefined ? { workspace: inputWorkspace } : {}),
-            schemaRef: config.schemaRef,
-            workspaceSchemasPaths,
           })
 
           const fmt = parseFormat(opts.format)

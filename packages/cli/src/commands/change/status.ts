@@ -3,7 +3,6 @@ import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
 
 /**
  * Registers the `change status` subcommand on the given parent command.
@@ -24,11 +23,7 @@ export function registerChangeStatus(parent: Command): void {
 
         // Schema version warning
         try {
-          const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
-          const activeSchema = await kernel.specs.getActiveSchema.execute({
-            schemaRef: config.schemaRef,
-            workspaceSchemasPaths,
-          })
+          const activeSchema = await kernel.specs.getActiveSchema.execute()
           const recorded = `${change.schemaName}@${change.schemaVersion}`
           const current = `${activeSchema.name()}@${activeSchema.version()}`
           if (recorded !== current) {

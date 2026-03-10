@@ -13,9 +13,6 @@ import {
 
 vi.mock('../../src/load-config.js', () => ({ loadConfig: vi.fn() }))
 vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
-vi.mock('../../src/helpers/workspace-map.js', () => ({
-  buildWorkspaceSchemasPaths: vi.fn().mockReturnValue(new Map()),
-}))
 
 import { loadConfig } from '../../src/load-config.js'
 import { createCliKernel } from '../../src/kernel.js'

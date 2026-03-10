@@ -10,6 +10,7 @@ import { createArtifactParserRegistry } from '../../infrastructure/artifact-pars
 import { createSchemaRegistry } from '../schema-registry.js'
 import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
 import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
+import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
 
 /**
  * Domain context for the primary (default) workspace used by `ArchiveChange`.
@@ -49,6 +50,15 @@ export interface FsArchiveChangeOptions {
   readonly nodeModulesPaths: readonly string[]
   /** Project root directory for resolving relative schema paths. */
   readonly configDir: string
+  readonly schemaRef: string
+  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
+  /** Absolute path to the project root. */
+  readonly projectRoot: string
+  /** Project-level hooks for the `archiving` workflow step. */
+  readonly projectHooks?: {
+    readonly pre: readonly HookEntry[]
+    readonly post: readonly HookEntry[]
+  }
 }
 
 /**
@@ -106,6 +116,13 @@ export function createArchiveChange(
         ),
       ]),
     )
+    const workspaceSchemasPaths = new Map<string, string>()
+    for (const ws of config.workspaces) {
+      if (ws.schemasPath !== null) {
+        workspaceSchemasPaths.set(ws.name, ws.schemasPath)
+      }
+    }
+    const archivingStep = config.workflow?.find((s) => s.step === 'archiving')
     return createArchiveChange(
       {
         workspace: defaultWs.name,
@@ -126,6 +143,10 @@ export function createArchiveChange(
           ...(kernelOpts?.extraNodeModulesPaths ?? []),
         ],
         configDir: config.projectRoot,
+        schemaRef: config.schemaRef,
+        workspaceSchemasPaths,
+        projectRoot: config.projectRoot,
+        ...(archivingStep?.hooks !== undefined ? { projectHooks: archivingStep.hooks } : {}),
       },
     )
   }
@@ -156,5 +177,10 @@ export function createArchiveChange(
     git,
     parsers,
     schemas,
+    opts.schemaRef,
+    opts.workspaceSchemasPaths,
+    opts.projectRoot,
+    opts.changesPath,
+    opts.projectHooks,
   )
 }

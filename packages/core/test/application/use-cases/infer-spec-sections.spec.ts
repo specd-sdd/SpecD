@@ -11,12 +11,6 @@ import {
 } from './helpers.js'
 
 // ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
-
-const defaultSchemasPaths: ReadonlyMap<string, string> = new Map()
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -32,12 +26,8 @@ describe('InferSpecSections', () => {
 
     const artifacts = new Map([['spec.md', { content: '# Spec Content' }]])
 
-    const uc = new InferSpecSections(makeSchemaRegistry(schema), makeParsers())
-    const result = await uc.execute({
-      artifacts,
-      schemaRef: 'test',
-      workspaceSchemasPaths: defaultSchemasPaths,
-    })
+    const uc = new InferSpecSections(makeSchemaRegistry(schema), makeParsers(), 'test', new Map())
+    const result = await uc.execute({ artifacts })
 
     expect(result.rules).toEqual([])
     expect(result.constraints).toEqual([])
@@ -47,15 +37,14 @@ describe('InferSpecSections', () => {
   it('throws SchemaNotFoundError when schema not found', async () => {
     const artifacts = new Map([['spec.md', { content: '# Spec' }]])
 
-    const uc = new InferSpecSections(makeSchemaRegistry(null), makeParsers())
+    const uc = new InferSpecSections(
+      makeSchemaRegistry(null),
+      makeParsers(),
+      'missing-schema',
+      new Map(),
+    )
 
-    await expect(
-      uc.execute({
-        artifacts,
-        schemaRef: 'missing-schema',
-        workspaceSchemasPaths: defaultSchemasPaths,
-      }),
-    ).rejects.toThrow(SchemaNotFoundError)
+    await expect(uc.execute({ artifacts })).rejects.toThrow(SchemaNotFoundError)
   })
 
   it('extracts sections from artifact content via selector matching', async () => {
@@ -111,12 +100,8 @@ describe('InferSpecSections', () => {
     const artifacts = new Map([['spec.md', { content: '# Spec' }]])
     const parsers = makeParsers(parser)
 
-    const uc = new InferSpecSections(makeSchemaRegistry(schema), parsers)
-    const result = await uc.execute({
-      artifacts,
-      schemaRef: 'test',
-      workspaceSchemasPaths: defaultSchemasPaths,
-    })
+    const uc = new InferSpecSections(makeSchemaRegistry(schema), parsers, 'test', new Map())
+    const result = await uc.execute({ artifacts })
 
     expect(result.rules).toEqual(['Must validate input'])
     expect(result.constraints).toEqual(['Max 100 chars'])

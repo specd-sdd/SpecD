@@ -17,7 +17,7 @@ export function registerChangeValidate(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, specPath: string, opts: { format: string; config?: string }) => {
       try {
-        const { config, kernel, workspaceSchemasPaths } = await resolveChangeContext({
+        const { config, kernel } = await resolveChangeContext({
           configPath: opts.config,
         })
         const parsed = parseSpecId(specPath, config)
@@ -26,8 +26,6 @@ export function registerChangeValidate(parent: Command): void {
         const result = await kernel.changes.validate.execute({
           name,
           specPath: fullSpecPath,
-          schemaRef: config.schemaRef,
-          workspaceSchemasPaths,
         })
 
         const fmt = parseFormat(opts.format)

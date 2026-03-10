@@ -16,10 +16,6 @@ export interface ApproveSpecInput {
   readonly reason: string
   /** Whether the spec approval gate is enabled in the active configuration. */
   readonly approvalsSpec: boolean
-  /** The schema reference from `specd.yaml` (e.g. `"@specd/schema-std"`). */
-  readonly schemaRef: string
-  /** Map of workspace name to its resolved `schemasPath`. */
-  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
 }
 
 /**
@@ -34,6 +30,8 @@ export class ApproveSpec {
   private readonly _git: GitAdapter
   private readonly _schemas: SchemaRegistry
   private readonly _hasher: ContentHasher
+  private readonly _schemaRef: string
+  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new `ApproveSpec` use case instance.
@@ -42,17 +40,23 @@ export class ApproveSpec {
    * @param git - Adapter for resolving the actor identity
    * @param schemas - Registry for resolving the active schema
    * @param hasher - Content hasher for computing artifact hashes
+   * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
+   * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
    */
   constructor(
     changes: ChangeRepository,
     git: GitAdapter,
     schemas: SchemaRegistry,
     hasher: ContentHasher,
+    schemaRef: string,
+    workspaceSchemasPaths: ReadonlyMap<string, string>,
   ) {
     this._changes = changes
     this._git = git
     this._schemas = schemas
     this._hasher = hasher
+    this._schemaRef = schemaRef
+    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
@@ -74,11 +78,7 @@ export class ApproveSpec {
       throw new ChangeNotFoundError(input.name)
     }
 
-    const artifactHashes = await this._computeArtifactHashes(
-      change,
-      input.schemaRef,
-      input.workspaceSchemasPaths,
-    )
+    const artifactHashes = await this._computeArtifactHashes(change)
 
     const actor = await this._git.identity()
     change.recordSpecApproval(input.reason, artifactHashes, actor)
@@ -92,16 +92,10 @@ export class ApproveSpec {
    * schema-defined pre-hash cleanup rules.
    *
    * @param change - The change whose artifacts to hash
-   * @param schemaRef - Schema reference for resolving cleanup rules
-   * @param workspaceSchemasPaths - Map of workspace name to schemas path
    * @returns Map of artifact filename to hash string
    */
-  private async _computeArtifactHashes(
-    change: Change,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
-  ): Promise<Record<string, string>> {
-    const schema = await this._schemas.resolve(schemaRef, workspaceSchemasPaths)
+  private async _computeArtifactHashes(change: Change): Promise<Record<string, string>> {
+    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
     const cleanupMap: ReadonlyMap<string, readonly PreHashCleanup[]> =
       schema !== null ? buildCleanupMap(schema) : new Map()
 

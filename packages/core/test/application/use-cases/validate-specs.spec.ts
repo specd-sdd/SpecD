@@ -12,12 +12,6 @@ import {
 } from './helpers.js'
 
 // ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
-
-const defaultSchemasPaths: ReadonlyMap<string, string> = new Map()
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -43,11 +37,14 @@ describe('ValidateSpecs', () => {
       ['billing', repo2],
     ])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaRegistry(schema), makeParsers())
-    const result = await uc.execute({
-      schemaRef: 'test',
-      workspaceSchemasPaths: defaultSchemasPaths,
-    })
+    const uc = new ValidateSpecs(
+      specRepos,
+      makeSchemaRegistry(schema),
+      makeParsers(),
+      'test',
+      new Map(),
+    )
+    const result = await uc.execute({})
 
     expect(result.totalSpecs).toBe(2)
     expect(result.entries).toHaveLength(2)
@@ -58,14 +55,15 @@ describe('ValidateSpecs', () => {
   it('throws SchemaNotFoundError when schema not resolved', async () => {
     const specRepos = new Map([['default', makeSpecRepository()]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaRegistry(null), makeParsers())
+    const uc = new ValidateSpecs(
+      specRepos,
+      makeSchemaRegistry(null),
+      makeParsers(),
+      'missing-schema',
+      new Map(),
+    )
 
-    await expect(
-      uc.execute({
-        schemaRef: 'missing-schema',
-        workspaceSchemasPaths: defaultSchemasPaths,
-      }),
-    ).rejects.toThrow(SchemaNotFoundError)
+    await expect(uc.execute({})).rejects.toThrow(SchemaNotFoundError)
   })
 
   it('reports passed for specs with valid artifacts', async () => {
@@ -79,11 +77,14 @@ describe('ValidateSpecs', () => {
     })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaRegistry(schema), makeParsers())
-    const result = await uc.execute({
-      schemaRef: 'test',
-      workspaceSchemasPaths: defaultSchemasPaths,
-    })
+    const uc = new ValidateSpecs(
+      specRepos,
+      makeSchemaRegistry(schema),
+      makeParsers(),
+      'test',
+      new Map(),
+    )
+    const result = await uc.execute({})
 
     expect(result.entries[0]!.passed).toBe(true)
     expect(result.entries[0]!.failures).toEqual([])
@@ -99,11 +100,14 @@ describe('ValidateSpecs', () => {
     const repo = makeSpecRepository({ specs: [spec] })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaRegistry(schema), makeParsers())
-    const result = await uc.execute({
-      schemaRef: 'test',
-      workspaceSchemasPaths: defaultSchemasPaths,
-    })
+    const uc = new ValidateSpecs(
+      specRepos,
+      makeSchemaRegistry(schema),
+      makeParsers(),
+      'test',
+      new Map(),
+    )
+    const result = await uc.execute({})
 
     expect(result.entries[0]!.passed).toBe(false)
     expect(result.entries[0]!.failures).toHaveLength(1)
@@ -116,10 +120,14 @@ describe('ValidateSpecs', () => {
     const schema = makeSchema([specType])
     const specRepos = new Map([['default', makeSpecRepository()]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaRegistry(schema), makeParsers())
+    const uc = new ValidateSpecs(
+      specRepos,
+      makeSchemaRegistry(schema),
+      makeParsers(),
+      'test',
+      new Map(),
+    )
     const result = await uc.execute({
-      schemaRef: 'test',
-      workspaceSchemasPaths: defaultSchemasPaths,
       workspace: 'nonexistent',
     })
 

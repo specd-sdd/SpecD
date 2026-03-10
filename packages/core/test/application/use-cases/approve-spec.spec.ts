@@ -37,8 +37,6 @@ function makePendingSpecApprovalChange(name: string): Change {
 
 const defaultInput = {
   approvalsSpec: true,
-  schemaRef: '@specd/schema-std',
-  workspaceSchemasPaths: new Map<string, string>(),
 }
 
 describe('ApproveSpec', () => {
@@ -52,6 +50,8 @@ describe('ApproveSpec', () => {
         makeGitAdapter(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
@@ -73,6 +73,8 @@ describe('ApproveSpec', () => {
         makeGitAdapter(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
@@ -89,7 +91,14 @@ describe('ApproveSpec', () => {
       const repo = makeChangeRepository([change])
       vi.spyOn(repo, 'artifact').mockResolvedValue(new SpecArtifact('spec.md', '# Spec'))
       const hasher = makeContentHasher()
-      const uc = new ApproveSpec(repo, makeGitAdapter(), makeSchemaRegistry(makeSchema()), hasher)
+      const uc = new ApproveSpec(
+        repo,
+        makeGitAdapter(),
+        makeSchemaRegistry(makeSchema()),
+        hasher,
+        'test',
+        new Map(),
+      )
 
       const result = await uc.execute({
         name: 'my-change',
@@ -110,6 +119,8 @@ describe('ApproveSpec', () => {
         makeGitAdapter(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await uc.execute({
@@ -125,30 +136,40 @@ describe('ApproveSpec', () => {
   describe('given the spec approval gate is disabled', () => {
     it('throws ApprovalGateDisabledError before loading the change', async () => {
       const repo = makeChangeRepository()
-      const uc = new ApproveSpec(repo, makeGitAdapter(), makeSchemaRegistry(), makeContentHasher())
+      const uc = new ApproveSpec(
+        repo,
+        makeGitAdapter(),
+        makeSchemaRegistry(),
+        makeContentHasher(),
+        'test',
+        new Map(),
+      )
 
       await expect(
         uc.execute({
           name: 'my-change',
           reason: 'ok',
           approvalsSpec: false,
-          schemaRef: '@specd/schema-std',
-          workspaceSchemasPaths: new Map(),
         }),
       ).rejects.toThrow(ApprovalGateDisabledError)
     })
 
     it('ApprovalGateDisabledError has correct code', async () => {
       const repo = makeChangeRepository()
-      const uc = new ApproveSpec(repo, makeGitAdapter(), makeSchemaRegistry(), makeContentHasher())
+      const uc = new ApproveSpec(
+        repo,
+        makeGitAdapter(),
+        makeSchemaRegistry(),
+        makeContentHasher(),
+        'test',
+        new Map(),
+      )
 
       await expect(
         uc.execute({
           name: 'my-change',
           reason: 'ok',
           approvalsSpec: false,
-          schemaRef: '@specd/schema-std',
-          workspaceSchemasPaths: new Map(),
         }),
       ).rejects.toMatchObject({ code: 'APPROVAL_GATE_DISABLED' })
     })
@@ -170,6 +191,8 @@ describe('ApproveSpec', () => {
         makeGitAdapter(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await expect(
@@ -190,6 +213,8 @@ describe('ApproveSpec', () => {
         makeGitAdapter(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await expect(

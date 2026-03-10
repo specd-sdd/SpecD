@@ -3,7 +3,6 @@ import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
 import { vlen, pad } from '../../helpers/table.js'
 
 /**
@@ -26,11 +25,7 @@ export function registerChangeArtifacts(parent: Command): void {
         // Resolve schema for delta info
         let schemaArtifacts: ReadonlyMap<string, { delta: boolean; output: string }> = new Map()
         try {
-          const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
-          const schema = await kernel.specs.getActiveSchema.execute({
-            schemaRef: config.schemaRef,
-            workspaceSchemasPaths,
-          })
+          const schema = await kernel.specs.getActiveSchema.execute()
           schemaArtifacts = new Map(
             schema
               .artifacts()

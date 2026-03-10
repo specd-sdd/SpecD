@@ -14,12 +14,6 @@ import {
 } from './helpers.js'
 
 // ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
-
-const defaultSchemasPaths: ReadonlyMap<string, string> = new Map()
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -37,11 +31,11 @@ describe('GetProjectContext', () => {
       fileReader,
       makeParsers(),
       makeContentHasher(),
+      'test',
+      new Map(),
     )
 
     const result = await uc.execute({
-      schemaRef: 'test',
-      workspaceSchemasPaths: defaultSchemasPaths,
       config: {
         context: [
           { instruction: 'Always use TypeScript strict mode.' },
@@ -64,12 +58,12 @@ describe('GetProjectContext', () => {
       makeFileReader(),
       makeParsers(),
       makeContentHasher(),
+      'test',
+      new Map(),
     )
 
     await expect(
       uc.execute({
-        schemaRef: 'missing-schema',
-        workspaceSchemasPaths: defaultSchemasPaths,
         config: {},
       }),
     ).rejects.toThrow(SchemaNotFoundError)
@@ -96,11 +90,11 @@ describe('GetProjectContext', () => {
       makeFileReader(),
       makeParsers(),
       makeContentHasher(),
+      'test',
+      new Map(),
     )
 
     const result = await uc.execute({
-      schemaRef: 'test',
-      workspaceSchemasPaths: defaultSchemasPaths,
       config: {
         contextIncludeSpecs: ['*'],
       },
@@ -136,11 +130,11 @@ describe('GetProjectContext', () => {
       makeFileReader(),
       makeParsers(),
       makeContentHasher(),
+      'test',
+      new Map(),
     )
 
     const result = await uc.execute({
-      schemaRef: 'test',
-      workspaceSchemasPaths: defaultSchemasPaths,
       config: {
         contextIncludeSpecs: ['*'],
         contextExcludeSpecs: ['auth/*'],

@@ -15,14 +15,13 @@ import {
   type SpecSection,
 } from './compile-context.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
-import { type WorkspaceContext } from '../ports/workspace-context.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { findNodes } from './_shared/selector-matching.js'
 import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
 import { traverseDependsOn } from './_shared/depends-on-traversal.js'
 
 /** Input for the {@link GetProjectContext} use case. */
-export interface GetProjectContextInput extends WorkspaceContext {
+export interface GetProjectContextInput {
   /** Resolved project configuration. */
   readonly config: CompileContextConfig
   /**
@@ -78,6 +77,8 @@ export class GetProjectContext {
   private readonly _files: FileReader
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
+  private readonly _schemaRef: string
+  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new `GetProjectContext` use case instance.
@@ -87,6 +88,8 @@ export class GetProjectContext {
    * @param files - Reader for project-level context file entries
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hasher for metadata freshness checks
+   * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
+   * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
    */
   constructor(
     specs: ReadonlyMap<string, SpecRepository>,
@@ -94,12 +97,16 @@ export class GetProjectContext {
     files: FileReader,
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
+    schemaRef: string,
+    workspaceSchemasPaths: ReadonlyMap<string, string>,
   ) {
     this._specs = specs
     this._schemas = schemas
     this._files = files
     this._parsers = parsers
     this._hasher = hasher
+    this._schemaRef = schemaRef
+    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
@@ -110,8 +117,8 @@ export class GetProjectContext {
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    */
   async execute(input: GetProjectContextInput): Promise<GetProjectContextResult> {
-    const schema = await this._schemas.resolve(input.schemaRef, input.workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(input.schemaRef)
+    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
+    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
 
     const warnings: ContextWarning[] = []
     const contextEntries: string[] = []

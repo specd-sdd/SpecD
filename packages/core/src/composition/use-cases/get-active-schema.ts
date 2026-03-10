@@ -7,6 +7,8 @@ import { createSchemaRegistry } from '../schema-registry.js'
 export interface FsGetActiveSchemaOptions {
   readonly nodeModulesPaths: readonly string[]
   readonly configDir: string
+  readonly schemaRef: string
+  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
 }
 
 /** Extra options when constructing from a `SpecdConfig`. */
@@ -51,11 +53,22 @@ export function createGetActiveSchema(
       ],
       configDir: configOrOptions.projectRoot,
     })
-    return new GetActiveSchema(schemas)
+    const schemaRef = configOrOptions.schemaRef
+    const workspaceSchemasPaths = new Map<string, string>()
+    for (const ws of configOrOptions.workspaces) {
+      if (ws.schemasPath !== null) {
+        workspaceSchemasPaths.set(ws.name, ws.schemasPath)
+      }
+    }
+    return new GetActiveSchema(schemas, schemaRef, workspaceSchemasPaths)
   }
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: configOrOptions.nodeModulesPaths,
     configDir: configOrOptions.configDir,
   })
-  return new GetActiveSchema(schemas)
+  return new GetActiveSchema(
+    schemas,
+    configOrOptions.schemaRef,
+    configOrOptions.workspaceSchemasPaths,
+  )
 }
