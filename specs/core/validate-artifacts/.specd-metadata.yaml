@@ -1,33 +1,33 @@
 title: 'ValidateArtifacts'
 description: >
-  Application use case that validates a change's artifact files against the active schema,
-  enforces required artifacts and dependency order, detects delta conflicts, invalidates stale
-  approvals, and marks artifacts complete. The only code path through which an artifact may
-  reach complete status.
+  Defines the ValidateArtifacts application use case that validates a change's artifact files
+  against the active schema, enforces required artifacts and dependency order, detects delta
+  conflicts, invalidates stale approvals, and marks artifacts complete. Read this when implementing
+  or modifying artifact validation, delta preview, or the mark-complete code path.
 keywords:
-  - 'validate-artifacts'
   - 'artifact-validation'
-  - 'delta-validation'
+  - 'delta-application-preview'
   - 'structural-validation'
-  - 'mark-complete'
   - 'approval-invalidation'
   - 'dependency-order'
+  - 'mark-complete'
+  - 'schema-mismatch-guard'
   - 'pre-hash-cleanup'
-contentHashes:
-  'spec.md': 'sha256:4bb1e47cdbd126c453d5204e64046357c6a412ead08abdd1437fe183d7419a52'
-  'verify.md': 'sha256:e7a2776f4791714349f5fe816448efec4e7dbe1ba7cd99de282309d520697135'
 dependsOn:
   - 'core:core/change'
   - 'core:core/schema-format'
   - 'core:core/delta-format'
   - 'core:core/selector-model'
   - 'core:core/storage'
-  - 'core:core/spec-id-format'
   - 'default:_global/architecture'
+  - 'core:core/spec-id-format'
+contentHashes:
+  'spec.md': 'sha256:8782818bd8397429d69677546bb30df70b1081ba3bf51d2c9cbef439e03506ce'
+  'verify.md': 'sha256:e7a2776f4791714349f5fe816448efec4e7dbe1ba7cd99de282309d520697135'
 rules:
   - requirement: 'Ports and constructor'
     rules:
-      - 'Receives ChangeRepository, a map of SpecRepository instances keyed by workspace name, SchemaRegistry, ArtifactParserRegistry, GitAdapter, schemaRef, and workspaceSchemasPaths at construction time.'
+      - 'Receives ChangeRepository, a map of SpecRepository instances keyed by workspace name, SchemaRegistry, ArtifactParserRegistry, VcsAdapter, schemaRef, and workspaceSchemasPaths at construction time.'
       - 'specs map is keyed by workspace name for looking up base specs during delta application preview.'
       - 'ArtifactParserRegistry maps format names to ArtifactParser adapters for deltaValidations checks and delta application preview.'
       - 'schemaRef and workspaceSchemasPaths are injected at kernel composition time, not passed per invocation.'

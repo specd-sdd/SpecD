@@ -260,7 +260,7 @@ new ArchiveChange(
   archive: ArchiveRepository,
   hooks: HookRunner,
   actor: ActorResolver,
-  git: GitAdapter,
+  git: VcsAdapter,
   parsers: ArtifactParserRegistry,
   schemas: SchemaRegistry,
 )

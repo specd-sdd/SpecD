@@ -6,7 +6,7 @@ export { ArchiveRepository, type ArchiveRepositoryConfig } from './archive-repos
 export { type SchemaRegistry, type SchemaEntry, type Schema } from './schema-registry.js'
 export { type HookRunner, type HookResult, type HookVariables } from './hook-runner.js'
 export { type ActorResolver } from './actor-resolver.js'
-export { type GitAdapter } from './git-adapter.js'
+export { type VcsAdapter } from './vcs-adapter.js'
 export { type FileReader } from './file-reader.js'
 export {
   type ArtifactNode,

@@ -11,7 +11,7 @@ keywords:
   - 'lifecycle-hooks'
   - 'artifact-parser'
   - 'archived-change'
-  - 'pre-archive-hooks'
+  - 'hook-runner'
   - 'metadata-refresh'
 dependsOn:
   - 'core:core/change'
@@ -25,12 +25,12 @@ dependsOn:
   - 'core:core/workspace'
   - 'core:core/spec-id-format'
 contentHashes:
-  'spec.md': 'sha256:be7dd440f5b62d2f4e1be0de4e36824e593af9455953274ff3ffb31ece6a596d'
+  'spec.md': 'sha256:59222179106204925ca2c2e5bc0bc51729c5ced0d74782feed8aabcc3f3e61f0'
   'verify.md': 'sha256:cc092a9faab12766a45611bb2063fac15b1c9f8abcbaaf49ffd652633880655b'
 rules:
   - requirement: 'Ports and constructor'
     rules:
-      - 'ArchiveChange receives at construction time: ChangeRepository, a map of SpecRepository instances (one per configured workspace), ArchiveRepository, HookRunner, GitAdapter, ArtifactParserRegistry, schemaRef, workspaceSchemasPaths, projectRoot, changesPath, and projectHooks.'
+      - 'ArchiveChange receives at construction time: ChangeRepository, a map of SpecRepository instances (one per configured workspace), ArchiveRepository, HookRunner, VcsAdapter, ArtifactParserRegistry, schemaRef, workspaceSchemasPaths, projectRoot, changesPath, and projectHooks.'
       - 'schemaRef is the schema reference string from specd.yaml; workspaceSchemasPaths is the resolved workspace-to-schemas-path map passed through to SchemaRegistry.resolve().'
       - 'projectRoot is the absolute path to the project root (the directory containing specd.yaml); changesPath is the absolute path to the changes directory.'
       - 'projectHooks contains the project-level workflow hook definitions from specd.yaml.'
@@ -71,7 +71,7 @@ rules:
       - 'For each artifact with delta: false (new file artifacts), load from ChangeRepository and save directly to SpecRepository if not absent or skipped.'
   - requirement: 'Archive repository call'
     rules:
-      - 'After syncing all specs, ArchiveChange must resolve the git actor via GitAdapter.identity() before calling archiveRepository.archive().'
+      - 'After syncing all specs, ArchiveChange must resolve the git actor via ActorResolver.identity() before calling archiveRepository.archive().'
       - 'If identity() throws, the archive proceeds without an actor.'
       - 'ArchiveChange calls archiveRepository.archive(change, { actor }) when an actor is available, or archiveRepository.archive(change, {}) when it is not.'
       - 'The ArchiveRepository port is responsible for constructing the ArchivedChange record; the use case never builds it directly.'

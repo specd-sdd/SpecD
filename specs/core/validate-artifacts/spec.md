@@ -8,7 +8,7 @@
 
 ### Requirement: Ports and constructor
 
-`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaRegistry`, `ArtifactParserRegistry`, `GitAdapter`, `schemaRef`, and `workspaceSchemasPaths`.
+`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaRegistry`, `ArtifactParserRegistry`, `VcsAdapter`, `schemaRef`, and `workspaceSchemasPaths`.
 
 ```typescript
 class ValidateArtifacts {
@@ -17,7 +17,7 @@ class ValidateArtifacts {
     specs: ReadonlyMap<string, SpecRepository>,
     schemas: SchemaRegistry,
     parsers: ArtifactParserRegistry,
-    git: GitAdapter,
+    git: VcsAdapter,
     schemaRef: string,
     workspaceSchemasPaths: ReadonlyMap<string, string>,
   )

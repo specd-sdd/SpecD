@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { execSync } from 'node:child_process'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { FsConfigLoader } from '../../../src/infrastructure/fs/config-loader.js'
 
@@ -11,7 +12,10 @@ import { FsConfigLoader } from '../../../src/infrastructure/fs/config-loader.js'
 let tmpDir: string
 
 beforeEach(async () => {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-config-loader-test-'))
+  // Resolve symlinks so paths match what git rev-parse returns
+  // (e.g. macOS /var → /private/var).
+  const raw = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-config-loader-test-'))
+  tmpDir = await fs.realpath(raw)
 })
 
 afterEach(async () => {
@@ -687,9 +691,9 @@ storage:
   })
 
   describe('Requirement: Storage paths must remain within repo root', () => {
-    it('throws ConfigValidationError when a storage path resolves outside the git root', async () => {
-      // Create a fake git repo so findGitRoot returns tmpDir
-      await fs.mkdir(path.join(tmpDir, '.git'), { recursive: true })
+    it('throws ConfigValidationError when a storage path resolves outside the VCS root', async () => {
+      // Initialise a real git repo so createVcsAdapter detects it
+      execSync('git init', { cwd: tmpDir, stdio: 'ignore' })
 
       const yaml = `
 schema: "@specd/schema-std"
@@ -728,8 +732,8 @@ storage:
       )
     })
 
-    it('accepts storage paths that are within the git root', async () => {
-      await fs.mkdir(path.join(tmpDir, '.git'), { recursive: true })
+    it('accepts storage paths that are within the VCS root', async () => {
+      execSync('git init', { cwd: tmpDir, stdio: 'ignore' })
 
       const configPath = await writeConfig(minimalYaml())
       const loader = new FsConfigLoader({ configPath })

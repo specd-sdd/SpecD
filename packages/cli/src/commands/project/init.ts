@@ -1,24 +1,24 @@
 import { type Command } from 'commander'
-import { createInitProject, createRecordSkillInstall } from '@specd/core'
+import { createInitProject, createRecordSkillInstall, createVcsAdapter } from '@specd/core'
 import { listSkills } from '@specd/skills'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { execSync } from 'node:child_process'
 import { KNOWN_AGENTS } from '../../helpers/known-agents.js'
 import { fileExists } from '../../helpers/file-exists.js'
 import { collect } from '../../helpers/collect.js'
 
 /**
- * Resolves the project root to the git repository root when inside a git repo,
+ * Resolves the project root to the VCS repository root when inside a repo,
  * falling back to the current working directory otherwise.
  *
  * @returns The absolute path to the project root.
  */
-function resolveProjectRoot(): string {
+async function resolveProjectRoot(): Promise<string> {
   try {
-    return execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim()
+    const vcs = await createVcsAdapter()
+    return await vcs.rootDir()
   } catch {
     return process.cwd()
   }
@@ -95,7 +95,7 @@ export function registerProjectInit(parent: Command): void {
 
           const isInteractive = process.stdout.isTTY === true && fmt === 'text' && !hasConfigFlags
 
-          const projectRoot = resolveProjectRoot()
+          const projectRoot = await resolveProjectRoot()
           const configPath = path.join(projectRoot, 'specd.yaml')
 
           if (isInteractive) {

@@ -1,13 +1,13 @@
 # Example: Implementing a port
 
-This guide walks through implementing three ports from scratch: `ChangeRepository` (an abstract class), `GitAdapter` (a plain interface), and `ActorResolver` (a plain interface). It shows the full pattern for both kinds of port and how to wire them into a use case.
+This guide walks through implementing three ports from scratch: `ChangeRepository` (an abstract class), `VcsAdapter` (a plain interface), and `ActorResolver` (a plain interface). It shows the full pattern for both kinds of port and how to wire them into a use case.
 
 ## The two port shapes
 
 `@specd/core` ports come in two shapes:
 
 - **Abstract classes** (`Repository`, `SpecRepository`, `ChangeRepository`, `ArchiveRepository`) — extend these and implement the abstract methods. The base class constructor sets `workspace`, `ownership`, and `isExternal` for you.
-- **Interfaces** (`SchemaRegistry`, `HookRunner`, `GitAdapter`, `ActorResolver`, `FileReader`, `ArtifactParser`) — implement these directly. No base class; just satisfy the interface.
+- **Interfaces** (`SchemaRegistry`, `HookRunner`, `VcsAdapter`, `ActorResolver`, `FileReader`, `ArtifactParser`) — implement these directly. No base class; just satisfy the interface.
 
 ---
 
@@ -84,15 +84,15 @@ export class InMemoryChangeRepository extends ChangeRepository {
 
 ---
 
-## Implementing GitAdapter (interface)
+## Implementing VcsAdapter (interface)
 
-This example implements a `GitAdapter` backed by the `simple-git` library. `GitAdapter` covers VCS operations only (root directory, branch, clean status).
+This example implements a `VcsAdapter` backed by the `simple-git` library. `VcsAdapter` covers VCS operations only (root directory, branch, clean status).
 
 ```typescript
-import { type GitAdapter } from '@specd/core'
+import { type VcsAdapter } from '@specd/core'
 import simpleGit from 'simple-git'
 
-export class SimpleGitAdapter implements GitAdapter {
+export class SimpleVcsAdapter implements VcsAdapter {
   private readonly _git = simpleGit()
 
   async rootDir(): Promise<string> {

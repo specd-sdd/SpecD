@@ -85,7 +85,7 @@ Everything exported is a domain type (entity, value object, error), an applicati
 | `ArchiveRepository`         | abstract class | Port for archiving and querying archived changes.                 |
 | `SchemaRegistry`            | interface      | Port for discovering and resolving schemas.                       |
 | `HookRunner`                | interface      | Port for executing `run:` hook commands.                          |
-| `GitAdapter`                | interface      | Port for querying git repository state (VCS operations).          |
+| `VcsAdapter`                | interface      | Port for querying version control system state (VCS operations).  |
 | `ActorResolver`             | interface      | Port for resolving the current actor identity.                    |
 | `FileReader`                | interface      | Port for reading files by absolute path.                          |
 | `ArtifactParser`            | interface      | Port for parsing, applying deltas, and serialising artifacts.     |

@@ -21,7 +21,7 @@ Both signatures are public exports. The explicit form is used in tests and in sc
 
 ### Requirement: Internal ports are never exported
 
-Port implementations that have a single concrete class and no caller-visible configuration — `NodeHookRunner`, `GitCLIAdapter`, `FsFileReader` — are constructed inside use-case factories and never appear in any public export. Repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`) are also internal to the composition layer.
+Port implementations that have a single concrete class and no caller-visible configuration — `NodeHookRunner`, `GitVcsAdapter`, `FsFileReader` — are constructed inside use-case factories and never appear in any public export. Repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`) are also internal to the composition layer.
 
 ### Requirement: Kernel builds all use cases from SpecdConfig
 
@@ -48,7 +48,7 @@ The kernel is a convenience — it is not the mandatory entry point. Callers tha
 ## Constraints
 
 - `composition/` is the only directory in `@specd/core` permitted to import from `infrastructure/`
-- Concrete adapter classes (`FsSpecRepository`, `NodeHookRunner`, `GitCLIAdapter`, `FsFileReader`, `FsSchemaRegistry`, etc.) must not appear in `src/index.ts` or any re-export chain
+- Concrete adapter classes (`FsSpecRepository`, `NodeHookRunner`, `GitVcsAdapter`, `FsFileReader`, `FsSchemaRegistry`, etc.) must not appear in `src/index.ts` or any re-export chain
 - Repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`) must not appear in `src/index.ts`
 - Use-case factories and the kernel are the only composition exports in `src/index.ts`
 - `ConfigLoader` implementations live in `infrastructure/`; the port interface lives in `application/ports/`

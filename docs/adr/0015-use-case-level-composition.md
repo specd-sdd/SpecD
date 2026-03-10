@@ -17,7 +17,7 @@ This approach has two problems. First, it leaks infrastructure detail: delivery 
 ## Decision Drivers
 
 - Delivery mechanisms (CLI, MCP) must not know which ports a use case requires — that is infrastructure detail
-- Internal port implementations with a single concrete class (`NodeHookRunner`, `GitCLIAdapter`, `FsFileReader`) must never appear in public API surfaces
+- Internal port implementations with a single concrete class (`NodeHookRunner`, `GitVcsAdapter`, `FsFileReader`) must never appear in public API surfaces
 - Config loading must be decoupled from the kernel so that new sources (env vars, remote config) can be added without touching the delivery layer
 - The composition layer must remain the only layer permitted to import from `infrastructure/`
 - Consumers that only need a single use case must not be forced through the full kernel
@@ -35,7 +35,7 @@ Chosen option: "Use-case-level factories + kernel + config loader port", because
 
 The composition layer is structured in three levels:
 
-**Level 1 — Use-case factories** (`composition/use-cases/`): each factory (e.g. `createArchiveChange`) accepts either a fully resolved `SpecdConfig` or an explicit `(context, options)` pair. Both call signatures are public. Internal ports (`NodeHookRunner`, `GitCLIAdapter`, `FsFileReader`) are constructed inside the factory and never exported. Repository-level factories (`createSpecRepository`, etc.) are also internal to this level.
+**Level 1 — Use-case factories** (`composition/use-cases/`): each factory (e.g. `createArchiveChange`) accepts either a fully resolved `SpecdConfig` or an explicit `(context, options)` pair. Both call signatures are public. Internal ports (`NodeHookRunner`, `GitVcsAdapter`, `FsFileReader`) are constructed inside the factory and never exported. Repository-level factories (`createSpecRepository`, etc.) are also internal to this level.
 
 **Level 2 — Kernel** (`composition/kernel.ts`): `createKernel(config: SpecdConfig)` is a convenience that calls every use-case factory with the same `SpecdConfig` and returns an object with all pre-wired use cases. Delivery mechanisms that need the full set call `createKernel`; those that need a single use case call its factory directly.
 
@@ -44,7 +44,7 @@ The composition layer is structured in three levels:
 ### Consequences
 
 - Good, because delivery mechanisms (CLI, MCP) are reduced to: load config → create kernel → call use case
-- Good, because internal ports (`NodeHookRunner`, `GitCLIAdapter`, `FsFileReader`) are never part of any public API
+- Good, because internal ports (`NodeHookRunner`, `GitVcsAdapter`, `FsFileReader`) are never part of any public API
 - Good, because adding a new internal port dependency to a use case requires no changes in delivery layers
 - Good, because config source (YAML, env vars, CI secrets) is fully interchangeable behind the `ConfigLoader` port
 - Good, because the kernel accepts a typed `SpecdConfig` — it is testable without any filesystem access
@@ -55,7 +55,7 @@ The composition layer is structured in three levels:
 ### Confirmation
 
 - No file under `src/infrastructure/` is imported from any file outside `src/composition/`
-- `NodeHookRunner`, `GitCLIAdapter`, and `FsFileReader` do not appear in `src/index.ts` or any public export
+- `NodeHookRunner`, `GitVcsAdapter`, and `FsFileReader` do not appear in `src/index.ts` or any public export
 - `createSpecRepository`, `createChangeRepository`, and `createArchiveRepository` do not appear in `src/index.ts`
 - The `ConfigLoader` port is defined in `src/application/ports/` and its implementations live in `src/infrastructure/`
 - These are verified by ESLint `no-restricted-imports` rules and by inspecting the public export surface of `@specd/core`
