@@ -1,6 +1,6 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type GitAdapter } from '../ports/git-adapter.js'
+import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 
 /** Input for the {@link DiscardChange} use case. */
@@ -21,17 +21,17 @@ export interface DiscardChangeInput {
  */
 export class DiscardChange {
   private readonly _changes: ChangeRepository
-  private readonly _git: GitAdapter
+  private readonly _actor: ActorResolver
 
   /**
    * Creates a new `DiscardChange` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
-   * @param git - Adapter for resolving the actor identity
+   * @param actor - Resolver for the actor identity
    */
-  constructor(changes: ChangeRepository, git: GitAdapter) {
+  constructor(changes: ChangeRepository, actor: ActorResolver) {
     this._changes = changes
-    this._git = git
+    this._actor = actor
   }
 
   /**
@@ -47,7 +47,7 @@ export class DiscardChange {
       throw new ChangeNotFoundError(input.name)
     }
 
-    const actor = await this._git.identity()
+    const actor = await this._actor.identity()
     change.discard(input.reason, actor, input.supersededBy)
     await this._changes.save(change)
     return change

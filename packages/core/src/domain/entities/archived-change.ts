@@ -1,5 +1,5 @@
 import { SpecPath } from '../value-objects/spec-path.js'
-import { type GitIdentity } from './change.js'
+import { type ActorIdentity } from './change.js'
 
 /**
  * Construction properties for an `ArchivedChange`.
@@ -14,7 +14,7 @@ export interface ArchivedChangeProps {
   /** Timestamp when the change was archived. */
   readonly archivedAt: Date
   /** Git identity of the actor who archived the change, if recorded. */
-  readonly archivedBy?: GitIdentity
+  readonly archivedBy?: ActorIdentity
   /** Artifact type IDs that were present when the change was archived. */
   readonly artifacts: readonly string[]
   /** Spec paths that were associated with the change at archive time. */
@@ -36,7 +36,7 @@ export class ArchivedChange {
   private readonly _archivedName: string
   private readonly _workspace: SpecPath
   private readonly _archivedAt: Date
-  private readonly _archivedBy: GitIdentity | undefined
+  private readonly _archivedBy: ActorIdentity | undefined
   private readonly _artifacts: readonly string[]
   private readonly _specIds: readonly string[]
   private readonly _schemaName: string
@@ -80,7 +80,7 @@ export class ArchivedChange {
   }
 
   /** Git identity of the actor who archived the change, or `undefined` if not recorded. */
-  get archivedBy(): GitIdentity | undefined {
+  get archivedBy(): ActorIdentity | undefined {
     return this._archivedBy
   }
 

@@ -1,6 +1,6 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type GitAdapter } from '../ports/git-adapter.js'
+import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
@@ -27,7 +27,7 @@ export interface ApproveSpecInput {
  */
 export class ApproveSpec {
   private readonly _changes: ChangeRepository
-  private readonly _git: GitAdapter
+  private readonly _actor: ActorResolver
   private readonly _schemas: SchemaRegistry
   private readonly _hasher: ContentHasher
   private readonly _schemaRef: string
@@ -37,7 +37,7 @@ export class ApproveSpec {
    * Creates a new `ApproveSpec` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
-   * @param git - Adapter for resolving the actor identity
+   * @param actor - Resolver for the actor identity
    * @param schemas - Registry for resolving the active schema
    * @param hasher - Content hasher for computing artifact hashes
    * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
@@ -45,14 +45,14 @@ export class ApproveSpec {
    */
   constructor(
     changes: ChangeRepository,
-    git: GitAdapter,
+    actor: ActorResolver,
     schemas: SchemaRegistry,
     hasher: ContentHasher,
     schemaRef: string,
     workspaceSchemasPaths: ReadonlyMap<string, string>,
   ) {
     this._changes = changes
-    this._git = git
+    this._actor = actor
     this._schemas = schemas
     this._hasher = hasher
     this._schemaRef = schemaRef
@@ -80,7 +80,7 @@ export class ApproveSpec {
 
     const artifactHashes = await this._computeArtifactHashes(change)
 
-    const actor = await this._git.identity()
+    const actor = await this._actor.identity()
     change.recordSpecApproval(input.reason, artifactHashes, actor)
     change.transition('spec-approved', actor)
     await this._changes.save(change)

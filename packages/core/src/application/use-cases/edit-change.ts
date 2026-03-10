@@ -1,6 +1,6 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type GitAdapter } from '../ports/git-adapter.js'
+import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 
@@ -32,17 +32,17 @@ export interface EditChangeResult {
  */
 export class EditChange {
   private readonly _changes: ChangeRepository
-  private readonly _git: GitAdapter
+  private readonly _actor: ActorResolver
 
   /**
    * Creates a new `EditChange` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
-   * @param git - Adapter for resolving the actor identity
+   * @param actor - Resolver for the actor identity
    */
-  constructor(changes: ChangeRepository, git: GitAdapter) {
+  constructor(changes: ChangeRepository, actor: ActorResolver) {
     this._changes = changes
-    this._git = git
+    this._actor = actor
   }
 
   /**
@@ -97,7 +97,7 @@ export class EditChange {
       return { change, invalidated: false }
     }
 
-    const actor = await this._git.identity()
+    const actor = await this._actor.identity()
 
     // Update spec IDs — this also appends an invalidated + transitioned event
     change.updateSpecIds(specIds, actor)

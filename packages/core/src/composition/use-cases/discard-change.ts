@@ -2,7 +2,7 @@ import { DiscardChange } from '../../application/use-cases/discard-change.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
-import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
+import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
 
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
@@ -70,6 +70,6 @@ export function createDiscardChange(
     )
   }
   const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  const git = new GitCLIAdapter()
-  return new DiscardChange(changeRepo, git)
+  const actor = new GitActorResolver()
+  return new DiscardChange(changeRepo, actor)
 }

@@ -1,6 +1,6 @@
 import { Change, type CreatedEvent } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type GitAdapter } from '../ports/git-adapter.js'
+import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeAlreadyExistsError } from '../errors/change-already-exists-error.js'
 
 /** Input for the {@link CreateChange} use case. */
@@ -26,17 +26,17 @@ export interface CreateChangeInput {
  */
 export class CreateChange {
   private readonly _changes: ChangeRepository
-  private readonly _git: GitAdapter
+  private readonly _actor: ActorResolver
 
   /**
    * Creates a new `CreateChange` use case instance.
    *
    * @param changes - Repository for persisting the new change
-   * @param git - Adapter for resolving the actor identity
+   * @param actor - Resolver for the actor identity
    */
-  constructor(changes: ChangeRepository, git: GitAdapter) {
+  constructor(changes: ChangeRepository, actor: ActorResolver) {
     this._changes = changes
-    this._git = git
+    this._actor = actor
   }
 
   /**
@@ -52,7 +52,7 @@ export class CreateChange {
       throw new ChangeAlreadyExistsError(input.name)
     }
 
-    const actor = await this._git.identity()
+    const actor = await this._actor.identity()
     const now = new Date()
 
     const created: CreatedEvent = {

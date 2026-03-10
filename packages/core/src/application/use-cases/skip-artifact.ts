@@ -1,6 +1,6 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type GitAdapter } from '../ports/git-adapter.js'
+import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { ArtifactNotFoundError } from '../errors/artifact-not-found-error.js'
 import { ArtifactNotOptionalError } from '../../domain/errors/artifact-not-optional-error.js'
@@ -23,17 +23,17 @@ export interface SkipArtifactInput {
  */
 export class SkipArtifact {
   private readonly _changes: ChangeRepository
-  private readonly _git: GitAdapter
+  private readonly _actor: ActorResolver
 
   /**
    * Creates a new `SkipArtifact` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
-   * @param git - Adapter for resolving the actor identity
+   * @param actor - Resolver for the actor identity
    */
-  constructor(changes: ChangeRepository, git: GitAdapter) {
+  constructor(changes: ChangeRepository, actor: ActorResolver) {
     this._changes = changes
-    this._git = git
+    this._actor = actor
   }
 
   /**
@@ -60,7 +60,7 @@ export class SkipArtifact {
       throw new ArtifactNotOptionalError(input.artifactId)
     }
 
-    const actor = await this._git.identity()
+    const actor = await this._actor.identity()
     change.recordArtifactSkipped(input.artifactId, actor, input.reason)
     artifact.markSkipped()
     await this._changes.save(change)

@@ -3,7 +3,7 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
-import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
+import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
 /**
@@ -85,7 +85,7 @@ export function createApproveSpec(
     )
   }
   const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  const git = new GitCLIAdapter()
+  const actor = new GitActorResolver()
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: [options!.projectRoot + '/node_modules'],
     configDir: options!.projectRoot,
@@ -93,7 +93,7 @@ export function createApproveSpec(
   const hasher = new NodeContentHasher()
   return new ApproveSpec(
     changeRepo,
-    git,
+    actor,
     schemas,
     hasher,
     options!.schemaRef,

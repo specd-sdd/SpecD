@@ -2,7 +2,7 @@ import { CreateChange } from '../../application/use-cases/create-change.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
-import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
+import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
 
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
@@ -73,6 +73,6 @@ export function createCreateChange(
     )
   }
   const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  const git = new GitCLIAdapter()
-  return new CreateChange(changeRepo, git)
+  const actor = new GitActorResolver()
+  return new CreateChange(changeRepo, actor)
 }

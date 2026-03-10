@@ -8,8 +8,8 @@
 
 import { z } from 'zod'
 
-/** Git identity as stored in the manifest JSON. */
-export interface ManifestGitIdentity {
+/** Actor identity as stored in the manifest JSON. */
+export interface ManifestActorIdentity {
   /** Display name of the actor. */
   readonly name: string
   /** Email address of the actor. */
@@ -43,7 +43,7 @@ export interface RawCreatedEvent {
   /** ISO 8601 timestamp. */
   readonly at: string
   /** Actor who created the change. */
-  readonly by: ManifestGitIdentity
+  readonly by: ManifestActorIdentity
   /** Spec paths at creation time. */
   readonly specIds: string[]
   /** Schema name at creation time. */
@@ -59,7 +59,7 @@ export interface RawTransitionedEvent {
   /** ISO 8601 timestamp. */
   readonly at: string
   /** Actor who triggered the transition. */
-  readonly by: ManifestGitIdentity
+  readonly by: ManifestActorIdentity
   /** The state transitioned from. */
   readonly from: string
   /** The state transitioned to. */
@@ -73,7 +73,7 @@ export interface RawSpecApprovedEvent {
   /** ISO 8601 timestamp. */
   readonly at: string
   /** Actor who approved the spec. */
-  readonly by: ManifestGitIdentity
+  readonly by: ManifestActorIdentity
   /** Free-text rationale for the approval. */
   readonly reason: string
   /** Hashes of the artifacts reviewed during approval, keyed by artifact type. */
@@ -87,7 +87,7 @@ export interface RawSignedOffEvent {
   /** ISO 8601 timestamp. */
   readonly at: string
   /** Actor who signed off. */
-  readonly by: ManifestGitIdentity
+  readonly by: ManifestActorIdentity
   /** Free-text rationale for the sign-off. */
   readonly reason: string
   /** Hashes of the artifacts reviewed during sign-off, keyed by artifact type. */
@@ -101,7 +101,7 @@ export interface RawInvalidatedEvent {
   /** ISO 8601 timestamp. */
   readonly at: string
   /** Actor who triggered the invalidation. */
-  readonly by: ManifestGitIdentity
+  readonly by: ManifestActorIdentity
   /** The reason the approval was invalidated. */
   readonly cause: string
 }
@@ -113,7 +113,7 @@ export interface RawDraftedEvent {
   /** ISO 8601 timestamp. */
   readonly at: string
   /** Actor who shelved the change. */
-  readonly by: ManifestGitIdentity
+  readonly by: ManifestActorIdentity
   /** Optional explanation for shelving. */
   readonly reason?: string
 }
@@ -125,7 +125,7 @@ export interface RawRestoredEvent {
   /** ISO 8601 timestamp. */
   readonly at: string
   /** Actor who restored the change. */
-  readonly by: ManifestGitIdentity
+  readonly by: ManifestActorIdentity
 }
 
 /** Raw JSON shape of a `discarded` event. */
@@ -135,7 +135,7 @@ export interface RawDiscardedEvent {
   /** ISO 8601 timestamp. */
   readonly at: string
   /** Actor who discarded the change. */
-  readonly by: ManifestGitIdentity
+  readonly by: ManifestActorIdentity
   /** Mandatory reason for discarding. */
   readonly reason: string
   /** Optional list of change names that replace this one. */
@@ -149,7 +149,7 @@ export interface RawArtifactSkippedEvent {
   /** ISO 8601 timestamp. */
   readonly at: string
   /** Actor who skipped the artifact. */
-  readonly by: ManifestGitIdentity
+  readonly by: ManifestActorIdentity
   /** The artifact type ID that was skipped. */
   readonly artifactId: string
   /** Optional explanation for skipping. */
@@ -170,7 +170,7 @@ export type RawChangeEvent =
 
 // ---- Zod validation schemas ----
 
-export const gitIdentitySchema = z.object({
+export const actorIdentitySchema = z.object({
   name: z.string(),
   email: z.string(),
 })
@@ -187,7 +187,7 @@ export const rawChangeEventSchema = z
   .object({
     type: z.string(),
     at: z.string(),
-    by: gitIdentitySchema,
+    by: actorIdentitySchema,
   })
   .passthrough()
 
@@ -196,7 +196,7 @@ export const changeManifestSchema = z.object({
   createdAt: z.string(),
   description: z.string().optional(),
   archivedAt: z.string().optional(),
-  archivedBy: gitIdentitySchema.optional(),
+  archivedBy: actorIdentitySchema.optional(),
   schema: z.object({
     name: z.string(),
     version: z.number(),
@@ -227,7 +227,7 @@ export interface ChangeManifest {
    *
    * Present only in manifests that have been moved to the archive directory.
    */
-  readonly archivedBy?: ManifestGitIdentity
+  readonly archivedBy?: ManifestActorIdentity
   /** Schema name and version recorded at creation; never updated. */
   readonly schema: {
     /** Schema name (e.g. `"@specd/schema-std"`). */

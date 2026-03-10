@@ -8,7 +8,7 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type HookRunner, type HookVariables } from '../ports/hook-runner.js'
-import { type GitAdapter } from '../ports/git-adapter.js'
+import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
@@ -52,7 +52,7 @@ export class ArchiveChange {
   private readonly _specs: ReadonlyMap<string, SpecRepository>
   private readonly _archive: ArchiveRepository
   private readonly _hooks: HookRunner
-  private readonly _git: GitAdapter
+  private readonly _actor: ActorResolver
   private readonly _parsers: ArtifactParserRegistry
   private readonly _schemas: SchemaRegistry
   private readonly _schemaRef: string
@@ -73,7 +73,7 @@ export class ArchiveChange {
    * @param specs - Spec repositories keyed by workspace name
    * @param archive - Repository for archiving the change
    * @param hooks - Adapter for executing `run:` hook commands
-   * @param git - Git adapter for resolving the actor identity
+   * @param actor - Resolver for the actor identity
    * @param parsers - Registry of artifact format parsers
    * @param schemas - Registry for resolving schema references
    * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
@@ -89,7 +89,7 @@ export class ArchiveChange {
     specs: ReadonlyMap<string, SpecRepository>,
     archive: ArchiveRepository,
     hooks: HookRunner,
-    git: GitAdapter,
+    actor: ActorResolver,
     parsers: ArtifactParserRegistry,
     schemas: SchemaRegistry,
     schemaRef: string,
@@ -105,7 +105,7 @@ export class ArchiveChange {
     this._specs = specs
     this._archive = archive
     this._hooks = hooks
-    this._git = git
+    this._actor = actor
     this._parsers = parsers
     this._schemas = schemas
     this._schemaRef = schemaRef
@@ -241,7 +241,7 @@ export class ArchiveChange {
     // --- Archive ---
     let actor: { name: string; email: string } | undefined
     try {
-      actor = await this._git.identity()
+      actor = await this._actor.identity()
     } catch {
       // If git identity is unavailable (e.g. no git config), proceed without it
     }

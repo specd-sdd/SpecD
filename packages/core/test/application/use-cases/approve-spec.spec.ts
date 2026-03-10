@@ -7,7 +7,7 @@ import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import {
   makeChangeRepository,
-  makeGitAdapter,
+  makeActorResolver,
   makeSchemaRegistry,
   makeSchema,
   makeContentHasher,
@@ -46,7 +46,7 @@ describe('ApproveSpec', () => {
       vi.spyOn(repo, 'artifact').mockResolvedValue(new SpecArtifact('spec.md', '# Spec'))
       const uc = new ApproveSpec(
         repo,
-        makeGitAdapter(),
+        makeActorResolver(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
         'test',
@@ -69,7 +69,7 @@ describe('ApproveSpec', () => {
       vi.spyOn(repo, 'artifact').mockResolvedValue(null)
       const uc = new ApproveSpec(
         repo,
-        makeGitAdapter(),
+        makeActorResolver(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
         'test',
@@ -92,7 +92,7 @@ describe('ApproveSpec', () => {
       const hasher = makeContentHasher()
       const uc = new ApproveSpec(
         repo,
-        makeGitAdapter(),
+        makeActorResolver(),
         makeSchemaRegistry(makeSchema()),
         hasher,
         'test',
@@ -115,7 +115,7 @@ describe('ApproveSpec', () => {
       vi.spyOn(repo, 'artifact').mockResolvedValue(null)
       const uc = new ApproveSpec(
         repo,
-        makeGitAdapter(),
+        makeActorResolver(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
         'test',
@@ -137,7 +137,7 @@ describe('ApproveSpec', () => {
       const repo = makeChangeRepository()
       const uc = new ApproveSpec(
         repo,
-        makeGitAdapter(),
+        makeActorResolver(),
         makeSchemaRegistry(),
         makeContentHasher(),
         'test',
@@ -157,7 +157,7 @@ describe('ApproveSpec', () => {
       const repo = makeChangeRepository()
       const uc = new ApproveSpec(
         repo,
-        makeGitAdapter(),
+        makeActorResolver(),
         makeSchemaRegistry(),
         makeContentHasher(),
         'test',
@@ -186,7 +186,7 @@ describe('ApproveSpec', () => {
       vi.spyOn(repo, 'artifact').mockResolvedValue(null)
       const uc = new ApproveSpec(
         repo,
-        makeGitAdapter(),
+        makeActorResolver(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
         'test',
@@ -208,7 +208,7 @@ describe('ApproveSpec', () => {
       const repo = makeChangeRepository()
       const uc = new ApproveSpec(
         repo,
-        makeGitAdapter(),
+        makeActorResolver(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
         'test',

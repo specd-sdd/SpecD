@@ -4,14 +4,14 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
-import { type GitIdentity } from '../../../src/domain/entities/change.js'
+import { type ActorIdentity } from '../../../src/domain/entities/change.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../../src/domain/errors/artifact-conflict-error.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { FsChangeRepository } from '../../../src/infrastructure/fs/change-repository.js'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
 
-const actor: GitIdentity = { name: 'Alice', email: 'alice@example.com' }
+const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
 
 // ---- Setup / teardown helpers ----
 

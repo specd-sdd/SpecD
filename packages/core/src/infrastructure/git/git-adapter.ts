@@ -1,22 +1,5 @@
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import { type GitAdapter } from '../../application/ports/git-adapter.js'
-import { type GitIdentity } from '../../domain/entities/change.js'
-
-const execFileAsync = promisify(execFile)
-
-/**
- * Runs `git <args>` in the given working directory and returns trimmed stdout.
- *
- * @param cwd - Working directory for the git command
- * @param args - Arguments to pass to the git binary
- * @returns Trimmed stdout from the git process
- * @throws When the git process exits with a non-zero code
- */
-async function git(cwd: string, ...args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync('git', args, { cwd })
-  return stdout.trim()
-}
+import { git } from './exec.js'
 
 /**
  * Git CLI implementation of the {@link GitAdapter} port.
@@ -71,20 +54,5 @@ export class GitCLIAdapter implements GitAdapter {
   async isClean(): Promise<boolean> {
     const output = await git(this._cwd, 'status', '--porcelain')
     return output.length === 0
-  }
-
-  /**
-   * Returns the git identity (`user.name` and `user.email`) of the current user.
-   *
-   * @returns The git identity of the current user
-   * @throws When the current working directory is not inside a git repository
-   * @throws When `user.name` or `user.email` are not configured
-   */
-  async identity(): Promise<GitIdentity> {
-    const [name, email] = await Promise.all([
-      git(this._cwd, 'config', 'user.name'),
-      git(this._cwd, 'config', 'user.email'),
-    ])
-    return { name, email }
   }
 }

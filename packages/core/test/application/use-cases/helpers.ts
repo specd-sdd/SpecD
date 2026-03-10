@@ -1,4 +1,4 @@
-import { Change, type GitIdentity } from '../../../src/domain/entities/change.js'
+import { Change, type ActorIdentity } from '../../../src/domain/entities/change.js'
 import { type Spec } from '../../../src/domain/entities/spec.js'
 import { type SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import {
@@ -22,11 +22,11 @@ import { ContentHasher } from '../../../src/application/ports/content-hasher.js'
 import { NodeContentHasher } from '../../../src/infrastructure/node/content-hasher.js'
 import { type HookRunner } from '../../../src/application/ports/hook-runner.js'
 import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
-import { type GitAdapter } from '../../../src/application/ports/git-adapter.js'
+import { type ActorResolver } from '../../../src/application/ports/actor-resolver.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 
-/** Default git identity for test actors. */
-export const testActor: GitIdentity = { name: 'Test User', email: 'test@example.com' }
+/** Default identity for test actors. */
+export const testActor: ActorIdentity = { name: 'Test User', email: 'test@example.com' }
 
 /**
  * In-memory `ChangeRepository` subclass for unit tests.
@@ -102,22 +102,13 @@ export function makeChangeRepository(
 }
 
 /**
- * Creates a fully-typed mock `GitAdapter`.
+ * Creates a fully-typed mock `ActorResolver`.
  *
  * Returns sensible defaults. Override individual methods as needed.
  */
-export function makeGitAdapter(overrides: Partial<GitAdapter> = {}): GitAdapter {
+export function makeActorResolver(overrides: Partial<ActorResolver> = {}): ActorResolver {
   return {
-    async rootDir(): Promise<string> {
-      return '/repo'
-    },
-    async branch(): Promise<string> {
-      return 'main'
-    },
-    async isClean(): Promise<boolean> {
-      return true
-    },
-    async identity(): Promise<GitIdentity> {
+    async identity(): Promise<ActorIdentity> {
       return testActor
     },
     ...overrides,

@@ -8,7 +8,7 @@ import { createSpecRepository } from '../spec-repository.js'
 import { createArchiveRepository } from '../archive-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
-import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
+import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
 import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
 import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
 
@@ -168,13 +168,13 @@ export function createArchiveChange(
   })
   const parsers = createArtifactParserRegistry()
   const hooks = new NodeHookRunner()
-  const git = new GitCLIAdapter()
+  const actor = new GitActorResolver()
   return new ArchiveChange(
     changeRepo,
     opts.specRepositories,
     archiveRepo,
     hooks,
-    git,
+    actor,
     parsers,
     schemas,
     opts.schemaRef,

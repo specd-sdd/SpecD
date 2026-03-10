@@ -9,9 +9,9 @@ All use cases are exported from `@specd/core`.
 Every use case follows the same pattern:
 
 ```typescript
-import { CreateChange, type ChangeRepository, type GitAdapter } from '@specd/core'
+import { CreateChange, type ChangeRepository, type ActorResolver } from '@specd/core'
 
-const createChange = new CreateChange(changeRepo, git)
+const createChange = new CreateChange(changeRepo, actor)
 const change = await createChange.execute({
   name: 'add-oauth-login',
   workspaces: ['default'],
@@ -31,7 +31,7 @@ Use cases are stateless between calls — constructing one instance and reusing 
 
 Creates a new change and persists it to the repository. The initial history contains a single `created` event.
 
-**Constructor:** `new CreateChange(changes: ChangeRepository, git: GitAdapter)`
+**Constructor:** `new CreateChange(changes: ChangeRepository, actor: ActorResolver)`
 
 **Input:**
 
@@ -94,7 +94,7 @@ Advances the change lifecycle from its current state to the requested target. Ha
 - `ready → implementing` is redirected to `ready → pending-spec-approval` when `approvalsSpec: true`.
 - `done → archivable` is redirected to `done → pending-signoff` when `approvalsSignoff: true`.
 
-**Constructor:** `new TransitionChange(changes: ChangeRepository, git: GitAdapter)`
+**Constructor:** `new TransitionChange(changes: ChangeRepository, actor: ActorResolver)`
 
 **Input:**
 
@@ -122,7 +122,7 @@ Advances the change lifecycle from its current state to the requested target. Ha
 
 Shelves a change to `drafts/`, appending a `drafted` event to its history. The change retains its full lifecycle state and can be restored at any time.
 
-**Constructor:** `new DraftChange(changes: ChangeRepository, git: GitAdapter)`
+**Constructor:** `new DraftChange(changes: ChangeRepository, actor: ActorResolver)`
 
 **Input:**
 
@@ -145,7 +145,7 @@ Shelves a change to `drafts/`, appending a `drafted` event to its history. The c
 
 Recovers a drafted change back to `changes/`, appending a `restored` event.
 
-**Constructor:** `new RestoreChange(changes: ChangeRepository, git: GitAdapter)`
+**Constructor:** `new RestoreChange(changes: ChangeRepository, actor: ActorResolver)`
 
 **Input:**
 
@@ -167,7 +167,7 @@ Recovers a drafted change back to `changes/`, appending a `restored` event.
 
 Permanently abandons a change, appending a `discarded` event. The change is moved to `discarded/`. This operation cannot be undone.
 
-**Constructor:** `new DiscardChange(changes: ChangeRepository, git: GitAdapter)`
+**Constructor:** `new DiscardChange(changes: ChangeRepository, actor: ActorResolver)`
 
 **Input:**
 
@@ -193,7 +193,7 @@ Permanently abandons a change, appending a `discarded` event. The change is move
 
 Records a spec approval and transitions the change to `spec-approved`. Requires the spec approval gate (`approvals.spec: true`) to be enabled. The caller is responsible for collecting current artifact hashes and passing them in — they are recorded in the `spec-approved` event for audit purposes.
 
-**Constructor:** `new ApproveSpec(changes: ChangeRepository, git: GitAdapter)`
+**Constructor:** `new ApproveSpec(changes: ChangeRepository, actor: ActorResolver)`
 
 **Input:**
 
@@ -220,7 +220,7 @@ Records a spec approval and transitions the change to `spec-approved`. Requires 
 
 Records a sign-off and transitions the change to `signed-off`. Requires the signoff gate (`approvals.signoff: true`) to be enabled. The caller is responsible for collecting current artifact hashes.
 
-**Constructor:** `new ApproveSignoff(changes: ChangeRepository, git: GitAdapter)`
+**Constructor:** `new ApproveSignoff(changes: ChangeRepository, actor: ActorResolver)`
 
 **Input:**
 
@@ -259,6 +259,7 @@ new ArchiveChange(
   specs: ReadonlyMap<string, SpecRepository>,  // keyed by workspace name
   archive: ArchiveRepository,
   hooks: HookRunner,
+  actor: ActorResolver,
   git: GitAdapter,
   parsers: ArtifactParserRegistry,
   schemas: SchemaRegistry,
@@ -309,7 +310,7 @@ new ValidateArtifacts(
   specs: ReadonlyMap<string, SpecRepository>,  // keyed by workspace name
   schemas: SchemaRegistry,
   parsers: ArtifactParserRegistry,
-  git: GitAdapter,
+  actor: ActorResolver,
 )
 ```
 
