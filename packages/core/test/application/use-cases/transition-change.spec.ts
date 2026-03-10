@@ -11,7 +11,6 @@ function makeChangeInState(name: string, events: ChangeEvent[]): Change {
   return new Change({
     name,
     createdAt: new Date('2024-01-01T00:00:00Z'),
-    workspaces: ['default'],
     specIds: ['auth/login'],
     history: events,
   })

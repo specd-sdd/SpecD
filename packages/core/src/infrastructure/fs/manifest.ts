@@ -44,8 +44,6 @@ export interface RawCreatedEvent {
   readonly at: string
   /** Actor who created the change. */
   readonly by: ManifestGitIdentity
-  /** Workspace IDs at creation time. */
-  readonly workspaces: string[]
   /** Spec paths at creation time. */
   readonly specIds: string[]
   /** Schema name at creation time. */
@@ -203,7 +201,7 @@ export const changeManifestSchema = z.object({
     name: z.string(),
     version: z.number(),
   }),
-  workspaces: z.array(z.string()),
+  workspaces: z.array(z.string()).optional(),
   specIds: z.array(z.string()),
   artifacts: z.array(manifestArtifactSchema),
   history: z.array(rawChangeEventSchema),
@@ -237,8 +235,13 @@ export interface ChangeManifest {
     /** Schema version integer. */
     readonly version: number
   }
-  /** Current snapshot of workspace IDs. */
-  readonly workspaces: string[]
+  /**
+   * Legacy workspace IDs field.
+   *
+   * No longer written on save. Accepted on load for backward compatibility
+   * with manifests created before workspaces became a computed property.
+   */
+  readonly workspaces?: string[]
   /** Current snapshot of spec paths being modified. */
   readonly specIds: string[]
   /** Artifact descriptors including their validation hashes. */

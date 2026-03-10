@@ -11,30 +11,30 @@
 
 ### Requirement: Workspaces and specs
 
-#### Scenario: Single workspace change
+#### Scenario: Workspaces derived from specIds
 
-- **WHEN** a Change is created with `workspaces: ['default']`
+- **WHEN** a Change has `specIds: ['default:auth/login', 'billing:invoices']`
+- **THEN** `workspaces` returns `['default', 'billing']` derived via `parseSpecId()`
+
+#### Scenario: Workspaces empty when specIds empty
+
+- **WHEN** a Change has an empty `specIds` list
+- **THEN** `workspaces` returns an empty list
+
+#### Scenario: Empty specIds allowed at creation
+
+- **WHEN** a Change is created with an empty `specIds` list
+- **THEN** creation succeeds and `workspaces` is empty
+
+#### Scenario: Single workspace derived from specIds
+
+- **WHEN** a Change has `specIds: ['default:auth/login']`
 - **THEN** only the `default` workspace is active for `CompileContext`
 
-#### Scenario: Multi-workspace change
+#### Scenario: Multi-workspace derived from specIds
 
-- **WHEN** a Change is created with `workspaces: ['default', 'billing']`
+- **WHEN** a Change has `specIds: ['default:auth/login', 'billing:invoices']`
 - **THEN** both `default` and `billing` are active and both workspace-level context patterns are applied
-
-#### Scenario: Empty workspace list rejected at creation
-
-- **WHEN** a Change is created with an empty `workspaces` list
-- **THEN** the creation fails with a validation error
-
-#### Scenario: Undeclared workspace ID rejected at creation
-
-- **WHEN** a Change is created with `workspaces: ['unknown']` and no workspace named `unknown` exists in `specd.yaml`
-- **THEN** the creation fails with a validation error
-
-#### Scenario: Workspace added after creation
-
-- **WHEN** a Change has `workspaces: ['default']` and `billing` is added to the list
-- **THEN** the workspace list becomes `['default', 'billing']`, an `invalidated` event with `cause: 'workspace-change'` is appended, a `transitioned` event rolling back to `designing` is appended, and any prior `spec-approved` or `signed-off` events are now superseded
 
 #### Scenario: Spec added after creation
 

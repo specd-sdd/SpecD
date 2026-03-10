@@ -6,7 +6,6 @@ import {
   SchemaNotFoundError,
   InvalidSpecPathError,
   SpecNotInChangeError,
-  EmptySpecIdsError,
   ArtifactNotFoundError,
   CorruptedManifestError,
   ParserNotRegisteredError,
@@ -50,7 +49,6 @@ export function handleError(err: unknown): never {
     err instanceof ConfigValidationError ||
     err instanceof InvalidSpecPathError ||
     err instanceof SpecNotInChangeError ||
-    err instanceof EmptySpecIdsError ||
     err instanceof ArtifactNotFoundError ||
     err instanceof CorruptedManifestError ||
     err instanceof ParserNotRegisteredError ||

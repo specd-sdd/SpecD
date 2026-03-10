@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { EmptySpecIdsError } from '@specd/core'
 import {
   makeMockConfig,
   makeMockChange,
@@ -213,19 +212,5 @@ describe('change edit', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
-  })
-
-  it('exits 1 when removing last spec is rejected', async () => {
-    const { kernel, stderr } = setup()
-    kernel.changes.edit.execute.mockRejectedValue(new EmptySpecIdsError('feat'))
-
-    const program = makeProgram()
-    registerChangeEdit(program.command('change'))
-    await program
-      .parseAsync(['node', 'specd', 'change', 'edit', 'feat', '--remove-spec', 'auth/login'])
-      .catch(() => {})
-
-    expect(process.exit).toHaveBeenCalledWith(1)
-    expect(stderr()).toMatch(/error:/i)
   })
 })

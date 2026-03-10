@@ -38,20 +38,11 @@ export function registerChangeCreate(parent: Command): void {
 
           const specIds = opts.spec.map((s) => parseSpecId(s, config).specId)
 
-          // Derive workspaces from specIds (already fully-qualified from parseSpecId)
-          const workspaceSet = new Set<string>()
-          for (const specId of specIds) {
-            const colon = specId.indexOf(':')
-            workspaceSet.add(colon !== -1 ? specId.slice(0, colon) : 'default')
-          }
-          const workspaces = [...workspaceSet]
-
           const schema = await kernel.specs.getActiveSchema.execute()
 
           const change = await kernel.changes.create.execute({
             name,
             ...(opts.description !== undefined ? { description: opts.description } : {}),
-            workspaces,
             specIds,
             schemaName: schema.name(),
             schemaVersion: schema.version(),

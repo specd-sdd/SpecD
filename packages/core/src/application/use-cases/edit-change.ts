@@ -3,7 +3,6 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type GitAdapter } from '../ports/git-adapter.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
-import { EmptySpecIdsError } from '../errors/empty-spec-ids-error.js'
 
 /** Input for the {@link EditChange} use case. */
 export interface EditChangeInput {
@@ -26,34 +25,24 @@ export interface EditChangeResult {
 /**
  * Edits the spec scope of an existing change by adding or removing spec paths.
  *
- * Workspaces are always derived from the resulting set of `specIds` after the
- * edit — they are never managed directly. Any modification to `specIds` triggers
- * approval invalidation via {@link Change.updateSpecIds}, and the workspace
- * snapshot is brought in line via {@link Change.setWorkspacesSnapshot} without
- * emitting a redundant `workspace-change` invalidation.
- *
- * The change must retain at least one `specId` after editing.
+ * Workspaces are derived from the resulting set of `specIds` via the computed
+ * `Change.workspaces` getter — they are never managed directly. Any
+ * modification to `specIds` triggers approval invalidation via
+ * {@link Change.updateSpecIds}.
  */
 export class EditChange {
   private readonly _changes: ChangeRepository
   private readonly _git: GitAdapter
-  private readonly _deriveWorkspaces: (specIds: readonly string[]) => string[]
 
   /**
    * Creates a new `EditChange` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
    * @param git - Adapter for resolving the actor identity
-   * @param deriveWorkspaces - Function that derives workspace IDs from a list of spec paths
    */
-  constructor(
-    changes: ChangeRepository,
-    git: GitAdapter,
-    deriveWorkspaces: (specIds: readonly string[]) => string[],
-  ) {
+  constructor(changes: ChangeRepository, git: GitAdapter) {
     this._changes = changes
     this._git = git
-    this._deriveWorkspaces = deriveWorkspaces
   }
 
   /**
@@ -63,7 +52,6 @@ export class EditChange {
    * @returns The updated change and whether approvals were invalidated
    * @throws {ChangeNotFoundError} If no change with the given name exists
    * @throws {SpecNotInChangeError} If a spec to remove is not in the change's specIds
-   * @throws {EmptySpecIdsError} If the result would leave specIds empty
    */
   async execute(input: EditChangeInput): Promise<EditChangeResult> {
     const change = await this._changes.get(input.name)
@@ -100,10 +88,6 @@ export class EditChange {
       }
     }
 
-    if (specIds.length === 0) {
-      throw new EmptySpecIdsError(input.name)
-    }
-
     // Check if specIds actually changed
     const currentSpecIds = change.specIds
     const specIdsChanged =
@@ -117,10 +101,6 @@ export class EditChange {
 
     // Update spec IDs — this also appends an invalidated + transitioned event
     change.updateSpecIds(specIds, actor)
-
-    // Derive and update workspace snapshot atomically (no additional invalidation event)
-    const newWorkspaces = this._deriveWorkspaces(specIds)
-    change.setWorkspacesSnapshot(newWorkspaces)
 
     await this._changes.save(change)
     return { change, invalidated: true }

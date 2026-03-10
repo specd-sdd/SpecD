@@ -9,8 +9,6 @@ export interface CreateChangeInput {
   readonly name: string
   /** Optional free-text description of the change's purpose. */
   readonly description?: string
-  /** Workspace IDs this change belongs to. */
-  readonly workspaces: readonly string[]
   /** Spec paths being created or modified by this change. */
   readonly specIds: readonly string[]
   /** The schema name from the active configuration (e.g. `'specd-std'`). */
@@ -61,7 +59,6 @@ export class CreateChange {
       type: 'created',
       at: now,
       by: actor,
-      workspaces: input.workspaces,
       specIds: input.specIds,
       schemaName: input.schemaName,
       schemaVersion: input.schemaVersion,
@@ -71,7 +68,6 @@ export class CreateChange {
       name: input.name,
       createdAt: now,
       ...(input.description !== undefined ? { description: input.description } : {}),
-      workspaces: [...input.workspaces],
       specIds: [...input.specIds],
       history: [created],
     })

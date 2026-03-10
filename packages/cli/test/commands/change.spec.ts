@@ -275,7 +275,7 @@ describe('change create', () => {
     ])
 
     const call = kernel.changes.create.execute.mock.calls[0]![0]
-    expect(call.workspaces).toContain('default')
+    expect(call.specIds).toContain('default:auth/login')
   })
 
   it('exits 1 with error when workspace prefix is unknown', async () => {

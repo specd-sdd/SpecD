@@ -1,6 +1,5 @@
 import { EditChange } from '../../application/use-cases/edit-change.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
@@ -17,23 +16,6 @@ export interface FsEditChangeOptions {
   readonly changesPath: string
   readonly draftsPath: string
   readonly discardedPath: string
-}
-
-/**
- * Derives the workspace list from a set of spec IDs.
- *
- * A spec ID like `billing:invoices/create` belongs to workspace `billing`.
- * A bare path like `auth/login` (no colon) belongs to workspace `default`.
- *
- * @param specIds - The spec IDs in canonical `workspace:capPath` format
- * @returns Deduplicated list of resolved workspace names
- */
-function deriveWorkspaces(specIds: readonly string[]): string[] {
-  const workspaces = new Set<string>()
-  for (const specId of specIds) {
-    workspaces.add(parseSpecId(specId).workspace)
-  }
-  return [...workspaces]
 }
 
 /**
@@ -84,5 +66,5 @@ export function createEditChange(
     discardedPath: opts.discardedPath,
   })
   const git = new GitCLIAdapter()
-  return new EditChange(changeRepo, git, (specIds) => deriveWorkspaces(specIds))
+  return new EditChange(changeRepo, git)
 }

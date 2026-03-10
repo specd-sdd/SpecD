@@ -14,6 +14,7 @@ import { changeDirName } from './dir-name.js'
 import { isEnoent } from './is-enoent.js'
 import { writeFileAtomic } from './write-atomic.js'
 import { type ChangeManifest, changeManifestSchema } from './manifest.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 
 /** Filename of the append-only archive index at the archive root. */
 const INDEX_FILE = '.specd-index.jsonl'
@@ -351,7 +352,7 @@ export class FsArchiveRepository extends ArchiveRepository {
   /**
    * Constructs an `ArchivedChange` domain entity from a manifest and archive metadata.
    *
-   * @param manifest - The parsed archive manifest (must have a non-empty `workspaces` array)
+   * @param manifest - The parsed archive manifest
    * @param archivedName - The timestamped directory name
    * @param archivedAt - The timestamp when the change was archived
    * @returns A new `ArchivedChange` instance
@@ -361,7 +362,7 @@ export class FsArchiveRepository extends ArchiveRepository {
     archivedName: string,
     archivedAt: Date,
   ): ArchivedChange {
-    const firstWorkspace = manifest.workspaces[0] ?? 'default'
+    const firstWorkspace = deriveFirstWorkspace(manifest)
     return new ArchivedChange({
       name: manifest.name,
       archivedName,
@@ -389,7 +390,7 @@ export class FsArchiveRepository extends ArchiveRepository {
       createdAt: manifest.createdAt,
       archivedAt: manifest.archivedAt,
       ...(manifest.archivedBy !== undefined ? { archivedBy: manifest.archivedBy } : {}),
-      workspace: manifest.workspaces[0] ?? 'default',
+      workspace: deriveFirstWorkspace(manifest),
       artifacts: manifest.artifacts.map((a) => a.type),
       specIds: manifest.specIds,
       schemaName: manifest.schema.name,
@@ -731,4 +732,21 @@ export class FsArchiveRepository extends ArchiveRepository {
       await this._collectManifests(fullPath, results)
     }
   }
+}
+
+/**
+ * Derives the first workspace from a manifest's specIds, falling back to
+ * the legacy `workspaces` field, then to `'default'`.
+ *
+ * @param manifest - The parsed manifest to derive a workspace from
+ * @returns The first workspace name
+ */
+function deriveFirstWorkspace(manifest: ChangeManifest): string {
+  if (manifest.specIds.length > 0) {
+    return parseSpecId(manifest.specIds[0]!).workspace
+  }
+  if (manifest.workspaces !== undefined && manifest.workspaces.length > 0) {
+    return manifest.workspaces[0]!
+  }
+  return 'default'
 }

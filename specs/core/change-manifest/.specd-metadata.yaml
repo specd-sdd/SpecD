@@ -1,16 +1,17 @@
 title: 'Change Manifest'
 description: >
   Defines the manifest.json format that persists the full state of a Change domain entity,
-  including identity, workspaces, specs, artifacts, and append-only event history.
-  FsChangeRepository reads and writes this file; lifecycle state is derived from history at load time.
+  including identity, specs, artifacts, and append-only event history. FsChangeRepository
+  reads and writes this file; lifecycle state is derived from history at load time.
 keywords:
-  - 'manifest'
-  - 'change'
-  - 'event-sourcing'
-  - 'history'
-  - 'artifacts'
-  - 'schema-version'
+  - 'change-manifest'
+  - 'manifest-json'
+  - 'event-history'
+  - 'artifact-validation'
+  - 'validated-hash'
   - 'atomic-write'
+  - 'schema-version'
+  - 'fs-change-repository'
 dependsOn:
   - 'core:core/change'
   - 'core:core/storage'
@@ -18,27 +19,28 @@ dependsOn:
   - 'core:core/spec-id-format'
   - 'core:core/workspace'
 contentHashes:
-  'spec.md': 'sha256:f7e148b8c82a7c66b9dfe37e2e2b05146fcc1ad61740e5459eca7af83fd42c27'
+  'spec.md': 'sha256:4ec515cd94e31df6cb4a33f70d310c64404b1e0914f8fd0b1bdb0b070e7aae01'
   'verify.md': 'sha256:da0edcc679f5ba5a2c5cbcab2d8844597474c5aa21305fb4c1b2ff2d36b1590c'
 rules:
   - requirement: 'Manifest structure'
     rules:
       - 'Each change is persisted as a manifest.json file inside its change directory.'
-      - 'The top-level fields are name, createdAt, schema, workspaces, specIds, artifacts, and history.'
+      - 'The top-level fields are name, createdAt, schema, specIds, artifacts, and history.'
+      - 'The workspaces field is optional and accepted on load for backward compatibility with older manifests but is no longer written on save.'
+      - 'Active workspaces are derived at runtime from specIds via parseSpecId().'
       - 'The name field is the change slug and is immutable after creation.'
       - 'The createdAt field is an ISO 8601 timestamp, immutable after creation, and is the source of truth for the directory prefix.'
       - 'The schema field contains name (string) and version (integer) of the schema active at creation; written once, never updated.'
-      - 'The workspaces field is the current snapshot of active workspace IDs and is mutable.'
       - 'The specIds field is the current snapshot of spec IDs and is mutable.'
       - 'The artifacts array contains descriptors with type, filename, optional, requires, and validatedHash fields.'
       - 'validatedHash is null when the artifact has not been validated, a SHA-256 string when validated, or __skipped__ when an optional artifact has been explicitly marked as not produced.'
       - 'ArtifactStatus is never stored in the manifest; it is derived at load time from validatedHash and file presence.'
       - 'The history field is an append-only array of typed events; the current lifecycle state is derived from the most recent transitioned event to field.'
-      - 'Event types serialized in history are: transitioned, spec-approved, signed-off, invalidated, drafted, restored, artifact-skipped, and discarded.'
+      - 'Event types serialized in history are created, transitioned, spec-approved, signed-off, invalidated, drafted, restored, artifact-skipped, and discarded.'
       - 'The transitioned event contains type, at, by, from, and to fields.'
       - 'The spec-approved event contains type, at, by, reason, and artifactHashes fields.'
       - 'The signed-off event contains type, at, by, reason, and artifactHashes fields.'
-      - 'The invalidated event contains type, at, by, and cause fields; cause values are workspace-change, spec-change, or artifact-change.'
+      - 'The invalidated event contains type, at, by, and cause fields; cause values are spec-change or artifact-change.'
       - 'The drafted event contains type, at, by, and reason fields.'
       - 'The restored event contains type, at, and by fields.'
       - 'The artifact-skipped event contains type, at, by, artifactId, and reason fields.'
@@ -64,7 +66,7 @@ scenarios:
     when:
       - 'A new change add-auth-flow is created.'
     then:
-      - 'A manifest.json is written containing name, createdAt, schema, workspaces, specIds, artifacts, and a history array with a single created event.'
+      - 'A manifest.json is written containing name, createdAt, schema, workspaces, specIds, contextSpecIds, artifacts, and a history array with a single created event.'
   - requirement: 'Manifest structure'
     name: 'No state field in manifest'
     given: []
@@ -115,6 +117,13 @@ scenarios:
       - 'An invalidated event is appended.'
     then:
       - 'Both validatedHash values are set to null in the manifest; rollback is uniform.'
+  - requirement: 'Manifest structure'
+    name: 'contextSpecIds does not invalidate approvals'
+    given: []
+    when:
+      - 'contextSpecIds is updated on a change that has an active spec-approved event.'
+    then:
+      - 'No invalidated event is appended and the approval remains active.'
   - requirement: 'Schema version'
     name: 'Schema unchanged'
     given: []

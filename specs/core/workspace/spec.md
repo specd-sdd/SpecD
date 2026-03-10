@@ -62,11 +62,11 @@ Internally, specd always uses the fully-qualified form. The bare-path shorthand 
 
 A workspace is considered active in the context of a change when at least one of the change's `specIds` belongs to that workspace. Active workspaces determine which workspace-level context patterns are applied during context compilation.
 
-The set of active workspaces is read from the change manifest (`change.workspaces`) — it is not inferred from `specIds` at compile time.
+The set of active workspaces is derived at runtime from `specIds` via the `workspaces` computed getter, which extracts the workspace component of each spec ID using `parseSpecId()`. It is not a persisted field.
 
 ### Requirement: Primary workspace
 
-The primary workspace of a change is the first entry in `change.workspaces`. It is used for:
+The primary workspace of a change is the first entry in the computed `change.workspaces` (derived from `specIds`). It is used for:
 
 - Archive path template resolution (`{{change.workspace}}`)
 - Default metadata attribution when archiving
@@ -114,8 +114,8 @@ Each project's `specd.yaml` is the sole source of truth for that project's view 
 - `codeRoot` is required for non-`default` workspaces
 - `isExternal` is inferred, never declared
 - Spec IDs are always workspace-qualified internally
-- A change must belong to at least one workspace
-- Modifications to a change's `workspaces` trigger approval invalidation
+- A change's workspaces are derived from its `specIds` via `parseSpecId()` — not persisted
+- When `specIds` is empty, `workspaces` is empty
 - Workspace-level exclude patterns do not apply to specs reached via `dependsOn`
 - External repository configurations are never read — each project declares its own view
 - Change artifacts always include the workspace segment in their path
