@@ -1,6 +1,5 @@
 import { type Command } from 'commander'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 
@@ -17,8 +16,7 @@ export function registerDiscardedShow(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, opts: { format: string; config?: string }) => {
       try {
-        const config = await loadConfig({ configPath: opts.config })
-        const kernel = createCliKernel(config)
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
         const { change } = await kernel.changes.status.execute({ name })
 
         const isDiscarded = change.history.some((e: { type: string }) => e.type === 'discarded')

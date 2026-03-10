@@ -2,8 +2,7 @@ import { type Command } from 'commander'
 import { SpecPath, checkMetadataFreshness, parseMetadata, NodeContentHasher } from '@specd/core'
 
 const hasher = new NodeContentHasher()
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
@@ -23,8 +22,7 @@ export function registerSpecMetadata(parent: Command): void {
     .action(
       async (specPath: string, opts: { format: string; config?: string; infer?: boolean }) => {
         try {
-          const config = await loadConfig({ configPath: opts.config })
-          const kernel = createCliKernel(config)
+          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
           const parsed = parseSpecId(specPath, config)
 
           const result = await kernel.specs.get.execute({

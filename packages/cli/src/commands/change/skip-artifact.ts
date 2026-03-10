@@ -1,6 +1,5 @@
 import { type Command } from 'commander'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 
@@ -23,8 +22,7 @@ export function registerChangeSkipArtifact(parent: Command): void {
         opts: { reason?: string; format: string; config?: string },
       ) => {
         try {
-          const config = await loadConfig({ configPath: opts.config })
-          const kernel = createCliKernel(config)
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
           await kernel.changes.skipArtifact.execute({
             name,
             artifactId,

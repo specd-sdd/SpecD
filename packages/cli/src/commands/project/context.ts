@@ -1,7 +1,6 @@
 import { type Command } from 'commander'
 import { type CompileContextConfig, type SpecSection } from '@specd/core'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 
@@ -41,8 +40,7 @@ export function registerProjectContext(parent: Command): void {
             process.exit(1)
           }
 
-          const config = await loadConfig({ configPath: opts.config })
-          const kernel = createCliKernel(config)
+          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
           const fmt = parseFormat(opts.format)
 
           const compileConfig: CompileContextConfig = {

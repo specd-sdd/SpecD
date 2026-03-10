@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { resolveChangeContext } from '../../helpers/change-context.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
@@ -17,7 +17,7 @@ export function registerChangeValidate(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, specPath: string, opts: { format: string; config?: string }) => {
       try {
-        const { config, kernel } = await resolveChangeContext({
+        const { config, kernel } = await resolveCliContext({
           configPath: opts.config,
         })
         const parsed = parseSpecId(specPath, config)
