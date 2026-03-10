@@ -4,7 +4,7 @@ import { ChangeNotFoundError } from '../../../src/application/errors/change-not-
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
-import { DeltaApplicationError } from '../../../src/application/ports/artifact-parser.js'
+import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
