@@ -30,7 +30,7 @@ When none of `--rules`, `--constraints`, or `--scenarios` are passed, all availa
 
 ### Requirement: Behaviour
 
-The command invokes the `CompileContext` use case. `schemaRef`, `workspaceSchemasPaths`, and the full `CompileContextConfig` are resolved from the loaded `SpecdConfig`. The `followDeps`, `depth`, and `sections` fields are populated from the corresponding CLI flags.
+The command invokes the `CompileContext` use case. The `CompileContextConfig`, `followDeps`, `depth`, and `sections` fields are populated from the loaded `SpecdConfig` and the corresponding CLI flags.
 
 ### Requirement: Output
 
@@ -61,7 +61,6 @@ Any warnings from the `CompileContext` use case (stale metadata, missing specs, 
 
 - The raw instruction block is the sole stdout output — no wrapping, no summary header
 - All warnings go to stderr; the instruction block goes to stdout
-- `schemaRef` and `workspaceSchemasPaths` are resolved from the loaded config — the user never supplies them
 - `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed
 - `--depth` without `--follow-deps` is a CLI usage error (exit code 1)
 - Section flags (`--rules`, `--constraints`, `--scenarios`) only filter spec content; schema instructions, delta context, artifact rules, step hooks, and available steps are unaffected

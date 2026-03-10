@@ -35,8 +35,6 @@ Concretely:
 3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set
 4. The metadata or fallback content of each included spec is rendered, using the same fresh-metadata / contextSections-fallback logic as `CompileContext`
 
-`schemaRef` and `workspaceSchemasPaths` are resolved from the loaded `SpecdConfig`.
-
 ### Requirement: Output
 
 In `text` mode (default), the compiled context block is printed to stdout verbatim — the same text `CompileContext` would produce for the project entries and spec content sections, with no additional framing added by the CLI. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.

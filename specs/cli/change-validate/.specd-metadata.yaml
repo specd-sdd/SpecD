@@ -1,44 +1,39 @@
 title: 'Change Validate'
 description: >
-  Defines the `specd change validate <name> <workspace:capability-path>` command, which validates a change's artifact files against the active schema for a specific spec and marks passing artifacts as complete.
+  Defines the specd change validate command, which validates a change's artifact files against
+  the active schema for a specific spec and marks passing artifacts as complete. Use this when
+  working on artifact validation, spec ID resolution, or validation output formatting.
 keywords:
-  - 'change'
-  - 'validate'
-  - 'command'
-  - 'signature'
-  - 'behaviour'
-  - 'output'
-  - 'success'
-  - 'failure'
-  - 'not'
-  - 'error'
-  - 'cases'
-  - 'schemaref'
+  - 'change-validate'
+  - 'artifact-validation'
+  - 'spec-id'
+  - 'mark-complete'
+  - 'validation-output'
+contentHashes:
+  'spec.md': 'sha256:cbb87f7ba67f060b729e6e312fa4bf0b44d9ac2eba93a36b540663b33b20f384'
+  'verify.md': 'sha256:ddafe2a6265131ea5c8164f731eac3d4a516deaacf533166353b1c9f640761c2'
 dependsOn:
   - 'cli:cli/entrypoint'
   - 'core:core/change'
   - 'core:core/spec-id-format'
-contentHashes:
-  'spec.md': 'sha256:27f8a631f682fdaa2a20b757cfe1a7efdf12d556706982f31230c5224130777e'
-  'verify.md': 'sha256:ddafe2a6265131ea5c8164f731eac3d4a516deaacf533166353b1c9f640761c2'
 rules:
   - requirement: 'Command signature'
     rules:
-      - '`<name>` — required positional; the name of the change to validate'
+      - '`<name>` — required positional; the name of the change to validate.'
       - "`<workspace:capability-path>` — required positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`."
-      - '`--format text|json|toon` — optional; output format, defaults to `text`'
+      - '`--format text|json|toon` — optional; output format, defaults to `text`.'
   - requirement: 'Behaviour'
     rules:
-      - 'The command invokes the `ValidateArtifacts` use case. It resolves `schemaRef` and `workspaceSchemasPaths` from the loaded `SpecdConfig` and passes them along with the change name and spec ID.'
+      - 'The command invokes the `ValidateArtifacts` use case, passing the change name and spec ID.'
   - requirement: 'Output on success'
     rules:
-      - 'In `text` mode (default), when all artifacts pass:'
-      - 'In `text` mode, when there are warnings but no failures:'
-      - 'In `json` or `toon` mode, the output is (encoded in the respective format):'
+      - 'In `text` mode (default), when all artifacts pass: `validated <name>/<workspace:capability-path>: all artifacts pass`.'
+      - 'In `text` mode, when there are warnings but no failures: `validated <name>/<workspace:capability-path>: pass (N warning(s))` followed by `warning:` lines.'
+      - 'In `json` or `toon` mode, the output is `{ "passed": true, "failures": [], "warnings": [...] }` encoded in the respective format.'
   - requirement: 'Output on failure'
     rules:
-      - 'In `text` mode, the command prints each failure to stdout, exits with code 1:'
-      - 'In `json` or `toon` mode, the output is (encoded in the respective format):'
+      - 'In `text` mode, the command prints each failure to stdout, exits with code 1: `validation failed <name>/<workspace:capability-path>:` followed by `error:` and `warning:` lines.'
+      - 'In `json` or `toon` mode, the output is `{ "passed": false, "failures": [...], "warnings": [...] }` encoded in the respective format.'
       - 'The process exits with code 1 when `passed` is `false`, regardless of format.'
   - requirement: 'Spec ID not in change'
     rules:
@@ -48,9 +43,8 @@ rules:
       - 'If the change does not exist, exits with code 1.'
       - 'If the schema cannot be resolved, exits with code 3.'
 constraints:
-  - '`schemaRef` and `workspaceSchemasPaths` are always resolved from the loaded config — never supplied by the user'
-  - 'Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr'
-  - 'The command marks artifacts as complete in the manifest when they pass'
+  - 'Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr.'
+  - 'The command marks artifacts as complete in the manifest when they pass.'
 scenarios:
   - requirement: 'Command signature'
     name: 'Missing arguments'

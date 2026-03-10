@@ -1,59 +1,60 @@
 title: 'Project Context'
 description: >
-  Defines the `specd project context` command, which compiles and prints the full project-level context: the `context:` entries from `specd.yaml` followed by the content of all specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns. This is the context block an agent would receive regardless of any specific change or lifecycle step.
+  Defines the specd project context command, which compiles and prints the full project-level
+  context: the context entries from specd.yaml followed by the content of all specs matched by
+  the project-level contextIncludeSpecs/contextExcludeSpecs patterns. This is the context block
+  an agent receives regardless of any specific change or lifecycle step.
 keywords:
-  - 'project'
-  - 'context'
-  - 'command'
-  - 'signature'
-  - 'behaviour'
-  - 'output'
-  - 'warnings'
-  - 'error'
-  - 'cases'
-  - 'read'
-  - 'only'
-  - 'level'
+  - 'project-context'
+  - 'context-include-specs'
+  - 'context-exclude-specs'
+  - 'follow-deps'
+  - 'section-filter'
+  - 'context-entries'
+contentHashes:
+  'spec.md': 'sha256:f564ea623b1605e70fa229a2229c972c3d8d50fe9ef80e6b038c36a23d2acb9e'
+  'verify.md': 'sha256:7851d3ba141fa8ef4025d51e0ab85723a10d0871bbbeedc1aeb993a7bd266985'
 dependsOn:
   - 'cli:cli/entrypoint'
   - 'cli:cli/change-context'
-contentHashes:
-  'spec.md': 'sha256:ff33d0eb50c60402b9f03b78f0aba38c0c364aea58e759ad010a15bc31697cc1'
-  'verify.md': 'sha256:7851d3ba141fa8ef4025d51e0ab85723a10d0871bbbeedc1aeb993a7bd266985'
 rules:
   - requirement: 'Command signature'
     rules:
-      - '`--rules` — when present, includes only the rules sections of spec content in the output'
-      - '`--constraints` — when present, includes only the constraints sections of spec content in the output'
-      - '`--scenarios` — when present, includes only the scenarios sections of spec content in the output'
+      - '`--rules` — when present, includes only the rules sections of spec content in the output.'
+      - '`--constraints` — when present, includes only the constraints sections of spec content in the output.'
+      - '`--scenarios` — when present, includes only the scenarios sections of spec content in the output.'
       - '`--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. By default (without this flag) `dependsOn` traversal is not performed.'
-      - '`--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`'
-      - '`--format text|json|toon` — optional; output format, defaults to `text`'
+      - '`--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`.'
+      - '`--format text|json|toon` — optional; output format, defaults to `text`.'
       - "When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block."
   - requirement: 'Behaviour'
     rules:
-      - 'The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active. No `dependsOn` traversal is performed — that requires a change.'
-      - 'Concretely:'
-      - "1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk) 2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared) 3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set 4. The metadata or fallback content of each included spec is rendered, using the same fresh-metadata / contextSections-fallback logic as `CompileContext`"
-      - '`schemaRef` and `workspaceSchemasPaths` are resolved from the loaded `SpecdConfig`.'
+      - 'The command compiles the project-level context: the `context:` entries and the specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns only.'
+      - 'Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.'
+      - 'Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk).'
+      - "Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)."
+      - 'Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set.'
+      - 'The metadata or fallback content of each included spec is rendered, using the same fresh-metadata / contextSections-fallback logic as `CompileContext`.'
   - requirement: 'Output'
     rules:
-      - 'In `text` mode (default), the compiled context block is printed to stdout verbatim — the same text `CompileContext` would produce for the project entries and spec content sections, with no additional framing added by the CLI. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.'
-      - 'In `json` or `toon` mode, the output is (encoded in the respective format):'
-      - 'where `contextEntries` are the rendered project `context:` entries, `specs` are the matched specs with their rendered metadata content, and `warnings` lists any advisory conditions (missing files, stale metadata, unknown workspaces, etc.).'
+      - 'In `text` mode (default), the compiled context block is printed to stdout verbatim — the same text `CompileContext` would produce for the project entries and spec content sections, with no additional framing added by the CLI.'
+      - 'If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.'
+      - 'In `json` or `toon` mode, the output includes `contextEntries`, `specs`, and `warnings`.'
   - requirement: 'Warnings'
     rules:
-      - 'Any advisory conditions (missing `file:` entries, stale metadata, unknown workspace patterns, spec not found) are emitted as `warning:` lines to stderr in all formats. They are also included in the `warnings` array in `json`/`toon` output. The command exits with code 0 regardless.'
+      - 'Any advisory conditions (missing `file:` entries, stale metadata, unknown workspace patterns, spec not found) are emitted as `warning:` lines to stderr in all formats.'
+      - 'They are also included in the `warnings` array in `json`/`toon` output.'
+      - 'The command exits with code 0 regardless.'
   - requirement: 'Error cases'
     rules:
       - 'If the config cannot be loaded (discovery failure or parse error), exits per the entrypoint exit code rules.'
       - 'If the schema cannot be resolved, exits with code 3.'
 constraints:
-  - 'This command is read-only'
-  - 'Only project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns are applied; workspace-level patterns are change-specific and not applied here'
-  - '`dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed'
-  - '`--depth` without `--follow-deps` is a CLI usage error (exit code 1)'
-  - 'Section flags (`--rules`, `--constraints`, `--scenarios`) only filter spec content; project `context:` entries are always rendered in full regardless of section flags'
+  - 'This command is read-only.'
+  - 'Only project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns are applied; workspace-level patterns are change-specific and not applied here.'
+  - '`dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed.'
+  - '`--depth` without `--follow-deps` is a CLI usage error (exit code 1).'
+  - 'Section flags (`--rules`, `--constraints`, `--scenarios`) only filter spec content; project `context:` entries are always rendered in full regardless of section flags.'
 scenarios:
   - requirement: 'Command signature'
     name: 'Extra arguments rejected'
@@ -98,7 +99,7 @@ scenarios:
     when:
       - '`specd project context` is run'
     then:
-      - 'billing specs are not included in the output (workspace-level patterns are change-specific, not applied by this command)'
+      - 'billing specs are not included in the output'
   - requirement: 'Behaviour'
     name: 'dependsOn traversal not performed by default'
     given:
