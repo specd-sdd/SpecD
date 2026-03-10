@@ -1,5 +1,6 @@
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
+import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
@@ -128,6 +129,11 @@ export class ValidateArtifacts {
 
     const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
     if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+
+    // --- Schema name guard ---
+    if (schema.name() !== change.schemaName) {
+      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
+    }
 
     const actor: GitIdentity = await this._git.identity()
     const failures: ValidationFailure[] = []

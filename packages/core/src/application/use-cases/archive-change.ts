@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
+import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
 import { HookFailedError } from '../../domain/errors/hook-failed-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
@@ -131,6 +132,11 @@ export class ArchiveChange {
 
     const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
     if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+
+    // --- Schema name guard ---
+    if (schema.name() !== change.schemaName) {
+      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
+    }
 
     // --- Archivable guard ---
     change.assertArchivable()

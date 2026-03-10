@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { ValidateArtifacts } from '../../../src/application/use-cases/validate-artifacts.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
+import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
@@ -41,15 +42,28 @@ function makeChangeWithArtifacts(
   opts: {
     specIds?: string[]
     history?: import('../../../src/domain/entities/change.js').ChangeEvent[]
+    schemaName?: string
   } = {},
 ): Change {
+  const specIds = opts.specIds ?? ['default:auth']
+  const createdAt = new Date('2024-01-01T00:00:00Z')
+  const createdEvent: import('../../../src/domain/entities/change.js').ChangeEvent = {
+    type: 'created',
+    at: createdAt,
+    by: testActor,
+    workspaces: ['default'],
+    specIds,
+    schemaName: opts.schemaName ?? 'test-schema',
+    schemaVersion: 1,
+  }
+  const history = opts.history ? [createdEvent, ...opts.history] : [createdEvent]
   const artifactMap = new Map(artifacts.map((a) => [a.type, a]))
   return new Change({
     name,
-    createdAt: new Date('2024-01-01T00:00:00Z'),
+    createdAt,
     workspaces: ['default'],
-    specIds: opts.specIds ?? ['default:auth'],
-    history: opts.history ?? [],
+    specIds,
+    history,
     artifacts: artifactMap,
   })
 }
@@ -121,6 +135,28 @@ describe('ValidateArtifacts', () => {
           specPath: 'default:auth',
         }),
       ).rejects.toThrow(SchemaNotFoundError)
+    })
+  })
+
+  describe('schema name mismatch', () => {
+    it('throws SchemaMismatchError when active schema name differs from change schema name', async () => {
+      const change = makeChangeWithArtifacts('c', [], { schemaName: 'schema-a' })
+      const uc = new ValidateArtifacts(
+        makeChangeRepository([change]),
+        new Map(),
+        makeSchemaRegistry(makeSchema({ name: 'schema-b' })),
+        makeParsers(),
+        makeGitAdapter(),
+        makeContentHasher(),
+        'test',
+        new Map(),
+      )
+      await expect(
+        uc.execute({
+          name: 'c',
+          specPath: 'default:auth',
+        }),
+      ).rejects.toThrow(SchemaMismatchError)
     })
   })
 

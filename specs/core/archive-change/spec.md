@@ -42,9 +42,13 @@ class ArchiveChange {
 
 - `name` — the change name to archive
 
+### Requirement: Schema name guard
+
+After resolving the schema from config, `ArchiveChange` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before the archivable guard, any hooks, or file modifications.
+
 ### Requirement: Archivable guard
 
-The first step of `ArchiveChange.execute` must call `change.assertArchivable()`. If the change is not in `archivable` state, this throws `InvalidStateTransitionError` and the archive is aborted without running any hooks or modifying any files.
+The first step of `ArchiveChange.execute` after the schema name guard must call `change.assertArchivable()`. If the change is not in `archivable` state, this throws `InvalidStateTransitionError` and the archive is aborted without running any hooks or modifying any files.
 
 ### Requirement: Pre-archive hooks
 

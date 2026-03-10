@@ -14,7 +14,7 @@ keywords:
   - 'dependency-order'
   - 'pre-hash-cleanup'
 contentHashes:
-  'spec.md': 'sha256:2dd3f909eec842976d0cfd561c91f1e97dbe506e4b3bf51174bbba36341545a5'
+  'spec.md': 'sha256:4bb1e47cdbd126c453d5204e64046357c6a412ead08abdd1437fe183d7419a52'
   'verify.md': 'sha256:e7a2776f4791714349f5fe816448efec4e7dbe1ba7cd99de282309d520697135'
 dependsOn:
   - 'core:core/change'
@@ -36,6 +36,11 @@ rules:
       - 'execute receives name (change name) and specPath (spec ID to validate, one spec per execution).'
       - 'specPath must be one of the IDs in change.specIds.'
       - 'Validating all specs in a change requires calling execute once per spec ID.'
+  - requirement: 'Schema name guard'
+    rules:
+      - 'After resolving the schema from config, ValidateArtifacts must compare schema.name() with change.schemaName.'
+      - 'If they differ, ValidateArtifacts must throw SchemaMismatchError.'
+      - 'The schema name guard must happen before any validation or artifact processing.'
   - requirement: 'Required artifacts check'
     rules:
       - 'All non-optional artifact IDs must be present in the change (status not missing).'

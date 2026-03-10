@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { ArchiveChange } from '../../../src/application/use-cases/archive-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
+import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
@@ -76,7 +77,7 @@ function makeArchiveRepository(override?: (change: Change) => ArchivedChange): A
 /** Creates a Change in `archivable` state. */
 function makeArchivableChange(
   name: string,
-  opts: { specIds?: string[]; createdAt?: Date } = {},
+  opts: { specIds?: string[]; createdAt?: Date; schemaName?: string } = {},
 ): Change {
   const createdAt = opts.createdAt ?? new Date('2024-01-15T12:00:00Z')
   const events: ChangeEvent[] = [
@@ -86,7 +87,7 @@ function makeArchivableChange(
       by: testActor,
       workspaces: ['default'],
       specIds: opts.specIds ?? ['default:auth/oauth'],
-      schemaName: '@specd/schema-std',
+      schemaName: opts.schemaName ?? 'test-schema',
       schemaVersion: 1,
     },
     { type: 'transitioned', from: 'drafting', to: 'designing', at: createdAt, by: testActor },
@@ -119,7 +120,7 @@ describe('ArchiveChange', () => {
         makeHookRunner(),
         makeGitAdapter(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema([])),
+        makeSchemaRegistry(makeSchema()),
         'std',
         new Map(),
         '/repo',
@@ -163,7 +164,7 @@ describe('ArchiveChange', () => {
             by: testActor,
             workspaces: ['default'],
             specIds: ['core/some-spec'],
-            schemaName: '@specd/schema-std',
+            schemaName: 'test-schema',
             schemaVersion: 1,
           },
           {
@@ -199,13 +200,33 @@ describe('ArchiveChange', () => {
         makeHookRunner(),
         makeGitAdapter(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema([])),
+        makeSchemaRegistry(makeSchema()),
         'std',
         new Map(),
         '/repo',
         '/changes',
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(InvalidStateTransitionError)
+    })
+  })
+
+  describe('given the active schema name differs from the change schema name', () => {
+    it('throws SchemaMismatchError', async () => {
+      const change = makeArchivableChange('my-change', { schemaName: 'schema-a' })
+      const uc = new ArchiveChange(
+        makeChangeRepository([change]),
+        new Map(),
+        makeArchiveRepository(),
+        makeHookRunner(),
+        makeGitAdapter(),
+        makeParsers(),
+        makeSchemaRegistry(makeSchema({ name: 'schema-b' })),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
+      )
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaMismatchError)
     })
   })
 
@@ -219,7 +240,7 @@ describe('ArchiveChange', () => {
         makeHookRunner(),
         makeGitAdapter(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema([])),
+        makeSchemaRegistry(makeSchema()),
         'std',
         new Map(),
         '/repo',
@@ -241,7 +262,7 @@ describe('ArchiveChange', () => {
         makeHookRunner(),
         makeGitAdapter(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema([])),
+        makeSchemaRegistry(makeSchema()),
         'std',
         new Map(),
         '/repo',
@@ -260,7 +281,7 @@ describe('ArchiveChange', () => {
         makeHookRunner(),
         makeGitAdapter(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema([])),
+        makeSchemaRegistry(makeSchema()),
         'std',
         new Map(),
         '/repo',
@@ -545,7 +566,7 @@ describe('ArchiveChange', () => {
         hooks,
         makeGitAdapter(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema([])),
+        makeSchemaRegistry(makeSchema()),
         'std',
         new Map(),
         '/repo',
@@ -574,7 +595,7 @@ describe('ArchiveChange', () => {
         hooks,
         makeGitAdapter(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema([])),
+        makeSchemaRegistry(makeSchema()),
         'std',
         new Map(),
         '/repo',
