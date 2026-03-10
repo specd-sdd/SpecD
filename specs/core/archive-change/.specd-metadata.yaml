@@ -1,16 +1,21 @@
 title: 'ArchiveChange'
 description: >
-  Covers the application use case that finalises a completed change by merging deltas into project
-  specs, moving the change to the archive, and running lifecycle hooks. Read this when working on
-  archiving logic, delta merge, post-archive hooks, or the archive result shape.
+  Defines the ArchiveChange application use case that finalises a completed change by merging
+  delta artifacts into project specs, moving the change directory to the archive, and firing
+  lifecycle hooks. Read this when implementing or modifying archiving logic, delta merge steps,
+  hook execution order, or the archive result shape.
 keywords:
-  - 'archive'
-  - 'change'
+  - 'archive-change'
   - 'delta-merge'
-  - 'hooks'
-  - 'lifecycle'
   - 'spec-sync'
-  - 'use-case'
+  - 'lifecycle-hooks'
+  - 'archived-change'
+  - 'artifact-parser'
+  - 'hook-runner'
+  - 'metadata-refresh'
+contentHashes:
+  'spec.md': 'sha256:1f95eb28d1d20950d850bf140d6814084547372b769a6116931d547ee666cc30'
+  'verify.md': 'sha256:cc092a9faab12766a45611bb2063fac15b1c9f8abcbaaf49ffd652633880655b'
 dependsOn:
   - 'core:core/change'
   - 'core:core/schema-format'
@@ -22,20 +27,21 @@ dependsOn:
   - 'default:_global/architecture'
   - 'core:core/workspace'
   - 'core:core/spec-id-format'
-contentHashes:
-  'spec.md': 'sha256:ab7890f5519dfdddd5ae4233ba7f3b97dd31f9f1e40cc10e2a08f5d9af9527fa'
-  'verify.md': 'sha256:cc092a9faab12766a45611bb2063fac15b1c9f8abcbaaf49ffd652633880655b'
 rules:
   - requirement: 'Ports and constructor'
     rules:
-      - 'ArchiveChange receives at construction time: ChangeRepository, a map of SpecRepository instances (one per configured workspace), ArchiveRepository, HookRunner, GitAdapter, and ArtifactParserRegistry.'
+      - 'ArchiveChange receives at construction time: ChangeRepository, a map of SpecRepository instances (one per configured workspace), ArchiveRepository, HookRunner, GitAdapter, ArtifactParserRegistry, schemaRef, workspaceSchemasPaths, projectRoot, changesPath, and projectHooks.'
+      - 'schemaRef is the schema reference string from specd.yaml; workspaceSchemasPaths is the resolved workspace-to-schemas-path map passed through to SchemaRegistry.resolve().'
+      - 'projectRoot is the absolute path to the project root (the directory containing specd.yaml); changesPath is the absolute path to the changes directory.'
+      - 'projectHooks contains the project-level workflow hook definitions from specd.yaml.'
+      - 'All constructor parameters are injected at kernel composition time, not passed per invocation.'
+      - 'hookVariables is built internally by ArchiveChange from projectRoot and changesPath; the caller does not provide it.'
       - 'specs is keyed by workspace name; ArchiveChange looks up the SpecRepository for each spec ID workspace before reading or writing.'
       - 'ArtifactParserRegistry is a map from format name (markdown, json, yaml, plaintext) to the corresponding ArtifactParser adapter.'
       - 'ArchiveChange does not instantiate parsers directly; the bootstrap layer constructs and injects ArtifactParserRegistry.'
   - requirement: 'Input'
     rules:
-      - 'ArchiveChange.execute receives name (the change name to archive), schemaRef, workspaceSchemasPaths, and hookVariables.'
-      - 'hookVariables are template variable values available to run: hook commands (change.name, change.workspace, codeRoot); the use case does not derive these.'
+      - 'ArchiveChange.execute receives name (the change name to archive).'
   - requirement: 'Archivable guard'
     rules:
       - 'The first step of ArchiveChange.execute must call change.assertArchivable().'
@@ -68,6 +74,8 @@ rules:
       - 'archivedAt is the timestamp when the archive operation completes, set by the repository.'
       - 'archivedBy is optional and is the git identity of the actor; absent if git identity was unavailable.'
       - 'workspace is the SpecPath of the primary workspace (the first entry in change.workspaces).'
+      - 'artifacts contains artifact metadata tracked by the repository.'
+      - 'The FsArchiveRepository implementation moves the change directory and appends an entry to index.jsonl; the use case has no knowledge of these implementation details.'
       - 'ArchivedChange has no approval field and no wasStructural flag.'
   - requirement: 'Post-archive hooks'
     rules:

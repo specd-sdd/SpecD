@@ -8,7 +8,7 @@
 
 ### Requirement: Ports and constructor
 
-`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `HookRunner`, `GitAdapter`, and `ArtifactParserRegistry`.
+`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `HookRunner`, `GitAdapter`, `ArtifactParserRegistry`, `schemaRef`, `workspaceSchemasPaths`, `projectRoot`, `changesPath`, and `projectHooks`.
 
 ```typescript
 class ArchiveChange {
@@ -19,9 +19,18 @@ class ArchiveChange {
     hooks: HookRunner,
     git: GitAdapter,
     parsers: ArtifactParserRegistry,
+    schemaRef: string,
+    workspaceSchemasPaths: ReadonlyMap<string, string>,
+    projectRoot: string,
+    changesPath: string,
+    projectHooks: ProjectHooks,
   )
 }
 ```
+
+`schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. `projectRoot` is the absolute path to the project root (the directory containing `specd.yaml`). `changesPath` is the absolute path to the changes directory. `projectHooks` contains the project-level workflow hook definitions from `specd.yaml`. All are injected at kernel composition time, not passed per invocation.
+
+`hookVariables` is built internally by `ArchiveChange` from `projectRoot` and `changesPath` — the caller does not provide it.
 
 `specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec ID's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.
 
@@ -32,9 +41,6 @@ class ArchiveChange {
 `ArchiveChange.execute` receives:
 
 - `name` — the change name to archive
-- `schemaRef` — the schema reference string from `specd.yaml`
-- `workspaceSchemasPaths` — resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`
-- `hookVariables` — template variable values available to `run:` hook commands (`change.name`, `change.workspace`, `codeRoot`); the use case does not derive these — the caller provides them from the active config and runtime context
 
 ### Requirement: Archivable guard
 

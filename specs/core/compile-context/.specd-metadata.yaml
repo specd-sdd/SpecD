@@ -2,17 +2,18 @@ title: 'CompileContext'
 description: >
   CompileContext is the application use case that assembles the instruction block an AI agent receives
   when entering a lifecycle step of a change. It collects context specs via five-step include/exclude
-  resolution and optional dependsOn traversal, evaluates step availability, and combines schema
-  instructions, delta context, artifact rules, spec content, and step hooks into a single structured output.
+  resolution and optional dependsOn traversal, evaluates step availability, and combines project context
+  entries, schema instructions, delta context, artifact rules, spec content, and step hooks into a single
+  structured output.
 keywords:
   - 'context-compilation'
   - 'instruction-block'
-  - 'lifecycle-step'
-  - 'spec-collection'
-  - 'depends-on-traversal'
-  - 'staleness-detection'
+  - 'include-exclude-resolution'
+  - 'dependson-traversal'
   - 'step-availability'
+  - 'staleness-detection'
   - 'delta-context'
+  - 'artifact-rules'
 dependsOn:
   - 'core:core/change'
   - 'core:core/config'
@@ -23,19 +24,20 @@ dependsOn:
   - 'core:core/spec-id-format'
   - 'core:core/workspace'
 contentHashes:
-  'spec.md': 'sha256:b81c6bb9175421dd4d3389cf2bb79c1ea7f39ecdd765e68ce895b7a376a27de4'
+  'spec.md': 'sha256:8ce579d6ed4cbea6aef6b2732791940cc48bff92d709a6eaa851dd8079e00394'
   'verify.md': 'sha256:5558daf7218656254520ba0a227d04060d1a14f58311cc538bb91ef076f9c346'
 rules:
   - requirement: 'Ports and constructor'
     rules:
-      - 'CompileContext receives ChangeRepository, a map of SpecRepository instances keyed by workspace name, SchemaRegistry, FileReader, and ArtifactParserRegistry at construction time.'
+      - 'CompileContext receives ChangeRepository, a map of SpecRepository instances keyed by workspace name, SchemaRegistry, FileReader, ArtifactParserRegistry, schemaRef, and workspaceSchemasPaths at construction time.'
       - 'ArtifactParserRegistry maps format names (markdown, json, yaml, plaintext) to ArtifactParser adapters used for delta context injection.'
       - 'The specs map is keyed by workspace name; each SpecRepository must have been constructed with the matching RepositoryConfig.workspace value so that repo.workspace() returns the same key used in the map.'
       - 'FileReader returns file content as a string or null if absent; it is bound to the project root by the bootstrap layer.'
       - 'CompileContext must not create or configure repositories — it only reads from them.'
+      - 'schemaRef and workspaceSchemasPaths are injected at kernel composition time, not passed per invocation.'
   - requirement: 'Input'
     rules:
-      - 'CompileContext.execute receives: name, step, optional activeArtifact, schemaRef, workspaceSchemasPaths, config, optional followDeps (default false), optional depth, and optional sections.'
+      - 'CompileContext.execute receives name, step, optional activeArtifact, config, optional followDeps (default false), optional depth, and optional sections.'
       - 'activeArtifact is only applicable to the designing step which traverses the artifact DAG once per artifact being created; post-ready steps do not use this field.'
       - 'When activeArtifact is present, only that artifact instruction and artifactRules are injected; when absent, no artifact instructions are injected.'
       - 'followDeps when true performs dependsOn transitive traversal; when false or absent, traversal is skipped.'
@@ -61,25 +63,25 @@ rules:
   - requirement: 'Staleness detection and content fallback'
     rules:
       - 'For every spec in the context set, CompileContext must check whether .specd-metadata.yaml exists and whether its contentHashes are fresh.'
-      - 'Fresh metadata: use structured content (rules, constraints, scenarios, description) from .specd-metadata.yaml.'
-      - 'Stale or absent metadata: fall back to raw artifact file content and emit a staleness warning — compilation is never blocked.'
+      - 'Fresh metadata uses structured content (rules, constraints, scenarios, description) from .specd-metadata.yaml.'
+      - 'Stale or absent metadata falls back to raw artifact file content and emits a staleness warning — compilation is never blocked.'
   - requirement: 'Step availability'
     rules:
       - 'A step is available when all artifact IDs in its workflow requires list have effective status complete or skipped.'
       - 'A skipped optional artifact satisfies the requirement identically to a completed artifact.'
-      - 'Unavailability is surfaced in the result with stepAvailable: false and blockingArtifacts populated — CompileContext must not throw.'
+      - 'Unavailability is surfaced in the result with stepAvailable false and blockingArtifacts populated — CompileContext must not throw.'
   - requirement: 'Assembled instruction block'
     rules:
-      - 'The instruction block is assembled in order: (1) project context entries, (2) schema artifact instruction (when activeArtifact present), (3) delta context (when activeArtifact has delta: true), (4) project artifactRules for the active artifact, (5) spec content for collected specs, (6) step hooks, (7) available steps listing.'
+      - 'The instruction block is assembled in order: (1) project context entries, (2) schema artifact instruction (when activeArtifact present), (3) delta context (when activeArtifact has delta true), (4) project artifactRules for the active artifact, (5) spec content for collected specs, (6) step hooks, (7) available steps listing.'
       - 'Project context entries resolve instruction values verbatim and file values by reading via FileReader relative to specd.yaml directory; missing file entries emit a warning and are skipped.'
       - 'Delta context consists of three sub-blocks: format instructions from ArtifactParser.deltaInstructions(), domain instructions from artifact deltaInstruction field, and existing artifact outlines per change.specIds parsed via ArtifactParser.parse() and outline(ast).'
       - 'Project artifact rules from config.artifactRules are additive and do not replace the schema instruction.'
       - 'Spec content uses fresh metadata sections when available; when metadata is absent or stale, falls back to extracting nodes via contextSections selectors from artifact files, parsing, applying selectors, and extracting per the extract field (content, label, or both).'
-      - 'Step hooks include only instruction: entries from hooks.pre and hooks.post prefixed with [pre] or [post] in declaration order; run: entries are not included.'
+      - 'Step hooks include only instruction entries from hooks.pre and hooks.post prefixed with [pre] or [post] in declaration order; run entries are not included.'
       - 'Available steps lists all steps declared in the schema workflow, each annotated with whether it is currently available; unavailable steps name the blocking artifacts.'
   - requirement: 'Result shape'
     rules:
-      - 'CompileContext.execute must return: stepAvailable (boolean), blockingArtifacts (string array), instructionBlock (string), and warnings (ContextWarning array).'
+      - 'CompileContext.execute must return stepAvailable (boolean), blockingArtifacts (string array), instructionBlock (string), and warnings (ContextWarning array).'
       - 'CompileContext must throw on ChangeNotFoundError and on schema resolution errors.'
       - 'CompileContext must not throw on step availability failures.'
   - requirement: 'Missing spec IDs emit a warning'
@@ -98,13 +100,13 @@ constraints:
   - 'The caller resolves the config and constructs all SpecRepository and FileReader instances before calling the constructor.'
   - 'The specs map must contain one entry per workspace declared in specd.yaml; missing workspaces produce a warning, not an error.'
   - 'Artifact instructions, delta context, and artifactRules are included only when activeArtifact is provided — and only for that artifact.'
-  - 'Delta context is injected only when activeArtifact has delta: true.'
+  - 'Delta context is injected only when activeArtifact has delta true.'
   - 'Existing artifact outlines are injected per spec ID in change.specIds; missing files are silently skipped.'
   - 'ArtifactParserRegistry must contain an adapter for every format in the schema; a missing adapter must emit a warning and skip the delta context block — no error.'
   - 'Step hooks fire once per step, not once per artifact iteration.'
-  - 'instruction: hook entries are included prefixed with [pre] or [post]; run: hook entries are not included.'
-  - 'dependsOn traversal is opt-in via followDeps: true; when absent or false, step 5 is skipped entirely.'
-  - 'depth is only meaningful when followDeps: true; it limits traversal levels (1 = direct deps only).'
+  - 'instruction hook entries are included prefixed with [pre] or [post]; run hook entries are not included.'
+  - 'dependsOn traversal is opt-in via followDeps true; when absent or false, step 5 is skipped entirely.'
+  - 'depth is only meaningful when followDeps is true; it limits traversal levels (1 = direct deps only).'
   - 'sections applies only to spec content rendering; schema instructions, delta context, artifact rules, step hooks, and available steps are unaffected.'
   - 'Cycle detection is mandatory — cycles in dependsOn must not cause infinite loops.'
   - 'Metadata-based content (fresh .specd-metadata.yaml) is always preferred; contextSections fallback is used only when metadata is absent or stale.'

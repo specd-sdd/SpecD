@@ -8,7 +8,7 @@
 
 ### Requirement: Ports and constructor
 
-`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaRegistry`, `ArtifactParserRegistry`, and `GitAdapter`.
+`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaRegistry`, `ArtifactParserRegistry`, `GitAdapter`, `schemaRef`, and `workspaceSchemasPaths`.
 
 ```typescript
 class ValidateArtifacts {
@@ -18,9 +18,13 @@ class ValidateArtifacts {
     schemas: SchemaRegistry,
     parsers: ArtifactParserRegistry,
     git: GitAdapter,
+    schemaRef: string,
+    workspaceSchemasPaths: ReadonlyMap<string, string>,
   )
 }
 ```
+
+`schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. Both are injected at kernel composition time, not passed per invocation.
 
 `specs` is keyed by workspace name. When loading a base spec for delta application preview, `ValidateArtifacts` looks up the `SpecRepository` for the spec ID's workspace. `ArtifactParserRegistry` maps format names to `ArtifactParser` adapters and is used for both `deltaValidations` checks and delta application preview.
 
@@ -30,8 +34,6 @@ class ValidateArtifacts {
 
 - `name` — the change name to validate
 - `specPath` — the spec ID to validate (one spec per execution); must be one of the IDs in `change.specIds`
-- `schemaRef` — the schema reference string from `specd.yaml`
-- `workspaceSchemasPaths` — resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`
 
 Validating all specs in a change requires calling `execute` once per spec ID. Use cases that need to validate all specs call `execute` in a loop.
 

@@ -8,7 +8,7 @@
 
 ### Requirement: Ports and constructor
 
-`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaRegistry`, `FileReader`, and `ArtifactParserRegistry`.
+`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaRegistry`, `FileReader`, `ArtifactParserRegistry`, `schemaRef`, and `workspaceSchemasPaths`.
 
 ```typescript
 class CompileContext {
@@ -18,9 +18,13 @@ class CompileContext {
     schemas: SchemaRegistry,
     files: FileReader,
     parsers: ArtifactParserRegistry,
+    schemaRef: string,
+    workspaceSchemasPaths: ReadonlyMap<string, string>,
   )
 }
 ```
+
+`schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. Both are injected at kernel composition time, not passed per invocation.
 
 `ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `CompileContext` uses it to look up the correct adapter when injecting delta context for a delta-capable artifact.
 
@@ -37,8 +41,6 @@ Each `SpecRepository` in the map must have been constructed with the matching `R
 - `name` — the change name to compile context for
 - `step` — the lifecycle step name being entered (e.g. `'designing'`, `'implementing'`, `'verifying'`, `'archiving'`)
 - `activeArtifact` (optional) — the artifact ID currently active in the step's iteration. Only applicable to the `designing` step, which traverses the artifact DAG and calls `CompileContext` once per artifact being created. Steps after `ready` (`implementing`, `verifying`, `archiving`) do not use this field — their artifacts already exist by that point. When present, only this artifact's `instruction` and `artifactRules` are injected. When absent, no artifact instructions are injected.
-- `schemaRef` — the schema reference string from `specd.yaml`
-- `workspaceSchemasPaths` — resolved workspace-to-schemas-path map
 - `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, `artifactRules`, `workflow`, and per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`
 - `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1–4 are included.
 - `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.
@@ -161,8 +163,6 @@ const result = await compileContext.execute({
   name: 'add-auth-flow',
   step: 'designing',
   activeArtifact: 'spec',
-  schemaRef: '@specd/schema-std',
-  workspaceSchemasPaths: { default: 'specd/schemas' },
   config: {
     context: [
       { file: 'specd-bootstrap.md' },
@@ -198,8 +198,6 @@ const result2 = await compileContext.execute({
 const result = await compileContext.execute({
   name: 'add-auth-flow',
   step: 'implementing',
-  schemaRef: '@specd/schema-std',
-  workspaceSchemasPaths: { default: 'specd/schemas' },
   config: {
     /* ... */
   },

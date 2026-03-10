@@ -57,7 +57,6 @@ where `<gate>` is `spec` or `signoff`.
 ## Constraints
 
 - Artifact hashes are computed automatically from disk — the user never specifies them
-- `schemaRef` and `workspaceSchemasPaths` are resolved from the loaded config and used to apply `preHashCleanup`
 - Both `spec` and `signoff` sub-verbs are required even when only one approval gate is enabled; the gate state enforces which command is currently valid
 
 ## Examples

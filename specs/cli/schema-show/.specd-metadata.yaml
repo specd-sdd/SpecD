@@ -1,41 +1,35 @@
 title: 'Schema Show'
 description: >
-  Defines the `specd schema show` command, which prints the active schema's declared artifacts and workflow steps. Primarily useful for agents entering a new project to understand what they need to produce and in what order.
+  Defines the specd schema show command, which prints the active schema's declared artifacts
+  and workflow steps. Primarily useful for agents entering a new project to understand what
+  they need to produce and in what order.
 keywords:
-  - 'schema'
-  - 'show'
-  - 'command'
-  - 'signature'
-  - 'output'
-  - 'format'
-  - 'error'
-  - 'cases'
-  - 'read'
-  - 'only'
-  - 'schemaref'
-  - 'workspaceschemaspaths'
+  - 'schema-show'
+  - 'artifacts'
+  - 'workflow'
+  - 'schema-structure'
+  - 'output-format'
+contentHashes:
+  'spec.md': 'sha256:e9a0379298433081496cbcf63fda2b9e476778df81f39f9c33a407d386abc27e'
+  'verify.md': 'sha256:753dd268e2df3857993cf716fa13887a2d4243c626fba0fded99048bd4ae1eb6'
 dependsOn:
   - 'cli:cli/entrypoint'
   - 'core:core/schema-format'
-contentHashes:
-  'spec.md': 'sha256:f467d9726c4a522598eab355a874c826005cb70e577227be00f98ee37858e48e'
-  'verify.md': 'sha256:753dd268e2df3857993cf716fa13887a2d4243c626fba0fded99048bd4ae1eb6'
 rules:
   - requirement: 'Command signature'
     rules:
-      - '`--format text|json|toon` — optional; output format, defaults to `text`'
+      - '`--format text|json|toon` — optional; output format, defaults to `text`.'
   - requirement: 'Output format'
     rules:
-      - 'In `text` mode (default), the command prints two sections:'
-      - 'where `<optional>` is `optional` or `required`, and `requires` lists the artifact IDs or step names that must be complete before this entry is available. The `requires` field is omitted when empty.'
-      - 'In `json` or `toon` mode, the output is (encoded in the respective format):'
+      - 'In `text` mode (default), the command prints two sections: schema name/version, an `artifacts:` section, and a `workflow:` section.'
+      - '`<optional>` is `optional` or `required`, and `requires` lists the artifact IDs or step names that must be complete before this entry is available. The `requires` field is omitted when empty.'
+      - 'In `json` or `toon` mode, the output includes `schema` (name/version), `artifacts` (with id, scope, optional, requires, format, delta), and `workflow` (with step, requires).'
   - requirement: 'Error cases'
     rules:
       - 'If the schema reference in `specd.yaml` cannot be resolved, exits with code 3.'
 constraints:
-  - 'This command is read-only'
-  - '`schemaRef` and `workspaceSchemasPaths` are resolved from the loaded `SpecdConfig`'
-  - 'Artifact `instruction`, `deltaInstruction`, and `validations` are not included in the output — this command focuses on structure, not content'
+  - 'This command is read-only.'
+  - 'Artifact `instruction`, `deltaInstruction`, and `validations` are not included in the output — this command focuses on structure, not content.'
 scenarios:
   - requirement: 'Command signature'
     name: 'Extra arguments rejected'

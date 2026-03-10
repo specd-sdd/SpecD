@@ -18,7 +18,7 @@ specd change validate <name> <workspace:capability-path> [--format text|json|too
 
 ### Requirement: Behaviour
 
-The command invokes the `ValidateArtifacts` use case. It resolves `schemaRef` and `workspaceSchemasPaths` from the loaded `SpecdConfig` and passes them along with the change name and spec ID.
+The command invokes the `ValidateArtifacts` use case, passing the change name and spec ID.
 
 ### Requirement: Output on success
 
@@ -73,7 +73,6 @@ If the given `<workspace:capability-path>` is not declared in the change's `spec
 
 ## Constraints
 
-- `schemaRef` and `workspaceSchemasPaths` are always resolved from the loaded config — never supplied by the user
 - Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr
 - The command marks artifacts as complete in the manifest when they pass
 

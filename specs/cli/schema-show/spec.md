@@ -63,7 +63,6 @@ In `json` or `toon` mode, the output is (encoded in the respective format):
 ## Constraints
 
 - This command is read-only
-- `schemaRef` and `workspaceSchemasPaths` are resolved from the loaded `SpecdConfig`
 - Artifact `instruction`, `deltaInstruction`, and `validations` are not included in the output — this command focuses on structure, not content
 
 ## Examples
