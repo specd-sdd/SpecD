@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { YamlParser } from '../../../src/infrastructure/artifact-parser/yaml-parser.js'
-import { DeltaApplicationError } from '../../../src/application/ports/artifact-parser.js'
+import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
 
 describe('YamlParser', () => {
   const parser = new YamlParser()

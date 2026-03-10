@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MarkdownParser } from '../../../src/infrastructure/artifact-parser/markdown-parser.js'
-import { DeltaApplicationError } from '../../../src/application/ports/artifact-parser.js'
+import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
 
 describe('MarkdownParser', () => {
   const parser = new MarkdownParser()

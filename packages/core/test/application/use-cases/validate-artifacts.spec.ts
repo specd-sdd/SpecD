@@ -10,10 +10,10 @@ import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import {
-  DeltaApplicationError,
   type ArtifactAST,
   type ArtifactNode,
 } from '../../../src/application/ports/artifact-parser.js'
+import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
 import {
   makeChangeRepository,
   makeGitAdapter,
