@@ -1,7 +1,6 @@
 import { type Command } from 'commander'
-import { createCliKernel } from '../../kernel.js'
 import { getSkill } from '@specd/skills'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import * as fs from 'node:fs/promises'
@@ -21,8 +20,7 @@ export function registerProjectUpdate(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (opts: { format: string; config?: string }) => {
       try {
-        const config = await loadConfig({ configPath: opts.config })
-        const kernel = createCliKernel(config)
+        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
         const fmt = parseFormat(opts.format)
 
         const manifest = await kernel.project.getSkillsManifest.execute({

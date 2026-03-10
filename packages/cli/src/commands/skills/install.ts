@@ -1,7 +1,6 @@
 import { type Command } from 'commander'
-import { createCliKernel } from '../../kernel.js'
 import { getSkill, listSkills } from '@specd/skills'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import * as fs from 'node:fs/promises'
@@ -85,8 +84,7 @@ export function registerSkillsInstall(parent: Command): void {
               process.exit(1)
             }
 
-            const config = await loadConfig({ configPath: opts.config })
-            const kernel = createCliKernel(config)
+            const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
             // Validate specd.yaml exists before writing skill files
             const configPath = path.join(config.projectRoot, 'specd.yaml')

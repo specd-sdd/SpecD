@@ -2,8 +2,7 @@ import * as fs from 'node:fs/promises'
 import { type Command } from 'commander'
 import { parse as parseYaml } from 'yaml'
 import { SpecPath } from '@specd/core'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
@@ -27,8 +26,7 @@ export function registerSpecWriteMetadata(parent: Command): void {
         opts: { format: string; config?: string; input?: string; force?: boolean },
       ) => {
         try {
-          const config = await loadConfig({ configPath: opts.config })
-          const kernel = createCliKernel(config)
+          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
           const parsed = parseSpecId(specPath, config)
 
           // Read content from --input file or stdin

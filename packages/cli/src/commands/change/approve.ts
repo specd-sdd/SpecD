@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { resolveChangeContext } from '../../helpers/change-context.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 
 /**
  * Registers the `change approve` subcommand on the given parent command.
@@ -21,7 +21,7 @@ export function registerChangeApprove(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
-        const { config, kernel } = await resolveChangeContext({
+        const { config, kernel } = await resolveCliContext({
           configPath: opts.config,
         })
 
@@ -50,7 +50,7 @@ export function registerChangeApprove(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
-        const { config, kernel } = await resolveChangeContext({
+        const { config, kernel } = await resolveCliContext({
           configPath: opts.config,
         })
 

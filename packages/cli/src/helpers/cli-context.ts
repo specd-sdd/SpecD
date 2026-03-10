@@ -5,7 +5,7 @@ import { loadConfig } from '../load-config.js'
 /**
  * The resolved CLI context containing config and kernel.
  */
-export interface ChangeContext {
+export interface CliContext {
   /** The loaded specd configuration. */
   readonly config: SpecdConfig
   /** The wired kernel instance. */
@@ -22,9 +22,9 @@ export interface ChangeContext {
  * @param options.configPath - Path to specd.yaml config file
  * @returns The resolved CLI context
  */
-export async function resolveChangeContext(options?: {
+export async function resolveCliContext(options?: {
   configPath?: string | undefined
-}): Promise<ChangeContext> {
+}): Promise<CliContext> {
   const config = await loadConfig({ configPath: options?.configPath })
   const kernel = createCliKernel(config)
   return { config, kernel }

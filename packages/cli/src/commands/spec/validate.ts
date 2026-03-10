@@ -1,6 +1,5 @@
 import { type Command } from 'commander'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
@@ -29,8 +28,7 @@ export function registerSpecValidate(parent: Command): void {
             process.exit(1)
           }
 
-          const config = await loadConfig({ configPath: opts.config })
-          const kernel = createCliKernel(config)
+          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
           let inputSpecPath: string | undefined
           let inputWorkspace: string | undefined
 

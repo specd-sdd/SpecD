@@ -1,6 +1,5 @@
 import { type Command } from 'commander'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 
@@ -18,8 +17,7 @@ export function registerChangeDraft(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, opts: { reason?: string; format: string; config?: string }) => {
       try {
-        const config = await loadConfig({ configPath: opts.config })
-        const kernel = createCliKernel(config)
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
         await kernel.changes.draft.execute({
           name,
           ...(opts.reason !== undefined ? { reason: opts.reason } : {}),

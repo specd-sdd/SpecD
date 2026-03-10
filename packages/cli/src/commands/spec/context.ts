@@ -1,7 +1,6 @@
 import { type Command } from 'commander'
 import { SpecPath, type SpecContextEntry } from '@specd/core'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
@@ -80,8 +79,7 @@ export function registerSpecContext(parent: Command): void {
             process.exit(1)
           }
 
-          const config = await loadConfig({ configPath: opts.config })
-          const kernel = createCliKernel(config)
+          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
           const parsed = parseSpecId(specPath, config)
 
           // Build section filter

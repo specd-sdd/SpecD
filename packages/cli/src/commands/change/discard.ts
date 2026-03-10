@@ -1,6 +1,5 @@
 import { type Command } from 'commander'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 
@@ -22,8 +21,7 @@ export function registerChangeDiscard(parent: Command): void {
           process.stderr.write('error: --reason must not be empty\n')
           process.exit(1)
         }
-        const config = await loadConfig({ configPath: opts.config })
-        const kernel = createCliKernel(config)
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
         await kernel.changes.discard.execute({
           name,
           reason: opts.reason,

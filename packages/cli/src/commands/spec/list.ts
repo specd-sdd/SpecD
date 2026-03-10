@@ -1,8 +1,7 @@
 import { type Command } from 'commander'
 import chalk from 'chalk'
 import { type SpecListEntry, type SpecMetadataStatus } from '@specd/core'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { colWidth, renderTable } from '../../helpers/table.js'
@@ -131,8 +130,7 @@ export function registerSpecList(parent: Command): void {
         config?: string
       }) => {
         try {
-          const config = await loadConfig({ configPath: opts.config })
-          const kernel = createCliKernel(config)
+          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
           const includeSummary = opts.summary === true
           const includeMetadataStatus = opts.metadataStatus !== undefined
           const metadataStatusFilter = parseMetadataStatusFilter(opts.metadataStatus)

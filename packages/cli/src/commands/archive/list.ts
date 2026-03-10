@@ -1,6 +1,5 @@
 import { type Command } from 'commander'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { colWidth, renderTable } from '../../helpers/table.js'
@@ -18,8 +17,7 @@ export function registerArchiveList(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (opts: { format: string; config?: string }) => {
       try {
-        const config = await loadConfig({ configPath: opts.config })
-        const kernel = createCliKernel(config)
+        const { kernel } = await resolveCliContext({ configPath: opts.config })
         const unsorted = await kernel.changes.listArchived.execute()
         const changes = [...unsorted].sort(
           (a, b) => b.archivedAt.getTime() - a.archivedAt.getTime(),

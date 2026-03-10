@@ -1,7 +1,6 @@
 import * as path from 'node:path'
 import { type Command } from 'commander'
-import { loadConfig } from '../../load-config.js'
-import { createCliKernel } from '../../kernel.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 
@@ -18,8 +17,7 @@ export function registerSpecResolvePath(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (fsPath: string, opts: { format: string; config?: string }) => {
       try {
-        const config = await loadConfig({ configPath: opts.config })
-        const kernel = createCliKernel(config)
+        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
         const absolute = path.resolve(process.cwd(), fsPath)
 

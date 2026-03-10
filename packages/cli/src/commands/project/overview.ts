@@ -1,8 +1,7 @@
 import { type Command } from 'commander'
 import chalk from 'chalk'
 import boxen from 'boxen'
-import { createCliKernel } from '../../kernel.js'
-import { loadConfig } from '../../load-config.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
 
@@ -74,8 +73,7 @@ export function registerProjectOverview(parent: Command): void {
     .action(async (opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const config = await loadConfig({ configPath: opts.config })
-        const kernel = createCliKernel(config)
+        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
         const [specs, activeChanges, drafts, discarded] = await Promise.all([
           kernel.specs.list.execute({ includeSummary: false }),
