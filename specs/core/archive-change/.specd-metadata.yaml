@@ -25,7 +25,7 @@ dependsOn:
   - 'core:core/workspace'
   - 'core:core/spec-id-format'
 contentHashes:
-  'spec.md': 'sha256:59222179106204925ca2c2e5bc0bc51729c5ced0d74782feed8aabcc3f3e61f0'
+  'spec.md': 'sha256:4e9a2a1059291a700ca4aec5be91b18b319873746990c84f21fbd92ff52a67e4'
   'verify.md': 'sha256:cc092a9faab12766a45611bb2063fac15b1c9f8abcbaaf49ffd652633880655b'
 rules:
   - requirement: 'Ports and constructor'
@@ -71,7 +71,7 @@ rules:
       - 'For each artifact with delta: false (new file artifacts), load from ChangeRepository and save directly to SpecRepository if not absent or skipped.'
   - requirement: 'Archive repository call'
     rules:
-      - 'After syncing all specs, ArchiveChange must resolve the git actor via ActorResolver.identity() before calling archiveRepository.archive().'
+      - 'After syncing all specs, ArchiveChange must resolve the actor via ActorResolver.identity() before calling archiveRepository.archive().'
       - 'If identity() throws, the archive proceeds without an actor.'
       - 'ArchiveChange calls archiveRepository.archive(change, { actor }) when an actor is available, or archiveRepository.archive(change, {}) when it is not.'
       - 'The ArchiveRepository port is responsible for constructing the ArchivedChange record; the use case never builds it directly.'
