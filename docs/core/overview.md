@@ -63,7 +63,7 @@ Everything exported is a domain type (entity, value object, error), an applicati
 | `Delta`                       | class          | A delta file record.                                        |
 | `ChangeState`                 | type           | Union of all valid lifecycle state strings.                 |
 | `ArtifactStatus`              | type           | `'missing' \| 'in-progress' \| 'complete' \| 'skipped'`     |
-| `GitIdentity`                 | interface      | `{ name: string; email: string }` — git actor identity.     |
+| `ActorIdentity`               | interface      | `{ name: string; email: string }` — actor identity.         |
 | `ChangeEvent`                 | type           | Discriminated union of all change history event types.      |
 | `VALID_TRANSITIONS`           | const          | Map of valid transitions per state.                         |
 | `isValidTransition`           | function       | Returns whether a state transition is permitted.            |
@@ -85,7 +85,8 @@ Everything exported is a domain type (entity, value object, error), an applicati
 | `ArchiveRepository`         | abstract class | Port for archiving and querying archived changes.                 |
 | `SchemaRegistry`            | interface      | Port for discovering and resolving schemas.                       |
 | `HookRunner`                | interface      | Port for executing `run:` hook commands.                          |
-| `GitAdapter`                | interface      | Port for querying git repository state.                           |
+| `GitAdapter`                | interface      | Port for querying git repository state (VCS operations).          |
+| `ActorResolver`             | interface      | Port for resolving the current actor identity.                    |
 | `FileReader`                | interface      | Port for reading files by absolute path.                          |
 | `ArtifactParser`            | interface      | Port for parsing, applying deltas, and serialising artifacts.     |
 | `ArtifactParserRegistry`    | type           | `ReadonlyMap<string, ArtifactParser>`                             |

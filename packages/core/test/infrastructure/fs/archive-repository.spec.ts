@@ -3,13 +3,13 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
-import { type GitIdentity } from '../../../src/domain/entities/change.js'
+import { type ActorIdentity } from '../../../src/domain/entities/change.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { FsChangeRepository } from '../../../src/infrastructure/fs/change-repository.js'
 import { FsArchiveRepository } from '../../../src/infrastructure/fs/archive-repository.js'
 import { changeDirName } from '../../../src/infrastructure/fs/dir-name.js'
 
-const actor: GitIdentity = { name: 'Alice', email: 'alice@example.com' }
+const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
 
 // ---- Setup / teardown helpers ----
 

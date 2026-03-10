@@ -1,4 +1,4 @@
-import { type Change, type GitIdentity } from '../../domain/entities/change.js'
+import { type Change, type ActorIdentity } from '../../domain/entities/change.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { Repository, type RepositoryConfig } from './repository.js'
 
@@ -51,7 +51,7 @@ export abstract class ArchiveRepository extends Repository {
    */
   abstract archive(
     change: Change,
-    options?: { force?: boolean; actor?: GitIdentity },
+    options?: { force?: boolean; actor?: ActorIdentity },
   ): Promise<{ archivedChange: ArchivedChange; archiveDirPath: string }>
 
   /**

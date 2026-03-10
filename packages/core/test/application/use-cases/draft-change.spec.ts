@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { DraftChange } from '../../../src/application/use-cases/draft-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
-import { makeChangeRepository, makeGitAdapter, makeChange } from './helpers.js'
+import { makeChangeRepository, makeActorResolver, makeChange } from './helpers.js'
 
 describe('DraftChange', () => {
   describe('given a change exists', () => {
     it('marks the change as drafted', async () => {
       const change = makeChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new DraftChange(repo, makeGitAdapter())
+      const uc = new DraftChange(repo, makeActorResolver())
 
       const result = await uc.execute({ name: 'my-change' })
 
@@ -18,7 +18,7 @@ describe('DraftChange', () => {
     it('appends a drafted event to history', async () => {
       const change = makeChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new DraftChange(repo, makeGitAdapter())
+      const uc = new DraftChange(repo, makeActorResolver())
 
       const result = await uc.execute({ name: 'my-change' })
 
@@ -29,7 +29,7 @@ describe('DraftChange', () => {
     it('records the reason when provided', async () => {
       const change = makeChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new DraftChange(repo, makeGitAdapter())
+      const uc = new DraftChange(repo, makeActorResolver())
 
       const result = await uc.execute({ name: 'my-change', reason: 'waiting for review' })
 
@@ -42,7 +42,7 @@ describe('DraftChange', () => {
     it('saves the updated change', async () => {
       const change = makeChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new DraftChange(repo, makeGitAdapter())
+      const uc = new DraftChange(repo, makeActorResolver())
 
       await uc.execute({ name: 'my-change' })
 
@@ -53,7 +53,7 @@ describe('DraftChange', () => {
   describe('given no change with that name', () => {
     it('throws ChangeNotFoundError', async () => {
       const repo = makeChangeRepository()
-      const uc = new DraftChange(repo, makeGitAdapter())
+      const uc = new DraftChange(repo, makeActorResolver())
 
       await expect(uc.execute({ name: 'missing' })).rejects.toThrow(ChangeNotFoundError)
     })

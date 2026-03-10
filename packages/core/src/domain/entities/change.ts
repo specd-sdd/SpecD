@@ -5,8 +5,8 @@ import { CorruptedManifestError } from '../errors/corrupted-manifest-error.js'
 import { type ChangeArtifact } from './change-artifact.js'
 import { parseSpecId } from '../services/parse-spec-id.js'
 
-/** Git identity of the actor performing an operation. */
-export interface GitIdentity {
+/** Identity of the actor performing an operation. */
+export interface ActorIdentity {
   readonly name: string
   readonly email: string
 }
@@ -15,7 +15,7 @@ export interface GitIdentity {
 export interface CreatedEvent {
   readonly type: 'created'
   readonly at: Date
-  readonly by: GitIdentity
+  readonly by: ActorIdentity
   readonly specIds: readonly string[]
   readonly schemaName: string
   readonly schemaVersion: number
@@ -25,7 +25,7 @@ export interface CreatedEvent {
 export interface TransitionedEvent {
   readonly type: 'transitioned'
   readonly at: Date
-  readonly by: GitIdentity
+  readonly by: ActorIdentity
   readonly from: ChangeState
   readonly to: ChangeState
 }
@@ -34,7 +34,7 @@ export interface TransitionedEvent {
 export interface SpecApprovedEvent {
   readonly type: 'spec-approved'
   readonly at: Date
-  readonly by: GitIdentity
+  readonly by: ActorIdentity
   readonly reason: string
   readonly artifactHashes: Record<string, string>
 }
@@ -43,7 +43,7 @@ export interface SpecApprovedEvent {
 export interface SignedOffEvent {
   readonly type: 'signed-off'
   readonly at: Date
-  readonly by: GitIdentity
+  readonly by: ActorIdentity
   readonly reason: string
   readonly artifactHashes: Record<string, string>
 }
@@ -52,7 +52,7 @@ export interface SignedOffEvent {
 export interface InvalidatedEvent {
   readonly type: 'invalidated'
   readonly at: Date
-  readonly by: GitIdentity
+  readonly by: ActorIdentity
   readonly cause: 'spec-change' | 'artifact-change'
 }
 
@@ -60,7 +60,7 @@ export interface InvalidatedEvent {
 export interface DraftedEvent {
   readonly type: 'drafted'
   readonly at: Date
-  readonly by: GitIdentity
+  readonly by: ActorIdentity
   readonly reason?: string
 }
 
@@ -68,14 +68,14 @@ export interface DraftedEvent {
 export interface RestoredEvent {
   readonly type: 'restored'
   readonly at: Date
-  readonly by: GitIdentity
+  readonly by: ActorIdentity
 }
 
 /** Appended when a change is permanently abandoned. */
 export interface DiscardedEvent {
   readonly type: 'discarded'
   readonly at: Date
-  readonly by: GitIdentity
+  readonly by: ActorIdentity
   readonly reason: string
   readonly supersededBy?: readonly string[]
 }
@@ -84,7 +84,7 @@ export interface DiscardedEvent {
 export interface ArtifactSkippedEvent {
   readonly type: 'artifact-skipped'
   readonly at: Date
-  readonly by: GitIdentity
+  readonly by: ActorIdentity
   readonly artifactId: string
   readonly reason?: string
 }
@@ -305,10 +305,10 @@ export class Change {
    * Attempts a lifecycle state transition, appending a `transitioned` event.
    *
    * @param to - The target state
-   * @param actor - Git identity of the actor performing the transition
+   * @param actor - Identity of the actor performing the transition
    * @throws {InvalidStateTransitionError} If the transition is not permitted
    */
-  transition(to: ChangeState, actor: GitIdentity): void {
+  transition(to: ChangeState, actor: ActorIdentity): void {
     const from = this.state
     if (!isValidTransition(from, to)) {
       throw new InvalidStateTransitionError(from, to)
@@ -324,10 +324,10 @@ export class Change {
    * spec approval or signoff.
    *
    * @param cause - The reason for invalidation
-   * @param actor - Git identity of the actor triggering the change
+   * @param actor - Identity of the actor triggering the change
    * @throws {InvalidStateTransitionError} If the current state cannot transition to `designing`
    */
-  invalidate(cause: InvalidatedEvent['cause'], actor: GitIdentity): void {
+  invalidate(cause: InvalidatedEvent['cause'], actor: ActorIdentity): void {
     const from = this.state
     // Invalidation is a forced rollback — only throw if already in a terminal
     // state (archivable) where no further transitions are meaningful.
@@ -350,12 +350,12 @@ export class Change {
    *
    * @param reason - Free-text rationale for the approval
    * @param artifactHashes - Hashes of the artifacts reviewed during approval
-   * @param actor - Git identity of the approver
+   * @param actor - Identity of the approver
    */
   recordSpecApproval(
     reason: string,
     artifactHashes: Record<string, string>,
-    actor: GitIdentity,
+    actor: ActorIdentity,
   ): void {
     this._history.push({ type: 'spec-approved', reason, artifactHashes, at: new Date(), by: actor })
   }
@@ -365,9 +365,13 @@ export class Change {
    *
    * @param reason - Free-text rationale for the sign-off
    * @param artifactHashes - Hashes of the artifacts reviewed during sign-off
-   * @param actor - Git identity of the approver
+   * @param actor - Identity of the approver
    */
-  recordSignoff(reason: string, artifactHashes: Record<string, string>, actor: GitIdentity): void {
+  recordSignoff(
+    reason: string,
+    artifactHashes: Record<string, string>,
+    actor: ActorIdentity,
+  ): void {
     this._history.push({ type: 'signed-off', reason, artifactHashes, at: new Date(), by: actor })
   }
 
@@ -375,10 +379,10 @@ export class Change {
    * Records that an optional artifact was explicitly skipped.
    *
    * @param artifactId - The artifact type ID that was skipped
-   * @param actor - Git identity of the actor skipping the artifact
+   * @param actor - Identity of the actor skipping the artifact
    * @param reason - Optional explanation for skipping
    */
-  recordArtifactSkipped(artifactId: string, actor: GitIdentity, reason?: string): void {
+  recordArtifactSkipped(artifactId: string, actor: ActorIdentity, reason?: string): void {
     const event: ArtifactSkippedEvent =
       reason !== undefined
         ? { type: 'artifact-skipped', artifactId, at: new Date(), by: actor, reason }
@@ -389,10 +393,10 @@ export class Change {
   /**
    * Shelves this change to `drafts/`, appending a `drafted` event.
    *
-   * @param actor - Git identity of the person shelving the change
+   * @param actor - Identity of the person shelving the change
    * @param reason - Optional explanation for shelving
    */
-  draft(actor: GitIdentity, reason?: string): void {
+  draft(actor: ActorIdentity, reason?: string): void {
     const event: DraftedEvent =
       reason !== undefined
         ? { type: 'drafted', at: new Date(), by: actor, reason }
@@ -403,9 +407,9 @@ export class Change {
   /**
    * Recovers a drafted change back to `changes/`, appending a `restored` event.
    *
-   * @param actor - Git identity of the person restoring the change
+   * @param actor - Identity of the person restoring the change
    */
-  restore(actor: GitIdentity): void {
+  restore(actor: ActorIdentity): void {
     this._history.push({ type: 'restored', at: new Date(), by: actor })
   }
 
@@ -413,10 +417,10 @@ export class Change {
    * Permanently abandons the change, appending a `discarded` event.
    *
    * @param reason - Mandatory explanation for discarding
-   * @param actor - Git identity of the person discarding the change
+   * @param actor - Identity of the person discarding the change
    * @param supersededBy - Optional list of change names that replace this one
    */
-  discard(reason: string, actor: GitIdentity, supersededBy?: readonly string[]): void {
+  discard(reason: string, actor: ActorIdentity, supersededBy?: readonly string[]): void {
     const event: DiscardedEvent =
       supersededBy !== undefined
         ? { type: 'discarded', reason, at: new Date(), by: actor, supersededBy }
@@ -431,9 +435,9 @@ export class Change {
    * followed by a `transitioned` event rolling back to `designing`.
    *
    * @param specIds - The new spec paths
-   * @param actor - Git identity of the actor making the change
+   * @param actor - Identity of the actor making the change
    */
-  updateSpecIds(specIds: readonly string[], actor: GitIdentity): void {
+  updateSpecIds(specIds: readonly string[], actor: ActorIdentity): void {
     this._specIds = [...specIds]
     this.invalidate('spec-change', actor)
   }

@@ -7,7 +7,7 @@ import { createChangeRepository } from '../change-repository.js'
 import { createSpecRepository } from '../spec-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
-import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
+import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
 /**
@@ -133,14 +133,14 @@ export function createValidateArtifacts(
     configDir: opts.configDir,
   })
   const parsers = createArtifactParserRegistry()
-  const git = new GitCLIAdapter()
+  const actor = new GitActorResolver()
   const hasher = new NodeContentHasher()
   return new ValidateArtifacts(
     changeRepo,
     opts.specRepositories,
     schemas,
     parsers,
-    git,
+    actor,
     hasher,
     opts.schemaRef,
     opts.workspaceSchemasPaths,

@@ -1,7 +1,7 @@
 export {
   Change,
   type ChangeProps,
-  type GitIdentity,
+  type ActorIdentity,
   type ChangeEvent,
   type CreatedEvent,
   type TransitionedEvent,

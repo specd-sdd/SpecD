@@ -2,7 +2,7 @@ import { TransitionChange } from '../../application/use-cases/transition-change.
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
-import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
+import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
 
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
@@ -75,6 +75,6 @@ export function createTransitionChange(
     draftsPath: opts.draftsPath,
     discardedPath: opts.discardedPath,
   })
-  const git = new GitCLIAdapter()
-  return new TransitionChange(changeRepo, git)
+  const actor = new GitActorResolver()
+  return new TransitionChange(changeRepo, actor)
 }

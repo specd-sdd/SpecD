@@ -7,10 +7,12 @@ import { type SchemaRegistry } from '../application/ports/schema-registry.js'
 import { type ArtifactParserRegistry } from '../application/ports/artifact-parser.js'
 import { type ContentHasher } from '../application/ports/content-hasher.js'
 import { type FileReader } from '../application/ports/file-reader.js'
+import { type ActorResolver } from '../application/ports/actor-resolver.js'
 import { type GitAdapter } from '../application/ports/git-adapter.js'
 import { type HookRunner } from '../application/ports/hook-runner.js'
 import { type ConfigWriter } from '../application/ports/config-writer.js'
 import { type YamlSerializer } from '../application/ports/yaml-serializer.js'
+import { GitActorResolver } from '../infrastructure/git/actor-resolver.js'
 import { GitCLIAdapter } from '../infrastructure/git/git-adapter.js'
 import { NodeHookRunner } from '../infrastructure/node/hook-runner.js'
 import { NodeContentHasher } from '../infrastructure/node/content-hasher.js'
@@ -47,7 +49,9 @@ export interface KernelInternals {
   readonly hasher: ContentHasher
   /** File reader for context file resolution. */
   readonly files: FileReader
-  /** Git adapter for identity resolution and history. */
+  /** Actor resolver for identity resolution. */
+  readonly actor: ActorResolver
+  /** Git adapter for VCS queries (rootDir, branch, isClean). */
   readonly git: GitAdapter
   /** Hook runner for lifecycle hooks. */
   readonly hooks: HookRunner
@@ -134,6 +138,7 @@ export function createKernelInternals(
     parsers: createArtifactParserRegistry(),
     hasher: new NodeContentHasher(),
     files: new FsFileReader(),
+    actor: new GitActorResolver(),
     git: new GitCLIAdapter(),
     hooks: new NodeHookRunner(),
     configWriter: new FsConfigWriter(),

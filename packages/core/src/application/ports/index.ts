@@ -5,6 +5,7 @@ export { ChangeRepository, type ChangeRepositoryConfig } from './change-reposito
 export { ArchiveRepository, type ArchiveRepositoryConfig } from './archive-repository.js'
 export { type SchemaRegistry, type SchemaEntry, type Schema } from './schema-registry.js'
 export { type HookRunner, type HookResult, type HookVariables } from './hook-runner.js'
+export { type ActorResolver } from './actor-resolver.js'
 export { type GitAdapter } from './git-adapter.js'
 export { type FileReader } from './file-reader.js'
 export {

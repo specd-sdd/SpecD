@@ -5,7 +5,7 @@ import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
-import { makeChangeRepository, makeGitAdapter, testActor } from './helpers.js'
+import { makeChangeRepository, makeActorResolver, testActor } from './helpers.js'
 
 function makeChangeInState(name: string, events: ChangeEvent[]): Change {
   return new Change({
@@ -22,7 +22,7 @@ describe('TransitionChange', () => {
   describe('given no change with that name', () => {
     it('throws ChangeNotFoundError', async () => {
       const repo = makeChangeRepository()
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       await expect(
         uc.execute({
@@ -39,7 +39,7 @@ describe('TransitionChange', () => {
     it('transitions to designing', async () => {
       const change = makeChangeInState('my-change', [])
       const repo = makeChangeRepository([change])
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       const result = await uc.execute({
         name: 'my-change',
@@ -54,7 +54,7 @@ describe('TransitionChange', () => {
     it('saves the updated change', async () => {
       const change = makeChangeInState('my-change', [])
       const repo = makeChangeRepository([change])
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       await uc.execute({
         name: 'my-change',
@@ -70,7 +70,7 @@ describe('TransitionChange', () => {
     it('throws InvalidStateTransitionError for invalid transition', async () => {
       const change = makeChangeInState('my-change', [])
       const repo = makeChangeRepository([change])
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       await expect(
         uc.execute({
@@ -94,7 +94,7 @@ describe('TransitionChange', () => {
     it('routes ready → implementing when approvalsSpec is false', async () => {
       const change = makeReadyChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       const result = await uc.execute({
         name: 'my-change',
@@ -109,7 +109,7 @@ describe('TransitionChange', () => {
     it('routes ready → pending-spec-approval when approvalsSpec is true', async () => {
       const change = makeReadyChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       const result = await uc.execute({
         name: 'my-change',
@@ -136,7 +136,7 @@ describe('TransitionChange', () => {
     it('routes done → archivable when approvalsSignoff is false', async () => {
       const change = makeDoneChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       const result = await uc.execute({
         name: 'my-change',
@@ -151,7 +151,7 @@ describe('TransitionChange', () => {
     it('routes done → pending-signoff when approvalsSignoff is true', async () => {
       const change = makeDoneChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       const result = await uc.execute({
         name: 'my-change',
@@ -184,7 +184,7 @@ describe('TransitionChange', () => {
       change.setArtifact(tasks)
 
       const repo = makeChangeRepository([change])
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       await uc.execute({
         name: 'my-change',
@@ -207,7 +207,7 @@ describe('TransitionChange', () => {
       change.setArtifact(spec)
 
       const repo = makeChangeRepository([change])
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       await uc.execute({
         name: 'my-change',
@@ -238,7 +238,7 @@ describe('TransitionChange', () => {
         }
         return null
       }
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       await expect(
         uc.execute({
@@ -262,7 +262,7 @@ describe('TransitionChange', () => {
         }
         return null
       }
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       const result = await uc.execute({
         name: 'my-change',
@@ -282,7 +282,7 @@ describe('TransitionChange', () => {
       const repo = makeChangeRepository([change])
       // artifact() returns null (file does not exist) — should not block
       repo.artifact = async () => null
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       const result = await uc.execute({
         name: 'my-change',
@@ -300,7 +300,7 @@ describe('TransitionChange', () => {
     it('allows transition when no task checks provided', async () => {
       const change = makeImplementingChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new TransitionChange(repo, makeGitAdapter())
+      const uc = new TransitionChange(repo, makeActorResolver())
 
       const result = await uc.execute({
         name: 'my-change',

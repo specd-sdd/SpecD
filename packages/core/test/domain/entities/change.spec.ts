@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
-import type { GitIdentity, ChangeEvent } from '../../../src/domain/entities/change.js'
+import type { ActorIdentity, ChangeEvent } from '../../../src/domain/entities/change.js'
 import type { ArtifactStatus } from '../../../src/domain/value-objects/artifact-status.js'
 
-const actor: GitIdentity = { name: 'Alice', email: 'alice@example.com' }
-const otherActor: GitIdentity = { name: 'Bob', email: 'bob@example.com' }
+const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
+const otherActor: ActorIdentity = { name: 'Bob', email: 'bob@example.com' }
 
 function makeChange(history: ChangeEvent[] = []) {
   return new Change({

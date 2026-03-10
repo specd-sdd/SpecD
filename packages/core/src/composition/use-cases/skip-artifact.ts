@@ -2,7 +2,7 @@ import { SkipArtifact } from '../../application/use-cases/skip-artifact.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
-import { GitCLIAdapter } from '../../infrastructure/git/git-adapter.js'
+import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
 
 /** Domain context for `createSkipArtifact(context, options)`. */
 export interface SkipArtifactContext {
@@ -60,6 +60,6 @@ export function createSkipArtifact(
     )
   }
   const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  const git = new GitCLIAdapter()
-  return new SkipArtifact(changeRepo, git)
+  const actor = new GitActorResolver()
+  return new SkipArtifact(changeRepo, actor)
 }

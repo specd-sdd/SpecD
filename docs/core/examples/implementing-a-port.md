@@ -1,13 +1,13 @@
 # Example: Implementing a port
 
-This guide walks through implementing two ports from scratch: `ChangeRepository` (an abstract class) and `GitAdapter` (a plain interface). It shows the full pattern for both kinds of port and how to wire them into a use case.
+This guide walks through implementing three ports from scratch: `ChangeRepository` (an abstract class), `GitAdapter` (a plain interface), and `ActorResolver` (a plain interface). It shows the full pattern for both kinds of port and how to wire them into a use case.
 
 ## The two port shapes
 
 `@specd/core` ports come in two shapes:
 
 - **Abstract classes** (`Repository`, `SpecRepository`, `ChangeRepository`, `ArchiveRepository`) — extend these and implement the abstract methods. The base class constructor sets `workspace`, `ownership`, and `isExternal` for you.
-- **Interfaces** (`SchemaRegistry`, `HookRunner`, `GitAdapter`, `FileReader`, `ArtifactParser`) — implement these directly. No base class; just satisfy the interface.
+- **Interfaces** (`SchemaRegistry`, `HookRunner`, `GitAdapter`, `ActorResolver`, `FileReader`, `ArtifactParser`) — implement these directly. No base class; just satisfy the interface.
 
 ---
 
@@ -86,10 +86,10 @@ export class InMemoryChangeRepository extends ChangeRepository {
 
 ## Implementing GitAdapter (interface)
 
-This example implements a `GitAdapter` backed by the `simple-git` library.
+This example implements a `GitAdapter` backed by the `simple-git` library. `GitAdapter` covers VCS operations only (root directory, branch, clean status).
 
 ```typescript
-import { type GitAdapter, type GitIdentity } from '@specd/core'
+import { type GitAdapter } from '@specd/core'
 import simpleGit from 'simple-git'
 
 export class SimpleGitAdapter implements GitAdapter {
@@ -110,8 +110,29 @@ export class SimpleGitAdapter implements GitAdapter {
     const status = await this._git.status()
     return status.isClean()
   }
+}
+```
 
-  async identity(): Promise<GitIdentity> {
+### Key points
+
+**Interfaces have no base class.** Just implement the three methods. TypeScript will tell you if you miss one.
+
+**All methods must throw when outside a git repository.** The contracts say so — do not return `null` or an empty string in that case. Let the underlying git error propagate, or wrap it in a descriptive `Error`.
+
+---
+
+## Implementing ActorResolver (interface)
+
+`ActorResolver` resolves the identity of the current actor. This example resolves it from git config, but your adapter could use any source (environment variables, an auth token, etc.).
+
+```typescript
+import { type ActorResolver, type ActorIdentity } from '@specd/core'
+import simpleGit from 'simple-git'
+
+export class GitActorResolver implements ActorResolver {
+  private readonly _git = simpleGit()
+
+  async identity(): Promise<ActorIdentity> {
     const name = await this._git.raw(['config', 'user.name'])
     const email = await this._git.raw(['config', 'user.email'])
 
@@ -129,11 +150,7 @@ export class SimpleGitAdapter implements GitAdapter {
 
 ### Key points
 
-**Interfaces have no base class.** Just implement the four methods. TypeScript will tell you if you miss one.
-
-**All methods must throw when outside a git repository.** The contracts say so — do not return `null` or an empty string in that case. Let the underlying git error propagate, or wrap it in a descriptive `Error`.
-
-**`identity()` must throw when `user.name` or `user.email` are missing.** The use cases that call it rely on the returned identity being complete. An empty string silently produces broken audit records.
+**`identity()` must throw when the actor cannot be determined.** The use cases that call it rely on the returned identity being complete. An empty string silently produces broken audit records.
 
 ---
 
@@ -350,9 +367,9 @@ If you implement a custom adapter (e.g. database-backed), construct your class d
 ```typescript
 import { CreateChange } from '@specd/core'
 import { MyDbChangeRepository } from './my-db-change-repository.js'
-import { MyGitAdapter } from './my-git-adapter.js'
+import { MyActorResolver } from './my-actor-resolver.js'
 
 const changeRepo = new MyDbChangeRepository(…)
-const git = new MyGitAdapter()
-const createChange = new CreateChange(changeRepo, git)
+const actor = new MyActorResolver()
+const createChange = new CreateChange(changeRepo, actor)
 ```

@@ -7,9 +7,9 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { DeltaApplicationError } from '../../domain/errors/delta-application-error.js'
-import { type GitAdapter } from '../ports/git-adapter.js'
+import { type ActorResolver } from '../ports/actor-resolver.js'
 import {
-  type GitIdentity,
+  type ActorIdentity,
   type SpecApprovedEvent,
   type SignedOffEvent,
 } from '../../domain/entities/change.js'
@@ -74,7 +74,7 @@ export class ValidateArtifacts {
   private readonly _specs: ReadonlyMap<string, SpecRepository>
   private readonly _schemas: SchemaRegistry
   private readonly _parsers: ArtifactParserRegistry
-  private readonly _git: GitAdapter
+  private readonly _actor: ActorResolver
   private readonly _hasher: ContentHasher
   private readonly _schemaRef: string
   private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
@@ -86,7 +86,7 @@ export class ValidateArtifacts {
    * @param specs - Spec repositories keyed by workspace name
    * @param schemas - Registry for resolving schema references
    * @param parsers - Registry of artifact format parsers
-   * @param git - Adapter for resolving the actor identity
+   * @param actor - Resolver for the actor identity
    * @param hasher - Content hasher for computing artifact hashes
    * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
    * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
@@ -96,7 +96,7 @@ export class ValidateArtifacts {
     specs: ReadonlyMap<string, SpecRepository>,
     schemas: SchemaRegistry,
     parsers: ArtifactParserRegistry,
-    git: GitAdapter,
+    actor: ActorResolver,
     hasher: ContentHasher,
     schemaRef: string,
     workspaceSchemasPaths: ReadonlyMap<string, string>,
@@ -105,7 +105,7 @@ export class ValidateArtifacts {
     this._specs = specs
     this._schemas = schemas
     this._parsers = parsers
-    this._git = git
+    this._actor = actor
     this._hasher = hasher
     this._schemaRef = schemaRef
     this._workspaceSchemasPaths = workspaceSchemasPaths
@@ -135,7 +135,7 @@ export class ValidateArtifacts {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
     }
 
-    const actor: GitIdentity = await this._git.identity()
+    const actor: ActorIdentity = await this._actor.identity()
     const failures: ValidationFailure[] = []
     const warnings: ValidationWarning[] = []
 

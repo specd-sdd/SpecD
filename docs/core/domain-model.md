@@ -83,14 +83,14 @@ for (const event of change.history) {
 }
 ```
 
-All events share three common fields: `type`, `at: Date`, and `by: GitIdentity`.
+All events share three common fields: `type`, `at: Date`, and `by: ActorIdentity`.
 
-### GitIdentity
+### ActorIdentity
 
 ```typescript
-interface GitIdentity {
-  readonly name: string // git user.name
-  readonly email: string // git user.email
+interface ActorIdentity {
+  readonly name: string // actor display name
+  readonly email: string // actor email
 }
 ```
 

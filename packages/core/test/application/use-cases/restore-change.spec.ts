@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { RestoreChange } from '../../../src/application/use-cases/restore-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
-import { makeChangeRepository, makeGitAdapter, makeChange, testActor } from './helpers.js'
+import { makeChangeRepository, makeActorResolver, makeChange, testActor } from './helpers.js'
 
 describe('RestoreChange', () => {
   describe('given a drafted change exists', () => {
@@ -9,7 +9,7 @@ describe('RestoreChange', () => {
       const change = makeChange('my-change')
       change.draft(testActor)
       const repo = makeChangeRepository([change])
-      const uc = new RestoreChange(repo, makeGitAdapter())
+      const uc = new RestoreChange(repo, makeActorResolver())
 
       const result = await uc.execute({ name: 'my-change' })
 
@@ -20,7 +20,7 @@ describe('RestoreChange', () => {
       const change = makeChange('my-change')
       change.draft(testActor)
       const repo = makeChangeRepository([change])
-      const uc = new RestoreChange(repo, makeGitAdapter())
+      const uc = new RestoreChange(repo, makeActorResolver())
 
       const result = await uc.execute({ name: 'my-change' })
 
@@ -32,7 +32,7 @@ describe('RestoreChange', () => {
       const change = makeChange('my-change')
       change.draft(testActor)
       const repo = makeChangeRepository([change])
-      const uc = new RestoreChange(repo, makeGitAdapter())
+      const uc = new RestoreChange(repo, makeActorResolver())
 
       await uc.execute({ name: 'my-change' })
 
@@ -43,7 +43,7 @@ describe('RestoreChange', () => {
   describe('given no change with that name', () => {
     it('throws ChangeNotFoundError', async () => {
       const repo = makeChangeRepository()
-      const uc = new RestoreChange(repo, makeGitAdapter())
+      const uc = new RestoreChange(repo, makeActorResolver())
 
       await expect(uc.execute({ name: 'missing' })).rejects.toThrow(ChangeNotFoundError)
     })

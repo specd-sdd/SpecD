@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { DiscardChange } from '../../../src/application/use-cases/discard-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
-import { makeChangeRepository, makeGitAdapter, makeChange } from './helpers.js'
+import { makeChangeRepository, makeActorResolver, makeChange } from './helpers.js'
 
 describe('DiscardChange', () => {
   describe('given a change exists', () => {
     it('appends a discarded event to history', async () => {
       const change = makeChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new DiscardChange(repo, makeGitAdapter())
+      const uc = new DiscardChange(repo, makeActorResolver())
 
       const result = await uc.execute({ name: 'my-change', reason: 'no longer needed' })
 
@@ -19,7 +19,7 @@ describe('DiscardChange', () => {
     it('records the mandatory reason', async () => {
       const change = makeChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new DiscardChange(repo, makeGitAdapter())
+      const uc = new DiscardChange(repo, makeActorResolver())
 
       const result = await uc.execute({ name: 'my-change', reason: 'superseded by new approach' })
 
@@ -32,7 +32,7 @@ describe('DiscardChange', () => {
     it('records supersededBy when provided', async () => {
       const change = makeChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new DiscardChange(repo, makeGitAdapter())
+      const uc = new DiscardChange(repo, makeActorResolver())
 
       const result = await uc.execute({
         name: 'my-change',
@@ -50,7 +50,7 @@ describe('DiscardChange', () => {
     it('saves the updated change', async () => {
       const change = makeChange('my-change')
       const repo = makeChangeRepository([change])
-      const uc = new DiscardChange(repo, makeGitAdapter())
+      const uc = new DiscardChange(repo, makeActorResolver())
 
       await uc.execute({ name: 'my-change', reason: 'no longer needed' })
 
@@ -62,7 +62,7 @@ describe('DiscardChange', () => {
   describe('given no change with that name', () => {
     it('throws ChangeNotFoundError', async () => {
       const repo = makeChangeRepository()
-      const uc = new DiscardChange(repo, makeGitAdapter())
+      const uc = new DiscardChange(repo, makeActorResolver())
 
       await expect(uc.execute({ name: 'missing', reason: 'gone' })).rejects.toThrow(
         ChangeNotFoundError,

@@ -285,9 +285,21 @@ Returns the name of the currently checked-out branch. Returns `'HEAD'` in detach
 
 Returns `true` when the working tree and index have no uncommitted changes. Used as a safety guard before archiving. **Throws** when not inside a git repository.
 
-#### `identity(): Promise<GitIdentity>`
+---
 
-Returns the git identity (`user.name` and `user.email`) of the current user. Used by use cases as the actor recorded in `ChangeEvent` history entries. **Throws** when not inside a git repository or when `user.name` / `user.email` are not configured.
+## ActorResolver
+
+Port for resolving the identity of the current actor. Use cases record this identity in `ChangeEvent` history entries.
+
+```typescript
+import { type ActorResolver } from '@specd/core'
+```
+
+### Methods
+
+#### `identity(): Promise<ActorIdentity>`
+
+Returns the identity of the current actor. **Throws** when the identity cannot be determined (e.g. git `user.name` / `user.email` are not configured).
 
 ---
 

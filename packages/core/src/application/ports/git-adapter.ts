@@ -1,12 +1,12 @@
-import { type GitIdentity } from '../../domain/entities/change.js'
-
 /**
  * Port for querying git repository state.
  *
  * Provides the read-only git information that use cases need — repository
- * root for path resolution, current branch for context, actor identity for
- * change history events, and working-tree cleanliness as a safety guard
- * before archiving.
+ * root for path resolution, current branch for context, and working-tree
+ * cleanliness as a safety guard before archiving.
+ *
+ * Actor identity resolution has been extracted to the {@link ActorResolver}
+ * port, decoupling identity from git.
  *
  * Write operations (staging, committing, pushing) are intentionally excluded
  * from v1. They are handled by `run:` hooks declared in `workflow[]`, keeping
@@ -50,16 +50,4 @@ export interface GitAdapter {
    * @throws When the current working directory is not inside a git repository
    */
   isClean(): Promise<boolean>
-
-  /**
-   * Returns the git identity (`user.name` and `user.email`) of the current user.
-   *
-   * Read from the local git config. Used by use cases as the actor recorded in
-   * `ChangeEvent` history entries.
-   *
-   * @returns The git identity of the current user
-   * @throws When the current working directory is not inside a git repository
-   * @throws When `user.name` or `user.email` are not configured
-   */
-  identity(): Promise<GitIdentity>
 }
