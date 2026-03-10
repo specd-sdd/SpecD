@@ -32,7 +32,7 @@
 #### Scenario: NodeHookRunner not in public exports
 
 - **WHEN** the public export surface of `@specd/core` is inspected
-- **THEN** `NodeHookRunner`, `GitCLIAdapter`, and `FsFileReader` are not present
+- **THEN** `NodeHookRunner`, `GitVcsAdapter`, and `FsFileReader` are not present
 
 #### Scenario: Repository factories not in public exports
 

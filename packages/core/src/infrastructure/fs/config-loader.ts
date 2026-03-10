@@ -13,6 +13,7 @@ import {
   type SpecdContextEntry,
 } from '../../application/specd-config.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
+import { git } from '../git/exec.js'
 
 // ---------------------------------------------------------------------------
 // Options
@@ -238,22 +239,20 @@ const SpecdYamlZodSchema = z.object({
 // ---------------------------------------------------------------------------
 
 /**
- * Walks up from `startDir` until a `.git` directory is found.
+ * Detects the VCS repository root by probing `git rev-parse`.
  *
- * @param startDir - Directory to start searching from
- * @returns Absolute path to the git root, or `null` if not inside a git repo
+ * Falls back to `null` when the directory is not inside a git repository
+ * (or any other VCS — git is the only VCS probed here since config
+ * discovery runs before the full VCS factory is available).
+ *
+ * @param startDir - Directory to probe for a VCS repository
+ * @returns Absolute path to the VCS root, or `null` if not inside a VCS repo
  */
-async function findGitRoot(startDir: string): Promise<string | null> {
-  let dir = startDir
-  while (true) {
-    try {
-      await fs.access(path.join(dir, '.git'))
-      return dir
-    } catch {
-      const parent = path.dirname(dir)
-      if (parent === dir) return null
-      dir = parent
-    }
+async function findVcsRoot(startDir: string): Promise<string | null> {
+  try {
+    return await git(startDir, 'rev-parse', '--show-toplevel')
+  } catch {
+    return null
   }
 }
 
@@ -269,7 +268,7 @@ async function findGitRoot(startDir: string): Promise<string | null> {
  * @returns Absolute path to the active config file, or `null` if not found
  */
 async function findConfigFile(startDir: string): Promise<string | null> {
-  const gitRoot = await findGitRoot(startDir)
+  const gitRoot = await findVcsRoot(startDir)
   let dir = path.resolve(startDir)
 
   if (gitRoot === null) {
@@ -422,7 +421,7 @@ export class FsConfigLoader implements ConfigLoader {
       throw new ConfigValidationError(configPath, "'workspaces.default' is required")
     }
 
-    const gitRoot = await findGitRoot(configDir)
+    const gitRoot = await findVcsRoot(configDir)
 
     const workspaces: SpecdWorkspaceConfig[] = Object.entries(data.workspaces).map(([name, ws]) => {
       const specsPath = path.resolve(configDir, ws.specs.fs.path)

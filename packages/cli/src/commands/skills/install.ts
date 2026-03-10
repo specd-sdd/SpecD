@@ -1,11 +1,11 @@
 import { type Command } from 'commander'
 import { getSkill, listSkills } from '@specd/skills'
+import { createVcsAdapter } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { execSync } from 'node:child_process'
 import { KNOWN_AGENTS } from '../../helpers/known-agents.js'
 
 /**
@@ -74,12 +74,13 @@ export function registerSkillsInstall(parent: Command): void {
               output(results, fmt)
             }
           } else {
-            // Project-level install: check git, validate config, write files + record in specd.yaml
+            // Project-level install: check VCS, validate config, write files + record in specd.yaml
             try {
-              execSync('git rev-parse --is-inside-work-tree', { stdio: 'ignore' })
+              const vcs = await createVcsAdapter()
+              await vcs.rootDir()
             } catch {
               process.stderr.write(
-                'error: not inside a git repository — use --global or run from inside a git repo\n',
+                'error: not inside a VCS repository — use --global or run from inside a repo\n',
               )
               process.exit(1)
             }

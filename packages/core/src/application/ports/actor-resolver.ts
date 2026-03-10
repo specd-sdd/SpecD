@@ -5,7 +5,7 @@ import { type ActorIdentity } from '../../domain/entities/change.js'
  *
  * Decoupled from any specific identity provider (git, SSO, environment
  * variables, etc.). Use cases that record change history events depend
- * on this port instead of {@link GitAdapter}.
+ * on this port instead of {@link VcsAdapter}.
  */
 export interface ActorResolver {
   /**

@@ -8,12 +8,12 @@ import { type ArtifactParserRegistry } from '../application/ports/artifact-parse
 import { type ContentHasher } from '../application/ports/content-hasher.js'
 import { type FileReader } from '../application/ports/file-reader.js'
 import { type ActorResolver } from '../application/ports/actor-resolver.js'
-import { type GitAdapter } from '../application/ports/git-adapter.js'
+import { type VcsAdapter } from '../application/ports/vcs-adapter.js'
 import { type HookRunner } from '../application/ports/hook-runner.js'
 import { type ConfigWriter } from '../application/ports/config-writer.js'
 import { type YamlSerializer } from '../application/ports/yaml-serializer.js'
 import { GitActorResolver } from '../infrastructure/git/actor-resolver.js'
-import { GitCLIAdapter } from '../infrastructure/git/git-adapter.js'
+import { GitVcsAdapter } from '../infrastructure/git/vcs-adapter.js'
 import { NodeHookRunner } from '../infrastructure/node/hook-runner.js'
 import { NodeContentHasher } from '../infrastructure/node/content-hasher.js'
 import { NodeYamlSerializer } from '../infrastructure/node/yaml-serializer.js'
@@ -31,7 +31,7 @@ import { type KernelOptions } from './kernel.js'
  * Shared adapter instances pre-built once for use across all kernel use cases.
  *
  * Eliminates redundant construction of identical adapters (e.g. ~11 duplicate
- * `GitCLIAdapter` instances, 6 duplicate `ChangeRepository` instances) that
+ * `GitVcsAdapter` instances, 6 duplicate `ChangeRepository` instances) that
  * occurred when each factory independently created its own adapters.
  */
 export interface KernelInternals {
@@ -51,8 +51,8 @@ export interface KernelInternals {
   readonly files: FileReader
   /** Actor resolver for identity resolution. */
   readonly actor: ActorResolver
-  /** Git adapter for VCS queries (rootDir, branch, isClean). */
-  readonly git: GitAdapter
+  /** VCS adapter for repository queries (rootDir, branch, isClean, ref, show). */
+  readonly vcs: VcsAdapter
   /** Hook runner for lifecycle hooks. */
   readonly hooks: HookRunner
   /** Config writer for project init and skill recording. */
@@ -139,7 +139,7 @@ export function createKernelInternals(
     hasher: new NodeContentHasher(),
     files: new FsFileReader(),
     actor: new GitActorResolver(),
-    git: new GitCLIAdapter(),
+    vcs: new GitVcsAdapter(),
     hooks: new NodeHookRunner(),
     configWriter: new FsConfigWriter(),
     yaml: new NodeYamlSerializer(),

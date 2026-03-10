@@ -15,6 +15,13 @@ vi.mock('@specd/core', async (importOriginal) => {
     ...original,
     createInitProject: vi.fn(),
     createRecordSkillInstall: vi.fn(),
+    createVcsAdapter: vi.fn().mockResolvedValue({
+      rootDir: vi.fn().mockResolvedValue('/project'),
+      branch: vi.fn().mockResolvedValue('main'),
+      isClean: vi.fn().mockResolvedValue(true),
+      ref: vi.fn().mockResolvedValue('abc1234'),
+      show: vi.fn().mockResolvedValue(null),
+    }),
   }
 })
 vi.mock('@specd/skills', () => ({
@@ -27,13 +34,12 @@ vi.mock('node:fs/promises', () => ({
   writeFile: vi.fn().mockResolvedValue(undefined),
   stat: vi.fn(),
 }))
-vi.mock('node:child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:child_process')>()
-  return { ...actual, execSync: vi.fn().mockReturnValue('/project\n') }
-})
-
-import { createInitProject, createRecordSkillInstall, AlreadyInitialisedError } from '@specd/core'
-import { execSync } from 'node:child_process'
+import {
+  createInitProject,
+  createRecordSkillInstall,
+  createVcsAdapter,
+  AlreadyInitialisedError,
+} from '@specd/core'
 import { registerProjectInit } from '../../src/commands/project/init.js'
 
 function setup() {
@@ -173,9 +179,15 @@ describe('project init (non-interactive)', () => {
     expect(stderr()).toMatch(/error:/)
   })
 
-  it('uses git root as project root', async () => {
+  it('uses VCS root as project root', async () => {
     const { mockExecute } = setup()
-    vi.mocked(execSync).mockReturnValue('/project\n')
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      rootDir: vi.fn().mockResolvedValue('/project'),
+      branch: vi.fn().mockResolvedValue('main'),
+      isClean: vi.fn().mockResolvedValue(true),
+      ref: vi.fn().mockResolvedValue('abc1234'),
+      show: vi.fn().mockResolvedValue(null),
+    })
     captureStdout()
 
     const program = makeProgram()

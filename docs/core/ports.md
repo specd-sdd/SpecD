@@ -263,12 +263,12 @@ interface HookResult {
 
 ---
 
-## GitAdapter
+## VcsAdapter
 
 Port for querying git repository state. All methods are read-only — write operations (staging, committing, pushing) are intentionally excluded from v1. They are handled by `run:` hooks declared in `workflow[]`.
 
 ```typescript
-import { type GitAdapter } from '@specd/core'
+import { type VcsAdapter } from '@specd/core'
 ```
 
 ### Methods
