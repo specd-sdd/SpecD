@@ -1,10 +1,8 @@
 import { type Change, type GitIdentity } from '../../domain/entities/change.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
-import { type InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { Repository, type RepositoryConfig } from './repository.js'
 
 export { type RepositoryConfig as ArchiveRepositoryConfig }
-export type { InvalidStateTransitionError }
 
 /**
  * Port for archiving and querying archived changes within a single workspace.

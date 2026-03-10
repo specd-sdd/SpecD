@@ -1,8 +1,5 @@
 import { type DeltaPosition, type Selector } from '../../domain/value-objects/index.js'
 
-// Re-export from domain for backwards compatibility
-export { DeltaApplicationError } from '../../domain/errors/delta-application-error.js'
-
 /** A single node in a normalized artifact AST. */
 export interface ArtifactNode {
   readonly type: string

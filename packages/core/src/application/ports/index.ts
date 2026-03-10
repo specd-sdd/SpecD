@@ -15,7 +15,6 @@ export {
   type OutlineEntry,
   type ArtifactParser,
   type ArtifactParserRegistry,
-  DeltaApplicationError,
 } from './artifact-parser.js'
 export { type ConfigLoader } from './config-loader.js'
 export {

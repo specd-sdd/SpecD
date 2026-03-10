@@ -2,8 +2,8 @@ import {
   type ArtifactAST,
   type ArtifactNode,
   type DeltaEntry,
-  DeltaApplicationError,
 } from '../../../application/ports/artifact-parser.js'
+import { DeltaApplicationError } from '../../../domain/errors/delta-application-error.js'
 import { type Selector } from '../../../domain/value-objects/selector.js'
 
 /**
