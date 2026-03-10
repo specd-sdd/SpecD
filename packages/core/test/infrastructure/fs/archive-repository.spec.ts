@@ -73,14 +73,12 @@ async function makeArchivableChange(
   const change = new Change({
     name,
     createdAt: at,
-    workspaces: ['default'],
     specIds: ['auth/login'],
     history: [
       {
         type: 'created',
         at,
         by: actor,
-        workspaces: ['default'],
         specIds: ['auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
@@ -194,14 +192,12 @@ describe('FsArchiveRepository', () => {
       const change = new Change({
         name: 'not-ready',
         createdAt: at,
-        workspaces: ['default'],
         specIds: ['auth/login'],
         history: [
           {
             type: 'created',
             at,
             by: actor,
-            workspaces: ['default'],
             specIds: ['auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,
@@ -218,14 +214,12 @@ describe('FsArchiveRepository', () => {
       const change = new Change({
         name: 'forced',
         createdAt: at,
-        workspaces: ['default'],
         specIds: ['auth/login'],
         history: [
           {
             type: 'created',
             at,
             by: actor,
-            workspaces: ['default'],
             specIds: ['auth/login'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,

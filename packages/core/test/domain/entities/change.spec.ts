@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
-import { InvalidChangeError } from '../../../src/domain/errors/invalid-change-error.js'
 import type { GitIdentity, ChangeEvent } from '../../../src/domain/entities/change.js'
 import type { ArtifactStatus } from '../../../src/domain/value-objects/artifact-status.js'
 
@@ -13,7 +12,6 @@ function makeChange(history: ChangeEvent[] = []) {
   return new Change({
     name: 'add-oauth-login',
     createdAt: new Date('2024-01-01T00:00:00Z'),
-    workspaces: ['default'],
     specIds: ['auth/login'],
     history,
   })
@@ -31,10 +29,32 @@ describe('Change', () => {
       expect(c.createdAt).toEqual(new Date('2024-01-01T00:00:00Z'))
     })
 
-    it('stores workspaces and specIds', () => {
+    it('derives workspaces from specIds', () => {
       const c = makeChange()
       expect(c.workspaces).toEqual(['default'])
       expect(c.specIds).toEqual(['auth/login'])
+    })
+
+    it('derives multiple workspaces from mixed specIds', () => {
+      const c = new Change({
+        name: 'multi-ws',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['billing:invoices/create', 'auth/login'],
+        history: [],
+      })
+      expect(c.workspaces).toContain('billing')
+      expect(c.workspaces).toContain('default')
+    })
+
+    it('allows empty specIds', () => {
+      const c = new Change({
+        name: 'bootstrap',
+        createdAt: new Date(),
+        specIds: [],
+        history: [],
+      })
+      expect(c.specIds).toEqual([])
+      expect(c.workspaces).toEqual([])
     })
 
     it('defaults artifacts to empty map', () => {
@@ -43,32 +63,6 @@ describe('Change', () => {
 
     it('defaults history to empty', () => {
       expect(makeChange().history).toHaveLength(0)
-    })
-
-    it('throws InvalidChangeError when workspaces is empty', () => {
-      expect(
-        () =>
-          new Change({
-            name: 'x',
-            createdAt: new Date(),
-            workspaces: [],
-            specIds: ['auth/login'],
-            history: [],
-          }),
-      ).toThrow(InvalidChangeError)
-    })
-
-    it('throws InvalidChangeError when specIds is empty', () => {
-      expect(
-        () =>
-          new Change({
-            name: 'x',
-            createdAt: new Date(),
-            workspaces: ['default'],
-            specIds: [],
-            history: [],
-          }),
-      ).toThrow(InvalidChangeError)
     })
   })
 
@@ -167,7 +161,7 @@ describe('Change', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.transition('ready', actor)
-      c.invalidate('workspace-change', actor)
+      c.invalidate('spec-change', actor)
       expect(c.state).toBe('designing')
     })
 
@@ -391,24 +385,14 @@ describe('Change', () => {
     })
   })
 
-  describe('updateWorkspaces', () => {
-    it('updates workspaces and invalidates', () => {
-      const c = makeChange()
-      c.transition('designing', actor)
-      c.updateWorkspaces(['default', 'billing'], actor)
-      expect(c.workspaces).toEqual(['default', 'billing'])
-      expect(c.state).toBe('designing')
-      const invalidated = c.history.find((e) => e.type === 'invalidated')
-      expect(invalidated?.type === 'invalidated' && invalidated.cause).toBe('workspace-change')
-    })
-  })
-
   describe('updateSpecIds', () => {
-    it('updates specIds and invalidates', () => {
+    it('updates specIds, derives workspaces, and invalidates', () => {
       const c = makeChange()
       c.transition('designing', actor)
-      c.updateSpecIds(['auth/login', 'auth/register'], actor)
-      expect(c.specIds).toEqual(['auth/login', 'auth/register'])
+      c.updateSpecIds(['billing:invoices/create', 'auth/register'], actor)
+      expect(c.specIds).toEqual(['billing:invoices/create', 'auth/register'])
+      expect(c.workspaces).toContain('billing')
+      expect(c.workspaces).toContain('default')
       expect(c.state).toBe('designing')
       const invalidated = c.history.find((e) => e.type === 'invalidated')
       expect(invalidated?.type === 'invalidated' && invalidated.cause).toBe('spec-change')
@@ -473,7 +457,6 @@ describe('Change', () => {
         const c = new Change({
           name: 'x',
           createdAt: new Date(),
-          workspaces: ['default'],
           specIds: ['auth/login'],
           history:
             state === 'drafting'

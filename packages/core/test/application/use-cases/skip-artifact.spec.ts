@@ -13,7 +13,6 @@ function makeChangeWithArtifact(name: string, artifact: ChangeArtifact): Change 
   return new Change({
     name,
     createdAt: new Date('2024-01-01T00:00:00Z'),
-    workspaces: ['default'],
     specIds: ['auth/login'],
     history: [],
     artifacts,
@@ -115,7 +114,6 @@ describe('SkipArtifact', () => {
       const change = new Change({
         name: 'my-change',
         createdAt: new Date('2024-01-01T00:00:00Z'),
-        workspaces: ['default'],
         specIds: ['auth/login'],
         history: [],
       })

@@ -11,7 +11,6 @@ describe('CreateChange', () => {
 
       const result = await uc.execute({
         name: 'add-oauth',
-        workspaces: ['default'],
         specIds: ['auth/login'],
         schemaName: 'specd-std',
         schemaVersion: 1,
@@ -21,20 +20,20 @@ describe('CreateChange', () => {
       expect(repo.store.has('add-oauth')).toBe(true)
     })
 
-    it('sets workspaces and specIds from input', async () => {
+    it('derives workspaces from specIds', async () => {
       const repo = makeChangeRepository()
       const uc = new CreateChange(repo, makeGitAdapter())
 
       const result = await uc.execute({
         name: 'my-change',
-        workspaces: ['frontend', 'backend'],
-        specIds: ['ui/login', 'api/auth'],
+        specIds: ['frontend:ui/login', 'backend:api/auth'],
         schemaName: 'specd-std',
         schemaVersion: 1,
       })
 
-      expect(result.workspaces).toEqual(['frontend', 'backend'])
-      expect(result.specIds).toEqual(['ui/login', 'api/auth'])
+      expect(result.workspaces).toContain('frontend')
+      expect(result.workspaces).toContain('backend')
+      expect(result.specIds).toEqual(['frontend:ui/login', 'backend:api/auth'])
     })
 
     it('appends a created event with the actor from GitAdapter', async () => {
@@ -43,7 +42,6 @@ describe('CreateChange', () => {
 
       const result = await uc.execute({
         name: 'my-change',
-        workspaces: ['default'],
         specIds: ['auth/login'],
         schemaName: 'specd-std',
         schemaVersion: 2,
@@ -56,7 +54,6 @@ describe('CreateChange', () => {
       expect(evt.by).toEqual(testActor)
       expect(evt.schemaName).toBe('specd-std')
       expect(evt.schemaVersion).toBe(2)
-      expect(evt.workspaces).toEqual(['default'])
       expect(evt.specIds).toEqual(['auth/login'])
     })
 
@@ -66,13 +63,27 @@ describe('CreateChange', () => {
 
       const result = await uc.execute({
         name: 'my-change',
-        workspaces: ['default'],
         specIds: ['auth/login'],
         schemaName: 'specd-std',
         schemaVersion: 1,
       })
 
       expect(result.state).toBe('drafting')
+    })
+
+    it('allows empty specIds for bootstrapping', async () => {
+      const repo = makeChangeRepository()
+      const uc = new CreateChange(repo, makeGitAdapter())
+
+      const result = await uc.execute({
+        name: 'bootstrap',
+        specIds: [],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.specIds).toEqual([])
+      expect(result.workspaces).toEqual([])
     })
   })
 
@@ -85,7 +96,6 @@ describe('CreateChange', () => {
       await expect(
         uc.execute({
           name: 'add-oauth',
-          workspaces: ['default'],
           specIds: ['auth/login'],
           schemaName: 'specd-std',
           schemaVersion: 1,
@@ -101,7 +111,6 @@ describe('CreateChange', () => {
       await expect(
         uc.execute({
           name: 'add-oauth',
-          workspaces: ['default'],
           specIds: ['auth/login'],
           schemaName: 'specd-std',
           schemaVersion: 1,

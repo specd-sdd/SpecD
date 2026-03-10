@@ -85,7 +85,6 @@ function makeArchivableChange(
       type: 'created',
       at: createdAt,
       by: testActor,
-      workspaces: ['default'],
       specIds: opts.specIds ?? ['default:auth/oauth'],
       schemaName: opts.schemaName ?? 'test-schema',
       schemaVersion: 1,
@@ -100,7 +99,6 @@ function makeArchivableChange(
   return new Change({
     name,
     createdAt,
-    workspaces: ['default'],
     specIds: opts.specIds ?? ['default:auth/oauth'],
     history: events,
   })
@@ -155,14 +153,12 @@ describe('ArchiveChange', () => {
       const change = new Change({
         name: 'my-change',
         createdAt: new Date(),
-        workspaces: ['default'],
         specIds: ['core/some-spec'],
         history: [
           {
             type: 'created',
             at: new Date(),
             by: testActor,
-            workspaces: ['default'],
             specIds: ['core/some-spec'],
             schemaName: 'test-schema',
             schemaVersion: 1,

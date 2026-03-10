@@ -49,20 +49,11 @@ function makeChange(
 ): Change {
   const { specIds = ['default:auth/login'], artifacts = [] } = opts
   const createdAt = new Date('2024-01-15')
-  const workspaces = [
-    ...new Set(
-      specIds.map((id) => {
-        const c = id.indexOf(':')
-        return c >= 0 ? id.slice(0, c) : 'default'
-      }),
-    ),
-  ]
   const events: ChangeEvent[] = [
     {
       type: 'created',
       at: createdAt,
       by: testActor,
-      workspaces,
       specIds,
       schemaName: opts.schemaName ?? '@specd/schema-std',
       schemaVersion: 1,
@@ -78,7 +69,6 @@ function makeChange(
   const change = new Change({
     name,
     createdAt,
-    workspaces,
     specIds,
     history: events,
   })
@@ -1176,18 +1166,16 @@ describe('CompileContext', () => {
       const billingRepo = makeSpecRepo([billingSpec])
       const defaultRepo = makeSpecRepo([])
 
-      // change.workspaces = ['default'] only; specIds could have confused the old code
+      // specId has no colon, so workspace defaults to 'default' — not 'billing'
       const change = new Change({
         name: 'my-change',
         createdAt: new Date(),
-        workspaces: ['default'],
-        specIds: ['billing/payments'], // first segment is 'billing', but workspace is NOT active
+        specIds: ['billing/payments'], // first segment is 'billing', but workspace is 'default' (no colon)
         history: [
           {
             type: 'created',
             at: new Date(),
             by: testActor,
-            workspaces: ['default'],
             specIds: ['billing/payments'],
             schemaName: '@specd/schema-std',
             schemaVersion: 1,

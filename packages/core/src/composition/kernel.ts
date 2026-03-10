@@ -31,7 +31,6 @@ import { GetSpecContext } from '../application/use-cases/get-spec-context.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SpecdConfig } from '../application/specd-config.js'
-import { parseSpecId } from '../domain/services/parse-spec-id.js'
 import { createKernelInternals } from './kernel-internals.js'
 
 /**
@@ -194,11 +193,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       list: new ListChanges(i.changes),
       listDrafts: new ListDrafts(i.changes),
       listDiscarded: new ListDiscarded(i.changes),
-      edit: new EditChange(i.changes, i.git, (specIds) => {
-        const workspaces = new Set<string>()
-        for (const specId of specIds) workspaces.add(parseSpecId(specId).workspace)
-        return [...workspaces]
-      }),
+      edit: new EditChange(i.changes, i.git),
       skipArtifact: new SkipArtifact(i.changes, i.git),
       listArchived: new ListArchived(i.archive),
       getArchived: new GetArchivedChange(i.archive),

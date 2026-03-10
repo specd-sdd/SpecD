@@ -51,7 +51,6 @@ function makeChangeWithArtifacts(
     type: 'created',
     at: createdAt,
     by: testActor,
-    workspaces: ['default'],
     specIds,
     schemaName: opts.schemaName ?? 'test-schema',
     schemaVersion: 1,
@@ -61,7 +60,6 @@ function makeChangeWithArtifacts(
   return new Change({
     name,
     createdAt,
-    workspaces: ['default'],
     specIds,
     history,
     artifacts: artifactMap,

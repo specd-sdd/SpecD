@@ -132,22 +132,19 @@ export function makeGitAdapter(overrides: Partial<GitAdapter> = {}): GitAdapter 
  */
 export function makeChange(
   name: string,
-  opts: { workspaces?: string[]; specIds?: string[]; schemaName?: string } = {},
+  opts: { specIds?: string[]; schemaName?: string } = {},
 ): Change {
-  const workspaces = opts.workspaces ?? ['default']
   const specIds = opts.specIds ?? ['auth/login']
   const createdAt = new Date('2024-01-01T00:00:00Z')
   return new Change({
     name,
     createdAt,
-    workspaces,
     specIds,
     history: [
       {
         type: 'created',
         at: createdAt,
         by: { name: 'Test User', email: 'test@example.com' },
-        workspaces,
         specIds,
         schemaName: opts.schemaName ?? 'test-schema',
         schemaVersion: 1,

@@ -14,12 +14,12 @@ A Change has a unique, user-defined slug name (e.g. `add-auth-flow`) and a `crea
 
 A Change declares:
 
-- **`workspaces`** — one or more workspace IDs it belongs to (e.g. `['default', 'billing']`). Workspace IDs reference keys declared in `specd.yaml`. At least one is required.
-- **`specIds`** — one or more spec IDs being created or modified by this change (e.g. `['auth/login', 'billing:invoices']`). At least one is required.
+- **`specIds`** — zero or more spec IDs being created or modified by this change (e.g. `['auth/login', 'billing:invoices']`). An empty list is allowed (e.g. when a change is first created but specs have not yet been assigned).
+- **`workspaces`** — a **computed getter** derived at runtime from `specIds` by extracting the workspace component of each spec ID via `parseSpecId()`. It is not a declared or persisted field. When `specIds` is empty, `workspaces` is empty.
 
-`workspaces` and `specIds` are validated against `specd.yaml` and the spec filesystem at creation time. Both are **mutable** after creation — workspaces and specs can be added or removed as the change scope evolves. Any modification to `workspaces` or `specIds` triggers approval invalidation (see Requirement: History and event sourcing).
+`specIds` are validated against `specd.yaml` and the spec filesystem at creation time. `specIds` is **mutable** after creation — specs can be added or removed as the change scope evolves. Any modification to `specIds` triggers approval invalidation (see Requirement: History and event sourcing).
 
-`CompileContext` reads `workspaces` from the change manifest to determine which workspaces are active — it does not infer this from spec IDs at compile time. It resolves `dependsOn` entries directly from `change.specIds` by reading each spec's `.specd-metadata.yaml`, then follows links transitively. This resolution happens dynamically on every execution, not as a snapshot. See [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
+`CompileContext` derives the active workspaces from `specIds` via the `workspaces` getter. It resolves `dependsOn` entries directly from `change.specIds` by reading each spec's `.specd-metadata.yaml`, then follows links transitively. This resolution happens dynamically on every execution, not as a snapshot. See [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
 
 ### Requirement: Lifecycle
 
@@ -117,19 +117,19 @@ All events share common fields:
 
 Event types:
 
-| Type               | Additional fields                                                 | When appended                                                        |
-| ------------------ | ----------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `created`          | `workspaces`, `specIds`, `schemaName`, `schemaVersion`            | Once, when the change is first created                               |
-| `transitioned`     | `from: ChangeState`, `to: ChangeState`                            | Each lifecycle state transition                                      |
-| `spec-approved`    | `reason: string`, `artifactHashes: Record<string, string>`        | When the spec approval gate is passed                                |
-| `signed-off`       | `reason: string`, `artifactHashes: Record<string, string>`        | When the signoff gate is passed                                      |
-| `invalidated`      | `cause: 'workspace-change' \| 'spec-change' \| 'artifact-change'` | When workspaces, specIds, or artifacts change, superseding approvals |
-| `drafted`          | `reason?: string`                                                 | When a change is shelved to `drafts/`                                |
-| `restored`         | _(none beyond common fields)_                                     | When a drafted change is moved back to `changes/`                    |
-| `artifact-skipped` | `artifactId: string`, `reason?: string`                           | When an optional artifact is explicitly marked as not produced       |
-| `discarded`        | `reason: string`, `supersededBy?: string[]`                       | When a change is permanently abandoned                               |
+| Type               | Additional fields                                          | When appended                                                  |
+| ------------------ | ---------------------------------------------------------- | -------------------------------------------------------------- |
+| `created`          | `specIds`, `schemaName`, `schemaVersion`                   | Once, when the change is first created                         |
+| `transitioned`     | `from: ChangeState`, `to: ChangeState`                     | Each lifecycle state transition                                |
+| `spec-approved`    | `reason: string`, `artifactHashes: Record<string, string>` | When the spec approval gate is passed                          |
+| `signed-off`       | `reason: string`, `artifactHashes: Record<string, string>` | When the signoff gate is passed                                |
+| `invalidated`      | `cause: 'spec-change' \| 'artifact-change'`                | When specIds or artifacts change, superseding approvals        |
+| `drafted`          | `reason?: string`                                          | When a change is shelved to `drafts/`                          |
+| `restored`         | _(none beyond common fields)_                              | When a drafted change is moved back to `changes/`              |
+| `artifact-skipped` | `artifactId: string`, `reason?: string`                    | When an optional artifact is explicitly marked as not produced |
+| `discarded`        | `reason: string`, `supersededBy?: string[]`                | When a change is permanently abandoned                         |
 
-**Approval invalidation:** when the workspace list, spec list, or any artifact content changes, specd appends an `invalidated` event (with the appropriate `cause`) followed immediately by a `transitioned` event rolling back to `designing`. The invalidated approvals remain in history for audit purposes and are identified as superseded by the presence of the subsequent `invalidated` event.
+**Approval invalidation:** when the spec list or any artifact content changes, specd appends an `invalidated` event (with the appropriate `cause`) followed immediately by a `transitioned` event rolling back to `designing`. The invalidated approvals remain in history for audit purposes and are identified as superseded by the presence of the subsequent `invalidated` event.
 
 **Multiple approval cycles:** if a change is approved, then invalidated, then approved again, the history records all events. The active approval is the last `spec-approved` / `signed-off` event with no subsequent `invalidated` event.
 
@@ -165,9 +165,10 @@ A change may be moved between storage locations without affecting its lifecycle 
 ## Constraints
 
 - `name` and `createdAt` are set at creation and never changed
-- A Change must have at least one workspace ID and at least one spec ID
+- `workspaces` is a computed getter derived from `specIds` via `parseSpecId()` — it is not a declared or persisted field
+- `specIds` may be empty (empty specIds results in empty workspaces)
 - Current lifecycle state is derived from history (last `transitioned` event); no state snapshot is stored
-- Any modification to the workspace list, spec list, or any artifact content appends an `invalidated` event followed by a `transitioned` event back to `designing`
+- Any modification to the spec list or any artifact content appends an `invalidated` event followed by a `transitioned` event back to `designing`
 - `ArtifactStatus` is never stored directly — always derived from `validatedHash` and file presence
 - `validatedHash === "__skipped__"` is the sentinel for `skipped` status — only valid on `optional: true` artifacts
 - `skipped` is only valid for `optional: true` artifacts; attempting to skip a non-optional artifact throws an error

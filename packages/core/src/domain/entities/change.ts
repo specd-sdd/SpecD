@@ -2,8 +2,8 @@ import { type ChangeState, isValidTransition } from '../value-objects/change-sta
 import { type ArtifactStatus } from '../value-objects/artifact-status.js'
 import { InvalidStateTransitionError } from '../errors/invalid-state-transition-error.js'
 import { CorruptedManifestError } from '../errors/corrupted-manifest-error.js'
-import { InvalidChangeError } from '../errors/invalid-change-error.js'
 import { type ChangeArtifact } from './change-artifact.js'
+import { parseSpecId } from '../services/parse-spec-id.js'
 
 /** Git identity of the actor performing an operation. */
 export interface GitIdentity {
@@ -16,7 +16,6 @@ export interface CreatedEvent {
   readonly type: 'created'
   readonly at: Date
   readonly by: GitIdentity
-  readonly workspaces: readonly string[]
   readonly specIds: readonly string[]
   readonly schemaName: string
   readonly schemaVersion: number
@@ -49,12 +48,12 @@ export interface SignedOffEvent {
   readonly artifactHashes: Record<string, string>
 }
 
-/** Appended when workspaces, specIds, or artifact content changes, superseding approvals. */
+/** Appended when specIds or artifact content changes, superseding approvals. */
 export interface InvalidatedEvent {
   readonly type: 'invalidated'
   readonly at: Date
   readonly by: GitIdentity
-  readonly cause: 'workspace-change' | 'spec-change' | 'artifact-change'
+  readonly cause: 'spec-change' | 'artifact-change'
 }
 
 /** Appended when the change is shelved to `drafts/`. */
@@ -116,8 +115,6 @@ export interface ChangeProps {
   readonly createdAt: Date
   /** Optional free-text description of the change's purpose. */
   readonly description?: string
-  /** Current snapshot of active workspace IDs. */
-  readonly workspaces: readonly string[]
   /** Current snapshot of spec paths being modified. */
   readonly specIds: readonly string[]
   /** Append-only event history from which lifecycle state is derived. */
@@ -139,7 +136,6 @@ export class Change {
   private readonly _name: string
   private readonly _createdAt: Date
   private readonly _description: string | undefined
-  private _workspaces: string[]
   private _specIds: string[]
   private _history: ChangeEvent[]
   private _artifacts: Map<string, ChangeArtifact>
@@ -150,16 +146,9 @@ export class Change {
    * @param props - Change construction properties
    */
   constructor(props: ChangeProps) {
-    if (props.workspaces.length === 0) {
-      throw new InvalidChangeError('A Change must have at least one workspace')
-    }
-    if (props.specIds.length === 0) {
-      throw new InvalidChangeError('A Change must have at least one specId')
-    }
     this._name = props.name
     this._createdAt = new Date(props.createdAt.getTime())
     this._description = props.description
-    this._workspaces = [...props.workspaces]
     this._specIds = [...props.specIds]
     this._history = [...props.history]
     this._artifacts =
@@ -191,9 +180,13 @@ export class Change {
     return this._createdEvent().schemaVersion
   }
 
-  /** Current snapshot of workspace IDs this change belongs to. */
+  /** Workspace IDs derived from specIds at runtime. */
   get workspaces(): readonly string[] {
-    return [...this._workspaces]
+    const set = new Set<string>()
+    for (const id of this._specIds) {
+      set.add(parseSpecId(id).workspace)
+    }
+    return [...set]
   }
 
   /** Current snapshot of spec paths being created or modified. */
@@ -327,8 +320,8 @@ export class Change {
    * Records an invalidation, appending an `invalidated` event followed by a
    * `transitioned` event rolling back to `designing`.
    *
-   * Called when workspaces, specIds, or artifact content changes and supersedes
-   * any active spec approval or signoff.
+   * Called when specIds or artifact content changes and supersedes any active
+   * spec approval or signoff.
    *
    * @param cause - The reason for invalidation
    * @param actor - Git identity of the actor triggering the change
@@ -432,20 +425,6 @@ export class Change {
   }
 
   /**
-   * Updates the workspace list and appends an invalidation.
-   *
-   * Any modification to workspaces always appends an `invalidated` event
-   * followed by a `transitioned` event rolling back to `designing`.
-   *
-   * @param workspaces - The new workspace IDs
-   * @param actor - Git identity of the actor making the change
-   */
-  updateWorkspaces(workspaces: readonly string[], actor: GitIdentity): void {
-    this._workspaces = [...workspaces]
-    this.invalidate('workspace-change', actor)
-  }
-
-  /**
    * Updates the spec ID list and appends an invalidation.
    *
    * Any modification to specIds always appends an `invalidated` event
@@ -457,20 +436,6 @@ export class Change {
   updateSpecIds(specIds: readonly string[], actor: GitIdentity): void {
     this._specIds = [...specIds]
     this.invalidate('spec-change', actor)
-  }
-
-  /**
-   * Updates the workspaces snapshot without appending any event or triggering invalidation.
-   *
-   * Used when workspace membership is derived from a `specIds` change that
-   * already caused an `invalidated` event — the workspace snapshot is brought
-   * in line with the new spec scope without emitting a redundant
-   * `workspace-change` invalidation.
-   *
-   * @param workspaces - The new workspace IDs
-   */
-  setWorkspacesSnapshot(workspaces: readonly string[]): void {
-    this._workspaces = [...workspaces]
   }
 
   /**

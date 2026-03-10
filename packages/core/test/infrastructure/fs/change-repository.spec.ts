@@ -53,14 +53,12 @@ function makeChange(name: string, createdAt?: Date): Change {
   return new Change({
     name,
     createdAt: at,
-    workspaces: ['default'],
     specIds: ['auth/login'],
     history: [
       {
         type: 'created',
         at,
         by: actor,
-        workspaces: ['default'],
         specIds: ['auth/login'],
         schemaName: '@specd/schema-std',
         schemaVersion: 1,
@@ -100,8 +98,8 @@ describe('FsChangeRepository', () => {
 
       expect(loaded).not.toBeNull()
       expect(loaded?.name).toBe('add-auth')
-      expect(loaded?.workspaces).toEqual(['default'])
       expect(loaded?.specIds).toEqual(['auth/login'])
+      expect(loaded?.workspaces).toEqual(['default'])
       expect(loaded?.history).toHaveLength(1)
       expect(loaded?.history[0]?.type).toBe('created')
     })
@@ -454,7 +452,7 @@ describe('FsChangeRepository', () => {
 
       const parsed = JSON.parse(raw) as Record<string, unknown>
       expect(parsed['name']).toBe('add-auth')
-      expect(parsed['workspaces']).toEqual(['default'])
+      expect(parsed['workspaces']).toBeUndefined()
       expect(Array.isArray(parsed['history'])).toBe(true)
     })
   })

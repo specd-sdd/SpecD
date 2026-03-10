@@ -428,7 +428,6 @@ export class FsChangeRepository extends ChangeRepository {
       name: manifest.name,
       createdAt: new Date(manifest.createdAt),
       ...(manifest.description !== undefined ? { description: manifest.description } : {}),
-      workspaces: manifest.workspaces,
       specIds: manifest.specIds,
       history,
       artifacts: artifactMap,
@@ -486,7 +485,6 @@ function changeToManifest(change: Change): ChangeManifest {
     createdAt: change.createdAt.toISOString(),
     ...(change.description !== undefined ? { description: change.description } : {}),
     schema,
-    workspaces: [...change.workspaces],
     specIds: [...change.specIds],
     artifacts: [...change.artifacts.values()].map(serializeArtifact),
     history: change.history.map(serializeEvent),
@@ -522,7 +520,6 @@ function serializeEvent(event: ChangeEvent): RawChangeEvent {
         type: 'created',
         at: event.at.toISOString(),
         by: event.by,
-        workspaces: [...event.workspaces],
         specIds: [...event.specIds],
         schemaName: event.schemaName,
         schemaVersion: event.schemaVersion,
@@ -596,7 +593,7 @@ function serializeEvent(event: ChangeEvent): RawChangeEvent {
 const CHANGE_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
 
 /** All valid `InvalidatedEvent` cause values. */
-const INVALIDATED_CAUSES = ['workspace-change', 'spec-change', 'artifact-change'] as const
+const INVALIDATED_CAUSES = ['spec-change', 'artifact-change'] as const
 /** Union of valid `InvalidatedEvent` cause strings. */
 type InvalidatedCause = (typeof INVALIDATED_CAUSES)[number]
 
@@ -638,7 +635,6 @@ function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
         type: 'created',
         at: new Date(raw.at),
         by: raw.by,
-        workspaces: raw.workspaces,
         specIds: raw.specIds,
         schemaName: raw.schemaName,
         schemaVersion: raw.schemaVersion,

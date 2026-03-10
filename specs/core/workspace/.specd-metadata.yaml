@@ -1,22 +1,23 @@
 title: 'Workspace'
 description: >
-  Governs how specd organizes specs, code locations, schemas, and ownership into named workspaces
-  within a project. Read this when working on multi-workspace configuration, cross-workspace
-  references, context compilation scoping, or change artifact path resolution.
+  Defines the workspace concept, the fundamental organizational unit in specd that groups specs,
+  code locations, schemas, and ownership semantics under a named context. Read this when working
+  on multi-workspace configuration, cross-workspace references, context compilation scoping,
+  workspace-qualified spec IDs, or change artifact path resolution.
 keywords:
   - 'workspace'
-  - 'configuration'
-  - 'ownership'
-  - 'prefix'
   - 'spec-id'
+  - 'ownership'
   - 'context-patterns'
   - 'cross-workspace'
-  - 'multi-workspace'
+  - 'prefix'
+  - 'code-root'
+  - 'external-workspace'
 dependsOn:
   - 'core:core/config'
   - 'core:core/spec-id-format'
 contentHashes:
-  'spec.md': 'sha256:530840acb50450767e54fb1a59f9cd821789a311bbed56386f2d9f78db6aa67b'
+  'spec.md': 'sha256:17521d50c96529fd08f554d7576e1dac059ba11d1d48b37b8b99b0cee92e179c'
   'verify.md': 'sha256:90850de8eef3bc31e4be14a77c9a1c318821919cc6da70fada534aa4cf0e0a76'
 rules:
   - requirement: 'Workspace identity'
@@ -67,10 +68,11 @@ rules:
     rules:
       - 'A workspace is considered active in the context of a change when at least one of the change specIds belongs to that workspace.'
       - 'Active workspaces determine which workspace-level context patterns are applied during context compilation.'
-      - 'The set of active workspaces is read from the change manifest (change.workspaces) and is not inferred from specIds at compile time.'
+      - 'The set of active workspaces is derived at runtime from specIds via the workspaces computed getter, which extracts the workspace component of each spec ID using parseSpecId().'
+      - 'The set of active workspaces is not a persisted field.'
   - requirement: 'Primary workspace'
     rules:
-      - 'The primary workspace of a change is the first entry in change.workspaces.'
+      - 'The primary workspace of a change is the first entry in the computed change.workspaces derived from specIds.'
       - 'The primary workspace is used for archive path template resolution (change.workspace) and default metadata attribution when archiving.'
   - requirement: 'Port-per-workspace pattern'
     rules:
@@ -108,8 +110,8 @@ constraints:
   - 'codeRoot is required for non-default workspaces.'
   - 'isExternal is inferred, never declared.'
   - 'Spec IDs are always workspace-qualified internally.'
-  - 'A change must belong to at least one workspace.'
-  - 'Modifications to a change workspaces trigger approval invalidation.'
+  - "A change's workspaces are derived from its specIds via parseSpecId() and are not persisted."
+  - 'When specIds is empty, workspaces is empty.'
   - 'Workspace-level exclude patterns do not apply to specs reached via dependsOn.'
   - 'External repository configurations are never read; each project declares its own view.'
   - 'Change artifacts always include the workspace segment in their path.'

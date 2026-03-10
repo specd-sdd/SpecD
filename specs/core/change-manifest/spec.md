@@ -2,7 +2,7 @@
 
 ## Overview
 
-The change manifest (`manifest.json`) is the single source of truth for a change. It lives inside the change's directory and persists the full state of the Change domain entity — identity, workspaces, specs, artifacts, and the complete event history from which lifecycle state is derived. It is written and read exclusively by `FsChangeRepository`.
+The change manifest (`manifest.json`) is the single source of truth for a change. It lives inside the change's directory and persists the full state of the Change domain entity — identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It is written and read exclusively by `FsChangeRepository`.
 
 ## Requirements
 
@@ -19,7 +19,6 @@ Each change is persisted as a `manifest.json` file inside its change directory. 
     "name": "@specd/schema-std",
     "version": 2,
   },
-  "workspaces": ["default"],
   "specIds": ["default:auth/login", "default:auth/register"],
   "artifacts": [
     {
@@ -49,7 +48,6 @@ Each change is persisted as a `manifest.json` file inside its change directory. 
       "type": "created",
       "at": "2024-03-15T10:00:00.000Z",
       "by": { "name": "Alice", "email": "alice@example.com" },
-      "workspaces": ["default"],
       "specIds": ["auth/login", "auth/register"],
       "schemaName": "@specd/schema-std",
       "schemaVersion": 2,
@@ -70,7 +68,7 @@ Field definitions:
 - **`name`** — the change slug; immutable after creation
 - **`createdAt`** — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix
 - **`schema`** — `name` (string) and `version` (integer) of the schema active at creation; written once, never updated
-- **`workspaces`** — current snapshot of active workspace IDs; mutable
+- **`workspaces`** — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from `specIds` via `parseSpecId()`
 - **`specIds`** — current snapshot of spec IDs; mutable
 - **`artifacts`** — array of artifact descriptors; `validatedHash` is `null` when the artifact has not been validated, a SHA-256 string when validated, or `"__skipped__"` when an optional artifact has been explicitly marked as not produced. `ArtifactStatus` is never stored — it is derived at load time from `validatedHash` and file presence
 - **`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field.
@@ -88,8 +86,8 @@ The JSON serialization of each event type is:
 { "type": "signed-off", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "Ship it", "artifactHashes": { "proposal": "sha256:...", "specs": "sha256:..." } }
 
 // approval invalidated (prior spec-approved/signed-off events are superseded)
-{ "type": "invalidated", "at": "...", "by": { "name": "...", "email": "..." }, "cause": "workspace-change" }
-// cause values: "workspace-change" | "spec-change" | "artifact-change"
+{ "type": "invalidated", "at": "...", "by": { "name": "...", "email": "..." }, "cause": "spec-change" }
+// cause values: "spec-change" | "artifact-change"
 
 // shelved to drafts/
 { "type": "drafted", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "parking for now" }
