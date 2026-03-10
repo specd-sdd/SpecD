@@ -70,6 +70,119 @@ const ContextEntryRawZodSchema = z.union([
   z.object({ instruction: z.string() }),
 ])
 
+/**
+ * Validates a `contextIncludeSpecs` / `contextExcludeSpecs` pattern string.
+ *
+ * Valid forms (per spec):
+ * - `*` — alone
+ * - `workspace:*` — wildcard after workspace qualifier
+ * - `prefix/*` — wildcard after path prefix ending in `/`
+ * - `workspace:prefix/*` — qualified wildcard after path prefix
+ * - `path/name` — exact spec (no wildcard)
+ * - `workspace:path/name` — qualified exact spec
+ *
+ * `*` may only appear alone, after `workspace:`, or after a path prefix ending
+ * in `/`. It may not appear in the middle of a path segment or in any other
+ * position.
+ *
+ * @param pattern - The pattern string to validate
+ * @param field - The config field name for error messages
+ * @param configPath - Absolute path to the config file for error messages
+ * @throws {ConfigValidationError} When the pattern syntax is invalid
+ */
+function validateContextPattern(pattern: string, field: string, configPath: string): void {
+  // Bare wildcard
+  if (pattern === '*') return
+
+  // Split optional workspace qualifier
+  const colonIdx = pattern.indexOf(':')
+  let workspace: string | null = null
+  let rest: string
+
+  if (colonIdx !== -1) {
+    workspace = pattern.slice(0, colonIdx)
+    rest = pattern.slice(colonIdx + 1)
+  } else {
+    rest = pattern
+  }
+
+  // Workspace qualifier must be a valid identifier (lowercase alphanumeric + hyphens)
+  if (workspace !== null && !/^[a-z][a-z0-9-]*$/.test(workspace)) {
+    throw new ConfigValidationError(
+      configPath,
+      `${field}: invalid workspace qualifier in pattern '${pattern}'`,
+    )
+  }
+
+  // After qualifier: `*`, `prefix/*`, or `path/name`
+  if (rest === '*') return
+
+  // Check for misplaced wildcards
+  if (rest.includes('*')) {
+    // Only valid position: at the very end, preceded by `/`
+    if (!rest.endsWith('/*') || rest.indexOf('*') !== rest.length - 1) {
+      throw new ConfigValidationError(
+        configPath,
+        `${field}: '*' in disallowed position in pattern '${pattern}'`,
+      )
+    }
+    // Validate the prefix before /*
+    const prefix = rest.slice(0, -2)
+    if (!/^[a-z_][a-z0-9_-]*(?:\/[a-z_][a-z0-9_-]*)*$/.test(prefix)) {
+      throw new ConfigValidationError(
+        configPath,
+        `${field}: invalid path prefix in pattern '${pattern}'`,
+      )
+    }
+    return
+  }
+
+  // Exact path — no wildcards
+  if (!/^[a-z_][a-z0-9_-]*(?:\/[a-z_][a-z0-9_-]*)*$/.test(rest)) {
+    throw new ConfigValidationError(configPath, `${field}: invalid pattern '${pattern}'`)
+  }
+}
+
+/**
+ * Validates all patterns in `contextIncludeSpecs` and `contextExcludeSpecs`
+ * arrays at both project and workspace level.
+ *
+ * @param data - Parsed config data containing patterns to validate
+ * @param data.contextIncludeSpecs - Project-level include patterns
+ * @param data.contextExcludeSpecs - Project-level exclude patterns
+ * @param data.workspaces - Workspace configs keyed by name
+ * @param configPath - Absolute path to the config file for error messages
+ */
+function validateContextPatterns(
+  data: {
+    contextIncludeSpecs?: string[] | undefined
+    contextExcludeSpecs?: string[] | undefined
+    workspaces: Record<
+      string,
+      {
+        contextIncludeSpecs?: string[] | undefined
+        contextExcludeSpecs?: string[] | undefined
+      }
+    >
+  },
+  configPath: string,
+): void {
+  for (const p of data.contextIncludeSpecs ?? []) {
+    validateContextPattern(p, 'contextIncludeSpecs', configPath)
+  }
+  for (const p of data.contextExcludeSpecs ?? []) {
+    validateContextPattern(p, 'contextExcludeSpecs', configPath)
+  }
+  for (const [wsName, ws] of Object.entries(data.workspaces)) {
+    for (const p of ws.contextIncludeSpecs ?? []) {
+      validateContextPattern(p, `workspaces.${wsName}.contextIncludeSpecs`, configPath)
+    }
+    for (const p of ws.contextExcludeSpecs ?? []) {
+      validateContextPattern(p, `workspaces.${wsName}.contextExcludeSpecs`, configPath)
+    }
+  }
+}
+
 const PREFIX_SEGMENT_RE = /^[a-z0-9_][a-z0-9_-]*$/
 
 const PrefixZodSchema = z.string().refine(
@@ -302,6 +415,8 @@ export class FsConfigLoader implements ConfigLoader {
     }
 
     const data = parseResult.data
+
+    validateContextPatterns(data, configPath)
 
     if (!data.workspaces.default) {
       throw new ConfigValidationError(configPath, "'workspaces.default' is required")
