@@ -4,7 +4,6 @@ import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
 
 /**
  * Registers the `project context` subcommand on the given parent command.
@@ -45,7 +44,6 @@ export function registerProjectContext(parent: Command): void {
           const config = await loadConfig({ configPath: opts.config })
           const kernel = createCliKernel(config)
           const fmt = parseFormat(opts.format)
-          const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
 
           const compileConfig: CompileContextConfig = {
             ...(config.context !== undefined
@@ -69,8 +67,6 @@ export function registerProjectContext(parent: Command): void {
           if (opts.scenarios) sectionFlags.push('scenarios')
 
           const result = await kernel.project.getProjectContext.execute({
-            schemaRef: config.schemaRef,
-            workspaceSchemasPaths,
             config: compileConfig,
             ...(opts.followDeps ? { followDeps: true } : {}),
             ...(opts.depth !== undefined ? { depth: opts.depth } : {}),

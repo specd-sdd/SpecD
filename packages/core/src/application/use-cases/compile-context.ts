@@ -14,7 +14,6 @@ import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
-import { type WorkspaceContext } from '../ports/workspace-context.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type ContextWarning } from './_shared/context-warning.js'
 import { findNodes } from './_shared/selector-matching.js'
@@ -57,7 +56,7 @@ export interface CompileContextConfig {
 export type SpecSection = 'rules' | 'constraints' | 'scenarios'
 
 /** Input for the {@link CompileContext} use case. */
-export interface CompileContextInput extends WorkspaceContext {
+export interface CompileContextInput {
   /** The change name to compile context for. */
   readonly name: string
   /** The lifecycle step being entered (e.g. `'designing'`, `'implementing'`). */
@@ -114,6 +113,8 @@ export class CompileContext {
   private readonly _files: FileReader
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
+  private readonly _schemaRef: string
+  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new `CompileContext` use case instance.
@@ -124,6 +125,8 @@ export class CompileContext {
    * @param files - Reader for project-level context file entries
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hasher for metadata freshness checks
+   * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
+   * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
    */
   constructor(
     changes: ChangeRepository,
@@ -132,6 +135,8 @@ export class CompileContext {
     files: FileReader,
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
+    schemaRef: string,
+    workspaceSchemasPaths: ReadonlyMap<string, string>,
   ) {
     this._changes = changes
     this._specs = specs
@@ -139,6 +144,8 @@ export class CompileContext {
     this._files = files
     this._parsers = parsers
     this._hasher = hasher
+    this._schemaRef = schemaRef
+    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
@@ -153,8 +160,8 @@ export class CompileContext {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemas.resolve(input.schemaRef, input.workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(input.schemaRef)
+    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
+    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
 
     const warnings: ContextWarning[] = []
 

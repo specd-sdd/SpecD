@@ -55,6 +55,10 @@ export interface KernelInternals {
   readonly configWriter: ConfigWriter
   /** YAML serializer for metadata operations. */
   readonly yaml: YamlSerializer
+  /** Schema reference string from config. */
+  readonly schemaRef: string
+  /** Map of workspace name → absolute schemas directory path. */
+  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
 }
 
 /**
@@ -115,6 +119,13 @@ export function createKernelInternals(
     configDir: config.projectRoot,
   })
 
+  const workspaceSchemasPaths = new Map<string, string>()
+  for (const ws of config.workspaces) {
+    if (ws.schemasPath !== null) {
+      workspaceSchemasPaths.set(ws.name, ws.schemasPath)
+    }
+  }
+
   return {
     changes,
     archive,
@@ -127,5 +138,7 @@ export function createKernelInternals(
     hooks: new NodeHookRunner(),
     configWriter: new FsConfigWriter(),
     yaml: new NodeYamlSerializer(),
+    schemaRef: config.schemaRef,
+    workspaceSchemasPaths,
   }
 }

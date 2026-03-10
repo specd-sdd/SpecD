@@ -4,7 +4,6 @@ import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
-import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
 import { collect } from '../../helpers/collect.js'
 
 /**
@@ -49,11 +48,7 @@ export function registerChangeCreate(parent: Command): void {
           }
           const workspaces = [...workspaceSet]
 
-          const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
-          const schema = await kernel.specs.getActiveSchema.execute({
-            schemaRef: config.schemaRef,
-            workspaceSchemasPaths,
-          })
+          const schema = await kernel.specs.getActiveSchema.execute()
 
           const change = await kernel.changes.create.execute({
             name,

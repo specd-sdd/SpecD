@@ -34,8 +34,6 @@ function makePendingSignoffChange(name: string): Change {
 
 const defaultInput = {
   approvalsSignoff: true,
-  schemaRef: '@specd/schema-std',
-  workspaceSchemasPaths: new Map<string, string>(),
 }
 
 describe('ApproveSignoff', () => {
@@ -49,6 +47,8 @@ describe('ApproveSignoff', () => {
         makeGitAdapter(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
@@ -70,6 +70,8 @@ describe('ApproveSignoff', () => {
         makeGitAdapter(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
@@ -91,6 +93,8 @@ describe('ApproveSignoff', () => {
         makeGitAdapter(),
         makeSchemaRegistry(makeSchema()),
         hasher,
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
@@ -111,6 +115,8 @@ describe('ApproveSignoff', () => {
         makeGitAdapter(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await uc.execute({
@@ -131,6 +137,8 @@ describe('ApproveSignoff', () => {
         makeGitAdapter(),
         makeSchemaRegistry(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await expect(
@@ -138,8 +146,6 @@ describe('ApproveSignoff', () => {
           name: 'my-change',
           reason: 'ok',
           approvalsSignoff: false,
-          schemaRef: '@specd/schema-std',
-          workspaceSchemasPaths: new Map(),
         }),
       ).rejects.toThrow(ApprovalGateDisabledError)
     })
@@ -151,6 +157,8 @@ describe('ApproveSignoff', () => {
         makeGitAdapter(),
         makeSchemaRegistry(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await expect(
@@ -158,8 +166,6 @@ describe('ApproveSignoff', () => {
           name: 'my-change',
           reason: 'ok',
           approvalsSignoff: false,
-          schemaRef: '@specd/schema-std',
-          workspaceSchemasPaths: new Map(),
         }),
       ).rejects.toMatchObject({ code: 'APPROVAL_GATE_DISABLED' })
     })
@@ -181,6 +187,8 @@ describe('ApproveSignoff', () => {
         makeGitAdapter(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await expect(
@@ -201,6 +209,8 @@ describe('ApproveSignoff', () => {
         makeGitAdapter(),
         makeSchemaRegistry(makeSchema()),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await expect(

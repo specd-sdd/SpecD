@@ -1,25 +1,22 @@
 import { type Kernel, type SpecdConfig } from '@specd/core'
 import { createCliKernel } from '../kernel.js'
 import { loadConfig } from '../load-config.js'
-import { buildWorkspaceSchemasPaths } from './workspace-map.js'
 
 /**
- * The resolved CLI context containing config, kernel, and workspace schema paths.
+ * The resolved CLI context containing config and kernel.
  */
 export interface ChangeContext {
   /** The loaded specd configuration. */
   readonly config: SpecdConfig
   /** The wired kernel instance. */
   readonly kernel: Kernel
-  /** Map of workspace name to absolute schemas path. */
-  readonly workspaceSchemasPaths: Map<string, string>
 }
 
 /**
- * Loads config, creates the CLI kernel, and builds workspace schema paths.
+ * Loads config and creates the CLI kernel.
  *
- * This consolidates the repeated `loadConfig` + `createCliKernel` +
- * `buildWorkspaceSchemasPaths` boilerplate found across CLI commands.
+ * This consolidates the repeated `loadConfig` + `createCliKernel`
+ * boilerplate found across CLI commands.
  *
  * @param options - Optional overrides
  * @param options.configPath - Path to specd.yaml config file
@@ -30,6 +27,5 @@ export async function resolveChangeContext(options?: {
 }): Promise<ChangeContext> {
   const config = await loadConfig({ configPath: options?.configPath })
   const kernel = createCliKernel(config)
-  const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
-  return { config, kernel, workspaceSchemasPaths }
+  return { config, kernel }
 }

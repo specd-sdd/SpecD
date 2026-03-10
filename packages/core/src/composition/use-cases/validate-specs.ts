@@ -11,6 +11,8 @@ export interface FsValidateSpecsOptions {
   readonly specRepositories: ReadonlyMap<string, SpecRepository>
   readonly nodeModulesPaths: readonly string[]
   readonly configDir: string
+  readonly schemaRef: string
+  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
 }
 
 /**
@@ -56,6 +58,12 @@ export function createValidateSpecs(
         ),
       ]),
     )
+    const workspaceSchemasPaths = new Map<string, string>()
+    for (const ws of config.workspaces) {
+      if (ws.schemasPath !== null) {
+        workspaceSchemasPaths.set(ws.name, ws.schemasPath)
+      }
+    }
     return createValidateSpecs({
       specRepositories: specRepos,
       nodeModulesPaths: [
@@ -63,6 +71,8 @@ export function createValidateSpecs(
         ...(kernelOpts?.extraNodeModulesPaths ?? []),
       ],
       configDir: config.projectRoot,
+      schemaRef: config.schemaRef,
+      workspaceSchemasPaths,
     })
   }
   const schemas = createSchemaRegistry('fs', {
@@ -70,5 +80,11 @@ export function createValidateSpecs(
     configDir: configOrOptions.configDir,
   })
   const parsers = createArtifactParserRegistry()
-  return new ValidateSpecs(configOrOptions.specRepositories, schemas, parsers)
+  return new ValidateSpecs(
+    configOrOptions.specRepositories,
+    schemas,
+    parsers,
+    configOrOptions.schemaRef,
+    configOrOptions.workspaceSchemasPaths,
+  )
 }

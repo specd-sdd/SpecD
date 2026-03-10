@@ -7,25 +7,17 @@ describe('GetActiveSchema', () => {
   it('returns schema when resolved', async () => {
     const schema = makeSchema({ name: 'my-schema' })
     const registry = makeSchemaRegistry(schema)
-    const uc = new GetActiveSchema(registry)
+    const uc = new GetActiveSchema(registry, '@specd/schema-std', new Map())
 
-    const result = await uc.execute({
-      schemaRef: '@specd/schema-std',
-      workspaceSchemasPaths: new Map(),
-    })
+    const result = await uc.execute()
 
     expect(result).toBe(schema)
   })
 
   it('throws SchemaNotFoundError when schema not found', async () => {
     const registry = makeSchemaRegistry(null)
-    const uc = new GetActiveSchema(registry)
+    const uc = new GetActiveSchema(registry, '@specd/schema-missing', new Map())
 
-    await expect(
-      uc.execute({
-        schemaRef: '@specd/schema-missing',
-        workspaceSchemasPaths: new Map(),
-      }),
-    ).rejects.toThrow(SchemaNotFoundError)
+    await expect(uc.execute()).rejects.toThrow(SchemaNotFoundError)
   })
 })

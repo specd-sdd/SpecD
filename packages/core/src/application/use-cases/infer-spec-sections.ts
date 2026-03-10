@@ -8,10 +8,6 @@ import { findNodes } from './_shared/selector-matching.js'
 export interface InferSpecSectionsInput {
   /** Loaded artifact file contents, keyed by filename. */
   readonly artifacts: ReadonlyMap<string, { readonly content: string }>
-  /** Schema reference (e.g. `"@specd/schema-std"`). */
-  readonly schemaRef: string
-  /** Map of workspace name to absolute schemas directory path. */
-  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
 }
 
 /** Result returned by the {@link InferSpecSections} use case. */
@@ -36,16 +32,27 @@ export interface InferSpecSectionsResult {
 export class InferSpecSections {
   private readonly _schemas: SchemaRegistry
   private readonly _parsers: ArtifactParserRegistry
+  private readonly _schemaRef: string
+  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new `InferSpecSections` use case instance.
    *
    * @param schemas - Registry for resolving schema references
    * @param parsers - Registry of artifact format parsers
+   * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
+   * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
    */
-  constructor(schemas: SchemaRegistry, parsers: ArtifactParserRegistry) {
+  constructor(
+    schemas: SchemaRegistry,
+    parsers: ArtifactParserRegistry,
+    schemaRef: string,
+    workspaceSchemasPaths: ReadonlyMap<string, string>,
+  ) {
     this._schemas = schemas
     this._parsers = parsers
+    this._schemaRef = schemaRef
+    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
@@ -56,8 +63,8 @@ export class InferSpecSections {
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    */
   async execute(input: InferSpecSectionsInput): Promise<InferSpecSectionsResult> {
-    const schema = await this._schemas.resolve(input.schemaRef, input.workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(input.schemaRef)
+    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
+    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
 
     const rules: string[] = []
     const constraints: string[] = []

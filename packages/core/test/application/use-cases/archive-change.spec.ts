@@ -105,9 +105,6 @@ function makeArchivableChange(
   })
 }
 
-/** Default hook variables for tests. */
-const hookVars = { project: { root: '/repo' } }
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -123,15 +120,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(makeSchema([])),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      await expect(
-        uc.execute({
-          name: 'missing',
-          schemaRef: 'std',
-          workspaceSchemasPaths: new Map(),
-          hookVariables: hookVars,
-        }),
-      ).rejects.toThrow(ChangeNotFoundError)
+      await expect(uc.execute({ name: 'missing' })).rejects.toThrow(ChangeNotFoundError)
     })
   })
 
@@ -146,15 +140,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(null),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      await expect(
-        uc.execute({
-          name: 'my-change',
-          schemaRef: 'std',
-          workspaceSchemasPaths: new Map(),
-          hookVariables: hookVars,
-        }),
-      ).rejects.toThrow(SchemaNotFoundError)
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaNotFoundError)
     })
   })
 
@@ -209,15 +200,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(makeSchema([])),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      await expect(
-        uc.execute({
-          name: 'my-change',
-          schemaRef: 'std',
-          workspaceSchemasPaths: new Map(),
-          hookVariables: hookVars,
-        }),
-      ).rejects.toThrow(InvalidStateTransitionError)
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(InvalidStateTransitionError)
     })
   })
 
@@ -232,13 +220,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(makeSchema([])),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      const result = await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-      })
+      const result = await uc.execute({ name: 'my-change' })
       expect(result.archivedChange).toBeDefined()
     })
 
@@ -255,13 +242,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(makeSchema([])),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      const result = await uc.execute({
-        name: 'add-auth-flow',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-      })
+      const result = await uc.execute({ name: 'add-auth-flow' })
 
       expect(result.archivedChange.archivedName).toBe('20240115-120000-add-auth-flow')
     })
@@ -275,13 +261,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(makeSchema([])),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      const result = await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-      })
+      const result = await uc.execute({ name: 'my-change' })
 
       expect(result.archivedChange).not.toHaveProperty('approval')
       expect(result.archivedChange).not.toHaveProperty('wasStructural')
@@ -315,13 +300,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      const result = await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-      })
+      const result = await uc.execute({ name: 'my-change' })
 
       expect(result.archivedChange).toBeInstanceOf(ArchivedChange)
       expect(result.postHookFailures).toEqual([])
@@ -381,13 +365,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-      })
+      await uc.execute({ name: 'my-change' })
 
       expect(callOrder[0]).toBe('pnpm test')
       expect(callOrder[1]).toBe('save')
@@ -421,16 +404,13 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
 
-      await expect(
-        uc.execute({
-          name: 'my-change',
-          schemaRef: 'std',
-          workspaceSchemasPaths: new Map(),
-          hookVariables: hookVars,
-        }),
-      ).rejects.toThrow(HookFailedError)
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
 
       expect(specRepo.saved.size).toBe(0)
     })
@@ -455,16 +435,13 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
 
-      await expect(
-        uc.execute({
-          name: 'my-change',
-          schemaRef: 'std',
-          workspaceSchemasPaths: new Map(),
-          hookVariables: hookVars,
-        }),
-      ).rejects.toThrow(HookFailedError)
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
     })
   })
 
@@ -497,17 +474,16 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(schema),
-      )
-      await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-        projectHooks: {
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
+        {
           pre: [{ type: 'run', command: 'project-pre' }],
           post: [],
         },
-      })
+      )
+      await uc.execute({ name: 'my-change' })
 
       expect(callOrder).toEqual(['schema-pre', 'project-pre'])
     })
@@ -540,17 +516,16 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(schema),
-      )
-      await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-        projectHooks: {
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
+        {
           pre: [],
           post: [{ type: 'run', command: 'project-post' }],
         },
-      })
+      )
+      await uc.execute({ name: 'my-change' })
 
       expect(callOrder).toEqual(['schema-post', 'project-post'])
     })
@@ -571,20 +546,17 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(makeSchema([])),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
+        {
+          pre: [{ type: 'run', command: 'project-pre' }],
+          post: [],
+        },
       )
 
-      await expect(
-        uc.execute({
-          name: 'my-change',
-          schemaRef: 'std',
-          workspaceSchemasPaths: new Map(),
-          hookVariables: hookVars,
-          projectHooks: {
-            pre: [{ type: 'run', command: 'project-pre' }],
-            post: [],
-          },
-        }),
-      ).rejects.toThrow(HookFailedError)
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
     })
 
     it('collects project-level post hook failures without rollback', async () => {
@@ -603,17 +575,16 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(makeSchema([])),
-      )
-      const result = await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-        projectHooks: {
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
+        {
           pre: [],
           post: [{ type: 'run', command: 'project-post' }],
         },
-      })
+      )
+      const result = await uc.execute({ name: 'my-change' })
 
       expect(result.postHookFailures).toEqual(['project-post'])
     })
@@ -646,13 +617,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-      })
+      await uc.execute({ name: 'my-change' })
 
       expect(runSpy).not.toHaveBeenCalled()
     })
@@ -700,13 +670,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(mdParser, yamlParser),
         makeSchemaRegistry(schema),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-      })
+      await uc.execute({ name: 'my-change' })
 
       expect(serializeSpy).toHaveBeenCalled()
       expect(specRepo.saved.get('spec.md')).toBe(mergedContent)
@@ -752,16 +721,13 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(mdParser, yamlParser),
         makeSchemaRegistry(schema),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
 
-      await expect(
-        uc.execute({
-          name: 'my-change',
-          schemaRef: 'std',
-          workspaceSchemasPaths: new Map(),
-          hookVariables: hookVars,
-        }),
-      ).rejects.toThrow(DeltaApplicationError)
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(DeltaApplicationError)
     })
   })
 
@@ -797,13 +763,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-      })
+      await uc.execute({ name: 'my-change' })
 
       expect(specRepo.saved.get('spec.md')).toBe(artifactContent)
     })
@@ -826,13 +791,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-      })
+      await uc.execute({ name: 'my-change' })
 
       expect(specRepo.saved.size).toBe(0)
     })
@@ -857,13 +821,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-      })
+      await uc.execute({ name: 'my-change' })
 
       expect(specRepo.saved.size).toBe(0)
     })
@@ -906,13 +869,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-      })
+      await uc.execute({ name: 'my-change' })
 
       expect(callOrder).toEqual(['archive', 'git commit -m archive'])
     })
@@ -952,13 +914,12 @@ describe('ArchiveChange', () => {
         makeGitAdapter(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        'std',
+        new Map(),
+        '/repo',
+        '/changes',
       )
-      const result = await uc.execute({
-        name: 'my-change',
-        schemaRef: 'std',
-        workspaceSchemasPaths: new Map(),
-        hookVariables: hookVars,
-      })
+      const result = await uc.execute({ name: 'my-change' })
 
       expect(archiveCalled).toBe(true)
       expect(result.postHookFailures).toEqual(['git push'])

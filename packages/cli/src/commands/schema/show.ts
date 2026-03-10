@@ -3,7 +3,6 @@ import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
 
 /**
  * Registers the `schema show` subcommand on the given parent command.
@@ -20,12 +19,7 @@ export function registerSchemaShow(parent: Command): void {
       try {
         const config = await loadConfig({ configPath: opts.config })
         const kernel = createCliKernel(config)
-        const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
-
-        const schema = await kernel.specs.getActiveSchema.execute({
-          schemaRef: config.schemaRef,
-          workspaceSchemasPaths,
-        })
+        const schema = await kernel.specs.getActiveSchema.execute()
 
         const fmt = parseFormat(opts.format)
         if (fmt === 'text') {

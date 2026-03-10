@@ -30,6 +30,8 @@ export interface FsApproveSpecOptions {
   readonly discardedPath: string
   /** Absolute path to the project root (for schema resolution). */
   readonly projectRoot: string
+  readonly schemaRef: string
+  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
 }
 
 /**
@@ -64,6 +66,12 @@ export function createApproveSpec(
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
+    const workspaceSchemasPaths = new Map<string, string>()
+    for (const ws2 of config.workspaces) {
+      if (ws2.schemasPath !== null) {
+        workspaceSchemasPaths.set(ws2.name, ws2.schemasPath)
+      }
+    }
     return createApproveSpec(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {
@@ -71,6 +79,8 @@ export function createApproveSpec(
         draftsPath: config.storage.draftsPath,
         discardedPath: config.storage.discardedPath,
         projectRoot: config.projectRoot,
+        schemaRef: config.schemaRef,
+        workspaceSchemasPaths,
       },
     )
   }
@@ -81,5 +91,12 @@ export function createApproveSpec(
     configDir: options!.projectRoot,
   })
   const hasher = new NodeContentHasher()
-  return new ApproveSpec(changeRepo, git, schemas, hasher)
+  return new ApproveSpec(
+    changeRepo,
+    git,
+    schemas,
+    hasher,
+    options!.schemaRef,
+    options!.workspaceSchemasPaths,
+  )
 }

@@ -43,6 +43,8 @@ export interface FsCompileContextOptions {
   readonly nodeModulesPaths: readonly string[]
   /** Project root directory for resolving relative schema paths. */
   readonly configDir: string
+  readonly schemaRef: string
+  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
 }
 
 /**
@@ -93,6 +95,12 @@ export function createCompileContext(
         ),
       ]),
     )
+    const workspaceSchemasPaths = new Map<string, string>()
+    for (const ws of config.workspaces) {
+      if (ws.schemasPath !== null) {
+        workspaceSchemasPaths.set(ws.name, ws.schemasPath)
+      }
+    }
     return createCompileContext(
       {
         workspace: defaultWs.name,
@@ -109,6 +117,8 @@ export function createCompileContext(
           ...(kernelOpts?.extraNodeModulesPaths ?? []),
         ],
         configDir: config.projectRoot,
+        schemaRef: config.schemaRef,
+        workspaceSchemasPaths,
       },
     )
   }
@@ -125,5 +135,14 @@ export function createCompileContext(
   const files = new FsFileReader()
   const parsers = createArtifactParserRegistry()
   const hasher = new NodeContentHasher()
-  return new CompileContext(changeRepo, opts.specRepositories, schemas, files, parsers, hasher)
+  return new CompileContext(
+    changeRepo,
+    opts.specRepositories,
+    schemas,
+    files,
+    parsers,
+    hasher,
+    opts.schemaRef,
+    opts.workspaceSchemasPaths,
+  )
 }

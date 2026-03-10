@@ -22,5 +22,4 @@ export {
   type InitProjectOptions,
   type InitProjectResult,
 } from './config-writer.js'
-export { type WorkspaceContext } from './workspace-context.js'
 export { YamlSerializer } from './yaml-serializer.js'

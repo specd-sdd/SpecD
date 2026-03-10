@@ -4,7 +4,6 @@ import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
 
 /**
  * Registers the `change archive` subcommand on the given parent command.
@@ -21,26 +20,8 @@ export function registerChangeArchive(parent: Command): void {
       try {
         const config = await loadConfig({ configPath: opts.config })
         const kernel = createCliKernel(config)
-        const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
 
-        const { change } = await kernel.changes.status.execute({ name })
-        const workspace = change.workspaces[0] ?? 'default'
-
-        const projectStep = config.workflow?.find((s) => s.step === 'archiving')
-        const result = await kernel.changes.archive.execute({
-          name,
-          schemaRef: config.schemaRef,
-          workspaceSchemasPaths,
-          hookVariables: {
-            project: { root: config.projectRoot },
-            change: {
-              name,
-              workspace,
-              path: config.storage.changesPath,
-            },
-          },
-          ...(projectStep !== undefined ? { projectHooks: projectStep.hooks } : {}),
-        })
+        const result = await kernel.changes.archive.execute({ name })
 
         const archivePath = path.relative(config.projectRoot, result.archiveDirPath)
 

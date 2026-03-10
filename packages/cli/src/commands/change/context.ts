@@ -4,7 +4,6 @@ import { createCliKernel } from '../../kernel.js'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
 
 /**
  * Registers the `change context` subcommand on the given parent command.
@@ -50,8 +49,6 @@ export function registerChangeContext(parent: Command): void {
 
           const config = await loadConfig({ configPath: opts.config })
           const kernel = createCliKernel(config)
-          const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
-
           /**
            * Context filter settings for a single workspace.
            *
@@ -103,8 +100,6 @@ export function registerChangeContext(parent: Command): void {
             name,
             step,
             ...(opts.artifact !== undefined ? { activeArtifact: opts.artifact } : {}),
-            schemaRef: config.schemaRef,
-            workspaceSchemasPaths,
             config: compileConfig,
             ...(opts.followDeps ? { followDeps: true } : {}),
             ...(opts.depth !== undefined ? { depth: opts.depth } : {}),

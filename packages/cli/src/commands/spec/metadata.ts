@@ -7,7 +7,6 @@ import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
-import { buildWorkspaceSchemasPaths } from '../../helpers/workspace-map.js'
 
 /**
  * Registers the `spec metadata` subcommand on the given parent command.
@@ -67,7 +66,6 @@ export function registerSpecMetadata(parent: Command): void {
           let inferredScenarios: readonly string[] = []
 
           if (shouldInfer) {
-            const workspaceSchemasPaths = buildWorkspaceSchemasPaths(config)
             const artifactContents = new Map<string, { content: string }>()
             for (const [filename, artifact] of result.artifacts) {
               if (filename !== '.specd-metadata.yaml') {
@@ -83,8 +81,6 @@ export function registerSpecMetadata(parent: Command): void {
 
             const inferred = await kernel.specs.inferSections.execute({
               artifacts: artifactContents,
-              schemaRef: config.schemaRef,
-              workspaceSchemasPaths,
             })
 
             inferredRules = inferred.rules

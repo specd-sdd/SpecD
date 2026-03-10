@@ -21,15 +21,13 @@ export function registerChangeApprove(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
-        const { config, kernel, workspaceSchemasPaths } = await resolveChangeContext({
+        const { config, kernel } = await resolveChangeContext({
           configPath: opts.config,
         })
 
         await kernel.specs.approveSpec.execute({
           name,
           reason: opts.reason,
-          schemaRef: config.schemaRef,
-          workspaceSchemasPaths,
           approvalsSpec: config.approvals.spec,
         })
 
@@ -52,15 +50,13 @@ export function registerChangeApprove(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
-        const { config, kernel, workspaceSchemasPaths } = await resolveChangeContext({
+        const { config, kernel } = await resolveChangeContext({
           configPath: opts.config,
         })
 
         await kernel.specs.approveSignoff.execute({
           name,
           reason: opts.reason,
-          schemaRef: config.schemaRef,
-          workspaceSchemasPaths,
           approvalsSignoff: config.approvals.signoff,
         })
 

@@ -20,6 +20,8 @@ export interface FsGetProjectContextOptions {
   readonly nodeModulesPaths: readonly string[]
   /** Project root directory for resolving relative schema paths. */
   readonly configDir: string
+  readonly schemaRef: string
+  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
 }
 
 /**
@@ -55,6 +57,12 @@ export function createGetProjectContext(
 ): GetProjectContext {
   if (isSpecdConfig(configOrOptions)) {
     const config = configOrOptions
+    const workspaceSchemasPaths = new Map<string, string>()
+    for (const ws of config.workspaces) {
+      if (ws.schemasPath !== null) {
+        workspaceSchemasPaths.set(ws.name, ws.schemasPath)
+      }
+    }
     return createGetProjectContext({
       specRepositories: new Map(
         config.workspaces.map((ws) => [
@@ -71,6 +79,8 @@ export function createGetProjectContext(
         ...(options?.extraNodeModulesPaths ?? []),
       ],
       configDir: config.projectRoot,
+      schemaRef: config.schemaRef,
+      workspaceSchemasPaths,
     })
   }
   const opts = configOrOptions
@@ -81,5 +91,13 @@ export function createGetProjectContext(
   const files = new FsFileReader()
   const parsers = createArtifactParserRegistry()
   const hasher = new NodeContentHasher()
-  return new GetProjectContext(opts.specRepositories, schemas, files, parsers, hasher)
+  return new GetProjectContext(
+    opts.specRepositories,
+    schemas,
+    files,
+    parsers,
+    hasher,
+    opts.schemaRef,
+    opts.workspaceSchemasPaths,
+  )
 }

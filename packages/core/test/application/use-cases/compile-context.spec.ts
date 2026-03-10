@@ -200,6 +200,8 @@ function makeSut(opts: {
     fileReader ?? makeStubFileReader(),
     parsers ?? (new Map() as ArtifactParserRegistry),
     makeContentHasher(),
+    'test',
+    new Map(),
   )
 
   return { sut, changeRepo, schemaRegistry }
@@ -238,6 +240,8 @@ describe('CompileContext', () => {
             makeStubFileReader(),
             new Map() as ArtifactParserRegistry,
             makeContentHasher(),
+            'test',
+            new Map(),
           ),
       ).not.toThrow()
     })
@@ -252,13 +256,14 @@ describe('CompileContext', () => {
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
         makeContentHasher(),
+        'test',
+        new Map(),
       )
       await expect(
         sut.execute({
           name: 'no-such-change',
           step: 'designing',
-          schemaRef: '@specd/schema-std',
-          workspaceSchemasPaths: new Map(),
+
           config: noOp,
         }),
       ).rejects.toThrow(ChangeNotFoundError)
@@ -273,13 +278,14 @@ describe('CompileContext', () => {
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
         makeContentHasher(),
+        'test',
+        new Map(),
       )
       await expect(
         sut.execute({
           name: 'my-change',
           step: 'designing',
-          schemaRef: '@specd/schema-std',
-          workspaceSchemasPaths: new Map(),
+
           config: noOp,
         }),
       ).rejects.toThrow(SchemaNotFoundError)
@@ -299,8 +305,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           contextIncludeSpecs: ['_global/*'],
           contextExcludeSpecs: [],
@@ -334,8 +339,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           contextIncludeSpecs: [],
           contextExcludeSpecs: [],
@@ -362,8 +366,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           contextIncludeSpecs: ['default:*'],
           contextExcludeSpecs: ['default:drafts/*'],
@@ -385,8 +388,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           contextIncludeSpecs: [],
           contextExcludeSpecs: [],
@@ -429,8 +431,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp, // no include patterns
         followDeps: true,
       })
@@ -466,8 +467,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           contextIncludeSpecs: [],
           contextExcludeSpecs: ['default:auth/*'], // exclude all auth — but dependsOn specs are immune
@@ -489,8 +489,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           contextIncludeSpecs: ['default:auth/login', 'default:auth/*'],
         },
@@ -530,8 +529,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
         followDeps: true,
       })
@@ -571,8 +569,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
         followDeps: true,
       })
@@ -607,8 +604,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
         followDeps: true,
       })
@@ -636,8 +632,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'implementing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
       })
 
@@ -665,8 +660,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'implementing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
       })
 
@@ -689,8 +683,7 @@ describe('CompileContext', () => {
         sut.execute({
           name: 'my-change',
           step: 'implementing',
-          schemaRef: '@specd/schema-std',
-          workspaceSchemasPaths: new Map(),
+
           config: noOp,
         }),
       ).resolves.toBeDefined()
@@ -710,8 +703,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
         activeArtifact: 'spec',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           context: [{ instruction: 'Always prefer editing existing files.' }],
         },
@@ -741,8 +733,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
         activeArtifact: 'spec',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           context: [{ file: 'specd-bootstrap.md' }],
         },
@@ -767,8 +758,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           context: [{ file: 'does-not-exist.md' }],
         },
@@ -794,8 +784,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
         activeArtifact: 'spec',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
       })
 
@@ -815,8 +804,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'implementing',
         // no activeArtifact
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
       })
 
@@ -835,8 +823,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
         activeArtifact: 'spec',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           artifactRules: {
             spec: ['All requirements must use SHALL/MUST'],
@@ -869,8 +856,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'archiving',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
       })
 
@@ -900,8 +886,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
         activeArtifact: 'spec',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
       })
 
@@ -910,8 +895,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
         activeArtifact: 'tasks',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
       })
 
@@ -944,8 +928,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           workflow: [configStep],
         },
@@ -978,8 +961,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
       })
 
@@ -1008,8 +990,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: { contextIncludeSpecs: ['default:auth/login'] },
       })
 
@@ -1070,8 +1051,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: { contextIncludeSpecs: ['default:auth/login'] },
       })
 
@@ -1097,8 +1077,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           context: [
             { file: 'AGENTS.md' },
@@ -1128,8 +1107,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           contextIncludeSpecs: ['default:auth/login'], // exact path that doesn't exist
         },
@@ -1150,8 +1128,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           contextIncludeSpecs: ['unknown-workspace:*'],
         },
@@ -1201,8 +1178,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: {
           contextIncludeSpecs: [],
           contextExcludeSpecs: [],
@@ -1273,8 +1249,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: { contextIncludeSpecs: ['default:auth/login'] },
       })
 
@@ -1316,8 +1291,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: { contextIncludeSpecs: ['default:auth/login'] },
       })
 
@@ -1339,8 +1313,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: { contextIncludeSpecs: ['default:auth/login'] },
         sections: ['rules'],
       })
@@ -1363,8 +1336,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: { contextIncludeSpecs: ['default:auth/login'] },
         sections: ['rules', 'constraints'],
       })
@@ -1435,8 +1407,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: { contextIncludeSpecs: ['default:auth/login'] },
         sections: ['rules'],
       })
@@ -1477,8 +1448,7 @@ describe('CompileContext', () => {
         name: 'my-change',
         step: 'designing',
         activeArtifact: 'spec',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: { contextIncludeSpecs: ['default:auth/login'] },
         sections: ['constraints'],
       })
@@ -1528,8 +1498,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
         followDeps: true,
         depth: 1,
@@ -1575,8 +1544,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
         followDeps: true,
       })
@@ -1614,8 +1582,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
         // followDeps omitted → false by default
       })
@@ -1647,8 +1614,7 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'implementing',
-        schemaRef: '@specd/schema-std',
-        workspaceSchemasPaths: new Map(),
+
         config: noOp,
       })
 

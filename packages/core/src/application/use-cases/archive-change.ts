@@ -17,25 +17,11 @@ import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
-import { type WorkspaceContext } from '../ports/workspace-context.js'
 
 /** Input for the {@link ArchiveChange} use case. */
-export interface ArchiveChangeInput extends WorkspaceContext {
+export interface ArchiveChangeInput {
   /** The change name to archive. */
   readonly name: string
-  /**
-   * Template variable values available to `run:` hook commands.
-   * Provided by the caller from the active config and runtime context.
-   */
-  readonly hookVariables: HookVariables
-  /**
-   * Project-level hooks for the `archiving` workflow step, resolved by the caller
-   * from `specd.yaml`. Schema hooks fire first, then project-level hooks.
-   */
-  readonly projectHooks?: {
-    readonly pre: readonly HookEntry[]
-    readonly post: readonly HookEntry[]
-  }
 }
 
 /** Result returned by a successful {@link ArchiveChange} execution. */
@@ -68,6 +54,16 @@ export class ArchiveChange {
   private readonly _git: GitAdapter
   private readonly _parsers: ArtifactParserRegistry
   private readonly _schemas: SchemaRegistry
+  private readonly _schemaRef: string
+  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
+  private readonly _projectRoot: string
+  private readonly _changesPath: string
+  private readonly _projectHooks:
+    | {
+        readonly pre: readonly HookEntry[]
+        readonly post: readonly HookEntry[]
+      }
+    | undefined
 
   /**
    * Creates a new `ArchiveChange` use case instance.
@@ -79,6 +75,13 @@ export class ArchiveChange {
    * @param git - Git adapter for resolving the actor identity
    * @param parsers - Registry of artifact format parsers
    * @param schemas - Registry for resolving schema references
+   * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
+   * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
+   * @param projectRoot - Absolute path to the project root
+   * @param changesPath - Absolute path to the changes directory
+   * @param projectHooks - Project-level hooks for the `archiving` workflow step
+   * @param projectHooks.pre - Pre-archive hook entries
+   * @param projectHooks.post - Post-archive hook entries
    */
   constructor(
     changes: ChangeRepository,
@@ -88,6 +91,14 @@ export class ArchiveChange {
     git: GitAdapter,
     parsers: ArtifactParserRegistry,
     schemas: SchemaRegistry,
+    schemaRef: string,
+    workspaceSchemasPaths: ReadonlyMap<string, string>,
+    projectRoot: string,
+    changesPath: string,
+    projectHooks?: {
+      readonly pre: readonly HookEntry[]
+      readonly post: readonly HookEntry[]
+    },
   ) {
     this._changes = changes
     this._specs = specs
@@ -96,6 +107,11 @@ export class ArchiveChange {
     this._git = git
     this._parsers = parsers
     this._schemas = schemas
+    this._schemaRef = schemaRef
+    this._workspaceSchemasPaths = workspaceSchemasPaths
+    this._projectRoot = projectRoot
+    this._changesPath = changesPath
+    this._projectHooks = projectHooks
   }
 
   /**
@@ -113,27 +129,34 @@ export class ArchiveChange {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemas.resolve(input.schemaRef, input.workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(input.schemaRef)
+    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
+    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
 
     // --- Archivable guard ---
     change.assertArchivable()
+
+    // --- Build hook variables from config-derived + runtime inputs ---
+    const workspace = change.workspaces[0] ?? 'default'
+    const hookVariables: HookVariables = {
+      project: { root: this._projectRoot },
+      change: { name: input.name, workspace, path: this._changesPath },
+    }
 
     // --- Pre-archive hooks (schema first, then project-level) ---
     const workflowStep = schema.workflowStep('archiving')
     if (workflowStep !== null) {
       for (const hook of workflowStep.hooks.pre) {
         if (hook.type !== 'run') continue
-        const result = await this._hooks.run(hook.command, input.hookVariables)
+        const result = await this._hooks.run(hook.command, hookVariables)
         if (!result.isSuccess()) {
           throw new HookFailedError(hook.command, result.exitCode(), result.stderr())
         }
       }
     }
-    if (input.projectHooks !== undefined) {
-      for (const hook of input.projectHooks.pre) {
+    if (this._projectHooks !== undefined) {
+      for (const hook of this._projectHooks.pre) {
         if (hook.type !== 'run') continue
-        const result = await this._hooks.run(hook.command, input.hookVariables)
+        const result = await this._hooks.run(hook.command, hookVariables)
         if (!result.isSuccess()) {
           throw new HookFailedError(hook.command, result.exitCode(), result.stderr())
         }
@@ -226,16 +249,16 @@ export class ArchiveChange {
     if (workflowStep !== null) {
       for (const hook of workflowStep.hooks.post) {
         if (hook.type !== 'run') continue
-        const result = await this._hooks.run(hook.command, input.hookVariables)
+        const result = await this._hooks.run(hook.command, hookVariables)
         if (!result.isSuccess()) {
           postHookFailures.push(hook.command)
         }
       }
     }
-    if (input.projectHooks !== undefined) {
-      for (const hook of input.projectHooks.post) {
+    if (this._projectHooks !== undefined) {
+      for (const hook of this._projectHooks.post) {
         if (hook.type !== 'run') continue
-        const result = await this._hooks.run(hook.command, input.hookVariables)
+        const result = await this._hooks.run(hook.command, hookVariables)
         if (!result.isSuccess()) {
           postHookFailures.push(hook.command)
         }

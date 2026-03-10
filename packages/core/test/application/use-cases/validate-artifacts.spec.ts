@@ -54,8 +54,6 @@ function makeChangeWithArtifacts(
   })
 }
 
-const defaultSchemasPaths: ReadonlyMap<string, string> = new Map()
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -70,13 +68,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
       await expect(
         uc.execute({
           name: 'missing',
           specPath: 'default:auth',
-          schemaRef: 'test',
-          workspaceSchemasPaths: defaultSchemasPaths,
         }),
       ).rejects.toThrow(ChangeNotFoundError)
     })
@@ -92,13 +90,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
       await expect(
         uc.execute({
           name: 'c',
           specPath: 'default:billing/invoices',
-          schemaRef: 'test',
-          workspaceSchemasPaths: defaultSchemasPaths,
         }),
       ).rejects.toThrow(SpecNotInChangeError)
     })
@@ -114,13 +112,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
       await expect(
         uc.execute({
           name: 'c',
           specPath: 'default:auth',
-          schemaRef: 'bad-ref',
-          workspaceSchemasPaths: defaultSchemasPaths,
         }),
       ).rejects.toThrow(SchemaNotFoundError)
     })
@@ -139,13 +137,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       expect(result.passed).toBe(false)
@@ -171,13 +169,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       expect(result.failures.some((f) => f.artifactId === 'design')).toBe(false)
@@ -195,13 +193,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       expect(result.failures.some((f) => f.artifactId === 'design')).toBe(false)
@@ -244,13 +242,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       expect(
@@ -296,13 +294,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       expect(
@@ -346,13 +344,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       expect(
@@ -399,13 +397,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       // After invalidation, change should be back in designing state
@@ -454,13 +452,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       const saved = repo.store.get('c')
@@ -506,13 +504,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       const saved = repo.store.get('c')
@@ -549,13 +547,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       const saved = repo.store.get('c')
@@ -596,13 +594,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       const saved = repo.store.get('c')
@@ -647,13 +645,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(parser),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       const saved = repo.store.get('c')
@@ -701,13 +699,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(parser),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       const specFailures = result.failures.filter((f) => f.artifactId === 'specs')
@@ -748,13 +746,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(parser),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       expect(result.passed).toBe(true)
@@ -810,13 +808,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(parser, yamlParser),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       expect(result.passed).toBe(false)
@@ -855,13 +853,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       expect(result.passed).toBe(true)
@@ -906,13 +904,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       expect(saveSpy).toHaveBeenCalled()
@@ -948,13 +946,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       expect(result.passed).toBe(true)
@@ -972,13 +970,13 @@ describe('ValidateArtifacts', () => {
         makeParsers(),
         makeGitAdapter(),
         makeContentHasher(),
+        'test',
+        new Map(),
       )
 
       const result = await uc.execute({
         name: 'c',
         specPath: 'default:auth',
-        schemaRef: 'test',
-        workspaceSchemasPaths: defaultSchemasPaths,
       })
 
       expect(result.passed).toBe(false)

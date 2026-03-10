@@ -123,29 +123,6 @@ describe('change approve spec', () => {
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
   })
-
-  it('passes schemaRef and workspaceSchemasPaths to use case', async () => {
-    const { kernel } = setup()
-    kernel.specs.approveSpec.execute.mockResolvedValue(undefined)
-    captureStdout()
-
-    const program = makeProgram()
-    registerChangeApprove(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'approve',
-      'spec',
-      'my-change',
-      '--reason',
-      'ok',
-    ])
-
-    const call = kernel.specs.approveSpec.execute.mock.calls[0]![0]
-    expect(call.schemaRef).toBe('@specd/schema-std')
-    expect(call.workspaceSchemasPaths).toBeInstanceOf(Map)
-  })
 })
 
 // ---------------------------------------------------------------------------

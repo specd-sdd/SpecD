@@ -43,6 +43,8 @@ export interface FsValidateArtifactsOptions {
   readonly nodeModulesPaths: readonly string[]
   /** Project root directory for resolving relative schema paths. */
   readonly configDir: string
+  readonly schemaRef: string
+  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
 }
 
 /**
@@ -93,6 +95,12 @@ export function createValidateArtifacts(
         ),
       ]),
     )
+    const workspaceSchemasPaths = new Map<string, string>()
+    for (const ws of config.workspaces) {
+      if (ws.schemasPath !== null) {
+        workspaceSchemasPaths.set(ws.name, ws.schemasPath)
+      }
+    }
     return createValidateArtifacts(
       {
         workspace: defaultWs.name,
@@ -109,6 +117,8 @@ export function createValidateArtifacts(
           ...(kernelOpts?.extraNodeModulesPaths ?? []),
         ],
         configDir: config.projectRoot,
+        schemaRef: config.schemaRef,
+        workspaceSchemasPaths,
       },
     )
   }
@@ -125,5 +135,14 @@ export function createValidateArtifacts(
   const parsers = createArtifactParserRegistry()
   const git = new GitCLIAdapter()
   const hasher = new NodeContentHasher()
-  return new ValidateArtifacts(changeRepo, opts.specRepositories, schemas, parsers, git, hasher)
+  return new ValidateArtifacts(
+    changeRepo,
+    opts.specRepositories,
+    schemas,
+    parsers,
+    git,
+    hasher,
+    opts.schemaRef,
+    opts.workspaceSchemasPaths,
+  )
 }
