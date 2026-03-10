@@ -541,6 +541,151 @@ context:
     })
   })
 
+  // ---------------------------------------------------------------------------
+  // Requirement: contextIncludeSpecs / contextExcludeSpecs pattern validation
+  // ---------------------------------------------------------------------------
+
+  describe('Requirement: Invalid pattern syntax aborts startup', () => {
+    it('accepts bare wildcard pattern', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - '*'
+`),
+      )
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+      expect(config.contextIncludeSpecs).toEqual(['*'])
+    })
+
+    it('accepts workspace:* pattern', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - 'billing:*'
+`),
+      )
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+      expect(config.contextIncludeSpecs).toEqual(['billing:*'])
+    })
+
+    it('accepts prefix/* pattern', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - '_global/*'
+`),
+      )
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+      expect(config.contextIncludeSpecs).toEqual(['_global/*'])
+    })
+
+    it('accepts workspace:prefix/* pattern', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - 'default:auth/*'
+`),
+      )
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+      expect(config.contextIncludeSpecs).toEqual(['default:auth/*'])
+    })
+
+    it('accepts exact spec path', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextExcludeSpecs:
+  - 'auth/login'
+`),
+      )
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+      expect(config.contextExcludeSpecs).toEqual(['auth/login'])
+    })
+
+    it('rejects wildcard in middle of path segment', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - 'auth/lo*in'
+`),
+      )
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/disallowed position/)
+    })
+
+    it('rejects wildcard not preceded by /', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - 'auth*'
+`),
+      )
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/disallowed position/)
+    })
+
+    it('rejects multiple wildcards', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - '*/*'
+`),
+      )
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/disallowed position/)
+    })
+
+    it('rejects empty pattern', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextIncludeSpecs:
+  - ''
+`),
+      )
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/invalid pattern/)
+    })
+
+    it('validates workspace-level patterns too', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    contextIncludeSpecs:
+      - 'auth*'
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/disallowed position/)
+    })
+  })
+
   describe('Requirement: Storage paths must remain within repo root', () => {
     it('throws ConfigValidationError when a storage path resolves outside the git root', async () => {
       // Create a fake git repo so findGitRoot returns tmpDir
