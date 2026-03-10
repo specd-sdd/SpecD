@@ -4,7 +4,8 @@ import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
-import { type ArtifactParserRegistry, DeltaApplicationError } from '../ports/artifact-parser.js'
+import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
+import { DeltaApplicationError } from '../../domain/errors/delta-application-error.js'
 import { type GitAdapter } from '../ports/git-adapter.js'
 import {
   type GitIdentity,
