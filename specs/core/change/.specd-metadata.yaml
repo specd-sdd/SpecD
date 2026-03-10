@@ -23,7 +23,7 @@ dependsOn:
   - 'core:core/spec-id-format'
   - 'core:core/workspace'
 contentHashes:
-  'spec.md': 'sha256:e3a07465cd045fbe224bd428a1ff889382de597904d84d6123b9d4001570b718'
+  'spec.md': 'sha256:a8b39116240374f7df4ab48f07662e8e8f1536e7aed8e6a76a96be9939d7c199'
   'verify.md': 'sha256:68552ba852709bf76460237f33cbfe20bc1a2e97538d276c0b8a98c3b7493139'
 rules:
   - requirement: 'Identity'
@@ -88,8 +88,9 @@ rules:
   - requirement: 'Schema version'
     rules:
       - 'The created event records schemaName and schemaVersion of the schema active at creation time.'
-      - 'If the active schema differs from the recorded version at load time, a warning is emitted but the change remains fully usable.'
-      - 'Archiving with a schema version mismatch is allowed.'
+      - 'A schemaName mismatch (different schema name) indicates structural incompatibility; use cases (ArchiveChange, ValidateArtifacts, CompileContext) must throw SchemaMismatchError when schema.name() !== change.schemaName.'
+      - 'A schemaVersion mismatch within the same schema name is advisory; a warning is emitted but the change remains fully usable.'
+      - 'Archiving with a schemaVersion mismatch is allowed; a schemaName mismatch throws SchemaMismatchError.'
   - requirement: 'Drafting and discarding'
     rules:
       - 'Draft moves a change from changes/ to drafts/, appending a drafted event with mandatory by identity, at timestamp, and optional reason.'
@@ -441,15 +442,21 @@ scenarios:
   - requirement: 'Schema version'
     name: 'Schema version mismatch warns'
     when:
-      - 'a Change is loaded and the active schema version differs from the schemaVersion recorded in the created event'
+      - 'a Change is loaded and the active schemaVersion differs from the schemaVersion recorded in the created event but the schemaName matches'
     then:
       - 'specd emits a warning but the change remains fully usable'
   - requirement: 'Schema version'
-    name: 'Schema mismatch does not block archive'
+    name: 'Schema version mismatch does not block archive'
     when:
-      - 'a Change with a schema version mismatch is in archivable state'
+      - 'a Change with a schemaVersion mismatch (same schemaName) is in archivable state'
     then:
-      - 'archiving proceeds normally because the mismatch warning is advisory only'
+      - 'archiving proceeds normally because the version mismatch warning is advisory only'
+  - requirement: 'Schema version'
+    name: 'Schema name mismatch throws SchemaMismatchError'
+    when:
+      - 'a use case (ArchiveChange, ValidateArtifacts, or CompileContext) detects schema.name() differs from change.schemaName'
+    then:
+      - 'SchemaMismatchError is thrown before any work is performed'
   - requirement: 'Drafting and discarding'
     name: 'Draft requires identity'
     when:

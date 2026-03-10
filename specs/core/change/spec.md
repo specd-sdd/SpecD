@@ -135,7 +135,11 @@ Event types:
 
 ### Requirement: Schema version
 
-The `created` event records the `schemaName` and `schemaVersion` of the schema active at creation time. When the change is loaded, specd compares these values against the currently active schema. If they differ, a warning is emitted. The change remains fully usable — the warning is advisory. Archiving with a schema version mismatch is allowed.
+The `created` event records the `schemaName` and `schemaVersion` of the schema active at creation time.
+
+A **`schemaName` mismatch** (e.g. `schema-std` → `schema-openspec`) indicates structural incompatibility — different artifact types, formats, delta rules, and validations. When a use case (`ArchiveChange`, `ValidateArtifacts`, `CompileContext`) detects that `schema.name() !== change.schemaName`, it must throw `SchemaMismatchError` before performing any work. This is an error, not a warning.
+
+A **`schemaVersion` mismatch** within the same schema name is advisory. A warning is emitted but the change remains fully usable. Archiving with a `schemaVersion` mismatch is allowed; a `schemaName` mismatch throws `SchemaMismatchError`.
 
 ### Requirement: Drafting and discarding
 

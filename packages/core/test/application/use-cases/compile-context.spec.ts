@@ -6,6 +6,7 @@ import {
 } from '../../../src/application/use-cases/compile-context.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
+import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { Schema } from '../../../src/domain/value-objects/schema.js'
@@ -43,10 +44,29 @@ function makeChange(
   opts: {
     specIds?: string[]
     artifacts?: ChangeArtifact[]
+    schemaName?: string
   } = {},
 ): Change {
   const { specIds = ['default:auth/login'], artifacts = [] } = opts
+  const createdAt = new Date('2024-01-15')
+  const workspaces = [
+    ...new Set(
+      specIds.map((id) => {
+        const c = id.indexOf(':')
+        return c >= 0 ? id.slice(0, c) : 'default'
+      }),
+    ),
+  ]
   const events: ChangeEvent[] = [
+    {
+      type: 'created',
+      at: createdAt,
+      by: testActor,
+      workspaces,
+      specIds,
+      schemaName: opts.schemaName ?? '@specd/schema-std',
+      schemaVersion: 1,
+    },
     {
       type: 'transitioned',
       from: 'drafting',
@@ -57,15 +77,8 @@ function makeChange(
   ]
   const change = new Change({
     name,
-    createdAt: new Date('2024-01-15'),
-    workspaces: [
-      ...new Set(
-        specIds.map((id) => {
-          const c = id.indexOf(':')
-          return c >= 0 ? id.slice(0, c) : 'default'
-        }),
-      ),
-    ],
+    createdAt,
+    workspaces,
     specIds,
     history: events,
   })
@@ -289,6 +302,21 @@ describe('CompileContext', () => {
           config: noOp,
         }),
       ).rejects.toThrow(SchemaNotFoundError)
+    })
+
+    it('throws SchemaMismatchError when active schema name differs from change schema name', async () => {
+      const change = makeChange('my-change', { schemaName: 'schema-a' })
+      const schema = new Schema('schema-b', 1, [], [])
+
+      const { sut } = makeSut({ change, schema })
+
+      await expect(
+        sut.execute({
+          name: 'my-change',
+          step: 'designing',
+          config: noOp,
+        }),
+      ).rejects.toThrow(SchemaMismatchError)
     })
   })
 
@@ -1155,6 +1183,15 @@ describe('CompileContext', () => {
         workspaces: ['default'],
         specIds: ['billing/payments'], // first segment is 'billing', but workspace is NOT active
         history: [
+          {
+            type: 'created',
+            at: new Date(),
+            by: testActor,
+            workspaces: ['default'],
+            specIds: ['billing/payments'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
           {
             type: 'transitioned',
             from: 'drafting',

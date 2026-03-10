@@ -2,6 +2,7 @@ import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { parseMetadata } from './_shared/parse-metadata.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
+import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
@@ -162,6 +163,11 @@ export class CompileContext {
 
     const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
     if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+
+    // --- Schema name guard ---
+    if (schema.name() !== change.schemaName) {
+      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
+    }
 
     const warnings: ContextWarning[] = []
 

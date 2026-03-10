@@ -24,7 +24,7 @@ dependsOn:
   - 'core:core/spec-id-format'
   - 'core:core/workspace'
 contentHashes:
-  'spec.md': 'sha256:8ce579d6ed4cbea6aef6b2732791940cc48bff92d709a6eaa851dd8079e00394'
+  'spec.md': 'sha256:c9f9d24346814f3e77d8ba6edc575d0d4d6962451a5c01591cb77882471ca27a'
   'verify.md': 'sha256:5558daf7218656254520ba0a227d04060d1a14f58311cc538bb91ef076f9c346'
 rules:
   - requirement: 'Ports and constructor'
@@ -43,6 +43,11 @@ rules:
       - 'followDeps when true performs dependsOn transitive traversal; when false or absent, traversal is skipped.'
       - 'depth limits dependsOn traversal to N levels deep (1 = direct dependencies only); only valid when followDeps is true; when absent traversal is unlimited.'
       - 'sections restricts metadata content rendered per spec to the listed sections (rules, constraints, scenarios); when absent all available sections are rendered. sections applies only to spec content and does not affect schema instructions, delta context, artifact rules, step hooks, or available steps.'
+  - requirement: 'Schema name guard'
+    rules:
+      - 'After resolving the schema from config, CompileContext must compare schema.name() with change.schemaName.'
+      - 'If they differ, CompileContext must throw SchemaMismatchError.'
+      - 'The schema name guard must happen before any context collection or instruction assembly.'
   - requirement: 'Workspace resolution for spec IDs'
     rules:
       - 'Explicit workspace qualifier (e.g. billing:auth/login) resolves to the named SpecRepository in the map.'

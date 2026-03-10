@@ -126,17 +126,33 @@ export function makeGitAdapter(overrides: Partial<GitAdapter> = {}): GitAdapter 
 
 /**
  * Builds a minimal `Change` in `drafting` state for use in tests.
+ *
+ * Includes a `created` event with `schemaName: 'test-schema'` by default,
+ * matching the default name used by `makeSchema()`.
  */
 export function makeChange(
   name: string,
-  opts: { workspaces?: string[]; specIds?: string[] } = {},
+  opts: { workspaces?: string[]; specIds?: string[]; schemaName?: string } = {},
 ): Change {
+  const workspaces = opts.workspaces ?? ['default']
+  const specIds = opts.specIds ?? ['auth/login']
+  const createdAt = new Date('2024-01-01T00:00:00Z')
   return new Change({
     name,
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    workspaces: opts.workspaces ?? ['default'],
-    specIds: opts.specIds ?? ['auth/login'],
-    history: [],
+    createdAt,
+    workspaces,
+    specIds,
+    history: [
+      {
+        type: 'created',
+        at: createdAt,
+        by: { name: 'Test User', email: 'test@example.com' },
+        workspaces,
+        specIds,
+        schemaName: opts.schemaName ?? 'test-schema',
+        schemaVersion: 1,
+      },
+    ],
   })
 }
 
