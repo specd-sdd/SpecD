@@ -121,4 +121,10 @@
 
 ### Requirement: Change manifest format
 
-See [`specs/core/change-manifest/verify.md`](../change-manifest/verify.md) for manifest format and schema version verification scenarios.
+#### Scenario: Manifest structure matches specification
+
+- **GIVEN** an active change with history events
+- **WHEN** the change is persisted to disk
+- **THEN** `manifest.json` contains the fields and structure defined in the change-manifest spec
+
+> Full scenarios are in [`specs/core/change-manifest/verify.md`](../change-manifest/verify.md).

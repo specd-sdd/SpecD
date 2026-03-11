@@ -146,12 +146,12 @@ describe('strictSpecMetadataSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects scenarios missing when', () => {
+  it('accepts scenarios missing when', () => {
     const result = strictSpecMetadataSchema.safeParse({
       ...VALID_BASE,
       scenarios: [{ requirement: 'X', name: 'Y', then: ['outcome'] }],
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
   it('rejects scenarios missing then', () => {

@@ -219,4 +219,10 @@
 
 ### Requirement: Delta structural validation
 
-Scenarios for `deltaValidations` rules are in [`specs/core/schema-format/verify.md` — Requirement: Delta validation rules](../schema-format/verify.md).
+#### Scenario: deltaValidations rules enforced on delta entries
+
+- **GIVEN** a schema with `deltaValidations` rules declared on an artifact
+- **WHEN** a delta entry for that artifact violates a `deltaValidations` rule
+- **THEN** validation fails with the appropriate error
+
+> Full scenarios for `deltaValidations` rules are in [`specs/core/schema-format/verify.md` — Requirement: Delta validation rules](../schema-format/verify.md).

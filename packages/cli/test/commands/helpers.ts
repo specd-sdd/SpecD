@@ -149,9 +149,8 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
       }),
     },
     validate: { execute: vi.fn() },
-    inferSections: {
-      execute: vi.fn().mockResolvedValue({ rules: [], constraints: [], scenarios: [] }),
-    },
+    invalidateMetadata: { execute: vi.fn() },
+    generateMetadata: { execute: vi.fn() },
     getContext: {
       execute: vi.fn().mockResolvedValue({ entries: [], warnings: [] }),
     },

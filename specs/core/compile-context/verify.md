@@ -165,19 +165,19 @@
 - **AND** `CompileContext.execute` is called twice — once with `activeArtifact: 'spec'` and once with `activeArtifact: 'tasks'`
 - **THEN** both calls include the `designing` pre-hook instruction — hooks are part of the step context, not scoped to a specific artifact
 
-#### Scenario: contextSections extracted from context specs
+#### Scenario: metadataExtraction used as fallback for stale/absent metadata
 
-- **GIVEN** the schema declares `artifacts[specs].contextSections: [{ selector: { type: section, matches: '^Requirements$' }, role: rules }]`
+- **GIVEN** the schema declares `metadataExtraction.rules: [{ artifact: specs, extractor: { selector: { type: section, matches: '^Requirements$' }, groupBy: label, extract: content } }]`
 - **AND** `auth/jwt/spec.md` is in the context set and has a `## Requirements` section
 - **WHEN** `CompileContext.execute` is called with stale or absent metadata for `auth/jwt`
-- **THEN** `result.instructionBlock` includes the serialized content of the `Requirements` section from `auth/jwt/spec.md`, labelled as `rules`
+- **THEN** `result.instructionBlock` includes extracted rules content from `auth/jwt/spec.md`
 
-#### Scenario: Missing contextSection silently skipped
+#### Scenario: metadataExtraction extractor matching no nodes silently skipped
 
-- **GIVEN** `artifacts[specs].contextSections: [{ selector: { type: section, matches: '^Examples$' } }]`
+- **GIVEN** the schema declares a `metadataExtraction` extractor with a selector matching `'^Examples$'`
 - **AND** a context spec has no section matching `Examples`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** no error is thrown and no warning is emitted for the missing section
+- **THEN** no error is thrown and no content is produced for that field
 
 #### Scenario: instruction hooks included but run hooks excluded
 

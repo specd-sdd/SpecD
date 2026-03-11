@@ -27,7 +27,7 @@ When none of `--rules`, `--constraints`, or `--scenarios` are passed, all availa
 
 ### Requirement: Behaviour
 
-The command reads the spec's `.specd-metadata.yaml` and renders the requested sections. If the metadata is absent or stale (content hashes do not match current artifact files), the command falls back to extracting the relevant `contextSections` from the spec's raw artifact files and emits a `warning:` to stderr.
+The command reads the spec's `.specd-metadata.yaml` and renders the requested sections. If the metadata is absent or stale (content hashes do not match current artifact files), the command falls back to the schema's `metadataExtraction` declarations to extract content deterministically from the spec's raw artifact files and emits a `warning:` to stderr.
 
 When `--follow-deps` is passed, the command recursively follows the `dependsOn` entries in each spec's `.specd-metadata.yaml`, applying the same section filtering and stale-fallback logic to each dependency. Cycles are detected and silently broken. The root spec is always listed first; dependencies follow in traversal order.
 

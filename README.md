@@ -90,17 +90,17 @@ Teams with microservice architectures can manage cross-cutting specs (authentica
 
 ## Packages
 
-| Package                  | Description                                                                                      | Status             |
-| ------------------------ | ------------------------------------------------------------------------------------------------ | ------------------ |
-| `@specd/core`            | Domain library: entities, value objects, use cases, ports, composition, infrastructure adapters. | In progress (real) |
-| `@specd/cli`             | CLI adapter around `@specd/core` with command registration and formatting/output modes.          | In progress (real) |
-| `@specd/mcp`             | MCP server adapter package.                                                                      | Scaffolded         |
-| `@specd/skills`          | Skill registry API used by plugins and CLI skill commands.                                       | Scaffolded/empty   |
-| `@specd/schema-std`      | Standard SpecD schema package with `schema.yaml` and template files.                             | In progress (real) |
-| `@specd/schema-openspec` | OpenSpec-compatible schema package.                                                              | Scaffolded         |
-| `@specd/plugin-claude`   | Claude plugin package.                                                                           | Scaffolded         |
-| `@specd/plugin-copilot`  | GitHub Copilot plugin package.                                                                   | Scaffolded         |
-| `@specd/plugin-codex`    | OpenAI Codex plugin package.                                                                     | Scaffolded         |
+| Package                  | Description                                                                                      | Status     |
+| ------------------------ | ------------------------------------------------------------------------------------------------ | ---------- |
+| `@specd/core`            | Domain library: entities, value objects, use cases, ports, composition, infrastructure adapters. | Functional |
+| `@specd/cli`             | CLI adapter around `@specd/core` with command registration and formatting/output modes.          | Functional |
+| `@specd/mcp`             | MCP server adapter package.                                                                      | Scaffolded |
+| `@specd/skills`          | Skill registry API used by plugins and CLI skill commands.                                       | Scaffolded |
+| `@specd/schema-std`      | Standard SpecD schema package with `schema.yaml` and template files.                             | Functional |
+| `@specd/schema-openspec` | OpenSpec-compatible schema package.                                                              | Scaffolded |
+| `@specd/plugin-claude`   | Claude plugin package.                                                                           | Scaffolded |
+| `@specd/plugin-copilot`  | GitHub Copilot plugin package.                                                                   | Scaffolded |
+| `@specd/plugin-codex`    | OpenAI Codex plugin package.                                                                     | Scaffolded |
 
 ## Getting started (workspace)
 

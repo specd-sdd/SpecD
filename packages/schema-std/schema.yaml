@@ -77,7 +77,7 @@ artifacts:
       Every `### Requirement:` heading in `content` must use exactly three hashtags.
     validations:
       - type: section
-        matches: '^Purpose$'
+        matches: '^Purpose$|^Overview$'
         required: true
       - type: section
         matches: '^Requirements$'
@@ -86,17 +86,6 @@ artifacts:
           - type: section
             matches: '^Requirement:'
             required: true
-    contextSections:
-      - selector:
-          type: section
-          matches: '^Requirements$'
-        role: rules
-        contextTitle: Spec Requirements
-      - selector:
-          type: section
-          matches: '^Constraints$'
-        role: constraints
-
   # ── verify ─────────────────────────────────────────────────────────────────
   - id: verify
     scope: spec
@@ -237,6 +226,69 @@ artifacts:
     taskCompletionCheck:
       incompletePattern: '^\s*-\s+\[ \]'
       completePattern: '^\s*-\s+\[x\]'
+
+metadataExtraction:
+  title:
+    artifact: specs
+    extractor:
+      selector: { type: section, level: 1 }
+      extract: label
+  description:
+    artifact: specs
+    extractor:
+      selector: { type: section, matches: '^Overview$|^Purpose$' }
+      extract: content
+  dependsOn:
+    artifact: specs
+    extractor:
+      selector: { type: section, matches: '^Spec Dependencies$' }
+      extract: content
+      capture: '\[.*?\]\(([^)]+)\)'
+      transform: resolveSpecPath
+  rules:
+    - artifact: specs
+      extractor:
+        selector:
+          type: section
+          matches: '^Requirement:'
+          parent: { type: section, matches: '^Requirements$' }
+        groupBy: label
+        strip: '^Requirement:\s*'
+        extract: content
+  constraints:
+    - artifact: specs
+      extractor:
+        selector:
+          type: list-item
+          parent: { type: section, matches: '^Constraints$' }
+        extract: label
+  scenarios:
+    - artifact: verify
+      extractor:
+        selector:
+          type: section
+          matches: '^Scenario:'
+          parent: { type: section, matches: '^Requirement:' }
+        fields:
+          name: { from: label, strip: '^Scenario:\s*' }
+          requirement: { from: parentLabel, strip: '^Requirement:\s*' }
+          given:
+            childSelector: { type: list-item, matches: '^GIVEN\b' }
+            capture: '^GIVEN\s+(.+)'
+            followSiblings: '^(?:AND|OR)\b'
+          when:
+            childSelector: { type: list-item, matches: '^WHEN\b' }
+            capture: '^WHEN\s+(.+)'
+            followSiblings: '^(?:AND|OR)\b'
+          then:
+            childSelector: { type: list-item, matches: '^THEN\b' }
+            capture: '^THEN\s+(.+)'
+            followSiblings: '^(?:AND|OR)\b'
+  context:
+    - artifact: specs
+      extractor:
+        selector: { type: section, matches: '^Overview$|^Purpose$' }
+        extract: content
 
 workflow:
   - step: designing

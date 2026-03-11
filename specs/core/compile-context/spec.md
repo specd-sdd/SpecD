@@ -110,7 +110,7 @@ If the step is not available (one or more required artifacts are neither `comple
 
 5. **Spec content** — for each spec in the collected context set, include its content using the following strategy. When `sections` is present, only the listed sections are rendered; when absent, all available sections are included (description + rules + constraints + scenarios).
    - If `.specd-metadata.yaml` exists and is fresh: include the requested sections from the metadata. This is the compact, machine-optimised representation.
-   - If metadata is absent or stale: fall back to extracting nodes declared in the artifact's `contextSections[]` from the spec's artifact files (loaded via `SpecRepository.artifact()`). For each entry: parse the artifact file via `ArtifactParser.parse()`, apply the `selector` to find matching nodes, extract content per `extract` (`content` → `parser.renderSubtree(node)`; `label` → `node.label`; `both` → label + serialized content), and inject the result labelled with `role` and titled with `contextTitle` (falling back to `node.label`). Only entries whose `role` matches a requested section are included when `sections` is present. Entries whose selector matches no node are silently skipped. Emit a staleness warning for this spec.
+   - If metadata is absent or stale: fall back to the schema's `metadataExtraction` declarations. For each declared metadata field (rules, constraints, scenarios, etc.), the extraction engine loads the referenced artifact from `SpecRepository`, parses it via `ArtifactParser.parse()`, runs the declared extractors against the AST, and produces the same structured output as fresh metadata would. Only sections matching the `sections` filter are included when present. Extractors whose selectors match no nodes are silently skipped. Emit a staleness warning for this spec.
 
 6. **Step hooks** — for the requested step, include all `instruction:` entries from the matching workflow step's `hooks.pre` and `hooks.post`, in declaration order (schema hooks before project-level hooks). Each entry is prefixed with `[pre]` or `[post]` according to its hook list. `run:` entries are not included — they are executed at archive time, not injected as AI context.
 
@@ -155,7 +155,7 @@ If a pattern or `dependsOn` entry references a workspace name that has no corres
 - `depth` is only meaningful when `followDeps: true`; it limits traversal levels (1 = direct deps only)
 - `sections` applies only to spec content rendering; schema instructions, delta context, artifact rules, step hooks, and available steps are unaffected
 - Cycle detection is mandatory — cycles in `dependsOn` must not cause infinite loops
-- Metadata-based content (fresh `.specd-metadata.yaml`) is always preferred; the `contextSections` fallback is only used when metadata is absent or stale
+- Metadata-based content (fresh `.specd-metadata.yaml`) is always preferred; the `metadataExtraction` fallback is only used when metadata is absent or stale
 
 ## Examples
 
@@ -214,8 +214,8 @@ const result = await compileContext.execute({
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `effectiveStatus`, active workspaces
 - [`specs/core/config/spec.md`](../config/spec.md) — 5-step context spec resolution, include/exclude patterns, workspace-level patterns, `artifactRules`, workflow hooks
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal, staleness detection
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `contextSections` (fallback path), `workflow`, `instruction`, `delta`, `format`, `deltaInstruction`
+- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `metadataExtraction` (fallback path), `workflow`, `instruction`, `delta`, `format`, `deltaInstruction`
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `deltaInstructions()`, `outline()`
-- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `contextSections[]`
+- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `metadataExtraction` extractors
 - [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds`
 - [`specs/core/workspace/spec.md`](../workspace/spec.md) — active workspace determination, workspace-level context patterns, port-per-workspace pattern

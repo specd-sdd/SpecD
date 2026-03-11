@@ -4,6 +4,7 @@ import {
   type DeltaEntry,
 } from '../../../application/ports/artifact-parser.js'
 import { DeltaApplicationError } from '../../../domain/errors/delta-application-error.js'
+import { nodeMatches } from '../../../domain/services/selector-matching.js'
 import { type Selector } from '../../../domain/value-objects/selector.js'
 
 /**
@@ -21,22 +22,6 @@ function pathsEqual(a: readonly number[], b: readonly number[]): boolean {
   return true
 }
 
-/**
- * Returns `true` if `pattern` is safe to compile as a `RegExp`.
- *
- * Rejects patterns longer than 500 characters and patterns containing nested
- * quantifiers — the primary vector for ReDoS (catastrophic backtracking).
- *
- * @param pattern - The raw pattern string to inspect
- * @returns Whether the pattern is safe to use with `new RegExp()`
- */
-function isSafePattern(pattern: string): boolean {
-  if (pattern.length > 500) return false
-  // Detect nested quantifiers: e.g. (a+)+ or [a-z]* followed by +
-  if (/([+*?])\{?\d*,?\d*\}?\s*[+*?]|\(([^)]*[+*?][^)]*)\)[+*?]/.test(pattern)) return false
-  return true
-}
-
 /** Internal context for a resolved node. */
 interface NodeCtx {
   node: ArtifactNode
@@ -46,102 +31,20 @@ interface NodeCtx {
 }
 
 /**
- * Returns `true` if the node's key-value pairs satisfy every entry in the `where` map.
- *
- * @param node - The candidate node (typically a sequence-item or array-item)
- * @param where - A map of key names to regex patterns that must all match
- * @returns Whether all `where` conditions are satisfied
- */
-function matchesWhere(node: ArtifactNode, where: Readonly<Record<string, string>>): boolean {
-  // The node is a sequence-item or array-item; look at its first child (mapping/object)
-  const firstChild = node.children?.[0]
-  if (!firstChild) return false
-
-  // Get the key-value pairs from the child
-  const pairs = firstChild.children ?? []
-
-  for (const [key, pattern] of Object.entries(where)) {
-    const pair = pairs.find((p) => p.label === key)
-    if (!pair) return false
-    const value = typeof pair.value === 'string' ? pair.value : String(pair.value ?? '')
-    if (isSafePattern(pattern)) {
-      try {
-        const regex = new RegExp(pattern, 'i')
-        if (!regex.test(value)) return false
-      } catch {
-        if (!value.toLowerCase().includes(pattern.toLowerCase())) return false
-      }
-    } else {
-      if (!value.toLowerCase().includes(pattern.toLowerCase())) return false
-    }
-  }
-  return true
-}
-
-/**
  * Returns `true` if the node context satisfies all criteria in the selector.
+ *
+ * Delegates core matching (type, matches, contains, where, parent, level) to the
+ * consolidated {@link nodeMatches} domain service. Adds delta-specific `index`
+ * semantics: in deltas, `selector.index` means "position within parent", not
+ * "Nth match in the result set".
  *
  * @param ctx - The node context containing the node and its position in the tree
  * @param sel - The selector to match against
  * @returns Whether the node matches the selector
  */
-function matchesSelector(ctx: NodeCtx, sel: Selector): boolean {
-  if (ctx.node.type !== sel.type) return false
-
-  if (sel.matches !== undefined) {
-    const label = typeof ctx.node.label === 'string' ? ctx.node.label : ''
-    if (isSafePattern(sel.matches)) {
-      try {
-        const regex = new RegExp(sel.matches, 'i')
-        if (!regex.test(label)) return false
-      } catch {
-        if (!label.toLowerCase().includes(sel.matches.toLowerCase())) return false
-      }
-    } else {
-      if (!label.toLowerCase().includes(sel.matches.toLowerCase())) return false
-    }
-  }
-
-  if (sel.contains !== undefined) {
-    const value =
-      typeof ctx.node.value === 'string'
-        ? ctx.node.value
-        : ctx.node.children
-          ? ctx.node.children.map((c) => (typeof c.value === 'string' ? c.value : '')).join('\n')
-          : String(ctx.node.value ?? '')
-    if (isSafePattern(sel.contains)) {
-      try {
-        const regex = new RegExp(sel.contains, 'i')
-        if (!regex.test(value)) return false
-      } catch {
-        if (!value.toLowerCase().includes(sel.contains.toLowerCase())) return false
-      }
-    } else {
-      if (!value.toLowerCase().includes(sel.contains.toLowerCase())) return false
-    }
-  }
-
-  if (sel.index !== undefined) {
-    if (ctx.indexInParent !== sel.index) return false
-  }
-
-  if (sel.where !== undefined) {
-    if (!matchesWhere(ctx.node, sel.where)) return false
-  }
-
-  if (sel.parent !== undefined) {
-    // The nearest ancestor must match the parent selector
-    // Build approximate contexts for ancestors
-    const ancestorCtxs: NodeCtx[] = ctx.ancestors.map((node, i) => ({
-      node,
-      parent: i > 0 ? ctx.ancestors[i - 1]! : null,
-      indexInParent: 0,
-      ancestors: ctx.ancestors.slice(0, i),
-    }))
-    const found = ancestorCtxs.some((a) => matchesSelector(a, sel.parent!))
-    if (!found) return false
-  }
-
+function deltaSelectorMatches(ctx: NodeCtx, sel: Selector): boolean {
+  if (!nodeMatches(ctx.node, sel, ctx.ancestors)) return false
+  if (sel.index !== undefined && ctx.indexInParent !== sel.index) return false
   return true
 }
 
@@ -155,7 +58,7 @@ function matchesSelector(ctx: NodeCtx, sel: Selector): boolean {
 export function resolveNodes(root: ArtifactNode, selector: Selector): NodeCtx[] {
   const all: NodeCtx[] = []
   walkTree(root, null, 0, [], all)
-  return all.filter((ctx) => matchesSelector(ctx, selector))
+  return all.filter((ctx) => deltaSelectorMatches(ctx, selector))
 }
 
 /**
@@ -220,7 +123,7 @@ function walkTreeForPaths(
 function getPathsMatchingSelector(root: ArtifactNode, selector: Selector): number[][] {
   const all: Array<{ ctx: NodeCtx; path: number[] }> = []
   walkTreeForPaths(root, [], [], all)
-  return all.filter(({ ctx }) => matchesSelector(ctx, selector)).map(({ path }) => path)
+  return all.filter(({ ctx }) => deltaSelectorMatches(ctx, selector)).map(({ path }) => path)
 }
 
 /**
@@ -357,14 +260,7 @@ function updateNodeInTree(
  */
 function findInChildren(children: readonly ArtifactNode[], sel: Selector): number {
   for (let i = 0; i < children.length; i++) {
-    const child = children[i]!
-    const ctx: NodeCtx = {
-      node: child,
-      parent: null,
-      indexInParent: i,
-      ancestors: [],
-    }
-    if (matchesSelector(ctx, sel)) return i
+    if (nodeMatches(children[i]!, sel)) return i
   }
   return -1
 }

@@ -12,29 +12,19 @@ import {
 import { SchemaValidationError } from '../../domain/errors/schema-validation-error.js'
 import { ArtifactParseError } from '../../domain/errors/artifact-parse-error.js'
 import { applyDelta } from './_shared/apply-delta.js'
-
-const selectorSchema: z.ZodType<unknown> = z.lazy(() =>
-  z.object({
-    type: z.string(),
-    matches: z.string().optional(),
-    contains: z.string().optional(),
-    parent: selectorSchema.optional(),
-    index: z.number().optional(),
-    where: z.record(z.string()).optional(),
-  }),
-)
+import { SelectorZodSchema } from '../zod/selector-schema.js'
 
 const deltaPositionSchema = z.object({
-  parent: selectorSchema.optional(),
-  after: selectorSchema.optional(),
-  before: selectorSchema.optional(),
+  parent: SelectorZodSchema.optional(),
+  after: SelectorZodSchema.optional(),
+  before: SelectorZodSchema.optional(),
   first: z.boolean().optional(),
   last: z.boolean().optional(),
 })
 
 const deltaEntrySchema = z.object({
   op: z.enum(['added', 'modified', 'removed']),
-  selector: selectorSchema.optional(),
+  selector: SelectorZodSchema.optional(),
   position: deltaPositionSchema.optional(),
   rename: z.string().optional(),
   content: z.string().optional(),

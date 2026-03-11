@@ -80,7 +80,7 @@ export interface ArtifactParser {
   /**
    * Serializes a single AST node and all its descendants back to the artifact's
    * native format string. Used by `ValidateArtifacts` to evaluate `contentMatches`
-   * and by `CompileContext` to extract spec content via `contextSections`.
+   * and by the metadata extraction engine to extract spec content.
    */
   renderSubtree(node: ArtifactNode): string
 

@@ -362,7 +362,7 @@ Serializes an AST back to the artifact's native format string.
 
 #### `renderSubtree(node: ArtifactNode): string`
 
-Serializes a single AST node and all its descendants back to the artifact's native format string. Used by `ValidateArtifacts` to evaluate `contentMatches` and by `CompileContext` to extract spec content via `contextSections`.
+Serializes a single AST node and all its descendants back to the artifact's native format string. Used by `ValidateArtifacts` to evaluate `contentMatches` and by the metadata extraction engine to extract spec content via `metadataExtraction`.
 
 #### `nodeTypes(): readonly NodeTypeDescriptor[]`
 

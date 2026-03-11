@@ -37,7 +37,7 @@ Each entry in `artifacts` must include:
 - `deltaInstruction` (string, optional) — domain-specific guidance injected by `CompileContext` alongside the format-level delta instructions when `delta: true` and `activeArtifact` matches this artifact. Describes which domain concepts to add, modify, or remove (e.g. requirements, scenarios) without repeating the technical delta format, which is provided automatically by the `ArtifactParser` adapter. Only valid when `delta: true`.
 - `deltaValidations` (array, optional) — structural validation rules checked against the normalized YAML AST of the delta file before application; see Requirement: Delta validation rules. Only valid when `delta: true`.
 - `validations` (array, optional) — structural validation rules for the base artifact (after delta application); see Requirement: Validation rules
-- `contextSections` (array, optional) — sections of existing specs to inject into the AI context; see Requirement: Context sections
+- `metadataExtraction` (object, optional) — top-level declaration of how to extract metadata fields from artifact content; see Requirement: Metadata extraction
 - `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has a `pattern` (regex string) and a `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
 - `taskCompletionCheck` (object, optional) — declares how to detect task completion within this artifact's file content. Used to gate the `implementing → verifying` transition: if the artifact is listed in the `implementing` step's `requires`, all items matching `incompletePattern` must be absent (zero matches) before the transition is allowed. Both fields are optional and default to markdown checkbox syntax:
   - `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item
@@ -140,14 +140,23 @@ Any spec file touched by a delta — whether created via an `added` operation or
 
 A spec created by an `added` operation also requires approval: someone must take ownership of the new spec, even if ownership is granted by the same person who submitted the change.
 
-### Requirement: Context sections
+### Requirement: Metadata extraction
 
-`contextSections` on an artifact declares which nodes of that artifact's spec files are relevant context for workflow steps. `CompileContext` uses these declarations to extract and inject the matched nodes when compiling context for a step as a fallback when `.specd-metadata.yaml` is absent or stale. Each entry must include:
+`metadataExtraction` is a top-level schema field that declares how to extract metadata fields from artifact content using selectors and the existing parser infrastructure. It enables deterministic metadata generation without LLM involvement. `CompileContext` and `GetProjectContext` use these declarations as a fallback when `.specd-metadata.yaml` is absent or stale.
 
-- `selector` (selector, required) — identifies which node(s) to extract, using the same selector model defined in [`specs/core/delta-format/spec.md` — Requirement: Selector model](../delta-format/spec.md); when the selector matches multiple nodes, each is extracted separately
-- `role` (`rules` | `constraints` | `scenarios` | `context`, optional, default `context`) — semantic category of the extracted content; `CompileContext` uses this to label and group the injected block so the LLM receives the same structural signal as when fresh metadata is available
-- `extract` (`content` | `label` | `both`, optional, default `content`) — what to inject for each matched node: `content` serializes the node's full subtree to the artifact's native format; `label` injects only the node's identifying value (heading text, key name); `both` injects label followed by serialized content
-- `contextTitle` (string, optional) — title used for this section in the compiled context block; if omitted, the node's `label` is used as the title
+Each metadata field maps to one or more `MetadataExtractorEntry` objects with:
+
+- `artifact` (string, required) — the artifact ID whose content to extract from (e.g. `specs`, `verify`)
+- `extractor` (object, required) — an `Extractor` declaring how to extract content:
+  - `selector` (selector, required) — identifies which node(s) to extract, using the selector model defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md)
+  - `extract` (`content` | `label` | `both`, optional, default `content`) — what to extract for each matched node
+  - `capture` (string, optional) — regex with capture group applied to extracted text
+  - `strip` (string, optional) — regex removed from labels/values
+  - `groupBy` (`label`, optional) — group matched nodes by their label
+  - `transform` (string, optional) — named post-processing callback (e.g. `resolveSpecPath`)
+  - `fields` (object, optional) — structured field mapping for complex objects (e.g. scenarios)
+
+Supported metadata fields: `title`, `description`, `dependsOn`, `keywords` (single-entry), `rules`, `constraints`, `scenarios`, `context` (array-entry).
 
 ### Requirement: Artifact scope
 
@@ -298,16 +307,6 @@ artifacts:
           op: 'added|modified'
         contentMatches: '#### Scenario:'
         required: true
-    contextSections:
-      - selector:
-          type: section
-          matches: '^Requirements$'
-        role: rules
-        contextTitle: Spec Requirements
-      - selector:
-          type: section
-          matches: '^Constraints$'
-        role: constraints
     validations:
       - type: section
         matches: '^Purpose$'
@@ -409,12 +408,42 @@ workflow:
         - run: 'git checkout -b specd/{{change.name}}'
         - instruction: |
             Summarise what changed in this archive.
+
+metadataExtraction:
+  title:
+    artifact: specs
+    extractor:
+      selector: { type: section, level: 1 }
+      extract: label
+  description:
+    artifact: specs
+    extractor:
+      selector: { type: section, matches: '^Overview$|^Purpose$' }
+      extract: content
+  rules:
+    - artifact: specs
+      extractor:
+        selector:
+          type: section
+          matches: '^Requirement:'
+          parent: { type: section, matches: '^Requirements$' }
+        groupBy: label
+        strip: '^Requirement:\s*'
+        extract: content
+  constraints:
+    - artifact: specs
+      extractor:
+        selector:
+          type: list-item
+          parent: { type: section, matches: '^Constraints$' }
+        extract: label
 ```
 
 ## Spec Dependencies
 
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta file format, ArtifactParser port, and structural validation rules
-- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `validations`, `deltaValidations`, and `contextSections`
+- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `validations`, `deltaValidations`, and `metadataExtraction`
+- [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — `Extractor` and `FieldMapping` value objects used in `metadataExtraction` declarations
 
 ## ADRs
 

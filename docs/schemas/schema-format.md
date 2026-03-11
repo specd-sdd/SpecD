@@ -16,7 +16,7 @@ The schema controls:
 - Structural validation rules applied to artifact content (`validations`)
 - Structural validation rules applied to delta files before application (`deltaValidations`)
 - Lifecycle step definitions and their hooks (`workflow`)
-- Which parts of existing specs are extracted into AI context (`contextSections`)
+- How metadata fields (title, description, rules, constraints, scenarios, dependsOn) are extracted from artifact content (`metadataExtraction`)
 
 ## File layout
 
@@ -82,7 +82,6 @@ Each entry in `artifacts` defines one type of file that participates in a change
 | `deltaInstruction`    | string                                        | no       | —                   | Domain-specific guidance injected alongside the format-level delta instructions. Only valid with `delta: true`. |
 | `deltaValidations`    | array                                         | no       | —                   | Structural validation rules checked against the delta file AST. Only valid with `delta: true`.                  |
 | `validations`         | array                                         | no       | —                   | Structural validation rules checked against the artifact content.                                               |
-| `contextSections`     | array                                         | no       | —                   | Nodes of existing spec files to extract into AI context.                                                        |
 | `preHashCleanup`      | array                                         | no       | —                   | Regex substitutions applied before computing the artifact's content hash.                                       |
 | `taskCompletionCheck` | object                                        | no       | markdown checkboxes | How to detect incomplete task items in this artifact's content.                                                 |
 
@@ -192,9 +191,9 @@ validations:
         required: true
 ```
 
-### contextSections
+### metadataExtraction
 
-`contextSections` declares which nodes of existing spec files are extracted into AI context by `CompileContext`. This is the fallback mechanism used when `.specd-metadata.yaml` is absent or stale — SpecD extracts content directly from the artifact files using these declarations.
+`metadataExtraction` is a **top-level schema field** that declares how to extract metadata fields (title, description, rules, constraints, scenarios, dependsOn, etc.) from artifact content using extractors. This is the fallback mechanism used by `CompileContext` when `.specd-metadata.yaml` is absent or stale — SpecD extracts content directly from the artifact files using these declarations.
 
 Each entry has four fields:
 
@@ -206,7 +205,7 @@ Each entry has four fields:
 | `contextTitle` | string                                               | no       | node label | Title used for this section in the compiled context block.                                 |
 
 ```yaml
-contextSections:
+metadataExtraction:
   - selector:
       type: section
       matches: '^Requirements$'
@@ -249,7 +248,7 @@ taskCompletionCheck:
 
 ## Selector model
 
-A selector identifies one or more nodes in an artifact's AST. Selectors appear in `validations`, `deltaValidations`, `contextSections`, and inside delta file entries.
+A selector identifies one or more nodes in an artifact's AST. Selectors appear in `validations`, `deltaValidations`, `metadataExtraction`, and inside delta file entries.
 
 ### Selector fields
 

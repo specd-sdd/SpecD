@@ -120,7 +120,7 @@ Staleness is advisory only. specd does not block any operation because `.specd-m
 
 1. **Spec collection** — `dependsOn` is followed transitively from `change.contextSpecIds` to discover which specs to include in the context. The full resolution order is defined in [`specs/core/config/spec.md`](../config/spec.md) — Requirement: Context spec selection.
 
-2. **Spec content** — for each spec in the collected context set, if metadata is fresh, `CompileContext` uses `description`, `rules`, `constraints`, and `scenarios` as the compact, machine-optimised representation of that spec. If metadata is absent or stale, `CompileContext` falls back to extracting the sections declared in the artifact's `contextSections[]` and emits a staleness warning.
+2. **Spec content** — for each spec in the collected context set, if metadata is fresh, `CompileContext` uses `description`, `rules`, `constraints`, and `scenarios` as the compact, machine-optimised representation of that spec. If metadata is absent or stale, `CompileContext` falls back to the schema's `metadataExtraction` declarations to extract the same fields deterministically and emits a staleness warning.
 
 A spec that cannot be resolved (missing file, unknown workspace) is silently skipped with a warning.
 
@@ -147,3 +147,4 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 - [`specs/core/config/spec.md`](../config/spec.md) — context spec selection and resolution order
 - [`specs/core/change/spec.md`](../change/spec.md) — `contextSpecIds` in the change manifest, populated from `dependsOn`
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `requiredSpecArtifacts`, used to determine which files to hash for staleness detection
+- [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — the extraction engine used as CompileContext fallback when metadata is stale

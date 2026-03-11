@@ -14,14 +14,6 @@ export interface ValidationRule {
   readonly children?: readonly ValidationRule[]
 }
 
-/** A section of an artifact to extract as context for downstream consumers. */
-export interface ContextSection {
-  readonly selector: Selector
-  readonly role?: 'rules' | 'constraints' | 'scenarios' | 'context'
-  readonly extract?: 'content' | 'label' | 'both'
-  readonly contextTitle?: string
-}
-
 /** A regex-based cleanup rule applied to artifact content before hashing. */
 export interface PreHashCleanup {
   readonly pattern: string

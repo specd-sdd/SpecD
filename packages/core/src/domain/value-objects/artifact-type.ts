@@ -1,6 +1,5 @@
 import {
   type ValidationRule,
-  type ContextSection,
   type PreHashCleanup,
   type TaskCompletionCheck,
 } from './validation-rule.js'
@@ -66,11 +65,6 @@ export interface ArtifactTypeProps {
    */
   readonly deltaValidations: readonly ValidationRule[]
   /**
-   * Spec sections extracted and injected into the compiled instruction block
-   * as context for the agent.
-   */
-  readonly contextSections: readonly ContextSection[]
-  /**
    * Regex substitutions applied to artifact content before computing any hash.
    */
   readonly preHashCleanup: readonly PreHashCleanup[]
@@ -100,7 +94,6 @@ export class ArtifactType {
   private readonly _deltaInstruction: string | undefined
   private readonly _validations: readonly ValidationRule[]
   private readonly _deltaValidations: readonly ValidationRule[]
-  private readonly _contextSections: readonly ContextSection[]
   private readonly _preHashCleanup: readonly PreHashCleanup[]
   private readonly _taskCompletionCheck: TaskCompletionCheck | undefined
 
@@ -123,7 +116,6 @@ export class ArtifactType {
     this._deltaInstruction = props.deltaInstruction
     this._validations = [...props.validations]
     this._deltaValidations = [...props.deltaValidations]
-    this._contextSections = [...props.contextSections]
     this._preHashCleanup = [...props.preHashCleanup]
     this._taskCompletionCheck = props.taskCompletionCheck
   }
@@ -191,11 +183,6 @@ export class ArtifactType {
   /** Structural validation rules applied to the delta file before application. */
   get deltaValidations(): readonly ValidationRule[] {
     return this._deltaValidations
-  }
-
-  /** Spec sections extracted and injected into the compiled instruction block. */
-  get contextSections(): readonly ContextSection[] {
-    return this._contextSections
   }
 
   /** Regex substitutions applied to artifact content before computing any hash. */

@@ -67,12 +67,6 @@ artifacts:
           type: section
           matches: '^Requirements$'
         required: true
-    contextSections:
-      - selector:
-          type: section
-          matches: '^Requirements$'
-        role: rules
-        contextTitle: Requirements
 
   - id: design
     scope: change

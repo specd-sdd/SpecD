@@ -1,17 +1,14 @@
 import { type ValidationRule } from '../value-objects/validation-rule.js'
-import { type Selector } from '../value-objects/selector.js'
 import { safeRegex } from './safe-regex.js'
+import {
+  type SelectorNode,
+  selectBySelector,
+  nodeMatches,
+  collectAllNodes,
+} from './selector-matching.js'
 
-/** A single node in a normalized artifact AST (domain-local mirror). */
-export interface RuleEvaluatorNode {
-  readonly type: string
-  readonly label?: string
-  readonly value?: string | number | boolean | null
-  readonly children?: readonly RuleEvaluatorNode[]
-  readonly level?: number
-  readonly ordered?: boolean
-  readonly [key: string]: unknown
-}
+/** @deprecated Use {@link SelectorNode} from `selector-matching.ts` instead. */
+export type RuleEvaluatorNode = SelectorNode
 
 /**
  * Minimal parser contract needed by the rule evaluator.
@@ -20,7 +17,7 @@ export interface RuleEvaluatorNode {
  * the subset of `RuleEvaluatorParser` that rule evaluation actually uses.
  */
 export interface RuleEvaluatorParser {
-  renderSubtree(node: RuleEvaluatorNode): string
+  renderSubtree(node: SelectorNode): string
 }
 
 /** A single validation failure — missing artifact, failed rule, or application error. */
@@ -59,7 +56,7 @@ export interface RuleEvaluationResult {
  */
 export function evaluateRules(
   rules: readonly ValidationRule[],
-  root: RuleEvaluatorNode,
+  root: SelectorNode,
   artifactId: string,
   parser: RuleEvaluatorParser,
 ): RuleEvaluationResult {
@@ -78,85 +75,10 @@ export function evaluateRules(
  * @param rule - The validation rule containing the selection criteria
  * @returns The matched AST nodes
  */
-export function selectNodes(root: RuleEvaluatorNode, rule: ValidationRule): RuleEvaluatorNode[] {
+export function selectNodes(root: SelectorNode, rule: ValidationRule): SelectorNode[] {
   if (rule.path !== undefined) return selectByJsonPath(root, rule.path)
   if (rule.selector !== undefined) return selectBySelector(root, rule.selector)
   return [root]
-}
-
-/**
- * Selects nodes matching the given selector, optionally constrained by a parent selector.
- *
- * @param root - The AST root node to search
- * @param selector - The selector criteria to match
- * @returns All matching nodes, filtered by `selector.index` when present
- */
-export function selectBySelector(root: RuleEvaluatorNode, selector: Selector): RuleEvaluatorNode[] {
-  if (selector.parent !== undefined) {
-    const parentNodes = selectBySelector(root, selector.parent)
-    const result: RuleEvaluatorNode[] = []
-    for (const parentNode of parentNodes) {
-      const children = parentNode.children ?? []
-      result.push(...children.filter((child) => nodeMatches(child, selector)))
-    }
-    if (selector.index !== undefined) {
-      const node = result[selector.index]
-      return node !== undefined ? [node] : []
-    }
-    return result
-  }
-  const all = collectNodes(root)
-  const matched = all.filter((node) => nodeMatches(node, selector))
-  if (selector.index !== undefined) {
-    const node = matched[selector.index]
-    return node !== undefined ? [node] : []
-  }
-  return matched
-}
-
-/**
- * Returns `true` if the node satisfies all criteria in the selector.
- *
- * @param node - The AST node to test
- * @param selector - The selector criteria to match against
- * @returns Whether the node matches the selector
- */
-export function nodeMatches(node: RuleEvaluatorNode, selector: Selector): boolean {
-  if (node.type !== selector.type) return false
-  if (selector.matches !== undefined) {
-    const re = safeRegex(selector.matches, 'i')
-    if (re === null || !re.test(node.label ?? '')) return false
-  }
-  if (selector.contains !== undefined) {
-    const re = safeRegex(selector.contains, 'i')
-    if (re === null || !re.test(String(node.value ?? ''))) return false
-  }
-  if (selector.where !== undefined) {
-    const innerContainer = node.children?.[0]
-    const fieldNodes = innerContainer?.children ?? node.children ?? []
-    for (const [k, v] of Object.entries(selector.where)) {
-      const re = safeRegex(v, 'i')
-      const field = fieldNodes.find((c) => c.label === k)
-      if (re === null || field === undefined || !re.test(String(field.value ?? ''))) return false
-    }
-  }
-  return true
-}
-
-/**
- * Recursively collects all nodes in the AST, including the root.
- *
- * @param root - The starting AST node
- * @returns All nodes in document order
- */
-export function collectNodes(root: RuleEvaluatorNode): RuleEvaluatorNode[] {
-  const result: RuleEvaluatorNode[] = [root]
-  if (root.children !== undefined) {
-    for (const child of root.children) {
-      result.push(...collectNodes(child))
-    }
-  }
-  return result
 }
 
 /**
@@ -166,7 +88,7 @@ export function collectNodes(root: RuleEvaluatorNode): RuleEvaluatorNode[] {
  * @param path - The JSONPath expression (e.g. `$.children[*]`)
  * @returns All nodes matching the path
  */
-export function selectByJsonPath(root: RuleEvaluatorNode, path: string): RuleEvaluatorNode[] {
+export function selectByJsonPath(root: SelectorNode, path: string): SelectorNode[] {
   if (path === '$') return [root]
   const tokens = tokenizeJsonPath(path)
   let current: unknown[] = [root]
@@ -202,7 +124,7 @@ export function selectByJsonPath(root: RuleEvaluatorNode, path: string): RuleEva
     current = next
   }
   return current.filter(
-    (n): n is RuleEvaluatorNode =>
+    (n): n is SelectorNode =>
       n !== null &&
       typeof n === 'object' &&
       !Array.isArray(n) &&
@@ -283,6 +205,10 @@ export function recursiveCollect(node: unknown, field: string): unknown[] {
   return result
 }
 
+// Re-export for backward compatibility — external consumers that imported
+// these from rule-evaluator can still use them.
+export { selectBySelector, nodeMatches, collectAllNodes as collectNodes }
+
 // ---------------------------------------------------------------------------
 // Private helper — evaluates a single rule recursively
 // ---------------------------------------------------------------------------
@@ -299,7 +225,7 @@ export function recursiveCollect(node: unknown, field: string): unknown[] {
  */
 function evaluateRule(
   rule: ValidationRule,
-  root: RuleEvaluatorNode,
+  root: SelectorNode,
   artifactId: string,
   parser: RuleEvaluatorParser,
   failures: RuleEvaluationFailure[],

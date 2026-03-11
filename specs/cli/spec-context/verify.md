@@ -28,7 +28,7 @@
 
 - **GIVEN** `default:auth/login` has `.specd-metadata.yaml` with mismatched content hashes
 - **WHEN** `specd spec context default:auth/login` is run
-- **THEN** stdout contains the contextSections fallback content
+- **THEN** stdout contains the metadataExtraction fallback content
 - **AND** stderr contains a `warning:` line about stale metadata
 - **AND** the process exits with code 0
 

@@ -26,8 +26,8 @@ import { RecordSkillInstall } from '../application/use-cases/record-skill-instal
 import { GetSkillsManifest } from '../application/use-cases/get-skills-manifest.js'
 import { GetProjectContext } from '../application/use-cases/get-project-context.js'
 import { ValidateSpecs } from '../application/use-cases/validate-specs.js'
-import { InferSpecSections } from '../application/use-cases/infer-spec-sections.js'
 import { GetSpecContext } from '../application/use-cases/get-spec-context.js'
+import { GenerateSpecMetadata } from '../application/use-cases/generate-spec-metadata.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SpecdConfig } from '../application/specd-config.js'
@@ -99,8 +99,8 @@ export interface Kernel {
     getActiveSchema: GetActiveSchema
     /** Validates spec artifacts against the active schema's structural rules. */
     validate: ValidateSpecs
-    /** Infers semantic sections (rules, constraints, scenarios) from spec artifacts. */
-    inferSections: InferSpecSections
+    /** Generates deterministic metadata from schema-declared extraction rules. */
+    generateMetadata: GenerateSpecMetadata
     /** Builds structured context entries for a spec with optional dependency traversal. */
     getContext: GetSpecContext
   }
@@ -228,9 +228,11 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
         i.schemaRef,
         i.workspaceSchemasPaths,
       ),
-      inferSections: new InferSpecSections(
+      generateMetadata: new GenerateSpecMetadata(
+        i.specs,
         i.schemas,
         i.parsers,
+        i.hasher,
         i.schemaRef,
         i.workspaceSchemasPaths,
       ),

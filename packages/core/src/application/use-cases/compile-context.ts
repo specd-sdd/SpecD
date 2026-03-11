@@ -17,7 +17,8 @@ import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type ContextWarning } from './_shared/context-warning.js'
-import { findNodes } from './_shared/selector-matching.js'
+import { extractMetadata, type SubtreeRenderer } from '../../domain/services/extract-metadata.js'
+import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
 import { traverseDependsOn } from './_shared/depends-on-traversal.js'
 
@@ -452,7 +453,7 @@ export class CompileContext {
         }
         specContentParts.push(`### Spec: ${specLabel}\n\n${metaParts.join('\n\n')}`)
       } else {
-        // Stale/absent metadata: fall back to contextSections extraction
+        // Stale/absent metadata: fall back to metadataExtraction engine
         if (metadataArtifact !== null) {
           warnings.push({
             type: 'stale-metadata',
@@ -467,43 +468,19 @@ export class CompileContext {
           })
         }
 
-        const fallbackParts: string[] = []
-        for (const artifactType of schema.artifacts()) {
-          if (artifactType.scope !== 'spec') continue
-          const contextSections = artifactType.contextSections
-          if (contextSections.length === 0) continue
+        const extraction = schema.metadataExtraction()
+        let fallbackParts: string[] = []
 
-          const outputFilename = artifactType.output.split('/').pop()!
-          const artifactFile = await specRepo.artifact(spec, outputFilename)
-          if (artifactFile === null) continue
-
-          const format = artifactType.format ?? inferFormat(outputFilename) ?? 'plaintext'
-          const parser = this._parsers.get(format)
-          if (parser === undefined) continue
-
-          const ast = parser.parse(artifactFile.content)
-
-          for (const section of contextSections) {
-            const role = section.role ?? 'context'
-            if (!showAll && !sectionsFilter.includes(role as SpecSection)) continue
-
-            const nodes = findNodes(ast.root, section.selector)
-            for (const node of nodes) {
-              let content: string
-              const extract = section.extract ?? 'content'
-              if (extract === 'label') {
-                content = node.label ?? ''
-              } else if (extract === 'both') {
-                content = `${node.label ?? ''}\n${parser.renderSubtree(node)}`
-              } else {
-                content = parser.renderSubtree(node)
-              }
-
-              if (!content) continue
-              const title = section.contextTitle ?? node.label ?? 'section'
-              fallbackParts.push(`**${title}** (${role})\n\n${content}`)
-            }
-          }
+        if (extraction !== undefined) {
+          fallbackParts = await this._extractionFallback(
+            specRepo,
+            spec,
+            schema,
+            extraction,
+            specLabel,
+            sectionsFilter,
+            showAll,
+          )
         }
 
         if (fallbackParts.length > 0) {
@@ -567,6 +544,78 @@ export class CompileContext {
       instructionBlock: parts.join('\n\n---\n\n'),
       warnings,
     }
+  }
+
+  /**
+   * Falls back to the metadataExtraction engine when metadata is stale/absent.
+   * Loads artifacts, parses ASTs, runs extractors, and renders the result as
+   * context parts in the same format as the fresh metadata path.
+   *
+   * @param specRepo - Repository for loading spec artifacts
+   * @param spec - The spec entity to extract metadata from
+   * @param schema - The resolved schema with artifact definitions
+   * @param extraction - The metadata extraction declarations from the schema
+   * @param specLabel - Display label for the spec (e.g. `workspace:capPath`)
+   * @param sectionsFilter - Optional filter to include only specific sections
+   * @param showAll - Whether to include all sections regardless of filter
+   * @returns Rendered context parts as strings
+   */
+  private async _extractionFallback(
+    specRepo: SpecRepository,
+    spec: Spec,
+    schema: import('../../domain/value-objects/schema.js').Schema,
+    extraction: import('../../domain/value-objects/metadata-extraction.js').MetadataExtraction,
+    specLabel: string,
+    sectionsFilter: ReadonlyArray<SpecSection> | undefined,
+    showAll: boolean,
+  ): Promise<string[]> {
+    const astsByArtifact = new Map<string, { root: SelectorNode }>()
+    const renderers = new Map<string, SubtreeRenderer>()
+
+    for (const artifactType of schema.artifacts()) {
+      if (artifactType.scope !== 'spec') continue
+      const filename = artifactType.output.split('/').pop()!
+      const format = artifactType.format ?? inferFormat(filename) ?? 'plaintext'
+      const parser = this._parsers.get(format)
+      if (parser === undefined) continue
+
+      const artifactFile = await specRepo.artifact(spec, filename)
+      if (artifactFile === null) continue
+
+      const ast = parser.parse(artifactFile.content)
+      astsByArtifact.set(artifactType.id, ast)
+      renderers.set(artifactType.id, parser as SubtreeRenderer)
+    }
+
+    const extracted = extractMetadata(extraction, astsByArtifact, renderers)
+    const metaParts: string[] = []
+
+    if (showAll && extracted.description !== undefined) {
+      metaParts.push(`**Description:** ${extracted.description}`)
+    }
+    if ((showAll || sectionsFilter?.includes('rules')) && extracted.rules?.length) {
+      const rulesText = extracted.rules
+        .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
+        .join('\n\n')
+      metaParts.push(`#### Rules\n\n${rulesText}`)
+    }
+    if ((showAll || sectionsFilter?.includes('constraints')) && extracted.constraints?.length) {
+      metaParts.push(`#### Constraints\n\n${extracted.constraints.map((c) => `- ${c}`).join('\n')}`)
+    }
+    if ((showAll || sectionsFilter?.includes('scenarios')) && extracted.scenarios?.length) {
+      const scenariosText = extracted.scenarios
+        .map((s) => {
+          const lines: string[] = [`##### Scenario: ${s.name}`, `*Requirement: ${s.requirement}*`]
+          if (s.given?.length) lines.push(`**Given:** ${s.given.join('; ')}`)
+          if (s.when?.length) lines.push(`**When:** ${s.when.join('; ')}`)
+          if (s.then?.length) lines.push(`**Then:** ${s.then.join('; ')}`)
+          return lines.join('\n')
+        })
+        .join('\n\n')
+      metaParts.push(`#### Scenarios\n\n${scenariosText}`)
+    }
+
+    return metaParts
   }
 
   /**

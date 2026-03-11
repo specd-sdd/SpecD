@@ -50,6 +50,8 @@ export const specMetadataSchema = z
         }),
       )
       .optional(),
+    context: z.array(z.string()).optional(),
+    generatedBy: z.enum(['core', 'agent']).optional(),
   })
   .passthrough()
 
@@ -91,11 +93,13 @@ export const strictSpecMetadataSchema = z
           requirement: z.string().min(1),
           name: z.string().min(1),
           given: z.array(z.string()).optional(),
-          when: z.array(z.string()).nonempty(),
+          when: z.array(z.string()).optional(),
           then: z.array(z.string()).nonempty(),
         }),
       )
       .optional(),
+    context: z.array(z.string().min(1)).optional(),
+    generatedBy: z.enum(['core', 'agent']).optional(),
   })
   .passthrough()
 
@@ -115,4 +119,6 @@ export interface SpecMetadata {
     readonly when?: string[]
     readonly then?: string[]
   }>
+  readonly context?: string[]
+  readonly generatedBy?: 'core' | 'agent'
 }

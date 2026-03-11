@@ -23,7 +23,7 @@ SpecD needs a schema system that defines the artifact workflow for a project (wh
 ## Considered Options
 
 - **Spec-driven baseline format** — `deltas[]`, `validations[]`, `changeVerify`, `apply` keys; evaluated as the starting point
-- **Adopted format** — derives directly from the baseline with configurable operation keywords, `deltaValidations[]` replacing `changeVerify`, `contextSections[]` for injectable context, `workflow` replacing `apply`, and three-level schema resolution
+- **Adopted format** — derives directly from the baseline with configurable operation keywords, `deltaValidations[]` replacing `changeVerify`, `metadataExtraction` for injectable context, `workflow` replacing `apply`, and three-level schema resolution
 
 ## Decision Outcome
 
@@ -54,9 +54,9 @@ SpecD replaces `changeVerify` with two independent mechanisms:
 
 This separation means `deltaValidations[]` is purely structural, and the approval requirement applies uniformly to all operations regardless of schema.
 
-### 4. `contextSections[]` added for injectable context
+### 4. `metadataExtraction` added for injectable context
 
-The baseline has no mechanism for injecting existing spec content into AI context. SpecD adds a `contextSections[]` array on each artifact. Every entry declares a section name to extract and an optional `contextTitle` for the compiled context block. `CompileContext` injects all declared sections — there is no opt-in flag; presence in the array means injection. This avoids sending full spec file content to the AI while still providing relevant context.
+The baseline has no mechanism for injecting existing spec content into AI context. SpecD adds a top-level `metadataExtraction` field on the schema. Every entry declares a section name to extract and an optional `contextTitle` for the compiled context block. `CompileContext` injects all declared sections — there is no opt-in flag; presence in the array means injection. This avoids sending full spec file content to the AI while still providing relevant context.
 
 ### 5. Three-level schema resolution
 
@@ -95,7 +95,7 @@ This avoids the schema fork problem — the team picks a community schema and ad
 - Good, because `mergeSpecs` and `ValidateSpec` are fully schema-driven with no hardcoded section names, patterns, or keywords
 - Good, because teams can localize operation keywords without forking SpecD
 - Good, because `deltaValidations[]` and per-spec approval are cleanly separated concerns
-- Good, because `contextSections[]` enables targeted context injection without sending full file content to the AI
+- Good, because `metadataExtraction` enables targeted context injection without sending full file content to the AI
 - Good, because three-level schema resolution supports community schemas, user overrides, and project overrides in a consistent pattern
 - Good, because templates ship as first-class files with editor support, versioned alongside the schema
 - Good, because `artifactRules` lets teams extend any community schema without forking it

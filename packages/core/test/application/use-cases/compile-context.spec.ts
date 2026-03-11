@@ -78,7 +78,13 @@ function makeChange(
   return change
 }
 
-function makeSchema(opts: { artifacts?: ArtifactType[]; workflow?: WorkflowStep[] } = {}): Schema {
+function makeSchema(
+  opts: {
+    artifacts?: ArtifactType[]
+    workflow?: WorkflowStep[]
+    metadataExtraction?: import('../../../src/domain/value-objects/metadata-extraction.js').MetadataExtraction
+  } = {},
+): Schema {
   return makeSchemaBase({ ...opts, name: '@specd/schema-std' })
 }
 
@@ -1016,7 +1022,7 @@ describe('CompileContext', () => {
       expect(result.warnings.filter((w) => w.type === 'stale-metadata')).toHaveLength(0)
     })
 
-    it('falls back to contextSections when metadata is absent', async () => {
+    it('falls back to metadataExtraction when metadata is absent', async () => {
       const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
       const loginContent = '# Login\n\n## Requirements\n\nSome requirements.\n'
 
@@ -1048,15 +1054,21 @@ describe('CompileContext', () => {
       const schema = makeSchema({
         artifacts: [
           makeArtifactType('spec', {
-            contextSections: [
-              {
-                selector: { type: 'section', matches: '^Requirements$' },
-                role: 'rules',
-                extract: 'content',
-              },
-            ],
+            scope: 'spec',
           }),
         ],
+        metadataExtraction: {
+          rules: [
+            {
+              artifact: 'spec',
+              extractor: {
+                selector: { type: 'section', matches: '^Requirements$' },
+                groupBy: 'label',
+                extract: 'content',
+              },
+            },
+          ],
+        },
       })
 
       const { sut } = makeSut({
@@ -1073,7 +1085,7 @@ describe('CompileContext', () => {
         config: { contextIncludeSpecs: ['default:auth/login'] },
       })
 
-      // Should emit a staleness warning (no metadata) and include content from contextSections
+      // Should emit a staleness warning (no metadata) and include content from metadataExtraction
       const stalenessWarnings = result.warnings.filter((w) => w.type === 'stale-metadata')
       expect(stalenessWarnings.length).toBeGreaterThan(0)
     })
@@ -1218,7 +1230,7 @@ describe('CompileContext', () => {
     })
   })
 
-  describe('Requirement: contextSections fallback with glob output pattern', () => {
+  describe('Requirement: metadataExtraction fallback with glob output pattern', () => {
     it('resolves glob-style output to the base filename for specRepo.artifact', async () => {
       const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
       const loginContent = '# Login\n\n## Requirements\n\nSome requirements.\n'
@@ -1253,15 +1265,21 @@ describe('CompileContext', () => {
           makeArtifactType('spec', {
             // Glob-style output like schema-std uses
             output: 'specs/**/spec.md',
-            contextSections: [
-              {
-                selector: { type: 'section', matches: '^Requirements$' },
-                role: 'rules',
-                extract: 'content',
-              },
-            ],
+            scope: 'spec',
           }),
         ],
+        metadataExtraction: {
+          rules: [
+            {
+              artifact: 'spec',
+              extractor: {
+                selector: { type: 'section', matches: '^Requirements$' },
+                groupBy: 'label',
+                extract: 'content',
+              },
+            },
+          ],
+        },
       })
 
       const { sut } = makeSut({
@@ -1372,7 +1390,7 @@ describe('CompileContext', () => {
       expect(result.instructionBlock).not.toContain('Login works')
     })
 
-    it('filters fallback contextSections by role when sections is set', async () => {
+    it('filters fallback metadataExtraction by section when sections is set', async () => {
       const specRepo = makeSpecRepo([loginSpec], {
         'auth/login/spec.md': specContent,
         // no metadata → forces fallback
@@ -1392,7 +1410,7 @@ describe('CompileContext', () => {
               {
                 type: 'section',
                 label: 'Constraints',
-                children: [{ type: 'paragraph', value: 'Some constraints.' }],
+                children: [{ type: 'list-item', label: 'Some constraints.' }],
               },
             ],
           },
@@ -1406,20 +1424,33 @@ describe('CompileContext', () => {
       const schema = makeSchema({
         artifacts: [
           makeArtifactType('spec', {
-            contextSections: [
-              {
-                selector: { type: 'section', matches: '^Requirements$' },
-                role: 'rules',
-                extract: 'content',
-              },
-              {
-                selector: { type: 'section', matches: '^Constraints$' },
-                role: 'constraints',
-                extract: 'content',
-              },
-            ],
+            scope: 'spec',
           }),
         ],
+        metadataExtraction: {
+          rules: [
+            {
+              artifact: 'spec',
+              extractor: {
+                selector: { type: 'section', matches: '^Requirements$' },
+                groupBy: 'label',
+                extract: 'content',
+              },
+            },
+          ],
+          constraints: [
+            {
+              artifact: 'spec',
+              extractor: {
+                selector: {
+                  type: 'list-item',
+                  parent: { type: 'section', matches: '^Constraints$' },
+                },
+                extract: 'label',
+              },
+            },
+          ],
+        },
       })
 
       const { sut } = makeSut({
@@ -1453,7 +1484,6 @@ describe('CompileContext', () => {
         requires: [],
         validations: [],
         deltaValidations: [],
-        contextSections: [],
         preHashCleanup: [],
         instruction: 'Write a spec.',
       })

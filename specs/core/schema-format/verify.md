@@ -236,32 +236,27 @@
 - **WHEN** the hash is computed
 - **THEN** the first substitution is applied to the full content, then the second is applied to the result of the first
 
-### Requirement: Context sections
+### Requirement: Metadata extraction
 
-#### Scenario: Section injected
+#### Scenario: Extraction declared and metadata absent
 
-- **WHEN** an artifact has a `contextSections` entry and the selector matches a node in the spec
-- **THEN** `CompileContext` includes the extracted content in the compiled context under the given `contextTitle`, labelled with the declared `role`
+- **GIVEN** the schema declares a `metadataExtraction` block with extractors for `rules` and `constraints`
+- **AND** a spec in the context set has no `.specd-metadata.yaml`
+- **WHEN** `CompileContext` or `GetProjectContext` processes that spec
+- **THEN** the extraction engine runs the declared extractors against parsed artifact ASTs
+- **AND** the extracted content is included in the compiled context
 
-#### Scenario: contextTitle omitted
+#### Scenario: Extractor selector matches no node
 
-- **WHEN** a `contextSections` entry has no `contextTitle`
-- **THEN** `CompileContext` uses the matched node's `label` as the context section title
+- **GIVEN** a `metadataExtraction` entry declares a selector that matches no node in the artifact
+- **WHEN** the extraction engine processes that entry
+- **THEN** no content is produced for that field — no error is thrown
 
-#### Scenario: Section not present in spec
+#### Scenario: GenerateSpecMetadata produces deterministic output
 
-- **WHEN** the selector matches no node in the spec
-- **THEN** `CompileContext` skips that entry without error
-
-#### Scenario: extract label only
-
-- **WHEN** a `contextSections` entry declares `extract: label`
-- **THEN** `CompileContext` injects only the matched node's identifying value, not its subtree content
-
-#### Scenario: extract both
-
-- **WHEN** a `contextSections` entry declares `extract: both` and the selector matches multiple nodes
-- **THEN** `CompileContext` injects the label followed by the serialized content for each matched node separately
+- **GIVEN** the schema declares `metadataExtraction` with extractors for title, rules, and constraints
+- **WHEN** `GenerateSpecMetadata.execute` is called for a spec
+- **THEN** the result contains extracted metadata with `generatedBy: 'core'` and computed `contentHashes`
 
 ### Requirement: Artifact scope
 

@@ -1,4 +1,5 @@
 import { ArtifactType } from './artifact-type.js'
+import { type MetadataExtraction } from './metadata-extraction.js'
 import { type WorkflowStep } from './workflow-step.js'
 
 /**
@@ -15,6 +16,7 @@ export class Schema {
   private readonly _version: number
   private readonly _artifacts: readonly ArtifactType[]
   private readonly _artifactIndex: ReadonlyMap<string, ArtifactType>
+  private readonly _metadataExtraction: MetadataExtraction | undefined
   private readonly _workflow: readonly WorkflowStep[]
   private readonly _workflowIndex: ReadonlyMap<string, WorkflowStep>
 
@@ -25,17 +27,20 @@ export class Schema {
    * @param version - The schema version integer, monotonically increasing
    * @param artifacts - Artifact type definitions in schema-declared order
    * @param workflow - Workflow step configurations in schema-declared order
+   * @param metadataExtraction - Optional metadata extraction declarations
    */
   constructor(
     name: string,
     version: number,
     artifacts: readonly ArtifactType[],
     workflow: readonly WorkflowStep[],
+    metadataExtraction?: MetadataExtraction,
   ) {
     this._name = name
     this._version = version
     this._artifacts = artifacts
     this._artifactIndex = new Map(artifacts.map((a) => [a.id, a]))
+    this._metadataExtraction = metadataExtraction
     this._workflow = workflow
     this._workflowIndex = new Map(workflow.map((s) => [s.step, s]))
   }
@@ -75,6 +80,16 @@ export class Schema {
    */
   artifact(id: string): ArtifactType | null {
     return this._artifactIndex.get(id) ?? null
+  }
+
+  /**
+   * The metadata extraction declarations, or `undefined` if the schema does
+   * not declare `metadataExtraction`.
+   *
+   * @returns The metadata extraction configuration, or `undefined`
+   */
+  metadataExtraction(): MetadataExtraction | undefined {
+    return this._metadataExtraction
   }
 
   /**
