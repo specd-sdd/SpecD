@@ -9,10 +9,12 @@
 - **WHEN** `specd change create` is run without a positional name
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
-#### Scenario: Missing --spec flag
+#### Scenario: No --spec flag creates change with empty specIds
 
 - **WHEN** `specd change create my-change` is run with no `--spec` flag
-- **THEN** the command exits with code 1 and prints a usage error to stderr
+- **THEN** the change is created with an empty specIds list
+- **AND** stdout contains `created change my-change`
+- **AND** the process exits with code 0
 
 ### Requirement: Workspace resolution
 
