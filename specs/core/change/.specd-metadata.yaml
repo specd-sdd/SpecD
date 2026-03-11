@@ -33,9 +33,10 @@ rules:
 
 
 
-        specIds are validated against specd.yaml and the spec filesystem at creation time. specIds is mutable after
-        creation — specs can be added or removed as the change scope evolves. Any modification to specIds triggers
-        approval invalidation (see Requirement: History and event sourcing).
+        specIds have their workspace component validated against specd.yaml at creation time (the spec path itself is
+        not validated against the filesystem, since a change may create new specs that don't yet exist). specIds is
+        mutable after creation — specs can be added or removed as the change scope evolves. Any modification to specIds
+        triggers approval invalidation (see Requirement: History and event sourcing).
 
 
 
@@ -448,7 +449,7 @@ scenarios:
     name: Valid transition — implementing to verifying when all task items complete
     given:
       - a Change in implementing state
-      - all artifacts in the implementing step's requires have zero matches for their
+      - AND all artifacts in the implementing step's requires have zero matches for their
         taskCompletionCheck.incompletePattern
     when:
       - the change is transitioned to verifying
@@ -459,7 +460,7 @@ scenarios:
     name: Default incompletePattern matches markdown unchecked checkboxes
     given:
       - an artifact with no taskCompletionCheck declared
-      - its file contains - [ ] implement login and - [x] implement logout
+      - AND its file contains - [ ] implement login and - [x] implement logout
     when:
       - the implementing → verifying transition is attempted
     then:
@@ -468,7 +469,7 @@ scenarios:
     name: Custom incompletePattern blocks transition
     given:
       - "an artifact declares taskCompletionCheck.incompletePattern: '^\\s*TODO:'"
-      - 'its file contains TODO: implement login and DONE: implement logout'
+      - 'AND its file contains TODO: implement login and DONE: implement logout'
     when:
       - the implementing → verifying transition is attempted
     then:
@@ -477,7 +478,7 @@ scenarios:
     name: Invalid transition — implementing to verifying when a task item is incomplete
     given:
       - a Change in implementing state
-      - at least one artifact in the implementing step's requires has one or more matches for
+      - AND at least one artifact in the implementing step's requires has one or more matches for
         taskCompletionCheck.incompletePattern
     when:
       - the change is transitioned to verifying
@@ -487,7 +488,7 @@ scenarios:
     name: Progress reported from both patterns
     given:
       - an artifact with taskCompletionCheck.completePattern and taskCompletionCheck.incompletePattern both declared
-      - the artifact file contains 3 complete items and 2 incomplete items
+      - AND the artifact file contains 3 complete items and 2 incomplete items
     when:
       - the CLI reports task progress
     then:
@@ -506,7 +507,7 @@ scenarios:
       - the change is transitioned back to implementing
     then:
       - "a transitioned event with from: 'verifying' and to: 'implementing' is appended"
-      - no approval invalidation is triggered
+      - AND no approval invalidation is triggered
   - requirement: Lifecycle
     name: implementing ↔ verifying loop repeats until verification passes
     given:
@@ -592,7 +593,7 @@ scenarios:
     name: Status derived — skipped
     given:
       - 'an optional: true artifact with no file on disk'
-      - its validatedHash is "__skipped__"
+      - AND its validatedHash is "__skipped__"
     when:
       - effectiveStatus is derived
     then:
@@ -773,6 +774,6 @@ scenarios:
     then:
       - no operation exists to move a change out of discarded/
 contentHashes:
-  spec.md: sha256:99716e9f6f11e1246e4d97f25cdbe603e751fff502111c6726b1bfd8d4f2e921
+  spec.md: sha256:c3400e8a66b9b1dd0abf3515e940f7e3eae6090ac3b8da1cb5a0c594cb4efc23
   verify.md: sha256:ffda2913c4976cff57dd97f14a001f8c79b1f6fb3812b86018a1d821524a6a3c
 generatedBy: core

@@ -24,16 +24,6 @@ export function registerChangeCreate(parent: Command): void {
         opts: { spec: string[]; description?: string; format: string; config?: string },
       ) => {
         try {
-          if (opts.spec.length === 0) {
-            process.stderr.write('error: required option --spec not provided\n')
-            process.exit(1)
-          }
-
-          if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) {
-            process.stderr.write(`error: invalid change name '${name}' — must be kebab-case\n`)
-            process.exit(1)
-          }
-
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
           const specIds = opts.spec.map((s) => parseSpecId(s, config).specId)

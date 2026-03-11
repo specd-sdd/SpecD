@@ -244,15 +244,19 @@ describe('change create', () => {
     expect(stderr()).toMatch(/error:/)
   })
 
-  it('exits 1 when --spec flag is missing', async () => {
-    const { stderr } = setup()
+  it('allows creating a change without --spec flag', async () => {
+    const { kernel } = setup()
+    kernel.changes.create.execute.mockResolvedValue(
+      makeMockChange({ name: 'my-change', state: 'drafting' }),
+    )
+    captureStdout()
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'create', 'my-change']).catch(() => {})
+    await program.parseAsync(['node', 'specd', 'change', 'create', 'my-change'])
 
-    expect(process.exit).toHaveBeenCalledWith(1)
-    expect(stderr()).toMatch(/--spec/)
+    const call = kernel.changes.create.execute.mock.calls[0]![0]
+    expect(call.specIds).toEqual([])
   })
 
   it('defaults to "default" workspace when prefix is omitted', async () => {

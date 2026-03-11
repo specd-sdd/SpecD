@@ -516,9 +516,10 @@ describe('FsChangeRepository', () => {
       change.discard('superseded', actor, ['new-auth'])
       await ctx.repo.save(change)
 
-      // Find in discarded/
-      const loaded = await ctx.repo.get('add-auth')
-      expect(loaded).not.toBeNull()
+      // Discarded changes are excluded from get() — use listDiscarded()
+      const discarded = await ctx.repo.listDiscarded()
+      const loaded = discarded.find((c) => c.name === 'add-auth')
+      expect(loaded).toBeDefined()
       const draftedEvent = loaded?.history.find((e) => e.type === 'drafted')
       expect(draftedEvent?.type === 'drafted' && draftedEvent.reason).toBe('parking for now')
       const discardedEvent = loaded?.history.find((e) => e.type === 'discarded')

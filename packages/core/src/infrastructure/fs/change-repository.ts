@@ -8,6 +8,7 @@ import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
 import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
+import { ChangeAlreadyExistsError } from '../../application/errors/change-already-exists-error.js'
 import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
 import {
   ChangeRepository,
@@ -74,14 +75,17 @@ export class FsChangeRepository extends ChangeRepository {
   }
 
   /**
-   * Returns the change with the given name, searching `changes/` then `drafts/`.
-   * Returns `null` if not found.
+   * Returns the change with the given name, searching `changes/` then `drafts/`
+   * (excludes `discarded/`). Returns `null` if not found.
+   *
+   * Discarded changes are excluded so that a discarded name can be reused
+   * when creating a new change.
    *
    * @param name - The change slug name to look up
    * @returns The change with current artifact state, or `null` if not found
    */
   override async get(name: string): Promise<Change | null> {
-    const dir = await this._resolveDir(name)
+    const dir = await this._resolveDir(name, { includeDiscarded: false })
     if (dir === null) return null
 
     const manifest = await this._loadManifest(dir)
@@ -182,8 +186,15 @@ export class FsChangeRepository extends ChangeRepository {
     const currentDir = await this._resolveDir(change.name)
 
     if (currentDir === null) {
-      // First save: create directory and write manifest
-      await fs.mkdir(targetDir, { recursive: true })
+      // First save: ensure parent exists, then atomically create change dir.
+      // Non-recursive mkdir fails with EEXIST if a concurrent create races us.
+      await fs.mkdir(path.dirname(targetDir), { recursive: true })
+      try {
+        await fs.mkdir(targetDir)
+      } catch (err) {
+        if (isEexist(err)) throw new ChangeAlreadyExistsError(change.name)
+        throw err
+      }
     } else if (currentDir !== targetDir) {
       // Move to new location (draft ↔ active, or to discarded)
       await fs.rename(currentDir, targetDir)
@@ -320,13 +331,22 @@ export class FsChangeRepository extends ChangeRepository {
 
   /**
    * Resolves the on-disk directory for a change by scanning `changes/`,
-   * `drafts/`, and `discarded/` for an entry ending in `-<name>`.
+   * `drafts/`, and optionally `discarded/` for an entry ending in `-<name>`.
    *
    * @param name - The change slug name to search for
+   * @param options - Resolution options
+   * @param options.includeDiscarded - Whether to search `discarded/` (default `true`)
    * @returns The absolute path to the change directory, or `null` if not found
    */
-  private async _resolveDir(name: string): Promise<string | null> {
-    for (const basePath of [this._changesPath, this._draftsPath, this._discardedPath]) {
+  private async _resolveDir(
+    name: string,
+    options?: { includeDiscarded?: boolean },
+  ): Promise<string | null> {
+    const paths =
+      options?.includeDiscarded === false
+        ? [this._changesPath, this._draftsPath]
+        : [this._changesPath, this._draftsPath, this._discardedPath]
+    for (const basePath of paths) {
       let entries: string[]
       try {
         entries = await fs.readdir(basePath)
@@ -713,6 +733,18 @@ function isDiscardedChange(change: Change): boolean {
   const history = change.history
   if (history.length === 0) return false
   return history[history.length - 1]?.type === 'discarded'
+}
+
+// ---- Error helpers ----
+
+/**
+ * Returns `true` if `err` is a Node.js `EEXIST` filesystem error.
+ *
+ * @param err - The caught error value to inspect
+ * @returns Whether `err` is an EEXIST error
+ */
+function isEexist(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as NodeJS.ErrnoException).code === 'EEXIST'
 }
 
 // ---- Directory filtering ----
