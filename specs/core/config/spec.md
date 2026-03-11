@@ -275,7 +275,7 @@ Keys are validated against the active schema's artifact IDs at startup. Unknown 
 3. Project-level exclude patterns — always applied; removes specs from the set accumulated in step 2
 4. Workspace-level include patterns from each active workspace (in workspace declaration order, then pattern order within each workspace)
 5. Workspace-level exclude patterns from each active workspace (same order as step 4)
-6. All specs reachable via `dependsOn` traversal — starting from the change's `contextSpecIds`, following `dependsOn` links in each spec's `.specd-metadata.yaml` transitively until no new specs are found. These specs are **not subject to exclude rules from steps 3 or 5** — a declared dependency is always included regardless of project or workspace excludes.
+6. All specs reachable via `dependsOn` traversal — starting from the change's `specIds`, following `dependsOn` links (resolved via the three-tier order: `change.specDependsOn`, `.specd-metadata.yaml`, content extraction) transitively until no new specs are found. These specs are **not subject to exclude rules from steps 3 or 5** — a declared dependency is always included regardless of project or workspace excludes.
 
 Specs matched by earlier patterns take priority if the context must be truncated. A spec matched by multiple include patterns appears only once, at the position of the first matching pattern. Specs added in step 6 that were already included in steps 2–5 also appear only once (at their earlier position). Step 1 (`context` entries) is not part of spec collection — those entries are injected as-is and are not deduplicated against specs. See [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
 

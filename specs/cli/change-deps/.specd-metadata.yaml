@@ -1,0 +1,166 @@
+title: change deps
+description:
+  specd change deps \<name> \<specId> manages the declared dependsOn dependencies for a single spec within an
+  active change. Dependencies are stored in the change manifest's specDependsOn field and used by CompileContext as the
+  highest-priority source for dependsOn resolution.
+context:
+  - specd change deps \<name> \<specId> manages the declared dependsOn dependencies for a single spec within an active
+    change. Dependencies are stored in the change manifest's specDependsOn field and used by CompileContext as the
+    highest-priority source for dependsOn resolution.
+rules:
+  - requirement: Command signature
+    rules:
+      - >-
+        ```
+
+        specd change deps <name> <specId>
+          [--add <id>...]
+          [--remove <id>...]
+          [--set <id>...]
+          [--format text|json|toon]
+          [--config <path>]
+        ```
+
+
+
+        * \<name> — required positional; the change name
+
+        * \<specId> — required positional; the spec within the change whose dependencies are being managed (must be in
+        change.specIds)
+
+        * \--add \<id> — repeatable; adds dependency spec IDs to this spec's dependsOn
+
+        * \--remove \<id> — repeatable; removes dependency spec IDs
+
+        * \--set \<id> — repeatable; replaces all dependencies (mutually exclusive with --add/--remove)
+
+        * At least one of --add, --remove, or --set is required
+  - requirement: Output
+    rules:
+      - |-
+        Text format (default):
+
+
+        ```
+        updated deps for <specId> in change <name>
+        dependsOn: dep1, dep2, dep3
+        ```
+
+
+        When no dependencies remain: dependsOn: (none)
+
+
+        JSON/toon format:
+
+
+        ```json
+        {
+          "result": "ok",
+          "name": "<name>",
+          "specId": "<specId>",
+          "dependsOn": ["dep1", "dep2"]
+        }
+        ```
+  - requirement: Error cases
+    rules:
+      - |-
+        All errors exit with code 1 and write to stderr:
+
+
+        * Change not found
+        * specId not in change.specIds
+        * \--set used with --add or --remove
+        * \--remove value not in current deps
+        * No flags provided
+constraints:
+  - --set is mutually exclusive with --add and --remove
+  - At least one modification flag must be provided
+  - The command delegates to the UpdateSpecDeps use case in @specd/core
+scenarios:
+  - requirement: Command signature
+    name: Add deps to a spec in the change
+    given:
+      - 'a change add-auth with specIds: ["default:auth/login"]'
+    when:
+      - specd change deps add-auth auth/login --add auth/shared --add auth/jwt
+    then:
+      - the command exits with code 0
+      - 'AND the output is:'
+  - requirement: Command signature
+    name: Remove deps from a spec in the change
+    given:
+      - 'a change add-auth with specDependsOn: { "default:auth/login": ["default:auth/shared", "default:auth/jwt"] }'
+    when:
+      - specd change deps add-auth auth/login --remove auth/jwt
+    then:
+      - the command exits with code 0
+      - 'AND the output includes dependsOn: auth/shared'
+  - requirement: Command signature
+    name: Set (replace) deps for a spec
+    given:
+      - a change add-auth with existing deps for auth/login
+    when:
+      - specd change deps add-auth auth/login --set auth/session
+    then:
+      - the command exits with code 0
+      - 'AND the output includes dependsOn: auth/session'
+      - AND previous deps are fully replaced
+  - requirement: Output
+    name: JSON output format
+    given:
+      - 'a change add-auth with specIds: ["default:auth/login"]'
+    when:
+      - specd change deps add-auth auth/login --add auth/shared --format json
+    then:
+      - 'the output is valid JSON with result: "ok", name, specId, and dependsOn array'
+  - requirement: Output
+    name: No deps remaining shows none
+    given:
+      - a change with deps ["default:auth/shared"] for auth/login
+    when:
+      - specd change deps add-auth auth/login --remove auth/shared
+    then:
+      - 'the output includes dependsOn: (none)'
+  - requirement: Error cases
+    name: Error when change not found
+    when:
+      - specd change deps nonexistent auth/login --add auth/shared
+    then:
+      - the command exits with code 1
+      - AND stderr indicates the change was not found
+  - requirement: Error cases
+    name: Error when specId not in change.specIds
+    given:
+      - 'a change add-auth with specIds: ["default:auth/login"]'
+    when:
+      - specd change deps add-auth billing/invoices --add auth/shared
+    then:
+      - the command exits with code 1
+      - AND stderr indicates the specId is not part of the change
+  - requirement: Error cases
+    name: Error when --set used with --add
+    when:
+      - specd change deps add-auth auth/login --set auth/session --add auth/shared
+    then:
+      - the command exits with code 1
+      - AND stderr indicates --set is mutually exclusive with --add/--remove
+  - requirement: Error cases
+    name: Error when no flags provided
+    when:
+      - specd change deps add-auth auth/login
+    then:
+      - the command exits with code 1
+      - AND stderr indicates at least one of --add, --remove, or --set is required
+  - requirement: Error cases
+    name: Error when removing non-existent dep
+    given:
+      - a change add-auth with no deps for auth/login
+    when:
+      - specd change deps add-auth auth/login --remove auth/shared
+    then:
+      - the command exits with code 1
+      - AND stderr indicates the dep was not found
+contentHashes:
+  spec.md: sha256:2d8039c72f6569d4d3560d550c9daa437bcf5f76a2b3ca054d91f0e1e7e82e23
+  verify.md: sha256:55c01a890fe4b920e7d5b002c5ed72a6220a428bfaa8d62a529dbeaa51190088
+generatedBy: core

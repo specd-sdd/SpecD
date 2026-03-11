@@ -78,4 +78,4 @@ specd change context add-oauth-login implementing --follow-deps --depth 1
 ## Spec Dependencies
 
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/core/change/spec.md`](../../core/change/spec.md) — lifecycle steps, contextSpecIds
+- [`specs/core/change/spec.md`](../../core/change/spec.md) — lifecycle steps, specDependsOn

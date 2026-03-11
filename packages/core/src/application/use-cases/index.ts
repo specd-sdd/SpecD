@@ -5,6 +5,11 @@ export { type ListArchived } from './list-archived.js'
 export { type GetArchivedChange, type GetArchivedChangeInput } from './get-archived-change.js'
 export { type EditChange, type EditChangeInput, type EditChangeResult } from './edit-change.js'
 export { type SkipArtifact, type SkipArtifactInput } from './skip-artifact.js'
+export {
+  type UpdateSpecDeps,
+  type UpdateSpecDepsInput,
+  type UpdateSpecDepsResult,
+} from './update-spec-deps.js'
 export { type ListSpecs, type SpecListEntry, type SpecMetadataStatus } from './list-specs.js'
 export { type GetSpec, type GetSpecInput, type GetSpecResult } from './get-spec.js'
 export {

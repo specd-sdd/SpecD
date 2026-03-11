@@ -697,4 +697,52 @@ describe('Change', () => {
       expect(evt.reason).toBe('not applicable for this change')
     })
   })
+
+  describe('specDependsOn', () => {
+    it('defaults to empty map', () => {
+      const c = makeChange()
+      expect(c.specDependsOn.size).toBe(0)
+    })
+
+    it('initialises from props', () => {
+      const c = new Change({
+        name: 'test-deps',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth/login'],
+        history: [],
+        specDependsOn: new Map([['auth/login', ['auth/shared', 'auth/jwt']]]),
+      })
+      expect([...c.specDependsOn.get('auth/login')!]).toEqual(['auth/shared', 'auth/jwt'])
+    })
+
+    it('setSpecDependsOn replaces deps for a spec', () => {
+      const c = makeChange()
+      c.setSpecDependsOn('auth/login', ['auth/shared'])
+      expect([...c.specDependsOn.get('auth/login')!]).toEqual(['auth/shared'])
+      c.setSpecDependsOn('auth/login', ['billing/core'])
+      expect([...c.specDependsOn.get('auth/login')!]).toEqual(['billing/core'])
+    })
+
+    it('removeSpecDependsOn removes entry', () => {
+      const c = makeChange()
+      c.setSpecDependsOn('auth/login', ['auth/shared'])
+      c.removeSpecDependsOn('auth/login')
+      expect(c.specDependsOn.has('auth/login')).toBe(false)
+    })
+
+    it('does not trigger invalidation', () => {
+      const c = makeChange()
+      const historyLengthBefore = c.history.length
+      c.setSpecDependsOn('auth/login', ['auth/shared'])
+      expect(c.history.length).toBe(historyLengthBefore)
+    })
+
+    it('getter returns a defensive copy', () => {
+      const c = makeChange()
+      c.setSpecDependsOn('auth/login', ['auth/shared'])
+      const deps = c.specDependsOn
+      ;(deps as Map<string, readonly string[]>).delete('auth/login')
+      expect(c.specDependsOn.has('auth/login')).toBe(true)
+    })
+  })
 })

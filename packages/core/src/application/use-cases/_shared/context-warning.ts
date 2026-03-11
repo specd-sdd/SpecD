@@ -8,6 +8,7 @@ export interface ContextWarning {
     | 'missing-file'
     | 'cycle'
     | 'missing-parser'
+    | 'missing-metadata'
   /** The affected spec path, workspace name, or file path. */
   readonly path?: string
   /** Human-readable description of the warning. */

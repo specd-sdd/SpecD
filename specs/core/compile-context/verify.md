@@ -34,7 +34,7 @@
 
 #### Scenario: dependsOn traversal adds specs beyond include set
 
-- **GIVEN** `change.contextSpecIds: ['auth/login']`
+- **GIVEN** `change.specIds: ['default:auth/login']`
 - **AND** `auth/login/.specd-metadata.yaml` declares `dependsOn: ['auth/jwt']`
 - **AND** `auth/jwt` was not matched by any include pattern
 - **WHEN** `CompileContext.execute` applies step 6
@@ -193,6 +193,31 @@
 - **GIVEN** an include pattern matches a spec ID that does not exist in `SpecRepository`
 - **WHEN** `CompileContext.execute` is called
 - **THEN** a warning is emitted identifying the missing path, the path is skipped, and no error is thrown
+
+### Requirement: dependsOn resolution order
+
+#### Scenario: Missing metadata during dependsOn traversal emits warning
+
+- **GIVEN** `change.specIds` includes `auth/login`
+- **AND** `auth/login` has no `.specd-metadata.yaml`
+- **WHEN** `CompileContext.execute` is called with `followDeps: true`
+- **THEN** `result.warnings` includes a `missing-metadata` warning for `auth/login`
+
+#### Scenario: Fallback to content extraction when metadata absent in dependsOn traversal
+
+- **GIVEN** the schema declares `metadataExtraction.dependsOn`
+- **AND** a spec in the `dependsOn` traversal has no `.specd-metadata.yaml`
+- **AND** the spec's artifact content contains extractable dependency references
+- **WHEN** `CompileContext.execute` is called with `followDeps: true`
+- **THEN** dependencies are extracted from the spec content via the `metadataExtraction` engine
+- **AND** a `missing-metadata` warning is still emitted
+
+#### Scenario: Manifest specDependsOn used as primary source for dependencies
+
+- **GIVEN** `change.specDependsOn` has an entry for `auth/login` with `['auth/shared']`
+- **AND** `auth/login/.specd-metadata.yaml` declares `dependsOn: ['auth/jwt']`
+- **WHEN** `CompileContext.execute` is called with `followDeps: true`
+- **THEN** `auth/shared` is used as the dependency (from manifest), not `auth/jwt` (from metadata)
 
 ### Requirement: Unknown workspace qualifiers emit a warning
 

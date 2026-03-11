@@ -98,14 +98,14 @@ Advances the change lifecycle from its current state to the requested target. Ha
 
 **Input:**
 
-| Field                  | Type                           | Description                                                             |
-| ---------------------- | ------------------------------ | ----------------------------------------------------------------------- |
-| `name`                 | `string`                       | The change to transition.                                               |
-| `to`                   | `ChangeState`                  | The requested target state.                                             |
-| `approvalsSpec`        | `boolean`                      | Whether the spec approval gate is enabled.                              |
-| `approvalsSignoff`     | `boolean`                      | Whether the signoff gate is enabled.                                    |
-| `contextSpecIds`       | `string[]` (optional)          | Context spec paths to set when transitioning `designing → ready`.       |
-| `implementingRequires` | `readonly string[]` (optional) | Artifact IDs whose validation is cleared on `verifying → implementing`. |
+| Field                  | Type                                  | Description                                                             |
+| ---------------------- | ------------------------------------- | ----------------------------------------------------------------------- |
+| `name`                 | `string`                              | The change to transition.                                               |
+| `to`                   | `ChangeState`                         | The requested target state.                                             |
+| `approvalsSpec`        | `boolean`                             | Whether the spec approval gate is enabled.                              |
+| `approvalsSignoff`     | `boolean`                             | Whether the signoff gate is enabled.                                    |
+| `specDependsOn`        | `Record<string, string[]>` (optional) | Per-spec declared dependencies to set on the change.                    |
+| `implementingRequires` | `readonly string[]` (optional)        | Artifact IDs whose validation is cleared on `verifying → implementing`. |
 
 **Returns:** `Promise<Change>` — the updated change.
 

@@ -10,6 +10,10 @@ import { createArtifactParserRegistry } from '../../infrastructure/artifact-pars
 import { createSchemaRegistry } from '../schema-registry.js'
 import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
 import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
+import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
+import { NodeYamlSerializer } from '../../infrastructure/node/yaml-serializer.js'
+import { GenerateSpecMetadata } from '../../application/use-cases/generate-spec-metadata.js'
+import { SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata.js'
 import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
 
 /**
@@ -169,6 +173,17 @@ export function createArchiveChange(
   const parsers = createArtifactParserRegistry()
   const hooks = new NodeHookRunner()
   const actor = new GitActorResolver()
+  const hasher = new NodeContentHasher()
+  const yaml = new NodeYamlSerializer()
+  const generateMetadata = new GenerateSpecMetadata(
+    opts.specRepositories,
+    schemas,
+    parsers,
+    hasher,
+    opts.schemaRef,
+    opts.workspaceSchemasPaths,
+  )
+  const saveMetadata = new SaveSpecMetadata(opts.specRepositories, yaml)
   return new ArchiveChange(
     changeRepo,
     opts.specRepositories,
@@ -177,6 +192,9 @@ export function createArchiveChange(
     actor,
     parsers,
     schemas,
+    generateMetadata,
+    saveMetadata,
+    yaml,
     opts.schemaRef,
     opts.workspaceSchemasPaths,
     opts.projectRoot,

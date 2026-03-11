@@ -8,7 +8,7 @@
 
 ### Requirement: Ports and constructor
 
-`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `HookRunner`, `VcsAdapter`, `ArtifactParserRegistry`, `schemaRef`, `workspaceSchemasPaths`, `projectRoot`, `changesPath`, and `projectHooks`.
+`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `HookRunner`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaRegistry`, `SaveSpecMetadata`, `YamlSerializer`, `schemaRef`, `workspaceSchemasPaths`, `projectRoot`, `changesPath`, and `projectHooks`.
 
 ```typescript
 class ArchiveChange {
@@ -19,6 +19,9 @@ class ArchiveChange {
     hooks: HookRunner,
     git: VcsAdapter,
     parsers: ArtifactParserRegistry,
+    schemas: SchemaRegistry,
+    saveMetadata: SaveSpecMetadata,
+    yaml: YamlSerializer,
     schemaRef: string,
     workspaceSchemasPaths: ReadonlyMap<string, string>,
     projectRoot: string,
@@ -105,11 +108,22 @@ After `archiveRepository.archive()` succeeds, `ArchiveChange` must run all `run:
 
 Post-archive hook failures do not roll back the archive — the change has already been moved and the index updated. Instead, `ArchiveChange` collects failures and returns them in the result so the CLI can present them to the user.
 
-### Requirement: Spec metadata refresh signal
+### Requirement: Spec metadata generation
 
-After post-archive hooks complete, `ArchiveChange` must collect the set of spec paths that were modified during the delta merge and spec sync step. These are included in the result so that the caller (CLI or MCP layer) can trigger metadata regeneration for those specs.
+After post-archive hooks complete, `ArchiveChange` must generate `.specd-metadata.yaml` for each spec that was modified during the delta merge and spec sync step.
 
-`ArchiveChange` does not invoke the LLM extraction agent directly — it only signals which specs need refresh. The caller is responsible for scheduling the actual metadata regeneration.
+For each modified spec:
+
+1. Resolve the schema for the spec's workspace
+2. Load the spec's `requiredSpecArtifacts` from `SpecRepository` and parse each via its `ArtifactParser` to obtain ASTs
+3. Call `extractMetadata()` with the schema's `metadataExtraction` declarations to extract `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, and `scenarios`
+4. If `change.specDependsOn` has an entry for this spec, use it as `dependsOn` (manifest dependencies take priority over extracted values)
+5. Compute `contentHashes` by hashing each `requiredSpecArtifacts` file
+6. Serialize the metadata as YAML and write via `SaveSpecMetadata`
+
+If metadata generation fails for a spec (e.g. extraction produces no required fields, or `SaveSpecMetadata` throws `MetadataValidationError`), the failure is collected but does not abort the archive — the spec was already synced successfully. Failures are included in `staleMetadataSpecPaths` so the caller can report them.
+
+`ArchiveChange` also needs `SchemaRegistry`, `YamlSerializer`, and `SaveSpecMetadata` (or equivalent ports) to perform the generation. These are injected at construction time alongside the existing dependencies.
 
 ### Requirement: Result shape
 
@@ -117,7 +131,7 @@ After post-archive hooks complete, `ArchiveChange` must collect the set of spec 
 
 - `archivedChange` — the `ArchivedChange` record that was persisted
 - `postHookFailures` — array of hook commands that failed post-archive, empty on full success
-- `staleMetadataSpecPaths` — array of spec paths whose `.specd-metadata.yaml` should be regenerated because their content was modified during this archive
+- `staleMetadataSpecPaths` — array of spec paths where `.specd-metadata.yaml` generation failed during this archive (e.g. extraction produced no required fields); empty when all metadata was generated successfully
 
 `ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure. Post-archive failures are returned, not thrown.
 
@@ -130,6 +144,7 @@ After post-archive hooks complete, `ArchiveChange` must collect the set of spec 
 - `ArchiveChange` never constructs `ArchivedChange` directly — it is always returned by `archiveRepository.archive(change, { actor })`
 - `archivedName` must be derived from `change.createdAt` by the repository — never from wall-clock time at archive execution
 - `ArchiveChange` does not delete the change from `ChangeRepository` — `FsArchiveRepository.archive()` moves the directory as part of the archive operation
+- Metadata generation failures do not abort the archive — the spec was already synced successfully; failures are collected in `staleMetadataSpecPaths`
 
 ## Spec Dependencies
 
@@ -139,7 +154,8 @@ After post-archive hooks complete, `ArchiveChange` must collect the set of spec 
 - [`specs/core/validate-artifacts/spec.md`](../validate-artifacts/spec.md) — artifact validation gate before archive
 - [`specs/core/storage/spec.md`](../storage/spec.md) — archive directory naming, `index.jsonl`, `FsArchiveRepository.archive()`
 - [`specs/core/config/spec.md`](../config/spec.md) — workflow hook structure, `run:` vs `instruction:` entries, template variables
-- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — metadata refresh signal; `staleMetadataSpecPaths` in result
+- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — deterministic metadata generation at archive time; `SaveSpecMetadata` for writing
+- [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — `extractMetadata()` engine used to extract metadata fields from spec artifacts
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port-per-workspace pattern; manual DI at entry points
 - [`specs/core/workspace/spec.md`](../workspace/spec.md) — primary workspace for archive path template resolution
 - [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`

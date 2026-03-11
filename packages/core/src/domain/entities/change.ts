@@ -125,6 +125,8 @@ export interface ChangeProps {
   readonly history: readonly ChangeEvent[]
   /** Pre-loaded artifact map; defaults to an empty map. */
   readonly artifacts?: Map<string, ChangeArtifact>
+  /** Per-spec declared dependencies, keyed by spec ID. */
+  readonly specDependsOn?: ReadonlyMap<string, readonly string[]>
 }
 
 /**
@@ -143,6 +145,7 @@ export class Change {
   private _specIds: string[]
   private _history: ChangeEvent[]
   private _artifacts: Map<string, ChangeArtifact>
+  private _specDependsOn: Map<string, string[]>
 
   /**
    * Creates a new `Change` from the given properties.
@@ -162,6 +165,12 @@ export class Change {
     this._history = [...props.history]
     this._artifacts =
       props.artifacts !== undefined ? new Map(props.artifacts) : new Map<string, ChangeArtifact>()
+    this._specDependsOn = new Map<string, string[]>()
+    if (props.specDependsOn !== undefined) {
+      for (const [key, deps] of props.specDependsOn) {
+        this._specDependsOn.set(key, [...deps])
+      }
+    }
   }
 
   /** Unique slug name identifying this change. */
@@ -263,6 +272,38 @@ export class Change {
   /** All artifacts currently attached to this change, keyed by type. */
   get artifacts(): ReadonlyMap<string, ChangeArtifact> {
     return new Map(this._artifacts)
+  }
+
+  /**
+   * Per-spec declared dependencies, keyed by spec ID.
+   *
+   * Used by `CompileContext` as the highest-priority source for `dependsOn`
+   * resolution. Not subject to approval invalidation.
+   */
+  get specDependsOn(): ReadonlyMap<string, readonly string[]> {
+    return new Map(this._specDependsOn)
+  }
+
+  /**
+   * Sets (replaces) the declared dependencies for a single spec.
+   *
+   * Does **not** trigger invalidation — `specDependsOn` is advisory,
+   * not spec content.
+   *
+   * @param specId - The spec whose dependencies to set
+   * @param deps - The new dependency list
+   */
+  setSpecDependsOn(specId: string, deps: readonly string[]): void {
+    this._specDependsOn.set(specId, [...deps])
+  }
+
+  /**
+   * Removes the declared dependencies entry for a single spec.
+   *
+   * @param specId - The spec whose dependencies to remove
+   */
+  removeSpecDependsOn(specId: string): void {
+    this._specDependsOn.delete(specId)
   }
 
   /** Whether this change is in `archivable` state and may be archived. */

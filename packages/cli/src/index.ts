@@ -16,6 +16,7 @@ import { registerChangeApprove } from './commands/change/approve.js'
 import { registerChangeContext } from './commands/change/context.js'
 import { registerChangeArtifacts } from './commands/change/artifacts.js'
 import { registerChangeSkipArtifact } from './commands/change/skip-artifact.js'
+import { registerChangeDeps } from './commands/change/deps.js'
 import { registerChangeDiscard } from './commands/change/discard.js'
 import { registerChangeArchive } from './commands/change/archive.js'
 
@@ -93,6 +94,7 @@ registerChangeApprove(changeCmd)
 registerChangeContext(changeCmd)
 registerChangeArtifacts(changeCmd)
 registerChangeSkipArtifact(changeCmd)
+registerChangeDeps(changeCmd)
 registerChangeDiscard(changeCmd)
 registerChangeArchive(changeCmd)
 

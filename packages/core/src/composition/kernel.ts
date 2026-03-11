@@ -15,6 +15,7 @@ import { ListDiscarded } from '../application/use-cases/list-discarded.js'
 import { ListArchived } from '../application/use-cases/list-archived.js'
 import { GetArchivedChange } from '../application/use-cases/get-archived-change.js'
 import { EditChange } from '../application/use-cases/edit-change.js'
+import { UpdateSpecDeps } from '../application/use-cases/update-spec-deps.js'
 import { SkipArtifact } from '../application/use-cases/skip-artifact.js'
 import { ListSpecs } from '../application/use-cases/list-specs.js'
 import { GetSpec } from '../application/use-cases/get-spec.js'
@@ -74,6 +75,8 @@ export interface Kernel {
     edit: EditChange
     /** Explicitly skips an optional artifact on a change. */
     skipArtifact: SkipArtifact
+    /** Updates declared dependencies for a spec within a change. */
+    updateSpecDeps: UpdateSpecDeps
     /** Lists all archived changes. */
     listArchived: ListArchived
     /** Retrieves a single archived change by name. */
@@ -164,6 +167,16 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
         i.actor,
         i.parsers,
         i.schemas,
+        new GenerateSpecMetadata(
+          i.specs,
+          i.schemas,
+          i.parsers,
+          i.hasher,
+          i.schemaRef,
+          i.workspaceSchemasPaths,
+        ),
+        new SaveSpecMetadata(i.specs, i.yaml),
+        i.yaml,
         i.schemaRef,
         i.workspaceSchemasPaths,
         config.projectRoot,
@@ -195,6 +208,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       listDiscarded: new ListDiscarded(i.changes),
       edit: new EditChange(i.changes, i.actor),
       skipArtifact: new SkipArtifact(i.changes, i.actor),
+      updateSpecDeps: new UpdateSpecDeps(i.changes),
       listArchived: new ListArchived(i.archive),
       getArchived: new GetArchivedChange(i.archive),
     },

@@ -31,6 +31,11 @@ rules:
         * workspaces — a computed getter derived at runtime from specIds by extracting the workspace component of each
         spec ID via parseSpecId(). It is not a declared or persisted field. When specIds is empty, workspaces is empty.
 
+        * specDependsOn — an optional map from spec ID to an array of spec IDs representing per-spec declared
+        dependencies. Captured during change authoring to track dependencies independently of .specd-metadata.yaml. Used
+        by CompileContext as the highest-priority source for dependsOn resolution. Not subject to approval invalidation
+        — updating specDependsOn does not trigger an invalidated event.
+
 
 
         specIds have their workspace component validated against specd.yaml at creation time (the spec path itself is
@@ -774,6 +779,6 @@ scenarios:
     then:
       - no operation exists to move a change out of discarded/
 contentHashes:
-  spec.md: sha256:c3400e8a66b9b1dd0abf3515e940f7e3eae6090ac3b8da1cb5a0c594cb4efc23
+  spec.md: sha256:cb5a9fb6d1cb786c1218ca53ab217268d5329645fb696efddf3d204c17858c4a
   verify.md: sha256:ffda2913c4976cff57dd97f14a001f8c79b1f6fb3812b86018a1d821524a6a3c
 generatedBy: core

@@ -19,7 +19,7 @@ import { type ContentHasher } from '../ports/content-hasher.js'
 import { extractMetadata, type SubtreeRenderer } from '../../domain/services/extract-metadata.js'
 import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
-import { traverseDependsOn } from './_shared/depends-on-traversal.js'
+import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
 
 /** Input for the {@link GetProjectContext} use case. */
 export interface GetProjectContextInput {
@@ -166,6 +166,12 @@ export class GetProjectContext {
 
     // Step 3 (optional): dependsOn traversal from included specs (only when followDeps is true)
     if (input.followDeps === true) {
+      const extraction = schema.metadataExtraction()
+      const depFallback: DependsOnFallback | undefined =
+        extraction !== undefined
+          ? { extraction, schemaArtifacts: schema.artifacts(), parsers: this._parsers }
+          : undefined
+
       const dependsOnAdded = new Map<string, ResolvedSpec>()
       const depSeen = new Set<string>()
       for (const [key] of includedSpecs) depSeen.add(key)
@@ -181,6 +187,7 @@ export class GetProjectContext {
           warnings,
           input.depth,
           0,
+          depFallback,
         )
       }
       for (const [key, spec] of dependsOnAdded) {
