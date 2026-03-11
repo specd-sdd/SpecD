@@ -239,7 +239,14 @@ export class GetSpecContext {
     currentDepth: number,
   ): Promise<void> {
     const metadataContent = artifacts.get('.specd-metadata.yaml')?.content
-    if (metadataContent === undefined) return
+    if (metadataContent === undefined) {
+      warnings.push({
+        type: 'missing-metadata',
+        path: `${defaultWorkspace}:unknown`,
+        message: `No .specd-metadata.yaml found — dependency traversal may be incomplete. Run metadata generation to fix.`,
+      })
+      return
+    }
 
     const metadata = this._parseMetadata(metadataContent)
     if (metadata.dependsOn === undefined || metadata.dependsOn.length === 0) return

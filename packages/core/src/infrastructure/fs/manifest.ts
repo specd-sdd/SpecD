@@ -203,6 +203,7 @@ export const changeManifestSchema = z.object({
   }),
   workspaces: z.array(z.string()).optional(),
   specIds: z.array(z.string()),
+  specDependsOn: z.record(z.string(), z.array(z.string())).optional(),
   artifacts: z.array(manifestArtifactSchema),
   history: z.array(rawChangeEventSchema),
 })
@@ -244,6 +245,13 @@ export interface ChangeManifest {
   readonly workspaces?: string[]
   /** Current snapshot of spec paths being modified. */
   readonly specIds: string[]
+  /**
+   * Per-spec declared dependencies, keyed by spec ID.
+   *
+   * Captured during change authoring to track dependencies even before
+   * `.specd-metadata.yaml` is generated. Omitted from the manifest when empty.
+   */
+  readonly specDependsOn?: Record<string, string[]>
   /** Artifact descriptors including their validation hashes. */
   readonly artifacts: ManifestArtifact[]
   /** Append-only event history. */

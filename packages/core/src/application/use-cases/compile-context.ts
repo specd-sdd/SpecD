@@ -20,7 +20,7 @@ import { type ContextWarning } from './_shared/context-warning.js'
 import { extractMetadata, type SubtreeRenderer } from '../../domain/services/extract-metadata.js'
 import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
-import { traverseDependsOn } from './_shared/depends-on-traversal.js'
+import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
 
 export { type ContextWarning } from './_shared/context-warning.js'
 
@@ -225,6 +225,13 @@ export class CompileContext {
     // Step 5: dependsOn traversal from change.specIds (only when followDeps is true)
     const dependsOnAdded = new Map<string, ResolvedSpec>()
     if (input.followDeps === true) {
+      // Build fallback for extracting dependsOn from spec content when metadata is absent
+      const extraction = schema.metadataExtraction()
+      const depFallback: DependsOnFallback | undefined =
+        extraction !== undefined
+          ? { extraction, schemaArtifacts: schema.artifacts(), parsers: this._parsers }
+          : undefined
+
       const depSeen = new Set<string>()
       for (const specId of change.specIds) {
         const { workspace, capPath } = parseSpecId(specId)
@@ -238,29 +245,56 @@ export class CompileContext {
         }
         const spec = await repo.get(specPathObj)
         if (!spec) continue
-        const metaArtifact = await repo.artifact(spec, '.specd-metadata.yaml')
-        if (!metaArtifact) continue
-        try {
-          const meta = parseMetadata(metaArtifact.content)
-          if (meta.dependsOn) {
-            for (const dep of meta.dependsOn) {
-              const { workspace: dw, capPath: dp } = parseSpecId(dep)
-              await traverseDependsOn(
-                dw,
-                dp,
-                includedSpecs,
-                dependsOnAdded,
-                depSeen,
-                new Set<string>(),
-                this._specs,
-                warnings,
-                input.depth,
-                0,
-              )
+        // Three-tier dependsOn resolution:
+        // 1. change.specDependsOn (manifest) — highest priority
+        // 2. .specd-metadata.yaml dependsOn field
+        // 3. Content extraction via metadataExtraction — fallback
+        let dependsOnList: string[] | undefined
+
+        const manifestDeps = change.specDependsOn.get(specId)
+        if (manifestDeps !== undefined && manifestDeps.length > 0) {
+          dependsOnList = [...manifestDeps]
+        } else {
+          const metaArtifact = await repo.artifact(spec, '.specd-metadata.yaml')
+
+          if (metaArtifact !== null) {
+            try {
+              const meta = parseMetadata(metaArtifact.content)
+              dependsOnList = meta.dependsOn
+            } catch {
+              // Skip specs with unparseable metadata
+            }
+          } else {
+            warnings.push({
+              type: 'missing-metadata',
+              path: specId,
+              message: `No .specd-metadata.yaml for '${specId}' — dependency traversal may be incomplete. Run metadata generation to fix.`,
+            })
+
+            // Attempt fallback extraction from spec content
+            if (depFallback !== undefined && depFallback.extraction.dependsOn !== undefined) {
+              dependsOnList = await this._extractDependsOnFallback(repo, spec, depFallback)
             }
           }
-        } catch {
-          // Skip specs with unparseable metadata
+        }
+
+        if (dependsOnList !== undefined) {
+          for (const dep of dependsOnList) {
+            const { workspace: dw, capPath: dp } = parseSpecId(dep)
+            await traverseDependsOn(
+              dw,
+              dp,
+              includedSpecs,
+              dependsOnAdded,
+              depSeen,
+              new Set<string>(),
+              this._specs,
+              warnings,
+              input.depth,
+              0,
+              depFallback,
+            )
+          }
         }
       }
     }
@@ -544,6 +578,44 @@ export class CompileContext {
       instructionBlock: parts.join('\n\n---\n\n'),
       warnings,
     }
+  }
+
+  /**
+   * Extracts `dependsOn` from spec content using the schema's metadata extraction
+   * declarations as a best-effort fallback.
+   *
+   * @param specRepo - Repository for loading spec artifacts
+   * @param spec - The spec entity to extract from
+   * @param fallback - Fallback configuration with extraction rules and parsers
+   * @returns Extracted dependsOn array, or undefined if extraction yields nothing
+   */
+  private async _extractDependsOnFallback(
+    specRepo: import('../ports/spec-repository.js').SpecRepository,
+    spec: Spec,
+    fallback: DependsOnFallback,
+  ): Promise<string[] | undefined> {
+    const astsByArtifact = new Map<string, { root: SelectorNode }>()
+    const renderers = new Map<string, SubtreeRenderer>()
+
+    for (const artifactType of fallback.schemaArtifacts) {
+      if (artifactType.scope !== 'spec') continue
+      const filename = artifactType.output.split('/').pop()!
+      const format = artifactType.format ?? inferFormat(filename) ?? 'plaintext'
+      const parser = this._parsers.get(format)
+      if (parser === undefined) continue
+
+      const artifactFile = await specRepo.artifact(spec, filename)
+      if (artifactFile === null) continue
+
+      const ast = parser.parse(artifactFile.content)
+      astsByArtifact.set(artifactType.id, ast)
+      renderers.set(artifactType.id, parser as SubtreeRenderer)
+    }
+
+    if (astsByArtifact.size === 0) return undefined
+
+    const extracted = extractMetadata(fallback.extraction, astsByArtifact, renderers)
+    return extracted.dependsOn
   }
 
   /**

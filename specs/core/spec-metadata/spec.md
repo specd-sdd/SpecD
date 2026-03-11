@@ -2,7 +2,7 @@
 
 ## Overview
 
-Each spec directory in a specd project may contain a `.specd-metadata.yaml` file alongside its content artifacts. This file records machine-readable metadata about the spec — specifically its declared context dependencies and a hash of the spec content at the time those dependencies were last derived. It is managed by the LLM agent, not by the user directly, and is not part of the schema artifact system.
+Each spec directory in a specd project may contain a `.specd-metadata.yaml` file alongside its content artifacts. This file records machine-readable metadata about the spec — specifically its declared context dependencies and a hash of the spec content at the time those dependencies were last derived. It is generated deterministically by core at archive time using the schema's `metadataExtraction` engine, and is not part of the schema artifact system.
 
 ## Requirements
 
@@ -100,11 +100,20 @@ If validation fails, `SaveSpecMetadata` throws a `MetadataValidationError` (a do
 
 Unknown top-level keys are allowed (`.passthrough()`) to support forward-compatible extensions.
 
-### Requirement: LLM authorship
+### Requirement: Deterministic generation at archive time
 
-`.specd-metadata.yaml` is written and maintained by the LLM agent. It is generated once per spec at archive time: when `ArchiveChange` completes, it signals which specs were modified via `staleMetadataSpecPaths`, and the caller (CLI or MCP layer) triggers the extraction agent for each of those specs.
+`.specd-metadata.yaml` is generated deterministically by core as part of the `ArchiveChange` use case. After merging deltas and syncing specs, `ArchiveChange` generates metadata for each modified spec:
 
-specd does not generate or rewrite `.specd-metadata.yaml` automatically. The agent is responsible for producing accurate output. After generation, the metadata is stable until the spec is modified again by a subsequent change.
+1. Load the spec's `requiredSpecArtifacts` from the workspace's `SpecRepository`
+2. Parse each artifact via its `ArtifactParser` to obtain an AST
+3. Run `extractMetadata()` with the schema's `metadataExtraction` declarations to extract `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, and `scenarios`
+4. If `change.specDependsOn` has an entry for the spec, use it as `dependsOn` instead of the extracted value (manifest dependencies take priority)
+5. Compute `contentHashes` by hashing each `requiredSpecArtifacts` file
+6. Write the result via `SaveSpecMetadata`
+
+If extraction produces no `title` or `description` (e.g. the spec has no `# Title` heading or `## Overview` section), the corresponding fields are omitted and `SaveSpecMetadata` will reject the write — the spec must conform to the schema's extraction declarations.
+
+After generation, the metadata is stable until the spec is modified again by a subsequent change. The LLM may improve metadata at any point (e.g. refining `description` or `keywords`) by calling `SaveSpecMetadata` directly — the deterministic baseline ensures metadata always exists after archive.
 
 ### Requirement: Staleness detection
 
@@ -118,7 +127,7 @@ Staleness is advisory only. specd does not block any operation because `.specd-m
 
 `CompileContext` reads `.specd-metadata.yaml` for two purposes:
 
-1. **Spec collection** — `dependsOn` is followed transitively from `change.contextSpecIds` to discover which specs to include in the context. The full resolution order is defined in [`specs/core/config/spec.md`](../config/spec.md) — Requirement: Context spec selection.
+1. **Spec collection** — `dependsOn` is followed transitively from `change.specIds` to discover which specs to include in the context. The full resolution order is defined in [`specs/core/config/spec.md`](../config/spec.md) — Requirement: Context spec selection. When `.specd-metadata.yaml` is absent for a spec during `dependsOn` traversal, a `missing-metadata` warning is emitted. `CompileContext` then attempts to extract `dependsOn` from the spec content using the schema's `metadataExtraction` declarations as a best-effort fallback.
 
 2. **Spec content** — for each spec in the collected context set, if metadata is fresh, `CompileContext` uses `description`, `rules`, `constraints`, and `scenarios` as the compact, machine-optimised representation of that spec. If metadata is absent or stale, `CompileContext` falls back to the schema's `metadataExtraction` declarations to extract the same fields deterministically and emits a staleness warning.
 
@@ -145,6 +154,6 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 ## Spec Dependencies
 
 - [`specs/core/config/spec.md`](../config/spec.md) — context spec selection and resolution order
-- [`specs/core/change/spec.md`](../change/spec.md) — `contextSpecIds` in the change manifest, populated from `dependsOn`
+- [`specs/core/change/spec.md`](../change/spec.md) — `specDependsOn` in the change manifest, per-spec declared dependencies
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `requiredSpecArtifacts`, used to determine which files to hash for staleness detection
 - [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — the extraction engine used as CompileContext fallback when metadata is stale

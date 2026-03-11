@@ -54,19 +54,19 @@
 - **WHEN** parsing `billing/auth/login` (no colon)
 - **THEN** workspace is `default` and capability path is `billing/auth/login`
 
-### Requirement: contextSpecIds format
+### Requirement: specDependsOn format
 
-#### Scenario: contextSpecIds use canonical format
+#### Scenario: specDependsOn uses canonical format
 
 - **GIVEN** a spec at `default:auth/login` with `dependsOn: ['auth/session']`
-- **WHEN** context spec IDs are resolved
-- **THEN** `contextSpecIds` contains `default:auth/session` in fully-qualified format
+- **WHEN** dependency spec IDs are resolved
+- **THEN** `specDependsOn` values contain `default:auth/session` in fully-qualified format
 
-#### Scenario: Cross-workspace contextSpecIds
+#### Scenario: Cross-workspace specDependsOn
 
 - **GIVEN** a spec at `billing:invoices/create` with `dependsOn: ['billing:invoices/shared']`
-- **WHEN** context spec IDs are resolved
-- **THEN** `contextSpecIds` contains `billing:invoices/shared` and traversal uses workspace `billing`
+- **WHEN** dependency spec IDs are resolved
+- **THEN** `specDependsOn` contains `billing:invoices/shared` and traversal uses workspace `billing`
 
 ### Requirement: Normalization
 

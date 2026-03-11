@@ -444,6 +444,14 @@ export class FsChangeRepository extends ChangeRepository {
 
     const history = manifest.history.map(deserializeEvent)
 
+    let specDependsOn: Map<string, readonly string[]> | undefined
+    if (manifest.specDependsOn !== undefined) {
+      specDependsOn = new Map<string, readonly string[]>()
+      for (const [key, deps] of Object.entries(manifest.specDependsOn)) {
+        specDependsOn.set(key, deps)
+      }
+    }
+
     return new Change({
       name: manifest.name,
       createdAt: new Date(manifest.createdAt),
@@ -451,6 +459,7 @@ export class FsChangeRepository extends ChangeRepository {
       specIds: manifest.specIds,
       history,
       artifacts: artifactMap,
+      ...(specDependsOn !== undefined ? { specDependsOn } : {}),
     })
   }
 
@@ -500,12 +509,18 @@ function changeToManifest(change: Change): ChangeManifest {
       ? { name: createdEvent.schemaName, version: createdEvent.schemaVersion }
       : { name: '', version: 0 }
 
+  const specDependsOn: Record<string, string[]> = {}
+  for (const [key, deps] of change.specDependsOn) {
+    specDependsOn[key] = [...deps]
+  }
+
   return {
     name: change.name,
     createdAt: change.createdAt.toISOString(),
     ...(change.description !== undefined ? { description: change.description } : {}),
     schema,
     specIds: [...change.specIds],
+    ...(Object.keys(specDependsOn).length > 0 ? { specDependsOn } : {}),
     artifacts: [...change.artifacts.values()].map(serializeArtifact),
     history: change.history.map(serializeEvent),
   }

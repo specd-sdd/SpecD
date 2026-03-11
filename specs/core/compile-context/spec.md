@@ -72,7 +72,19 @@ If a pattern or `dependsOn` entry references a workspace name that has no entry 
 4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set.
 5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's `.specd-metadata.yaml` `dependsOn` entries, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.
 
+When a spec in the traversal has no `.specd-metadata.yaml`, `CompileContext` emits a `missing-metadata` warning identifying the spec and suggesting metadata generation. Traversal continues with any `dependsOn` information available from the change manifest's `specDependsOn` or from content extraction via the schema's `metadataExtraction` declarations.
+
 A spec matched by multiple include patterns appears exactly once, at the position of the first matching include pattern. Specs added via `dependsOn` traversal that were already included in steps 1–4 also appear once (at their earlier position).
+
+### Requirement: dependsOn resolution order
+
+For each spec in Step 5, `dependsOn` is resolved using a three-tier fallback:
+
+1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority)
+2. `.specd-metadata.yaml` `dependsOn` field — the persisted metadata
+3. Schema `metadataExtraction` engine — extracts `dependsOn` from spec content when metadata is absent
+
+The first tier that returns a non-empty result is used. If all tiers return empty, the spec is treated as having no dependencies.
 
 ### Requirement: Cycle detection during dependsOn traversal
 

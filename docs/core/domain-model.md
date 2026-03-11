@@ -8,16 +8,16 @@ This document describes the entities and value objects that `@specd/core` use ca
 
 ### Readable properties
 
-| Property         | Type                                  | Description                                                  |
-| ---------------- | ------------------------------------- | ------------------------------------------------------------ |
-| `name`           | `string`                              | Unique slug name. Immutable after creation.                  |
-| `createdAt`      | `Date`                                | Timestamp when the change was created. Immutable.            |
-| `state`          | `ChangeState`                         | Current lifecycle state, derived from history.               |
-| `workspaces`     | `readonly string[]`                   | Workspace IDs this change belongs to.                        |
-| `specIds`        | `readonly string[]`                   | Spec paths being created or modified.                        |
-| `contextSpecIds` | `readonly string[]`                   | Spec paths providing context but not being modified.         |
-| `history`        | `readonly ChangeEvent[]`              | Append-only event log.                                       |
-| `artifacts`      | `ReadonlyMap<string, ChangeArtifact>` | Artifacts tracked in this change, keyed by artifact type ID. |
+| Property        | Type                                     | Description                                                  |
+| --------------- | ---------------------------------------- | ------------------------------------------------------------ |
+| `name`          | `string`                                 | Unique slug name. Immutable after creation.                  |
+| `createdAt`     | `Date`                                   | Timestamp when the change was created. Immutable.            |
+| `state`         | `ChangeState`                            | Current lifecycle state, derived from history.               |
+| `workspaces`    | `readonly string[]`                      | Workspace IDs this change belongs to.                        |
+| `specIds`       | `readonly string[]`                      | Spec paths being created or modified.                        |
+| `specDependsOn` | `ReadonlyMap<string, readonly string[]>` | Per-spec declared dependencies, keyed by spec ID.            |
+| `history`       | `readonly ChangeEvent[]`                 | Append-only event log.                                       |
+| `artifacts`     | `ReadonlyMap<string, ChangeArtifact>`    | Artifacts tracked in this change, keyed by artifact type ID. |
 
 ### state
 

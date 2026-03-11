@@ -100,6 +100,34 @@
 - **THEN** the archive is not rolled back
 - **AND** the result's `postHookFailures` includes the failed hook
 
+### Requirement: Spec metadata generation
+
+#### Scenario: Metadata generated for modified specs after archive
+
+- **GIVEN** a change modifies specs `auth/login` and `auth/register`
+- **WHEN** `ArchiveChange.execute` completes successfully
+- **THEN** `.specd-metadata.yaml` is written for both `auth/login` and `auth/register` with `title`, `description`, `dependsOn`, `contentHashes`, and any `rules`, `constraints`, `scenarios` extracted from the spec content
+
+#### Scenario: Manifest specDependsOn overrides extracted dependsOn
+
+- **GIVEN** a change has `specDependsOn: { "default:auth/login": ["default:auth/shared"] }`
+- **AND** the spec's `## Spec Dependencies` section links to `auth/jwt`
+- **WHEN** `ArchiveChange.execute` generates metadata for `auth/login`
+- **THEN** the written `.specd-metadata.yaml` has `dependsOn: [default:auth/shared]` (from the manifest, not from extraction)
+
+#### Scenario: Metadata generation failure does not abort archive
+
+- **GIVEN** a spec has no `# Title` heading and the schema's `metadataExtraction.title` selector matches nothing
+- **WHEN** `ArchiveChange.execute` runs metadata generation for that spec
+- **THEN** the archive is not rolled back
+- **AND** the spec path appears in `staleMetadataSpecPaths`
+
+#### Scenario: staleMetadataSpecPaths empty on full success
+
+- **GIVEN** all modified specs produce valid metadata
+- **WHEN** `ArchiveChange.execute` completes
+- **THEN** `staleMetadataSpecPaths` is empty
+
 ### Requirement: Result shape
 
 #### Scenario: Successful archive returns result

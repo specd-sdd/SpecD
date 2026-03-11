@@ -13,6 +13,9 @@ import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js
 import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
 import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { type GenerateSpecMetadata } from '../../../src/application/use-cases/generate-spec-metadata.js'
+import { type SaveSpecMetadata } from '../../../src/application/use-cases/save-spec-metadata.js'
+import { YamlSerializer } from '../../../src/application/ports/yaml-serializer.js'
 import {
   makeChangeRepository,
   makeActorResolver,
@@ -25,6 +28,31 @@ import {
   makeParsers,
   testActor,
 } from './helpers.js'
+
+function makeGenerateMetadata(): GenerateSpecMetadata {
+  return {
+    execute: vi.fn().mockResolvedValue({ metadata: {}, hasExtraction: false }),
+  } as unknown as GenerateSpecMetadata
+}
+
+function makeSaveMetadata(): SaveSpecMetadata {
+  return {
+    execute: vi.fn().mockResolvedValue({ spec: 'default:test' }),
+  } as unknown as SaveSpecMetadata
+}
+
+class StubYamlSerializer extends YamlSerializer {
+  override parse(content: string): unknown {
+    return JSON.parse(content)
+  }
+  override stringify(data: unknown): string {
+    return JSON.stringify(data)
+  }
+}
+
+function makeYaml(): YamlSerializer {
+  return new StubYamlSerializer()
+}
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -119,6 +147,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -139,6 +170,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(null),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -197,6 +231,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -217,6 +254,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema({ name: 'schema-b' })),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -237,6 +277,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -259,6 +302,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -278,6 +324,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -317,6 +366,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -382,6 +434,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -421,6 +476,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -452,6 +510,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -491,6 +552,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -533,6 +597,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -563,6 +630,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -592,6 +662,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -634,6 +707,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -687,6 +763,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -738,6 +817,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -780,6 +862,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -808,6 +893,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -838,6 +926,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -886,6 +977,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',
@@ -931,6 +1025,9 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
         'std',
         new Map(),
         '/repo',

@@ -545,10 +545,10 @@ rules:
 
         5. Workspace-level exclude patterns from each active workspace (same order as step 4)
 
-        6. All specs reachable via dependsOn traversal — starting from the change's contextSpecIds, following dependsOn
-        links in each spec's .specd-metadata.yaml transitively until no new specs are found. These specs are not subject
-        to exclude rules from steps 3 or 5 — a declared dependency is always included regardless of project or workspace
-        excludes.
+        6. All specs reachable via dependsOn traversal — starting from the change's specIds, following dependsOn links
+        (resolved via the three-tier order: change.specDependsOn, .specd-metadata.yaml, content extraction) transitively
+        until no new specs are found. These specs are not subject to exclude rules from steps 3 or 5 — a declared
+        dependency is always included regardless of project or workspace excludes.
 
 
 
@@ -1196,20 +1196,20 @@ scenarios:
     name: Resolution order — project includes, project excludes, workspace includes, workspace excludes
     given:
       - "project-level contextIncludeSpecs: ['default:*'] and contextExcludeSpecs: ['default:drafts/*']"
+      - "AND default workspace declares contextIncludeSpecs: ['*'] and the change is active in default"
     when:
       - CompileContext builds the context
     then:
-      - "default workspace declares contextIncludeSpecs: ['*'] and the change is active in default"
       - project-level includes are accumulated first, then project-level excludes remove default:drafts/*, then
         workspace-level includes from default add remaining specs, in that order
   - requirement: Context spec selection
     name: Project-level exclude applied before workspace-level includes
     given:
       - "project-level contextExcludeSpecs: ['default:auth/*']"
+      - "AND default workspace declares contextIncludeSpecs: ['auth/*'] and is active"
     when:
       - CompileContext builds the context
     then:
-      - "default workspace declares contextIncludeSpecs: ['auth/*'] and is active"
       - default:auth/* specs are excluded — the project-level exclude (step 2) fires before workspace-level includes
         (step 3)
   - requirement: Context spec selection
@@ -1391,6 +1391,6 @@ scenarios:
     then:
       - it reads /shared/instructions.md directly, without resolving relative to the specd.yaml directory
 contentHashes:
-  spec.md: sha256:65a2f5dd19a996aa4a735d943c4e42ef98ef37cdd5b21a2cfce8b0461b7f1a70
+  spec.md: sha256:1c27d4b607f6c198de72b61ae4bb7639fee5ab4dc330ea5c9daea80d047c1fd3
   verify.md: sha256:1f68b76a90ebd403b257cfaddfd2acb71d7720864000cc19ad9602d09ef48f1f
 generatedBy: core

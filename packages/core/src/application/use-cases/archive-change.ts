@@ -18,6 +18,9 @@ import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
+import { type GenerateSpecMetadata } from './generate-spec-metadata.js'
+import { type SaveSpecMetadata } from './save-spec-metadata.js'
+import { type YamlSerializer } from '../ports/yaml-serializer.js'
 
 /** Input for the {@link ArchiveChange} use case. */
 export interface ArchiveChangeInput {
@@ -34,8 +37,9 @@ export interface ArchiveChangeResult {
   /** Commands of post-archive hooks that failed; empty on full success. */
   readonly postHookFailures: string[]
   /**
-   * Spec paths whose `.specd-metadata.yaml` should be regenerated because their
-   * content was modified during the delta merge step.
+   * Spec paths where `.specd-metadata.yaml` generation failed during this archive
+   * (e.g. extraction produced no required fields); empty when all metadata was
+   * generated successfully.
    */
   readonly staleMetadataSpecPaths: string[]
 }
@@ -55,6 +59,9 @@ export class ArchiveChange {
   private readonly _actor: ActorResolver
   private readonly _parsers: ArtifactParserRegistry
   private readonly _schemas: SchemaRegistry
+  private readonly _generateMetadata: GenerateSpecMetadata
+  private readonly _saveMetadata: SaveSpecMetadata
+  private readonly _yaml: YamlSerializer
   private readonly _schemaRef: string
   private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
   private readonly _projectRoot: string
@@ -76,6 +83,9 @@ export class ArchiveChange {
    * @param actor - Resolver for the actor identity
    * @param parsers - Registry of artifact format parsers
    * @param schemas - Registry for resolving schema references
+   * @param generateMetadata - Use case for deterministic metadata extraction
+   * @param saveMetadata - Use case for writing `.specd-metadata.yaml`
+   * @param yaml - YAML serializer for metadata content
    * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
    * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
    * @param projectRoot - Absolute path to the project root
@@ -92,6 +102,9 @@ export class ArchiveChange {
     actor: ActorResolver,
     parsers: ArtifactParserRegistry,
     schemas: SchemaRegistry,
+    generateMetadata: GenerateSpecMetadata,
+    saveMetadata: SaveSpecMetadata,
+    yaml: YamlSerializer,
     schemaRef: string,
     workspaceSchemasPaths: ReadonlyMap<string, string>,
     projectRoot: string,
@@ -108,6 +121,9 @@ export class ArchiveChange {
     this._actor = actor
     this._parsers = parsers
     this._schemas = schemas
+    this._generateMetadata = generateMetadata
+    this._saveMetadata = saveMetadata
+    this._yaml = yaml
     this._schemaRef = schemaRef
     this._workspaceSchemasPaths = workspaceSchemasPaths
     this._projectRoot = projectRoot
@@ -236,6 +252,12 @@ export class ArchiveChange {
       }
 
       if (synced) staleSpecIds.add(specId)
+
+      // Specs with manifest-declared dependencies also need metadata regeneration
+      // so that dependsOn flows into .specd-metadata.yaml
+      if (change.specDependsOn.get(specId) !== undefined) {
+        staleSpecIds.add(specId)
+      }
     }
 
     // --- Archive ---
@@ -271,11 +293,42 @@ export class ArchiveChange {
       }
     }
 
+    // --- Spec metadata generation ---
+    const failedMetadataSpecPaths: string[] = []
+
+    for (const specId of staleSpecIds) {
+      try {
+        const result = await this._generateMetadata.execute({ specId })
+        if (!result.hasExtraction || Object.keys(result.metadata).length === 0) {
+          failedMetadataSpecPaths.push(specId)
+          continue
+        }
+
+        // Merge manifest dependsOn (highest priority)
+        const manifestDeps = change.specDependsOn.get(specId)
+        const metadata =
+          manifestDeps !== undefined
+            ? { ...result.metadata, dependsOn: [...manifestDeps] }
+            : result.metadata
+
+        const yamlContent = this._yaml.stringify(metadata)
+        const { workspace, capPath } = parseSpecId(specId)
+        await this._saveMetadata.execute({
+          workspace,
+          specPath: SpecPath.parse(capPath),
+          content: yamlContent,
+          force: true,
+        })
+      } catch {
+        failedMetadataSpecPaths.push(specId)
+      }
+    }
+
     return {
       archivedChange,
       archiveDirPath,
       postHookFailures,
-      staleMetadataSpecPaths: [...staleSpecIds],
+      staleMetadataSpecPaths: failedMetadataSpecPaths,
     }
   }
 }

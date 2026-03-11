@@ -121,17 +121,32 @@
 - **WHEN** `parseMetadata` reads the file
 - **THEN** it returns `{}` without throwing — read path never blocks operations
 
-### Requirement: LLM authorship
+### Requirement: Deterministic generation at archive time
 
-#### Scenario: Agent writes metadata after creating spec
+#### Scenario: Metadata generated after archive
 
-- **WHEN** the LLM agent creates a new spec
-- **THEN** it produces a `.specd-metadata.yaml` with `title`, `description`, `keywords`, `dependsOn`, `contentHashes`, `rules`, `constraints` (if any), and `scenarios` (if any) derived from the spec content
+- **GIVEN** a change modifies the spec `core/change`
+- **WHEN** `ArchiveChange` completes the delta merge and spec sync
+- **THEN** core generates `.specd-metadata.yaml` for `core/change` using the schema's `metadataExtraction` engine
+- **AND** the file contains `title`, `description`, `dependsOn`, `contentHashes`, and any `rules`, `constraints`, `scenarios` extracted from the spec content
 
-#### Scenario: specd does not overwrite metadata
+#### Scenario: Manifest dependsOn takes priority over extracted
 
-- **WHEN** any specd command runs
-- **THEN** specd never rewrites `.specd-metadata.yaml` — only the LLM agent does
+- **GIVEN** a change has `specDependsOn` entries for a spec
+- **WHEN** metadata is generated for that spec
+- **THEN** `dependsOn` in the written metadata comes from `change.specDependsOn`, not from the extraction engine
+
+#### Scenario: LLM may improve metadata after generation
+
+- **GIVEN** a spec has a deterministically generated `.specd-metadata.yaml`
+- **WHEN** the LLM calls `SaveSpecMetadata` with an improved `description`
+- **THEN** the metadata is overwritten — the LLM is free to improve any field
+
+#### Scenario: Generation failure does not block archive
+
+- **GIVEN** extraction produces no `title` for a spec
+- **WHEN** `SaveSpecMetadata` rejects the write
+- **THEN** the archive is not aborted — the spec path is reported in `staleMetadataSpecPaths`
 
 ### Requirement: Staleness detection
 
@@ -169,7 +184,7 @@
 
 #### Scenario: Transitive traversal
 
-- **WHEN** change has `contextSpecIds: [auth/login]` and `auth/login/.specd-metadata.yaml` lists `auth/jwt` in `dependsOn`, and `auth/jwt/.specd-metadata.yaml` lists `crypto/keys`
+- **WHEN** change has `specIds: ['default:auth/login']` and `auth/login/.specd-metadata.yaml` lists `auth/jwt` in `dependsOn`, and `auth/jwt/.specd-metadata.yaml` lists `crypto/keys`
 - **THEN** `CompileContext` includes all three: `auth/login`, `auth/jwt`, and `crypto/keys`
 
 #### Scenario: Missing spec in dependsOn skipped with warning

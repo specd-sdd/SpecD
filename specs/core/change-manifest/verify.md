@@ -7,7 +7,7 @@
 #### Scenario: Manifest written on creation
 
 - **WHEN** a new change `add-auth-flow` is created
-- **THEN** a `manifest.json` is written containing `name`, `createdAt`, `schema`, `workspaces`, `specIds`, `contextSpecIds`, `artifacts`, and a `history` array with a single `created` event
+- **THEN** a `manifest.json` is written containing `name`, `createdAt`, `schema`, `specIds`, `artifacts`, and a `history` array with a single `created` event
 
 #### Scenario: No state field in manifest
 
@@ -45,10 +45,21 @@
 - **WHEN** an `invalidated` event is appended
 - **THEN** both `validatedHash` values are set to `null` in the manifest — rollback is uniform
 
-#### Scenario: contextSpecIds does not invalidate approvals
+#### Scenario: specDependsOn does not invalidate approvals
 
-- **WHEN** `contextSpecIds` is updated on a change that has an active `spec-approved` event
+- **WHEN** `specDependsOn` is updated on a change that has an active `spec-approved` event
 - **THEN** no `invalidated` event is appended and the approval remains active
+
+#### Scenario: Manifest with specDependsOn round-trips correctly
+
+- **WHEN** a manifest is saved with `specDependsOn: { "auth/login": ["auth/shared", "auth/jwt"] }`
+- **AND** the manifest is loaded back
+- **THEN** `change.specDependsOn.get("auth/login")` returns `["auth/shared", "auth/jwt"]`
+
+#### Scenario: Manifest without specDependsOn loads with empty dependencies
+
+- **WHEN** a manifest is loaded that has no `specDependsOn` field
+- **THEN** `change.specDependsOn` is an empty map
 
 ### Requirement: Schema version
 
