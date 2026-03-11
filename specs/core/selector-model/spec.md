@@ -2,7 +2,7 @@
 
 ## Overview
 
-The selector model defines how nodes in an artifact AST are identified and addressed. Selectors are used across multiple specd mechanisms: delta entries target nodes for modification or removal, validation rules assert structural constraints, and context sections declare which nodes to extract. The selector model is format-agnostic — the same fields apply regardless of whether the target document is markdown, JSON, YAML, or plain text.
+The selector model defines how nodes in an artifact AST are identified and addressed. Selectors are used across multiple specd mechanisms: delta entries target nodes for modification or removal, validation rules assert structural constraints, and metadata extraction declares which nodes to extract for deterministic metadata generation. The selector model is format-agnostic — the same fields apply regardless of whether the target document is markdown, JSON, YAML, or plain text.
 
 ## Requirements
 
@@ -16,6 +16,7 @@ A selector is a YAML object with the following fields:
 - `parent` (selector, optional) — constrains the search to nodes whose nearest ancestor matches this selector; used to disambiguate nodes with the same identifier at different nesting levels
 - `index` (integer, optional) — for `array-item` and `sequence-item` nodes, targets the item at this zero-based index; mutually exclusive with `where`
 - `where` (object, optional) — for `array-item` and `sequence-item` nodes where items are objects, targets the item whose fields match all key–value pairs in `where`; values are matched as case-insensitive regular expressions (same as `matches`); mutually exclusive with `index`
+- `level` (integer, optional) — for markdown `section` nodes, matches only sections at this heading level (1 = `#`, 2 = `##`, etc.); non-markdown nodes or nodes without a `level` property simply do not match when `level` is specified
 
 ### Requirement: Node types by file format
 
@@ -33,7 +34,7 @@ The `label` field on a node is the identifying value evaluated by `matches`; the
 When multiple nodes match a selector, the outcome depends on the calling context:
 
 - In **delta entries** (`modified`, `removed`) — `apply` must reject with a `DeltaApplicationError`; selectors in delta operations must resolve to exactly one node.
-- In **validation rules** and **context sections** — multiple matches are expected and each matched node is processed individually.
+- In **validation rules** and **metadata extraction** — multiple matches are expected and each matched node is processed individually.
 
 ### Requirement: No-match behaviour
 
@@ -102,5 +103,3 @@ selector:
 ## Spec Dependencies
 
 - [`specs/core/artifact-ast/spec.md`](../artifact-ast/spec.md) — normalized AST format; defines node types, `label`/`value` semantics
-- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — uses selectors in delta entries and `position` hints
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — uses selectors in `validations`, `deltaValidations`, and `contextSections`

@@ -70,10 +70,10 @@ export {
 export { computeArtifactHash, buildCleanupMap } from './_shared/compute-artifact-hash.js'
 export { parseMetadata } from './_shared/parse-metadata.js'
 export {
-  type InferSpecSections,
-  type InferSpecSectionsInput,
-  type InferSpecSectionsResult,
-} from './infer-spec-sections.js'
+  type GenerateSpecMetadata,
+  type GenerateSpecMetadataInput,
+  type GenerateSpecMetadataResult,
+} from './generate-spec-metadata.js'
 export {
   type GetSpecContext,
   type GetSpecContextInput,

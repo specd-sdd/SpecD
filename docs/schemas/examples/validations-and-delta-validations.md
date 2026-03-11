@@ -251,25 +251,28 @@ deltaValidations:
         required: true
 ```
 
-## Combining validations with contextSections
+## Combining validations with metadataExtraction
 
-`validations` and `contextSections` work off the same node type vocabulary and selector model. A pattern you use to validate that a section exists can be reused to extract that section into AI context:
+`validations` and `metadataExtraction` work off the same node type vocabulary and selector model. A pattern you use to validate that a section exists can be reused to extract that section's metadata. Note that `metadataExtraction` is a **top-level schema field**, not a per-artifact field:
 
 ```yaml
-- id: specs
-  scope: spec
-  output: 'specs/**/spec.md'
-  validations:
-    - type: section
+# Top-level schema field
+metadataExtraction:
+  # Extract the same Requirements section for metadata
+  - selector:
+      type: section
       matches: '^Requirements$'
-      required: true
-  contextSections:
-    # Extract the same Requirements section for context injection
-    - selector:
-        type: section
+    role: rules
+    contextTitle: Spec Requirements
+
+artifacts:
+  - id: specs
+    scope: spec
+    output: 'specs/**/spec.md'
+    validations:
+      - type: section
         matches: '^Requirements$'
-      role: rules
-      contextTitle: Spec Requirements
+        required: true
 ```
 
-This keeps the validation constraint and the context extraction declaration aligned — if you add a new section to validate, you can decide whether it also belongs in AI context.
+This keeps the validation constraint and the metadata extraction declaration aligned — if you add a new section to validate, you can decide whether it also belongs in extracted metadata.

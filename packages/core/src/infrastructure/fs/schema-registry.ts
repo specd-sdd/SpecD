@@ -14,11 +14,16 @@ import {
 import { type WorkflowStep, type HookEntry } from '../../domain/value-objects/workflow-step.js'
 import {
   type ValidationRule,
-  type ContextSection,
   type PreHashCleanup,
   type TaskCompletionCheck,
 } from '../../domain/value-objects/validation-rule.js'
 import { type Selector } from '../../domain/value-objects/selector.js'
+import { type Extractor, type FieldMapping } from '../../domain/value-objects/extractor.js'
+import { type SelectorRaw, SelectorZodSchema, buildSelector } from '../zod/selector-schema.js'
+import {
+  type MetadataExtraction,
+  type MetadataExtractorEntry,
+} from '../../domain/value-objects/metadata-extraction.js'
 import { SchemaValidationError } from '../../domain/errors/schema-validation-error.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 
@@ -47,16 +52,6 @@ export interface FsSchemaRegistryConfig {
 // Used only inside this module; domain types are built from these shapes.
 // ---------------------------------------------------------------------------
 
-/** Zod-inferred intermediate shape for a parsed selector before domain conversion. */
-interface SelectorRaw {
-  type: string
-  matches?: string | undefined
-  contains?: string | undefined
-  parent?: SelectorRaw | undefined
-  index?: number | undefined
-  where?: Record<string, string> | undefined
-}
-
 /** Zod-inferred intermediate shape for a parsed validation rule before domain conversion. */
 interface ValidationRuleRaw {
   selector?: SelectorRaw | undefined
@@ -73,28 +68,9 @@ interface ValidationRuleRaw {
   where?: Record<string, string> | undefined
 }
 
-/** Zod-inferred intermediate shape for a parsed context section before domain conversion. */
-interface ContextSectionRaw {
-  selector: SelectorRaw
-  role?: 'rules' | 'constraints' | 'scenarios' | 'context' | undefined
-  extract?: 'content' | 'label' | 'both' | undefined
-  contextTitle?: string | undefined
-}
-
 // ---------------------------------------------------------------------------
 // Zod schemas for schema.yaml validation
 // ---------------------------------------------------------------------------
-
-const SelectorZodSchema: z.ZodType<SelectorRaw> = z.lazy(() =>
-  z.object({
-    type: z.string(),
-    matches: z.string().optional(),
-    contains: z.string().optional(),
-    parent: SelectorZodSchema.optional(),
-    index: z.number().optional(),
-    where: z.record(z.string()).optional(),
-  }),
-)
 
 const ValidationRuleZodSchema: z.ZodType<ValidationRuleRaw> = z.lazy(() =>
   z.object({
@@ -114,11 +90,38 @@ const ValidationRuleZodSchema: z.ZodType<ValidationRuleRaw> = z.lazy(() =>
   }),
 )
 
-const ContextSectionZodSchema: z.ZodType<ContextSectionRaw> = z.object({
+const FieldMappingZodSchema = z.object({
+  from: z.enum(['label', 'parentLabel', 'content']).optional(),
+  childSelector: SelectorZodSchema.optional(),
+  capture: z.string().optional(),
+  strip: z.string().optional(),
+  followSiblings: z.string().optional(),
+})
+
+const ExtractorZodSchema = z.object({
   selector: SelectorZodSchema,
-  role: z.enum(['rules', 'constraints', 'scenarios', 'context']).optional(),
   extract: z.enum(['content', 'label', 'both']).optional(),
-  contextTitle: z.string().optional(),
+  capture: z.string().optional(),
+  strip: z.string().optional(),
+  groupBy: z.literal('label').optional(),
+  transform: z.string().optional(),
+  fields: z.record(FieldMappingZodSchema).optional(),
+})
+
+const MetadataExtractorEntryZodSchema = z.object({
+  artifact: z.string(),
+  extractor: ExtractorZodSchema,
+})
+
+const MetadataExtractionZodSchema = z.object({
+  title: MetadataExtractorEntryZodSchema.optional(),
+  description: MetadataExtractorEntryZodSchema.optional(),
+  dependsOn: MetadataExtractorEntryZodSchema.optional(),
+  keywords: MetadataExtractorEntryZodSchema.optional(),
+  context: z.array(MetadataExtractorEntryZodSchema).optional(),
+  rules: z.array(MetadataExtractorEntryZodSchema).optional(),
+  constraints: z.array(MetadataExtractorEntryZodSchema).optional(),
+  scenarios: z.array(MetadataExtractorEntryZodSchema).optional(),
 })
 
 const PreHashCleanupZodSchema = z.object({
@@ -175,7 +178,6 @@ const ArtifactZodSchema = z
     deltaInstruction: z.string().optional(),
     validations: z.array(ValidationRuleZodSchema).optional(),
     deltaValidations: z.array(ValidationRuleZodSchema).optional(),
-    contextSections: z.array(ContextSectionZodSchema).optional(),
     preHashCleanup: z.array(PreHashCleanupZodSchema).optional(),
     taskCompletionCheck: TaskCompletionCheckZodSchema.optional(),
   })
@@ -193,6 +195,7 @@ const SchemaYamlZodSchema = z.object({
   version: z.number().int(),
   description: z.string().optional(),
   artifacts: z.array(ArtifactZodSchema),
+  metadataExtraction: MetadataExtractionZodSchema.optional(),
   workflow: z.array(WorkflowStepZodSchema).optional(),
 })
 
@@ -202,24 +205,6 @@ type ArtifactYaml = z.infer<typeof ArtifactZodSchema>
 // ---------------------------------------------------------------------------
 // Domain type builders (strip | undefined to satisfy exactOptionalPropertyTypes)
 // ---------------------------------------------------------------------------
-
-/**
- * Converts an intermediate `SelectorRaw` to the domain {@link Selector} type,
- * stripping any `undefined` optional values.
- *
- * @param raw - The Zod-validated selector shape
- * @returns A domain-compatible `Selector`
- */
-function buildSelector(raw: SelectorRaw): Selector {
-  return {
-    type: raw.type,
-    ...(raw.matches !== undefined ? { matches: raw.matches } : {}),
-    ...(raw.contains !== undefined ? { contains: raw.contains } : {}),
-    ...(raw.parent !== undefined ? { parent: buildSelector(raw.parent) } : {}),
-    ...(raw.index !== undefined ? { index: raw.index } : {}),
-    ...(raw.where !== undefined ? { where: raw.where } : {}),
-  }
-}
 
 /**
  * Converts an intermediate `ValidationRuleRaw` to the domain
@@ -254,18 +239,86 @@ function buildValidationRule(raw: ValidationRuleRaw): ValidationRule {
 }
 
 /**
- * Converts an intermediate `ContextSectionRaw` to the domain
- * {@link ContextSection} type.
+ * Converts a Zod-validated field mapping to the domain {@link FieldMapping} type.
  *
- * @param raw - The Zod-validated context section shape
- * @returns A domain-compatible `ContextSection`
+ * @param raw - The Zod-validated field mapping object
+ * @returns The domain FieldMapping value object
  */
-function buildContextSection(raw: ContextSectionRaw): ContextSection {
+function buildFieldMapping(raw: z.infer<typeof FieldMappingZodSchema>): FieldMapping {
+  return {
+    ...(raw.from !== undefined ? { from: raw.from } : {}),
+    ...(raw.childSelector !== undefined ? { childSelector: buildSelector(raw.childSelector) } : {}),
+    ...(raw.capture !== undefined ? { capture: raw.capture } : {}),
+    ...(raw.strip !== undefined ? { strip: raw.strip } : {}),
+    ...(raw.followSiblings !== undefined ? { followSiblings: raw.followSiblings } : {}),
+  }
+}
+
+/**
+ * Converts a Zod-validated extractor to the domain {@link Extractor} type.
+ *
+ * @param raw - The Zod-validated extractor object
+ * @returns The domain Extractor value object
+ */
+function buildExtractor(raw: z.infer<typeof ExtractorZodSchema>): Extractor {
   return {
     selector: buildSelector(raw.selector),
-    ...(raw.role !== undefined ? { role: raw.role } : {}),
     ...(raw.extract !== undefined ? { extract: raw.extract } : {}),
-    ...(raw.contextTitle !== undefined ? { contextTitle: raw.contextTitle } : {}),
+    ...(raw.capture !== undefined ? { capture: raw.capture } : {}),
+    ...(raw.strip !== undefined ? { strip: raw.strip } : {}),
+    ...(raw.groupBy !== undefined ? { groupBy: raw.groupBy } : {}),
+    ...(raw.transform !== undefined ? { transform: raw.transform } : {}),
+    ...(raw.fields !== undefined
+      ? {
+          fields: Object.fromEntries(
+            Object.entries(raw.fields).map(([k, v]) => [k, buildFieldMapping(v)]),
+          ),
+        }
+      : {}),
+  }
+}
+
+/**
+ * Converts a Zod-validated metadata extractor entry to the domain type.
+ *
+ * @param raw - The Zod-validated metadata extractor entry
+ * @returns The domain MetadataExtractorEntry value object
+ */
+function buildMetadataExtractorEntry(
+  raw: z.infer<typeof MetadataExtractorEntryZodSchema>,
+): MetadataExtractorEntry {
+  return {
+    artifact: raw.artifact,
+    extractor: buildExtractor(raw.extractor),
+  }
+}
+
+/**
+ * Converts a Zod-validated metadata extraction block to the domain type.
+ *
+ * @param raw - The Zod-validated metadata extraction block
+ * @returns The domain MetadataExtraction value object
+ */
+function buildMetadataExtraction(
+  raw: z.infer<typeof MetadataExtractionZodSchema>,
+): MetadataExtraction {
+  return {
+    ...(raw.title !== undefined ? { title: buildMetadataExtractorEntry(raw.title) } : {}),
+    ...(raw.description !== undefined
+      ? { description: buildMetadataExtractorEntry(raw.description) }
+      : {}),
+    ...(raw.dependsOn !== undefined
+      ? { dependsOn: buildMetadataExtractorEntry(raw.dependsOn) }
+      : {}),
+    ...(raw.keywords !== undefined ? { keywords: buildMetadataExtractorEntry(raw.keywords) } : {}),
+    ...(raw.context !== undefined ? { context: raw.context.map(buildMetadataExtractorEntry) } : {}),
+    ...(raw.rules !== undefined ? { rules: raw.rules.map(buildMetadataExtractorEntry) } : {}),
+    ...(raw.constraints !== undefined
+      ? { constraints: raw.constraints.map(buildMetadataExtractorEntry) }
+      : {}),
+    ...(raw.scenarios !== undefined
+      ? { scenarios: raw.scenarios.map(buildMetadataExtractorEntry) }
+      : {}),
   }
 }
 
@@ -566,7 +619,12 @@ export class FsSchemaRegistry implements SchemaRegistry {
 
     this._validateArtifactGraph(ref, artifacts)
 
-    return new Schema(data.name, data.version, artifacts, workflow)
+    const metadataExtraction =
+      data.metadataExtraction !== undefined
+        ? buildMetadataExtraction(data.metadataExtraction)
+        : undefined
+
+    return new Schema(data.name, data.version, artifacts, workflow, metadataExtraction)
   }
 
   /**
@@ -614,7 +672,6 @@ export class FsSchemaRegistry implements SchemaRegistry {
 
       const validations: ValidationRule[] = (r.validations ?? []).map(buildValidationRule)
       const deltaValidations: ValidationRule[] = (r.deltaValidations ?? []).map(buildValidationRule)
-      const contextSections: ContextSection[] = (r.contextSections ?? []).map(buildContextSection)
 
       const preHashCleanup: PreHashCleanup[] = (r.preHashCleanup ?? []).map((p) => ({
         pattern: p.pattern,
@@ -648,7 +705,6 @@ export class FsSchemaRegistry implements SchemaRegistry {
           ...(r.deltaInstruction !== undefined ? { deltaInstruction: r.deltaInstruction } : {}),
           validations,
           deltaValidations,
-          contextSections,
           preHashCleanup,
           ...(taskCompletionCheck !== undefined ? { taskCompletionCheck } : {}),
         }),

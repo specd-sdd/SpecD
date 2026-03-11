@@ -16,143 +16,106 @@ export function registerSpecMetadata(parent: Command): void {
   parent
     .command('metadata <specPath>')
     .description('Show the metadata for a spec')
-    .option('--infer', 'infer semantic sections from artifacts when stale or absent')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
-    .action(
-      async (specPath: string, opts: { format: string; config?: string; infer?: boolean }) => {
-        try {
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-          const parsed = parseSpecId(specPath, config)
+    .action(async (specPath: string, opts: { format: string; config?: string }) => {
+      try {
+        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+        const parsed = parseSpecId(specPath, config)
 
-          const result = await kernel.specs.get.execute({
-            workspace: parsed.workspace,
-            specPath: SpecPath.parse(parsed.capabilityPath),
-          })
+        const result = await kernel.specs.get.execute({
+          workspace: parsed.workspace,
+          specPath: SpecPath.parse(parsed.capabilityPath),
+        })
 
-          if (result === null) {
-            process.stderr.write(`error: spec '${specPath}' not found\n`)
-            process.exit(1)
-          }
+        if (result === null) {
+          process.stderr.write(`error: spec '${specPath}' not found\n`)
+          process.exit(1)
+        }
 
-          const metadataArtifact = result.artifacts.get('.specd-metadata.yaml')
-          const hasMetadata = metadataArtifact !== undefined
+        const metadataArtifact = result.artifacts.get('.specd-metadata.yaml')
 
-          if (!hasMetadata && !opts.infer) {
-            process.stderr.write(`error: no .specd-metadata.yaml for spec '${specPath}'\n`)
-            process.exit(1)
-            return
-          }
+        if (metadataArtifact === undefined) {
+          process.stderr.write(`error: no .specd-metadata.yaml for spec '${specPath}'\n`)
+          process.exit(1)
+          return
+        }
 
-          const metadata = hasMetadata ? parseMetadata(metadataArtifact.content) : {}
+        const metadata = parseMetadata(metadataArtifact.content)
 
-          const specLabel = `${parsed.workspace}:${parsed.capabilityPath}`
+        const specLabel = `${parsed.workspace}:${parsed.capabilityPath}`
 
-          // Compute freshness for each content hash
-          const freshnessResult = await checkMetadataFreshness(
-            metadata.contentHashes,
-            (filename) => Promise.resolve(result.artifacts.get(filename)?.content ?? null),
-            (c) => hasher.hash(c),
+        // Compute freshness for each content hash
+        const freshnessResult = await checkMetadataFreshness(
+          metadata.contentHashes,
+          (filename) => Promise.resolve(result.artifacts.get(filename)?.content ?? null),
+          (c) => hasher.hash(c),
+        )
+        const hashEntries = freshnessResult.entries
+        const allFresh = freshnessResult.allFresh
+
+        const effectiveRules = metadata.rules ?? []
+        const effectiveConstraints = metadata.constraints ?? []
+        const effectiveScenarios = metadata.scenarios ?? []
+
+        const fmt = parseFormat(opts.format)
+        if (fmt === 'text') {
+          const lines: string[] = [`spec: ${specLabel}`]
+
+          lines.push('')
+
+          if (metadata.title !== undefined) lines.push(`title:       ${metadata.title}`)
+          if (metadata.description !== undefined) lines.push(`description: ${metadata.description}`)
+          if (metadata.generatedBy !== undefined) lines.push(`generatedBy: ${metadata.generatedBy}`)
+          if (
+            metadata.title !== undefined ||
+            metadata.description !== undefined ||
+            metadata.generatedBy !== undefined
           )
-          const hashEntries = freshnessResult.entries
-          const allFresh = freshnessResult.allFresh
-
-          // Determine whether to infer semantic sections
-          const shouldInfer = opts.infer === true && !allFresh
-          let inferredRules: readonly string[] = []
-          let inferredConstraints: readonly string[] = []
-          let inferredScenarios: readonly string[] = []
-
-          if (shouldInfer) {
-            const artifactContents = new Map<string, { content: string }>()
-            for (const [filename, artifact] of result.artifacts) {
-              if (filename !== '.specd-metadata.yaml') {
-                artifactContents.set(filename, { content: artifact.content })
-              }
-            }
-
-            if (artifactContents.size === 0) {
-              process.stderr.write(`error: no artifact files for spec '${specPath}'\n`)
-              process.exit(1)
-              return
-            }
-
-            const inferred = await kernel.specs.inferSections.execute({
-              artifacts: artifactContents,
-            })
-
-            inferredRules = inferred.rules
-            inferredConstraints = inferred.constraints
-            inferredScenarios = inferred.scenarios
-          }
-
-          // Choose which rules/constraints/scenarios to use
-          const source = shouldInfer ? ('inferred' as const) : ('recorded' as const)
-          const effectiveRules = shouldInfer ? inferredRules : (metadata.rules ?? [])
-          const effectiveConstraints = shouldInfer
-            ? inferredConstraints
-            : (metadata.constraints ?? [])
-          const effectiveScenarios = shouldInfer ? inferredScenarios : (metadata.scenarios ?? [])
-
-          // Title fallback to capability path when metadata is absent
-          const effectiveTitle = metadata.title ?? (hasMetadata ? undefined : parsed.capabilityPath)
-
-          const fmt = parseFormat(opts.format)
-          if (fmt === 'text') {
-            const lines: string[] = [`spec: ${specLabel}`]
-
-            if (opts.infer) lines.push(`source: ${source}`)
-
             lines.push('')
 
-            if (effectiveTitle !== undefined) lines.push(`title:       ${effectiveTitle}`)
-            if (metadata.description !== undefined)
-              lines.push(`description: ${metadata.description}`)
-            if (effectiveTitle !== undefined || metadata.description !== undefined) lines.push('')
-
-            if (hashEntries.length > 0) {
-              lines.push('content hashes:')
-              for (const h of hashEntries) {
-                lines.push(`  ${h.filename}  ${h.fresh ? 'fresh' : 'STALE'}`)
-              }
-              lines.push('')
+          if (hashEntries.length > 0) {
+            lines.push('content hashes:')
+            for (const h of hashEntries) {
+              lines.push(`  ${h.filename}  ${h.fresh ? 'fresh' : 'STALE'}`)
             }
-
-            if (metadata.dependsOn !== undefined && metadata.dependsOn.length > 0) {
-              lines.push('dependsOn:')
-              for (const dep of metadata.dependsOn) {
-                lines.push(`  ${dep}`)
-              }
-              lines.push('')
-            }
-
-            const counts: string[] = []
-            if (effectiveRules.length > 0) counts.push(`rules:       ${effectiveRules.length}`)
-            if (effectiveConstraints.length > 0)
-              counts.push(`constraints: ${effectiveConstraints.length}`)
-            if (effectiveScenarios.length > 0)
-              counts.push(`scenarios:   ${effectiveScenarios.length}`)
-            if (counts.length > 0) lines.push(...counts)
-
-            output(lines.join('\n'), 'text')
-          } else {
-            const jsonObj: Record<string, unknown> = {
-              spec: specLabel,
-              fresh: allFresh,
-            }
-            if (opts.infer) jsonObj.source = source
-            if (effectiveTitle !== undefined) jsonObj.title = effectiveTitle
-            if (metadata.description !== undefined) jsonObj.description = metadata.description
-            jsonObj.contentHashes = hashEntries
-            if (metadata.dependsOn !== undefined) jsonObj.dependsOn = metadata.dependsOn
-            jsonObj.rules = effectiveRules
-            jsonObj.constraints = effectiveConstraints
-            jsonObj.scenarios = effectiveScenarios
-            output(jsonObj, fmt)
+            lines.push('')
           }
-        } catch (err) {
-          handleError(err)
+
+          if (metadata.dependsOn !== undefined && metadata.dependsOn.length > 0) {
+            lines.push('dependsOn:')
+            for (const dep of metadata.dependsOn) {
+              lines.push(`  ${dep}`)
+            }
+            lines.push('')
+          }
+
+          const counts: string[] = []
+          if (effectiveRules.length > 0) counts.push(`rules:       ${effectiveRules.length}`)
+          if (effectiveConstraints.length > 0)
+            counts.push(`constraints: ${effectiveConstraints.length}`)
+          if (effectiveScenarios.length > 0)
+            counts.push(`scenarios:   ${effectiveScenarios.length}`)
+          if (counts.length > 0) lines.push(...counts)
+
+          output(lines.join('\n'), 'text')
+        } else {
+          const jsonObj: Record<string, unknown> = {
+            spec: specLabel,
+            fresh: allFresh,
+          }
+          if (metadata.title !== undefined) jsonObj.title = metadata.title
+          if (metadata.description !== undefined) jsonObj.description = metadata.description
+          if (metadata.generatedBy !== undefined) jsonObj.generatedBy = metadata.generatedBy
+          jsonObj.contentHashes = hashEntries
+          if (metadata.dependsOn !== undefined) jsonObj.dependsOn = metadata.dependsOn
+          jsonObj.rules = effectiveRules
+          jsonObj.constraints = effectiveConstraints
+          jsonObj.scenarios = effectiveScenarios
+          output(jsonObj, fmt)
         }
-      },
-    )
+      } catch (err) {
+        handleError(err)
+      }
+    })
 }

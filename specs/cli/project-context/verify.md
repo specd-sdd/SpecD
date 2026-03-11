@@ -109,4 +109,4 @@
 - **GIVEN** a spec included via patterns has stale `.specd-metadata.yaml`
 - **WHEN** `specd project context` is run
 - **THEN** stderr contains a `warning:` line for the stale spec
-- **AND** the spec content is still included using the contextSections fallback
+- **AND** the spec content is still included using the metadataExtraction fallback

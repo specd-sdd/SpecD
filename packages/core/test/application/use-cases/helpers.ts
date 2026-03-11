@@ -6,6 +6,7 @@ import {
   type ArtifactTypeProps,
 } from '../../../src/domain/value-objects/artifact-type.js'
 import { Schema } from '../../../src/domain/value-objects/schema.js'
+import { type MetadataExtraction } from '../../../src/domain/value-objects/metadata-extraction.js'
 import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
 import { ChangeRepository } from '../../../src/application/ports/change-repository.js'
 import { SpecRepository } from '../../../src/application/ports/spec-repository.js'
@@ -273,7 +274,6 @@ export function makeArtifactType(id: string, extra: Partial<ArtifactTypeProps> =
     requires: [],
     validations: [],
     deltaValidations: [],
-    contextSections: [],
     preHashCleanup: [],
     ...extra,
   })
@@ -286,7 +286,12 @@ export function makeArtifactType(id: string, extra: Partial<ArtifactTypeProps> =
  */
 export function makeSchema(
   optsOrArtifacts:
-    | { artifacts?: ArtifactType[]; workflow?: WorkflowStep[]; name?: string }
+    | {
+        artifacts?: ArtifactType[]
+        workflow?: WorkflowStep[]
+        name?: string
+        metadataExtraction?: MetadataExtraction
+      }
     | ArtifactType[] = {},
   workflow: WorkflowStep[] = [],
 ): Schema {
@@ -298,6 +303,7 @@ export function makeSchema(
     1,
     optsOrArtifacts.artifacts ?? [],
     optsOrArtifacts.workflow ?? [],
+    optsOrArtifacts.metadataExtraction,
   )
 }
 

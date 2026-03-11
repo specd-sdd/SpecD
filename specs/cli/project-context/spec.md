@@ -33,7 +33,7 @@ Concretely:
 1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)
 2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)
 3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set
-4. The metadata or fallback content of each included spec is rendered, using the same fresh-metadata / contextSections-fallback logic as `CompileContext`
+4. The metadata or fallback content of each included spec is rendered, using the same fresh-metadata / metadataExtraction-fallback logic as `CompileContext`
 
 ### Requirement: Output
 

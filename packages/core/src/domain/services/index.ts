@@ -11,10 +11,23 @@ export { inferFormat } from './format-inference.js'
 export { safeRegex } from './safe-regex.js'
 export { shiftHeadings } from './shift-headings.js'
 export {
+  extractContent,
+  type SubtreeRenderer,
+  type GroupedExtraction,
+  type StructuredExtraction,
+} from './content-extraction.js'
+export { extractMetadata, type ExtractedMetadata } from './extract-metadata.js'
+export {
+  type SelectorNode,
+  findNodes,
+  nodeMatches,
+  collectAll,
+  selectBySelector,
+  collectAllNodes,
+} from './selector-matching.js'
+export {
   evaluateRules,
   selectNodes,
-  selectBySelector,
-  nodeMatches,
   collectNodes,
   selectByJsonPath,
   tokenizeJsonPath,

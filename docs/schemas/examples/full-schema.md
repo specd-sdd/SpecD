@@ -26,6 +26,22 @@ name: spec-driven
 version: 1
 description: Proposal → specs → design → tasks workflow
 
+# Top-level metadata extraction — declares how to extract metadata fields
+# (title, description, rules, constraints, scenarios, dependsOn) from artifact
+# content. Used by CompileContext when .specd-metadata.yaml is absent or stale.
+metadataExtraction:
+  # Extract the Requirements section for AI context.
+  - selector:
+      type: section
+      matches: '^Requirements$'
+    role: rules
+    contextTitle: Spec Requirements
+  # Extract the Constraints section separately with its semantic role.
+  - selector:
+      type: section
+      matches: '^Constraints$'
+    role: constraints
+
 artifacts:
   # ── proposal ──────────────────────────────────────────────────────────────
   # A change-scoped document — produced during the change, never synced to the
@@ -76,19 +92,6 @@ artifacts:
           - type: section
             matches: '^Requirement:'
             required: true
-    contextSections:
-      # When metadata is absent, extract the Requirements section for AI context.
-      - selector:
-          type: section
-          matches: '^Requirements$'
-        role: rules
-        contextTitle: Spec Requirements
-      # Extract the Constraints section separately with its semantic role.
-      - selector:
-          type: section
-          matches: '^Constraints$'
-        role: constraints
-
   # ── verify ─────────────────────────────────────────────────────────────────
   # A spec-scoped artifact paired with specs. Contains WHEN/THEN scenarios that
   # verify the system behaves as specified. Requires specs to be complete first.

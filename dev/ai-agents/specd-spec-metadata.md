@@ -5,11 +5,21 @@ allowed-tools: Bash(node *), Bash(cat *), Bash(rm *), Bash(shasum *), Read, Agen
 
 # Skill: Spec Metadata Generator
 
-Generates or updates `.specd-metadata.yaml` files by launching subagents for extraction and writing the results from the main thread.
+Generates or updates `.specd-metadata.yaml` files in two steps:
+
+1. **Deterministic extraction** — `spec generate-metadata` extracts raw metadata from artifact ASTs via schema-declared `metadataExtraction` rules. Produces `title`, `description`, `dependsOn`, `rules`, `constraints`, `scenarios`, `context`, and `contentHashes`. No LLM.
+2. **LLM optimization** — subagents read the generated metadata and optimize `rules`, `constraints`, `scenarios`, `description` for quality (clean formatting artifacts, deduplicate, convert tables to sentences) without losing content. They also add `keywords`, which cannot be extracted deterministically.
 
 ## Architecture
 
-Subagents **only extract** — they read spec content, compute hashes, resolve dependencies, and return the full YAML as their result string. They **never write files**. The main orchestrator receives the YAML from each subagent and writes it via `spec write-metadata`.
+The deterministic path runs `spec generate-metadata --write` which:
+
+- Parses artifacts into ASTs via the schema's artifact parsers
+- Runs extractors declared in `metadataExtraction` (selectors, captures, groupBy, transforms)
+- Computes SHA-256 content hashes and resolves dependency paths
+- Writes `.specd-metadata.yaml` with `generatedBy: core`
+
+Subagents **only optimize** — they read the generated metadata (not the raw spec files), clean up semantic fields, and return the full YAML as their result string. They **never write files**. The main orchestrator receives the YAML from each subagent and writes it via `spec write-metadata`.
 
 ## Instructions
 
@@ -36,9 +46,16 @@ When this skill is invoked:
 
    The command returns `{ workspace, specPath, specId }`. Use the returned `specId` as
    `<spec-id>`. If the command fails, tell the user the path could not be resolved.
-   c. Launch a single extractor subagent (see "Subagent prompt" below) with `<spec-id>` substituted.
-   Single-spec mode: the subagent runs the freshness check and may return `FRESH` if the spec
-   is already up to date.
+   c. Run deterministic generation:
+
+   ```bash
+   node packages/cli/dist/index.js spec generate-metadata <spec-id> --write --force
+   ```
+
+   If the schema has no `metadataExtraction` (command exits with error), fall back to the
+   legacy LLM extraction subagent (see "LLM subagent fallback" below).
+   d. Launch a single optimizer subagent (see "Subagent prompt" below) with `<spec-id>` substituted.
+   Single-spec mode: the subagent runs the freshness + quality check and may return `FRESH`.
 
 3. **If all specs:**
 
@@ -50,18 +67,24 @@ When this skill is invoked:
 
    b. Parse the JSON. For each workspace, collect the spec IDs.
    If the result is empty (no stale, missing, or invalid specs), report that all metadata is fresh and stop.
-   c. Launch extractor subagents **in parallel batches** — up to 5 concurrent subagents at a time.
+   c. For each spec, run deterministic generation:
+
+   ```bash
+   node packages/cli/dist/index.js spec generate-metadata <spec-id> --write --force
+   ```
+
+   d. Launch optimizer subagents **in parallel batches** — up to 5 concurrent subagents at a time.
    Each subagent receives its own `<spec-id>`. Prepend `BATCH MODE:` to the prompt for batch specs.
-   d. As each subagent completes, **write its result** (see "Writing results" below).
-   e. After all subagents complete, report a summary.
+   e. As each subagent completes, **write its result** (see "Writing results" below).
+   f. After all subagents complete, report a summary.
 
 4. Each subagent uses the Agent tool with:
    - `subagent_type: general-purpose`
-   - The full extractor prompt below, substituting `<spec-id>`.
+   - The full optimizer prompt below, substituting `<spec-id>`.
 
 5. **Regeneration policy (only when needed).**
    - If metadata is fresh **and** passes semantic quality checks, do not rewrite (`FRESH`).
-   - If metadata is stale but semantic quality is good, regenerate with minimal churn (preserve semantic fields when possible, update `contentHashes`).
+   - If metadata is stale but semantic quality is good, regenerate deterministic baseline + optimize with minimal churn.
    - If semantic quality fails, force full regeneration of semantic fields (`keywords`, `rules`, `constraints`, `scenarios`).
 
 ## Writing results (main thread only)
@@ -78,7 +101,7 @@ When a subagent returns:
   - `keywords` must be a non-empty YAML list
   - `keywords` must contain 4-8 concrete domain tags; reject obvious generic filler terms (`each`, `may`, `project`, `contain`, `thing`, `misc`)
   - `rules[*].rules` must not contain formatting artifacts or example scaffolding (tree glyphs like `├──`/`└──`, Markdown table rows, raw YAML example keys like `title:`/`dependsOn:`/`contentHashes:`, or field docs like `**\`title\`\*\*`)
-  - If `## Spec Dependencies` in `spec.md` has entries, `dependsOn` must be present and non-empty
+  - If `dependsOn` was present in the deterministic output, it must still be present
 
   If any check fails, regenerate once with a forced prompt prefix:
   `FORCE FULL REGEN: previous output failed quality gate.`
@@ -99,11 +122,13 @@ Where `<safe-name>` is the spec ID with colons and slashes replaced by hyphens.
 After writing, `spec metadata` output must show non-empty `keywords` and non-empty `contentHashes`.
 If it does not, log `ERROR:` for that spec.
 
-## Extractor subagent prompt
+## Subagent prompt
 
 ````
-You are extracting metadata for spec <spec-id>. Your job is to read the spec content, extract
-structured metadata, and return the complete YAML as your final message. Do NOT write any files.
+You are optimizing metadata for spec <spec-id>. The deterministic extractor has already produced
+a baseline from the spec's AST. Your job is to read the generated metadata, optimize the semantic
+fields for quality without losing content, add keywords, and return the complete YAML as your
+final message. Do NOT write any files.
 
 IMPORTANT: Use `node packages/cli/dist/index.js` instead of `specd` for all CLI commands.
 All Bash commands must run from the project root directory.
@@ -113,7 +138,7 @@ Follow these steps exactly:
 ### Step 1 — Check freshness (single-spec mode only)
 
 **If BATCH MODE** (the prompt starts with "BATCH MODE:"):
-Skip — treat all files as stale.
+Skip — treat as needing optimization.
 
 **Otherwise:**
 Run:
@@ -125,118 +150,71 @@ If `fresh` is `true`, evaluate existing metadata quality from command output:
 - `keywords` has 4-8 items, no generic filler tags
 - `rules[*].rules` has no formatting artifacts (tree glyphs, table rows, YAML example keys, field-doc lines)
 - rules are requirement statements, not snippets copied from examples
+- `description` is 2-3 sentences, not a dictionary-style definition
 
 If freshness and quality both pass → return the single word `FRESH` and stop.
-If freshness passes but quality fails → continue extraction and force semantic regeneration.
+If freshness passes but quality fails → continue optimization and force semantic regeneration.
 If the command fails (no metadata yet), treat all files as stale.
 
-### Step 2 — Read spec content
+### Step 2 — Read the generated metadata and spec content
 
 ```bash
+node packages/cli/dist/index.js spec metadata <spec-id> --format json
 node packages/cli/dist/index.js spec show <spec-id> --format json
 ```
 
-This returns an array of `{ filename, content }` objects.
+The metadata JSON is your primary source — it already contains `title`, `description`,
+`dependsOn`, `rules`, `constraints`, `scenarios`, and `contentHashes` extracted by the
+deterministic engine. The spec content is for domain context only — do NOT re-extract
+structural fields from it.
 
-Classify sections:
-- requirements-source: content under `## Requirements` in `spec.md`
-- constraints-source: content under `## Constraints` in `spec.md`
-- deps-source: content under `## Spec Dependencies` in `spec.md`
-- scenarios-source: requirement/scenario blocks in `verify.md`
-- ignore: examples, ADRs, pending, everything else
+### Step 3 — Optimize semantic fields
 
-### Step 3 — Compute content hashes
+Work from the metadata output (Step 2), optimizing without losing content:
 
-For each file returned by `spec show`, compute its SHA-256:
-```bash
-node packages/cli/dist/index.js spec show <spec-id> --format json | node -e "
-const crypto = require('crypto');
-let input = '';
-process.stdin.on('data', d => input += d);
-process.stdin.on('end', () => {
-  const data = JSON.parse(input);
-  for (const f of data) {
-    const hash = crypto.createHash('sha256').update(f.content).digest('hex');
-    console.log(f.filename + ': sha256:' + hash);
-  }
-});
-"
-```
+#### `description`
+Optimize the extracted description into 2-3 sentences aimed at a reader deciding whether this
+spec is relevant. Answer: what does this spec cover, why does it exist, and when would you need
+it? Avoid dictionary-style openings, passive constructions, and structural descriptions.
 
-### Step 4 — Resolve dependencies
-
-Extract dependencies from `## Spec Dependencies` using BOTH formats:
-
-- Markdown links: `- [text](../path/spec.md)`
-- Plain text bullets: `- core:core/config` or `- specs/_global/architecture/spec.md`
-
-For each dependency candidate:
-
-1. Normalize by removing bullet markers and trailing explanatory text after ` — ` or ` - `.
-2. If it is already a qualified spec ID (`workspace:capability/path`), keep as-is.
-3. Otherwise resolve it via:
-```bash
-node packages/cli/dist/index.js spec resolve-path <resolved-dir> --format json
-```
-Use the returned `specId` in the `dependsOn` list.
-4. Deduplicate while preserving order.
-
-If `## Spec Dependencies` is `_none` / `_none — ...`, omit `dependsOn`.
-If it has entries and none can be resolved, return `ERROR:` instead of silently omitting.
-
-### Step 5 — Extract metadata
-
-#### Extraction boundaries (STRICT)
-
-Use ONLY these sources:
-
-- `title`, `description`: from `# ...` and `## Overview` in `spec.md`
-- `keywords`: derive from `title`, `## Overview`, and `## Requirements` in `spec.md`
-- `dependsOn`: ONLY from `## Spec Dependencies` in `spec.md`
-- `constraints`: ONLY from `## Constraints` in `spec.md`
-- `rules`: ONLY from `## Requirements` in `spec.md`, grouped by each `### Requirement: ...`
-- `scenarios`: ONLY from `verify.md` under `## Requirements` / `### Requirement` / `#### Scenario`
+#### `rules`
+For each requirement group from the extracted `rules`: optimize every rule entry into a single
+clean plain-text normative statement. Preserve named functions, APIs, field names, state/enum
+values, transitions. Strip explanation and rationale. Convert tables to standalone sentence units.
 
 Hard exclusions for `rules`:
-
-- Never include content from `## Spec Dependencies`
-- Never include content from `## Constraints`
-- Never include links to `.../spec.md` as rule entries unless part of a normative sentence in `## Requirements`
-- Never include raw Markdown table rows (`| ... |`) as list items in `rules` or `constraints`
-- If normative information appears in a table, convert to plain-language sentences (no pipe syntax)
+- Never include content from `## Spec Dependencies` or `## Constraints`
+- Never include raw Markdown table rows (`| ... |`)
+- If normative information appears in table form, convert to plain-language sentences
 - Never include example-only scaffolding lines (`title:`, `description:`, `dependsOn:`, `contentHashes:`, `rules:`, `constraints:`, `scenarios:`)
 - Never include filesystem tree-art lines (`├──`, `└──`, `│`)
 - Never include field reference docs (`**\`field\`** ...`) as rules
 
 Deduplication:
-
 - Remove exact duplicates across all `rules[*].rules`
 - Remove any `rules[*].rules` entry identical to an entry in `constraints`
 - Remove table separator rows and formatting-only lines
-- Remove example scaffolding and tree-art lines
 
-For `description`: write 2–3 sentences aimed at a reader deciding whether this spec is relevant.
-Answer: what does this spec cover, why does it exist, and when would you need it? Avoid
-dictionary-style openings, passive constructions, and structural descriptions.
+#### `constraints`
+Clean up each constraint into a single plain-text sentence. Same exclusion rules as `rules`.
 
-#### Rules
-
-For each named requirement: extract every normative statement as a single plain-text sentence.
-Preserve named functions, APIs, field names, state/enum values, transitions. Strip explanation
-and rationale. Convert tables to standalone sentence units.
-
-#### Scenarios
-
-Flat array, one object per scenario. `name` is the exact scenario title from the verify file.
+#### `scenarios`
+Preserve the structure (requirement, name, given, when, then) but clean up formatting artifacts
+from the extracted text. `name` must be the exact scenario title from the verify file.
 Multiple scenarios for the same requirement each get their own entry.
 
-#### Keywords
+#### `keywords`
+Generate 4-8 lowercase hyphenated tags that help retrieval. Use concrete domain terms (commands,
+use cases, concepts), not generic words. No duplicates.
 
-`keywords` is REQUIRED. Generate 4-8 lowercase hyphenated tags that help retrieval.
-Use concrete domain terms (commands, use cases, concepts), not generic words.
-No duplicates.
+### Step 4 — Preserve structural fields
 
-### Step 6 — Return the YAML
+Copy these fields exactly from the metadata — do NOT modify them:
+- `title` (keep as extracted unless clearly wrong)
+- `dependsOn` (keep all resolved paths)
+- `contentHashes` (keep all computed hashes — never recompute)
+
+### Step 5 — Return the YAML
 
 Compose the complete YAML and return it as your final message. The YAML must be the ONLY content
 in your final message — no explanation, no markdown fences, just raw YAML.
@@ -280,11 +258,41 @@ scenarios:
 
 ## Notes
 
-- contentHashes is always rewritten — never copy from previous version
+- contentHashes and dependsOn come from the deterministic extractor — never modify them
 - If a statement comes from `## Constraints`, it MUST go to `constraints`, never to `rules`
-- If a dependency is not in `## Spec Dependencies`, do not add it to `dependsOn`
 - `keywords` is mandatory; never omit it
 - Prefer omission over guessing when section ownership is unclear
-- Omit constraints if no `## Constraints` section exists
-- Omit scenarios if no scenarios exist
+- Omit constraints if the deterministic output has none
+- Omit scenarios if the deterministic output has none
 ````
+
+## LLM subagent fallback
+
+If the schema has no `metadataExtraction` declarations (i.e. `spec generate-metadata` fails),
+fall back to the full LLM extraction subagent that reads raw spec files. This uses the same
+subagent prompt as above, except:
+
+- Step 2 is skipped (no metadata to read)
+- Step 3 becomes the primary source
+- The subagent must compute `contentHashes` itself:
+
+```bash
+node packages/cli/dist/index.js spec show <spec-id> --format json | node -e "
+const crypto = require('crypto');
+let input = '';
+process.stdin.on('data', d => input += d);
+process.stdin.on('end', () => {
+  const data = JSON.parse(input);
+  for (const f of data) {
+    const hash = crypto.createHash('sha256').update(f.content).digest('hex');
+    console.log(f.filename + ': sha256:' + hash);
+  }
+});
+"
+```
+
+- The subagent must resolve dependencies from `## Spec Dependencies`:
+
+```bash
+node packages/cli/dist/index.js spec resolve-path <path> --format json
+```

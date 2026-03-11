@@ -49,7 +49,7 @@ Every `spec.md` must follow this structure. Sections marked _optional_ may be om
 ## Examples
 
 <!-- Optional. Concrete usage examples — YAML snippets, CLI invocations, etc.
-     Useful as AI context via contextSections. -->
+     Useful as AI context via metadataExtraction. -->
 
 ## Spec Dependencies
 

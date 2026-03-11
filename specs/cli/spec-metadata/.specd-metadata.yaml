@@ -1,132 +1,184 @@
-title: 'Spec Metadata'
-description: >
-  Defines the `specd spec metadata <workspace:capability-path>` command, which displays the parsed contents of a spec's `.specd-metadata.yaml` in a structured form, including freshness status for each recorded content hash. Optionally, when metadata is stale or absent, the command can infer sections from the spec's raw artifact files.
-keywords:
-  - 'metadata'
-  - 'command'
-  - 'signature'
-  - 'behaviour'
-  - 'infer'
-  - 'mode'
-  - 'output'
-  - 'format'
-  - 'error'
-  - 'cases'
-  - 'read'
-  - 'only'
-dependsOn:
-  - 'cli:cli/entrypoint'
-  - 'core:core/compile-context'
-  - 'core:core/spec-id-format'
-contentHashes:
-  'spec.md': 'sha256:0abbf4e1d614f1ef29a78f5d262f4fc147c9c23aaf2f17227b109f4b4f8b71cf'
-  'verify.md': 'sha256:09e83a3b69ac6f6d3ff36bc9c24d23ea9b3baf3bc8a24748e3a29ec5e403ad73'
+title: Spec Metadata
+description:
+  Defines the specd spec metadata \<workspace:capability-path> command, which displays the parsed contents of
+  a spec's .specd-metadata.yaml in a structured form, including freshness status for each recorded content hash.
+context:
+  - Defines the specd spec metadata \<workspace:capability-path> command, which displays the parsed contents of a spec's
+    .specd-metadata.yaml in a structured form, including freshness status for each recorded content hash.
 rules:
-  - requirement: 'Command signature'
+  - requirement: Command signature
     rules:
-      - '`<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)'
-      - "`--infer` — optional; when metadata is stale or absent, extract rules, constraints, and scenarios from the spec's raw artifact files using the active schema's `contextSections` definitions instead of showing the stale recorded values. Only affects the semantic sections (rules, constraints, scenarios) — all other fields (title, description, dependsOn, contentHashes) always come from the recorded metadata"
-      - '`--format text|json|toon` — optional; output format, defaults to `text`'
-  - requirement: 'Behaviour'
+      - |-
+        ```
+        specd spec metadata <workspace:capability-path> [--format text|json|toon]
+        ```
+
+
+        * \<workspace:capability-path> — required positional; the fully-qualified spec ID (e.g. default:auth/login)
+        * \--format text|json|toon — optional; output format, defaults to text
+  - requirement: Behaviour
     rules:
-      - 'The command reads `.specd-metadata.yaml` for the given spec and renders its contents in a structured form. For each file listed in `contentHashes`, it computes the current SHA-256 hash of the file on disk and compares it against the recorded hash, reporting whether the metadata is fresh or stale per file.'
-      - 'If `.specd-metadata.yaml` does not exist and `--infer` is not passed, the command exits with code 1.'
-  - requirement: 'Infer mode'
+      - >-
+        The command reads .specd-metadata.yaml for the given spec and renders its contents in a structured form. For
+        each file listed in contentHashes, it computes the current SHA-256 hash of the file on disk and compares it
+        against the recorded hash, reporting whether the metadata is fresh or stale per file.
+
+
+
+        If .specd-metadata.yaml does not exist, the command exits with code 1.
+  - requirement: Output format
     rules:
-      - "When `--infer` is passed and the metadata is stale or absent, the command resolves the active schema from `specd.yaml` and uses its `contextSections` selectors to extract **only the semantic sections** — rules, constraints, and scenarios — from the spec's raw artifact files. The extracted data replaces the stale recorded values for those three sections in the output."
-      - 'All other metadata fields — description, dependsOn, contentHashes — always come from the recorded `.specd-metadata.yaml`. They cannot be inferred mechanically and are omitted when metadata is absent.'
-      - 'The only exception is `title`: when metadata is absent, the capability path (without workspace prefix) is used as a fallback title (e.g. `auth/login`).'
-      - 'The output clearly indicates the data source for the semantic sections:'
-      - '**`source: recorded`** — rules, constraints, and scenarios come from `.specd-metadata.yaml` (fresh metadata)'
-      - '**`source: inferred`** — rules, constraints, and scenarios were extracted from raw artifact files because metadata was stale or absent'
-      - 'When `--infer` is passed and the metadata is fresh, the command behaves identically to the default mode (source is `recorded`).'
-      - 'When `--infer` is not passed, stale metadata is shown as-is with `STALE` hash indicators — no extraction is attempted.'
-  - requirement: 'Output format'
+      - >-
+        In text mode (default):
+
+
+
+        ```
+
+        spec: <workspace>:<capability-path>
+
+
+        title:       <title>
+
+        description: <description>
+
+        generatedBy: <core|agent>
+
+
+        content hashes:
+          <filename>  <fresh|STALE>
+
+        dependsOn:
+          <specId>
+          ...
+
+        rules:      <N>
+
+        constraints: <N>
+
+        scenarios:  <N>
+
+        ```
+
+
+
+        Sections with no content are omitted. rules, constraints, and scenarios show counts only in text mode.
+        generatedBy shows which mechanism produced the metadata (core for deterministic extraction, agent for
+        LLM-generated).
+
+
+
+        In json or toon mode, the full parsed metadata is output including all rules, constraints, and scenarios
+        (encoded in the respective format):
+
+
+
+        ```json
+
+        {
+          "spec": "workspace:cap/path",
+          "fresh": true,
+          "title": "...",
+          "description": "...",
+          "generatedBy": "core",
+          "contentHashes": [
+            {"filename": "...", "recorded": "sha256:...", "current": "sha256:...", "fresh": true}
+          ],
+          "dependsOn": [...],
+          "rules": [...],
+          "constraints": [...],
+          "scenarios": [...]
+        }
+
+        ```
+
+
+
+        fresh at the top level is true only when all contentHashes entries are fresh.
+  - requirement: Error cases
     rules:
-      - 'In `text` mode (default):'
-      - 'Sections with no content are omitted. `rules`, `constraints`, and `scenarios` show counts only in text mode. The `source:` line is only shown when `--infer` is passed. When not in infer mode, `content hashes:` and counts reflect the recorded metadata as-is.'
-      - 'In `json` or `toon` mode, the full parsed metadata is output including all rules, constraints, and scenarios (encoded in the respective format):'
-      - '`fresh` at the top level is `true` only when all `contentHashes` entries are fresh. The `source` field is only present when `--infer` is passed.'
-  - requirement: 'Error cases'
-    rules:
-      - 'If the workspace is not configured, exits with code 1.'
-      - 'If `.specd-metadata.yaml` does not exist and `--infer` is not passed, exits with code 1 and prints an `error:` message to stderr.'
-      - 'If `--infer` is passed but no artifact files exist for the spec, exits with code 1.'
+      - |-
+        * If the workspace is not configured, exits with code 1.
+        * If .specd-metadata.yaml does not exist, exits with code 1 and prints an error: message to stderr.
 constraints:
-  - 'This command is read-only — it never writes or updates metadata'
-  - 'Metadata regeneration is handled by a skill, not by this command'
-  - '`--infer` does not write or modify `.specd-metadata.yaml` — it only affects the output for the current invocation'
-  - 'The inference logic uses the same `contextSections` selectors and artifact parsers as `CompileContext`'
+  - This command is read-only — it never writes or updates metadata
+  - Metadata regeneration is handled by specd spec generate-metadata or by a skill
 scenarios:
-  - requirement: 'Command signature'
-    name: 'Missing path argument'
+  - requirement: Command signature
+    name: Missing path argument
     when:
-      - '`specd spec metadata` is run without a path'
+      - specd spec metadata is run without a path
     then:
-      - 'the command exits with code 1 and prints a usage error to stderr'
-  - requirement: 'Behaviour'
-    name: 'Fresh hash shown as fresh'
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Behaviour
+    name: Fresh hash shown as fresh
     given:
-      - '`default:auth/login` has `.specd-metadata.yaml` with a `contentHashes` entry for `spec.md` matching the current file on disk'
+      - default:auth/login has .specd-metadata.yaml with a contentHashes entry for spec.md matching the current file on
+        disk
     when:
-      - '`specd spec metadata default:auth/login` is run'
+      - specd spec metadata default:auth/login is run
     then:
-      - 'the `spec.md` line shows `fresh`'
-  - requirement: 'Behaviour'
-    name: 'Stale hash shown as STALE'
+      - the spec.md line shows fresh
+  - requirement: Behaviour
+    name: Stale hash shown as STALE
     given:
-      - '`default:auth/login` has `.specd-metadata.yaml` with a `contentHashes` entry for `spec.md` that does not match the current file'
+      - default:auth/login has .specd-metadata.yaml with a contentHashes entry for spec.md that does not match the
+        current file
     when:
-      - '`specd spec metadata default:auth/login` is run'
+      - specd spec metadata default:auth/login is run
     then:
-      - 'the `spec.md` line shows `STALE`'
-  - requirement: 'Behaviour'
-    name: 'Sections with no content omitted in text mode'
+      - the spec.md line shows STALE
+  - requirement: Behaviour
+    name: Sections with no content omitted in text mode
     given:
-      - '`.specd-metadata.yaml` has no `dependsOn` entries'
+      - .specd-metadata.yaml has no dependsOn entries
     when:
-      - '`specd spec metadata default:auth/login` is run'
+      - specd spec metadata default:auth/login is run
     then:
-      - 'the `dependsOn:` section is not printed'
-  - requirement: 'Output format'
-    name: 'Text output shows counts for rules, constraints, scenarios'
+      - 'the dependsOn: section is not printed'
+  - requirement: Output format
+    name: Text output shows counts for rules, constraints, scenarios
     given:
-      - '`.specd-metadata.yaml` has 3 rules, 2 constraints, and 5 scenarios'
+      - .specd-metadata.yaml has 3 rules, 2 constraints, and 5 scenarios
     when:
-      - '`specd spec metadata default:auth/login` is run'
+      - specd spec metadata default:auth/login is run
     then:
-      - 'stdout shows `rules: 3`, `constraints: 2`, and `scenarios: 5`'
-  - requirement: 'Output format'
-    name: 'JSON output includes full rules, constraints, scenarios'
+      - 'stdout shows rules: 3, constraints: 2, and scenarios: 5'
+  - requirement: Output format
+    name: JSON output includes full rules, constraints, scenarios
     given:
-      - '`.specd-metadata.yaml` has rules, constraints, and scenarios'
+      - .specd-metadata.yaml has rules, constraints, and scenarios
     when:
-      - '`specd spec metadata default:auth/login --format json` is run'
+      - specd spec metadata default:auth/login --format json is run
     then:
-      - 'stdout is valid JSON with `rules`, `constraints`, and `scenarios` as full arrays, not counts'
-      - '`fresh` at the top level is `true` when all hashes match'
-      - 'the process exits with code 0'
-  - requirement: 'Output format'
-    name: 'JSON fresh field reflects all hashes'
+      - stdout is valid JSON with rules, constraints, and scenarios as full arrays, not counts
+      - fresh at the top level is true when all hashes match
+      - the process exits with code 0
+  - requirement: Output format
+    name: JSON fresh field reflects all hashes
     given:
-      - 'one of the `contentHashes` entries is stale'
+      - one of the contentHashes entries is stale
     when:
-      - '`specd spec metadata default:auth/login --format json` is run'
+      - specd spec metadata default:auth/login --format json is run
     then:
-      - '`fresh` at the top level is `false`'
-  - requirement: 'Error cases'
-    name: 'Metadata file absent'
+      - fresh at the top level is false
+  - requirement: Error cases
+    name: Metadata file absent
     given:
-      - '`default:auth/login` exists but has no `.specd-metadata.yaml`'
+      - default:auth/login exists but has no .specd-metadata.yaml
     when:
-      - '`specd spec metadata default:auth/login` is run'
+      - specd spec metadata default:auth/login is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
-  - requirement: 'Error cases'
-    name: 'Unknown workspace'
+      - the command exits with code 1
+      - 'stderr contains an error: message'
+  - requirement: Error cases
+    name: Unknown workspace
     when:
-      - '`specd spec metadata unknown-ws:auth/login` is run'
+      - specd spec metadata unknown-ws:auth/login is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
+      - the command exits with code 1
+      - 'stderr contains an error: message'
+contentHashes:
+  spec.md: sha256:4ffa48b6b3444a70d09082638f968feca102c642eafed3f18d694dd0c05e53d9
+  verify.md: sha256:09e83a3b69ac6f6d3ff36bc9c24d23ea9b3baf3bc8a24748e3a29ec5e403ad73
+generatedBy: core

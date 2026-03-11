@@ -2,8 +2,8 @@
  * Identifies one or more nodes in an artifact's AST.
  *
  * Used in delta entries (to target nodes for modification or removal), in
- * `contextSections` (to extract spec content), and in validation rules (to
- * assert structural constraints).
+ * `metadataExtraction` (to extract spec content), and in validation rules
+ * (to assert structural constraints).
  *
  * All string fields (`matches`, `contains`, `where` values) are matched
  * case-insensitively as regular expressions.
@@ -28,6 +28,11 @@ export interface Selector {
    * regex). Mutually exclusive with `index`.
    */
   readonly where?: Readonly<Record<string, string>>
+  /**
+   * For markdown `section` nodes, matches only sections at this heading level
+   * (1 = `#`, 2 = `##`, etc.). Non-markdown nodes without `level` will not match.
+   */
+  readonly level?: number
 }
 
 /**

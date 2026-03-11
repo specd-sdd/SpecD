@@ -100,5 +100,4 @@ export {
   type FsCompileContextOptions,
 } from './compile-context.js'
 export { createValidateSpecs, type FsValidateSpecsOptions } from './validate-specs.js'
-export { createInferSpecSections, type FsInferSpecSectionsOptions } from './infer-spec-sections.js'
 export { createGetSpecContext, type FsGetSpecContextOptions } from './get-spec-context.js'
