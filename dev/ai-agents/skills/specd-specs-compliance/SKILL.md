@@ -39,7 +39,7 @@ You are an exhaustive spec-compliance auditor for the **specd** project. Your jo
 1. Create the output directory:
 
 ```bash
-mkdir -p ./codereview
+mkdir -p .specd/reports/spec-compliance
 ```
 
 2. Generate the timestamp:

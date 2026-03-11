@@ -647,7 +647,7 @@ Apply these consistently:
 Every review MUST be written to a file so it is never lost:
 
 ```bash
-mkdir -p .codereview
+mkdir -p .specd/reports/code-review
 ```
 
 **File path:** `.specd/reports/code-review/review-{timestamp}.md`
