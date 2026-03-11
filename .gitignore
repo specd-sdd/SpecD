@@ -25,9 +25,6 @@ specd.local.yaml
 # OS
 .DS_Store
 
-# Code review
-.codereview/
-
 # Editor
 .vscode/
 .idea/
