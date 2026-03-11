@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
+import { InvalidChangeError } from '../../../src/domain/errors/invalid-change-error.js'
 import type { ActorIdentity, ChangeEvent } from '../../../src/domain/entities/change.js'
 import type { ArtifactStatus } from '../../../src/domain/value-objects/artifact-status.js'
 
@@ -55,6 +56,64 @@ describe('Change', () => {
       })
       expect(c.specIds).toEqual([])
       expect(c.workspaces).toEqual([])
+    })
+
+    it('throws InvalidChangeError for non-kebab-case name', () => {
+      expect(
+        () =>
+          new Change({
+            name: 'Add_OAuth',
+            createdAt: new Date(),
+            specIds: [],
+            history: [],
+          }),
+      ).toThrow(InvalidChangeError)
+    })
+
+    it('throws InvalidChangeError for name with uppercase letters', () => {
+      expect(
+        () =>
+          new Change({
+            name: 'AddOAuth',
+            createdAt: new Date(),
+            specIds: [],
+            history: [],
+          }),
+      ).toThrow(InvalidChangeError)
+    })
+
+    it('throws InvalidChangeError for name with leading hyphen', () => {
+      expect(
+        () =>
+          new Change({
+            name: '-add-oauth',
+            createdAt: new Date(),
+            specIds: [],
+            history: [],
+          }),
+      ).toThrow(InvalidChangeError)
+    })
+
+    it('throws InvalidChangeError for empty name', () => {
+      expect(
+        () =>
+          new Change({
+            name: '',
+            createdAt: new Date(),
+            specIds: [],
+            history: [],
+          }),
+      ).toThrow(InvalidChangeError)
+    })
+
+    it('deduplicates specIds', () => {
+      const c = new Change({
+        name: 'dedup-test',
+        createdAt: new Date(),
+        specIds: ['auth/login', 'auth/login', 'billing:invoices'],
+        history: [],
+      })
+      expect(c.specIds).toEqual(['auth/login', 'billing:invoices'])
     })
 
     it('defaults artifacts to empty map', () => {
@@ -396,6 +455,13 @@ describe('Change', () => {
       expect(c.state).toBe('designing')
       const invalidated = c.history.find((e) => e.type === 'invalidated')
       expect(invalidated?.type === 'invalidated' && invalidated.cause).toBe('spec-change')
+    })
+
+    it('deduplicates specIds', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.updateSpecIds(['auth/login', 'auth/login', 'billing:invoices'], actor)
+      expect(c.specIds).toEqual(['auth/login', 'billing:invoices'])
     })
   })
 

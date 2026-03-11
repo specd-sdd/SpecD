@@ -85,6 +85,20 @@ describe('CreateChange', () => {
       expect(result.specIds).toEqual([])
       expect(result.workspaces).toEqual([])
     })
+
+    it('deduplicates specIds', async () => {
+      const repo = makeChangeRepository()
+      const uc = new CreateChange(repo, makeActorResolver())
+
+      const result = await uc.execute({
+        name: 'dedup-test',
+        specIds: ['auth/login', 'auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.specIds).toEqual(['auth/login'])
+    })
   })
 
   describe('given a change with that name already exists', () => {

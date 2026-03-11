@@ -1,9 +1,13 @@
 import { type ChangeState, isValidTransition } from '../value-objects/change-state.js'
 import { type ArtifactStatus } from '../value-objects/artifact-status.js'
 import { InvalidStateTransitionError } from '../errors/invalid-state-transition-error.js'
+import { InvalidChangeError } from '../errors/invalid-change-error.js'
 import { CorruptedManifestError } from '../errors/corrupted-manifest-error.js'
 import { type ChangeArtifact } from './change-artifact.js'
 import { parseSpecId } from '../services/parse-spec-id.js'
+
+/** Kebab-case pattern for change names: lowercase alphanumeric segments separated by hyphens. */
+const CHANGE_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 /** Identity of the actor performing an operation. */
 export interface ActorIdentity {
@@ -146,10 +150,15 @@ export class Change {
    * @param props - Change construction properties
    */
   constructor(props: ChangeProps) {
+    if (!CHANGE_NAME_PATTERN.test(props.name)) {
+      throw new InvalidChangeError(
+        `invalid change name '${props.name}' — must be kebab-case (lowercase alphanumeric segments separated by hyphens)`,
+      )
+    }
     this._name = props.name
     this._createdAt = new Date(props.createdAt.getTime())
     this._description = props.description
-    this._specIds = [...props.specIds]
+    this._specIds = [...new Set(props.specIds)]
     this._history = [...props.history]
     this._artifacts =
       props.artifacts !== undefined ? new Map(props.artifacts) : new Map<string, ChangeArtifact>()
@@ -438,7 +447,7 @@ export class Change {
    * @param actor - Identity of the actor making the change
    */
   updateSpecIds(specIds: readonly string[], actor: ActorIdentity): void {
-    this._specIds = [...specIds]
+    this._specIds = [...new Set(specIds)]
     this.invalidate('spec-change', actor)
   }
 
