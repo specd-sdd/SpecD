@@ -199,26 +199,33 @@ export class FsSpecRepository extends SpecRepository {
   }
 
   /**
-   * Resolves an absolute storage path to a spec identity within this workspace.
+   * Resolves a storage path to a spec identity within this workspace.
    *
-   * Validates the path exists, resolves files to their parent directory, and
-   * computes the spec path relative to this workspace's `specsPath`. Returns
-   * `null` if the path does not belong to this workspace.
+   * When `inputPath` is relative (does not start with `/`), strips any
+   * anchor fragment, resolves against the `from` spec's directory, and
+   * returns the result without filesystem access. When `inputPath` is
+   * absolute, validates via `fs.lstat` as before.
    *
-   * @param absolutePath - The absolute path to resolve
+   * @param inputPath - Absolute path or relative spec link
+   * @param from - Reference spec for relative resolution
    * @returns The resolved spec path and ID, or `null` if no match
    */
   override async resolveFromPath(
-    absolutePath: string,
+    inputPath: string,
+    from?: SpecPath,
   ): Promise<{ specPath: SpecPath; specId: string } | null> {
-    if (absolutePath !== this._specsPath && !absolutePath.startsWith(this._specsPath + path.sep)) {
+    if (!path.isAbsolute(inputPath)) {
+      return this._resolveRelative(inputPath, from)
+    }
+
+    if (inputPath !== this._specsPath && !inputPath.startsWith(this._specsPath + path.sep)) {
       return null
     }
 
     let dir: string
     try {
-      const stat = await fs.lstat(absolutePath)
-      dir = stat.isDirectory() ? absolutePath : path.dirname(absolutePath)
+      const stat = await fs.lstat(inputPath)
+      dir = stat.isDirectory() ? inputPath : path.dirname(inputPath)
     } catch {
       return null
     }
@@ -231,6 +238,38 @@ export class FsSpecRepository extends SpecRepository {
 
     const prefixed = [...this._prefixSegments, ...segments]
     const specPath = SpecPath.fromSegments(prefixed)
+    const specId = this.workspace() + ':' + specPath.toString()
+    return { specPath, specId }
+  }
+
+  /**
+   * Resolves a relative spec link (e.g. `../storage/spec.md`) to a spec
+   * identity, using `from` as the reference point. Pure computation, no I/O.
+   *
+   * @param relativePath - Relative path, possibly with anchor fragment
+   * @param from - The spec from which the link originates
+   * @returns The resolved spec path and ID, or `null` if not resolvable
+   */
+  private _resolveRelative(
+    relativePath: string,
+    from?: SpecPath,
+  ): { specPath: SpecPath; specId: string } | null {
+    if (from === undefined) return null
+
+    // Strip anchor fragments
+    const cleanPath = relativePath.replace(/#.*$/, '')
+
+    // Must match ../path/spec.md pattern
+    const match = cleanPath.match(/^\.\.\/(.+?)\/spec\.md$/)
+    if (match === null) return null
+
+    // Resolve relative to the from spec's parent directory
+    const fromParts = from.toString().split('/')
+    const parentParts = fromParts.slice(0, -1)
+    const resolvedParts = match[1]!.split('/')
+
+    const segments = [...parentParts, ...resolvedParts]
+    const specPath = SpecPath.fromSegments(segments)
     const specId = this.workspace() + ':' + specPath.toString()
     return { specPath, specId }
   }

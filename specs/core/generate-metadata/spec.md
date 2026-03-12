@@ -40,15 +40,9 @@ The use case calls `extractMetadata()` with:
 
 The extraction engine produces fields including `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, `scenarios`, and `context`.
 
-### Requirement: resolveSpecPath transform
+### Requirement: dependsOn resolution
 
-The use case registers a `resolveSpecPath` transform that converts relative spec paths to spec IDs. Given a value like `../foo/spec.md`:
-
-1. Strips any anchor fragment (e.g. `#section`)
-2. Matches the pattern `../<path>/spec.md`
-3. Resolves the path relative to the current spec's parent directory
-
-Values that do not match the `../*/spec.md` pattern are filtered out (the transform returns `null`).
+After extraction, if `dependsOn` contains raw relative paths (e.g. `../storage/spec.md`), the use case resolves each entry via `SpecRepository.resolveFromPath(rawPath, specPath)`. The repository handles anchor stripping, pattern matching, and workspace-qualified spec ID construction. Entries that the repository cannot resolve are filtered out.
 
 ### Requirement: Content hashes
 

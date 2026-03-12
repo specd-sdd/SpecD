@@ -79,16 +79,23 @@ export abstract class SpecRepository extends Repository {
   abstract delete(spec: Spec): Promise<void>
 
   /**
-   * Resolves an absolute storage path to a spec identity within this workspace.
+   * Resolves a storage path to a spec identity within this workspace.
+   *
+   * Accepts both absolute paths and relative spec links. When `inputPath`
+   * is relative (e.g. `../storage/spec.md`), `from` must be provided as
+   * the reference spec. Relative resolution is pure computation (no I/O);
+   * absolute resolution may require filesystem access.
    *
    * Returns `null` if the path does not belong to this workspace or does not
    * point to a valid spec. Implementations that do not support path-based
    * resolution (e.g. HTTP) may always return `null`.
    *
-   * @param absolutePath - The absolute path to resolve
+   * @param inputPath - Absolute path or relative spec link (e.g. `../storage/spec.md`)
+   * @param from - Reference spec for relative resolution (required when `inputPath` is relative)
    * @returns The resolved spec path and ID, or `null` if no match
    */
   abstract resolveFromPath(
-    absolutePath: string,
+    inputPath: string,
+    from?: SpecPath,
   ): Promise<{ specPath: SpecPath; specId: string } | null>
 }

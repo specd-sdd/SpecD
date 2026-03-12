@@ -34,8 +34,8 @@ export interface GenerateSpecMetadataResult {
  * 1. Resolve schema; bail if no `metadataExtraction`
  * 2. For each `scope: 'spec'` artifact, load content from `SpecRepository`
  * 3. Parse each into AST via `ArtifactParserRegistry`
- * 4. Build transform map (`resolveSpecPath` resolves relative paths to spec IDs)
- * 5. Call `extractMetadata()`
+ * 4. Call `extractMetadata()` (no transforms — raw values pass through)
+ * 5. Resolve `dependsOn` entries via `SpecRepository.resolveFromPath()`
  * 6. Compute `contentHashes` (SHA-256 per artifact file)
  * 7. Merge extracted + hashes + `generatedBy: 'core'`
  */
@@ -124,14 +124,20 @@ export class GenerateSpecMetadata {
       renderers.set(artifactType.id, parser as SubtreeRenderer)
     }
 
-    // Build transforms
-    const transforms = new Map<string, (values: string[]) => string[]>()
-    transforms.set('resolveSpecPath', (values: string[]) =>
-      values.map((v) => this._resolveSpecPath(v, capPath)).filter((v): v is string => v !== null),
-    )
+    // Extract metadata (no transforms — raw captured values pass through)
+    const extracted = extractMetadata(extraction, astsByArtifact, renderers)
 
-    // Extract metadata
-    const extracted = extractMetadata(extraction, astsByArtifact, renderers, transforms)
+    // Resolve dependsOn entries via the repository
+    let resolvedDeps: string[] | undefined
+    if (extracted.dependsOn !== undefined) {
+      resolvedDeps = []
+      for (const raw of extracted.dependsOn) {
+        const result = await specRepo.resolveFromPath(raw, specPath)
+        if (result !== null) {
+          resolvedDeps.push(result.specId)
+        }
+      }
+    }
 
     // Compute content hashes
     const contentHashes: Record<string, string> = {}
@@ -142,37 +148,11 @@ export class GenerateSpecMetadata {
     // Assemble final metadata
     const metadata: SpecMetadata = {
       ...extracted,
+      ...(resolvedDeps !== undefined ? { dependsOn: resolvedDeps } : {}),
       contentHashes,
       generatedBy: 'core',
     }
 
     return { metadata, hasExtraction: true }
-  }
-
-  /**
-   * Resolves a relative spec path (e.g. `../artifact-ast/spec.md`) to a spec ID
-   * relative to the current spec's capability path.
-   *
-   * @param relativePath - The relative path from the spec file
-   * @param currentCapPath - The current spec's capability path
-   * @returns The resolved spec ID, or null if not resolvable
-   */
-  private _resolveSpecPath(relativePath: string, currentCapPath: string): string | null {
-    // Strip anchor fragments
-    const cleanPath = relativePath.replace(/#.*$/, '')
-
-    // Match patterns like ../foo/spec.md or ../foo/bar/spec.md
-    const match = cleanPath.match(/^\.\.\/(.+?)\/spec\.md$/)
-    if (match === null) return null
-
-    // Resolve relative to current spec's parent directory
-    const currentParts = currentCapPath.split('/')
-    const parentPath = currentParts.slice(0, -1).join('/')
-    const resolvedParts = match[1]!.split('/')
-
-    if (parentPath) {
-      return `${parentPath}/${resolvedParts.join('/')}`
-    }
-    return resolvedParts.join('/')
   }
 }
