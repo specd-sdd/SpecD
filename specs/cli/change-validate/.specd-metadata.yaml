@@ -1,115 +1,137 @@
-title: 'Change Validate'
-description: >
-  Defines the specd change validate command, which validates a change's artifact files against
-  the active schema for a specific spec and marks passing artifacts as complete. Use this when
-  working on artifact validation, spec ID resolution, or validation output formatting.
-keywords:
-  - 'change-validate'
-  - 'artifact-validation'
-  - 'spec-id'
-  - 'mark-complete'
-  - 'validation-output'
-contentHashes:
-  'spec.md': 'sha256:cbb87f7ba67f060b729e6e312fa4bf0b44d9ac2eba93a36b540663b33b20f384'
-  'verify.md': 'sha256:ddafe2a6265131ea5c8164f731eac3d4a516deaacf533166353b1c9f640761c2'
+title: Change Validate
+description: Defines the `specd change validate <name> <workspace:capability-path>` command, which validates a change's artifact files against the active schema for a specific spec and marks passing artifacts as complete.
 dependsOn:
-  - 'cli:cli/entrypoint'
-  - 'core:core/change'
-  - 'core:core/spec-id-format'
+  - cli:cli/entrypoint
+  - core:core/change
+  - core:core/spec-id-format
+context:
+  - Defines the `specd change validate <name> <workspace:capability-path>` command, which validates a change's artifact files against the active schema for a specific spec and marks passing artifacts as complete.
 rules:
-  - requirement: 'Command signature'
+  - requirement: Command signature
     rules:
-      - '`<name>` — required positional; the name of the change to validate.'
-      - "`<workspace:capability-path>` — required positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`."
-      - '`--format text|json|toon` — optional; output format, defaults to `text`.'
-  - requirement: 'Behaviour'
+      - |-
+        ```
+        specd change validate <name> <workspace:capability-path> [--format text|json|toon]
+        ```
+        * `<name>` — required positional; the name of the change to validate
+        * `<workspace:capability-path>` — required positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`.
+        * `--format text|json|toon` — optional; output format, defaults to `text`
+  - requirement: Behaviour
     rules:
-      - 'The command invokes the `ValidateArtifacts` use case, passing the change name and spec ID.'
-  - requirement: 'Output on success'
+      - The command invokes the `ValidateArtifacts` use case, passing the change name and spec ID.
+  - requirement: Output on success
     rules:
-      - 'In `text` mode (default), when all artifacts pass: `validated <name>/<workspace:capability-path>: all artifacts pass`.'
-      - 'In `text` mode, when there are warnings but no failures: `validated <name>/<workspace:capability-path>: pass (N warning(s))` followed by `warning:` lines.'
-      - 'In `json` or `toon` mode, the output is `{ "passed": true, "failures": [], "warnings": [...] }` encoded in the respective format.'
-  - requirement: 'Output on failure'
+      - |-
+        In `text` mode (default), when all artifacts pass:
+        ```
+        validated <name>/<workspace:capability-path>: all artifacts pass
+        ```
+        In `text` mode, when there are warnings but no failures:
+        ```
+        validated <name>/<workspace:capability-path>: pass (N warning(s))
+        warning: <artifactId> — <description>
+        ...
+        ```
+        In `json` or `toon` mode, the output is (encoded in the respective format):
+        ```json
+        { "passed": true, "failures": [], "warnings": [{ "artifactId": "...", "description": "..." }] }
+        ```
+  - requirement: Output on failure
     rules:
-      - 'In `text` mode, the command prints each failure to stdout, exits with code 1: `validation failed <name>/<workspace:capability-path>:` followed by `error:` and `warning:` lines.'
-      - 'In `json` or `toon` mode, the output is `{ "passed": false, "failures": [...], "warnings": [...] }` encoded in the respective format.'
-      - 'The process exits with code 1 when `passed` is `false`, regardless of format.'
-  - requirement: 'Spec ID not in change'
+      - |-
+        In `text` mode, the command prints each failure to stdout, exits with code 1:
+        ```
+        validation failed <name>/<workspace:capability-path>:
+          error: <artifactId> — <description>
+          ...
+          warning: <artifactId> — <description>
+          ...
+        ```
+        In `json` or `toon` mode, the output is (encoded in the respective format):
+        ```json
+        {"passed": false, "failures": [{"artifactId": "...", "description": "..."}], "warnings": [...]}
+        ```
+        The process exits with code 1 when `passed` is `false`, regardless of format.
+  - requirement: Spec ID not in change
     rules:
-      - "If the given `<workspace:capability-path>` is not declared in the change's `specIds`, the command exits with code 1 and prints an `error:` message to stderr."
-  - requirement: 'Error cases'
+      - If the given `<workspace:capability-path>` is not declared in the change's `specIds`, the command exits with code 1 and prints an `error:` message to stderr.
+  - requirement: Error cases
     rules:
-      - 'If the change does not exist, exits with code 1.'
-      - 'If the schema cannot be resolved, exits with code 3.'
+      - |-
+        * If the change does not exist, exits with code 1.
+        * If the schema cannot be resolved, exits with code 3.
 constraints:
-  - 'Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr.'
-  - 'The command marks artifacts as complete in the manifest when they pass.'
+  - Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr
+  - The command marks artifacts as complete in the manifest when they pass
 scenarios:
-  - requirement: 'Command signature'
-    name: 'Missing arguments'
+  - requirement: Command signature
+    name: Missing arguments
     when:
-      - '`specd change validate my-change` is run without the spec ID'
+      - specd change validate my-change is run without the spec ID
     then:
-      - 'the command exits with code 1 and prints a usage error to stderr'
-  - requirement: 'Output on success'
-    name: 'All artifacts pass, no warnings'
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Output on success
+    name: All artifacts pass, no warnings
     given:
-      - 'a change where all artifacts pass validation'
+      - a change where all artifacts pass validation
     when:
-      - '`specd change validate my-change default:auth/login` is run'
+      - specd change validate my-change default:auth/login is run
     then:
-      - 'stdout contains `validated my-change/default:auth/login: all artifacts pass`'
-      - 'the process exits with code 0'
-  - requirement: 'Output on success'
-    name: 'Pass with warnings'
+      - 'stdout contains validated my-change/default:auth/login: all artifacts pass'
+      - AND the process exits with code 0
+  - requirement: Output on success
+    name: Pass with warnings
     given:
-      - 'a change where artifacts pass but there are optional rule mismatches'
+      - a change where artifacts pass but there are optional rule mismatches
     when:
-      - '`specd change validate my-change default:auth/login` is run'
+      - specd change validate my-change default:auth/login is run
     then:
-      - 'stdout contains a pass message and `warning:` lines for each warning'
-      - 'the process exits with code 0'
-  - requirement: 'Output on failure'
-    name: 'Validation failures'
+      - 'stdout contains a pass message and warning: lines for each warning'
+      - AND the process exits with code 0
+  - requirement: Output on failure
+    name: Validation failures
     given:
-      - 'a change where a required artifact fails validation'
+      - a change where a required artifact fails validation
     when:
-      - '`specd change validate my-change default:auth/login` is run'
+      - specd change validate my-change default:auth/login is run
     then:
-      - 'stdout contains `validation failed` and `error:` lines for each failure'
-      - 'the process exits with code 1'
-  - requirement: 'Spec ID not in change'
-    name: 'Unknown spec ID'
+      - 'stdout contains validation failed and error: lines for each failure'
+      - AND the process exits with code 1
+  - requirement: Spec ID not in change
+    name: Unknown spec ID
     given:
-      - 'a change with specId `default:auth/login`'
+      - a change with specId default:auth/login
     when:
-      - '`specd change validate my-change default:billing/invoices` is run'
+      - specd change validate my-change default:billing/invoices is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
-  - requirement: 'Error cases'
-    name: 'Change not found'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+  - requirement: Error cases
+    name: Change not found
     when:
-      - '`specd change validate nonexistent default:auth/login` is run'
+      - specd change validate nonexistent default:auth/login is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
-  - requirement: 'Output on success'
-    name: 'JSON output on pass'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+  - requirement: Output on success
+    name: JSON output on pass
     given:
-      - 'a change where all artifacts pass validation with no warnings'
+      - a change where all artifacts pass validation with no warnings
     when:
-      - '`specd change validate my-change default:auth/login --format json` is run'
+      - specd change validate my-change default:auth/login --format json is run
     then:
-      - 'stdout is valid JSON with `passed` equal to `true`, `failures` equal to `[]`, and `warnings` equal to `[]`'
-      - 'the process exits with code 0'
-  - requirement: 'Output on failure'
-    name: 'JSON output on failure'
+      - stdout is valid JSON with passed equal to true, failures equal to [], and warnings equal to []
+      - AND the process exits with code 0
+  - requirement: Output on failure
+    name: JSON output on failure
     given:
-      - 'a change where a required artifact fails validation'
+      - a change where a required artifact fails validation
     when:
-      - '`specd change validate my-change default:auth/login --format json` is run'
+      - specd change validate my-change default:auth/login --format json is run
     then:
-      - 'stdout is valid JSON with `passed` equal to `false` and `failures` containing at least one entry with `artifactId` and `description`'
-      - 'the process exits with code 1'
+      - stdout is valid JSON with passed equal to false and failures containing at least one entry with artifactId and description
+      - AND the process exits with code 1
+contentHashes:
+  spec.md: sha256:cbb87f7ba67f060b729e6e312fa4bf0b44d9ac2eba93a36b540663b33b20f384
+  verify.md: sha256:ddafe2a6265131ea5c8164f731eac3d4a516deaacf533166353b1c9f640761c2
+generatedBy: core

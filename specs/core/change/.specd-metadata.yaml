@@ -1,14 +1,14 @@
 title: Change
 description: A Change is the central domain entity in specd. It represents a discrete, named unit of in-progress spec work — a coherent set of modifications across one or more workspaces that moves from initial drafting through implementation and into the archive. Every specd operation targets a Change. The Change enforces its own lifecycle and invariants; no external code may bypass them.
 dependsOn:
-  - core/config
-  - core/schema-format
-  - core/change-manifest
-  - core/storage
-  - core/delta-format
-  - core/spec-metadata
-  - core/spec-id-format
-  - core/workspace
+  - core:core/config
+  - core:core/schema-format
+  - core:core/change-manifest
+  - core:core/storage
+  - core:core/delta-format
+  - core:core/spec-metadata
+  - core:core/spec-id-format
+  - core:core/workspace
 context:
   - A Change is the central domain entity in specd. It represents a discrete, named unit of in-progress spec work — a coherent set of modifications across one or more workspaces that moves from initial drafting through implementation and into the archive. Every specd operation targets a Change. The Change enforces its own lifecycle and invariants; no external code may bypass them.
 rules:

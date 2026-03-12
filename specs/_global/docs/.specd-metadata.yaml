@@ -1,118 +1,232 @@
-title: 'Documentation Conventions'
-description: >
-  All project documentation lives under `docs/`. Each subdirectory has a specific scope. Documentation is written and maintained by agents and humans alike — the same constraints apply to both.
-keywords:
-  - 'documentation'
-  - 'conventions'
-  - 'directory'
-  - 'structure'
-  - 'adr'
-  - 'format'
-  - 'all'
-  - 'files'
-  - 'use'
-  - 'markdown'
-  - 'filenames'
-  - 'match'
+title: Documentation Conventions
+description: All project documentation lives under `docs/`. Each subdirectory has a specific scope. Documentation is written and maintained by agents and humans alike — the same constraints apply to both.
 dependsOn:
-  - 'default:_global/conventions'
-contentHashes:
-  'spec.md': 'sha256:f878defaa38014eda0d78a8a34167e8591d23b62071a2b884c1e76737609d838'
-  'verify.md': 'sha256:2bed20f27ce16cffa390fd112ffdc02f1d36ab49c3882c1176c30c328597feb2'
+  - default:_global/conventions
+context:
+  - All project documentation lives under `docs/`. Each subdirectory has a specific scope. Documentation is written and maintained by agents and humans alike — the same constraints apply to both.
 rules:
-  - requirement: 'Directory structure'
+  - requirement: Directory structure
     rules:
-      - 'No documentation lives outside `docs/` except `README.md` at the project root and `AGENTS.md` / `CLAUDE.md` for agent instructions.'
-  - requirement: 'ADR format'
+      - |-
+        ```
+        docs/
+        ├── adr/        # Architecture Decision Records
+        ├── cli/        # CLI commands reference
+        ├── mcp/        # MCP server tools and resources reference
+        ├── core/       # @specd/core API and domain model documentation
+        └── schemas/    # Schema authoring guide
+        ```
+        No documentation lives outside `docs/` except `README.md` at the project root and `AGENTS.md` / `CLAUDE.md` for agent instructions.
+  - requirement: ADR format
     rules:
-      - 'Every Architecture Decision Record follows the [MADR](https://adr.github.io/madr/) format (Markdown Architectural Decision Records) verbatim, with one project-specific addition: a `### Spec` sub-section inside `## More Information` linking to the spec(s) that capture constraints derived from this decision.'
+      - |-
+        Every Architecture Decision Record follows the [MADR](https://adr.github.io/madr/) format (Markdown Architectural Decision Records) verbatim, with one project-specific addition: a `### Spec` sub-section inside `## More Information` linking to the spec(s) that capture constraints derived from this decision.
+        ```markdown
+        ---
+        status: '{proposed | rejected | accepted | deprecated | … | superseded by ADR-0123}'
+        date: YYYY-MM-DD
+        decision-makers: list everyone involved in the decision
+        consulted: list everyone whose opinions are sought; two-way communication
+        informed: list everyone kept up-to-date; one-way communication
+        ---
+
+        # {short title, representative of solved problem and found solution}
+
+        ## Context and Problem Statement
+
+        {Describe the context and problem statement, e.g., in free form using two to three sentences or in the form of an illustrative story. You may want to articulate the problem in form of a question and add links to collaboration boards or issue management systems.}
+
+        ## Decision Drivers
+
+        - {decision driver 1, e.g., a force, facing concern, …}
+        - {decision driver 2, e.g., a force, facing concern, …}
+        - …
+
+        ## Considered Options
+
+        - {title of option 1}
+        - {title of option 2}
+        - {title of option 3}
+        - …
+
+        ## Decision Outcome
+
+        Chosen option: "{title of option 1}", because {justification. e.g., only option, which meets k.o. criterion decision driver | which resolves force {force} | … | comes out best (see below)}.
+
+        ### Consequences
+
+        - Good, because {positive consequence, e.g., improvement of one or more desired qualities, …}
+        - Bad, because {negative consequence, e.g., compromising one or more desired qualities, …}
+        - …
+
+        ### Confirmation
+
+        {Describe how the implementation / compliance of the ADR can/will be confirmed. Is there any automated or manual fitness function? If so, list it and explain how it is applied.}
+
+        ## Pros and Cons of the Options
+
+        ### {title of option 1}
+
+        {example | description | pointer to more information | …}
+
+        - Good, because {argument a}
+        - Good, because {argument b}
+        - Neutral, because {argument c}
+        - Bad, because {argument d}
+        - …
+
+        ### {title of other option}
+
+        {example | description | pointer to more information | …}
+
+        - Good, because {argument a}
+        - Good, because {argument b}
+        - Neutral, because {argument c}
+        - Bad, because {argument d}
+        - …
+
+        ## More Information
+
+        {You might want to provide additional evidence/confidence for the decision outcome here and/or document the team agreement on the decision and/or define when/how this decision should be realized and if/when it should be re-visited.}
+
+        ### Spec
+
+        - [`specs/path/to/spec.md`](../../specs/path/to/spec.md)
+        ```
+        `## Decision Drivers`, `## Considered Options`, `## Pros and Cons of the Options`, and `## More Information` are optional — omit them when they add no value. `### Confirmation` inside `## Decision Outcome` is always present. `### Spec` inside `## More Information` is always present.
+  - requirement: ADR numbering
+    rules:
+      - 'ADRs are numbered sequentially starting at `0001`. The filename matches the number and a kebab-case title: `0001-hexagonal-architecture.md`. Numbers are never reused — deprecated or superseded ADRs keep their number and update their status.'
+  - requirement: ADR creation
+    rules:
+      - 'An ADR is created for every significant architectural or design decision. Significant means: it affects multiple packages, it constrains future development, or it was a non-obvious choice between real alternatives. Implementation details that follow naturally from prior ADRs do not need their own ADR.'
+  - requirement: CLI documentation
+    rules:
+      - Every `specd` command has a corresponding doc file in `docs/cli/` describing its purpose, flags, examples, and exit codes.
+  - requirement: MCP documentation
+    rules:
+      - Every MCP tool and resource exposed by `@specd/mcp` has a corresponding entry in `docs/mcp/` describing its input schema, output schema, and example usage.
+  - requirement: Core documentation
+    rules:
+      - Public types, ports, and use cases in `@specd/core` are documented in `docs/core/` with their purpose, contracts, and usage examples.
+  - requirement: JSDoc on all symbols
+    rules:
+      - |-
+        All functions, methods, classes, type aliases, and interfaces in all packages must have JSDoc comments — not just public exports. This enables IDE tooling, API doc generation, and self-describing code for both agents and human contributors.
+        JSDoc must include:
+        * A description of what the symbol does or represents
+        * `@param` for each parameter with a description
+        * `@returns` describing the return value (omit for `void` and constructors)
+        * `@throws` for each error type the function can throw
+        ```typescript
+        /**
+         * Merges a delta spec into a base spec using the schema's delta configuration.
+         *
+         * @param base - The original spec to merge into
+         * @param delta - The spec containing the delta operations
+         * @param deltaConfigs - Per-section merge configuration from the schema
+         * @param deltaOperations - Optional custom operation keywords (defaults to ADDED/MODIFIED/REMOVED/RENAMED)
+         * @returns A new Spec with all delta operations applied
+         * @throws {DeltaConflictError} When conflicting operations are detected in the delta
+         */
+        export function mergeSpecs(
+          base: Spec,
+          delta: Spec,
+          deltaConfigs: readonly DeltaConfig[],
+          deltaOperations?: OperationKeywords,
+        ): Spec
+        ```
 constraints:
-  - 'All documentation files use Markdown'
-  - 'ADR filenames must match the pattern `NNNN-kebab-case-title.md`'
-  - 'ADR numbers are sequential and never reused'
-  - 'Every significant architectural decision must have an ADR'
-  - 'Every ADR must include a `### Spec` sub-section inside `## More Information` linking to the spec(s) that capture its constraints'
-  - 'Specs that have associated ADRs include a `## ADRs` section linking to them — omitted if none exist'
-  - 'No documentation outside `docs/` except `README.md`, `AGENTS.md`, `CLAUDE.md`'
-  - "A spec's `## ADRs` section lists only the ADRs that _produced_ that spec — they are historical provenance, not dependencies"
-  - 'A spec may only depend on other specs (`## Spec Dependencies`), never on ADRs directly'
-  - "If an ADR's decision needs to be enforced as a constraint, it must first be captured in a spec; that spec is then what other specs depend on"
+  - All documentation files use Markdown
+  - ADR filenames must match the pattern NNNN-kebab-case-title.md
+  - ADR numbers are sequential and never reused
+  - Every significant architectural decision must have an ADR
+  - 'Every ADR must include a ### Spec sub-section inside ## More Information linking to the spec(s) that capture its constraints'
+  - 'Specs that have associated ADRs include a ## ADRs section linking to them — omitted if none exist'
+  - No documentation outside docs/ except README.md, AGENTS.md, CLAUDE.md
+  - "A spec's ## ADRs section lists only the ADRs that produced that spec — they are historical provenance, not dependencies"
+  - A spec may only depend on other specs (## Spec Dependencies), never on ADRs directly
+  - If an ADR's decision needs to be enforced as a constraint, it must first be captured in a spec; that spec is then what other specs depend on
 scenarios:
-  - requirement: 'Directory structure'
-    name: 'Doc placed outside docs/'
+  - requirement: Directory structure
+    name: Doc placed outside docs/
     when:
-      - 'a documentation file is created outside `docs/` (excluding `README.md`, `AGENTS.md`, `CLAUDE.md`)'
+      - a documentation file is created outside docs/ (excluding README.md, AGENTS.md, CLAUDE.md)
     then:
-      - 'it must be moved to the appropriate subdirectory under `docs/`'
-  - requirement: 'ADR format'
-    name: 'ADR missing required section'
+      - it must be moved to the appropriate subdirectory under docs/
+  - requirement: ADR format
+    name: ADR missing required section
     when:
-      - 'an ADR file is missing `## Context and Problem Statement`, `## Decision Outcome`, or `## More Information` with a `### Spec` sub-section'
+      - 'an ADR file is missing ## Context and Problem Statement, ## Decision Outcome, or ## More Information with a ### Spec sub-section'
     then:
-      - 'the review must reject it as malformed'
-  - requirement: 'ADR format'
-    name: 'ADR missing Confirmation'
+      - the review must reject it as malformed
+  - requirement: ADR format
+    name: ADR missing Confirmation
     when:
-      - "an ADR's `## Decision Outcome` section has no `### Confirmation` sub-section"
+      - "an ADR's ## Decision Outcome section has no ### Confirmation sub-section"
     then:
-      - 'the review must reject it as malformed'
-  - requirement: 'ADR format'
-    name: 'ADR with real alternatives omits Considered Options'
+      - the review must reject it as malformed
+  - requirement: ADR format
+    name: ADR with real alternatives omits Considered Options
     when:
-      - 'an ADR describes a decision where multiple options were genuinely evaluated'
+      - an ADR describes a decision where multiple options were genuinely evaluated
     then:
-      - 'it must include `## Considered Options` and at least one entry per option evaluated'
-  - requirement: 'ADR format'
-    name: 'ADR missing frontmatter'
+      - 'it must include ## Considered Options and at least one entry per option evaluated'
+  - requirement: ADR format
+    name: ADR missing frontmatter
     when:
-      - 'an ADR file has no YAML frontmatter block with `status` and `date` fields before the title'
+      - an ADR file has no YAML frontmatter block with status and date fields before the title
     then:
-      - 'the review must reject it as malformed'
-  - requirement: 'ADR numbering'
-    name: 'Duplicate ADR number'
+      - the review must reject it as malformed
+  - requirement: ADR numbering
+    name: Duplicate ADR number
     when:
-      - 'a new ADR is created with a number already used by an existing ADR'
+      - a new ADR is created with a number already used by an existing ADR
     then:
-      - 'it must be renumbered to the next available number'
-  - requirement: 'ADR numbering'
-    name: 'Superseded ADR'
+      - it must be renumbered to the next available number
+  - requirement: ADR numbering
+    name: Superseded ADR
     when:
-      - 'a decision is reversed or replaced by a new ADR'
+      - a decision is reversed or replaced by a new ADR
     then:
-      - 'the old ADR updates its status to `Superseded by [ADR-NNNN]` and keeps its number'
-  - requirement: 'ADR creation'
-    name: 'Significant decision without ADR'
+      - the old ADR updates its status to Superseded by [ADR-NNNN] and keeps its number
+  - requirement: ADR creation
+    name: Significant decision without ADR
     when:
-      - 'a decision affects multiple packages or constrains future development'
+      - a decision affects multiple packages or constrains future development
     then:
-      - 'an ADR must be created before or alongside the implementing code'
-  - requirement: 'CLI documentation'
-    name: 'New command without docs'
+      - an ADR must be created before or alongside the implementing code
+  - requirement: CLI documentation
+    name: New command without docs
     when:
-      - 'a new `specd` command is added to `@specd/cli`'
+      - a new specd command is added to @specd/cli
     then:
-      - 'a corresponding `docs/cli/<command>.md` file must be created in the same change'
-  - requirement: 'MCP documentation'
-    name: 'New MCP tool without docs'
+      - a corresponding docs/cli/<command>.md file must be created in the same change
+  - requirement: MCP documentation
+    name: New MCP tool without docs
     when:
-      - 'a new tool is added to `@specd/mcp`'
+      - a new tool is added to @specd/mcp
     then:
-      - 'a corresponding entry in `docs/mcp/` must be created in the same change'
-  - requirement: 'Core documentation'
-    name: 'New public port without docs'
+      - a corresponding entry in docs/mcp/ must be created in the same change
+  - requirement: Core documentation
+    name: New public port without docs
     when:
-      - 'a new port interface is added to `@specd/core/application/ports/`'
+      - a new port interface is added to @specd/core/application/ports/
     then:
-      - 'a corresponding entry in `docs/core/` must be created in the same change'
-  - requirement: 'JSDoc on all symbols'
-    name: 'Exported function without JSDoc'
+      - a corresponding entry in docs/core/ must be created in the same change
+  - requirement: JSDoc on all symbols
+    name: Exported function without JSDoc
     when:
-      - 'an exported function in `@specd/core` has no JSDoc block comment'
+      - an exported function in @specd/core has no JSDoc block comment
     then:
-      - 'the linter must report an error'
-  - requirement: 'JSDoc on all symbols'
-    name: 'Internal helper without JSDoc'
+      - the linter must report an error
+  - requirement: JSDoc on all symbols
+    name: Internal helper without JSDoc
     when:
-      - 'a non-exported helper function has no JSDoc'
+      - a non-exported helper function has no JSDoc
     then:
-      - 'the linter must not report an error'
+      - the linter must not report an error
+contentHashes:
+  spec.md: sha256:f878defaa38014eda0d78a8a34167e8591d23b62071a2b884c1e76737609d838
+  verify.md: sha256:2bed20f27ce16cffa390fd112ffdc02f1d36ab49c3882c1176c30c328597feb2
+generatedBy: core

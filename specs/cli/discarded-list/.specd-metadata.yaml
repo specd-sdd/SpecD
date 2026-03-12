@@ -1,127 +1,133 @@
-title: 'Discarded List'
-description: >
-  Defines the `specd discarded list` command, which lists all discarded changes in `discarded/`, sorted by discard date descending (most recently discarded first).
-keywords:
-  - 'discarded'
-  - 'list'
-  - 'command'
-  - 'signature'
-  - 'output'
-  - 'format'
-  - 'text'
-  - 'json'
-  - 'toon'
-  - 'empty'
-  - 'error'
-  - 'cases'
+title: Discarded List
+description: Defines the `specd discarded list` command, which lists all discarded changes in `discarded/`, sorted by discard date descending (most recently discarded first).
 dependsOn:
-  - 'cli:cli/entrypoint'
-  - 'core:core/change'
-contentHashes:
-  'spec.md': 'sha256:6687aacca13e143e236e85b8a2b7c87e003515532b8b6c80d831bd9b4e5a2d38'
-  'verify.md': 'sha256:219eded2f08aaff1f67a50f448a8b18157e1865ddf6f328ebc9fd980a03b21f4'
+  - cli:cli/entrypoint
+  - core:core/change
+context:
+  - Defines the `specd discarded list` command, which lists all discarded changes in `discarded/`, sorted by discard date descending (most recently discarded first).
 rules:
-  - requirement: 'Command signature'
+  - requirement: Command signature
     rules:
-      - 'No positional arguments. The `--format` flag controls output encoding; defaults to `text`.'
-  - requirement: 'Output format — text'
+      - |-
+        ```
+        specd discarded list [--format text|json|toon]
+        ```
+        No positional arguments. The `--format` flag controls output encoding; defaults to `text`.
+  - requirement: Output format — text
     rules:
-      - 'The command prints a human-readable table to stdout. Changes are sorted by discard date descending (most recently discarded first).'
-      - 'The output has an inverse-video column header row `NAME DATE BY REASON` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group). The REASON column uses wrap overflow capped at 60 characters.'
-  - requirement: 'Output format — JSON'
+      - |-
+        The command prints a human-readable table to stdout. Changes are sorted by discard date descending (most recently discarded first).
+        The output has an inverse-video column header row `NAME  DATE  BY  REASON` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group). The REASON column uses wrap overflow capped at 60 characters.
+  - requirement: Output format — JSON
     rules:
-      - 'When `--format json` is passed, the command writes a JSON array to stdout:'
-      - 'One object per discarded change, sorted by discard date descending. `supersededBy` is omitted when empty. `discardedBy` is omitted when not recorded.'
-  - requirement: 'Output format — toon'
+      - |-
+        When `--format json` is passed, the command writes a JSON array to stdout:
+        ```json
+        [
+          {
+            "name": "...",
+            "discardedAt": "...",
+            "discardedBy": { "name": "...", "email": "..." },
+            "reason": "...",
+            "supersededBy": ["..."]
+          }
+        ]
+        ```
+        One object per discarded change, sorted by discard date descending. `supersededBy` is omitted when empty. `discardedBy` is omitted when not recorded.
+  - requirement: Output format — toon
     rules:
-      - 'When `--format toon` is passed, the command writes the same data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout.'
-  - requirement: 'Empty discarded list'
+      - When `--format toon` is passed, the command writes the same data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout.
+  - requirement: Empty discarded list
     rules:
-      - 'If there are no discarded changes, the command prints `no discarded changes` to stdout in text mode, or `[]` in JSON/toon mode, and exits with code 0.'
-  - requirement: 'Error cases'
+      - If there are no discarded changes, the command prints `no discarded changes` to stdout in text mode, or `[]` in JSON/toon mode, and exits with code 0.
+  - requirement: Error cases
     rules:
-      - 'If an I/O error occurs while reading `discarded/`, the command exits with code 3 and prints an `error:` message to stderr.'
+      - '* If an I/O error occurs while reading `discarded/`, the command exits with code 3 and prints an `error:` message to stderr.'
 constraints:
-  - 'Errors always go to stderr as plain text regardless of `--format`'
-  - '`--format` only affects stdout'
+  - Errors always go to stderr as plain text regardless of --format
+  - --format only affects stdout
 scenarios:
-  - requirement: 'Command signature'
-    name: 'Extra arguments rejected'
+  - requirement: Command signature
+    name: Extra arguments rejected
     when:
-      - '`specd discarded list some-name` is run with an unexpected positional argument'
+      - specd discarded list some-name is run with an unexpected positional argument
     then:
-      - 'the command exits with code 1 and prints a usage error to stderr'
-  - requirement: 'Output format — text'
-    name: 'Discarded changes listed with correct fields'
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Output format — text
+    name: Discarded changes listed with correct fields
     given:
-      - '`discarded/` contains two changes: `old-experiment` (discarded `2024-01-10`, actor `alice`, reason `"no longer needed"`, no supersededBy) and `bad-idea` (discarded `2024-01-08`, actor `bob`, reason `"duplicate effort"`, supersededBy `[''new-approach'']`)'
+      - 'discarded/ contains two changes: old-experiment (discarded 2024-01-10, actor alice, reason "no longer needed", no supersededBy) and bad-idea (discarded 2024-01-08, actor bob, reason "duplicate effort", supersededBy [''new-approach''])'
     when:
-      - '`specd discarded list` is run'
+      - specd discarded list is run
     then:
-      - 'stdout contains one row for each change showing name, date, actor, and reason'
-      - 'the row for `bad-idea` includes `→ new-approach`'
-      - 'the row for `old-experiment` does not include a `→` segment'
-      - 'the process exits with code 0'
-  - requirement: 'Output format — text'
-    name: 'Rows sorted by discard date descending'
+      - stdout contains one row for each change showing name, date, actor, and reason
+      - AND the row for bad-idea includes → new-approach
+      - AND the row for old-experiment does not include a → segment
+      - AND the process exits with code 0
+  - requirement: Output format — text
+    name: Rows sorted by discard date descending
     given:
-      - '`discarded/` contains change `older-discard` discarded before `newer-discard`'
+      - discarded/ contains change older-discard discarded before newer-discard
     when:
-      - '`specd discarded list` is run'
+      - specd discarded list is run
     then:
-      - '`newer-discard` appears before `older-discard` in the output'
-  - requirement: 'Output format — JSON'
-    name: 'JSON format output'
+      - newer-discard appears before older-discard in the output
+  - requirement: Output format — JSON
+    name: JSON format output
     given:
-      - '`discarded/` contains one change named `old-experiment` discarded at `2024-01-10T09:00:00.000Z`, actor `alice`, reason `"no longer needed"`, no supersededBy'
+      - discarded/ contains one change named old-experiment discarded at 2024-01-10T09:00:00.000Z, actor alice, reason "no longer needed", no supersededBy
     when:
-      - '`specd discarded list --format json` is run'
+      - specd discarded list --format json is run
     then:
-      - 'stdout is a JSON array with one object containing `name`, `discardedAt`, `discardedBy`, and `reason` fields'
-      - 'the object does not contain a `supersededBy` field'
-      - 'the process exits with code 0'
-  - requirement: 'Output format — JSON'
-    name: 'JSON format output — supersededBy present'
+      - stdout is a JSON array with one object containing name, discardedAt, discardedBy, and reason fields
+      - AND the object does not contain a supersededBy field
+      - AND the process exits with code 0
+  - requirement: Output format — JSON
+    name: JSON format output — supersededBy present
     given:
-      - "`discarded/` contains one change named `bad-idea` with `supersededBy` set to `['new-approach']`"
+      - discarded/ contains one change named bad-idea with supersededBy set to ['new-approach']
     when:
-      - '`specd discarded list --format json` is run'
+      - specd discarded list --format json is run
     then:
-      - 'the JSON object for `bad-idea` contains a `supersededBy` array with `"new-approach"`'
-      - 'the process exits with code 0'
-  - requirement: 'Output format — JSON'
-    name: 'JSON format output — no actor recorded'
+      - the JSON object for bad-idea contains a supersededBy array with "new-approach"
+      - AND the process exits with code 0
+  - requirement: Output format — JSON
+    name: JSON format output — no actor recorded
     given:
-      - '`discarded/` contains one change named `old-experiment` with no `discardedBy` recorded'
+      - discarded/ contains one change named old-experiment with no discardedBy recorded
     when:
-      - '`specd discarded list --format json` is run'
+      - specd discarded list --format json is run
     then:
-      - 'the JSON object for `old-experiment` does not contain a `discardedBy` field'
-      - 'the process exits with code 0'
-  - requirement: 'Empty discarded list'
-    name: 'No discarded changes — text'
+      - the JSON object for old-experiment does not contain a discardedBy field
+      - AND the process exits with code 0
+  - requirement: Empty discarded list
+    name: No discarded changes — text
     given:
-      - '`discarded/` is empty'
+      - discarded/ is empty
     when:
-      - '`specd discarded list` is run'
+      - specd discarded list is run
     then:
-      - 'stdout contains `no discarded changes`'
-      - 'the process exits with code 0'
-  - requirement: 'Empty discarded list'
-    name: 'No discarded changes — JSON'
+      - stdout contains no discarded changes
+      - AND the process exits with code 0
+  - requirement: Empty discarded list
+    name: No discarded changes — JSON
     given:
-      - '`discarded/` is empty'
+      - discarded/ is empty
     when:
-      - '`specd discarded list --format json` is run'
+      - specd discarded list --format json is run
     then:
-      - 'stdout is `[]`'
-      - 'the process exits with code 0'
-  - requirement: 'Error cases'
-    name: 'I/O error reading discarded directory'
+      - stdout is []
+      - AND the process exits with code 0
+  - requirement: Error cases
+    name: I/O error reading discarded directory
     given:
-      - 'the `discarded/` directory cannot be read due to a permissions error'
+      - the discarded/ directory cannot be read due to a permissions error
     when:
-      - '`specd discarded list` is run'
+      - specd discarded list is run
     then:
-      - 'the command exits with code 3'
-      - 'stderr contains an `error:` message'
+      - the command exits with code 3
+      - 'AND stderr contains an error: message'
+contentHashes:
+  spec.md: sha256:6687aacca13e143e236e85b8a2b7c87e003515532b8b6c80d831bd9b4e5a2d38
+  verify.md: sha256:219eded2f08aaff1f67a50f448a8b18157e1865ddf6f328ebc9fd980a03b21f4
+generatedBy: core

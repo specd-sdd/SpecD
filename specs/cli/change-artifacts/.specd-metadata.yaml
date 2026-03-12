@@ -1,97 +1,109 @@
-title: 'Change Artifacts'
-description: >
-  Defines the `specd change artifacts <name>` command, which lists all artifact files for a change with their absolute paths on disk, effective statuses, and whether each file currently exists. Primarily useful for agents that need to know exactly where to create or edit artifact files.
-keywords:
-  - 'change'
-  - 'artifacts'
-  - 'command'
-  - 'signature'
-  - 'output'
-  - 'format'
-  - 'error'
-  - 'cases'
-  - 'paths'
-  - 'are'
-  - 'always'
-  - 'absolute'
+title: Change Artifacts
+description: Defines the `specd change artifacts <name>` command, which lists all artifact files for a change with their absolute paths on disk, effective statuses, and whether each file currently exists. Primarily useful for agents that need to know exactly where to create or edit artifact files.
 dependsOn:
-  - 'cli:cli/entrypoint'
-  - 'core:core/change'
-contentHashes:
-  'spec.md': 'sha256:f22824fafc4ca09331f2f02390d8b1c2bb6959c39ff68c494e5a163d67cf230a'
-  'verify.md': 'sha256:e9a857428358ecc5fbf562cca125fb94077c481f69ca312e84cfd3abb7fcac03'
+  - cli:cli/entrypoint
+  - core:core/change
+context:
+  - Defines the `specd change artifacts <name>` command, which lists all artifact files for a change with their absolute paths on disk, effective statuses, and whether each file currently exists. Primarily useful for agents that need to know exactly where to create or edit artifact files.
 rules:
-  - requirement: 'Command signature'
+  - requirement: Command signature
     rules:
-      - '`<name>` — required positional; the name of the change'
-      - '`--format text|json|toon` — optional; output format, defaults to `text`'
-  - requirement: 'Output format'
+      - |-
+        ```
+        specd change artifacts <name> [--format text|json|toon]
+        ```
+        * `<name>` — required positional; the name of the change
+        * `--format text|json|toon` — optional; output format, defaults to `text`
+  - requirement: Output format
     rules:
-      - 'In `text` mode (default), each artifact is listed on one line:'
-      - 'where `<exists>` is `yes` or `no`, and `<absolute-path>` is the full filesystem path to the artifact file within the change directory (whether or not the file currently exists on disk).'
-      - 'In `json` or `toon` mode, the output is (encoded in the respective format):'
-      - 'Artifacts are listed in schema-declared order. `changeDir` is the absolute path to the root of the change directory.'
-  - requirement: 'Error cases'
+      - |-
+        In `text` mode (default), each artifact is listed on one line:
+        ```
+        <artifact-id>  <effectiveStatus>  <exists>  <absolute-path>
+        ```
+        where `<exists>` is `yes` or `no`, and `<absolute-path>` is the full filesystem path to the artifact file within the change directory (whether or not the file currently exists on disk).
+        In `json` or `toon` mode, the output is (encoded in the respective format):
+        ```json
+        {
+          "name": "<change-name>",
+          "changeDir": "<absolute-path-to-change-directory>",
+          "artifacts": [
+            {
+              "id": "...",
+              "filename": "...",
+              "path": "<absolute-path>",
+              "effectiveStatus": "missing|in-progress|complete|skipped",
+              "exists": true
+            }
+          ]
+        }
+        ```
+        Artifacts are listed in schema-declared order. `changeDir` is the absolute path to the root of the change directory.
+  - requirement: Error cases
     rules:
-      - 'If the change does not exist, exits with code 1.'
+      - '* If the change does not exist, exits with code 1.'
 constraints:
-  - 'Paths are always absolute — never relative'
-  - 'All artifacts declared by the schema are listed, regardless of whether their files exist on disk'
-  - 'Delta artifact paths (e.g. `deltas/<workspace>/<cap-path>/<filename>.delta.yaml`) are included as separate entries when the schema declares `delta: true` for an artifact'
+  - Paths are always absolute — never relative
+  - All artifacts declared by the schema are listed, regardless of whether their files exist on disk
+  - 'Delta artifact paths (e.g. deltas/<workspace>/<cap-path>/<filename>.delta.yaml) are included as separate entries when the schema declares delta: true for an artifact'
 scenarios:
-  - requirement: 'Command signature'
-    name: 'Missing name argument'
+  - requirement: Command signature
+    name: Missing name argument
     when:
-      - '`specd change artifacts` is run without a name'
+      - specd change artifacts is run without a name
     then:
-      - 'the command exits with code 1 and prints a usage error to stderr'
-  - requirement: 'Output format'
-    name: 'Text output includes all fields'
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Output format
+    name: Text output includes all fields
     given:
-      - 'a change `my-change` with artifact `proposal` (complete, file exists) and `tasks` (missing, file absent)'
+      - a change my-change with artifact proposal (complete, file exists) and tasks (missing, file absent)
     when:
-      - '`specd change artifacts my-change` is run'
+      - specd change artifacts my-change is run
     then:
-      - 'the `proposal` line shows `complete`, `yes`, and an absolute path'
-      - 'the `tasks` line shows `missing`, `no`, and an absolute path'
-      - 'the process exits with code 0'
-  - requirement: 'Output format'
-    name: 'All schema artifacts listed regardless of existence'
+      - the proposal line shows complete, yes, and an absolute path
+      - AND the tasks line shows missing, no, and an absolute path
+      - AND the process exits with code 0
+  - requirement: Output format
+    name: All schema artifacts listed regardless of existence
     given:
-      - 'the schema declares three artifacts and none of the files exist on disk'
+      - the schema declares three artifacts and none of the files exist on disk
     when:
-      - '`specd change artifacts my-change` is run'
+      - specd change artifacts my-change is run
     then:
-      - 'three lines are printed, all showing `missing` and `no`'
-  - requirement: 'Output format'
-    name: 'Artifacts in schema-declared order'
+      - three lines are printed, all showing missing and no
+  - requirement: Output format
+    name: Artifacts in schema-declared order
     given:
-      - 'the schema declares artifacts in order: `proposal`, `spec`, `tasks`'
+      - 'the schema declares artifacts in order: proposal, spec, tasks'
     when:
-      - '`specd change artifacts my-change` is run'
+      - specd change artifacts my-change is run
     then:
-      - 'the lines appear in that order'
-  - requirement: 'Output format'
-    name: 'JSON output structure'
+      - the lines appear in that order
+  - requirement: Output format
+    name: JSON output structure
     given:
-      - 'a change `my-change` with one artifact `proposal` that exists on disk'
+      - a change my-change with one artifact proposal that exists on disk
     when:
-      - '`specd change artifacts my-change --format json` is run'
+      - specd change artifacts my-change --format json is run
     then:
-      - 'stdout is valid JSON with `name`, `changeDir`, and `artifacts`'
-      - '`artifacts[0]` has `id`, `filename`, `path`, `effectiveStatus`, and `exists`'
-      - '`path` is an absolute filesystem path'
-      - '`changeDir` is the absolute path to the change directory'
-  - requirement: 'Output format'
-    name: 'Paths are absolute'
+      - stdout is valid JSON with name, changeDir, and artifacts
+      - AND artifacts[0] has id, filename, path, effectiveStatus, and exists
+      - AND path is an absolute filesystem path
+      - AND changeDir is the absolute path to the change directory
+  - requirement: Output format
+    name: Paths are absolute
     when:
-      - '`specd change artifacts my-change` is run from any working directory'
+      - specd change artifacts my-change is run from any working directory
     then:
-      - 'all paths in the output are absolute and do not depend on CWD'
-  - requirement: 'Error cases'
-    name: 'Change not found'
+      - all paths in the output are absolute and do not depend on CWD
+  - requirement: Error cases
+    name: Change not found
     when:
-      - '`specd change artifacts nonexistent` is run'
+      - specd change artifacts nonexistent is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+contentHashes:
+  spec.md: sha256:f22824fafc4ca09331f2f02390d8b1c2bb6959c39ff68c494e5a163d67cf230a
+  verify.md: sha256:e9a857428358ecc5fbf562cca125fb94077c481f69ca312e84cfd3abb7fcac03
+generatedBy: core

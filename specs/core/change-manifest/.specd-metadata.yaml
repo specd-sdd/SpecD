@@ -1,25 +1,20 @@
 title: Change Manifest
-description:
-  The change manifest (manifest.json) is the single source of truth for a change. It lives inside the
-  change's directory and persists the full state of the Change domain entity — identity, specs, artifacts, and the
-  complete event history from which lifecycle state is derived. It is written and read exclusively by
-  FsChangeRepository.
+description: The change manifest (`manifest.json`) is the single source of truth for a change. It lives inside the change's directory and persists the full state of the Change domain entity — identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It is written and read exclusively by `FsChangeRepository`.
+dependsOn:
+  - core:core/change
+  - core:core/storage
+  - core:core/spec-metadata
+  - core:core/spec-id-format
+  - core:core/workspace
 context:
-  - The change manifest (manifest.json) is the single source of truth for a change. It lives inside the change's
-    directory and persists the full state of the Change domain entity — identity, specs, artifacts, and the complete
-    event history from which lifecycle state is derived. It is written and read exclusively by FsChangeRepository.
+  - The change manifest (`manifest.json`) is the single source of truth for a change. It lives inside the change's directory and persists the full state of the Change domain entity — identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It is written and read exclusively by `FsChangeRepository`.
 rules:
   - requirement: Manifest structure
     rules:
-      - >-
-        Each change is persisted as a manifest.json file inside its change directory. Its top-level structure is:
-
-
-
+      - |-
+        Each change is persisted as a `manifest.json` file inside its change directory. Its top-level structure is:
         ```jsonc
-
         // manifest.json
-
         {
           "name": "add-auth-flow",
           "createdAt": "2024-03-15T10:00:00.000Z",
@@ -69,115 +64,54 @@ rules:
             },
           ],
         }
-
         ```
-
-
-
         Field definitions:
-
-
-
-        * name — the change slug; immutable after creation
-
-        * createdAt — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix
-
-        * schema — name (string) and version (integer) of the schema active at creation; written once, never updated
-
-        * workspaces — optional; accepted on load for backward compatibility with older manifests but no longer written
-        on save. Active workspaces are derived at runtime from specIds via parseSpecId()
-
-        * specIds — current snapshot of spec IDs; mutable
-
-        * specDependsOn (optional) — a record keyed by spec ID, each value being an array of spec ID strings
-        representing that spec's declared dependencies. Captured at authoring time to ensure dependencies are tracked
-        even before metadata is generated. Omitted from the manifest when empty.
-
-        * artifacts — array of artifact descriptors; validatedHash is null when the artifact has not been validated, a
-        SHA-256 string when validated, or "\_\_skipped\_\_" when an optional artifact has been explicitly marked as not
-        produced. ArtifactStatus is never stored — it is derived at load time from validatedHash and file presence
-
-        * history — append-only array of typed events. The event types, their semantics, and the derivation rules
-        (current state, active approval, draft status) are defined in specs/core/change/spec.md — Requirement: History
-        and event sourcing. This section defines only the JSON serialization of those events. The current lifecycle
-        state is derived from the most recent transitioned event's to field.
-
-
-
+        * **`name`** — the change slug; immutable after creation
+        * **`createdAt`** — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix
+        * **`schema`** — `name` (string) and `version` (integer) of the schema active at creation; written once, never updated
+        * **`workspaces`** — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from `specIds` via `parseSpecId()`
+        * **`specIds`** — current snapshot of spec IDs; mutable
+        * **`specDependsOn`** (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's declared dependencies. Captured at authoring time to ensure dependencies are tracked even before metadata is generated. Omitted from the manifest when empty.
+        * **`artifacts`** — array of artifact descriptors; `validatedHash` is `null` when the artifact has not been validated, a SHA-256 string when validated, or `"__skipped__"` when an optional artifact has been explicitly marked as not produced. `ArtifactStatus` is never stored — it is derived at load time from `validatedHash` and file presence
+        * **`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field.
         The JSON serialization of each event type is:
-
-
-
         ```jsonc
-
         // state transition
-
-        { "type": "transitioned", "at": "...", "by": { "name": "...", "email": "..." }, "from": "drafting", "to":
-        "designing" }
-
+        { "type": "transitioned", "at": "...", "by": { "name": "...", "email": "..." }, "from": "drafting", "to": "designing" }
 
         // spec gate approved
-
-        { "type": "spec-approved", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "LGTM",
-        "artifactHashes": { "proposal": "sha256:...", "specs": "sha256:..." } }
-
+        { "type": "spec-approved", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "LGTM", "artifactHashes": { "proposal": "sha256:...", "specs": "sha256:..." } }
 
         // signoff gate passed
-
-        { "type": "signed-off", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "Ship it",
-        "artifactHashes": { "proposal": "sha256:...", "specs": "sha256:..." } }
-
+        { "type": "signed-off", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "Ship it", "artifactHashes": { "proposal": "sha256:...", "specs": "sha256:..." } }
 
         // approval invalidated (prior spec-approved/signed-off events are superseded)
-
         { "type": "invalidated", "at": "...", "by": { "name": "...", "email": "..." }, "cause": "spec-change" }
-
         // cause values: "spec-change" | "artifact-change"
 
-
         // shelved to drafts/
-
         { "type": "drafted", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "parking for now" }
 
-
         // restored from drafts/
-
         { "type": "restored", "at": "...", "by": { "name": "...", "email": "..." } }
 
-
         // optional artifact explicitly marked as not produced
-
-        { "type": "artifact-skipped", "at": "...", "by": { "name": "...", "email": "..." }, "artifactId": "design",
-        "reason": "not needed for this change" }
-
+        { "type": "artifact-skipped", "at": "...", "by": { "name": "...", "email": "..." }, "artifactId": "design", "reason": "not needed for this change" }
 
         // permanently abandoned
-
-        { "type": "discarded", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "superseded",
-        "supersededBy": ["new-auth-flow"] }
-
+        { "type": "discarded", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "superseded", "supersededBy": ["new-auth-flow"] }
         ```
   - requirement: Schema version
     rules:
-      - >-
-        schema.name is the value of the schema field from specd.yaml at creation time. schema.version is the version
-        integer from the schema's schema.yaml. Both are written once at change creation and never updated.
-
-
-
-        When a change is loaded and the active schema's name or version differs from what is recorded in the manifest,
-        specd must emit a warning. The change remains usable — the warning is advisory, not a hard error. Archiving a
-        change with a schema version mismatch must still be possible; the warning surfaces the mismatch so the user can
-        decide whether to proceed.
+      - |-
+        `schema.name` is the value of the `schema` field from `specd.yaml` at creation time. `schema.version` is the `version` integer from the schema's `schema.yaml`. Both are written once at change creation and never updated.
+        When a change is loaded and the active schema's name or version differs from what is recorded in the manifest, specd must emit a warning. The change remains usable — the warning is advisory, not a hard error. Archiving a change with a schema version mismatch must still be possible; the warning surfaces the mismatch so the user can decide whether to proceed.
   - requirement: Atomic writes
     rules:
-      - The manifest must be written atomically — by writing to a temporary file and then renaming it into place — to
-        prevent partial reads if the process is interrupted mid-write.
+      - The manifest must be written atomically — by writing to a temporary file and then renaming it into place — to prevent partial reads if the process is interrupted mid-write.
 constraints:
-  - ArtifactStatus is never stored in the manifest — it is always derived from validatedHash and file presence at load
-    time
-  - 'validatedHash has three valid values: null (not yet validated), a SHA-256 string (validated), or "__skipped__"
-    (optional artifact explicitly not produced)'
+  - ArtifactStatus is never stored in the manifest — it is always derived from validatedHash and file presence at load time
+  - 'validatedHash has three valid values: null (not yet validated), a SHA-256 string (validated), or "__skipped__" (optional artifact explicitly not produced)'
   - The manifest has no state field; the current lifecycle state is always derived from the history array at load time
   - The history array is append-only — existing events must never be modified or removed by any operation
   - The schema field is written once at creation and must never be updated by subsequent operations
@@ -187,15 +121,13 @@ scenarios:
     when:
       - a new change add-auth-flow is created
     then:
-      - a manifest.json is written containing name, createdAt, schema, specIds, artifacts, and a history array with a
-        single created event
+      - a manifest.json is written containing name, createdAt, schema, specIds, artifacts, and a history array with a single created event
   - requirement: Manifest structure
     name: No state field in manifest
     when:
       - a manifest is read from disk
     then:
-      - there is no top-level state field; the current state is derived by reading the to field of the last transitioned
-        event in history
+      - there is no top-level state field; the current state is derived by reading the to field of the last transitioned event in history
   - requirement: Manifest structure
     name: History never shrinks
     when:
@@ -225,8 +157,7 @@ scenarios:
     when:
       - an optional artifact is skipped with reason "not needed for this change"
     then:
-      - 'the history contains { "type": "artifact-skipped", "artifactId": "design", "reason": "not needed for this
-        change", "at": "...", "by": { ... } }'
+      - 'the history contains { "type": "artifact-skipped", "artifactId": "design", "reason": "not needed for this change", "at": "...", "by": { ... } }'
   - requirement: Manifest structure
     name: validatedHash cleared on invalidation
     given:
@@ -265,8 +196,7 @@ scenarios:
     when:
       - a change is loaded and the active schema has a higher version than recorded in the manifest
     then:
-      - specd emits a warning indicating the schema has changed since the change was created and the user should review
-        whether the change artifacts are still compatible
+      - specd emits a warning indicating the schema has changed since the change was created and the user should review whether the change artifacts are still compatible
   - requirement: Schema version
     name: Schema name changed
     when:
@@ -284,8 +214,7 @@ scenarios:
     when:
       - a state transition occurs
     then:
-      - the new transitioned event is appended to history and the entire manifest is written atomically (temp file +
-        rename); no partial writes are visible
+      - the new transitioned event is appended to history and the entire manifest is written atomically (temp file + rename); no partial writes are visible
 contentHashes:
   spec.md: sha256:f5df8ed0d324a82dbd4eb40266f41fbf4ffc12f9525850bc7d7a91a0dd12db73
   verify.md: sha256:23e836325e6ef3fbb7a148af30741300d15bc021b6dbba364bd588e16ceea8c9

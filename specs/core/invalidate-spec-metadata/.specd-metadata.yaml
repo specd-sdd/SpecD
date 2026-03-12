@@ -1,8 +1,8 @@
 title: Invalidate Spec Metadata
 description: The `InvalidateSpecMetadata` use case marks a spec's `.specd-metadata.yaml` as stale by removing its `contentHashes` field. Without content hashes the metadata is treated as stale by all downstream consumers (staleness detection, `spec list --metadata-status`), forcing regeneration on the next metadata pass. All other fields (title, description, rules, scenarios, etc.) are preserved.
 dependsOn:
-  - core/spec-metadata
-  - core/storage
+  - core:core/spec-metadata
+  - core:core/storage
 context:
   - The `InvalidateSpecMetadata` use case marks a spec's `.specd-metadata.yaml` as stale by removing its `contentHashes` field. Without content hashes the metadata is treated as stale by all downstream consumers (staleness detection, `spec list --metadata-status`), forcing regeneration on the next metadata pass. All other fields (title, description, rules, scenarios, etc.) are preserved.
 rules:

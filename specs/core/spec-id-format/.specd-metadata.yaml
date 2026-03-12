@@ -1,68 +1,41 @@
 title: Spec ID Format
-description:
-  A spec ID is the canonical string that identifies a spec within a specd project. Every spec belongs to
-  exactly one workspace and has a capability path within that workspace. This spec defines the canonical format, parsing
-  rules, and storage conventions for spec IDs to eliminate ambiguity between workspace prefixes and capability path
-  segments.
+description: A **spec ID** is the canonical string that identifies a spec within a specd project. Every spec belongs to exactly one workspace and has a capability path within that workspace. This spec defines the canonical format, parsing rules, and storage conventions for spec IDs to eliminate ambiguity between workspace prefixes and capability path segments.
+dependsOn:
+  - core:core/change
+  - core:core/change-manifest
+  - core:core/spec-metadata
+  - core:core/compile-context
+  - core:core/workspace
 context:
-  - A spec ID is the canonical string that identifies a spec within a specd project. Every spec belongs to exactly one
-    workspace and has a capability path within that workspace. This spec defines the canonical format, parsing rules,
-    and storage conventions for spec IDs to eliminate ambiguity between workspace prefixes and capability path segments.
+  - A **spec ID** is the canonical string that identifies a spec within a specd project. Every spec belongs to exactly one workspace and has a capability path within that workspace. This spec defines the canonical format, parsing rules, and storage conventions for spec IDs to eliminate ambiguity between workspace prefixes and capability path segments.
 rules:
   - requirement: Canonical format
     rules:
-      - >-
-        The canonical spec ID format SHALL be workspace:capabilityPath, where:
-
-
-
-        * workspace is the workspace name (e.g. default, billing)
-
-        * capabilityPath is the slash-separated path to the spec within the workspace (e.g. auth/login,
-        \_global/architecture)
-
-
-
-        The workspace and capability path are separated by : (colon). All / characters belong to the capability path.
-
-
-
-        This format is used everywhere: internal storage (change.specIds, manifest), domain-layer references, CLI input,
-        metadata dependsOn, and user-facing output. There is a single format — no internal vs external distinction.
+      - |-
+        The canonical spec ID format SHALL be `workspace:capabilityPath`, where:
+        * `workspace` is the workspace name (e.g. `default`, `billing`)
+        * `capabilityPath` is the slash-separated path to the spec within the workspace (e.g. `auth/login`, `_global/architecture`)
+        The workspace and capability path are separated by `:` (colon). All `/` characters belong to the capability path.
+        This format is used everywhere: internal storage (`change.specIds`, manifest), domain-layer references, CLI input, metadata `dependsOn`, and user-facing output. There is a single format — no internal vs external distinction.
   - requirement: Bare path shorthand
     rules:
-      - >-
-        When no : is present, the spec ID SHALL be interpreted as a capability path in the default workspace.
-
-
-
-        For example, auth/login with no colon resolves to workspace default, capability path auth/login. Its
-        fully-qualified form is default:auth/login.
+      - |-
+        When no `:` is present, the spec ID SHALL be interpreted as a capability path in the `default` workspace.
+        For example, `auth/login` with no colon resolves to workspace `default`, capability path `auth/login`. Its fully-qualified form is `default:auth/login`.
   - requirement: Unknown workspace rejection
     rules:
-      - When a colon-qualified spec ID specifies a workspace name that does not exist in the project configuration, the
-        parser SHALL reject the input with an error.
+      - When a colon-qualified spec ID specifies a workspace name that does not exist in the project configuration, the parser SHALL reject the input with an error.
   - requirement: Parsing rules
     rules:
-      - >-
+      - |-
         Parsing a spec ID string SHALL follow these steps:
-
-
-
-        1. Find the first : in the string.
-
-        2. If found: everything before : is the workspace, everything after is the capability path. Validate the
-        workspace exists.
-
-        3. If not found: workspace is default, the entire string is the capability path.
-
-
-
-        There is no slash-based workspace detection. The / character is never used as a workspace separator.
+        1. Find the first `:` in the string.
+        2. If found: everything before `:` is the workspace, everything after is the capability path. Validate the workspace exists.
+        3. If not found: workspace is `default`, the entire string is the capability path.
+        There is no slash-based workspace detection. The `/` character is never used as a workspace separator.
   - requirement: Normalization
     rules:
-      - Functions that accept spec IDs SHOULD normalize bare paths to fully-qualified form (default:capPath) at the
-        system boundary. Domain-layer code MAY assume spec IDs are already qualified.
+      - Functions that accept spec IDs SHOULD normalize bare paths to fully-qualified form (`default:capPath`) at the system boundary. Domain-layer code MAY assume spec IDs are already qualified.
 constraints:
   - 'Workspace names MUST NOT contain / or : characters'
   - 'Capability paths MUST NOT contain : characters'

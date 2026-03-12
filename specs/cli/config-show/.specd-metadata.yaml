@@ -1,89 +1,98 @@
-title: 'Config Show'
-description: >
-  Defines the `specd config show` command, which prints the fully-resolved project configuration as loaded from `specd.yaml`. Useful for debugging config discovery, verifying paths, and inspecting approval gate settings.
-keywords:
-  - 'config'
-  - 'show'
-  - 'command'
-  - 'signature'
-  - 'output'
-  - 'format'
-  - 'sensitive'
-  - 'fields'
-  - 'error'
-  - 'cases'
-  - 'all'
-  - 'paths'
+title: Config Show
+description: Defines the `specd config show` command, which prints the fully-resolved project configuration as loaded from `specd.yaml`. Useful for debugging config discovery, verifying paths, and inspecting approval gate settings.
 dependsOn:
-  - 'cli:cli/entrypoint'
-  - 'core:core/config'
-contentHashes:
-  'spec.md': 'sha256:80492c519f45572480a2a0a49675893450b4ecdcdf6de549f4457b8d6688a1ef'
-  'verify.md': 'sha256:6558e166cb27fe670112ab018fda687f79d9bd4730f201560dfd1b72dba806f1'
+  - cli:cli/entrypoint
+  - core:core/config
+context:
+  - Defines the `specd config show` command, which prints the fully-resolved project configuration as loaded from `specd.yaml`. Useful for debugging config discovery, verifying paths, and inspecting approval gate settings.
 rules:
-  - requirement: 'Command signature'
+  - requirement: Command signature
     rules:
-      - '`--format text|json|toon` — optional; output format, defaults to `text`'
-  - requirement: 'Output format'
+      - |-
+        ```
+        specd config show [--format text|json|toon]
+        ```
+        * `--format text|json|toon` — optional; output format, defaults to `text`
+  - requirement: Output format
     rules:
-      - 'In `text` mode (default), the command prints the resolved config as structured key-value output:'
-      - 'In `json` or `toon` mode, the output is the full `SpecdConfig` object encoded in the respective format, with all paths resolved to absolute values.'
-  - requirement: 'Sensitive fields'
+      - |-
+        In `text` mode (default), the command prints the resolved config as structured key-value output:
+        ```
+        projectRoot:  <absolute-path>
+        schemaRef:    <schema-ref>
+        approvals:    spec=<true|false>  signoff=<true|false>
+
+        workspaces:
+          <name>  <ownership>  <specsPath>
+          ...
+
+        storage:
+          changes:   <absolute-path>
+          drafts:    <absolute-path>
+          discarded: <absolute-path>
+          archive:   <absolute-path>
+        ```
+        In `json` or `toon` mode, the output is the full `SpecdConfig` object encoded in the respective format, with all paths resolved to absolute values.
+  - requirement: Sensitive fields
     rules:
-      - 'The config contains no sensitive values — all fields are filesystem paths, schema references, and boolean flags. No redaction is required.'
-  - requirement: 'Error cases'
+      - The config contains no sensitive values — all fields are filesystem paths, schema references, and boolean flags. No redaction is required.
+  - requirement: Error cases
     rules:
-      - 'If the config cannot be loaded (discovery failure or parse error), exits per the entrypoint exit code rules. This command is most useful precisely when config loading is suspected to be wrong — errors are printed with enough detail to diagnose the problem.'
+      - If the config cannot be loaded (discovery failure or parse error), exits per the entrypoint exit code rules. This command is most useful precisely when config loading is suspected to be wrong — errors are printed with enough detail to diagnose the problem.
 constraints:
-  - 'All paths in the output are absolute — the same values as in the resolved `SpecdConfig`'
-  - 'This command is read-only'
+  - All paths in the output are absolute — the same values as in the resolved SpecdConfig
+  - This command is read-only
 scenarios:
-  - requirement: 'Command signature'
-    name: 'Extra arguments rejected'
+  - requirement: Command signature
+    name: Extra arguments rejected
     when:
-      - '`specd config show some-arg` is run with an unexpected argument'
+      - specd config show some-arg is run with an unexpected argument
     then:
-      - 'the command exits with code 1 and prints a usage error to stderr'
-  - requirement: 'Output format'
-    name: 'Text output shows all sections'
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Output format
+    name: Text output shows all sections
     given:
-      - 'a valid `specd.yaml` with one workspace and storage paths configured'
+      - a valid specd.yaml with one workspace and storage paths configured
     when:
-      - '`specd config show` is run'
+      - specd config show is run
     then:
-      - 'stdout contains `projectRoot`, `schemaRef`, `approvals`, `workspaces`, and `storage` sections'
-      - 'all paths are absolute'
-      - 'the process exits with code 0'
-  - requirement: 'Output format'
-    name: 'Approval gates shown correctly'
+      - stdout contains projectRoot, schemaRef, approvals, workspaces, and storage sections
+      - AND all paths are absolute
+      - AND the process exits with code 0
+  - requirement: Output format
+    name: Approval gates shown correctly
     given:
-      - '`specd.yaml` has `approvals: { spec: true, signoff: false }`'
+      - 'specd.yaml has approvals: { spec: true, signoff: false }'
     when:
-      - '`specd config show` is run'
+      - specd config show is run
     then:
-      - 'stdout shows `spec=true` and `signoff=false`'
-  - requirement: 'Output format'
-    name: 'JSON output is full SpecdConfig'
+      - stdout shows spec=true and signoff=false
+  - requirement: Output format
+    name: JSON output is full SpecdConfig
     when:
-      - '`specd config show --format json` is run'
+      - specd config show --format json is run
     then:
-      - 'stdout is valid JSON containing `projectRoot`, `schemaRef`, `workspaces`, `storage`, and `approvals`'
-      - 'all path values are absolute strings'
-      - 'the process exits with code 0'
-  - requirement: 'Output format'
-    name: 'Multiple workspaces listed'
+      - stdout is valid JSON containing projectRoot, schemaRef, workspaces, storage, and approvals
+      - AND all path values are absolute strings
+      - AND the process exits with code 0
+  - requirement: Output format
+    name: Multiple workspaces listed
     given:
-      - '`specd.yaml` declares two workspaces `default` and `billing-ws`'
+      - specd.yaml declares two workspaces default and billing-ws
     when:
-      - '`specd config show` is run'
+      - specd config show is run
     then:
-      - 'both workspaces appear in the `workspaces` section with their `specsPath` and `ownership`'
-  - requirement: 'Error cases'
-    name: 'Config not found'
+      - both workspaces appear in the workspaces section with their specsPath and ownership
+  - requirement: Error cases
+    name: Config not found
     given:
-      - 'CWD is not under any directory containing `specd.yaml`'
+      - CWD is not under any directory containing specd.yaml
     when:
-      - '`specd config show` is run'
+      - specd config show is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message describing the discovery failure'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message describing the discovery failure'
+contentHashes:
+  spec.md: sha256:80492c519f45572480a2a0a49675893450b4ecdcdf6de549f4457b8d6688a1ef
+  verify.md: sha256:6558e166cb27fe670112ab018fda687f79d9bd4730f201560dfd1b72dba806f1
+generatedBy: core

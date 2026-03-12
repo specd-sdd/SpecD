@@ -1,106 +1,103 @@
-title: 'Skills Update'
-description: >
-  Defines the `specd skills update` command, which reinstalls all skills recorded in the project manifest from the currently installed `@specd/skills` package. Used after upgrading specd to pick up changes to bundled skill files. The CLI calls `GetSkillsManifest` from `@specd/core` to read what is recorded, then resolves content from `@specd/skills` and writes the files itself — following the same responsibility split as `specd skills install`.
-keywords:
-  - 'skills'
-  - 'update'
-  - 'command'
-  - 'signature'
-  - 'reading'
-  - 'installation'
-  - 'manifest'
-  - 'reinstalling'
-  - 'skill'
-  - 'files'
-  - 'longer'
-  - 'bundle'
+title: Skills Update
+description: Defines the `specd skills update` command, which reinstalls all skills recorded in the project manifest from the currently installed `@specd/skills` package. Used after upgrading specd to pick up changes to bundled skill files. The CLI calls `GetSkillsManifest` from `@specd/core` to read what is recorded, then resolves content from `@specd/skills` and writes the files itself — following the same responsibility split as `specd skills install`.
 dependsOn:
-  - 'cli:cli/entrypoint'
-  - 'cli:cli/skills-install'
-  - 'core:core/config'
-contentHashes:
-  'spec.md': 'sha256:964fb358381707c7c631c6d72c254bed74e0dab60a6dab9fac8226d095ef4935'
-  'verify.md': 'sha256:187eaa94fc16aca86ee478d4775a61be392a0e625d909348c7b21c37e7ced80c'
+  - cli:cli/entrypoint
+  - cli:cli/skills-install
+  - core:core/config
+context:
+  - Defines the `specd skills update` command, which reinstalls all skills recorded in the project manifest from the currently installed `@specd/skills` package. Used after upgrading specd to pick up changes to bundled skill files. The CLI calls `GetSkillsManifest` from `@specd/core` to read what is recorded, then resolves content from `@specd/skills` and writes the files itself — following the same responsibility split as `specd skills install`.
 rules:
-  - requirement: 'Command signature'
+  - requirement: Command signature
     rules:
-      - "`--agent <id>` — optional; restricts the update to one agent's skills. When omitted, all agents in the manifest are updated."
-      - '`--format text|json|toon` — optional; output format, defaults to `text`.'
-  - requirement: 'Reading the installation manifest'
+      - |-
+        ```
+        specd skills update [--agent claude] [--format text|json|toon]
+        ```
+        * `--agent <id>` — optional; restricts the update to one agent's skills. When omitted, all agents in the manifest are updated.
+        * `--format text|json|toon` — optional; output format, defaults to `text`.
+  - requirement: Reading the installation manifest
     rules:
       - 'The CLI calls `GetSkillsManifest` from `@specd/core`, which returns a typed map of `{ [agentId: string]: string[] }`. The CLI never reads `specd.yaml` directly — it has no knowledge of the storage format.'
-  - requirement: 'Reinstalling skill files'
+  - requirement: Reinstalling skill files
     rules:
-      - 'For each agent and each recorded skill name, the CLI:'
-      - '1. Looks up the skill content in `@specd/skills` (same as `specd skills install`) 2. Resolves the project-level target path for the agent (e.g. `<git-root>/.claude/commands/<name>.md`) 3. Writes the file to disk, overwriting whatever was there'
-      - 'Core is not involved in steps 1–3. `RecordSkillInstall` is **not** called — the manifest already contains these names; nothing new is being added.'
-  - requirement: 'Skill no longer in bundle'
+      - |-
+        For each agent and each recorded skill name, the CLI:
+        1. Looks up the skill content in `@specd/skills` (same as `specd skills install`)
+        2. Resolves the project-level target path for the agent (e.g. `<git-root>/.claude/commands/<name>.md`)
+        3. Writes the file to disk, overwriting whatever was there
+        Core is not involved in steps 1–3. `RecordSkillInstall` is **not** called — the manifest already contains these names; nothing new is being added.
+  - requirement: Skill no longer in bundle
     rules:
-      - 'If a recorded skill name is not present in the current `@specd/skills` bundle (renamed or removed in an upgrade):'
-      - 'Prints a warning to stderr: `warning: skill <name> is no longer available — skipped`'
-      - 'Continues updating the remaining skills'
-      - 'Exits with code 0'
-  - requirement: 'No skills recorded'
+      - |-
+        If a recorded skill name is not present in the current `@specd/skills` bundle (renamed or removed in an upgrade):
+        * Prints a warning to stderr: `warning: skill <name> is no longer available — skipped`
+        * Continues updating the remaining skills
+        * Exits with code 0
+  - requirement: No skills recorded
     rules:
-      - 'If the manifest is empty (or empty for the filtered agent), the command prints `no skills to update` to stdout and exits with code 0.'
-  - requirement: 'Output on success'
+      - If the manifest is empty (or empty for the filtered agent), the command prints `no skills to update` to stdout and exits with code 0.
+  - requirement: Output on success
     rules:
-      - '`text` (default): prints one line per updated skill to stdout:'
-      - '`json` or `toon`: outputs an array:'
-      - '`warning` is omitted when absent.'
+      - |-
+        * `text` (default): prints one line per updated skill to stdout:
+        * `json` or `toon`: outputs an array: `warning` is omitted when absent.
 constraints:
-  - 'Only project-level installs (recorded in the manifest) are updated; user-level (`--global`) installs are not tracked and not touched'
-  - 'The command never mutates the manifest — it only reads via `GetSkillsManifest`'
-  - 'Agent IDs in the manifest that are not recognised are skipped with a warning'
-  - '**CLI responsibility:** read manifest via `GetSkillsManifest`, read skill content from `@specd/skills`, resolve agent paths, write `.md` files to disk'
-  - '**Core responsibility:** return the typed manifest via `GetSkillsManifest` → `ConfigWriter.readSkillsManifest`'
+  - Only project-level installs (recorded in the manifest) are updated; user-level (--global) installs are not tracked and not touched
+  - The command never mutates the manifest — it only reads via GetSkillsManifest
+  - Agent IDs in the manifest that are not recognised are skipped with a warning
+  - 'CLI responsibility: read manifest via GetSkillsManifest, read skill content from @specd/skills, resolve agent paths, write .md files to disk'
+  - 'Core responsibility: return the typed manifest via GetSkillsManifest → ConfigWriter.readSkillsManifest'
 scenarios:
-  - requirement: 'Reading the installation manifest from specd.yaml'
-    name: 'All recorded skills are reinstalled'
+  - requirement: Reading the installation manifest from specd.yaml
+    name: All recorded skills are reinstalled
     given:
-      - '`specd.yaml` records `skills.claude: [my-skill, my-other-skill]`'
+      - 'specd.yaml records skills.claude: [my-skill, my-other-skill]'
     when:
-      - '`specd skills update` is run'
+      - specd skills update is run
     then:
-      - 'both `.claude/commands/my-skill.md` and `.claude/commands/my-other-skill.md` are overwritten with the current bundle content'
-      - 'the process exits with code 0'
-  - requirement: 'Reading the installation manifest from specd.yaml'
-    name: '--agent restricts update to one agent'
+      - both .claude/commands/my-skill.md and .claude/commands/my-other-skill.md are overwritten with the current bundle content
+      - AND the process exits with code 0
+  - requirement: Reading the installation manifest from specd.yaml
+    name: --agent restricts update to one agent
     given:
-      - '`specd.yaml` records skills for `claude`'
+      - specd.yaml records skills for claude
     when:
-      - '`specd skills update --agent claude` is run'
+      - specd skills update --agent claude is run
     then:
-      - 'only Claude Code skills are updated'
-  - requirement: 'Skill no longer in bundle'
-    name: 'Removed skill generates warning and is skipped'
+      - only Claude Code skills are updated
+  - requirement: Skill no longer in bundle
+    name: Removed skill generates warning and is skipped
     given:
-      - '`specd.yaml` lists `old-skill` under `skills.claude`'
-      - '`old-skill` is not present in the current `@specd/skills` bundle'
+      - specd.yaml lists old-skill under skills.claude
+      - AND old-skill is not present in the current @specd/skills bundle
     when:
-      - '`specd skills update` is run'
+      - specd skills update is run
     then:
-      - 'stderr contains `warning: skill old-skill is no longer available — skipped`'
-      - 'other skills in the list are still updated'
-      - 'the process exits with code 0'
-  - requirement: 'No skills recorded'
-    name: 'No skills section exits cleanly'
+      - 'stderr contains warning: skill old-skill is no longer available — skipped'
+      - AND other skills in the list are still updated
+      - AND the process exits with code 0
+  - requirement: No skills recorded
+    name: No skills section exits cleanly
     given:
-      - '`specd.yaml` has no `skills` key'
+      - specd.yaml has no skills key
     when:
-      - '`specd skills update` is run'
+      - specd skills update is run
     then:
-      - 'stdout contains `no skills to update`'
-      - 'the process exits with code 0'
-  - requirement: 'Output on success'
-    name: 'Text output lists each updated skill'
+      - stdout contains no skills to update
+      - AND the process exits with code 0
+  - requirement: Output on success
+    name: Text output lists each updated skill
     when:
-      - '`specd skills update` succeeds with two recorded skills'
+      - specd skills update succeeds with two recorded skills
     then:
-      - 'stdout contains two `updated <name> →` lines each with an absolute path'
-  - requirement: 'Output on success'
-    name: 'JSON output is an array with status fields'
+      - stdout contains two updated <name> → lines each with an absolute path
+  - requirement: Output on success
+    name: JSON output is an array with status fields
     when:
-      - '`specd skills update --format json` succeeds'
+      - specd skills update --format json succeeds
     then:
-      - 'stdout is a valid JSON array where each object has `name`, `path`, and `status` fields'
+      - stdout is a valid JSON array where each object has name, path, and status fields
+contentHashes:
+  spec.md: sha256:964fb358381707c7c631c6d72c254bed74e0dab60a6dab9fac8226d095ef4935
+  verify.md: sha256:187eaa94fc16aca86ee478d4775a61be392a0e625d909348c7b21c37e7ced80c
+generatedBy: core
