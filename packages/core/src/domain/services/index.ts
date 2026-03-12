@@ -18,6 +18,15 @@ export {
 } from './content-extraction.js'
 export { extractMetadata, type ExtractedMetadata } from './extract-metadata.js'
 export {
+  buildSchema,
+  buildSelector,
+  type SchemaYamlData,
+  type ArtifactYamlData,
+  type SelectorRaw,
+  type ValidationRuleRaw,
+  type MetadataExtractionRaw,
+} from './build-schema.js'
+export {
   type SelectorNode,
   findNodes,
   nodeMatches,
