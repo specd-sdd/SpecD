@@ -21,6 +21,8 @@ The deterministic path runs `spec generate-metadata --write` which:
 
 Subagents **only optimize** — they read the generated metadata (not the raw spec files), clean up semantic fields, and return the full YAML as their result string. They **never write files**. The main orchestrator receives the YAML from each subagent and writes it via `spec write-metadata`.
 
+After optimization, the final written metadata must have `generatedBy: agent` (not `core`), since the LLM optimization step has enhanced it beyond pure deterministic extraction.
+
 ## Instructions
 
 When this skill is invoked:
@@ -46,16 +48,30 @@ When this skill is invoked:
 
    The command returns `{ workspace, specPath, specId }`. Use the returned `specId` as
    `<spec-id>`. If the command fails, tell the user the path could not be resolved.
-   c. Run deterministic generation:
+   c. **Capture existing `dependsOn` before regeneration** (see "dependsOn preservation" below):
 
    ```bash
-   node packages/cli/dist/index.js spec generate-metadata <spec-id> --write --force
+   node packages/cli/dist/index.js spec metadata <spec-id> --format json
    ```
 
-   If the schema has no `metadataExtraction` (command exits with error), fall back to the
-   legacy LLM extraction subagent (see "LLM subagent fallback" below).
-   d. Launch a single optimizer subagent (see "Subagent prompt" below) with `<spec-id>` substituted.
-   Single-spec mode: the subagent runs the freshness + quality check and may return `FRESH`.
+   Save the current `dependsOn` array (if any) for comparison after generation.
+   d. Run deterministic generation (without `--force`):
+
+   ```bash
+   node packages/cli/dist/index.js spec generate-metadata <spec-id> --write
+   ```
+
+   **Error handling:**
+   - If the schema has no `metadataExtraction` (command exits with error), fall back to the
+     legacy LLM extraction subagent (see "LLM subagent fallback" below).
+   - If the command fails for any other reason (e.g., validation error, missing artifacts,
+     metadata already fresh), report the error to the user and ask how to proceed. Do NOT
+     silently retry with `--force` — the user must decide.
+     e. **Reconcile `dependsOn`** — compare the newly generated `dependsOn` with the saved
+     existing ones (see "dependsOn preservation" below). If there are differences, ask the
+     user before proceeding.
+     f. Launch a single optimizer subagent (see "Subagent prompt" below) with `<spec-id>` substituted.
+     Single-spec mode: the subagent runs the freshness + quality check and may return `FRESH`.
 
 3. **If all specs:**
 
@@ -67,22 +83,58 @@ When this skill is invoked:
 
    b. Parse the JSON. For each workspace, collect the spec IDs.
    If the result is empty (no stale, missing, or invalid specs), report that all metadata is fresh and stop.
-   c. For each spec, run deterministic generation:
+   c. **Capture existing `dependsOn` for each spec** before regeneration:
 
    ```bash
-   node packages/cli/dist/index.js spec generate-metadata <spec-id> --write --force
+   node packages/cli/dist/index.js spec metadata <spec-id> --format json
    ```
 
-   d. Launch optimizer subagents **in parallel batches** — up to 5 concurrent subagents at a time.
+   Save each spec's current `dependsOn` array (if any).
+   d. For each spec, run deterministic generation (without `--force`):
+
+   ```bash
+   node packages/cli/dist/index.js spec generate-metadata <spec-id> --write
+   ```
+
+   If any spec fails, collect the error and continue with the rest. After all specs are
+   processed, report all failures to the user with the error details and ask how to proceed
+   for each (skip, retry with `--force`, or abort).
+   e. **Reconcile `dependsOn` for each spec** — compare new vs existing. Collect all
+   discrepancies and present them to the user in a single summary before proceeding
+   to optimization (see "dependsOn preservation" below).
+   f. Launch optimizer subagents **in parallel batches** — up to 5 concurrent subagents at a time.
    Each subagent receives its own `<spec-id>`. Prepend `BATCH MODE:` to the prompt for batch specs.
-   e. As each subagent completes, **write its result** (see "Writing results" below).
-   f. After all subagents complete, report a summary.
+   g. As each subagent completes, **write its result** (see "Writing results" below).
+   h. After all subagents complete, report a summary.
 
 4. Each subagent uses the Agent tool with:
    - `subagent_type: general-purpose`
    - The full optimizer prompt below, substituting `<spec-id>`.
 
-5. **Regeneration policy (only when needed).**
+5. **dependsOn preservation (MUST follow).**
+
+   Existing `dependsOn` entries are curated and **MUST NEVER be silently overwritten**. The
+   deterministic extractor may produce a different `dependsOn` list — always reconcile:
+
+   a. **Before** running `spec generate-metadata`, read the current metadata and save its
+   `dependsOn` array as `existingDeps`.
+   b. **After** running `spec generate-metadata`, read the new metadata and get `newDeps`.
+   c. Compare the two:
+   - **Removed entries** (`existingDeps` has items not in `newDeps`): These were likely
+     manually added. **Ask the user** before removing them:
+     > `dependsOn` for `<spec-id>`: the extractor dropped `<dep>`. Keep it? (It was in the
+     > previous metadata but not detected by the extractor.)
+   - **Added entries** (`newDeps` has items not in `existingDeps`): These are newly detected.
+     **Ask the user** before adding them:
+     > `dependsOn` for `<spec-id>`: the extractor found new dependency `<dep>`. Add it?
+   - **No changes**: Proceed silently.
+     d. After user confirmation, write the reconciled `dependsOn` back to the metadata file
+     before launching the optimizer subagent. Use `spec write-metadata` with a YAML that has
+     the corrected `dependsOn`.
+     e. In **batch mode** (all specs), collect all discrepancies first, then present them to
+     the user in a single grouped summary to avoid question fatigue.
+
+6. **Regeneration policy (only when needed).**
    - If metadata is fresh **and** passes semantic quality checks, do not rewrite (`FRESH`).
    - If metadata is stale but semantic quality is good, regenerate deterministic baseline + optimize with minimal churn.
    - If semantic quality fails, force full regeneration of semantic fields (`keywords`, `rules`, `constraints`, `scenarios`).
@@ -97,11 +149,12 @@ When a subagent returns:
   - Run this gate on every non-`FRESH` result, including stale specs.
 
   - Must be YAML mapping syntax (no top-level JSON `{ ... }` wrapper)
-  - Must include `title`, `description`, `keywords`, `contentHashes`, `rules`
+  - Must include `generatedBy: agent`, `title`, `description`, `keywords`, `contentHashes`, `rules`
+  - `generatedBy` must be `agent` (not `core`)
   - `keywords` must be a non-empty YAML list
   - `keywords` must contain 4-8 concrete domain tags; reject obvious generic filler terms (`each`, `may`, `project`, `contain`, `thing`, `misc`)
   - `rules[*].rules` must not contain formatting artifacts or example scaffolding (tree glyphs like `├──`/`└──`, Markdown table rows, raw YAML example keys like `title:`/`dependsOn:`/`contentHashes:`, or field docs like `**\`title\`\*\*`)
-  - If `dependsOn` was present in the deterministic output, it must still be present
+  - `dependsOn` must match the reconciled list from the preservation step — if the subagent dropped or changed any entries, restore them from the reconciled list before writing
 
   If any check fails, regenerate once with a forced prompt prefix:
   `FORCE FULL REGEN: previous output failed quality gate.`
@@ -113,12 +166,14 @@ When a subagent returns:
 cat > /tmp/specd-metadata-<safe-name>.yaml << 'YAMLEOF'
 <yaml content from subagent>
 YAMLEOF
-node packages/cli/dist/index.js spec write-metadata <spec-id> --force --input /tmp/specd-metadata-<safe-name>.yaml
+node packages/cli/dist/index.js spec write-metadata <spec-id> --input /tmp/specd-metadata-<safe-name>.yaml
 node packages/cli/dist/index.js spec metadata <spec-id> --format json
 rm /tmp/specd-metadata-<safe-name>.yaml
 ```
 
 Where `<safe-name>` is the spec ID with colons and slashes replaced by hyphens.
+If `write-metadata` fails, report the error to the user and ask how to proceed — do NOT
+silently retry with `--force`.
 After writing, `spec metadata` output must show non-empty `keywords` and non-empty `contentHashes`.
 If it does not, log `ERROR:` for that spec.
 
@@ -207,12 +262,14 @@ Multiple scenarios for the same requirement each get their own entry.
 Generate 4-8 lowercase hyphenated tags that help retrieval. Use concrete domain terms (commands,
 use cases, concepts), not generic words. No duplicates.
 
-### Step 4 — Preserve structural fields
+### Step 4 — Preserve structural fields and set generatedBy
 
 Copy these fields exactly from the metadata — do NOT modify them:
 - `title` (keep as extracted unless clearly wrong)
-- `dependsOn` (keep all resolved paths)
+- `dependsOn` (keep all resolved paths — NEVER drop, add, or reorder entries)
 - `contentHashes` (keep all computed hashes — never recompute)
+
+Set `generatedBy: agent` (replacing `core` from the deterministic step).
 
 ### Step 5 — Return the YAML
 
@@ -229,6 +286,7 @@ Do NOT return JSON-compatible inline structures (`[ ... ]`, `{ ... }`) as the do
 ## Output format
 
 ```yaml
+generatedBy: 'agent'
 title: '<short name>'
 description: >
   <2–3 sentences>
@@ -258,7 +316,9 @@ scenarios:
 
 ## Notes
 
-- contentHashes and dependsOn come from the deterministic extractor — never modify them
+- `generatedBy` must be `agent` in the output — this marks the metadata as LLM-optimized
+- `contentHashes` come from the deterministic extractor — never modify them
+- `dependsOn` are curated — copy them exactly as provided, never drop, reorder, or add entries
 - If a statement comes from `## Constraints`, it MUST go to `constraints`, never to `rules`
 - `keywords` is mandatory; never omit it
 - Prefer omission over guessing when section ownership is unclear
