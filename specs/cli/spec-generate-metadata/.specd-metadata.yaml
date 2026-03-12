@@ -1,0 +1,90 @@
+title: Spec Generate-Metadata
+description: The specd spec generate-metadata command generates .specd-metadata.yaml content deterministically from schema extraction rules. It delegates to GenerateSpecMetadata for generation and optionally to SaveSpecMetadata for persistence.
+context:
+  - The specd spec generate-metadata command generates .specd-metadata.yaml content deterministically from schema extraction rules. It delegates to GenerateSpecMetadata for generation and optionally to SaveSpecMetadata for persistence.
+rules:
+  - requirement: Command signature
+    rules:
+      - |-
+        The command is registered as generate-metadata \<specPath> on the spec parent command. It accepts:
+        * \--write — persist the generated metadata to the spec directory
+        * \--force — skip conflict detection when writing (requires --write)
+        * \--format \<fmt> — output format: text|json|toon (default text)
+        * \--config \<path> — path to specd.yaml
+        The \<specPath> argument uses the same workspace:capability-path syntax as other spec subcommands.
+  - requirement: Default output (no --write)
+    rules:
+      - |-
+        Without --write, the command generates metadata and outputs it to stdout without persisting:
+        * Text format: outputs the generated YAML content, trimmed of trailing whitespace
+        * JSON/toon format: outputs { spec: "\<workspace:path>", metadata: \<object> }
+  - requirement: Write mode
+    rules:
+      - |-
+        With --write, the command generates metadata, persists it via SaveSpecMetadata, and outputs a confirmation:
+        * Text format: wrote .specd-metadata.yaml for \<workspace:path>
+        * JSON/toon format: { result: "ok", spec: "\<workspace:path>", written: true }
+  - requirement: Force flag
+    rules:
+      - "\\--force requires --write. Without --write, the command writes error: --force requires --write to stderr and exits with code 1. With --write, the command passes force: true to SaveSpecMetadata to skip conflict detection."
+  - requirement: Error — no metadataExtraction
+    rules:
+      - 'If the core use case returns hasExtraction: false (schema has no metadataExtraction declarations), the command writes error: schema has no metadataExtraction declarations to stderr and exits with code 1.'
+constraints:
+  - The command contains no business logic — all generation is delegated to GenerateSpecMetadata and all writing to SaveSpecMetadata
+  - 'YAML serialization uses lineWidth: 0 for literal scalars'
+  - The command never reads or writes the filesystem directly for spec content — it uses the kernel
+scenarios:
+  - requirement: Command signature
+    name: Missing path argument
+    when:
+      - specd spec generate-metadata is invoked without a <specPath> argument
+    then:
+      - the command exits with an error
+  - requirement: Error — no metadataExtraction
+    name: Schema has no metadataExtraction
+    when:
+      - 'the core use case returns hasExtraction: false'
+    then:
+      - 'the command writes error: schema has no metadataExtraction declarations to stderr'
+      - AND exits with code 1
+  - requirement: Default output (no --write)
+    name: Text format outputs YAML to stdout
+    given:
+      - "the core use case returns metadata with title: 'Login' and generatedBy: 'core'"
+    when:
+      - specd spec generate-metadata auth/login is invoked without --write
+    then:
+      - 'stdout contains the YAML representation including title: Login and generatedBy: core'
+  - requirement: Default output (no --write)
+    name: JSON format outputs spec and metadata
+    given:
+      - "the core use case returns metadata with title: 'Login'"
+    when:
+      - specd spec generate-metadata auth/login --format json is invoked
+    then:
+      - 'stdout contains a JSON object with spec: "default:auth/login" and metadata containing the extracted fields'
+  - requirement: Write mode
+    name: Write persists metadata and confirms
+    when:
+      - specd spec generate-metadata auth/login --write is invoked
+    then:
+      - SaveSpecMetadata is called with the generated YAML content
+      - AND stdout contains wrote .specd-metadata.yaml for default:auth/login
+  - requirement: Force flag
+    name: Write with force passes force flag
+    when:
+      - specd spec generate-metadata auth/login --write --force is invoked
+    then:
+      - 'SaveSpecMetadata is called with force: true'
+  - requirement: Force flag
+    name: Force without write exits with error
+    when:
+      - specd spec generate-metadata auth/login --force is invoked without --write
+    then:
+      - 'the command writes error: --force requires --write to stderr'
+      - AND exits with code 1
+contentHashes:
+  spec.md: sha256:d9eda741431e4068cfffb9da1d9453ddbb365ccb9dd5243dd66d58b0cc025ce0
+  verify.md: sha256:6412ab6f1593b7717bb1d97159dc70f868afe06a835777a87e3ed111c1b697ef
+generatedBy: core
