@@ -1,78 +1,82 @@
-title: 'Archive Show'
-description: >
-  Defines the `specd archive show <name>` command, which displays basic metadata for a single archived change.
-keywords:
-  - 'archive'
-  - 'show'
-  - 'command'
-  - 'signature'
-  - 'output'
-  - 'format'
-  - 'text'
-  - 'json'
-  - 'toon'
-  - 'error'
-  - 'cases'
-  - 'errors'
+title: Archive Show
+description: Defines the `specd archive show <name>` command, which displays basic metadata for a single archived change.
 dependsOn:
-  - 'cli:cli/entrypoint'
-  - 'core:core/change'
-contentHashes:
-  'spec.md': 'sha256:916489e0651105c0475577b702e3c9de4e27bf23c304dfc154b3bfbf2c09af74'
-  'verify.md': 'sha256:7ee898ee3d0f81de254abfd876574acff2495e7f7906bbe91afd4d41d0a8782f'
+  - cli:cli/entrypoint
+  - core:core/change
+context:
+  - Defines the `specd archive show <name>` command, which displays basic metadata for a single archived change.
 rules:
-  - requirement: 'Command signature'
+  - requirement: Command signature
     rules:
-      - '`<name>` — required positional; the name of the archived change to show'
-      - '`--format` — controls output encoding; defaults to `text`'
-  - requirement: 'Output format — text'
+      - |-
+        ```
+        specd archive show <name> [--format text|json|toon]
+        ```
+        * `<name>` — required positional; the name of the archived change to show
+        * `--format` — controls output encoding; defaults to `text`
+  - requirement: Output format — text
     rules:
-      - 'The command prints metadata for the change to stdout:'
-      - 'The `state` field is always `archivable` for archived changes.'
-  - requirement: 'Output format — JSON'
+      - |-
+        The command prints metadata for the change to stdout:
+        ```
+        name:    <name>
+        state:   archivable
+        specs:   <specId>, ...
+        schema:  <schema-name>@<version>
+        ```
+        The `state` field is always `archivable` for archived changes.
+  - requirement: Output format — JSON
     rules:
-      - 'When `--format json` is passed, the command writes a single JSON object to stdout:'
-  - requirement: 'Output format — toon'
+      - |-
+        When `--format json` is passed, the command writes a single JSON object to stdout:
+        ```json
+        {"name":"...","state":"archivable","specIds":[...],"schema":{"name":"...","version":N}}
+        ```
+  - requirement: Output format — toon
     rules:
-      - 'When `--format toon` is passed, the command writes the same data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout.'
-  - requirement: 'Error cases'
+      - When `--format toon` is passed, the command writes the same data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout.
+  - requirement: Error cases
     rules:
-      - 'If no change with the given name exists in the archive directory, the command exits with code 1 and prints an `error:` message to stderr.'
+      - '* If no change with the given name exists in the archive directory, the command exits with code 1 and prints an `error:` message to stderr.'
 constraints:
-  - 'Errors always go to stderr as plain text regardless of `--format`'
-  - '`--format` only affects stdout'
-  - 'The `state` field is always `archivable` for all changes returned by this command'
+  - Errors always go to stderr as plain text regardless of --format
+  - --format only affects stdout
+  - The state field is always archivable for all changes returned by this command
 scenarios:
-  - requirement: 'Command signature'
-    name: 'Missing name argument'
+  - requirement: Command signature
+    name: Missing name argument
     when:
-      - '`specd archive show` is run without a name'
+      - specd archive show is run without a name
     then:
-      - 'the command exits with code 1 and prints a usage error to stderr'
-  - requirement: 'Output format — text'
-    name: 'Normal text output'
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Output format — text
+    name: Normal text output
     given:
-      - "the archive directory contains a change `add-oauth-login` with specIds `['auth/oauth']` and schema `schema-std@1`"
+      - the archive directory contains a change add-oauth-login with specIds ['auth/oauth'] and schema schema-std@1
     when:
-      - '`specd archive show add-oauth-login` is run'
+      - specd archive show add-oauth-login is run
     then:
-      - 'stdout contains `name:`, `state:`, `specs:`, and `schema:` fields with the correct values'
-      - 'the `state:` line shows `archivable`'
-      - 'the process exits with code 0'
-  - requirement: 'Output format — JSON'
-    name: 'JSON format output'
+      - 'stdout contains name:, state:, specs:, and schema: fields with the correct values'
+      - 'AND the state: line shows archivable'
+      - AND the process exits with code 0
+  - requirement: Output format — JSON
+    name: JSON format output
     given:
-      - "the archive directory contains a change `add-oauth-login` with specIds `['auth/oauth']` and schema `schema-std@1`"
+      - the archive directory contains a change add-oauth-login with specIds ['auth/oauth'] and schema schema-std@1
     when:
-      - '`specd archive show add-oauth-login --format json` is run'
+      - specd archive show add-oauth-login --format json is run
     then:
-      - 'stdout is a JSON object with `name`, `state`, `specIds`, and `schema` fields matching the change'
-      - 'the `state` field is `"archivable"`'
-      - 'the process exits with code 0'
-  - requirement: 'Error cases'
-    name: 'Change not found in archive'
+      - stdout is a JSON object with name, state, specIds, and schema fields matching the change
+      - AND the state field is "archivable"
+      - AND the process exits with code 0
+  - requirement: Error cases
+    name: Change not found in archive
     when:
-      - '`specd archive show nonexistent` is run and no change named `nonexistent` exists in the archive'
+      - specd archive show nonexistent is run and no change named nonexistent exists in the archive
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+contentHashes:
+  spec.md: sha256:916489e0651105c0475577b702e3c9de4e27bf23c304dfc154b3bfbf2c09af74
+  verify.md: sha256:7ee898ee3d0f81de254abfd876574acff2495e7f7906bbe91afd4d41d0a8782f
+generatedBy: core

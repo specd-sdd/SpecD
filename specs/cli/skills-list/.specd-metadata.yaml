@@ -1,103 +1,104 @@
-title: 'Skills List'
-description: >
-  Defines the `specd skills list` command, which lists all skills bundled in `@specd/skills` and reports whether each is currently installed for the target agent.
-keywords:
-  - 'skills'
-  - 'list'
-  - 'command'
-  - 'signature'
-  - 'output'
-  - 'format'
-  - 'empty'
-  - 'skill'
-  - 'set'
-  - 'installation'
-  - 'check'
-  - 'read'
+title: Skills List
+description: Defines the `specd skills list` command, which lists all skills bundled in `@specd/skills` and reports whether each is currently installed for the target agent.
 dependsOn:
-  - 'cli:cli/entrypoint'
-contentHashes:
-  'spec.md': 'sha256:d4bda0dafb5d298133b24eb9d5abfcb7460ff2ebf260da25b5a261e1d4adde4c'
-  'verify.md': 'sha256:db06e3bd813089f6e697bfb1b4d8a339a2be8965b8dac0de067dc1dab17bd7c6'
+  - cli:cli/entrypoint
+context:
+  - Defines the `specd skills list` command, which lists all skills bundled in `@specd/skills` and reports whether each is currently installed for the target agent.
 rules:
-  - requirement: 'Command signature'
+  - requirement: Command signature
     rules:
-      - '`--agent <id>` — optional; the agent to check installation status against (e.g. `claude`). When omitted, installation status is not shown.'
-      - '`--format text|json|toon` — optional; output format, defaults to `text`.'
-  - requirement: 'Output format'
+      - |-
+        ```
+        specd skills list [--agent claude] [--format text|json|toon]
+        ```
+        * `--agent <id>` — optional; the agent to check installation status against (e.g. `claude`). When omitted, installation status is not shown.
+        * `--format text|json|toon` — optional; output format, defaults to `text`.
+  - requirement: Output format
     rules:
-      - 'In `text` mode (default), the command prints one row per skill to stdout:'
-      - 'Where `<installed>` is `installed` or `not installed` when `--agent` is provided, and omitted otherwise.'
-      - 'In `json` or `toon` mode, the output is an array:'
-      - '`installed` is omitted from each object when `--agent` is not provided.'
-  - requirement: 'Empty skill set'
+      - |-
+        In `text` mode (default), the command prints one row per skill to stdout:
+        ```
+        <name>  <description>  <installed>
+        ```
+        Where `<installed>` is `installed` or `not installed` when `--agent` is provided, and omitted otherwise.
+        In `json` or `toon` mode, the output is an array:
+        ```json
+        [{ "name": "...", "description": "...", "installed": true }]
+        ```
+        `installed` is omitted from each object when `--agent` is not provided.
+  - requirement: Empty skill set
     rules:
-      - 'If `@specd/skills` exports no skills, the command prints `no skills available` in `text` mode, or `[]` in `json`/`toon` mode. The process exits with code 0.'
-  - requirement: 'Installation check'
+      - If `@specd/skills` exports no skills, the command prints `no skills available` in `text` mode, or `[]` in `json`/`toon` mode. The process exits with code 0.
+  - requirement: Installation check
     rules:
-      - "When `--agent <id>` is provided, the command checks whether a file named `<name>.md` exists in the agent's project-level or user-level commands directory. For example, for `claude` these are `<git-root>/.claude/commands/` and `~/.claude/commands/`. The resolution of the commands directory for a given agent ID is defined per agent."
-      - 'A skill is considered `installed` if the file exists in either location.'
-      - 'If the agent ID is not recognised, the command exits with code 1 and prints an `error:` message to stderr.'
+      - |-
+        When `--agent <id>` is provided, the command checks whether a file named `<name>.md` exists in the agent's project-level or user-level commands directory. For example, for `claude` these are `<git-root>/.claude/commands/` and `~/.claude/commands/`. The resolution of the commands directory for a given agent ID is defined per agent.
+        A skill is considered `installed` if the file exists in either location.
+        If the agent ID is not recognised, the command exits with code 1 and prints an `error:` message to stderr.
 constraints:
-  - 'The command is read-only — it never installs or modifies any files'
-  - 'Skills are sourced from `@specd/skills` at the version installed alongside the CLI'
+  - The command is read-only — it never installs or modifies any files
+  - Skills are sourced from @specd/skills at the version installed alongside the CLI
 scenarios:
-  - requirement: 'Command signature'
-    name: 'Unknown agent exits with error'
+  - requirement: Command signature
+    name: Unknown agent exits with error
     when:
-      - '`specd skills list --agent unknown` is run'
+      - specd skills list --agent unknown is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
-  - requirement: 'Output format'
-    name: 'Text output without --agent shows no installed column'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+  - requirement: Output format
+    name: Text output without --agent shows no installed column
     when:
-      - '`specd skills list` is run'
+      - specd skills list is run
     then:
-      - 'stdout lists one row per skill with name and description'
-      - 'no `installed`/`not installed` column is shown'
-  - requirement: 'Output format'
-    name: 'Text output with --agent shows installation status'
+      - stdout lists one row per skill with name and description
+      - AND no installed/not installed column is shown
+  - requirement: Output format
+    name: Text output with --agent shows installation status
     when:
-      - '`specd skills list --agent claude` is run'
+      - specd skills list --agent claude is run
     then:
-      - 'each row includes either `installed` or `not installed`'
-  - requirement: 'Output format'
-    name: 'JSON output omits installed when --agent is absent'
+      - each row includes either installed or not installed
+  - requirement: Output format
+    name: JSON output omits installed when --agent is absent
     when:
-      - '`specd skills list --format json` is run without `--agent`'
+      - specd skills list --format json is run without --agent
     then:
-      - 'stdout is a valid JSON array where no object contains an `installed` key'
-  - requirement: 'Empty skill set'
-    name: 'No skills available prints placeholder'
+      - stdout is a valid JSON array where no object contains an installed key
+  - requirement: Empty skill set
+    name: No skills available prints placeholder
     given:
-      - '`@specd/skills` exports no skills'
+      - '@specd/skills exports no skills'
     when:
-      - '`specd skills list` is run'
+      - specd skills list is run
     then:
-      - 'stdout contains `no skills available`'
-      - 'the process exits with code 0'
-  - requirement: 'Installation check for Claude Code'
-    name: 'Skill found at project level is reported as installed'
+      - stdout contains no skills available
+      - AND the process exits with code 0
+  - requirement: Installation check for Claude Code
+    name: Skill found at project level is reported as installed
     given:
-      - 'a file `<git-root>/.claude/commands/my-skill.md` exists'
+      - a file <git-root>/.claude/commands/my-skill.md exists
     when:
-      - '`specd skills list --agent claude` is run'
+      - specd skills list --agent claude is run
     then:
-      - '`my-skill` is reported as `installed`'
-  - requirement: 'Installation check for Claude Code'
-    name: 'Skill found only at user level is reported as installed'
+      - my-skill is reported as installed
+  - requirement: Installation check for Claude Code
+    name: Skill found only at user level is reported as installed
     given:
-      - '`my-skill.md` exists in `~/.claude/commands/` but not in `.claude/commands/`'
+      - my-skill.md exists in ~/.claude/commands/ but not in .claude/commands/
     when:
-      - '`specd skills list --agent claude` is run'
+      - specd skills list --agent claude is run
     then:
-      - '`my-skill` is reported as `installed`'
-  - requirement: 'Installation check for Claude Code'
-    name: 'Skill missing from both locations is reported as not installed'
+      - my-skill is reported as installed
+  - requirement: Installation check for Claude Code
+    name: Skill missing from both locations is reported as not installed
     given:
-      - '`my-skill.md` does not exist in either `.claude/commands/` or `~/.claude/commands/`'
+      - my-skill.md does not exist in either .claude/commands/ or ~/.claude/commands/
     when:
-      - '`specd skills list --agent claude` is run'
+      - specd skills list --agent claude is run
     then:
-      - '`my-skill` is reported as `not installed`'
+      - my-skill is reported as not installed
+contentHashes:
+  spec.md: sha256:d4bda0dafb5d298133b24eb9d5abfcb7460ff2ebf260da25b5a261e1d4adde4c
+  verify.md: sha256:db06e3bd813089f6e697bfb1b4d8a339a2be8965b8dac0de067dc1dab17bd7c6
+generatedBy: core

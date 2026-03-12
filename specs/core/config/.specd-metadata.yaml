@@ -1,136 +1,55 @@
 title: Project Configuration
-description:
-  specd.yaml is the single project-level configuration file for specd. It declares which schema governs the
-  project, how specs are organised across workspaces, where changes and archives are stored, project-level workflow
-  hooks, per-artifact constraints, and installed plugins. Every tool in the specd ecosystem reads this file — the CLI,
-  MCP server, and plugins all derive their wiring from it.
+description: '`specd.yaml` is the single project-level configuration file for specd. It declares which schema governs the project, how specs are organised across workspaces, where changes and archives are stored, project-level workflow hooks, per-artifact constraints, and installed plugins. Every tool in the specd ecosystem reads this file — the CLI, MCP server, and plugins all derive their wiring from it.'
+dependsOn:
+  - core:core/schema-format
+  - default:_global/architecture
+  - core:core/storage
+  - core:core/spec-metadata
+  - core:core/workspace
 context:
-  - specd.yaml is the single project-level configuration file for specd. It declares which schema governs the project,
-    how specs are organised across workspaces, where changes and archives are stored, project-level workflow hooks,
-    per-artifact constraints, and installed plugins. Every tool in the specd ecosystem reads this file — the CLI, MCP
-    server, and plugins all derive their wiring from it.
+  - '`specd.yaml` is the single project-level configuration file for specd. It declares which schema governs the project, how specs are organised across workspaces, where changes and archives are stored, project-level workflow hooks, per-artifact constraints, and installed plugins. Every tool in the specd ecosystem reads this file — the CLI, MCP server, and plugins all derive their wiring from it.'
 rules:
   - requirement: Config file location and format
     rules:
-      - >-
-        specd.yaml must be a valid YAML file. specd discovers it using the following strategy, in order:
-
-
-
-        1. \--config flag — if the CLI is invoked with --config path/to/specd.yaml, that path is used directly; no
-        discovery takes place.
-
-        2. Walk up from CWD, bounded by the git repo root — specd walks up from the current working directory, checking
-        each directory for specd.yaml. The walk stops at the first match (nearest to CWD) or at the git repo root (the
-        nearest ancestor directory containing .git/), whichever comes first. If no specd.yaml is found before or at the
-        repo root, specd exits with an error.
-
-        3. CWD only, when not inside a git repo — if no .git/ ancestor exists (e.g. the user is running specd from
-        outside any repository, as in a coordinator script), specd checks only the current working directory and stops
-        there. It does not walk further up.
-
-
-
-        The search never goes above the git repo root. This prevents accidentally picking up a specd.yaml from a parent
-        repository in nested or sibling monorepo layouts. In a monorepo where each package has its own specd.yaml, the
-        package-level file is used when running specd from within that package — the root-level file is not considered.
+      - |-
+        `specd.yaml` must be a valid YAML file. specd discovers it using the following strategy, in order:
+        1. **`--config` flag** — if the CLI is invoked with `--config path/to/specd.yaml`, that path is used directly; no discovery takes place.
+        2. **Walk up from CWD, bounded by the git repo root** — specd walks up from the current working directory, checking each directory for `specd.yaml`. The walk stops at the **first match** (nearest to CWD) or at the git repo root (the nearest ancestor directory containing `.git/`), whichever comes first. If no `specd.yaml` is found before or at the repo root, specd exits with an error.
+        3. **CWD only, when not inside a git repo** — if no `.git/` ancestor exists (e.g. the user is running specd from outside any repository, as in a coordinator script), specd checks only the current working directory and stops there. It does not walk further up.
+        The search never goes above the git repo root. This prevents accidentally picking up a `specd.yaml` from a parent repository in nested or sibling monorepo layouts. In a monorepo where each package has its own `specd.yaml`, the package-level file is used when running specd from within that package — the root-level file is not considered.
   - requirement: Local config override
     rules:
-      - >-
-        Alongside specd.yaml, developers may place a specd.local.yaml file in the same directory to use a fully
-        independent local configuration. When specd.local.yaml is present, specd uses it exclusively — specd.yaml is not
-        read and no merging takes place. The local file is a complete, self-contained config that must be valid on its
-        own.
-
-
-
-        The file is optional — its absence is normal. specd init must add specd.local.yaml to the project's .gitignore
-        so it is never committed.
-
-
-
-        The typical workflow for local customisation is: copy specd.yaml to specd.local.yaml, then edit the copy. This
-        keeps the mental model simple — there is always exactly one active config file.
-
-
-
-        When the CLI is invoked with --config path/to/specd.yaml, that file is used exactly as specified — no
-        specd.local.yaml lookup takes place. This allows testing with the shared config without the local override
-        interfering.
+      - |-
+        Alongside `specd.yaml`, developers may place a `specd.local.yaml` file in the same directory to use a fully independent local configuration. When `specd.local.yaml` is present, specd uses it exclusively — `specd.yaml` is not read and no merging takes place. The local file is a complete, self-contained config that must be valid on its own.
+        The file is optional — its absence is normal. `specd init` must add `specd.local.yaml` to the project's `.gitignore` so it is never committed.
+        The typical workflow for local customisation is: copy `specd.yaml` to `specd.local.yaml`, then edit the copy. This keeps the mental model simple — there is always exactly one active config file.
+        When the CLI is invoked with `--config path/to/specd.yaml`, that file is used exactly as specified — no `specd.local.yaml` lookup takes place. This allows testing with the shared config without the local override interfering.
   - requirement: Schema reference
     rules:
-      - >-
-        specd.yaml must declare a schema field identifying the schema that governs this project. Only one schema is
-        active per project at a time — per-workspace schema selection is not supported. The field is required.
-
-
-
+      - |-
+        `specd.yaml` must declare a `schema` field identifying the schema that governs this project. Only one schema is active per project at a time — per-workspace schema selection is not supported. The field is required.
         The value uses a prefix convention to make the resolution strategy explicit:
-
-
-
         ```yaml
-
         schema: "@specd/schema-std"            # npm package — starts with @
-
         schema: "#spec-driven"                 # default workspace's schemasPath (same as bare name)
-
         schema: "spec-driven"                  # bare name — resolved from default workspace's schemasPath
-
         schema: "#billing:my-billing-schema"   # named workspace's schemasPath
-
         schema: "./schemas/custom/schema.yaml" # direct path — relative to specd.yaml location
-
         schema: "/absolute/path/schema.yaml"   # direct absolute path
-
         ```
-
-
-
-        * @scope/name — an npm package. The schema file is loaded from node\_modules/@scope/name/schema.yaml. Version
-        selection is handled by npm via package.json.
-
-        * \#workspace:name — a named schema resolved from a specific workspace's schemas section. #billing:my-schema
-        loads from workspaces.billing.schemas.fs.path/my-schema/schema.yaml.
-
-        * \#name or bare name — equivalent to #default:name. Resolved from the default workspace's schemas section.
-
-        * Relative or absolute path — a direct path to a schema.yaml file. Relative paths are resolved from the
-        directory containing specd.yaml.
-
-
-
-        There is no implicit multi-level fallback — the prefix determines exactly where specd looks.
-        SchemaRegistry.resolve() receives the full value from specd.yaml and dispatches based on the prefix.
-
-
-
-        Resolution timing: schema resolution happens at command dispatch time, immediately before the command body
-        executes. Commands that do not require the schema — such as --help, --version, init, config validate, and plugin
-        subcommands — skip resolution entirely.
-
-
-
-        Error types: both ConfigValidationError (malformed specd.yaml) and SchemaNotFoundError / SchemaValidationError
-        (resolution failures) are domain errors defined in @specd/core and extend SpecdError. They are distinct types
-        with distinct messages and exit codes — config errors indicate a problem with specd.yaml itself; schema errors
-        indicate a problem with the referenced schema.
+        * **`@scope/name`** — an npm package. The schema file is loaded from `node_modules/@scope/name/schema.yaml`. Version selection is handled by npm via `package.json`.
+        * **`#workspace:name`** — a named schema resolved from a specific workspace's `schemas` section. `#billing:my-schema` loads from `workspaces.billing.schemas.fs.path/my-schema/schema.yaml`.
+        * **`#name` or bare name** — equivalent to `#default:name`. Resolved from the `default` workspace's `schemas` section.
+        * **Relative or absolute path** — a direct path to a `schema.yaml` file. Relative paths are resolved from the directory containing `specd.yaml`.
+        There is no implicit multi-level fallback — the prefix determines exactly where specd looks. `SchemaRegistry.resolve()` receives the full value from `specd.yaml` and dispatches based on the prefix.
+        **Resolution timing:** schema resolution happens at command dispatch time, immediately before the command body executes. Commands that do not require the schema — such as `--help`, `--version`, `init`, `config validate`, and `plugin` subcommands — skip resolution entirely.
+        **Error types:** both `ConfigValidationError` (malformed `specd.yaml`) and `SchemaNotFoundError` / `SchemaValidationError` (resolution failures) are domain errors defined in `@specd/core` and extend `SpecdError`. They are distinct types with distinct messages and exit codes — config errors indicate a problem with `specd.yaml` itself; schema errors indicate a problem with the referenced schema.
   - requirement: Workspaces
     rules:
-      - >-
-        specd.yaml must declare at least one workspace under the workspaces key. Each workspace defines where its specs
-        live, where the implementation code lives, where its local schemas are stored, and the ownership relationship
-        the project has with those specs.
-
-
-
-        default is a reserved workspace name that identifies the local project workspace. Every config must contain a
-        default workspace. specd init creates it automatically if no workspaces section is present.
-
-
-
+      - |-
+        `specd.yaml` must declare at least one workspace under the `workspaces` key. Each workspace defines where its specs live, where the implementation code lives, where its local schemas are stored, and the ownership relationship the project has with those specs.
+        `default` is a reserved workspace name that identifies the local project workspace. Every config must contain a `default` workspace. `specd init` creates it automatically if no `workspaces` section is present.
         ```yaml
-
         workspaces:
           default: # required — the local project workspace
             prefix: _global # optional — logical path prefix for all specs in this workspace
@@ -157,145 +76,48 @@ rules:
             codeRoot: ../billing # required for non-default workspaces — no default
             ownership: readOnly # default for non-default workspaces
         ```
-
-
-
-        specs (required) — declares where this workspace's spec files live. Has its own adapter and adapter-specific
-        config block. Only "fs" is supported in v1.
-
-
-
-        specs.fs.path (required for fs adapter) — directory where spec files live. Relative paths are resolved from the
-        directory containing specd.yaml. May point outside the project repo root, in which case
-        RepositoryConfig.isExternal is set to true by the application layer.
-
-
-
-        schemas (optional) — declares where named local schemas for this workspace are stored. Has its own adapter and
-        adapter-specific config block, independent of specs. Used when the schema field references #workspace:name or a
-        bare/hash-prefixed name targeting this workspace.
-
-
-
-        * For the default workspace, if omitted, defaults to adapter: fs with fs.path: specd/schemas.
-
-        * For non-default workspaces, if omitted, the workspace has no local schemas — any schema reference targeting it
-        (e.g. #billing:name) will produce a SchemaNotFoundError.
-
-
-
-        codeRoot — directory where the implementation code for this workspace lives. Used by CompileContext to tell the
-        agent where to write code.
-
-
-
-        * For the default workspace, defaults to the project root (the directory containing specd.yaml).
-
-        * For non-default workspaces, codeRoot is required — there is no sensible default since the implementation code
-        lives in an external location.
-
-
-
-        ownership — the relationship this project has with specs in the workspace:
-
-
-
-        * owned — the project owns these specs; changes are freely proposed (default for default)
-
-        * shared — the project co-owns these specs; changes may require coordination
-
-        * readOnly — the project reads but does not modify these specs (default for non-default workspaces)
-
-
-
-        prefix (optional) — a logical path prefix prepended to all capability paths in this workspace. When set, a spec
-        at architecture/ on disk becomes \<prefix>/architecture in the specd model. When omitted, specs use bare
-        capability paths (current behavior).
-
-
-
-        * Prefix may be single-segment (\_global) or multi-segment (team\_1/shared/core). Each segment must match
-        /^\[a-z0-9\_]\[a-z0-9\_-]\*$/.
-
-        * The full prefix is validated as: one or more valid segments separated by /. No leading/trailing /. No empty
-        segments (a//b). No . or .. segments. No \\, :, \*, ?, ", <, >, | characters.
-
+        **`specs`** (required) — declares where this workspace's spec files live. Has its own `adapter` and adapter-specific config block. Only `"fs"` is supported in v1.
+        **`specs.fs.path`** (required for `fs` adapter) — directory where spec files live. Relative paths are resolved from the directory containing `specd.yaml`. May point outside the project repo root, in which case `RepositoryConfig.isExternal` is set to `true` by the application layer.
+        **`schemas`** (optional) — declares where named local schemas for this workspace are stored. Has its own `adapter` and adapter-specific config block, independent of `specs`. Used when the `schema` field references `#workspace:name` or a bare/hash-prefixed name targeting this workspace.
+        * For the `default` workspace, if omitted, defaults to `adapter: fs` with `fs.path: specd/schemas`.
+        * For non-`default` workspaces, if omitted, the workspace has no local schemas — any schema reference targeting it (e.g. `#billing:name`) will produce a `SchemaNotFoundError`.
+        **`codeRoot`** — directory where the implementation code for this workspace lives. Used by `CompileContext` to tell the agent where to write code.
+        * For the `default` workspace, defaults to the project root (the directory containing `specd.yaml`).
+        * For non-`default` workspaces, `codeRoot` is required — there is no sensible default since the implementation code lives in an external location.
+        **`ownership`** — the relationship this project has with specs in the workspace:
+        * `owned` — the project owns these specs; changes are freely proposed (default for `default`)
+        * `shared` — the project co-owns these specs; changes may require coordination
+        * `readOnly` — the project reads but does not modify these specs (default for non-`default` workspaces)
+        **`prefix`** (optional) — a logical path prefix prepended to all capability paths in this workspace. When set, a spec at `architecture/` on disk becomes `<prefix>/architecture` in the specd model. When omitted, specs use bare capability paths (current behavior).
+        * Prefix may be single-segment (`_global`) or multi-segment (`team_1/shared/core`). Each segment must match `/^[a-z0-9_][a-z0-9_-]*$/`.
+        * The full prefix is validated as: one or more valid segments separated by `/`. No leading/trailing `/`. No empty segments (`a//b`). No `.` or `..` segments. No `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|` characters.
         * Two workspaces MAY share the same prefix — prefix is not a unique identifier.
-
-        * dependsOn references use the prefixed path: \_global/architecture (same-workspace) or
-        default:\_global/architecture (cross-workspace).
-
-        * contextIncludeSpecs / contextExcludeSpecs patterns use the prefixed path: default:\_global/\*.
-
-        * Invalid prefix values produce ConfigValidationError at startup.
-
-
-
+        * `dependsOn` references use the prefixed path: `_global/architecture` (same-workspace) or `default:_global/architecture` (cross-workspace).
+        * `contextIncludeSpecs` / `contextExcludeSpecs` patterns use the prefixed path: `default:_global/*`.
+        * Invalid prefix values produce `ConfigValidationError` at startup.
         Examples:
-
-
-
         ```yaml
-
         # Single-segment prefix
-
         default:
           prefix: _global # architecture → _global/architecture
 
         # Multi-segment prefix
-
         shared:
           prefix: team_1/shared # auth/login → team_1/shared/auth/login
         ```
-
-
-
-        isExternal is not declared in config — it is inferred by the application layer from whether the resolved
-        specs.fs.path is outside the project repo root.
-
-
-
-        contextIncludeSpecs (optional) — workspace-level context spec patterns. Loaded only when this workspace is
-        active in the current change. Patterns follow the same syntax as the project-level field, with one difference:
-        omitting the workspace qualifier means this workspace (not default). So \['\*'] means all specs in this
-        workspace; \['auth/\*'] means specs under auth/ in this workspace.
-
-
-
-        contextExcludeSpecs (optional) — workspace-level exclusion patterns. Applied only when this workspace is active
-        in the current change. Same qualifier semantics as contextIncludeSpecs at workspace level.
-
-
-
-        Workspace names must be unique and must match /^\[a-z]\[a-z0-9-]\*$/. The name default is reserved.
-
-
-
-        Each project's specd.yaml is the sole source of truth for that project's view of its workspaces. specd never
-        reads the specd.yaml of external repos declared as workspaces — paths, schemas, ownership, and all other
-        workspace fields must be explicitly declared in the active config. This means:
-
-
-
-        * If the billing repo has its own specd.yaml where it is the default (owned) workspace, the coordinator that
-        references it as readOnly must independently declare those paths and settings. The two configs coexist without
-        awareness of each other.
-
-        * When an external workspace's structure changes (paths, schema, etc.), every project that references it must
-        update its own specd.yaml manually — there is no automatic synchronisation.
-
-        * ownership is always relative to the declaring project: the same repo can be owned in its own config and
-        readOnly in a coordinator's config simultaneously. Both are valid and intentional.
+        **`isExternal`** is not declared in config — it is inferred by the application layer from whether the resolved `specs.fs.path` is outside the project repo root.
+        **`contextIncludeSpecs`** (optional) — workspace-level context spec patterns. Loaded only when this workspace is active in the current change. Patterns follow the same syntax as the project-level field, with one difference: omitting the workspace qualifier means *this workspace* (not `default`). So `['*']` means all specs in this workspace; `['auth/*']` means specs under `auth/` in this workspace.
+        **`contextExcludeSpecs`** (optional) — workspace-level exclusion patterns. Applied only when this workspace is active in the current change. Same qualifier semantics as `contextIncludeSpecs` at workspace level.
+        Workspace names must be unique and must match `/^[a-z][a-z0-9-]*$/`. The name `default` is reserved.
+        **Each project's `specd.yaml` is the sole source of truth for that project's view of its workspaces.** specd never reads the `specd.yaml` of external repos declared as workspaces — paths, schemas, ownership, and all other workspace fields must be explicitly declared in the active config. This means:
+        * If the `billing` repo has its own `specd.yaml` where it is the `default` (`owned`) workspace, the coordinator that references it as `readOnly` must independently declare those paths and settings. The two configs coexist without awareness of each other.
+        * When an external workspace's structure changes (paths, schema, etc.), every project that references it must update its own `specd.yaml` manually — there is no automatic synchronisation.
+        * `ownership` is always relative to the declaring project: the same repo can be `owned` in its own config and `readOnly` in a coordinator's config simultaneously. Both are valid and intentional.
   - requirement: Storage configuration
     rules:
-      - >-
-        specd.yaml must include a storage section with sub-keys for changes and archive. These paths are global — a
-        project has one changes directory and one archive directory regardless of workspaces.
-
-
-
+      - |-
+        `specd.yaml` must include a `storage` section with sub-keys for `changes` and `archive`. These paths are global — a project has one changes directory and one archive directory regardless of workspaces.
         ```yaml
-
         storage:
           changes:
             adapter: fs
@@ -318,98 +140,34 @@ rules:
               path: specd/archive
               pattern: '{{change.archivedName}}' # optional; default: "{{change.archivedName}}"
         ```
-
-
-
-        All four sub-keys (changes, drafts, discarded, archive) are required. adapter is required per sub-key;
-        adapter-specific fields are nested under the adapter key (fs:). Unknown adapter values must produce a validation
-        error. Relative paths are resolved from the directory containing specd.yaml and must remain within the project
-        repo root.
-
-
-
-        drafts — shelved changes that are not ready for active development but may be recovered. A change can be moved
-        from changes/ to drafts/ at any point before archiving; it retains its full internal state and can be moved back
-        to changes/ to continue from where it left off.
-
-
-
-        discarded — permanently abandoned changes. A change can be discarded from changes/ or drafts/. A discarded
-        change must include a reason; it cannot be recovered. specd init adds specd/drafts/ and specd/discarded/ to
-        .gitignore by default — local-only directories unless the team opts in.
-
-
-
-        archive index — the archive directory contains a .specd-index.jsonl file that caches metadata from individual
-        manifests for fast listing. This file is a derived cache, not a source of truth — the manifests inside each
-        archived change directory are authoritative. specd init gitignores .specd-index.jsonl inside the archive
-        directory (via a local .gitignore), so the index is never committed. When the index is missing (e.g. after a
-        fresh clone) or stale (e.g. after pulling new archives from other developers), it is automatically rebuilt from
-        the manifest files on disk. Staleness is detected by comparing manifest paths on disk against paths recorded in
-        the index.
+        All four sub-keys (`changes`, `drafts`, `discarded`, `archive`) are required. `adapter` is required per sub-key; adapter-specific fields are nested under the adapter key (`fs:`). Unknown adapter values must produce a validation error. Relative paths are resolved from the directory containing `specd.yaml` and must remain within the project repo root.
+        **`drafts`** — shelved changes that are not ready for active development but may be recovered. A change can be moved from `changes/` to `drafts/` at any point before archiving; it retains its full internal state and can be moved back to `changes/` to continue from where it left off.
+        **`discarded`** — permanently abandoned changes. A change can be discarded from `changes/` or `drafts/`. A discarded change must include a reason; it cannot be recovered. `specd init` adds `specd/drafts/` and `specd/discarded/` to `.gitignore` by default — local-only directories unless the team opts in.
+        **`archive` index** — the archive directory contains a `.specd-index.jsonl` file that caches metadata from individual manifests for fast listing. This file is a **derived cache**, not a source of truth — the manifests inside each archived change directory are authoritative. `specd init` gitignores `.specd-index.jsonl` inside the archive directory (via a local `.gitignore`), so the index is never committed. When the index is missing (e.g. after a fresh clone) or stale (e.g. after pulling new archives from other developers), it is automatically rebuilt from the manifest files on disk. Staleness is detected by comparing manifest paths on disk against paths recorded in the index.
   - requirement: Template variables
     rules:
-      - >-
-        Several fields in specd.yaml support template variable interpolation using {{variable}} syntax. Template
-        variables are resolved at runtime by the application layer before the value is used.
-
-
-
-        The following variables are available in storage.archive.fs.pattern:
-
-
-
-        | Variable                  |
-        Value                                                                                                   |
-
-        | ------------------------- |
-        ------------------------------------------------------------------------------------------------------- |
-
-        | {{change.name}}         | The change's slug name (e.g.
-        add-auth-flow)                                                           |
-
-        | {{change.archivedName}} | The change's full archived directory name (e.g. 2024-01-15-add-auth-flow) — the
-        default pattern value |
-
-        | {{change.workspace}}    | The primary workspace of the
-        change                                                                     |
-
-        | {{year}}                | Four-digit current year (e.g.
-        2024)                                                                   |
-
-        | {{date}}                | ISO date at archive time (e.g.
-        2024-01-15)                                                            |
-
-
-
-        The following variables are available in workflow hook run commands:
-
-
-
+      - |-
+        Several fields in `specd.yaml` support template variable interpolation using `{{variable}}` syntax. Template variables are resolved at runtime by the application layer before the value is used.
+        The following variables are available in **`storage.archive.fs.pattern`**:
+        | Variable                  | Value                                                                                                   |
+        | ------------------------- | ------------------------------------------------------------------------------------------------------- |
+        | `{{change.name}}`         | The change's slug name (e.g. `add-auth-flow`)                                                           |
+        | `{{change.archivedName}}` | The change's full archived directory name (e.g. `2024-01-15-add-auth-flow`) — the default pattern value |
+        | `{{change.workspace}}`    | The primary workspace of the change                                                                     |
+        | `{{year}}`                | Four-digit current year (e.g. `2024`)                                                                   |
+        | `{{date}}`                | ISO date at archive time (e.g. `2024-01-15`)                                                            |
+        The following variables are available in **`workflow` hook `run` commands**:
         | Variable               | Value                                                           |
-
         | ---------------------- | --------------------------------------------------------------- |
-
-        | {{change.name}}      | The change's slug name                                          |
-
-        | {{change.workspace}} | The primary workspace of the change                             |
-
-        | {{codeRoot}}         | The resolved absolute path to the active workspace's codeRoot |
-
-
-
+        | `{{change.name}}`      | The change's slug name                                          |
+        | `{{change.workspace}}` | The primary workspace of the change                             |
+        | `{{codeRoot}}`         | The resolved absolute path to the active workspace's `codeRoot` |
         Unknown variables in a template are left as-is and a warning is emitted.
   - requirement: Workflow additions
     rules:
-      - >-
-        specd.yaml may include a workflow section to add project-level hooks to the change lifecycle steps declared in
-        the schema. Entries are matched to schema workflow entries by step name; schema hooks fire first, then project
-        hooks. requires is not valid in project-level workflow entries and must be rejected.
-
-
-
+      - |-
+        `specd.yaml` may include a `workflow` section to add project-level hooks to the change lifecycle steps declared in the schema. Entries are matched to schema workflow entries by `step` name; schema hooks fire first, then project hooks. `requires` is not valid in project-level workflow entries and must be rejected.
         ```yaml
-
         workflow:
           - step: archiving
             hooks:
@@ -424,15 +182,9 @@ rules:
         ```
   - requirement: Project-level artifact rules
     rules:
-      - >-
-        specd.yaml may include an artifactRules section to add per-artifact constraints without forking the schema. Keys
-        are artifact IDs; values are arrays of constraint strings. CompileContext injects them as a distinct block in
-        the compiled instruction, after the schema's instruction.
-
-
-
+      - |-
+        `specd.yaml` may include an `artifactRules` section to add per-artifact constraints without forking the schema. Keys are artifact IDs; values are arrays of constraint strings. `CompileContext` injects them as a distinct block in the compiled instruction, after the schema's instruction.
         ```yaml
-
         artifactRules:
           specs:
             - 'All requirements must reference the relevant RFC number'
@@ -440,130 +192,42 @@ rules:
           design:
             - 'Architecture decisions must reference an ADR'
         ```
-
-
-
-        Keys are validated against the active schema's artifact IDs at startup. Unknown keys emit a warning but do not
-        prevent startup.
+        Keys are validated against the active schema's artifact IDs at startup. Unknown keys emit a warning but do not prevent startup.
   - requirement: Context spec selection
     rules:
-      - >-
-        contextIncludeSpecs and contextExcludeSpecs can be declared at two levels with different semantics:
-
-
-
-        * Project level (top-level in specd.yaml) — patterns are always applied, regardless of which workspaces the
-        current change touches. Use this for specs that must always be in context: global constraints, cross-cutting
-        architecture specs, shared external specs.
-
-        * Workspace level (inside a workspace entry) — patterns are applied only when that workspace is active in the
-        current change. Use this for specs that are relevant only when working within that workspace.
-
-
-
-        A workspace is considered active if at least one of its specs is listed in the current change's metadata. When a
-        change is created or updated, the set of specs it contains is recorded in its metadata file. CompileContext
-        reads that list and resolves each spec's workspace by matching its path against the declared specs.fs.path
-        entries — not by scanning the filesystem at compile time, not by CWD, not by codeRoot. A change whose metadata
-        lists specs from both default and billing activates both workspaces simultaneously.
-
-
-
-        Pattern syntax:
-
-
-
-        | Pattern               | Meaning at project level                                          | Meaning at
-        workspace level                                        |
-
-        | --------------------- | ----------------------------------------------------------------- |
-        ----------------------------------------------------------------- |
-
-        | \*                   | All specs in all workspaces                                       | All specs in this
-        workspace (= {self}:\*)                        |
-
-        | workspace:\*         | All specs in the named workspace                                  | All specs in the
-        named workspace                                  |
-
-        | prefix/\*            | All specs under prefix/ in default                            | All specs under prefix/
-        in this workspace                       |
-
-        | workspace:prefix/\*  | All specs under prefix/ in the named workspace                  | All specs under
-        prefix/ in the named workspace                  |
-
-        | path/name           | Exact spec in default (does not match descendants)              | Exact spec in this
-        workspace (does not match descendants)         |
-
-        | workspace:path/name | Exact spec ID in the named workspace (does not match descendants) | Exact spec ID in the
-        named workspace (does not match descendants) |
-
-
-
-        \* may only appear in three positions: alone (\*), as the sole suffix after workspace: (billing:\*), or as the
-        sole suffix after a path prefix ending in / (\_global/\*). It may not appear in the middle of a path segment or
-        in any other position.
-
-
-
-        Qualifier resolution by level:
-
-
-
-        * At project level, omitting the workspace qualifier is equivalent to default:.
-
-        * At workspace level, omitting the workspace qualifier means this workspace — e.g. inside billing:, \['auth/\*']
-        means billing:auth/\* and \['\*'] means all specs in billing.
-
-
-
-        Defaults:
-
-
-
-        * Project-level contextIncludeSpecs: \['default:\*']
-
-        * Project-level contextExcludeSpecs: \[]
-
-        * Workspace-level contextIncludeSpecs: \['\*'] (equivalent to {workspace-name}:\*)
-
-        * Workspace-level contextExcludeSpecs: \[]
-
-
-
-        Resolution order: CompileContext builds the compiled context in this sequence:
-
-
-
-        1. Project-level context entries (in declaration order) — always first, before any spec content
-
+      - |-
+        `contextIncludeSpecs` and `contextExcludeSpecs` can be declared at two levels with different semantics:
+        * **Project level** (top-level in `specd.yaml`) — patterns are always applied, regardless of which workspaces the current change touches. Use this for specs that must always be in context: global constraints, cross-cutting architecture specs, shared external specs.
+        * **Workspace level** (inside a workspace entry) — patterns are applied only when that workspace is active in the current change. Use this for specs that are relevant only when working within that workspace.
+        **A workspace is considered active if at least one of its specs is listed in the current change's metadata.** When a change is created or updated, the set of specs it contains is recorded in its metadata file. `CompileContext` reads that list and resolves each spec's workspace by matching its path against the declared `specs.fs.path` entries — not by scanning the filesystem at compile time, not by CWD, not by `codeRoot`. A change whose metadata lists specs from both `default` and `billing` activates both workspaces simultaneously.
+        **Pattern syntax:**
+        | Pattern               | Meaning at project level                                          | Meaning at workspace level                                        |
+        | --------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------- |
+        | `*`                   | All specs in all workspaces                                       | All specs in this workspace (= `{self}:*`)                        |
+        | `workspace:*`         | All specs in the named workspace                                  | All specs in the named workspace                                  |
+        | `prefix/*`            | All specs under `prefix/` in `default`                            | All specs under `prefix/` in this workspace                       |
+        | `workspace:prefix/*`  | All specs under `prefix/` in the named workspace                  | All specs under `prefix/` in the named workspace                  |
+        | `path/name`           | Exact spec in `default` (does not match descendants)              | Exact spec in this workspace (does not match descendants)         |
+        | `workspace:path/name` | Exact spec ID in the named workspace (does not match descendants) | Exact spec ID in the named workspace (does not match descendants) |
+        `*` may only appear in three positions: alone (`*`), as the sole suffix after `workspace:` (`billing:*`), or as the sole suffix after a path prefix ending in `/` (`_global/*`). It may not appear in the middle of a path segment or in any other position.
+        **Qualifier resolution by level:**
+        * At project level, omitting the workspace qualifier is equivalent to `default:`.
+        * At workspace level, omitting the workspace qualifier means *this workspace* — e.g. inside `billing:`, `['auth/*']` means `billing:auth/*` and `['*']` means all specs in `billing`.
+        **Defaults:**
+        * Project-level `contextIncludeSpecs`: `['default:*']`
+        * Project-level `contextExcludeSpecs`: `[]`
+        * Workspace-level `contextIncludeSpecs`: `['*']` (equivalent to `{workspace-name}:*`)
+        * Workspace-level `contextExcludeSpecs`: `[]`
+        **Resolution order:** `CompileContext` builds the compiled context in this sequence:
+        1. Project-level `context` entries (in declaration order) — always first, before any spec content
         2. Project-level include patterns (in declaration order) — always applied
-
         3. Project-level exclude patterns — always applied; removes specs from the set accumulated in step 2
-
-        4. Workspace-level include patterns from each active workspace (in workspace declaration order, then pattern
-        order within each workspace)
-
+        4. Workspace-level include patterns from each active workspace (in workspace declaration order, then pattern order within each workspace)
         5. Workspace-level exclude patterns from each active workspace (same order as step 4)
-
-        6. All specs reachable via dependsOn traversal — starting from the change's specIds, following dependsOn links
-        (resolved via the three-tier order: change.specDependsOn, .specd-metadata.yaml, content extraction) transitively
-        until no new specs are found. These specs are not subject to exclude rules from steps 3 or 5 — a declared
-        dependency is always included regardless of project or workspace excludes.
-
-
-
-        Specs matched by earlier patterns take priority if the context must be truncated. A spec matched by multiple
-        include patterns appears only once, at the position of the first matching pattern. Specs added in step 6 that
-        were already included in steps 2–5 also appear only once (at their earlier position). Step 1 (context entries)
-        is not part of spec collection — those entries are injected as-is and are not deduplicated against specs. See
-        specs/core/spec-metadata/spec.md for the .specd-metadata.yaml format.
-
-
-
+        6. All specs reachable via `dependsOn` traversal — starting from the change's `specIds`, following `dependsOn` links (resolved via the three-tier order: `change.specDependsOn`, `.specd-metadata.yaml`, content extraction) transitively until no new specs are found. These specs are **not subject to exclude rules from steps 3 or 5** — a declared dependency is always included regardless of project or workspace excludes.
+        Specs matched by earlier patterns take priority if the context must be truncated. A spec matched by multiple include patterns appears only once, at the position of the first matching pattern. Specs added in step 6 that were already included in steps 2–5 also appear only once (at their earlier position). Step 1 (`context` entries) is not part of spec collection — those entries are injected as-is and are not deduplicated against specs. See [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
         ```yaml
-
         # always in context — global constraints regardless of change scope
-
         contextIncludeSpecs:
           - 'shared:_global/*'
 
@@ -595,271 +259,106 @@ rules:
             ownership: readOnly
             # no workspace-level context — project-level shared:_global/* covers it
         ```
-
-
-
-        References to unknown workspace qualifiers produce a warning at startup but do not prevent startup — runtime is
-        tolerant to allow working with partial workspace setups. However, specd config validate must fail with an error
-        if any unknown workspace qualifier is found: a typo in a qualifier silently excludes specs from context, which
-        is a dangerous silent failure in teams. References to non-existent spec IDs are silently skipped at
-        context-compilation time — this avoids breaking when a spec is temporarily deleted or not yet created. Invalid
-        pattern syntax is an error caught at startup.
-
-
-
-        specd config validate additionally warns when a pattern (include or exclude, at any level) matches no specs on
-        disk at validation time. This is not a runtime error — specs may not exist yet — but the warning helps catch
-        typos early.
+        References to unknown workspace qualifiers produce a warning at startup but do not prevent startup — runtime is tolerant to allow working with partial workspace setups. However, `specd config validate` must fail with an error if any unknown workspace qualifier is found: a typo in a qualifier silently excludes specs from context, which is a dangerous silent failure in teams. References to non-existent spec IDs are silently skipped at context-compilation time — this avoids breaking when a spec is temporarily deleted or not yet created. Invalid pattern syntax is an error caught at startup.
+        `specd config validate` additionally warns when a pattern (include or exclude, at any level) matches no specs on disk at validation time. This is not a runtime error — specs may not exist yet — but the warning helps catch typos early.
   - requirement: Project context instructions
     rules:
-      - >-
-        specd.yaml may include a top-level context field to inject additional freeform content into the compiled context
-        alongside specs. Each entry is either an inline instruction string or a reference to an external file.
-
-
-
+      - |-
+        `specd.yaml` may include a top-level `context` field to inject additional freeform content into the compiled context alongside specs. Each entry is either an inline instruction string or a reference to an external file.
         ```yaml
-
         context:
           - file: specd-bootstrap.md # file path relative to specd.yaml
           - file: AGENTS.md
           - instruction: 'Always prefer editing existing files over creating new ones.'
         ```
-
-
-
         Each item is an object with exactly one of the following keys:
-
-
-
-        * instruction — a string injected verbatim as an additional context block.
-
-        * file — the file at the given path is read at compile time and its content is injected verbatim. Paths are
-        relative to the directory containing specd.yaml. Absolute paths are also accepted.
-
-
-
-        The context field is optional. If absent, no additional content is injected. Entries are prepended to the
-        compiled context in declaration order, before any spec content.
-
-
-
-        If a referenced file does not exist at compile time, specd emits a warning identifying the missing file, skips
-        that entry, and continues compilation normally.
-
-
-
-        There is no depth limit on file content — the full file is injected. Files are not parsed or transformed;
-        markdown, plain text, and any other format are all treated as opaque strings.
+        * **`instruction`** — a string injected verbatim as an additional context block.
+        * **`file`** — the file at the given path is read at compile time and its content is injected verbatim. Paths are relative to the directory containing `specd.yaml`. Absolute paths are also accepted.
+        The `context` field is optional. If absent, no additional content is injected. Entries are prepended to the compiled context in declaration order, before any spec content.
+        If a referenced file does not exist at compile time, specd emits a warning identifying the missing file, skips that entry, and continues compilation normally.
+        There is no depth limit on file content — the full file is injected. Files are not parsed or transformed; markdown, plain text, and any other format are all treated as opaque strings.
   - requirement: Approvals
     rules:
-      - >-
-        specd.yaml may include an approvals section to configure which lifecycle gates require explicit human approval.
-        Both gates are disabled by default — teams opt in to the level of governance they need.
-
-
-
+      - |-
+        `specd.yaml` may include an `approvals` section to configure which lifecycle gates require explicit human approval. Both gates are disabled by default — teams opt in to the level of governance they need.
         ```yaml
-
         approvals:
           spec: false # require approval of the spec before implementation (default: false)
           signoff: false # require sign-off of the completed work before archiving (default: false)
         ```
-
-
-
-        spec — when true, a change in ready state cannot transition directly to implementing. It must first enter
-        pending-spec-approval and receive an explicit approval (with approver identity, reason, and timestamp) before
-        transitioning to spec-approved and then to implementing. When false (default), ready → implementing is a free
-        transition.
-
-
-
-        signoff — when true, a change in done state cannot transition directly to archivable, regardless of whether it
-        contains structural modifications or only additions. It must enter pending-signoff, receive explicit sign-off,
-        and transition through signed-off → archivable. The sign-off record captures what was reviewed — new specs,
-        modified specs, and removed specs alike. When false (default), done → archivable is a free transition.
-
-
-
+        **`spec`** — when `true`, a change in `ready` state cannot transition directly to `implementing`. It must first enter `pending-spec-approval` and receive an explicit approval (with approver identity, reason, and timestamp) before transitioning to `spec-approved` and then to `implementing`. When `false` (default), `ready → implementing` is a free transition.
+        **`signoff`** — when `true`, a change in `done` state cannot transition directly to `archivable`, regardless of whether it contains structural modifications or only additions. It must enter `pending-signoff`, receive explicit sign-off, and transition through `signed-off → archivable`. The sign-off record captures what was reviewed — new specs, modified specs, and removed specs alike. When `false` (default), `done → archivable` is a free transition.
         Both flags are independent — any combination is valid.
   - requirement: LLM optimization
     rules:
-      - >-
-        specd.yaml may include a top-level llmOptimizedContext boolean field. When true, specd may invoke an LLM for
-        optimization tasks that produce richer output than deterministic extraction alone. When false or absent (the
-        default), all operations use deterministic processing only.
-
-
-
+      - |-
+        `specd.yaml` may include a top-level `llmOptimizedContext` boolean field. When `true`, specd may invoke an LLM for optimization tasks that produce richer output than deterministic extraction alone. When `false` or absent (the default), all operations use deterministic processing only.
         ```yaml
-
         llmOptimizedContext: true # default: false
-
         ```
-
-
-
-        The first use case is spec metadata generation: with llmOptimizedContext: false, the metadata agent extracts
-        rules and scenarios by parsing the structural conventions of spec.md and verify.md directly; with true, the LLM
-        generates richer description, structured given/when/then for free-form scenarios, and more precise dependsOn
-        suggestions. Further use cases may be added in future versions.
-
-
-
-        This field is a project-level opt-in. Teams that have no LLM available in their automation pipeline (e.g.
-        offline CI, air-gapped environments) leave it false. Teams that want LLM-enriched output set it to true and
-        ensure their tooling has access to a model.
+        The first use case is spec metadata generation: with `llmOptimizedContext: false`, the metadata agent extracts rules and scenarios by parsing the structural conventions of `spec.md` and `verify.md` directly; with `true`, the LLM generates richer `description`, structured `given`/`when`/`then` for free-form scenarios, and more precise `dependsOn` suggestions. Further use cases may be added in future versions.
+        This field is a project-level opt-in. Teams that have no LLM available in their automation pipeline (e.g. offline CI, air-gapped environments) leave it `false`. Teams that want LLM-enriched output set it to `true` and ensure their tooling has access to a model.
   - requirement: Skills manifest
     rules:
-      - >-
-        specd.yaml may include a skills section recording which skills from @specd/skills have been installed at the
-        project level for each agent. This manifest is written and read by specd skills install and specd skills update.
-
-
-
+      - |-
+        `specd.yaml` may include a `skills` section recording which skills from `@specd/skills` have been installed at the project level for each agent. This manifest is written and read by `specd skills install` and `specd skills update`.
         ```yaml
-
         skills:
           claude:
             - specd-bootstrap
             - specd-spec-metadata
         ```
-
-
-
-        Keys are agent IDs (e.g. claude); values are arrays of skill names. The section is optional — its absence means
-        no skills are tracked. Skills installed globally (--global) are not recorded here.
+        Keys are agent IDs (e.g. `claude`); values are arrays of skill names. The section is optional — its absence means no skills are tracked. Skills installed globally (`--global`) are not recorded here.
   - requirement: Plugin declarations
     rules:
-      - >-
-        specd.yaml may include a plugins section declaring which agent-integration plugins are installed. Each entry
-        must include name; options is plugin-specific and optional.
-
-
-
+      - |-
+        `specd.yaml` may include a `plugins` section declaring which agent-integration plugins are installed. Each entry must include `name`; `options` is plugin-specific and optional.
         ```yaml
-
         plugins:
           - name: '@specd/plugin-claude'
           - name: '@specd/plugin-copilot'
             options:
               commandsDir: .github/copilot/instructions
         ```
-
-
-
-        Plugin declarations are used by specd project init, specd plugin add, and specd project update to install and
-        maintain the plugin's skill files and hooks in the project. They do not affect schema resolution, storage, or
-        context compilation.
+        Plugin declarations are used by `specd project init`, `specd plugin add`, and `specd project update` to install and maintain the plugin's skill files and hooks in the project. They do not affect schema resolution, storage, or context compilation.
   - requirement: Config writer port
     rules:
-      - >-
-        @specd/core exposes a ConfigWriter application port for all operations that mutate specd.yaml. Adapters (CLI,
-        MCP) never serialise or deserialise YAML directly — they call use cases that delegate to ConfigWriter.
-
-
-
+      - |-
+        `@specd/core` exposes a `ConfigWriter` application port for all operations that mutate `specd.yaml`. Adapters (CLI, MCP) never serialise or deserialise YAML directly — they call use cases that delegate to `ConfigWriter`.
         The port defines the following operations:
-
-
-
-        * initProject(options) — writes a new specd.yaml at the given path with the provided schema reference, workspace
-        id, and workspace specs path. Fails if the file already exists and force is false. Also creates the standard
-        storage directories (changes/, drafts/, discarded/, archive/), appends specd.local.yaml to .gitignore, and
-        creates a .gitignore inside the archive directory to exclude index.jsonl.
-
-        * recordSkillInstall(configPath, agent, skillNames) — adds the given skill names to specd.yaml's skills.\<agent>
-        array, deduplicating existing entries.
-
-        * readSkillsManifest(configPath) — returns the skills section of specd.yaml as a typed map { \[agent: string]:
-        string\[] }. This is a targeted read that does not require a fully validated SpecdConfig.
-
-
-
-        The FsConfigWriter adapter implements this port using the filesystem. It reads the existing YAML (when
-        required), makes the targeted mutation, and writes the file back, preserving comments and key order as much as
-        the YAML library permits.
-
-
-
-        Responsibility boundary: @specd/core owns all YAML serialisation and deserialisation. Adapters (CLI, MCP) call
-        use cases with typed inputs and receive typed outputs — they never read or write specd.yaml directly.
-        Conversely, @specd/core never writes agent-specific files (e.g. .claude/commands/\*.md) — those are
-        adapter-layer concerns. This boundary is intentional: @specd/skills depends on @specd/core, not the other way
-        around, so core cannot resolve skill content.
-
-
-
-        Use cases that call ConfigWriter:
-
-
-
+        * **`initProject(options)`** — writes a new `specd.yaml` at the given path with the provided schema reference, workspace id, and workspace specs path. Fails if the file already exists and `force` is false. Also creates the standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`), appends `specd.local.yaml` to `.gitignore`, and creates a `.gitignore` inside the archive directory to exclude `index.jsonl`.
+        * **`recordSkillInstall(configPath, agent, skillNames)`** — adds the given skill names to `specd.yaml`'s `skills.<agent>` array, deduplicating existing entries.
+        * **`readSkillsManifest(configPath)`** — returns the `skills` section of `specd.yaml` as a typed map `{ [agent: string]: string[] }`. This is a targeted read that does not require a fully validated `SpecdConfig`.
+        The `FsConfigWriter` adapter implements this port using the filesystem. It reads the existing YAML (when required), makes the targeted mutation, and writes the file back, preserving comments and key order as much as the YAML library permits.
+        **Responsibility boundary:** `@specd/core` owns all YAML serialisation and deserialisation. Adapters (CLI, MCP) call use cases with typed inputs and receive typed outputs — they never read or write `specd.yaml` directly. Conversely, `@specd/core` never writes agent-specific files (e.g. `.claude/commands/*.md`) — those are adapter-layer concerns. This boundary is intentional: `@specd/skills` depends on `@specd/core`, not the other way around, so core cannot resolve skill content.
+        Use cases that call `ConfigWriter`:
         | Use case             | Operation            |
-
         | -------------------- | -------------------- |
-
-        | InitProject        | initProject        |
-
-        | RecordSkillInstall | recordSkillInstall |
-
-        | GetSkillsManifest  | readSkillsManifest |
+        | `InitProject`        | `initProject`        |
+        | `RecordSkillInstall` | `recordSkillInstall` |
+        | `GetSkillsManifest`  | `readSkillsManifest` |
   - requirement: Startup validation
     rules:
-      - >-
-        specd must validate specd.yaml before executing any command that requires a config (see Schema reference
-        requirement for which commands skip this). specd init is exempt — it creates specd.yaml and therefore requires
-        no existing config.
-
-
-
-        FsConfigLoader validates the parsed YAML against a Zod schema before constructing the SpecdConfig object. Any
-        structural mismatch (missing required fields, wrong types, unknown adapter values) surfaces immediately as a
-        ConfigValidationError — a domain error that extends SpecdError — before any path resolution or domain object
-        construction takes place.
-
-
-
-        The following conditions are errors that abort startup immediately:
-
-
-
-        * schema field is missing
-
-        * storage section is missing, or either changes or archive sub-key is absent
-
-        * workspaces section is missing, or no default workspace is declared
-
-        * specs section is missing in any workspace
-
-        * codeRoot is missing in any non-default workspace
-
-        * adapter is missing in any specs, schemas, or storage section
-
-        * Unknown adapter value in any specs, schemas, or storage section
-
-        * Required adapter-specific fields are absent (e.g. fs.path missing when adapter: fs)
-
-        * requires field present in a project-level workflow entry
-
-        * Storage path (changes.fs.path or archive.fs.path) resolves outside the repo root
-
-        * Invalid contextIncludeSpecs or contextExcludeSpecs pattern syntax (e.g. \* in a disallowed position)
-
-
-
-        The following conditions emit warnings but allow startup to proceed:
-
-
-
-        * Unknown key in artifactRules (no matching artifact ID in the active schema)
-
+      - |-
+        specd must validate `specd.yaml` before executing any command that requires a config (see Schema reference requirement for which commands skip this). `specd init` is exempt — it creates `specd.yaml` and therefore requires no existing config.
+        `FsConfigLoader` validates the parsed YAML against a Zod schema before constructing the `SpecdConfig` object. Any structural mismatch (missing required fields, wrong types, unknown adapter values) surfaces immediately as a `ConfigValidationError` — a domain error that extends `SpecdError` — before any path resolution or domain object construction takes place.
+        The following conditions are **errors** that abort startup immediately:
+        * `schema` field is missing
+        * `storage` section is missing, or either `changes` or `archive` sub-key is absent
+        * `workspaces` section is missing, or no `default` workspace is declared
+        * `specs` section is missing in any workspace
+        * `codeRoot` is missing in any non-`default` workspace
+        * `adapter` is missing in any `specs`, `schemas`, or storage section
+        * Unknown adapter value in any `specs`, `schemas`, or storage section
+        * Required adapter-specific fields are absent (e.g. `fs.path` missing when `adapter: fs`)
+        * `requires` field present in a project-level `workflow` entry
+        * Storage path (`changes.fs.path` or `archive.fs.path`) resolves outside the repo root
+        * Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax (e.g. `*` in a disallowed position)
+        The following conditions emit **warnings** but allow startup to proceed:
+        * Unknown key in `artifactRules` (no matching artifact ID in the active schema)
         * Duplicate workspace names (YAML retains last-wins; warn about the pattern)
-
         * Project-level workflow entry names a step not declared in the schema
-
-        * Unknown workspace qualifier in a contextIncludeSpecs or contextExcludeSpecs pattern (runtime only — specd
-        config validate treats this as an error)
+        * Unknown workspace qualifier in a `contextIncludeSpecs` or `contextExcludeSpecs` pattern (runtime only — `specd config validate` treats this as an error)
 constraints:
   - schema is required — specd cannot start without a schema reference
   - workspaces.default is required — every config must have a default workspace; specd init creates it
@@ -869,38 +368,26 @@ constraints:
   - requires is not valid in project-level workflow entries — only step and hooks are accepted
   - Workspace names must match /^[a-z][a-z0-9-]*$/; default is reserved for the local project workspace
   - ownership values are limited to readOnly, shared, and owned
-  - isExternal is not declared — it is inferred by the application layer from whether the resolved specs.fs.path is
-    outside the project repo root
+  - isExternal is not declared — it is inferred by the application layer from whether the resolved specs.fs.path is outside the project repo root
   - Every workspace must declare a specs section; codeRoot is required for non-default workspaces
-  - 'schemas is optional: for the default workspace it defaults to adapter: fs / fs.path: specd/schemas; for non-default
-    workspaces, omitting it means no local schemas — schema references targeting that workspace produce
-    SchemaNotFoundError'
-  - adapter is required in every specs, schemas, and storage section; adapter-specific fields are nested under the
-    adapter key
+  - 'schemas is optional: for the default workspace it defaults to adapter: fs / fs.path: specd/schemas; for non-default workspaces, omitting it means no local schemas — schema references targeting that workspace produce SchemaNotFoundError'
+  - adapter is required in every specs, schemas, and storage section; adapter-specific fields are nested under the adapter key
   - storage section is required and must contain both changes and archive sub-keys
-  - All relative paths resolve from the specd.yaml directory; storage paths (fs.path in changes and archive) must remain
-    within the repo root
+  - All relative paths resolve from the specd.yaml directory; storage paths (fs.path in changes and archive) must remain within the repo root
   - Project-level contextIncludeSpecs defaults to ['default:*']; project-level contextExcludeSpecs defaults to []
-  - Workspace-level contextIncludeSpecs defaults to ['*'] (all specs in that workspace); workspace-level
-    contextExcludeSpecs defaults to []
+  - Workspace-level contextIncludeSpecs defaults to ['*'] (all specs in that workspace); workspace-level contextExcludeSpecs defaults to []
   - llmOptimizedContext is optional; defaults to false; must be a boolean — any other type is a startup validation error
-  - 'context is optional; each entry is an object with exactly one key: either file or instruction — no other shapes are
-    valid'
+  - 'context is optional; each entry is an object with exactly one key: either file or instruction — no other shapes are valid'
   - context file paths are resolved relative to the specd.yaml directory; absolute paths are accepted
   - A missing context file is silently skipped at compile time — no warning, no error
   - context file content is injected verbatim — no parsing or transformation is applied
   - context entries are prepended to the compiled context in declaration order, before any spec content
-  - Project-level patterns are always applied; workspace-level patterns are applied only when that workspace is active
-    in the current change
-  - At project level, omitting the workspace qualifier is equivalent to default:; at workspace level, omitting it means
-    the declaring workspace
-  - Include pattern order (project-level first, then active workspace declaration order) determines context order and
-    truncation priority
+  - Project-level patterns are always applied; workspace-level patterns are applied only when that workspace is active in the current change
+  - At project level, omitting the workspace qualifier is equivalent to default:; at workspace level, omitting it means the declaring workspace
+  - Include pattern order (project-level first, then active workspace declaration order) determines context order and truncation priority
   - A spec matched by multiple include patterns appears once, at the position of the first matching pattern
-  - '* in a pattern may only appear alone, as workspace:*, or as a path suffix prefix/* — any other position is a
-    startup error'
-  - Unknown workspace qualifiers in patterns produce a warning, not an error; missing spec IDs are silently skipped at
-    compile time
+  - '* in a pattern may only appear alone, as workspace:*, or as a path suffix prefix/* — any other position is a startup error'
+  - Unknown workspace qualifiers in patterns produce a warning, not an error; missing spec IDs are silently skipped at compile time
 scenarios:
   - requirement: Config file location and format
     name: Config found — nearest file used
@@ -911,15 +398,13 @@ scenarios:
   - requirement: Config file location and format
     name: Monorepo — package config takes precedence
     when:
-      - a monorepo has a specd.yaml at the root and another at packages/billing/specd.yaml, and the user runs specd from
-        within packages/billing/
+      - a monorepo has a specd.yaml at the root and another at packages/billing/specd.yaml, and the user runs specd from within packages/billing/
     then:
       - specd uses packages/billing/specd.yaml and does not continue walking up to the root
   - requirement: Config file location and format
     name: Config not found inside repo
     when:
-      - the user runs any specd command inside a git repository and no specd.yaml exists between the CWD and the repo
-        root
+      - the user runs any specd command inside a git repository and no specd.yaml exists between the CWD and the repo root
     then:
       - specd exits with an error explaining that specd.yaml was not found and pointing to specd init
   - requirement: Config file location and format
@@ -979,8 +464,7 @@ scenarios:
   - requirement: Schema reference
     name: Workspace-qualified schema reference
     when:
-      - 'schema: "#billing:my-billing-schema" is declared and workspaces.billing.schemas.fs.path is
-        ../billing/dev/schemas'
+      - 'schema: "#billing:my-billing-schema" is declared and workspaces.billing.schemas.fs.path is ../billing/dev/schemas'
     then:
       - SchemaRegistry.resolve() loads ../billing/dev/schemas/my-billing-schema/schema.yaml
   - requirement: Schema reference
@@ -1012,8 +496,7 @@ scenarios:
     when:
       - specd --help or specd init is run
     then:
-      - SchemaRegistry.resolve() is not called; the command runs regardless of whether the schema is valid or even
-        declared
+      - SchemaRegistry.resolve() is not called; the command runs regardless of whether the schema is valid or even declared
   - requirement: Workspaces
     name: Default workspace only (simple project)
     when:
@@ -1025,8 +508,7 @@ scenarios:
     when:
       - specd init is run in a project with no specd.yaml
     then:
-      - 'a specd.yaml is created with a default workspace using specs.adapter: fs, specs.fs.path: specs/, storage paths
-        specd/changes and specd/archive, and no other workspaces'
+      - 'a specd.yaml is created with a default workspace using specs.adapter: fs, specs.fs.path: specs/, storage paths specd/changes and specd/archive, and no other workspaces'
   - requirement: Workspaces
     name: Non-default workspace resolves outside repo
     when:
@@ -1104,15 +586,13 @@ scenarios:
     when:
       - a project-level workflow entry names a step not declared in the schema's workflow
     then:
-      - the hooks are registered for that step; they fire if the step is ever invoked, and a warning is emitted at
-        startup
+      - the hooks are registered for that step; they fire if the step is ever invoked, and a warning is emitted at startup
   - requirement: Project-level artifact rules
     name: Rules injected
     when:
       - artifactRules.specs is set
     then:
-      - CompileContext includes those strings in the compiled context for the specs artifact as constraints the agent
-        must follow
+      - CompileContext includes those strings in the compiled context for the specs artifact as constraints the agent must follow
   - requirement: Project-level artifact rules
     name: Unknown artifact ID
     when:
@@ -1158,8 +638,7 @@ scenarios:
   - requirement: Context spec selection
     name: Project-level patterns always apply
     when:
-      - "project-level contextIncludeSpecs: ['shared:_global/*'] is declared and the current change only touches the
-        default workspace"
+      - "project-level contextIncludeSpecs: ['shared:_global/*'] is declared and the current change only touches the default workspace"
     then:
       - CompileContext still includes shared:_global/* specs — project-level patterns are not filtered by change scope
   - requirement: Context spec selection
@@ -1200,8 +679,7 @@ scenarios:
     when:
       - CompileContext builds the context
     then:
-      - project-level includes are accumulated first, then project-level excludes remove default:drafts/*, then
-        workspace-level includes from default add remaining specs, in that order
+      - project-level includes are accumulated first, then project-level excludes remove default:drafts/*, then workspace-level includes from default add remaining specs, in that order
   - requirement: Context spec selection
     name: Project-level exclude applied before workspace-level includes
     given:
@@ -1210,8 +688,7 @@ scenarios:
     when:
       - CompileContext builds the context
     then:
-      - default:auth/* specs are excluded — the project-level exclude (step 2) fires before workspace-level includes
-        (step 3)
+      - default:auth/* specs are excluded — the project-level exclude (step 2) fires before workspace-level includes (step 3)
   - requirement: Context spec selection
     name: Project-level exclude always applied regardless of active workspace
     when:
@@ -1221,15 +698,13 @@ scenarios:
   - requirement: Context spec selection
     name: Workspace declaration order determines workspace-level priority
     when:
-      - "default and billing both declare contextIncludeSpecs: ['*'] and the change touches both, and default is
-        declared first in specd.yaml"
+      - "default and billing both declare contextIncludeSpecs: ['*'] and the change touches both, and default is declared first in specd.yaml"
     then:
       - default specs appear before billing specs in context
   - requirement: Context spec selection
     name: Spec matched by multiple patterns appears once
     when:
-      - project-level includes shared:_global/* and default workspace includes ['shared:_global/architecture'], and both
-        match the same spec
+      - project-level includes shared:_global/* and default workspace includes ['shared:_global/architecture'], and both match the same spec
     then:
       - the spec appears once, at the position determined by the project-level pattern (first match)
   - requirement: Context spec selection
@@ -1247,15 +722,13 @@ scenarios:
   - requirement: Context spec selection
     name: Direct include path selects only that spec
     when:
-      - "contextIncludeSpecs: ['auth/login'] is declared and both auth/login and auth/register exist in the default
-        workspace"
+      - "contextIncludeSpecs: ['auth/login'] is declared and both auth/login and auth/register exist in the default workspace"
     then:
       - CompileContext includes auth/login and does not include auth/register
   - requirement: Context spec selection
     name: Direct exclude path removes only that spec
     when:
-      - "contextIncludeSpecs: ['auth/*'] and contextExcludeSpecs: ['auth/login'] are declared and both auth/login and
-        auth/register exist"
+      - "contextIncludeSpecs: ['auth/*'] and contextExcludeSpecs: ['auth/login'] are declared and both auth/login and auth/register exist"
     then:
       - CompileContext includes auth/register but not auth/login
   - requirement: Context spec selection
@@ -1279,11 +752,9 @@ scenarios:
   - requirement: Context spec selection
     name: Unknown workspace qualifier fails config validate
     when:
-      - specd config validate is run and a pattern contains a workspace qualifier that does not match any declared
-        workspace
+      - specd config validate is run and a pattern contains a workspace qualifier that does not match any declared workspace
     then:
-      - specd exits with an error — unknown qualifiers are treated as errors in validate to catch typos before they
-        silently drop specs from context
+      - specd exits with an error — unknown qualifiers are treated as errors in validate to catch typos before they silently drop specs from context
   - requirement: Context spec selection
     name: Workspace becomes active from change metadata
     when:
@@ -1295,8 +766,7 @@ scenarios:
     when:
       - a change's metadata lists only default specs
     then:
-      - the billing workspace is not active and its workspace-level patterns are not applied, regardless of CWD or
-        codeRoot
+      - the billing workspace is not active and its workspace-level patterns are not applied, regardless of CWD or codeRoot
   - requirement: Context spec selection
     name: Invalid pattern syntax is a startup error
     when:
@@ -1356,8 +826,7 @@ scenarios:
     when:
       - CompileContext builds the compiled context
     then:
-      - a warning is emitted identifying the missing file, compilation proceeds normally, and the entry is absent from
-        the output
+      - a warning is emitted identifying the missing file, compilation proceeds normally, and the entry is absent from the output
   - requirement: Project context instructions
     name: context absent — no effect
     given:

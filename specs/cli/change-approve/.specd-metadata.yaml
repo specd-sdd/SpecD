@@ -1,117 +1,115 @@
-title: 'Change Approve'
-description: >
-  Defines the specd change approve spec and specd change approve signoff commands, which record
-  human approval decisions at the two optional approval gates. Use this when implementing or
-  modifying approval workflows, artifact hash computation, or gate state transitions.
-keywords:
-  - 'change-approve'
-  - 'spec-approval'
-  - 'signoff-approval'
-  - 'artifact-hashes'
-  - 'approval-gate'
-contentHashes:
-  'spec.md': 'sha256:62d309f826cef2ef2f842c29e934a9baf6efd770f8f26d7beb27a53acfbbaab5'
-  'verify.md': 'sha256:04928df9713e67a726b487e5a9d309a95d076a04b87318218be79f857445e075'
+title: Change Approve
+description: Defines the `specd change approve spec <name> --reason <text>` and `specd change approve signoff <name> --reason <text>` commands, which record human approval decisions at the two optional approval gates.
 dependsOn:
-  - 'cli:cli/entrypoint'
-  - 'core:core/change'
+  - cli:cli/entrypoint
+  - core:core/change
+context:
+  - Defines the `specd change approve spec <name> --reason <text>` and `specd change approve signoff <name> --reason <text>` commands, which record human approval decisions at the two optional approval gates.
 rules:
-  - requirement: 'Command signatures'
+  - requirement: Command signatures
     rules:
-      - '`spec` / `signoff` — required sub-verb selecting which approval gate to exercise.'
-      - '`<name>` — required positional; the name of the change to approve.'
-      - '`--reason <text>` — required; a human-readable explanation for the approval decision.'
-      - '`--format text|json|toon` — optional; output format, defaults to `text`.'
-  - requirement: 'Artifact hash computation'
+      - |-
+        ```
+        specd change approve spec <name> --reason <text> [--format text|json|toon]
+        specd change approve signoff <name> --reason <text> [--format text|json|toon]
+        ```
+        * `spec` / `signoff` — required sub-verb selecting which approval gate to exercise
+        * `<name>` — required positional; the name of the change to approve
+        * `--reason <text>` — required; a human-readable explanation for the approval decision
+        * `--format text|json|toon` — optional; output format, defaults to `text`
+  - requirement: Artifact hash computation
     rules:
-      - 'Before invoking the use case, the CLI computes the current hash of each artifact file on disk (applying `preHashCleanup` if declared in the schema) and passes the resulting `artifactHashes` map to the use case.'
-      - 'The user never supplies artifact hashes.'
-  - requirement: 'Approve spec behaviour'
+      - Before invoking the use case, the CLI computes the current hash of each artifact file on disk (applying `preHashCleanup` if declared in the schema) and passes the resulting `artifactHashes` map to the use case. The user never supplies artifact hashes.
+  - requirement: Approve spec behaviour
     rules:
-      - '`approve spec` invokes `ApproveSpec`.'
-      - 'It is only valid when the change is in `pending-spec-approval` state.'
-      - 'On success, the change transitions to `spec-approved`.'
-  - requirement: 'Approve signoff behaviour'
+      - '`approve spec` invokes `ApproveSpec`. It is only valid when the change is in `pending-spec-approval` state. On success, the change transitions to `spec-approved`.'
+  - requirement: Approve signoff behaviour
     rules:
-      - '`approve signoff` invokes `ApproveSignoff`.'
-      - 'It is only valid when the change is in `pending-signoff` state.'
-      - 'On success, the change transitions to `signed-off`.'
-  - requirement: 'Output on success'
+      - '`approve signoff` invokes `ApproveSignoff`. It is only valid when the change is in `pending-signoff` state. On success, the change transitions to `signed-off`.'
+  - requirement: Output on success
     rules:
-      - 'In `text` mode (default), prints `approved <gate> for <name>` to stdout.'
-      - 'In `json` or `toon` mode, outputs `{"result": "ok", "gate": "<gate>", "name": "<name>"}` encoded in the respective format.'
-  - requirement: 'Error cases'
+      - |-
+        On success, output depends on `--format`:
+        * `text` (default): prints to stdout:
+        * `json` or `toon`: outputs the following to stdout (encoded in the respective format):
+        where `<gate>` is `spec` or `signoff`.
+  - requirement: Error cases
     rules:
-      - '`--reason` is mandatory; omitting it is a CLI usage error (exit code 1).'
-      - 'If the change is not in the expected state for the gate, the command exits with code 1 and prints an `error:` message.'
-      - 'If the change does not exist, exits with code 1.'
+      - |-
+        * `--reason` is mandatory; omitting it is a CLI usage error (exit code 1).
+        * If the change is not in the expected state for the gate, the command exits with code 1 and prints an `error:` message.
+        * If the change does not exist, exits with code 1.
 constraints:
-  - 'Artifact hashes are computed automatically from disk — the user never specifies them.'
-  - 'Both `spec` and `signoff` sub-verbs are required even when only one approval gate is enabled; the gate state enforces which command is currently valid.'
+  - Artifact hashes are computed automatically from disk — the user never specifies them
+  - Both spec and signoff sub-verbs are required even when only one approval gate is enabled; the gate state enforces which command is currently valid
 scenarios:
-  - requirement: 'Command signatures'
-    name: 'Missing reason flag'
+  - requirement: Command signatures
+    name: Missing reason flag
     when:
-      - '`specd change approve spec my-change` is run without `--reason`'
+      - specd change approve spec my-change is run without --reason
     then:
-      - 'the command exits with code 1 and prints a usage error to stderr'
-  - requirement: 'Command signatures'
-    name: 'Unknown sub-verb'
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Command signatures
+    name: Unknown sub-verb
     when:
-      - '`specd change approve review my-change --reason "ok"` is run with an unknown sub-verb'
+      - specd change approve review my-change --reason "ok" is run with an unknown sub-verb
     then:
-      - 'the command exits with code 1 and prints a usage error to stderr'
-  - requirement: 'Artifact hash computation'
-    name: 'Hashes computed from disk'
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Artifact hash computation
+    name: Hashes computed from disk
     given:
-      - 'artifact files exist on disk for the change'
+      - artifact files exist on disk for the change
     when:
-      - '`specd change approve spec my-change --reason "ok"` is run'
+      - specd change approve spec my-change --reason "ok" is run
     then:
-      - 'the approval event in history contains `artifactHashes` computed from the current file content on disk'
-      - 'the user did not supply any hash values'
-  - requirement: 'Approve spec behaviour'
-    name: 'Successful spec approval'
+      - the approval event in history contains artifactHashes computed from the current file content on disk
+      - AND the user did not supply any hash values
+  - requirement: Approve spec behaviour
+    name: Successful spec approval
     given:
-      - 'the change is in `pending-spec-approval` state'
+      - the change is in pending-spec-approval state
     when:
-      - '`specd change approve spec my-change --reason "looks good"` is run'
+      - specd change approve spec my-change --reason "looks good" is run
     then:
-      - 'the change transitions to `spec-approved`'
-      - 'stdout contains `approved spec for my-change`'
-      - 'the process exits with code 0'
-  - requirement: 'Approve spec behaviour'
-    name: 'Wrong state for spec approval'
+      - the change transitions to spec-approved
+      - AND stdout contains approved spec for my-change
+      - AND the process exits with code 0
+  - requirement: Approve spec behaviour
+    name: Wrong state for spec approval
     given:
-      - 'the change is in `designing` state'
+      - the change is in designing state
     when:
-      - '`specd change approve spec my-change --reason "ok"` is run'
+      - specd change approve spec my-change --reason "ok" is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
-  - requirement: 'Approve signoff behaviour'
-    name: 'Successful signoff'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+  - requirement: Approve signoff behaviour
+    name: Successful signoff
     given:
-      - 'the change is in `pending-signoff` state'
+      - the change is in pending-signoff state
     when:
-      - '`specd change approve signoff my-change --reason "done"` is run'
+      - specd change approve signoff my-change --reason "done" is run
     then:
-      - 'the change transitions to `signed-off`'
-      - 'stdout contains `approved signoff for my-change`'
-      - 'the process exits with code 0'
-  - requirement: 'Error cases'
-    name: 'Change not found'
+      - the change transitions to signed-off
+      - AND stdout contains approved signoff for my-change
+      - AND the process exits with code 0
+  - requirement: Error cases
+    name: Change not found
     when:
-      - '`specd change approve spec nonexistent --reason "ok"` is run'
+      - specd change approve spec nonexistent --reason "ok" is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
-  - requirement: 'Output on success'
-    name: 'JSON output on successful approval'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+  - requirement: Output on success
+    name: JSON output on successful approval
     given:
-      - 'the change is in `pending-spec-approval` state'
+      - the change is in pending-spec-approval state
     when:
-      - '`specd change approve spec my-change --reason "looks good" --format json` is run'
+      - specd change approve spec my-change --reason "looks good" --format json is run
     then:
-      - 'stdout is valid JSON with `result` equal to `"ok"`, `gate` equal to `"spec"`, and `name` equal to `"my-change"`'
-      - 'the process exits with code 0'
+      - stdout is valid JSON with result equal to "ok", gate equal to "spec", and name equal to "my-change"
+      - AND the process exits with code 0
+contentHashes:
+  spec.md: sha256:62d309f826cef2ef2f842c29e934a9baf6efd770f8f26d7beb27a53acfbbaab5
+  verify.md: sha256:04928df9713e67a726b487e5a9d309a95d076a04b87318218be79f857445e075
+generatedBy: core

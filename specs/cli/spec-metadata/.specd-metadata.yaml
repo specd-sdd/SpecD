@@ -1,10 +1,11 @@
 title: Spec Metadata
-description:
-  Defines the specd spec metadata \<workspace:capability-path> command, which displays the parsed contents of
-  a spec's .specd-metadata.yaml in a structured form, including freshness status for each recorded content hash.
+description: Defines the `specd spec metadata <workspace:capability-path>` command, which displays the parsed contents of a spec's `.specd-metadata.yaml` in a structured form, including freshness status for each recorded content hash.
+dependsOn:
+  - cli:cli/entrypoint
+  - core:core/spec-metadata
+  - core:core/spec-id-format
 context:
-  - Defines the specd spec metadata \<workspace:capability-path> command, which displays the parsed contents of a spec's
-    .specd-metadata.yaml in a structured form, including freshness status for each recorded content hash.
+  - Defines the `specd spec metadata <workspace:capability-path>` command, which displays the parsed contents of a spec's `.specd-metadata.yaml` in a structured form, including freshness status for each recorded content hash.
 rules:
   - requirement: Command signature
     rules:
@@ -12,38 +13,23 @@ rules:
         ```
         specd spec metadata <workspace:capability-path> [--format text|json|toon]
         ```
-
-
-        * \<workspace:capability-path> — required positional; the fully-qualified spec ID (e.g. default:auth/login)
-        * \--format text|json|toon — optional; output format, defaults to text
+        * `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
+        * `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Behaviour
     rules:
-      - >-
-        The command reads .specd-metadata.yaml for the given spec and renders its contents in a structured form. For
-        each file listed in contentHashes, it computes the current SHA-256 hash of the file on disk and compares it
-        against the recorded hash, reporting whether the metadata is fresh or stale per file.
-
-
-
-        If .specd-metadata.yaml does not exist, the command exits with code 1.
+      - |-
+        The command reads `.specd-metadata.yaml` for the given spec and renders its contents in a structured form. For each file listed in `contentHashes`, it computes the current SHA-256 hash of the file on disk and compares it against the recorded hash, reporting whether the metadata is fresh or stale per file.
+        If `.specd-metadata.yaml` does not exist, the command exits with code 1.
   - requirement: Output format
     rules:
-      - >-
-        In text mode (default):
-
-
-
+      - |-
+        In `text` mode (default):
         ```
-
         spec: <workspace>:<capability-path>
 
-
         title:       <title>
-
         description: <description>
-
         generatedBy: <core|agent>
-
 
         content hashes:
           <filename>  <fresh|STALE>
@@ -53,28 +39,12 @@ rules:
           ...
 
         rules:      <N>
-
         constraints: <N>
-
         scenarios:  <N>
-
         ```
-
-
-
-        Sections with no content are omitted. rules, constraints, and scenarios show counts only in text mode.
-        generatedBy shows which mechanism produced the metadata (core for deterministic extraction, agent for
-        LLM-generated).
-
-
-
-        In json or toon mode, the full parsed metadata is output including all rules, constraints, and scenarios
-        (encoded in the respective format):
-
-
-
+        Sections with no content are omitted. `rules`, `constraints`, and `scenarios` show counts only in text mode. `generatedBy` shows which mechanism produced the metadata (`core` for deterministic extraction, `agent` for LLM-generated).
+        In `json` or `toon` mode, the full parsed metadata is output including all rules, constraints, and scenarios (encoded in the respective format):
         ```json
-
         {
           "spec": "workspace:cap/path",
           "fresh": true,
@@ -89,17 +59,13 @@ rules:
           "constraints": [...],
           "scenarios": [...]
         }
-
         ```
-
-
-
-        fresh at the top level is true only when all contentHashes entries are fresh.
+        `fresh` at the top level is `true` only when all `contentHashes` entries are fresh.
   - requirement: Error cases
     rules:
       - |-
         * If the workspace is not configured, exits with code 1.
-        * If .specd-metadata.yaml does not exist, exits with code 1 and prints an error: message to stderr.
+        * If `.specd-metadata.yaml` does not exist, exits with code 1 and prints an `error:` message to stderr.
 constraints:
   - This command is read-only — it never writes or updates metadata
   - Metadata regeneration is handled by specd spec generate-metadata or by a skill
@@ -113,8 +79,7 @@ scenarios:
   - requirement: Behaviour
     name: Fresh hash shown as fresh
     given:
-      - default:auth/login has .specd-metadata.yaml with a contentHashes entry for spec.md matching the current file on
-        disk
+      - default:auth/login has .specd-metadata.yaml with a contentHashes entry for spec.md matching the current file on disk
     when:
       - specd spec metadata default:auth/login is run
     then:
@@ -122,8 +87,7 @@ scenarios:
   - requirement: Behaviour
     name: Stale hash shown as STALE
     given:
-      - default:auth/login has .specd-metadata.yaml with a contentHashes entry for spec.md that does not match the
-        current file
+      - default:auth/login has .specd-metadata.yaml with a contentHashes entry for spec.md that does not match the current file
     when:
       - specd spec metadata default:auth/login is run
     then:
@@ -152,8 +116,8 @@ scenarios:
       - specd spec metadata default:auth/login --format json is run
     then:
       - stdout is valid JSON with rules, constraints, and scenarios as full arrays, not counts
-      - fresh at the top level is true when all hashes match
-      - the process exits with code 0
+      - AND fresh at the top level is true when all hashes match
+      - AND the process exits with code 0
   - requirement: Output format
     name: JSON fresh field reflects all hashes
     given:
@@ -170,14 +134,14 @@ scenarios:
       - specd spec metadata default:auth/login is run
     then:
       - the command exits with code 1
-      - 'stderr contains an error: message'
+      - 'AND stderr contains an error: message'
   - requirement: Error cases
     name: Unknown workspace
     when:
       - specd spec metadata unknown-ws:auth/login is run
     then:
       - the command exits with code 1
-      - 'stderr contains an error: message'
+      - 'AND stderr contains an error: message'
 contentHashes:
   spec.md: sha256:4ffa48b6b3444a70d09082638f968feca102c642eafed3f18d694dd0c05e53d9
   verify.md: sha256:09e83a3b69ac6f6d3ff36bc9c24d23ea9b3baf3bc8a24748e3a29ec5e403ad73

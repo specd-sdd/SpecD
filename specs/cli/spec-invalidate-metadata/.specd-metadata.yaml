@@ -1,66 +1,59 @@
-title: 'Spec Invalidate-Metadata'
-description: >
-  Defines the `specd spec invalidate-metadata` CLI command, which marks a spec's
-  `.specd-metadata.yaml` as stale by removing its contentHashes field. Use this spec
-  when implementing or modifying the invalidate-metadata subcommand on the spec parent
-  command.
-keywords:
-  - 'invalidate-metadata'
-  - 'spec-command'
-  - 'metadata-staleness'
-  - 'content-hashes'
-  - 'cli-adapter'
-  - 'specd-metadata-yaml'
+title: Spec Invalidate-Metadata
+description: The `specd spec invalidate-metadata` command marks a spec's `.specd-metadata.yaml` as stale by removing its `contentHashes` field. This forces metadata regeneration on the next pass without deleting the file or losing other metadata fields.
 dependsOn:
-  - 'default:_global/architecture'
-  - 'default:_global/conventions'
-  - 'core:core/invalidate-spec-metadata'
-contentHashes:
-  'spec.md': 'sha256:abc43623bcd1a7b3fc04e5019be5107a1a8567143e73154ba236be28e290d616'
-  'verify.md': 'sha256:248116cecf1775bc19c1e9638c5d9e7c60850db773c30134154b52b23e314f85'
+  - default:_global/architecture
+  - default:_global/conventions
+  - core:core/invalidate-spec-metadata
+context:
+  - The `specd spec invalidate-metadata` command marks a spec's `.specd-metadata.yaml` as stale by removing its `contentHashes` field. This forces metadata regeneration on the next pass without deleting the file or losing other metadata fields.
 rules:
-  - requirement: 'Command signature'
+  - requirement: Command signature
     rules:
-      - 'The command is registered as invalidate-metadata <specPath> on the spec parent command.'
-      - 'The command accepts --format <fmt> with allowed values text, json, and toon, defaulting to text.'
-      - 'The command accepts --config <path> to specify the path to specd.yaml.'
-      - 'The <specPath> argument uses the workspace:capability-path syntax.'
-  - requirement: 'Text output'
+      - |-
+        The command is registered as `invalidate-metadata <specPath>` on the `spec` parent command. It accepts:
+        * `--format <fmt>` — output format: `text|json|toon` (default `text`)
+        * `--config <path>` — path to `specd.yaml`
+        The `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands.
+  - requirement: Text output
     rules:
-      - 'On success with text format, the command outputs: invalidated .specd-metadata.yaml for <workspace:path>.'
-  - requirement: 'JSON output'
+      - 'On success, text format outputs: `invalidated .specd-metadata.yaml for <workspace:path>`'
+  - requirement: JSON output
     rules:
-      - 'On success with JSON format, the command outputs { "result": "ok", "spec": "<workspace:path>" }.'
-  - requirement: 'Error — spec not found or no metadata'
+      - 'On success, JSON format outputs: `{ "result": "ok", "spec": "<workspace:path>" }`'
+  - requirement: Error — spec not found or no metadata
     rules:
-      - 'If the spec does not exist or has no .specd-metadata.yaml, the command writes error: spec <specPath> not found or has no metadata to stderr and exits with code 1.'
+      - "If the spec does not exist, or has no `.specd-metadata.yaml`, the command writes `error: spec '<specPath>' not found or has no metadata` to stderr and exits with code 1."
 constraints:
-  - 'The command contains no business logic — all work is delegated to the InvalidateSpecMetadata use case.'
-  - 'The command never reads or writes the filesystem directly for spec content — it uses the kernel.'
+  - The command contains no business logic — all work is delegated to the InvalidateSpecMetadata use case
+  - The command never reads or writes the filesystem directly for spec content — it uses the kernel
 scenarios:
-  - requirement: 'Text output'
-    name: 'Successful invalidation in text format'
+  - requirement: Text output
+    name: Successful invalidation in text format
     when:
-      - 'The invalidation succeeds and format is text.'
+      - the invalidation succeeds and format is text
     then:
-      - 'The command outputs invalidated .specd-metadata.yaml for default:auth/login.'
-  - requirement: 'JSON output'
-    name: 'Successful invalidation in JSON format'
+      - the command outputs invalidated .specd-metadata.yaml for default:auth/login
+  - requirement: JSON output
+    name: Successful invalidation in JSON format
     when:
-      - 'The invalidation succeeds and format is json.'
+      - the invalidation succeeds and format is json
     then:
-      - 'The command outputs { "result": "ok", "spec": "default:auth/login" }.'
-  - requirement: 'Error — spec not found or no metadata'
-    name: 'Unknown spec exits 1'
+      - 'the command outputs { "result": "ok", "spec": "default:auth/login" }'
+  - requirement: Error — spec not found or no metadata
+    name: Unknown spec exits 1
     when:
-      - 'The spec does not exist in the workspace.'
+      - the spec does not exist in the workspace
     then:
-      - 'The command writes error: spec <specPath> not found or has no metadata to stderr and exits with code 1.'
-  - requirement: 'Error — spec not found or no metadata'
-    name: 'No metadata file exits 1'
+      - "the command writes error: spec '<specPath>' not found or has no metadata to stderr and exits with code 1"
+  - requirement: Error — spec not found or no metadata
+    name: No metadata file exits 1
     given:
-      - 'A spec that exists but has no .specd-metadata.yaml.'
+      - a spec that exists but has no .specd-metadata.yaml
     when:
-      - 'specd spec invalidate-metadata auth/login is invoked.'
+      - specd spec invalidate-metadata auth/login is invoked
     then:
-      - 'The command writes error: spec auth/login not found or has no metadata to stderr and exits with code 1.'
+      - "the command writes error: spec 'auth/login' not found or has no metadata to stderr and exits with code 1"
+contentHashes:
+  spec.md: sha256:abc43623bcd1a7b3fc04e5019be5107a1a8567143e73154ba236be28e290d616
+  verify.md: sha256:248116cecf1775bc19c1e9638c5d9e7c60850db773c30134154b52b23e314f85
+generatedBy: core

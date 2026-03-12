@@ -1,105 +1,52 @@
 title: Project Context
-description:
-  'Defines the specd project context command, which compiles and prints the full project-level context: the
-  context: entries from specd.yaml followed by the content of all specs matched by the project-level
-  contextIncludeSpecs/contextExcludeSpecs patterns. This is the context block an agent would receive regardless of any
-  specific change or lifecycle step.'
+description: 'Defines the `specd project context` command, which compiles and prints the full project-level context: the `context:` entries from `specd.yaml` followed by the content of all specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns. This is the context block an agent would receive regardless of any specific change or lifecycle step.'
+dependsOn:
+  - cli:cli/entrypoint
+  - cli:cli/change-context
 context:
-  - 'Defines the specd project context command, which compiles and prints the full project-level context: the context:
-    entries from specd.yaml followed by the content of all specs matched by the project-level
-    contextIncludeSpecs/contextExcludeSpecs patterns. This is the context block an agent would receive regardless of any
-    specific change or lifecycle step.'
+  - 'Defines the `specd project context` command, which compiles and prints the full project-level context: the `context:` entries from `specd.yaml` followed by the content of all specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns. This is the context block an agent would receive regardless of any specific change or lifecycle step.'
 rules:
   - requirement: Command signature
     rules:
-      - >-
+      - |-
         ```
-
         specd project context
           [--rules] [--constraints] [--scenarios]
           [--follow-deps [--depth <n>]]
           [--format text|json|toon]
         ```
-
-
-
-        * \--rules — when present, includes only the rules sections of spec content in the output
-
-        * \--constraints — when present, includes only the constraints sections of spec content in the output
-
-        * \--scenarios — when present, includes only the scenarios sections of spec content in the output
-
-        * \--follow-deps — when present, follows dependsOn links from .specd-metadata.yaml transitively to discover
-        additional specs beyond those matched by include/exclude patterns. By default (without this flag) dependsOn
-        traversal is not performed.
-
-        * \--depth \<n> — optional; only valid with --follow-deps; limits dependency traversal to N levels (1 = direct
-        deps only); defaults to unlimited when --follow-deps is passed without --depth
-
-        * \--format text|json|toon — optional; output format, defaults to text
-
-
-
-        When none of --rules, --constraints, or --scenarios are passed, all available sections are included. When one or
-        more are passed, only those sections appear in each spec's content block.
+        * `--rules` — when present, includes only the rules sections of spec content in the output
+        * `--constraints` — when present, includes only the constraints sections of spec content in the output
+        * `--scenarios` — when present, includes only the scenarios sections of spec content in the output
+        * `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. By default (without this flag) `dependsOn` traversal is not performed.
+        * `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`
+        * `--format text|json|toon` — optional; output format, defaults to `text`
+        When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block.
   - requirement: Behaviour
     rules:
-      - >-
-        The command compiles the project-level context: the context: entries and the specs matched by the project-level
-        contextIncludeSpecs/contextExcludeSpecs patterns only. Workspace-level patterns are not applied — those are
-        conditional on a specific change having that workspace active. No dependsOn traversal is performed — that
-        requires a change.
-
-
-
+      - |-
+        The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active. No `dependsOn` traversal is performed — that requires a change.
         Concretely:
-
-
-
-        1. Project context: entries from specd.yaml are rendered (instruction text verbatim, file entries read from
-        disk)
-
-        2. Project-level contextIncludeSpecs patterns are applied across all workspaces (defaults to \['default:\*']
-        when not declared)
-
-        3. Project-level contextExcludeSpecs patterns are applied to remove specs from the set
-
-        4. The metadata or fallback content of each included spec is rendered, using the same fresh-metadata /
-        metadataExtraction-fallback logic as CompileContext
+        1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)
+        2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)
+        3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set
+        4. The metadata or fallback content of each included spec is rendered, using the same fresh-metadata / metadataExtraction-fallback logic as `CompileContext`
   - requirement: Output
     rules:
-      - >-
-        In text mode (default), the compiled context block is printed to stdout verbatim — the same text CompileContext
-        would produce for the project entries and spec content sections, with no additional framing added by the CLI. If
-        nothing is configured (no context: entries and no specs matched), the command prints no project context
-        configured and exits with code 0.
-
-
-
-        In json or toon mode, the output is (encoded in the respective format):
-
-
-
+      - |-
+        In `text` mode (default), the compiled context block is printed to stdout verbatim — the same text `CompileContext` would produce for the project entries and spec content sections, with no additional framing added by the CLI. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.
+        In `json` or `toon` mode, the output is (encoded in the respective format):
         ```json
-
         {
           "contextEntries": ["...", "..."],
           "specs": [{ "workspace": "...", "path": "...", "content": "..." }],
           "warnings": []
         }
-
         ```
-
-
-
-        where contextEntries are the rendered project context: entries, specs are the matched specs with their rendered
-        metadata content, and warnings lists any advisory conditions (missing files, stale metadata, unknown workspaces,
-        etc.).
+        where `contextEntries` are the rendered project `context:` entries, `specs` are the matched specs with their rendered metadata content, and `warnings` lists any advisory conditions (missing files, stale metadata, unknown workspaces, etc.).
   - requirement: Warnings
     rules:
-      - 'Any advisory conditions (missing file: entries, stale metadata, unknown workspace patterns, spec not found) are
-        emitted as warning: lines to stderr in all formats. They are also included in the warnings array in json/toon
-        output. The command exits with code 0 regardless.'
+      - Any advisory conditions (missing `file:` entries, stale metadata, unknown workspace patterns, spec not found) are emitted as `warning:` lines to stderr in all formats. They are also included in the `warnings` array in `json`/`toon` output. The command exits with code 0 regardless.
   - requirement: Error cases
     rules:
       - |-
@@ -107,12 +54,10 @@ rules:
         * If the schema cannot be resolved, exits with code 3.
 constraints:
   - This command is read-only
-  - Only project-level contextIncludeSpecs/contextExcludeSpecs patterns are applied; workspace-level patterns are
-    change-specific and not applied here
+  - Only project-level contextIncludeSpecs/contextExcludeSpecs patterns are applied; workspace-level patterns are change-specific and not applied here
   - dependsOn traversal is opt-in via --follow-deps; without the flag, deps are not followed
   - --depth without --follow-deps is a CLI usage error (exit code 1)
-  - 'Section flags (--rules, --constraints, --scenarios) only filter spec content; project context: entries are always
-    rendered in full regardless of section flags'
+  - 'Section flags (--rules, --constraints, --scenarios) only filter spec content; project context: entries are always rendered in full regardless of section flags'
 scenarios:
   - requirement: Command signature
     name: Extra arguments rejected
@@ -153,13 +98,11 @@ scenarios:
   - requirement: Behaviour
     name: Workspace-level patterns not applied
     given:
-      - 'workspace billing has contextIncludeSpecs: ["billing/*"] but no project-level contextIncludeSpecs includes
-        billing specs'
+      - 'workspace billing has contextIncludeSpecs: ["billing/*"] but no project-level contextIncludeSpecs includes billing specs'
     when:
       - specd project context is run
     then:
-      - billing specs are not included in the output (workspace-level patterns are change-specific, not applied by this
-        command)
+      - billing specs are not included in the output (workspace-level patterns are change-specific, not applied by this command)
   - requirement: Behaviour
     name: dependsOn traversal not performed by default
     given:
@@ -192,7 +135,7 @@ scenarios:
       - specd project context --rules is run
     then:
       - only rules sections appear in the spec content output
-      - description, constraints, and scenarios are not present
+      - AND description, constraints, and scenarios are not present
   - requirement: Behaviour
     name: Section flags do not affect context entries
     given:
@@ -217,19 +160,18 @@ scenarios:
       - specd project context is run
     then:
       - stdout contains no project context configured
-      - the process exits with code 0
+      - AND the process exits with code 0
   - requirement: Output
     name: JSON output structure
     given:
-      - 'specd.yaml has context: with instruction: "Follow conventions." and one spec default:auth/login matched by
-        include patterns'
+      - 'specd.yaml has context: with instruction: "Follow conventions." and one spec default:auth/login matched by include patterns'
     when:
       - specd project context --format json is run
     then:
       - stdout is valid JSON with contextEntries, specs, and warnings
-      - contextEntries contains "Follow conventions."
-      - specs contains one entry with workspace, path, and content
-      - the process exits with code 0
+      - AND contextEntries contains "Follow conventions."
+      - AND specs contains one entry with workspace, path, and content
+      - AND the process exits with code 0
   - requirement: Warnings
     name: Missing file entry emits warning
     given:
@@ -238,7 +180,7 @@ scenarios:
       - specd project context is run
     then:
       - 'stderr contains a warning: line mentioning missing.md'
-      - the process exits with code 0
+      - AND the process exits with code 0
   - requirement: Warnings
     name: Stale metadata emits warning
     given:
@@ -247,7 +189,7 @@ scenarios:
       - specd project context is run
     then:
       - 'stderr contains a warning: line for the stale spec'
-      - the spec content is still included using the metadataExtraction fallback
+      - AND the spec content is still included using the metadataExtraction fallback
 contentHashes:
   spec.md: sha256:92a85f5ea6f0c4dca876dc9f638602ba1484634c93af2062520351108ea71b24
   verify.md: sha256:c563c4d8310b4be5696183f9b4a6bcdc41f77b15ad0749cbe3d51f02819649b5

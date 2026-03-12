@@ -1,143 +1,133 @@
-title: 'Coding Conventions'
-description: >
-  TypeScript conventions for the specd monorepo. These apply to all packages unless a package-level spec overrides a specific rule.
-keywords:
-  - 'coding'
-  - 'conventions'
-  - 'typescript'
-  - 'strict'
-  - 'mode'
-  - 'esm'
-  - 'only'
-  - 'named'
-  - 'exports'
-  - 'file'
-  - 'naming'
-  - 'any'
-contentHashes:
-  'spec.md': 'sha256:c20a8be53ae62549e58054cec37581f89886f4bf1c7268c7861104e33779635d'
-  'verify.md': 'sha256:9dd5bb3432b73ff956f4900cf1ce64301e1ea79430c1ea633546b3ac61b15c99'
+title: Coding Conventions
+description: TypeScript conventions for the specd monorepo. These apply to all packages unless a package-level spec overrides a specific rule.
+context:
+  - TypeScript conventions for the specd monorepo. These apply to all packages unless a package-level spec overrides a specific rule.
 rules:
-  - requirement: 'TypeScript strict mode'
+  - requirement: TypeScript strict mode
     rules:
       - 'All packages compile with `strict: true`, `noUncheckedIndexedAccess: true`, and `exactOptionalPropertyTypes: true`. No `@ts-ignore` or `@ts-expect-error` without a co-located comment explaining why.'
-  - requirement: 'ESM only'
+  - requirement: ESM only
     rules:
       - 'All packages use `"type": "module"` and `NodeNext` module resolution. No CommonJS. No `.cjs` output unless a specific consumer requires it and it is explicitly documented why.'
-  - requirement: 'Named exports only'
+  - requirement: Named exports only
     rules:
-      - 'No default exports. All exported values use named exports. This makes refactoring and auto-import more predictable.'
-  - requirement: 'File naming'
+      - No default exports. All exported values use named exports. This makes refactoring and auto-import more predictable.
+  - requirement: File naming
     rules:
-      - 'Source files use `kebab-case.ts`. Test files use the `.spec.ts` suffix and match the source file name (`change.ts` → `change.spec.ts`), living in `test/` mirroring the `src/` structure — never co-located with source files. No `index.ts` barrel files except at the package root (`src/index.ts`). Layer-level barrels (`domain/index.ts`, `application/index.ts`, `composition/index.ts`) are permitted in packages with more than 50 internal modules.'
-  - requirement: 'No `any`'
+      - Source files use `kebab-case.ts`. Test files use the `.spec.ts` suffix and match the source file name (`change.ts` → `change.spec.ts`), living in `test/` mirroring the `src/` structure — never co-located with source files. No `index.ts` barrel files except at the package root (`src/index.ts`). Layer-level barrels (`domain/index.ts`, `application/index.ts`, `composition/index.ts`) are permitted in packages with more than 50 internal modules.
+  - requirement: No any
     rules:
       - '`any` is forbidden. Use `unknown` at boundaries and narrow with type guards. If a third-party type requires `any`, wrap it in a typed adapter.'
-  - requirement: 'Explicit return types on public functions'
+  - requirement: Explicit return types on public functions
     rules:
-      - 'All exported functions and class methods have explicit return type annotations. Internal/private functions may rely on inference when the type is obvious.'
-  - requirement: 'Error types'
+      - All exported functions and class methods have explicit return type annotations. Internal/private functions may rely on inference when the type is obvious.
+  - requirement: Error types
     rules:
-      - 'All domain and application errors extend `SpecdError` (defined in `@specd/core`). Errors include a machine-readable `code` string for programmatic handling by CLI and MCP.'
-  - requirement: 'Private backing fields use underscore prefix'
+      - All domain and application errors extend `SpecdError` (defined in `@specd/core`). Errors include a machine-readable `code` string for programmatic handling by CLI and MCP.
+  - requirement: Private backing fields use underscore prefix
     rules:
-      - 'Private fields that back a public getter must be named with a leading underscore (e.g. `_name` for a `get name()` getter). This avoids the infinite recursion that would occur if both the field and the getter shared the same name and `this.name` resolved to the getter instead of the field.'
-  - requirement: 'Lazy loading — metadata before content'
+      - Private fields that back a public getter must be named with a leading underscore (e.g. `_name` for a `get name()` getter). This avoids the infinite recursion that would occur if both the field and the getter shared the same name and `this.name` resolved to the getter instead of the field.
+  - requirement: Lazy loading — metadata before content
     rules:
-      - 'When a collection of resources must be loaded, the initial load returns lightweight metadata objects (references, identifiers, display fields) without reading file content or parsing heavy structures. Full content is fetched explicitly and on demand.'
-      - 'This pattern applies across the codebase:'
-      - '**Repositories** — `list()` returns metadata objects (`Spec`, `Change`, `ArchivedChange`) without artifact file content; content is loaded via a separate `artifact()` call.'
-      - '**`SchemaRegistry`** — `list()` returns `SchemaEntry` objects (ref, name, source) without parsing `schema.yaml`; the full `Schema` is loaded via `resolve()`.'
-      - '**Any future collection port** — `list()` or `search()` returns a reference/metadata type; a `get()` or `load()` call fetches the full resource.'
-      - 'The metadata type must carry enough information to be useful standalone (for display, filtering, selection) and must include the reference or identifier needed to fetch the full resource.'
-      - 'Content is never pre-loaded speculatively. If a use case needs the full resource, it calls the explicit load method.'
-  - requirement: 'Immutability preference'
+      - |-
+        When a collection of resources must be loaded, the initial load returns lightweight metadata objects (references, identifiers, display fields) without reading file content or parsing heavy structures. Full content is fetched explicitly and on demand.
+        This pattern applies across the codebase:
+        * **Repositories** — `list()` returns metadata objects (`Spec`, `Change`, `ArchivedChange`) without artifact file content; content is loaded via a separate `artifact()` call.
+        * **`SchemaRegistry`** — `list()` returns `SchemaEntry` objects (ref, name, source) without parsing `schema.yaml`; the full `Schema` is loaded via `resolve()`.
+        * **Any future collection port** — `list()` or `search()` returns a reference/metadata type; a `get()` or `load()` call fetches the full resource.
+        The metadata type must carry enough information to be useful standalone (for display, filtering, selection) and must include the reference or identifier needed to fetch the full resource.
+        Content is never pre-loaded speculatively. If a use case needs the full resource, it calls the explicit load method.
+  - requirement: Immutability preference
     rules:
-      - 'Prefer `readonly` arrays and properties on domain value objects and entities where mutation is not required. Use `as const` for literal configuration objects.'
+      - Prefer `readonly` arrays and properties on domain value objects and entities where mutation is not required. Use `as const` for literal configuration objects.
 constraints:
-  - "`strict: true` must be set in every package's `tsconfig.json` via `tsconfig.base.json`"
-  - 'Default exports are forbidden'
-  - '`any` type is forbidden — use `unknown` and narrow'
-  - 'All source files must be `kebab-case.ts`'
-  - 'Errors thrown by domain or application code must extend `SpecdError`'
-  - 'Public API functions must have explicit return type annotations'
-  - 'Collection methods (`list`, `search`) return metadata/reference types only — no content pre-loading; content is fetched via explicit `get`/`artifact`/`resolve` calls'
+  - "strict: true must be set in every package's tsconfig.json via tsconfig.base.json"
+  - Default exports are forbidden
+  - any type is forbidden — use unknown and narrow
+  - All source files must be kebab-case.ts
+  - Errors thrown by domain or application code must extend SpecdError
+  - Public API functions must have explicit return type annotations
+  - Collection methods (list, search) return metadata/reference types only — no content pre-loading; content is fetched via explicit get/artifact/resolve calls
 scenarios:
-  - requirement: 'TypeScript strict mode'
-    name: 'Package missing strict mode'
+  - requirement: TypeScript strict mode
+    name: Package missing strict mode
     when:
-      - "a package's `tsconfig.json` does not extend `tsconfig.base.json` or overrides `strict: false`"
+      - "a package's tsconfig.json does not extend tsconfig.base.json or overrides strict: false"
     then:
-      - 'the build must fail'
-  - requirement: 'ESM only'
-    name: 'CommonJS require used'
+      - the build must fail
+  - requirement: ESM only
+    name: CommonJS require used
     when:
-      - 'a source file uses `require()` or `module.exports`'
+      - a source file uses require() or module.exports
     then:
-      - 'the TypeScript compiler must reject it under `NodeNext` resolution'
-  - requirement: 'Named exports only'
-    name: 'Default export added'
+      - the TypeScript compiler must reject it under NodeNext resolution
+  - requirement: Named exports only
+    name: Default export added
     when:
-      - 'a source file contains `export default`'
+      - a source file contains export default
     then:
-      - 'the linter must reject it'
-  - requirement: 'File naming'
-    name: 'Source file with camelCase name'
+      - the linter must reject it
+  - requirement: File naming
+    name: Source file with camelCase name
     when:
-      - 'a file is named `changeRepository.ts`'
+      - a file is named changeRepository.ts
     then:
-      - 'it must be renamed to `change-repository.ts`'
-  - requirement: 'File naming'
-    name: 'Test file co-located with source'
+      - it must be renamed to change-repository.ts
+  - requirement: File naming
+    name: Test file co-located with source
     when:
-      - 'a test file lives at `src/domain/entities/change.spec.ts`'
+      - a test file lives at src/domain/entities/change.spec.ts
     then:
-      - 'it must be moved to `test/domain/entities/change.spec.ts`'
-  - requirement: 'No `any`'
-    name: 'any in function parameter'
+      - it must be moved to test/domain/entities/change.spec.ts
+  - requirement: No any
+    name: any in function parameter
     when:
-      - 'a function signature contains `: any`'
+      - 'a function signature contains : any'
     then:
-      - 'the TypeScript compiler must reject it under strict mode'
-  - requirement: 'Explicit return types on public functions'
-    name: 'Exported function without return type'
+      - the TypeScript compiler must reject it under strict mode
+  - requirement: Explicit return types on public functions
+    name: Exported function without return type
     when:
-      - 'an exported function has no explicit return type annotation'
+      - an exported function has no explicit return type annotation
     then:
-      - 'the linter must reject it'
-  - requirement: 'Error types'
-    name: 'Raw Error thrown in domain code'
+      - the linter must reject it
+  - requirement: Error types
+    name: Raw Error thrown in domain code
     when:
-      - "domain or application code throws `new Error('something')`"
+      - domain or application code throws new Error('something')
     then:
-      - 'it must be replaced with a typed `SpecdError` subclass'
-  - requirement: 'Private backing fields use underscore prefix'
-    name: 'Private backing field without underscore'
+      - it must be replaced with a typed SpecdError subclass
+  - requirement: Private backing fields use underscore prefix
+    name: Private backing field without underscore
     when:
-      - 'a private field backs a public getter and both share the same name'
+      - a private field backs a public getter and both share the same name
     then:
-      - 'it must be renamed with a leading underscore to prevent recursive getter calls'
-  - requirement: 'Lazy loading — metadata before content'
-    name: 'Repository list does not load content'
+      - it must be renamed with a leading underscore to prevent recursive getter calls
+  - requirement: Lazy loading — metadata before content
+    name: Repository list does not load content
     when:
-      - '`SpecRepository.list()` is called'
+      - SpecRepository.list() is called
     then:
-      - 'it returns `Spec` objects with filenames but no artifact content; no file reads beyond directory listing occur'
-  - requirement: 'Lazy loading — metadata before content'
-    name: 'SchemaRegistry list does not parse schemas'
+      - it returns Spec objects with filenames but no artifact content; no file reads beyond directory listing occur
+  - requirement: Lazy loading — metadata before content
+    name: SchemaRegistry list does not parse schemas
     when:
-      - '`SchemaRegistry.list()` is called'
+      - SchemaRegistry.list() is called
     then:
-      - 'it returns `SchemaEntry` objects without reading or validating any `schema.yaml` file'
-  - requirement: 'Lazy loading — metadata before content'
-    name: 'Full resource loaded on demand'
+      - it returns SchemaEntry objects without reading or validating any schema.yaml file
+  - requirement: Lazy loading — metadata before content
+    name: Full resource loaded on demand
     when:
-      - 'a caller needs the content of a specific artifact'
+      - a caller needs the content of a specific artifact
     then:
-      - 'it calls `SpecRepository.artifact(spec, filename)` explicitly, not `list()`'
-  - requirement: 'Immutability preference'
-    name: 'Mutable array on value object'
+      - it calls SpecRepository.artifact(spec, filename) explicitly, not list()
+  - requirement: Immutability preference
+    name: Mutable array on value object
     when:
-      - 'a value object exposes a public `string[]` property'
+      - a value object exposes a public string[] property
     then:
-      - 'it should be typed as `readonly string[]`'
+      - it should be typed as readonly string[]
+contentHashes:
+  spec.md: sha256:c20a8be53ae62549e58054cec37581f89886f4bf1c7268c7861104e33779635d
+  verify.md: sha256:9dd5bb3432b73ff956f4900cf1ce64301e1ea79430c1ea633546b3ac61b15c99
+generatedBy: core

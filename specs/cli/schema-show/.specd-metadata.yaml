@@ -1,91 +1,122 @@
-title: 'Schema Show'
-description: >
-  Defines the specd schema show command, which prints the active schema's declared artifacts
-  and workflow steps. Primarily useful for agents entering a new project to understand what
-  they need to produce and in what order.
-keywords:
-  - 'schema-show'
-  - 'artifacts'
-  - 'workflow'
-  - 'schema-structure'
-  - 'output-format'
-contentHashes:
-  'spec.md': 'sha256:e9a0379298433081496cbcf63fda2b9e476778df81f39f9c33a407d386abc27e'
-  'verify.md': 'sha256:753dd268e2df3857993cf716fa13887a2d4243c626fba0fded99048bd4ae1eb6'
+title: Schema Show
+description: Defines the `specd schema show` command, which prints the active schema's declared artifacts and workflow steps. Primarily useful for agents entering a new project to understand what they need to produce and in what order.
 dependsOn:
-  - 'cli:cli/entrypoint'
-  - 'core:core/schema-format'
+  - cli:cli/entrypoint
+  - core:core/schema-format
+context:
+  - Defines the `specd schema show` command, which prints the active schema's declared artifacts and workflow steps. Primarily useful for agents entering a new project to understand what they need to produce and in what order.
 rules:
-  - requirement: 'Command signature'
+  - requirement: Command signature
     rules:
-      - '`--format text|json|toon` — optional; output format, defaults to `text`.'
-  - requirement: 'Output format'
+      - |-
+        ```
+        specd schema show [--format text|json|toon]
+        ```
+        * `--format text|json|toon` — optional; output format, defaults to `text`
+  - requirement: Output format
     rules:
-      - 'In `text` mode (default), the command prints two sections: schema name/version, an `artifacts:` section, and a `workflow:` section.'
-      - '`<optional>` is `optional` or `required`, and `requires` lists the artifact IDs or step names that must be complete before this entry is available. The `requires` field is omitted when empty.'
-      - 'In `json` or `toon` mode, the output includes `schema` (name/version), `artifacts` (with id, scope, optional, requires, format, delta), and `workflow` (with step, requires).'
-  - requirement: 'Error cases'
+      - |-
+        In `text` mode (default), the command prints two sections:
+        ```
+        schema: <name>  version: <N>
+
+        artifacts:
+          <id>  <scope>  <optional>  requires=[<id>,...]
+          ...
+
+        workflow:
+          <step>  requires=[<id>,...]
+          ...
+        ```
+        where `<optional>` is `optional` or `required`, and `requires` lists the artifact IDs or step names that must be complete before this entry is available. The `requires` field is omitted when empty.
+        In `json` or `toon` mode, the output is (encoded in the respective format):
+        ```json
+        {
+          "schema": {"name": "...", "version": N},
+          "artifacts": [
+            {
+              "id": "...",
+              "scope": "change|spec",
+              "optional": false,
+              "requires": [],
+              "format": "...",
+              "delta": false
+            }
+          ],
+          "workflow": [
+            {
+              "step": "...",
+              "requires": []
+            }
+          ]
+        }
+        ```
+  - requirement: Error cases
     rules:
-      - 'If the schema reference in `specd.yaml` cannot be resolved, exits with code 3.'
+      - '* If the schema reference in `specd.yaml` cannot be resolved, exits with code 3.'
 constraints:
-  - 'This command is read-only.'
-  - 'Artifact `instruction`, `deltaInstruction`, and `validations` are not included in the output — this command focuses on structure, not content.'
+  - This command is read-only
+  - Artifact instruction, deltaInstruction, and validations are not included in the output — this command focuses on structure, not content
 scenarios:
-  - requirement: 'Command signature'
-    name: 'Extra arguments rejected'
+  - requirement: Command signature
+    name: Extra arguments rejected
     when:
-      - '`specd schema show some-arg` is run with an unexpected argument'
+      - specd schema show some-arg is run with an unexpected argument
     then:
-      - 'the command exits with code 1 and prints a usage error to stderr'
-  - requirement: 'Output format'
-    name: 'Text output shows schema name, artifacts, and workflow'
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Output format
+    name: Text output shows schema name, artifacts, and workflow
     given:
-      - 'a valid schema with name `specd-std` version `1` and declared artifacts and workflow steps'
+      - a valid schema with name specd-std version 1 and declared artifacts and workflow steps
     when:
-      - '`specd schema show` is run'
+      - specd schema show is run
     then:
-      - 'stdout contains the schema name and version, an `artifacts:` section, and a `workflow:` section'
-      - 'the process exits with code 0'
-  - requirement: 'Output format'
-    name: 'Optional and required artifacts distinguished'
+      - 'stdout contains the schema name and version, an artifacts: section, and a workflow: section'
+      - AND the process exits with code 0
+  - requirement: Output format
+    name: Optional and required artifacts distinguished
     given:
-      - 'the schema declares artifact `proposal` as `optional: true` and `spec` as `optional: false`'
+      - 'the schema declares artifact proposal as optional: true and spec as optional: false'
     when:
-      - '`specd schema show` is run'
+      - specd schema show is run
     then:
-      - '`proposal` is shown as `optional` and `spec` as `required`'
-  - requirement: 'Output format'
-    name: 'Requires listed for artifacts'
+      - proposal is shown as optional and spec as required
+  - requirement: Output format
+    name: Requires listed for artifacts
     given:
-      - 'the schema declares artifact `spec` with `requires: ["proposal"]`'
+      - 'the schema declares artifact spec with requires: ["proposal"]'
     when:
-      - '`specd schema show` is run'
+      - specd schema show is run
     then:
-      - 'the `spec` line shows `requires=[proposal]`'
-  - requirement: 'Output format'
-    name: 'Empty requires omitted in text mode'
+      - the spec line shows requires=[proposal]
+  - requirement: Output format
+    name: Empty requires omitted in text mode
     given:
-      - 'the schema declares artifact `proposal` with no `requires`'
+      - the schema declares artifact proposal with no requires
     when:
-      - '`specd schema show` is run'
+      - specd schema show is run
     then:
-      - 'the `proposal` line does not show a `requires` field'
-  - requirement: 'Output format'
-    name: 'JSON output structure'
+      - the proposal line does not show a requires field
+  - requirement: Output format
+    name: JSON output structure
     when:
-      - '`specd schema show --format json` is run'
+      - specd schema show --format json is run
     then:
-      - 'stdout is valid JSON with `schema`, `artifacts`, and `workflow`'
-      - '`schema` has `name` and `version`'
-      - 'each artifact entry has `id`, `scope`, `optional`, `requires`, `format`, and `delta`'
-      - 'each workflow entry has `step` and `requires`'
-      - 'the process exits with code 0'
-  - requirement: 'Error cases'
-    name: 'Schema cannot be resolved'
+      - stdout is valid JSON with schema, artifacts, and workflow
+      - AND schema has name and version
+      - AND each artifact entry has id, scope, optional, requires, format, and delta
+      - AND each workflow entry has step and requires
+      - AND the process exits with code 0
+  - requirement: Error cases
+    name: Schema cannot be resolved
     given:
-      - '`specd.yaml` references a schema that does not exist'
+      - specd.yaml references a schema that does not exist
     when:
-      - '`specd schema show` is run'
+      - specd schema show is run
     then:
-      - 'the command exits with code 3'
-      - 'stderr contains a `fatal:` message'
+      - the command exits with code 3
+      - 'AND stderr contains a fatal: message'
+contentHashes:
+  spec.md: sha256:e9a0379298433081496cbcf63fda2b9e476778df81f39f9c33a407d386abc27e
+  verify.md: sha256:753dd268e2df3857993cf716fa13887a2d4243c626fba0fded99048bd4ae1eb6
+generatedBy: core

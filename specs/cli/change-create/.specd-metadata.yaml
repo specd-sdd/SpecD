@@ -1,58 +1,38 @@
 title: Change Create
-description:
-  Defines the specd change create \<name> --spec \<id>... command, which creates a new change and persists it
-  to the repository.
+description: Defines the `specd change create <name> --spec <id>...` command, which creates a new change and persists it to the repository.
+dependsOn:
+  - cli:cli/entrypoint
+  - core:core/change
+  - core:core/spec-id-format
 context:
-  - Defines the specd change create \<name> --spec \<id>... command, which creates a new change and persists it to the
-    repository.
+  - Defines the `specd change create <name> --spec <id>...` command, which creates a new change and persists it to the repository.
 rules:
   - requirement: Command signature
     rules:
-      - >-
+      - |-
         ```
-
         specd change create <name> [--spec <id>...] [--format text|json|toon]
-
         ```
-
-
-
-        * \<name> — required positional; the unique slug name for the new change (e.g. add-auth-flow)
-
-        * \--spec \<id> — optional repeatable flag; one or more spec IDs being created or modified. Each \<id> is
-        \[\<workspace>:]\<capability-path> — the workspace qualifier is optional and defaults to default when omitted
-        (e.g. --spec auth/login means default:auth/login, --spec billing/invoices with an explicit workspace would be
-        --spec billing-ws:billing/invoices). When omitted, the change is created with an empty specIds list — specs can
-        be added later via change edit.
-
-        * \--description \<text> — optional; a short free-text description of the change's purpose, stored in the
-        manifest
-
-        * \--format text|json|toon — optional; output format, defaults to text
+        * `<name>` — required positional; the unique slug name for the new change (e.g. `add-auth-flow`)
+        * `--spec <id>` — optional repeatable flag; one or more spec IDs being created or modified. Each `<id>` is `[<workspace>:]<capability-path>` — the workspace qualifier is optional and defaults to `default` when omitted (e.g. `--spec auth/login` means `default:auth/login`, `--spec billing/invoices` with an explicit workspace would be `--spec billing-ws:billing/invoices`). When omitted, the change is created with an empty specIds list — specs can be added later via `change edit`.
+        * `--description <text>` — optional; a short free-text description of the change's purpose, stored in the manifest
+        * `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Workspace resolution
     rules:
-      - 'The workspace IDs for the new change are derived from the workspace prefix of each --spec value. If the
-        workspace prefix is omitted, default is used. If a named workspace is not declared in specd.yaml, the command
-        fails with exit code 1 and prints an error: message to stderr.'
+      - The workspace IDs for the new change are derived from the workspace prefix of each `--spec` value. If the workspace prefix is omitted, `default` is used. If a named workspace is not declared in `specd.yaml`, the command fails with exit code 1 and prints an `error:` message to stderr.
   - requirement: Schema name and version
     rules:
-      - schemaName and schemaVersion are resolved from the active SpecdConfig at command time and passed to the
-        CreateChange use case. The user does not specify these values.
+      - '`schemaName` and `schemaVersion` are resolved from the active `SpecdConfig` at command time and passed to the `CreateChange` use case. The user does not specify these values.'
   - requirement: Output on success
     rules:
       - |-
-        On success, output depends on --format:
-
-
-        * text (default): prints a single line to stdout:
-        * json or toon: outputs the following to stdout (encoded in the respective format):
-
-
+        On success, output depends on `--format`:
+        * `text` (default): prints a single line to stdout:
+        * `json` or `toon`: outputs the following to stdout (encoded in the respective format):
         No further output is produced.
   - requirement: Duplicate name error
     rules:
-      - 'If a change with the given name already exists (ChangeAlreadyExistsError), the command exits with code 1 and
-        prints an error: message to stderr.'
+      - If a change with the given name already exists (`ChangeAlreadyExistsError`), the command exits with code 1 and prints an `error:` message to stderr.
 constraints:
   - --spec is optional; when omitted, the change is created with an empty specIds list
   - The change name must be a valid kebab-case slug; the CLI validates the format before invoking the use case

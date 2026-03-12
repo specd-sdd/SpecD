@@ -1,18 +1,16 @@
 title: change deps
-description:
-  specd change deps \<name> \<specId> manages the declared dependsOn dependencies for a single spec within an
-  active change. Dependencies are stored in the change manifest's specDependsOn field and used by CompileContext as the
-  highest-priority source for dependsOn resolution.
+description: "`specd change deps <name> <specId>` manages the declared `dependsOn` dependencies for a single spec within an active change. Dependencies are stored in the change manifest's `specDependsOn` field and used by `CompileContext` as the highest-priority source for `dependsOn` resolution."
+dependsOn:
+  - core:core/change
+  - core:core/change-manifest
+  - core:core/compile-context
 context:
-  - specd change deps \<name> \<specId> manages the declared dependsOn dependencies for a single spec within an active
-    change. Dependencies are stored in the change manifest's specDependsOn field and used by CompileContext as the
-    highest-priority source for dependsOn resolution.
+  - "`specd change deps <name> <specId>` manages the declared `dependsOn` dependencies for a single spec within an active change. Dependencies are stored in the change manifest's `specDependsOn` field and used by `CompileContext` as the highest-priority source for `dependsOn` resolution."
 rules:
   - requirement: Command signature
     rules:
-      - >-
+      - |-
         ```
-
         specd change deps <name> <specId>
           [--add <id>...]
           [--remove <id>...]
@@ -20,39 +18,22 @@ rules:
           [--format text|json|toon]
           [--config <path>]
         ```
-
-
-
-        * \<name> — required positional; the change name
-
-        * \<specId> — required positional; the spec within the change whose dependencies are being managed (must be in
-        change.specIds)
-
-        * \--add \<id> — repeatable; adds dependency spec IDs to this spec's dependsOn
-
-        * \--remove \<id> — repeatable; removes dependency spec IDs
-
-        * \--set \<id> — repeatable; replaces all dependencies (mutually exclusive with --add/--remove)
-
-        * At least one of --add, --remove, or --set is required
+        * `<name>` — required positional; the change name
+        * `<specId>` — required positional; the spec within the change whose dependencies are being managed (must be in `change.specIds`)
+        * `--add <id>` — repeatable; adds dependency spec IDs to this spec's `dependsOn`
+        * `--remove <id>` — repeatable; removes dependency spec IDs
+        * `--set <id>` — repeatable; replaces all dependencies (mutually exclusive with `--add`/`--remove`)
+        * At least one of `--add`, `--remove`, or `--set` is required
   - requirement: Output
     rules:
       - |-
-        Text format (default):
-
-
+        **Text format (default):**
         ```
         updated deps for <specId> in change <name>
         dependsOn: dep1, dep2, dep3
         ```
-
-
-        When no dependencies remain: dependsOn: (none)
-
-
-        JSON/toon format:
-
-
+        When no dependencies remain: `dependsOn: (none)`
+        **JSON/toon format:**
         ```json
         {
           "result": "ok",
@@ -65,12 +46,10 @@ rules:
     rules:
       - |-
         All errors exit with code 1 and write to stderr:
-
-
         * Change not found
-        * specId not in change.specIds
-        * \--set used with --add or --remove
-        * \--remove value not in current deps
+        * `specId` not in `change.specIds`
+        * `--set` used with `--add` or `--remove`
+        * `--remove` value not in current deps
         * No flags provided
 constraints:
   - --set is mutually exclusive with --add and --remove

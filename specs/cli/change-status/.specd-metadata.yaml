@@ -1,95 +1,106 @@
-title: 'Change Status'
-description: >
-  Defines the `specd change status <name>` command, which reports the current lifecycle state and artifact statuses of a named change.
-keywords:
-  - 'change'
-  - 'status'
-  - 'command'
-  - 'signature'
-  - 'output'
-  - 'format'
-  - 'schema'
-  - 'version'
-  - 'warning'
-  - 'not'
-  - 'found'
-  - 'includes'
+title: Change Status
+description: Defines the `specd change status <name>` command, which reports the current lifecycle state and artifact statuses of a named change.
 dependsOn:
-  - 'cli:cli/entrypoint'
-  - 'core:core/change'
-contentHashes:
-  'spec.md': 'sha256:bd2bacd8e426ee4180b6886cbc19e791388d144f462c84fb604083a1340cfacc'
-  'verify.md': 'sha256:99fa75949e7c2ae65c406ff7fea61a224b3a0818695a319456441ea2e5f7c2fb'
+  - cli:cli/entrypoint
+  - core:core/change
+context:
+  - Defines the `specd change status <name>` command, which reports the current lifecycle state and artifact statuses of a named change.
 rules:
-  - requirement: 'Command signature'
+  - requirement: Command signature
     rules:
-      - '`<name>` — required positional; the name of the change to inspect'
-      - '`--format text|json|toon` — optional; output format, defaults to `text`'
-  - requirement: 'Output format'
+      - |-
+        ```
+        specd change status <name> [--format text|json|toon]
+        ```
+        * `<name>` — required positional; the name of the change to inspect
+        * `--format text|json|toon` — optional; output format, defaults to `text`
+  - requirement: Output format
     rules:
-      - 'In `text` mode (default), the command prints a structured summary to stdout:'
-      - 'The `description:` line is omitted when no description is set on the change.'
-      - 'Each artifact line shows the artifact type ID and its effective status (`missing`, `in-progress`, `complete`, or `skipped`). Artifacts are listed in schema-declared order.'
-      - 'In `json` or `toon` mode, the output is:'
-      - '`description` is omitted from the JSON object when not set.'
-  - requirement: 'Schema version warning'
+      - |-
+        In `text` mode (default), the command prints a structured summary to stdout:
+        ```
+        change:      <name>
+        state:       <state>
+        specs:       <specId>, <specId>, ...
+        description: <description>            ← only if set
+
+        artifacts:
+          <type>  <effectiveStatus>
+          ...
+        ```
+        The `description:` line is omitted when no description is set on the change.
+        Each artifact line shows the artifact type ID and its effective status (`missing`, `in-progress`, `complete`, or `skipped`). Artifacts are listed in schema-declared order.
+        In `json` or `toon` mode, the output is:
+        ```json
+        {"name":"...","state":"...","specIds":[...],"schema":{"name":"...","version":N},"description":"...","artifacts":[{"type":"...","effectiveStatus":"..."}]}
+        ```
+        `description` is omitted from the JSON object when not set.
+  - requirement: Schema version warning
     rules:
-      - "If the change's recorded `schemaName`/`schemaVersion` differs from the currently active schema, the command prints a warning to stderr:"
-      - 'The command still exits with code 0.'
-  - requirement: 'Change not found'
+      - |-
+        If the change's recorded `schemaName`/`schemaVersion` differs from the currently active schema, the command prints a warning to stderr:
+        ```
+        warning: change was created with schema <recorded> but active schema is <current>
+        ```
+        The command still exits with code 0.
+  - requirement: Change not found
     rules:
-      - 'If no change with the given name exists, the command exits with code 1 and prints an `error:` message to stderr.'
+      - If no change with the given name exists, the command exits with code 1 and prints an `error:` message to stderr.
 constraints:
-  - 'The output includes all artifacts declared by the schema, not only those present on disk'
-  - '`effectiveStatus` reflects dependency cascading — an artifact may be `in-progress` because a dependency is incomplete even if its own hash matches'
+  - The output includes all artifacts declared by the schema, not only those present on disk
+  - effectiveStatus reflects dependency cascading — an artifact may be in-progress because a dependency is incomplete even if its own hash matches
 scenarios:
-  - requirement: 'Command signature'
-    name: 'Missing name argument'
+  - requirement: Command signature
+    name: Missing name argument
     when:
-      - '`specd change status` is run without a positional name'
+      - specd change status is run without a positional name
     then:
-      - 'the command exits with code 1 and prints a usage error to stderr'
-  - requirement: 'Output format'
-    name: 'Normal status output'
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Output format
+    name: Normal status output
     given:
-      - 'a change `add-login` in state `designing` with spec `auth/login` and one complete artifact'
+      - a change add-login in state designing with spec auth/login and one complete artifact
     when:
-      - '`specd change status add-login` is run'
+      - specd change status add-login is run
     then:
-      - 'stdout shows `change: add-login`, `state: designing`, `specs: auth/login`, and an artifact line'
-      - 'the process exits with code 0'
-  - requirement: 'Output format'
-    name: 'Effective status reflects dependency cascading'
+      - 'stdout shows change: add-login, state: designing, specs: auth/login, and an artifact line'
+      - AND the process exits with code 0
+  - requirement: Output format
+    name: Effective status reflects dependency cascading
     given:
-      - 'a change where artifact `spec` depends on `proposal` and `proposal` is `in-progress`'
+      - a change where artifact spec depends on proposal and proposal is in-progress
     when:
-      - '`specd change status <name>` is run'
+      - specd change status <name> is run
     then:
-      - 'the `spec` artifact line shows `in-progress` even if its own hash is valid'
-  - requirement: 'Schema version warning'
-    name: 'Schema mismatch'
+      - the spec artifact line shows in-progress even if its own hash is valid
+  - requirement: Schema version warning
+    name: Schema mismatch
     given:
-      - 'the change was created with schema version 1 and the active schema is version 2'
+      - the change was created with schema version 1 and the active schema is version 2
     when:
-      - '`specd change status <name>` is run'
+      - specd change status <name> is run
     then:
-      - 'stderr contains a `warning:` line mentioning both schema versions'
-      - 'the process exits with code 0'
-  - requirement: 'Change not found'
-    name: 'Unknown change name'
+      - 'stderr contains a warning: line mentioning both schema versions'
+      - AND the process exits with code 0
+  - requirement: Change not found
+    name: Unknown change name
     when:
-      - '`specd change status nonexistent` is run'
+      - specd change status nonexistent is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
-  - requirement: 'Change not found'
-    name: 'JSON output contains correct structure'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+  - requirement: Change not found
+    name: JSON output contains correct structure
     given:
-      - 'a change `add-login` in state `designing` with specId `auth/login`, schema `std` version `1`, and one artifact `proposal` with `effectiveStatus` `complete`'
+      - a change add-login in state designing with specId auth/login, schema std version 1, and one artifact proposal with effectiveStatus complete
     when:
-      - '`specd change status add-login --format json` is run'
+      - specd change status add-login --format json is run
     then:
-      - 'stdout is valid JSON with `name`, `state`, `specIds`, `schema`, and `artifacts`'
-      - '`schema` has `name` equal to `"std"` and `version` equal to `1`'
-      - '`artifacts` contains one entry with `type` equal to `"proposal"` and `effectiveStatus` equal to `"complete"`'
-      - 'the process exits with code 0'
+      - stdout is valid JSON with name, state, specIds, schema, and artifacts
+      - AND schema has name equal to "std" and version equal to 1
+      - AND artifacts contains one entry with type equal to "proposal" and effectiveStatus equal to "complete"
+      - AND the process exits with code 0
+contentHashes:
+  spec.md: sha256:bd2bacd8e426ee4180b6886cbc19e791388d144f462c84fb604083a1340cfacc
+  verify.md: sha256:99fa75949e7c2ae65c406ff7fea61a224b3a0818695a319456441ea2e5f7c2fb
+generatedBy: core

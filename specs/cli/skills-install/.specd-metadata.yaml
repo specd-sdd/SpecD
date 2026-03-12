@@ -1,184 +1,179 @@
-title: 'Skills Install'
-description: >
-  Defines the `specd skills install <name|all>` command. The CLI reads skill content from `@specd/skills`, resolves the agent-specific target path, and writes the skill file to disk. It then calls `RecordSkillInstall` in `@specd/core` to persist the installation in the project manifest. Core never touches skill files; the CLI never touches `specd.yaml`.
-keywords:
-  - 'skills'
-  - 'install'
-  - 'command'
-  - 'signature'
-  - 'skill'
-  - 'content'
-  - 'resolution'
-  - 'installation'
-  - 'target'
-  - 'overwrite'
-  - 'behaviour'
-  - 'recording'
+title: Skills Install
+description: Defines the `specd skills install <name|all>` command. The CLI reads skill content from `@specd/skills`, resolves the agent-specific target path, and writes the skill file to disk. It then calls `RecordSkillInstall` in `@specd/core` to persist the installation in the project manifest. Core never touches skill files; the CLI never touches `specd.yaml`.
 dependsOn:
-  - 'cli:cli/entrypoint'
-  - 'cli:cli/skills-list'
-  - 'core:core/config'
-contentHashes:
-  'spec.md': 'sha256:c2f4ab57290050ada8ef98d0cd0c6725255ff4207f652b8c1db32af78ac4b733'
-  'verify.md': 'sha256:a94d7e1e59858878fe005cf434023be35d153051a5235779c3571cc927e95a6d'
+  - cli:cli/entrypoint
+  - cli:cli/skills-list
+  - core:core/config
+context:
+  - Defines the `specd skills install <name|all>` command. The CLI reads skill content from `@specd/skills`, resolves the agent-specific target path, and writes the skill file to disk. It then calls `RecordSkillInstall` in `@specd/core` to persist the installation in the project manifest. Core never touches skill files; the CLI never touches `specd.yaml`.
 rules:
-  - requirement: 'Command signature'
+  - requirement: Command signature
     rules:
-      - '`<name|all>` — required positional; the name of a specific skill to install, or `all` to install every skill in `@specd/skills`.'
-      - '`--agent <id>` — optional; the target agent (e.g. `claude`). Defaults to `claude`.'
-      - '`--global` — optional; installs to the user-level commands directory instead of the project-level directory. Without this flag, installation is project-level.'
-      - '`--format text|json|toon` — optional; output format, defaults to `text`.'
-  - requirement: 'Skill content resolution'
+      - |-
+        ```
+        specd skills install <name|all> [--agent claude] [--global] [--format text|json|toon]
+        ```
+        * `<name|all>` — required positional; the name of a specific skill to install, or `all` to install every skill in `@specd/skills`.
+        * `--agent <id>` — optional; the target agent (e.g. `claude`). Defaults to `claude`.
+        * `--global` — optional; installs to the user-level commands directory instead of the project-level directory. Without this flag, installation is project-level.
+        * `--format text|json|toon` — optional; output format, defaults to `text`.
+  - requirement: Skill content resolution
     rules:
-      - 'The CLI reads the skill name and markdown content from `@specd/skills`. Core is never involved in this step — `@specd/skills` depends on `@specd/core`, not the other way around, so core cannot import from skills.'
-  - requirement: 'Installation target'
+      - The CLI reads the skill name and markdown content from `@specd/skills`. Core is never involved in this step — `@specd/skills` depends on `@specd/core`, not the other way around, so core cannot import from skills.
+  - requirement: Installation target
     rules:
-      - 'The CLI resolves the target path based on the agent ID and scope. Each agent ID maps to a commands directory — for example, `claude` uses `<git-root>/.claude/commands/` (project-level) and `~/.claude/commands/` (user-level). The resolution of the commands directory for a given agent ID is defined per agent.'
-      - 'If the agent ID is not recognised, the command exits with code 1 and prints an `error:` message to stderr.'
-      - 'The target directory is created if it does not exist. The CLI writes the file directly to disk — this is adapter-layer filesystem work, not domain logic.'
-  - requirement: 'Overwrite behaviour'
+      - |-
+        The CLI resolves the target path based on the agent ID and scope. Each agent ID maps to a commands directory — for example, `claude` uses `<git-root>/.claude/commands/` (project-level) and `~/.claude/commands/` (user-level). The resolution of the commands directory for a given agent ID is defined per agent.
+        If the agent ID is not recognised, the command exits with code 1 and prints an `error:` message to stderr.
+        The target directory is created if it does not exist. The CLI writes the file directly to disk — this is adapter-layer filesystem work, not domain logic.
+  - requirement: Overwrite behaviour
     rules:
-      - 'If a skill file already exists at the target path, it is silently overwritten. Install is always idempotent.'
-  - requirement: 'Recording project-level installations'
+      - If a skill file already exists at the target path, it is silently overwritten. Install is always idempotent.
+  - requirement: Recording project-level installations
     rules:
-      - "After a successful **project-level** install, the CLI calls `RecordSkillInstall` from `@specd/core`, passing the agent id and the list of installed skill names. `RecordSkillInstall` uses `ConfigWriter` to update the skills manifest in `specd.yaml`. The CLI has no knowledge of `specd.yaml`'s format — it only provides the typed input."
-      - 'User-level installs (`--global`) do **not** call `RecordSkillInstall` — global installs are not tracked.'
-      - 'If `specd.yaml` does not exist, `RecordSkillInstall` returns a `ProjectNotInitialisedError`. The CLI exits with code 1 and prints an `error:` message **before** writing any skill files.'
-  - requirement: 'Output on success'
+      - |-
+        After a successful **project-level** install, the CLI calls `RecordSkillInstall` from `@specd/core`, passing the agent id and the list of installed skill names. `RecordSkillInstall` uses `ConfigWriter` to update the skills manifest in `specd.yaml`. The CLI has no knowledge of `specd.yaml`'s format — it only provides the typed input.
+        * User-level installs (`--global`) do **not** call `RecordSkillInstall` — global installs are not tracked.
+        * If `specd.yaml` does not exist, `RecordSkillInstall` returns a `ProjectNotInitialisedError`. The CLI exits with code 1 and prints an `error:` message **before** writing any skill files.
+  - requirement: Output on success
     rules:
-      - '`text` (default): prints one line per installed skill to stdout:'
-      - 'When `all` is used, one line per skill.'
-      - '`json` or `toon`: outputs an array:'
-  - requirement: 'Skill not found'
+      - |-
+        * `text` (default): prints one line per installed skill to stdout: When `all` is used, one line per skill.
+        * `json` or `toon`: outputs an array:
+  - requirement: Skill not found
     rules:
-      - 'If the named skill does not exist in `@specd/skills`, the command exits with code 1 and prints an `error:` message to stderr. No files are written and `RecordSkillInstall` is not called.'
-  - requirement: 'Not in a git repository (project-level install)'
+      - If the named skill does not exist in `@specd/skills`, the command exits with code 1 and prints an `error:` message to stderr. No files are written and `RecordSkillInstall` is not called.
+  - requirement: Not in a git repository (project-level install)
     rules:
-      - 'If `--global` is not provided and the command is run outside any git repository, the command exits with code 1 and prints an `error:` message to stderr advising the user to use `--global` or run from inside a git repository.'
-  - requirement: 'Unknown agent'
+      - If `--global` is not provided and the command is run outside any git repository, the command exits with code 1 and prints an `error:` message to stderr advising the user to use `--global` or run from inside a git repository.
+  - requirement: Unknown agent
     rules:
-      - 'If an unsupported `--agent` value is provided, the command exits with code 1 and prints an `error:` message to stderr.'
+      - If an unsupported `--agent` value is provided, the command exits with code 1 and prints an `error:` message to stderr.
 constraints:
-  - '`all` installs every skill exported by `@specd/skills`; if the set is empty the command exits with code 0 and prints `no skills to install`'
-  - 'Skill file content comes from `@specd/skills` verbatim — no templating or substitution'
-  - '**CLI responsibility:** read skill content from `@specd/skills`, resolve agent path, write `.md` file to disk'
-  - '**Core responsibility:** persist the installation record in `specd.yaml` via `RecordSkillInstall` → `ConfigWriter`'
+  - all installs every skill exported by @specd/skills; if the set is empty the command exits with code 0 and prints no skills to install
+  - Skill file content comes from @specd/skills verbatim — no templating or substitution
+  - 'CLI responsibility: read skill content from @specd/skills, resolve agent path, write .md file to disk'
+  - 'Core responsibility: persist the installation record in specd.yaml via RecordSkillInstall → ConfigWriter'
 scenarios:
-  - requirement: 'Command signature'
-    name: 'Missing positional argument exits with usage error'
+  - requirement: Command signature
+    name: Missing positional argument exits with usage error
     when:
-      - '`specd skills install` is run with no positional argument'
+      - specd skills install is run with no positional argument
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains a usage error message'
-  - requirement: 'Installation target for Claude Code'
-    name: 'Project-level install writes to .claude/commands/'
+      - the command exits with code 1
+      - AND stderr contains a usage error message
+  - requirement: Installation target for Claude Code
+    name: Project-level install writes to .claude/commands/
     given:
-      - 'the CWD is inside a git repository with root at `/repo`'
+      - the CWD is inside a git repository with root at /repo
     when:
-      - '`specd skills install my-skill` is run'
+      - specd skills install my-skill is run
     then:
-      - "`/repo/.claude/commands/my-skill.md` is created with the skill's content"
-      - 'the process exits with code 0'
-  - requirement: 'Installation target for Claude Code'
-    name: 'Global install writes to ~/.claude/commands/'
+      - /repo/.claude/commands/my-skill.md is created with the skill's content
+      - AND the process exits with code 0
+  - requirement: Installation target for Claude Code
+    name: Global install writes to ~/.claude/commands/
     when:
-      - '`specd skills install my-skill --global` is run'
+      - specd skills install my-skill --global is run
     then:
-      - "`~/.claude/commands/my-skill.md` is created with the skill's content"
-      - 'the process exits with code 0'
-  - requirement: 'Installation target for Claude Code'
-    name: 'Target directory is created if absent'
+      - ~/.claude/commands/my-skill.md is created with the skill's content
+      - AND the process exits with code 0
+  - requirement: Installation target for Claude Code
+    name: Target directory is created if absent
     given:
-      - '`.claude/commands/` does not exist'
+      - .claude/commands/ does not exist
     when:
-      - '`specd skills install my-skill` is run'
+      - specd skills install my-skill is run
     then:
-      - '`.claude/commands/` is created'
-      - '`my-skill.md` is written inside it'
-  - requirement: 'Overwrite behaviour'
-    name: 'Existing skill file is overwritten'
+      - .claude/commands/ is created
+      - AND my-skill.md is written inside it
+  - requirement: Overwrite behaviour
+    name: Existing skill file is overwritten
     given:
-      - '`.claude/commands/my-skill.md` exists with old content'
+      - .claude/commands/my-skill.md exists with old content
     when:
-      - '`specd skills install my-skill` is run'
+      - specd skills install my-skill is run
     then:
-      - 'the file is overwritten with the current skill content'
-      - 'the command exits with code 0'
-  - requirement: 'Recording installations in specd.yaml'
-    name: 'Project-level install adds skill to specd.yaml'
+      - the file is overwritten with the current skill content
+      - AND the command exits with code 0
+  - requirement: Recording installations in specd.yaml
+    name: Project-level install adds skill to specd.yaml
     given:
-      - 'a `specd.yaml` with no `skills` section'
+      - a specd.yaml with no skills section
     when:
-      - '`specd skills install my-skill` is run'
+      - specd skills install my-skill is run
     then:
-      - '`specd.yaml` now contains `skills.claude` with `my-skill` in the list'
-  - requirement: 'Recording installations in specd.yaml'
-    name: 'Installing already-recorded skill does not duplicate it'
+      - specd.yaml now contains skills.claude with my-skill in the list
+  - requirement: Recording installations in specd.yaml
+    name: Installing already-recorded skill does not duplicate it
     given:
-      - '`specd.yaml` already lists `my-skill` under `skills.claude`'
+      - specd.yaml already lists my-skill under skills.claude
     when:
-      - '`specd skills install my-skill` is run again'
+      - specd skills install my-skill is run again
     then:
-      - '`my-skill` appears exactly once in `skills.claude`'
-  - requirement: 'Recording installations in specd.yaml'
-    name: 'Global install does not modify specd.yaml'
+      - my-skill appears exactly once in skills.claude
+  - requirement: Recording installations in specd.yaml
+    name: Global install does not modify specd.yaml
     given:
-      - 'a `specd.yaml` with no `skills` section'
+      - a specd.yaml with no skills section
     when:
-      - '`specd skills install my-skill --global` is run'
+      - specd skills install my-skill --global is run
     then:
-      - '`specd.yaml` is unchanged'
-  - requirement: 'Recording installations in specd.yaml'
-    name: 'No specd.yaml exits with error before writing any files'
+      - specd.yaml is unchanged
+  - requirement: Recording installations in specd.yaml
+    name: No specd.yaml exits with error before writing any files
     given:
-      - 'there is no `specd.yaml` in the project'
+      - there is no specd.yaml in the project
     when:
-      - '`specd skills install my-skill` is run'
+      - specd skills install my-skill is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
-      - 'no `.md` file is written'
-  - requirement: 'Output on success'
-    name: 'Text output shows installed path'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+      - AND no .md file is written
+  - requirement: Output on success
+    name: Text output shows installed path
     when:
-      - '`specd skills install my-skill` succeeds'
+      - specd skills install my-skill succeeds
     then:
-      - 'stdout contains `installed my-skill →` followed by the absolute file path'
-      - 'the process exits with code 0'
-  - requirement: 'Output on success'
-    name: 'JSON output is an array with name and path'
+      - stdout contains installed my-skill → followed by the absolute file path
+      - AND the process exits with code 0
+  - requirement: Output on success
+    name: JSON output is an array with name and path
     when:
-      - '`specd skills install my-skill --format json` succeeds'
+      - specd skills install my-skill --format json succeeds
     then:
-      - 'stdout is a valid JSON array containing one object with `name` and `path` fields'
-  - requirement: 'Output on success'
-    name: 'Install all prints one line per skill'
+      - stdout is a valid JSON array containing one object with name and path fields
+  - requirement: Output on success
+    name: Install all prints one line per skill
     when:
-      - '`specd skills install all` succeeds'
+      - specd skills install all succeeds
     then:
-      - 'stdout contains one `installed <name> →` line per skill in `@specd/skills`'
-  - requirement: 'Skill not found'
-    name: 'Unknown skill name exits with error'
+      - stdout contains one installed <name> → line per skill in @specd/skills
+  - requirement: Skill not found
+    name: Unknown skill name exits with error
     when:
-      - '`specd skills install nonexistent-skill` is run'
+      - specd skills install nonexistent-skill is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
-      - 'no files are written'
-  - requirement: 'Not in a git repository (project-level install)'
-    name: 'Project-level install outside git repo exits with error'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+      - AND no files are written
+  - requirement: Not in a git repository (project-level install)
+    name: Project-level install outside git repo exits with error
     given:
-      - 'the CWD is not inside any git repository'
+      - the CWD is not inside any git repository
     when:
-      - '`specd skills install my-skill` is run without `--global`'
+      - specd skills install my-skill is run without --global
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message mentioning `--global`'
-  - requirement: 'Unknown agent'
-    name: 'Unrecognised agent value exits with error'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message mentioning --global'
+  - requirement: Unknown agent
+    name: Unrecognised agent value exits with error
     when:
-      - '`specd skills install my-skill --agent unknown-agent` is run'
+      - specd skills install my-skill --agent unknown-agent is run
     then:
-      - 'the command exits with code 1'
-      - 'stderr contains an `error:` message'
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+contentHashes:
+  spec.md: sha256:c2f4ab57290050ada8ef98d0cd0c6725255ff4207f652b8c1db32af78ac4b733
+  verify.md: sha256:a94d7e1e59858878fe005cf434023be35d153051a5235779c3571cc927e95a6d
+generatedBy: core

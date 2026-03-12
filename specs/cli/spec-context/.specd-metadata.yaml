@@ -1,85 +1,44 @@
 title: Spec Context
-description:
-  Defines the specd spec context \<workspace:capability-path> command, which prints the metadata summary for
-  a single spec as it would appear in an AI context block, with optional section filtering and dependency traversal.
+description: Defines the `specd spec context <workspace:capability-path>` command, which prints the metadata summary for a single spec as it would appear in an AI context block, with optional section filtering and dependency traversal.
+dependsOn:
+  - cli:cli/entrypoint
 context:
-  - Defines the specd spec context \<workspace:capability-path> command, which prints the metadata summary for a single
-    spec as it would appear in an AI context block, with optional section filtering and dependency traversal.
+  - Defines the `specd spec context <workspace:capability-path>` command, which prints the metadata summary for a single spec as it would appear in an AI context block, with optional section filtering and dependency traversal.
 rules:
   - requirement: Command signature
     rules:
-      - >-
+      - |-
         ```
-
         specd spec context <workspace:capability-path>
           [--rules] [--constraints] [--scenarios]
           [--follow-deps [--depth <n>]]
           [--format text|json|toon]
         ```
-
-
-
-        * \<workspace:capability-path> — required positional; the fully-qualified spec ID (e.g. default:auth/login)
-
-        * \--rules — when present, includes only the rules sections in the output
-
-        * \--constraints — when present, includes only the constraints sections in the output
-
-        * \--scenarios — when present, includes only the scenarios sections in the output
-
-        * \--follow-deps — when present, follows dependsOn links from .specd-metadata.yaml transitively and includes
-        each dependency's context in the output
-
-        * \--depth \<n> — optional; only valid with --follow-deps; limits dependency traversal to N levels (1 = direct
-        deps only, 2 = deps of deps, etc.); defaults to unlimited when --follow-deps is passed without --depth
-
-        * \--format text|json|toon — optional; output format, defaults to text
-
-
-
-        When none of --rules, --constraints, or --scenarios are passed, all available sections are included (description
-        + rules + constraints + scenarios). When one or more section flags are passed, only those sections are included.
+        * `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
+        * `--rules` — when present, includes only the rules sections in the output
+        * `--constraints` — when present, includes only the constraints sections in the output
+        * `--scenarios` — when present, includes only the scenarios sections in the output
+        * `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively and includes each dependency's context in the output
+        * `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only, 2 = deps of deps, etc.); defaults to unlimited when `--follow-deps` is passed without `--depth`
+        * `--format text|json|toon` — optional; output format, defaults to `text`
+        When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included (description + rules + constraints + scenarios). When one or more section flags are passed, only those sections are included.
   - requirement: Behaviour
     rules:
-      - >-
-        The command reads the spec's .specd-metadata.yaml and renders the requested sections. If the metadata is absent
-        or stale (content hashes do not match current artifact files), the command falls back to the schema's
-        metadataExtraction declarations to extract content deterministically from the spec's raw artifact files and
-        emits a warning: to stderr.
-
-
-
-        When --follow-deps is passed, the command recursively follows the dependsOn entries in each spec's
-        .specd-metadata.yaml, applying the same section filtering and stale-fallback logic to each dependency. Cycles
-        are detected and silently broken. The root spec is always listed first; dependencies follow in traversal order.
+      - |-
+        The command reads the spec's `.specd-metadata.yaml` and renders the requested sections. If the metadata is absent or stale (content hashes do not match current artifact files), the command falls back to the schema's `metadataExtraction` declarations to extract content deterministically from the spec's raw artifact files and emits a `warning:` to stderr.
+        When `--follow-deps` is passed, the command recursively follows the `dependsOn` entries in each spec's `.specd-metadata.yaml`, applying the same section filtering and stale-fallback logic to each dependency. Cycles are detected and silently broken. The root spec is always listed first; dependencies follow in traversal order.
   - requirement: Output
     rules:
-      - >-
-        In text mode (default), each spec in the output is introduced by a header:
-
-
-
+      - |-
+        In `text` mode (default), each spec in the output is introduced by a header:
         ```
-
         ### Spec: <workspace>:<capability-path>
 
-
         <metadata content>
-
         ```
-
-
-
-        When --follow-deps is passed, each dependency appears as a subsequent ### Spec: block after the root.
-
-
-
-        In json or toon mode, the output is (encoded in the respective format):
-
-
-
+        When `--follow-deps` is passed, each dependency appears as a subsequent `### Spec:` block after the root.
+        In `json` or `toon` mode, the output is (encoded in the respective format):
         ```json
-
         {
           "specs": [
             {
@@ -94,20 +53,14 @@ rules:
           ],
           "warnings": []
         }
-
         ```
-
-
-
-        Only the requested sections are included in each spec object. description is always included when not using
-        section filters. When a section is requested but absent, it is omitted from the object (not null or \[]). The
-        root spec is always specs\[0]; dependencies follow in traversal order.
+        Only the requested sections are included in each spec object. `description` is always included when not using section filters. When a section is requested but absent, it is omitted from the object (not `null` or `[]`). The root spec is always `specs[0]`; dependencies follow in traversal order.
   - requirement: Error cases
     rules:
       - |-
         * If the workspace is not configured, exits with code 1.
         * If no artifact files exist for the spec at the given path, exits with code 1.
-        * \--depth without --follow-deps is a CLI usage error (exit code 1).
+        * `--depth` without `--follow-deps` is a CLI usage error (exit code 1).
 constraints:
   - This command is read-only — it never updates metadata
   - The workspace is always explicit in the path
@@ -135,8 +88,8 @@ scenarios:
       - specd spec context default:auth/login is run
     then:
       - stdout contains the metadata summary (description, rules, constraints, scenarios)
-      - no warning is emitted to stderr
-      - the process exits with code 0
+      - AND no warning is emitted to stderr
+      - AND the process exits with code 0
   - requirement: Behaviour
     name: Stale metadata falls back to raw artifacts
     given:
@@ -145,8 +98,8 @@ scenarios:
       - specd spec context default:auth/login is run
     then:
       - stdout contains the metadataExtraction fallback content
-      - 'stderr contains a warning: line about stale metadata'
-      - the process exits with code 0
+      - 'AND stderr contains a warning: line about stale metadata'
+      - AND the process exits with code 0
   - requirement: Behaviour
     name: Section flags filter output
     given:
@@ -155,7 +108,7 @@ scenarios:
       - specd spec context default:auth/login --rules --scenarios is run
     then:
       - stdout contains the rules and scenarios sections
-      - stdout does not contain the description or constraints sections
+      - AND stdout does not contain the description or constraints sections
   - requirement: Behaviour
     name: No section flags includes all sections
     given:
@@ -168,10 +121,10 @@ scenarios:
     name: --follow-deps includes dependency specs
     given:
       - 'default:auth/login has .specd-metadata.yaml with dependsOn: ["default:auth/shared-errors"]'
+      - AND default:auth/shared-errors exists with its own metadata
     when:
       - specd spec context default:auth/login --follow-deps is run
     then:
-      - default:auth/shared-errors exists with its own metadata
       - 'stdout contains a ### Spec: default:auth/login block followed by a ### Spec: default:auth/shared-errors block'
   - requirement: Behaviour
     name: --depth limits traversal
@@ -189,7 +142,7 @@ scenarios:
       - specd spec context default:a --follow-deps is run
     then:
       - each spec appears at most once in the output
-      - the process exits with code 0
+      - AND the process exits with code 0
   - requirement: Output
     name: Text header format
     when:
@@ -203,9 +156,8 @@ scenarios:
     when:
       - specd spec context default:auth/login --format json is run
     then:
-      - 'stdout is valid JSON with specs array containing one entry with spec, title, description, rules, constraints,
-        scenarios, and stale: false'
-      - warnings is []
+      - 'stdout is valid JSON with specs array containing one entry with spec, title, description, rules, constraints, scenarios, and stale: false'
+      - AND warnings is []
   - requirement: Output
     name: JSON output — section filter applied
     when:
@@ -234,14 +186,14 @@ scenarios:
       - specd spec context unknown-ws:auth/login is run
     then:
       - the command exits with code 1
-      - 'stderr contains an error: message'
+      - 'AND stderr contains an error: message'
   - requirement: Error cases
     name: No artifacts at path
     when:
       - specd spec context default:nonexistent is run and no files exist at that path
     then:
       - the command exits with code 1
-      - 'stderr contains an error: message'
+      - 'AND stderr contains an error: message'
 contentHashes:
   spec.md: sha256:9ddef932866c4a8c43283c546a6d5d5247ecb52f87fadbeedad13474b2b55159
   verify.md: sha256:8f6ac25d68ee48399d8d01a03aa8b112453cf72378c50b075beb0b8337b70277
