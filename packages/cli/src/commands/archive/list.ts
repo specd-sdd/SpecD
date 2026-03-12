@@ -29,6 +29,8 @@ export function registerArchiveList(parent: Command): void {
             output('no archived changes', 'text')
           } else {
             const dates = changes.map((c) => c.archivedAt.toISOString().slice(0, 10))
+            const workspaces = changes.map((c) => c.workspace?.toString() ?? '')
+            const byCol = changes.map((c) => (c.archivedBy ? `by ${c.archivedBy.name}` : ''))
             output(
               renderTable(
                 null,
@@ -40,9 +42,11 @@ export function registerArchiveList(parent: Command): void {
                       changes.map((c) => c.name),
                     ),
                   },
+                  { header: 'WORKSPACE', width: colWidth('WORKSPACE', workspaces) },
                   { header: 'DATE', width: colWidth('DATE', dates) },
+                  { header: 'BY', width: colWidth('BY', byCol) },
                 ],
-                changes.map((c, i) => [c.name, dates[i]!]),
+                changes.map((c, i) => [c.name, workspaces[i]!, dates[i]!, byCol[i]!]),
               ),
               'text',
             )
