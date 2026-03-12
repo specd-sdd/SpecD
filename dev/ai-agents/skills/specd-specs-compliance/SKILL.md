@@ -1,16 +1,78 @@
 ---
 name: specs-compliance
 description:
-  Exhaustive spec-vs-code compliance reviewer. Dynamically discovers every spec in specs/,
-  compares against the actual implementation, checks test coverage, and produces a detailed
-  report. Does NOT modify any code — read-only analysis only.
-argument-hint: '[spec area to audit, or leave empty for full audit]'
-allowed-tools: Bash(git *), Bash(mkdir *), Bash(date *), Bash(npx gitnexus *), Bash(cat *), Read, Grep, Glob, Write, Agent, mcp__gitnexus__query, mcp__gitnexus__context, mcp__gitnexus__impact, mcp__gitnexus__cypher, ReadMcpResourceTool, ListMcpResourcesTool
+  Exhaustive spec-vs-code compliance reviewer. Supports four modes — full audit, single spec,
+  uncommitted changes, or PR diff. Compares specs against actual implementation, checks test
+  coverage, and produces a detailed report. Does NOT modify any code — read-only analysis only.
+argument-hint: '[spec area | --changed | --pr <number> | leave empty for full audit]'
+allowed-tools: Bash(git *), Bash(gh *), Bash(mkdir *), Bash(date *), Bash(npx gitnexus *), Bash(cat *), Read, Grep, Glob, Write, Agent, mcp__gitnexus__query, mcp__gitnexus__context, mcp__gitnexus__impact, mcp__gitnexus__cypher, ReadMcpResourceTool, ListMcpResourcesTool
 ---
 
 # Spec Compliance Auditor
 
-You are an exhaustive spec-compliance auditor for the **specd** project. Your job is to compare every spec in `specs/` against the actual codebase, identify discrepancies, assess test coverage, and produce a detailed report. **You MUST NOT modify any code or spec files.** This is a read-only audit.
+You are an exhaustive spec-compliance auditor for the **specd** project. Your job is to compare specs in `specs/` against the actual codebase, identify discrepancies, assess test coverage, and produce a detailed report. **You MUST NOT modify any code or spec files.** This is a read-only audit.
+
+---
+
+## Audit Modes
+
+The skill supports four modes, determined by the argument passed:
+
+| Argument                  | Mode              | What it audits                                                 |
+| ------------------------- | ----------------- | -------------------------------------------------------------- |
+| _(empty)_                 | **Full**          | Every spec in `specs/` — full project audit                    |
+| `core/change`             | **Single Spec**   | Only the specified spec (`specs/core/change/`)                 |
+| `--changed`               | **Changed Files** | Only specs whose implementation files have uncommitted changes |
+| `--pr 42` or `--pr <url>` | **Pull Request**  | Only specs whose implementation files are touched by the PR    |
+
+### Mode details
+
+**Single Spec** — The argument is a spec path relative to `specs/` (e.g., `core/change`, `_global/testing`). It resolves to `specs/{argument}/spec.md`. If the spec doesn't exist, report an error and stop. No subagent batching — audit inline or with a single subagent.
+
+**Changed Files (`--changed`)** — Scoped audit based on uncommitted changes (staged + unstaged):
+
+1. Run `git diff --name-only HEAD` to get all changed files (staged + unstaged vs HEAD)
+2. Also run `git ls-files --others --exclude-standard` to catch untracked new files
+3. Map changed files to affected specs (see "File-to-Spec Mapping" below)
+4. Audit only the resolved specs
+
+**Pull Request (`--pr N`)** — Scoped audit based on a PR's diff:
+
+1. Run `gh pr diff <N> --name-only` to get all files changed in the PR
+2. Map changed files to affected specs (see "File-to-Spec Mapping" below)
+3. Audit only the resolved specs
+4. The argument can be a PR number (`--pr 42`) or a full URL (`--pr https://github.com/.../pull/42`)
+
+### File-to-Spec Mapping
+
+For `--changed` and `--pr` modes, map changed files to specs using this algorithm:
+
+1. **Direct spec changes**: If a file under `specs/<area>/<name>/` changed → include that spec directly.
+
+2. **Package source/test changes**: If a file under `packages/<pkg>/` changed:
+   a. Determine the affected package name (`<pkg>`)
+   b. Find all specs under `specs/<pkg>/`
+   c. For each spec, check if the changed file is related:
+   - **Name matching**: Does the changed file path contain the spec name or a derivative? (e.g., `change.ts` → `specs/core/change/`, `spec-loader.ts` → `specs/core/spec-loading/`)
+   - **GitNexus mapping**: Run `gitnexus_context({name: "<exported symbol from changed file>"})` to find which execution flows the changed code participates in. Map flow names to spec areas.
+   - **Broad match fallback**: If neither name nor GitNexus produces a confident match, include ALL specs for that package (better to over-audit than miss something).
+
+3. **Config/tooling changes**: If files like `tsconfig.json`, `.eslintrc.*`, `vitest.config.*`, `package.json`, or files outside `packages/` changed → include relevant global specs (`specs/_global/`).
+
+4. **Spec dependency expansion**: After initial mapping, read each resolved spec's `## Spec Dependencies` section. If a resolved spec depends on another spec, include the dependency too (depth 1 only — don't recurse further for scoped audits).
+
+5. **Deduplication**: Remove duplicate spec paths before proceeding to audit.
+
+After mapping, print the resolved scope to screen:
+
+```
+Audit scope ({mode}): {N} specs resolved from {M} changed files
+- specs/core/change/
+- specs/core/config/
+- specs/_global/conventions/
+```
+
+If no specs are resolved (e.g., only non-code files changed), report "No specs affected by changes" and stop.
 
 ---
 
@@ -34,6 +96,17 @@ You are an exhaustive spec-compliance auditor for the **specd** project. Your jo
 
 ## Workflow
 
+### Phase 0 — Mode Detection
+
+Parse the argument to determine the audit mode:
+
+1. **No argument** → `mode = full`
+2. **Argument is `--changed`** → `mode = changed`
+3. **Argument starts with `--pr`** → `mode = pr`, extract the PR number/URL from the rest of the argument
+4. **Anything else** → `mode = single`, treat the argument as a spec path relative to `specs/`
+
+For single mode, validate that `specs/{argument}/spec.md` exists. If not, report an error and stop.
+
 ### Phase 1 — Discovery and Setup
 
 1. Create the output directory:
@@ -52,17 +125,29 @@ date +"%Y%m%d-%H%M%S"
 
 4. **Build a codebase map from GitNexus.** Read `gitnexus://repo/specd/clusters` to get all functional areas and their cohesion scores. This gives you a structural understanding of how code is organized — use it to map specs to the right code areas instead of guessing from file paths alone.
 
-5. **Dynamically discover all specs.** Use Glob to find every `spec.md` under `specs/`:
+5. **Resolve the spec scope** based on the detected mode:
 
-```
-specs/**/spec.md
-```
+   **If `mode = full`:**
+   - Use Glob to find every `spec.md` under `specs/`: `specs/**/spec.md`
+   - Categorize by top-level directory:
+     - `specs/_global/*` → Global specs (apply to all packages)
+     - `specs/<package>/*` → Package-specific specs
 
-6. **Categorize discovered specs** by their top-level directory under `specs/`:
-   - `specs/_global/*` → Global specs (apply to all packages)
-   - `specs/<package>/*` → Package-specific specs (e.g., `specs/core/*`, `specs/cli/*`, etc.)
+   **If `mode = single`:**
+   - The scope is just `specs/{argument}/spec.md`
+   - Also read its `## Spec Dependencies` and include those specs (depth 1)
 
-7. **Discover the package structure.** Use Glob to find all `package.json` files under `packages/`:
+   **If `mode = changed`:**
+   - Run: `git diff --name-only HEAD` and `git ls-files --others --exclude-standard`
+   - Apply the **File-to-Spec Mapping** algorithm (see Audit Modes section above)
+   - Print the resolved scope to screen
+
+   **If `mode = pr`:**
+   - Run: `gh pr diff <N> --name-only`
+   - Apply the **File-to-Spec Mapping** algorithm (see Audit Modes section above)
+   - Print the resolved scope to screen
+
+6. **Discover the package structure.** Use Glob to find all `package.json` files under `packages/`:
 
 ```
 packages/*/package.json
@@ -70,11 +155,21 @@ packages/*/package.json
 
 This tells you which packages exist and where their source/test directories are.
 
-8. **Plan subagent batches.** Group the discovered specs into balanced batches for parallel processing:
+7. **Plan subagent batches** based on the resolved scope:
+
+   **If `mode = full`:**
    - **Batch: Global** — all specs under `specs/_global/`
    - **One batch per package** — e.g., all specs under `specs/core/`, all under `specs/cli/`, etc.
-   - If a package has too many specs (more than ~12), split it into two batches alphabetically to keep subagent context manageable.
+   - If a package has too many specs (more than ~12), split it into two batches alphabetically.
    - If a new package directory appears under `specs/` that you haven't seen before, create a batch for it — do NOT skip unknown packages.
+
+   **If `mode = single`:**
+   - No batching needed. Audit the spec (and its dependencies) directly in a single subagent or inline.
+
+   **If `mode = changed` or `mode = pr`:**
+   - If the resolved scope has ≤5 specs → single subagent or inline, no batching.
+   - If >5 specs → group into batches by package area, same as full mode but only for resolved specs.
+   - Global specs (if resolved) go into their own batch.
 
 ### Phase 2 — Parallel Audit via Subagents
 
@@ -213,6 +308,7 @@ Final report structure:
 **Project:** specd
 **Branch:** {current git branch}
 **Commit:** {current HEAD short hash}
+**Mode:** {Full | Single: core/change | Changed: N files | PR #42: N files}
 
 ---
 
@@ -263,8 +359,13 @@ Missing Tests, Spec Dependency Chain. Do NOT summarize or condense.}
 
 ### Phase 5 — Output
 
-1. Write the compiled report to `.specd/reports/spec-compliance/specs-compliance-{timestamp}.md`
+1. Write the compiled report with a mode-aware filename:
+   - **Full mode**: `.specd/reports/spec-compliance/specs-compliance-{timestamp}.md`
+   - **Single spec mode**: `.specd/reports/spec-compliance/specs-compliance-{spec-name}-{timestamp}.md` (e.g., `specs-compliance-change-20260311-143027.md`)
+   - **Changed mode**: `.specd/reports/spec-compliance/specs-compliance-changed-{timestamp}.md`
+   - **PR mode**: `.specd/reports/spec-compliance/specs-compliance-pr{N}-{timestamp}.md` (e.g., `specs-compliance-pr42-20260311-143027.md`)
 2. Print a concise summary to screen showing:
+   - Audit mode and scope (e.g., "Changed files mode: 3 specs from 7 changed files")
    - Total specs, conformant/divergent/not-implemented counts
    - Top 5 critical issues
    - Location of the full report
