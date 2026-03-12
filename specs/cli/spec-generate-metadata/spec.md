@@ -39,6 +39,12 @@ With `--write`, the command generates metadata, persists it via `SaveSpecMetadat
 
 If the core use case returns `hasExtraction: false` (schema has no `metadataExtraction` declarations), the command writes `error: schema has no metadataExtraction declarations` to stderr and exits with code 1.
 
+### Requirement: Error — dependsOn overwrite (write mode)
+
+When `--write` is used and `--force` is not set, if the generated metadata would change existing `dependsOn` entries, `SaveSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` which writes `error: dependsOn would change (...)` to stderr and exits with code 1. Stdout remains empty on error.
+
+When `--write --force` is used, the overwrite check is skipped entirely.
+
 ## Constraints
 
 - The command contains no business logic — all generation is delegated to `GenerateSpecMetadata` and all writing to `SaveSpecMetadata`

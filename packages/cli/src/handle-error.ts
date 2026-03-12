@@ -22,6 +22,7 @@ import {
   SchemaValidationError,
   ConfigValidationError,
   MetadataValidationError,
+  DependsOnOverwriteError,
 } from '@specd/core'
 
 /**
@@ -55,7 +56,8 @@ export function handleError(err: unknown): never {
     err instanceof UnsupportedPatternError ||
     err instanceof PathTraversalError ||
     err instanceof DeltaApplicationError ||
-    err instanceof MetadataValidationError
+    err instanceof MetadataValidationError ||
+    err instanceof DependsOnOverwriteError
   ) {
     process.stderr.write(`error: ${err.message}\n`)
     process.exit(1)

@@ -63,3 +63,21 @@
 - **GIVEN** the `.specd-metadata.yaml` file was modified since it was last read
 - **WHEN** `specd spec write-metadata auth/login --force` is invoked
 - **THEN** the write succeeds and the conflict is ignored
+
+### Requirement: Error — dependsOn overwrite
+
+#### Scenario: dependsOn change without --force exits 1
+
+- **GIVEN** existing metadata has `dependsOn: [core:config, core:schema-format]`
+- **AND** incoming YAML has `dependsOn: [core:change]`
+- **WHEN** `specd spec write-metadata auth/login --input /tmp/metadata.yaml` is invoked without `--force`
+- **THEN** the command writes `error: dependsOn would change` to stderr
+- **AND** exits with code 1
+- **AND** stdout is empty
+
+#### Scenario: --force bypasses dependsOn check
+
+- **GIVEN** existing metadata has `dependsOn: [core:config]`
+- **AND** incoming YAML has `dependsOn: [core:change]`
+- **WHEN** `specd spec write-metadata auth/login --input /tmp/metadata.yaml --force` is invoked
+- **THEN** the write succeeds

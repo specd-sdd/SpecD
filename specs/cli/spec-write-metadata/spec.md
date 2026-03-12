@@ -49,6 +49,12 @@ If the use case throws a `MetadataValidationError` (content is valid YAML but fa
 
 If `--force` is not set and the repository detects a concurrent modification (hash mismatch), the command writes the conflict error to stderr and exits with code 1.
 
+### Requirement: Error — dependsOn overwrite
+
+If `--force` is not set and the incoming metadata would change existing `dependsOn` entries, `SaveSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` which writes `error: dependsOn would change (...)` to stderr and exits with code 1. Stdout remains empty on error.
+
+When `--force` is set, the overwrite check is skipped entirely.
+
 ## Constraints
 
 - The command contains no business logic — all writing is delegated to the `SaveSpecMetadata` use case
@@ -59,6 +65,7 @@ If `--force` is not set and the repository detects a concurrent modification (ha
 
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — adapter packages contain no business logic
 - [`specs/_global/conventions/spec.md`](../../_global/conventions/spec.md) — error types, named exports
+- [`specs/core/spec-metadata/spec.md`](../../core/spec-metadata/spec.md) — metadata format, validation, and dependsOn overwrite protection
 
 ## ADRs
 
