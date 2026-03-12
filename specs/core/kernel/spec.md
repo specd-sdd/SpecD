@@ -80,6 +80,7 @@ The following table is the exhaustive mapping between kernel paths and use case 
 | `specs.validate`           | `ValidateSpecs`                       | [validate-specs](../validate-specs/spec.md)                     | Validates spec artifacts against schema rules               |
 | `specs.generateMetadata`   | `GenerateSpecMetadata`                | [generate-metadata](../generate-metadata/spec.md)               | Generates deterministic metadata from extraction rules      |
 | `specs.getContext`         | `GetSpecContext`                      | [get-spec-context](../get-spec-context/spec.md)                 | Builds structured context entries with dependency traversal |
+| `specs.resolveSchema`      | `ResolveSchema`                       | [resolve-schema](../resolve-schema/spec.md)                     | Resolves base schema with extends, plugins, and overrides   |
 
 #### `kernel.project`
 
@@ -179,3 +180,4 @@ await kernel.project.init.execute({
 - [`specs/core/record-skill-install/spec.md`](../record-skill-install/spec.md)
 - [`specs/core/get-skills-manifest/spec.md`](../get-skills-manifest/spec.md)
 - [`specs/core/get-project-context/spec.md`](../get-project-context/spec.md)
+- [`specs/core/resolve-schema/spec.md`](../resolve-schema/spec.md)

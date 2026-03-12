@@ -8,7 +8,7 @@
 
 ### Requirement: Interface shape
 
-The port MUST be declared as a TypeScript `interface` named `SchemaRegistry` with two methods: `resolve` and `list`. It SHALL NOT be an abstract class, because there are no invariant constructor arguments shared across all implementations.
+The port MUST be declared as a TypeScript `interface` named `SchemaRegistry` with three methods: `resolve`, `resolveRaw`, and `list`. It SHALL NOT be an abstract class, because there are no invariant constructor arguments shared across all implementations.
 
 ### Requirement: Resolve method signature
 
@@ -29,6 +29,23 @@ The `resolve` method MUST route references by prefix:
 - Relative or absolute filesystem path — loaded directly from that path
 
 There SHALL be no implicit multi-level fallback between these resolution strategies.
+
+### Requirement: ResolveRaw method signature
+
+The `resolveRaw` method MUST accept the same two parameters as `resolve`:
+
+1. `ref: string` — the schema reference
+2. `workspaceSchemasPaths: ReadonlyMap<string, string>` — workspace-to-schemasPath map
+
+It MUST return `Promise<SchemaRawResult | null>`. `SchemaRawResult` is an object containing:
+
+- `data: SchemaYamlData` — the parsed and Zod-validated intermediate data (before domain construction)
+- `templates: ReadonlyMap<string, string>` — loaded template content keyed by relative path
+- `resolvedPath: string` — the absolute path of the resolved schema file (used for extends cycle detection)
+
+This method is used by `ResolveSchema` to obtain the intermediate representation needed for the merge pipeline. The existing `resolve` method continues to return the fully-built `Schema` entity for consumers that do not need the merge pipeline.
+
+A `null` return indicates the resolved file does not exist.
 
 ### Requirement: List method signature
 
@@ -64,3 +81,5 @@ The port module MUST re-export the `Schema` type from `domain/value-objects/sche
 ## Spec Dependencies
 
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — hexagonal architecture and port placement rules
+- [`specs/core/parse-schema-yaml/spec.md`](../parse-schema-yaml/spec.md) — `SchemaYamlData` type returned by `resolveRaw`
+- [`specs/core/resolve-schema/spec.md`](../resolve-schema/spec.md) — consumer of `resolveRaw` for the merge pipeline

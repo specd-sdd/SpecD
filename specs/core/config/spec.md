@@ -201,38 +201,50 @@ The following variables are available in **`workflow` hook `run` commands**:
 
 Unknown variables in a template are left as-is and a warning is emitted.
 
-### Requirement: Workflow additions
+### Requirement: Schema plugins
 
-`specd.yaml` may include a `workflow` section to add project-level hooks to the change lifecycle steps declared in the schema. Entries are matched to schema workflow entries by `step` name; schema hooks fire first, then project hooks. `requires` is not valid in project-level workflow entries and must be rejected.
-
-```yaml
-workflow:
-  - step: archiving
-    hooks:
-      post:
-        - run: 'pnpm run notify-team'
-        - run: 'git checkout -b specd/{{change.name}}'
-  - step: implementing
-    hooks:
-      pre:
-        - instruction: |
-            Prefer editing existing files over creating new ones.
-```
-
-### Requirement: Project-level artifact rules
-
-`specd.yaml` may include an `artifactRules` section to add per-artifact constraints without forking the schema. Keys are artifact IDs; values are arrays of constraint strings. `CompileContext` injects them as a distinct block in the compiled instruction, after the schema's instruction.
+`specd.yaml` may include a `schemaPlugins` field — an array of schema-plugin references. Each reference uses the same convention as the `schema` field (npm package, workspace-qualified, bare name, or path). Plugins are resolved and applied as merge layers after the base schema's `extends` chain, in declaration order.
 
 ```yaml
-artifactRules:
-  specs:
-    - 'All requirements must reference the relevant RFC number'
-    - 'Scenarios must use WHEN/THEN/AND format'
-  design:
-    - 'Architecture decisions must reference an ADR'
+schemaPlugins:
+  - '@specd/plugin-rfc'
+  - '#my-plugin'
 ```
 
-Keys are validated against the active schema's artifact IDs at startup. Unknown keys emit a warning but do not prevent startup.
+Each referenced file must have `kind: schema-plugin`. If a reference resolves to a file with `kind: schema`, startup must fail with `SchemaValidationError`. If a reference cannot be resolved, startup must fail with `SchemaNotFoundError`.
+
+### Requirement: Schema overrides
+
+`specd.yaml` may include a `schemaOverrides` field — an inline block containing merge operations applied after all plugins. The structure mirrors the `SchemaOperations` interface from the merge engine:
+
+```yaml
+schemaOverrides:
+  append:
+    artifacts:
+      - id: specs
+        rules:
+          post:
+            - id: rfc-reference
+              text: 'All requirements must reference the relevant RFC number'
+    workflow:
+      - step: archiving
+        hooks:
+          post:
+            - id: notify-team
+              run: 'pnpm run notify-team'
+  remove:
+    workflow:
+      - step: implementing
+        hooks:
+          post:
+            - id: run-tests
+  set:
+    description: 'Custom project schema description'
+```
+
+The five operations (`create`, `remove`, `set`, `append`, `prepend`) are all optional. They follow the same semantics as `mergeSchemaLayers` — see [`specs/core/schema-merge/spec.md`](../schema-merge/spec.md).
+
+`schemaOverrides` is validated structurally at startup (correct shape, valid operation keys). Semantic validation (e.g. removing a non-existent entry) happens at schema resolution time when the merge engine processes the override layer.
 
 ### Requirement: Context spec selection
 
@@ -432,15 +444,14 @@ The following conditions are **errors** that abort startup immediately:
 - `adapter` is missing in any `specs`, `schemas`, or storage section
 - Unknown adapter value in any `specs`, `schemas`, or storage section
 - Required adapter-specific fields are absent (e.g. `fs.path` missing when `adapter: fs`)
-- `requires` field present in a project-level `workflow` entry
 - Storage path (`changes.fs.path` or `archive.fs.path`) resolves outside the repo root
 - Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax (e.g. `*` in a disallowed position)
+- `schemaPlugins` entry is not a valid string reference
+- `schemaOverrides` has an invalid structure (unknown operation keys, wrong types)
 
 The following conditions emit **warnings** but allow startup to proceed:
 
-- Unknown key in `artifactRules` (no matching artifact ID in the active schema)
 - Duplicate workspace names (YAML retains last-wins; warn about the pattern)
-- Project-level workflow entry names a step not declared in the schema
 - Unknown workspace qualifier in a `contextIncludeSpecs` or `contextExcludeSpecs` pattern (runtime only — `specd config validate` treats this as an error)
 
 ## Constraints
@@ -450,7 +461,6 @@ The following conditions emit **warnings** but allow startup to proceed:
 - `specd.local.yaml` is always `.gitignored`; `specd init` must add it automatically
 - When `specd.local.yaml` is present it is the sole active config — `specd.yaml` is not read
 - `specd.local.yaml` must be a complete, valid config on its own; partial overrides are not supported
-- `requires` is not valid in project-level `workflow` entries — only `step` and `hooks` are accepted
 - Workspace names must match `/^[a-z][a-z0-9-]*$/`; `default` is reserved for the local project workspace
 - `ownership` values are limited to `readOnly`, `shared`, and `owned`
 - `isExternal` is not declared — it is inferred by the application layer from whether the resolved `specs.fs.path` is outside the project repo root
@@ -584,11 +594,14 @@ storage:
 # workspace-level contextIncludeSpecs defaults to ['*'] —
 # default, auth, and payments each load all their own specs when active
 
-workflow:
-  - step: archiving
-    hooks:
-      post:
-        - run: 'git -C {{codeRoot}} checkout -b specd/{{change.name}}'
+schemaOverrides:
+  append:
+    workflow:
+      - step: archiving
+        hooks:
+          post:
+            - id: create-branch
+              run: 'git -C {{codeRoot}} checkout -b specd/{{change.name}}'
 ```
 
 ### Project with workspace-specific schema
@@ -625,14 +638,20 @@ storage:
     fs:
       path: specd/archive
 
-artifactRules:
-  specs:
-    - 'All requirements must reference the platform contract they satisfy'
+schemaOverrides:
+  append:
+    artifacts:
+      - id: specs
+        rules:
+          post:
+            - id: platform-contract
+              text: 'All requirements must reference the platform contract they satisfy'
 ```
 
 ## Spec Dependencies
 
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — schema structure and resolution order
+- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — schema structure, `kind`, `extends`, and resolution order
+- [`specs/core/schema-merge/spec.md`](../schema-merge/spec.md) — merge engine operations used by `schemaOverrides`
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port and adapter design
 - [`specs/core/storage/spec.md`](../storage/spec.md) — storage adapter behavior
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal in step 5

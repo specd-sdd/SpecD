@@ -2,42 +2,39 @@
 
 ## Overview
 
-The `GetActiveSchema` use case resolves and returns the active schema for the project. It delegates to the `SchemaRegistry` port using the schema reference from `specd.yaml` and throws `SchemaNotFoundError` if resolution fails. This is the canonical way for delivery mechanisms to obtain the project's schema without duplicating resolution logic.
+The `GetActiveSchema` use case resolves and returns the active schema for the project. It delegates to `ResolveSchema` which orchestrates the full resolution pipeline (base schema → extends chain → plugins → overrides → merge → build). This is the canonical way for delivery mechanisms to obtain the project's schema without duplicating resolution logic.
 
 ## Requirements
 
 ### Requirement: Accepts no input
 
-`execute()` MUST take no arguments. The schema reference and workspace schemas paths are provided at construction time, not at invocation time.
+`execute()` MUST take no arguments. All configuration is provided at construction time, not at invocation time.
 
-### Requirement: Resolves the schema via SchemaRegistry
+### Requirement: Delegates to ResolveSchema
 
-The use case MUST call `SchemaRegistry.resolve(schemaRef, workspaceSchemasPaths)` to resolve the active schema. It SHALL NOT load schema files directly or implement any resolution logic itself.
+The use case MUST call `resolveSchema.execute()` to obtain the active schema. It SHALL NOT resolve schemas directly or implement any resolution logic itself. `ResolveSchema` handles the full pipeline: base resolution, extends chain, plugins, overrides, merge, and build.
 
 ### Requirement: Returns the resolved Schema on success
 
-`execute` MUST return `Promise<Schema>` — the fully-parsed schema value object resolved by the registry.
-
-### Requirement: Throws SchemaNotFoundError when resolution fails
-
-When `SchemaRegistry.resolve` returns `null`, the use case MUST throw a `SchemaNotFoundError` with the schema reference string. It MUST NOT return `null` — the error is the only failure signal.
+`execute` MUST return `Promise<Schema>` — the fully-resolved, customised schema.
 
 ### Requirement: Construction dependencies
 
-`GetActiveSchema` MUST be constructed with three dependencies:
+`GetActiveSchema` MUST be constructed with one dependency:
 
-- `schemas` (`SchemaRegistry`) — the registry port for resolving schema references.
-- `schemaRef` (`string`) — the schema reference from `specd.yaml` (e.g. `"@specd/schema-std"`).
-- `workspaceSchemasPaths` (`ReadonlyMap<string, string>`) — map of workspace name to absolute schemas directory path, used for workspace-qualified schema resolution.
+- `resolveSchema` (`ResolveSchema`) — the use case that orchestrates the full schema resolution pipeline.
+
+All lower-level dependencies (schema registry, schema ref, plugins, overrides) are provided to `ResolveSchema` at its construction time.
 
 ## Constraints
 
-- The use case contains no business logic beyond null-check and error conversion.
+- The use case contains no business logic — it is a thin delegation to `ResolveSchema`.
 - The schema reference is fixed at construction time — calling `execute` multiple times resolves the same reference.
 - The use case is async — it returns `Promise<Schema>`.
 
 ## Spec Dependencies
 
+- [`specs/core/resolve-schema/spec.md`](../resolve-schema/spec.md) — full schema resolution pipeline
 - [`specs/core/config/spec.md`](../config/spec.md) — schema reference field and resolution semantics
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `Schema` value object structure
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port/adapter design constraints

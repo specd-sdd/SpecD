@@ -7,7 +7,7 @@
 #### Scenario: Implementation satisfies the contract
 
 - **GIVEN** a concrete class implementing `SchemaRegistry`
-- **WHEN** the class implements both `resolve` and `list`
+- **WHEN** the class implements `resolve`, `resolveRaw`, and `list`
 - **THEN** it compiles and can be instantiated
 
 ### Requirement: Resolve method signature
@@ -51,6 +51,25 @@
 
 - **WHEN** `resolve` is called with `"./custom/schema.yaml"`
 - **THEN** the implementation loads from that path directly without prefix routing
+
+### Requirement: ResolveRaw method signature
+
+#### Scenario: ResolveRaw returns intermediate data on success
+
+- **GIVEN** a valid schema reference
+- **WHEN** `resolveRaw` is called
+- **THEN** it returns a `SchemaRawResult` with `data` (SchemaYamlData), `templates` (Map), and `resolvedPath` (string)
+
+#### Scenario: ResolveRaw returns null for missing schema
+
+- **GIVEN** a reference to a non-existent schema file
+- **WHEN** `resolveRaw` is called
+- **THEN** it returns `null`
+
+#### Scenario: ResolveRaw uses same prefix routing as resolve
+
+- **WHEN** `resolveRaw` is called with `"@specd/schema-std"`
+- **THEN** it resolves from the same location as `resolve` would
 
 ### Requirement: List result ordering
 

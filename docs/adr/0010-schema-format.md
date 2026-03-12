@@ -29,7 +29,7 @@ SpecD needs a schema system that defines the artifact workflow for a project (wh
 
 Chosen option: "Adopted format derived from the spec-driven baseline", because it resolves the baseline's inflexibilities — hardcoded operation keywords, conflated validation and approval concerns, missing context injection, and a fixed resolution path — while preserving its core structure.
 
-The nine key decisions are as follows:
+The fourteen key decisions are as follows. Decisions 1–8 define the original schema format; decisions 9–14 extend it with a schema customisation model.
 
 ### 1. Operation keywords are configurable at schema level
 
@@ -74,8 +74,6 @@ A top-level `workflow` array replaces the dedicated `apply` key. Each entry decl
 
 `tracks` is dropped entirely. For skills that work through a task list (e.g. `apply`), the skill scans all artifacts listed in its `requires` for markdown checkboxes. The `requires` list implicitly defines where the work is — no separate pointer needed.
 
-`specd.yaml` uses the same `workflow` format for project-level hook additions. Entries are matched by `skill` name; schema hooks fire first, then project hooks. This gives both levels a consistent format rather than a flat `hooks.pre-archive` key only available at project level.
-
 ### 8. Templates are files bundled with the schema; HTML comments are valid
 
 Each artifact can declare a `template` field — a path relative to the directory containing `schema.yaml`. By convention templates live in a `templates/` subdirectory, but the path is explicit in the field so authors can place them elsewhere if needed.
@@ -84,11 +82,62 @@ Each artifact can declare a `template` field — a path relative to the director
 
 This approach keeps templates as first-class files with full editor support (syntax highlighting, preview) rather than embedding content as YAML multiline strings. Bundling them with the schema package means they are distributed and versioned together.
 
-### 9. `artifactRules` in `specd.yaml` for project-level constraints
+### 9. Three customisation mechanisms: `extends`, `schemaPlugins`, `schemaOverrides`
 
-Teams often need to add project-specific constraints to artifact generation (e.g. "all requirements must reference the relevant RFC") without forking the schema. A top-level `artifactRules` field in `specd.yaml` provides this: keyed by artifact ID, each value is an array of rule strings injected by `CompileContext` alongside the schema's instruction.
+The monolithic schema model required forking an entire schema for any customisation. Three complementary mechanisms replace this:
 
-This avoids the schema fork problem — the team picks a community schema and adds project-specific constraints locally. Rules are validated against the active schema's artifact IDs on load (unknown IDs produce a warning, not an error). Rules are `instruction:`-only; `run:` hooks are not supported here.
+- **`extends`** — a schema-level field (`extends: string`) that declares a parent schema. The child inherits all parent definitions and may override or extend them. Chains are permitted (`A extends B extends C`); cycles produce `SchemaValidationError`. Both parent and child must have `kind: schema`.
+- **`schemaPlugins`** — a `specd.yaml`-level field (`schemaPlugins: string[]`) that lists schema-plugin references. Each plugin is a partial schema (`kind: schema-plugin`) containing only `description` and merge operations — no artifacts, workflow, or metadataExtraction of its own. Plugins are applied after extends resolution.
+- **`schemaOverrides`** — a `specd.yaml`-level inline block (`schemaOverrides: { create?, remove?, set?, append?, prepend? }`) for project-specific customisations. Applied last, after plugins.
+
+All three feed into a unified merge engine (`mergeSchemaLayers`) that applies operations in a fixed order. The resolution pipeline is: resolve base schema → resolve extends chain → resolve plugins → apply overrides → `buildSchema`.
+
+### 10. Five merge operations with fixed intra-layer order
+
+The merge engine supports five operations, applied in this fixed order within each layer:
+
+1. **`remove`** — delete entries from arrays by `id`/`step`, or remove scalar fields entirely
+2. **`create`** — add new entries to arrays (must not collide with existing `id`/`step`)
+3. **`prepend`** — insert entries at the beginning of arrays, in declaration order
+4. **`append`** — insert entries at the end of arrays, in declaration order
+5. **`set`** — replace scalar values (last-writer-wins for scalars)
+
+This fixed order ensures deterministic results regardless of declaration order within a layer. Cross-layer order is: extends → plugins (in declaration order) → overrides.
+
+### 11. `kind` field as schema type discriminator
+
+Every schema file must declare a `kind` field:
+
+- `kind: schema` — a full schema with artifacts, workflow, metadataExtraction, and optional `extends`
+- `kind: schema-plugin` — a partial schema containing only `description` and merge operations (no artifacts, workflow, or metadataExtraction)
+
+`kind` is required. Omitting it is a `SchemaValidationError`. This allows tooling and the merge engine to distinguish full schemas from plugins without inspecting content heuristically.
+
+### 12. Mandatory `id` on all array entries
+
+Every entry in schema arrays — `workflow[].hooks.pre[]`, `workflow[].hooks.post[]`, `artifacts[].validations[]`, `artifacts[].deltaValidations[]`, `artifacts[].rules.pre[]`, `artifacts[].rules.post[]`, `artifacts[].preHashCleanup[]`, and `metadataExtraction.*[]` — must carry an `id` field.
+
+Format: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters. IDs must be unique within their immediate array.
+
+Identity matching by `id` is how the merge engine targets specific entries for `remove`, `set`, and positional operations. Without mandatory IDs, the merge engine would need fragile content-based or index-based matching.
+
+Workflow steps use `step` instead of `id` as their identity field — the `step` name already serves this role.
+
+### 13. `rules.pre` / `rules.post` on artifacts
+
+Each artifact may declare `rules: { pre: [], post: [] }` — arrays of `{ id, text }` entries. `CompileContext` injects them as constraint blocks:
+
+- `rules.pre` — injected **before** the artifact's `instruction`
+- `rules.post` — injected **after** the artifact's `instruction`
+
+Project-specific rules are expressed as `schemaOverrides.append.artifacts[].rules.post` (or `.pre`), which supports both pre and post positions and all five merge operations.
+
+### 14. `schemaOverrides` replaces `artifactRules` and `workflow` in `specd.yaml`
+
+Two former `specd.yaml` fields are replaced by `schemaOverrides`:
+
+- **`artifactRules`** — replaced by `schemaOverrides` targeting `artifacts[].rules.post` (or `.pre`). The override model subsumes `artifactRules` with more granular control.
+- **`workflow`** (project-level hook additions) — replaced by `schemaOverrides` targeting `workflow[].hooks`. The override model allows not just appending hooks but also removing, prepending, or replacing them.
 
 ### Consequences
 
@@ -98,17 +147,23 @@ This avoids the schema fork problem — the team picks a community schema and ad
 - Good, because `metadataExtraction` enables targeted context injection without sending full file content to the AI
 - Good, because three-level schema resolution supports community schemas, user overrides, and project overrides in a consistent pattern
 - Good, because templates ship as first-class files with editor support, versioned alongside the schema
-- Good, because `artifactRules` lets teams extend any community schema without forking it
+- Good, because the three customisation mechanisms (`extends`, `schemaPlugins`, `schemaOverrides`) eliminate the need to fork schemas for any level of customisation
+- Good, because a unified merge engine with five operations and fixed order ensures deterministic, composable schema customisation
+- Good, because mandatory `id` on array entries enables stable identity matching across schema layers
+- Good, because `rules.pre`/`rules.post` on artifacts provide expressive control over constraint injection (before/after instruction, all five operations)
+- Good, because `schemaOverrides` consolidates all project-level customisation into a single mechanism, reducing config surface
 - Bad, because `mergeSpecs` must be updated — the current implementation hardcodes defaults and applies operations without conflict checks; both must be changed
 - Bad, because `ApproveChange` must become per-spec rather than per-change, requiring a manifest format update
 - Bad, because `SchemaRegistry` load-time validation adds startup cost proportional to the number of referenced template files
+- Bad, because mandatory `id` on all array entries adds verbosity to schema files — every hook, validation rule, and cleanup entry needs a unique identifier
 
 ### Confirmation
 
-`specs/core/schema-format/verify.md` scenarios serve as acceptance tests for the format. `mergeSpecs` unit tests verify schema-driven section resolution, configurable operation keywords, fixed apply order (RENAMED → REMOVED → MODIFIED → ADDED), and conflict detection before any mutation. `ValidateSpec` unit tests verify `validations[]`, `deltaValidations[]` (all three modes: file-level, `scope`, `eachBlock`), and that `deltaValidations[]` section names use the schema's resolved `deltaOperations` keywords.
+`specs/core/schema-format/verify.md` scenarios serve as acceptance tests for the format, including `kind`, `extends`, `id` uniqueness, and `rules.pre`/`rules.post` semantics. `specs/core/schema-merge/verify.md` scenarios cover the five merge operations, layer ordering, identity matching, and post-merge validation. `mergeSpecs` unit tests verify schema-driven section resolution, configurable operation keywords, fixed apply order (RENAMED → REMOVED → MODIFIED → ADDED), and conflict detection before any mutation. `ValidateSpec` unit tests verify `validations[]`, `deltaValidations[]` (all three modes: file-level, `scope`, `eachBlock`), and that `deltaValidations[]` section names use the schema's resolved `deltaOperations` keywords.
 
 ## More Information
 
 ### Spec
 
 - [`specs/core/schema-format/spec.md`](../../specs/core/schema-format/spec.md)
+- [`specs/core/schema-merge/spec.md`](../../specs/core/schema-merge/spec.md)

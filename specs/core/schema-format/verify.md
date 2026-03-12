@@ -6,13 +6,81 @@
 
 #### Scenario: Minimal valid schema
 
-- **WHEN** a schema file contains `name`, `version`, and at least one artifact
+- **WHEN** a schema file contains `kind: schema`, `name`, `version`, and at least one artifact
 - **THEN** `SchemaRegistry.resolve()` must return the parsed schema without error
 
 #### Scenario: Missing required field
 
 - **WHEN** a schema file is missing `name` or `version`
 - **THEN** `SchemaRegistry.resolve()` must throw a validation error
+
+### Requirement: Schema kind field
+
+#### Scenario: Missing kind field
+
+- **WHEN** a schema file omits the `kind` field
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+#### Scenario: Invalid kind value
+
+- **WHEN** a schema file declares `kind: extension`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+#### Scenario: Plugin with artifacts is rejected
+
+- **WHEN** a schema file declares `kind: schema-plugin` and also declares `artifacts`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+#### Scenario: Plugin with workflow is rejected
+
+- **WHEN** a schema file declares `kind: schema-plugin` and also declares `workflow`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+### Requirement: Schema extends
+
+#### Scenario: Simple extends chain resolved
+
+- **GIVEN** schema A declares `extends: '#child-schema'` and child-schema declares `extends: '#base-schema'`
+- **WHEN** schema A is resolved
+- **THEN** the resolution follows the chain: base-schema → child-schema → A, with each layer applied in order
+
+#### Scenario: Extends cycle detected
+
+- **GIVEN** schema A declares `extends: '#b'` and schema B declares `extends: '#a'`
+- **WHEN** schema A is resolved
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` identifying the cycle
+
+#### Scenario: Plugin with extends is rejected
+
+- **WHEN** a schema file declares `kind: schema-plugin` and also declares `extends: '#base'`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+#### Scenario: Extends references a non-existent schema
+
+- **WHEN** a schema declares `extends: '#nonexistent'` and no such schema exists
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaNotFoundError`
+
+### Requirement: Array entry identity
+
+#### Scenario: Valid id format accepted
+
+- **WHEN** a hook entry declares `id: run-tests`
+- **THEN** the schema loads without error
+
+#### Scenario: Invalid id format rejected
+
+- **WHEN** a hook entry declares `id: Run_Tests`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+#### Scenario: Duplicate id within same array rejected
+
+- **WHEN** two entries in `workflow[0].hooks.pre` both declare `id: run-tests`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+#### Scenario: Same id in different arrays is valid
+
+- **WHEN** `workflow[0].hooks.pre` has `id: run-tests` and `workflow[1].hooks.post` also has `id: run-tests`
+- **THEN** the schema loads without error — uniqueness is per-array, not global
 
 ### Requirement: Artifact definition
 
@@ -297,27 +365,36 @@
 - **WHEN** a step's `requires` lists an artifact that is not `complete`
 - **THEN** `CompileContext` must report that the step is blocked
 
-#### Scenario: Schema and project hooks merged
+#### Scenario: Hook entries require id
 
-- **WHEN** both the schema and `specd.yaml` define `workflow` entries for the same step
-- **THEN** schema hooks fire first, followed by project hooks, within the same `pre`/`post` event
+- **WHEN** a `workflow[].hooks.pre` entry omits the `id` field
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
-#### Scenario: requires in specd.yaml workflow entry rejected
+### Requirement: Artifact definition
 
-- **WHEN** a `specd.yaml` workflow entry includes a `requires` field
-- **THEN** the config loader must reject it with a validation error
+#### Scenario: Artifact with rules.pre and rules.post
 
-### Requirement: Project-level artifactRules
+- **GIVEN** an artifact declares `rules: { pre: [{ id: pre-rule, text: "Before instruction" }], post: [{ id: post-rule, text: "After instruction" }] }`
+- **WHEN** `CompileContext` assembles the instruction block for that artifact
+- **THEN** `pre-rule` text appears before the artifact's `instruction` and `post-rule` text appears after it
 
-#### Scenario: Rules injected into compiled context
+#### Scenario: preHashCleanup entry requires id
 
-- **WHEN** `specd.yaml` defines artifactRules for artifact `specs`
-- **THEN** `CompileContext` includes those rules in the compiled instruction block for the `specs` artifact
+- **WHEN** a `preHashCleanup` entry omits the `id` field
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
-#### Scenario: Unknown artifact ID in artifactRules
+### Requirement: Schema plugin kind
 
-- **WHEN** `specd.yaml` defines artifactRules for an artifact ID not present in the active schema
-- **THEN** `SchemaRegistry` emits a warning at load time and ignores those rules
+#### Scenario: Valid plugin with operations
+
+- **GIVEN** a schema file with `kind: schema-plugin`, `name: my-plugin`, `version: 1`, and merge operations
+- **WHEN** the plugin is resolved
+- **THEN** it loads successfully
+
+#### Scenario: Plugin with metadataExtraction is rejected
+
+- **WHEN** a schema-plugin declares `metadataExtraction`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
 ### Requirement: Schema resolution
 

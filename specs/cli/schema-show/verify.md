@@ -4,12 +4,24 @@
 
 ### Requirement: Output format
 
-#### Scenario: Text output shows schema name, artifacts, and workflow
+#### Scenario: Text output shows schema name, kind, artifacts, and workflow
 
-- **GIVEN** a valid schema with name `specd-std` version `1` and declared artifacts and workflow steps
+- **GIVEN** a valid schema with name `specd-std` version `1`, `kind: schema`, and declared artifacts and workflow steps
 - **WHEN** `specd schema show` is run
-- **THEN** stdout contains the schema name and version, an `artifacts:` section, and a `workflow:` section
+- **THEN** stdout contains the schema name, version, and kind, an `artifacts:` section, and a `workflow:` section
 - **AND** the process exits with code 0
+
+#### Scenario: Text output shows extends when present
+
+- **GIVEN** a schema that declares `extends: '@specd/schema-std'`
+- **WHEN** `specd schema show` is run
+- **THEN** stdout contains `extends: @specd/schema-std`
+
+#### Scenario: Text output shows plugin count when plugins are configured
+
+- **GIVEN** `specd.yaml` declares `schemaPlugins: ['@specd/plugin-rfc']`
+- **WHEN** `specd schema show` is run
+- **THEN** stdout contains `plugins: 1 applied`
 
 #### Scenario: Optional and required artifacts distinguished
 
@@ -32,8 +44,8 @@
 #### Scenario: JSON output structure
 
 - **WHEN** `specd schema show --format json` is run
-- **THEN** stdout is valid JSON with `schema`, `artifacts`, and `workflow`
-- **AND** `schema` has `name` and `version`
+- **THEN** stdout is valid JSON with `schema`, `plugins`, `artifacts`, and `workflow`
+- **AND** `schema` has `name`, `version`, `kind`, and optionally `extends`
 - **AND** each artifact entry has `id`, `scope`, `optional`, `requires`, `format`, and `delta`
 - **AND** each workflow entry has `step` and `requires`
 - **AND** the process exits with code 0

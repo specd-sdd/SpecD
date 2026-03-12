@@ -25,6 +25,8 @@ The module SHALL export a `SchemaYamlData` type representing the validated inter
 - `name: string` — the schema's machine identifier
 - `version: number` — integer schema version
 - `description?: string` — optional human-readable summary
+- `kind: 'schema' | 'schema-plugin'` — schema type discriminator
+- `extends?: string` — optional parent schema reference
 - `artifacts: ArtifactYaml[]` — array of raw artifact definitions as validated by Zod (NOT domain `ArtifactType` instances)
 - `workflow?: WorkflowStepRaw[]` — optional array of raw workflow step definitions before domain transform
 - `metadataExtraction?` — optional metadata extraction configuration as validated by Zod
@@ -41,9 +43,15 @@ After successful YAML parsing, the function SHALL validate the parsed object aga
 
 - `name` is a required string
 - `version` is a required integer
+- `kind` is a required enum (`schema` | `schema-plugin`)
+- `extends` is an optional string, only valid when `kind: schema`
 - `artifacts` is a required array of artifact objects, each validated for required fields (`id`, `scope`, `output`) and optional fields with correct types
+- Hook entries require an `id` field alongside `instruction` or `run`
+- Validation/deltaValidation rule entries require an `id` field
+- `preHashCleanup` entries require an `id` field
+- `rules` on artifacts is an optional object with `pre` and `post` arrays of `{ id, text }`
 - `workflow` is an optional array of workflow step objects
-- `metadataExtraction` is an optional object matching the metadata extraction schema
+- `metadataExtraction` is an optional object matching the metadata extraction schema; array entries require an `id` field
 - Unknown top-level fields SHALL be ignored (forward compatibility via Zod's default `strip` mode)
 
 The Zod schemas for selector fields within validation rules, metadata extractors, and related structures SHALL be imported from the existing `infrastructure/zod/selector-schema.ts` module to avoid duplication.
@@ -54,6 +62,7 @@ The Zod schema SHALL include refinement rules that enforce structural constraint
 
 - `deltaValidations` is only valid when `delta` is `true`
 - `delta: true` is not valid when `scope` is `change`
+- `kind: schema-plugin` must not declare `artifacts`, `workflow`, `metadataExtraction`, or `extends`
 
 These refinements SHALL produce descriptive error messages.
 
