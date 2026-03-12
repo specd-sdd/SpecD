@@ -1,0 +1,81 @@
+title: Get Spec
+description: The `GetSpec` use case loads a single spec and all of its artifact files by workspace name and spec path. It is the primary query for reading a complete spec with its content, used by delivery mechanisms that need to display or process spec artifacts.
+dependsOn:
+  - core:core/storage
+  - core:core/workspace
+  - core:core/spec-id-format
+context:
+  - The `GetSpec` use case loads a single spec and all of its artifact files by workspace name and spec path. It is the primary query for reading a complete spec with its content, used by delivery mechanisms that need to display or process spec artifacts.
+rules:
+  - requirement: Resolve workspace from input
+    rules:
+      - The use case SHALL look up the `SpecRepository` for the given `workspace` name. If the workspace does not exist in the configured repository map, the use case MUST throw a `WorkspaceNotFoundError`.
+  - requirement: Load spec by path
+    rules:
+      - The use case SHALL call `repo.get(specPath)` to load the spec metadata. If the spec does not exist (returns `null`), the use case MUST throw a `SpecNotFoundError` with a qualified identifier in the format `workspace:capabilityPath`.
+  - requirement: Load all artifact files
+    rules:
+      - When the spec exists, the use case SHALL iterate over `spec.filenames` and load each artifact via `repo.artifact(spec, filename)`. Only artifacts that return non-null are included in the result map. The result `artifacts` map MUST be keyed by filename.
+  - requirement: Return spec and artifacts
+    rules:
+      - |-
+        The use case SHALL return a `GetSpecResult` containing:
+
+        * `spec` — the `Spec` entity as returned by the repository.
+        * `artifacts` — a `Map<string, SpecArtifact>` of all successfully loaded artifacts.
+  - requirement: Input shape
+    rules:
+      - |-
+        `GetSpecInput` MUST include:
+
+        * `workspace` — the workspace name (string).
+        * `specPath` — a `SpecPath` value object identifying the spec within the workspace.
+constraints:
+  - The use case receives a ReadonlyMap<string, SpecRepository> — it MUST NOT modify the map or the repositories.
+  - The use case throws on missing workspace or missing spec — it does not return null for these cases.
+  - Artifacts that fail to load (return null from repo.artifact) are silently omitted from the result map; no error is thrown for individual missing artifact files.
+scenarios:
+  - requirement: Resolve workspace from input
+    name: Unknown workspace throws WorkspaceNotFoundError
+    when:
+      - "execute({ workspace: 'nonexistent', specPath }) is called"
+    then:
+      - a WorkspaceNotFoundError is thrown with message containing 'nonexistent'
+  - requirement: Load spec by path
+    name: Spec not found throws SpecNotFoundError
+    given:
+      - a valid workspace 'default' with no spec at path auth/oauth
+    when:
+      - "execute({ workspace: 'default', specPath: SpecPath.parse('auth/oauth') }) is called"
+    then:
+      - a SpecNotFoundError is thrown with message containing 'default:auth/oauth'
+  - requirement: Load all artifact files
+    name: All artifacts loaded successfully
+    given:
+      - a spec with filenames ['spec.md', 'verify.md', '.specd-metadata.yaml'] and all exist on disk
+    when:
+      - execute(input) is called
+    then:
+      - the result artifacts map contains entries for all three filenames
+  - requirement: Load all artifact files
+    name: Some artifacts missing on disk
+    given:
+      - a spec with filenames ['spec.md', 'verify.md'] where repo.artifact returns null for verify.md
+    when:
+      - execute(input) is called
+    then:
+      - the result artifacts map contains only 'spec.md'
+      - AND no error is thrown
+  - requirement: Return spec and artifacts
+    name: Successful retrieval returns spec entity and artifacts map
+    given:
+      - a spec exists at the requested path with two artifact files
+    when:
+      - execute(input) is called
+    then:
+      - the result contains the Spec entity at result.spec
+      - AND the result contains a Map at result.artifacts keyed by filename
+contentHashes:
+  spec.md: sha256:cc4b6c44ab1d4299db7c68b7964642d8f7accb8c8ff6e6996bf60385a44537a0
+  verify.md: sha256:d08df2b0cca89147ab83a9588b0102e91f5a959734ac69a9e55998ad1d60c597
+generatedBy: core

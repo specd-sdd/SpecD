@@ -1,0 +1,28 @@
+# ListChanges
+
+## Overview
+
+The `ListChanges` use case retrieves all active changes from the default workspace. Active changes are those that have not been drafted (shelved) or discarded. Delivery mechanisms use this to display the current working set of changes.
+
+## Requirements
+
+### Requirement: Returns all active changes
+
+`ListChanges.execute()` MUST return all changes that are neither drafted nor discarded. The result MUST be sorted by creation order, oldest first.
+
+### Requirement: Returns Change entities without content
+
+The returned `Change[]` MUST contain artifact state (status, validated hashes) but MUST NOT include artifact file content. Content is loaded on demand through separate use cases.
+
+### Requirement: Constructor accepts a ChangeRepository
+
+`ListChanges` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.list()` to retrieve changes.
+
+### Requirement: Returns an empty array when no active changes exist
+
+When the repository contains no active changes (all are drafted, discarded, or none exist), `execute()` MUST return an empty array. It MUST NOT throw.
+
+## Spec Dependencies
+
+- [`specs/core/change/spec.md`](../change/spec.md)
+- [`specs/core/kernel/spec.md`](../kernel/spec.md)

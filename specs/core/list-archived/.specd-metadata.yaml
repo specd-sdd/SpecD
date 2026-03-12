@@ -1,0 +1,80 @@
+title: ListArchived
+description: '`ListArchived` is the application use case that retrieves all archived changes in the default workspace. It is a read-only query with no side effects, no input parameters, and no lifecycle hooks.'
+dependsOn:
+  - core:core/archive-change
+  - core:core/storage
+  - core:core/kernel
+  - default:_global/architecture
+context:
+  - '`ListArchived` is the application use case that retrieves all archived changes in the default workspace. It is a read-only query with no side effects, no input parameters, and no lifecycle hooks.'
+rules:
+  - requirement: Ports and constructor
+    rules:
+      - |-
+        `ListArchived` receives at construction time a single dependency: `ArchiveRepository`.
+
+        ```typescript
+        class ListArchived {
+          constructor(archive: ArchiveRepository)
+        }
+        ```
+
+        The `ArchiveRepository` instance is scoped to the default workspace and is injected by the kernel composition layer.
+  - requirement: No input
+    rules:
+      - '`ListArchived.execute()` accepts no parameters. It always operates on the full set of archived changes in the repository.'
+  - requirement: Output
+    rules:
+      - '`ListArchived.execute()` MUST return `Promise<ArchivedChange[]>`. The returned array contains all archived changes in the repository, ordered oldest first (chronological order by `archivedAt`). If no archived changes exist, the result MUST be an empty array.'
+  - requirement: Delegation to ArchiveRepository
+    rules:
+      - '`ListArchived` MUST delegate entirely to `ArchiveRepository.list()`. It SHALL NOT apply additional filtering, sorting, or transformation to the repository result. The ordering guarantee (oldest first) is the responsibility of the `ArchiveRepository` port.'
+  - requirement: No side effects
+    rules:
+      - '`ListArchived` MUST NOT mutate any state. It SHALL NOT write to any repository, run hooks, or trigger any lifecycle operations. It is a pure read-only query.'
+constraints:
+  - ListArchived has no error cases of its own -- any errors originate from the ArchiveRepository infrastructure
+  - The use case does not accept workspace selection -- it operates on the single ArchiveRepository injected at construction time
+  - The returned ArchivedChange instances are immutable domain entities
+scenarios:
+  - requirement: No input
+    name: Execute called with no arguments
+    when:
+      - listArchived.execute() is called
+    then:
+      - it does not require any input parameters
+  - requirement: Output
+    name: Archive contains multiple changes
+    given:
+      - the archive repository contains three archived changes with distinct archivedAt timestamps
+    when:
+      - listArchived.execute() is called
+    then:
+      - the result is an array of three ArchivedChange instances ordered oldest first
+  - requirement: Output
+    name: Archive is empty
+    when:
+      - listArchived.execute() is called and the archive repository contains no entries
+    then:
+      - the result is an empty array
+  - requirement: Delegation to ArchiveRepository
+    name: Result matches repository output exactly
+    given:
+      - ArchiveRepository.list() returns a specific array of ArchivedChange instances
+    when:
+      - listArchived.execute() is called
+    then:
+      - the result is identical to the array returned by ArchiveRepository.list() -- no filtering, sorting, or transformation is applied
+  - requirement: No side effects
+    name: Repeated calls produce same result
+    given:
+      - the archive repository state does not change between calls
+    when:
+      - listArchived.execute() is called multiple times
+    then:
+      - each call returns the same result
+      - AND no repository write methods are invoked
+contentHashes:
+  spec.md: sha256:aa629637855c8522450e4b1b11f872d257ebfa98be77f4b32ad8c6b9e572647c
+  verify.md: sha256:e412860467e5540bc0c5576b4e0bea9646649b6b268757d59920752a632fda09
+generatedBy: core

@@ -1,0 +1,120 @@
+# Verification: Kernel
+
+## Requirements
+
+### Requirement: Kernel interface groups use cases by domain area
+
+#### Scenario: Use cases are nested under domain groups
+
+- **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+- **THEN** the returned object has exactly three top-level keys: `changes`, `specs`, `project`
+- **AND** each key contains an object with use case entries — not use cases at the root level
+
+#### Scenario: Changes group contains all change use cases
+
+- **WHEN** `kernel.changes` is inspected
+- **THEN** it contains entries for: `create`, `status`, `transition`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`
+- **AND** it contains `repo` as the underlying `ChangeRepository`
+
+#### Scenario: Specs group contains all spec use cases
+
+- **WHEN** `kernel.specs` is inspected
+- **THEN** it contains entries for: `approveSpec`, `approveSignoff`, `list`, `get`, `saveMetadata`, `invalidateMetadata`, `getActiveSchema`, `validate`, `generateMetadata`, `getContext`
+- **AND** it contains `repos` as the `ReadonlyMap<string, SpecRepository>`
+
+#### Scenario: Project group contains all project use cases
+
+- **WHEN** `kernel.project` is inspected
+- **THEN** it contains entries for: `init`, `recordSkillInstall`, `getSkillsManifest`, `getProjectContext`
+
+### Requirement: Every exported use case must have a kernel entry
+
+#### Scenario: New use case added without kernel entry
+
+- **GIVEN** a new use case class is added to `application/use-cases/` and exported from the use cases index
+- **WHEN** `createKernel` is inspected
+- **THEN** the new use case must have a corresponding entry in the `Kernel` interface and be wired in `createKernel`
+- **AND** omitting it is a spec violation
+
+#### Scenario: Shared utilities are exempt
+
+- **WHEN** `application/use-cases/_shared/` exports `checkMetadataFreshness`, `computeArtifactHash`, or `parseMetadata`
+- **THEN** these do not require kernel entries — they are internal building blocks
+
+### Requirement: Kernel entry mapping
+
+#### Scenario: Every mapped entry exists at the documented path
+
+- **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+- **THEN** every kernel path listed in the entry mapping table resolves to a non-undefined value
+- **AND** each value is an instance of the use case class documented in the table
+
+#### Scenario: No undocumented entries in the kernel
+
+- **WHEN** the keys of `kernel.changes`, `kernel.specs`, and `kernel.project` are enumerated
+- **THEN** every key appears in the entry mapping table — there are no undocumented entries
+
+#### Scenario: Entry added to kernel without updating the mapping table
+
+- **GIVEN** a new use case is wired into `createKernel` under `kernel.changes.newUseCase`
+- **WHEN** the kernel spec is reviewed
+- **THEN** the entry mapping table must include the new path — omitting it is a spec violation
+
+### Requirement: Kernel entries must match use case types
+
+#### Scenario: Kernel entry type matches use case class
+
+- **WHEN** `kernel.changes.create` is inspected
+- **THEN** it is an instance of `CreateChange`
+- **AND** calling `kernel.changes.create.execute(...)` invokes the use case directly
+
+#### Scenario: Kernel does not wrap use cases in abstractions
+
+- **WHEN** any kernel entry is inspected
+- **THEN** its type is the concrete use case class, not a wrapper, proxy, or simplified interface
+
+### Requirement: createKernel constructs shared adapters once
+
+#### Scenario: No duplicate adapter construction
+
+- **WHEN** `createKernel(config)` is called
+- **THEN** `createKernelInternals` is called exactly once
+- **AND** the returned adapter instances (repositories, VCS adapter, hook runner, hasher, etc.) are shared across all use case instantiations
+
+### Requirement: Kernel exposes repository instances for adapter access
+
+#### Scenario: ChangeRepository accessible via kernel
+
+- **WHEN** `kernel.changes.repo` is accessed
+- **THEN** it returns the `ChangeRepository` instance used by all change use cases
+
+#### Scenario: SpecRepository map accessible via kernel
+
+- **WHEN** `kernel.specs.repos` is accessed
+- **THEN** it returns a `ReadonlyMap<string, SpecRepository>` with one entry per configured workspace
+
+### Requirement: createKernel accepts optional KernelOptions
+
+#### Scenario: Extra node_modules paths appended to schema search
+
+- **GIVEN** a `KernelOptions` with `extraNodeModulesPaths: ['/usr/lib/node_modules']`
+- **WHEN** `createKernel(config, options)` is called
+- **THEN** the schema registry searches the project's own `node_modules` first, then `/usr/lib/node_modules`
+
+#### Scenario: No options provided
+
+- **WHEN** `createKernel(config)` is called without options
+- **THEN** the schema registry searches only the project's own `node_modules`
+
+### Requirement: Kernel is a plain object, not a class
+
+#### Scenario: Kernel has no methods or lifecycle
+
+- **WHEN** the kernel object is inspected
+- **THEN** it has no `dispose()`, `shutdown()`, `initialize()`, or similar lifecycle methods
+- **AND** it has no event emitter or observable properties
+
+#### Scenario: Kernel is immutable after creation
+
+- **WHEN** `createKernel(config)` returns
+- **THEN** the kernel object and its nested groups are not expected to change — there is no `addUseCase()` or `removeUseCase()` mechanism

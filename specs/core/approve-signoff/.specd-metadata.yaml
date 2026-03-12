@@ -1,0 +1,134 @@
+title: ApproveSignoff
+description: The `ApproveSignoff` use case records a signoff on a change and transitions it to the `signed-off` state. It enforces that the signoff gate is enabled, computes artifact hashes using schema-defined pre-hash cleanup rules, and persists the updated change. This is the only path through the signoff gate in the change lifecycle.
+dependsOn:
+  - core:core/change
+  - core:core/schema-format
+  - core:core/composition
+  - core:core/kernel
+context:
+  - The `ApproveSignoff` use case records a signoff on a change and transitions it to the `signed-off` state. It enforces that the signoff gate is enabled, computes artifact hashes using schema-defined pre-hash cleanup rules, and persists the updated change. This is the only path through the signoff gate in the change lifecycle.
+rules:
+  - requirement: Gate guard
+    rules:
+      - The use case MUST reject the operation with an `ApprovalGateDisabledError` if the `approvalsSignoff` input flag is `false`. The gate check MUST occur before any repository access or side effects.
+  - requirement: Change lookup
+    rules:
+      - The use case MUST load the change by name from the `ChangeRepository`. If no change with the given name exists, it MUST throw a `ChangeNotFoundError`.
+  - requirement: Artifact hash computation
+    rules:
+      - |-
+        Before recording the signoff, the use case MUST compute a content hash for every artifact in the change. For each artifact:
+
+        1. Load the artifact content from the repository via `ChangeRepository.artifact()`.
+        2. If the artifact cannot be loaded (returns `null`), skip it silently.
+        3. Resolve the active schema from the `SchemaRegistry` using the configured schema reference and workspace schema paths.
+        4. If the schema resolves, build a cleanup map of artifact-type to pre-hash cleanup rules; if it does not resolve, use an empty cleanup map.
+        5. Apply the matching cleanup rules (by artifact type) to the content, then hash the cleaned content via the `ContentHasher`.
+
+        The result is a `Record<string, string>` mapping artifact filename to hash string.
+  - requirement: Signoff recording and state transition
+    rules:
+      - |-
+        The use case MUST resolve the current actor identity via the `ActorResolver`, then:
+
+        1. Call `change.recordSignoff(reason, artifactHashes, actor)` to append a `signed-off` history event.
+        2. Call `change.transition('signed-off', actor)` to advance the lifecycle state.
+
+        The `Change` entity enforces that the transition from the current state to `signed-off` is valid. If the change is not in `pending-signoff` state, the entity throws an `InvalidStateTransitionError`.
+  - requirement: Persistence and return value
+    rules:
+      - After recording the signoff and transitioning state, the use case MUST persist the change via `ChangeRepository.save()` and return the updated `Change` entity.
+  - requirement: Input contract
+    rules:
+      - |-
+        The `ApproveSignoffInput` interface MUST include:
+
+        * `name` (string) -- the change slug identifying the target change.
+        * `reason` (string) -- free-text rationale recorded in the signoff event.
+        * `approvalsSignoff` (boolean) -- whether the signoff gate is enabled in the active configuration.
+
+        All fields are required and readonly.
+constraints:
+  - The gate check MUST be the first validation step -- no I/O occurs if the gate is disabled.
+  - Artifact hashes are computed from on-disk content at signoff time, not from cached or in-memory state.
+  - The use case does not validate artifact content beyond hashing it -- content validation is a separate concern.
+  - The use case does not determine whether the gate should be enabled; the caller passes that decision as approvalsSignoff.
+scenarios:
+  - requirement: Gate guard
+    name: Signoff gate is disabled
+    when:
+      - 'execute() is called with approvalsSignoff: false'
+    then:
+      - an ApprovalGateDisabledError is thrown with gate 'signoff'
+      - AND no repository access occurs
+  - requirement: Change lookup
+    name: Change does not exist
+    given:
+      - the signoff gate is enabled
+    when:
+      - execute() is called with a name that does not exist in the repository
+    then:
+      - a ChangeNotFoundError is thrown
+  - requirement: Artifact hash computation
+    name: Artifacts are hashed with schema cleanup rules
+    given:
+      - the change has two artifacts of type spec and verify
+      - AND the schema defines a pre-hash cleanup rule for spec but not verify
+    when:
+      - the use case computes artifact hashes
+    then:
+      - the spec artifact content has the cleanup rule applied before hashing
+      - AND the verify artifact content is hashed without cleanup
+  - requirement: Artifact hash computation
+    name: Artifact cannot be loaded
+    given:
+      - the change has an artifact entry but ChangeRepository.artifact() returns null for it
+    when:
+      - the use case computes artifact hashes
+    then:
+      - that artifact is skipped and does not appear in the hash map
+  - requirement: Artifact hash computation
+    name: Schema does not resolve
+    given:
+      - the SchemaRegistry returns null for the configured schema reference
+    when:
+      - the use case computes artifact hashes
+    then:
+      - all artifacts are hashed without any pre-hash cleanup rules applied
+  - requirement: Signoff recording and state transition
+    name: Change is in pending-signoff state
+    given:
+      - the change is in pending-signoff state
+    when:
+      - execute() completes successfully
+    then:
+      - the change history contains a signed-off event with the provided reason, computed artifact hashes, and the resolved actor
+      - AND the change state is signed-off
+  - requirement: Signoff recording and state transition
+    name: Change is not in pending-signoff state
+    given:
+      - the change is in drafting state
+    when:
+      - execute() is called
+    then:
+      - an InvalidStateTransitionError is thrown
+  - requirement: Persistence and return value
+    name: Change is saved and returned
+    given:
+      - a successful signoff
+    when:
+      - execute() returns
+    then:
+      - ChangeRepository.save() has been called with the updated change
+      - AND the returned Change has state signed-off
+  - requirement: Input contract
+    name: All input fields are required
+    when:
+      - ApproveSignoffInput is constructed
+    then:
+      - name, reason, and approvalsSignoff are all required
+      - AND all fields are readonly
+contentHashes:
+  spec.md: sha256:bffefc8a09de5532fb77432acd811f908f0c968962c087b5dd6d228cdcab0791
+  verify.md: sha256:f4f2dd06a8ef74c593ef000083c63fabceb38b2c5643f397ce7fd343b37929bb
+generatedBy: core

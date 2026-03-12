@@ -1,0 +1,52 @@
+# RestoreChange
+
+## Overview
+
+The `RestoreChange` use case recovers a drafted change by appending a `restored` event to its history. The repository implementation moves the change directory from `drafts/` back to `changes/` when persisted.
+
+## Requirements
+
+### Requirement: Input contract
+
+`RestoreChange.execute` SHALL accept a `RestoreChangeInput` with the following field:
+
+- `name` (string, required) — the drafted change to restore
+
+### Requirement: Change must exist
+
+The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
+
+### Requirement: Actor resolution
+
+The use case MUST resolve the current actor identity via the `ActorResolver` port. The resolved actor is recorded in the `restored` event.
+
+### Requirement: Restored event appended to history
+
+The use case MUST call `change.restore(actor)` to append a `restored` event to the change's history. The event records:
+
+- `type`: `'restored'`
+- `at`: the current timestamp
+- `by`: the resolved actor identity
+
+### Requirement: Persistence
+
+After appending the restored event, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` instance. The repository implementation is responsible for relocating the change directory back to `changes/`.
+
+### Requirement: Dependencies
+
+`RestoreChange` depends on two ports injected via constructor:
+
+- `ChangeRepository` — for loading and persistence
+- `ActorResolver` — for resolving the current actor identity
+
+## Constraints
+
+- The use case MUST NOT perform any state transitions — restoring is orthogonal to lifecycle state
+- The use case delegates directory relocation entirely to the repository layer
+- The `isDrafted` property on the `Change` entity is derived from the most recent `drafted` or `restored` event in history
+
+## Spec Dependencies
+
+- [`specs/core/change/spec.md`](../change/spec.md)
+- [`specs/core/draft-change/spec.md`](../draft-change/spec.md)
+- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md)
