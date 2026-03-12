@@ -1,3 +1,4 @@
+kind: schema
 name: schema-std
 version: 1
 description: Standard SpecD workflow — proposal → specs → design → tasks
@@ -18,14 +19,16 @@ artifacts:
       - **What changes**: Bullet list of the concrete changes — new capabilities, modified
         behaviour, removals. Mark breaking changes explicitly.
       - **Specs affected**: List every spec that will be created or modified.
-        - New specs: each becomes a new `specs/<path>/spec.md` file.
-        - Modified specs: each needs a delta file. Run `specd list --specs` to see
-          existing specs with their exact paths before filling this in.
+        - New specs: each becomes a new `<workspace>:<capability-path>` spec.
+        - Modified specs: each needs a delta file. Run `specd spec list --format json --summary` to see
+          existing specs with their exact paths and a summary for discovery, and
+          `specd spec show <workspace>:<capability-path> --format json` for full review before filling this in.
       - **Impact**: Affected code areas, APIs, data models, or external dependencies.
       - **Open questions**: Unresolved decisions that must be settled before spec work begins.
 
       This section is the contract between proposal and specs — every spec listed here
-      will need a corresponding spec.md. Research existing specs before filling it in.
+      will need a corresponding `<workspace>:<capability-path>` spec. Research existing specs
+      before filling it in.
 
       Keep it concise (1–2 pages). Focus on the "why", not the "how" — implementation
       details belong in design.md.
@@ -39,30 +42,33 @@ artifacts:
     requires:
       - proposal
     instruction: |
-      Create or update specification files that define WHAT the system should do.
-      One spec file per capability listed in the proposal's "Specs affected" section.
+      Create new specification files for every new spec listed in the proposal's
+      "Specs affected" section. Each new spec defines WHAT the system should do for
+      one capability.
+
+      The proposal lists each spec as `<workspace>:<capability-path>`. Use those
+      components to create `specs/<workspace>/<capability-path>/spec.md` using the
+      template.
 
       Format requirements:
+      - Include a Purpose section explaining what this capability is and why it exists.
       - Use `### Requirement: <name>` for each requirement.
       - Use SHALL / MUST for normative statements. Avoid "should" or "may" for hard rules.
       - Do not include WHEN/THEN scenarios here — those go in verify.md.
 
-      For new specs: create `specs/<workspace>/<capability-path>/spec.md` using the template.
-      The workspace segment matches the workspace ID from `specd.yaml` (e.g. `default`).
-      Include a Purpose section and at least one Requirement.
-
-      For modified specs: do not rewrite the file. Produce a delta file instead
-      (`deltas/<workspace>/<capability-path>/spec.md.delta.yaml`). Read the existing spec
-      first to understand its current structure before writing the delta.
-
       Common pitfalls:
       - Using the wrong heading level. Requirements are `###`, never `##` or `####`.
       - Mixing requirement content into the Purpose section.
-      - Forgetting to read the existing spec before writing a MODIFIED delta — the
-        selector must match the exact heading text.
     delta: true
     deltaInstruction: |
-      Produce a delta file when modifying an existing spec rather than rewriting it.
+      For every modified spec listed in the proposal's "Specs affected" section,
+      produce a delta file instead of rewriting the existing file.
+
+      The proposal lists each spec as `<workspace>:<capability-path>`. Use those
+      components to create `deltas/<workspace>/<capability-path>/spec.md.delta.yaml`.
+
+      Read the existing spec first (`specd spec show <workspace>:<capability-path>`)
+      to understand its current structure before writing the delta.
 
       Operations:
       - **added**: New requirement. Use `position.parent` targeting the Requirements
@@ -75,15 +81,23 @@ artifacts:
       - **renamed**: Name change only. Use `from` / `to` in the selector.
 
       Every `### Requirement:` heading in `content` must use exactly three hashtags.
+
+      Common pitfalls:
+      - Forgetting to read the existing spec before writing a MODIFIED delta — the
+        selector must match the exact heading text.
+      - Writing a full spec file instead of a delta — never rewrite an existing spec.
     validations:
-      - type: section
+      - id: has-purpose-or-overview
+        type: section
         matches: '^Purpose$|^Overview$'
         required: true
-      - type: section
+      - id: has-requirements
+        type: section
         matches: '^Requirements$'
         required: true
         children:
-          - type: section
+          - id: has-requirement-block
+            type: section
             matches: '^Requirement:'
             required: true
   # ── verify ─────────────────────────────────────────────────────────────────
@@ -95,7 +109,12 @@ artifacts:
     requires:
       - specs
     instruction: |
-      Create the verification file that describes HOW to confirm the spec is satisfied.
+      Create verification files for every new spec listed in the proposal's
+      "Specs affected" section. Each verify file describes HOW to confirm the
+      spec is satisfied.
+
+      The proposal lists each spec as `<workspace>:<capability-path>`. Create
+      `specs/<workspace>/<capability-path>/verify.md` using the template.
 
       Format requirements:
       - Top-level heading: `# Verification: <spec name>`
@@ -113,8 +132,14 @@ artifacts:
       is fully described by a parent requirement's scenarios.
     delta: true
     deltaInstruction: |
-      Produce a delta file (`deltas/<workspace>/<capability-path>/verify.md.delta.yaml`)
-      when modifying verification scenarios for an existing spec.
+      For every modified spec listed in the proposal's "Specs affected" section,
+      produce a delta file for its verification scenarios.
+
+      The proposal lists each spec as `<workspace>:<capability-path>`. Create
+      `deltas/<workspace>/<capability-path>/verify.md.delta.yaml`.
+
+      Read the existing verify.md first (`specd spec show <workspace>:<capability-path>`)
+      to understand its current structure before writing the delta.
 
       Operations:
       - **modified**: Updated scenarios under an existing requirement. Selector targets
@@ -130,21 +155,25 @@ artifacts:
 
       Every `#### Scenario:` heading in `content` must use exactly four hashtags.
     deltaValidations:
-      - type: sequence-item
+      - id: added-has-scenario
+        type: sequence-item
         where:
           op: 'added|modified'
         contentMatches: '#### Scenario:'
         required: true
     validations:
-      - type: section
+      - id: has-requirements
+        type: section
         matches: '^Requirements$'
         required: true
         children:
-          - type: section
+          - id: has-requirement-block
+            type: section
             matches: '^Requirement:'
             required: true
             children:
-              - type: section
+              - id: has-scenario
+                type: section
                 matches: '^Scenario:'
                 required: true
 
@@ -221,11 +250,14 @@ artifacts:
 
       Each task should be verifiable — you know unambiguously when it is done.
     preHashCleanup:
-      - pattern: '^\s*-\s+\[x\]'
+      - id: normalize-checkboxes
+        pattern: '^\s*-\s+\[x\]'
         replacement: '- [ ]'
     taskCompletionCheck:
       incompletePattern: '^\s*-\s+\[ \]'
       completePattern: '^\s*-\s+\[x\]'
+
+# ── metadataExtraction ──────────────────────────────────────────────────────────────────
 
 metadataExtraction:
   title:
@@ -246,7 +278,8 @@ metadataExtraction:
       capture: '\[.*?\]\(([^)]+)\)'
       transform: resolveSpecPath
   rules:
-    - artifact: specs
+    - id: spec-requirements
+      artifact: specs
       extractor:
         selector:
           type: section
@@ -256,14 +289,16 @@ metadataExtraction:
         strip: '^Requirement:\s*'
         extract: content
   constraints:
-    - artifact: specs
+    - id: spec-constraints
+      artifact: specs
       extractor:
         selector:
           type: list-item
           parent: { type: section, matches: '^Constraints$' }
         extract: label
   scenarios:
-    - artifact: verify
+    - id: verify-scenarios
+      artifact: verify
       extractor:
         selector:
           type: section
@@ -285,17 +320,21 @@ metadataExtraction:
             capture: '^THEN\s+(.+)'
             followSiblings: '^(?:AND|OR)\b'
   context:
-    - artifact: specs
+    - id: spec-overview
+      artifact: specs
       extractor:
         selector: { type: section, matches: '^Overview$|^Purpose$' }
         extract: content
+
+# ── workflows ──────────────────────────────────────────────────────────────────
 
 workflow:
   - step: designing
     requires: []
     hooks:
       pre:
-        - instruction: |
+        - id: designing-guidance
+          instruction: |
             Start with the proposal — establish why the change is needed and which specs
             will be created or modified. Once the proposal is ready, write
             `specs/<workspace>/<capability-path>/spec.md` and the paired `verify.md` for
@@ -308,20 +347,24 @@ workflow:
     requires: [tasks]
     hooks:
       pre:
-        - instruction: |
+        - id: implementing-guidance
+          instruction: |
             Read tasks.md. Work through tasks one by one in order, marking each complete
             (- [x]) as you go. Pause and ask for guidance if you hit a blocker or the
             task is ambiguous. Do not advance to verifying while any - [ ] items remain.
       post:
-        - run: 'pnpm test'
-        - instruction: |
+        - id: run-tests
+          run: 'pnpm test'
+        - id: confirm-tests
+          instruction: |
             Confirm all tests pass before marking implementing complete.
 
   - step: verifying
     requires: [verify]
     hooks:
       pre:
-        - instruction: |
+        - id: verifying-guidance
+          instruction: |
             Run through every scenario in verify.md. For each one, confirm the implementation
             satisfies it by inspecting the code and running the relevant tests. If a scenario
             fails, return to implementing — do not mark verifying complete until all scenarios pass.
@@ -330,12 +373,15 @@ workflow:
     requires: [specs, tasks]
     hooks:
       pre:
-        - run: 'pnpm test'
-        - instruction: |
+        - id: run-tests
+          run: 'pnpm test'
+        - id: archiving-guidance
+          instruction: |
             Review the delta files before confirming the archive. Confirm that every modified
             spec accurately reflects what was actually built. If the implementation diverged
             from the spec, update the spec now rather than archiving an inaccurate record.
       post:
-        - instruction: |
+        - id: summarise-archive
+          instruction: |
             Summarise what changed in this archive for the commit message. List each spec
             created or modified and the key requirement changes.
