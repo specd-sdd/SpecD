@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 
 /**
  * Registers the `change discard` subcommand on the given parent command.
@@ -18,8 +18,7 @@ export function registerChangeDiscard(parent: Command): void {
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
         if (opts.reason.trim().length === 0) {
-          process.stderr.write('error: --reason must not be empty\n')
-          process.exit(1)
+          cliError('--reason must not be empty', opts.format)
         }
         const { kernel } = await resolveCliContext({ configPath: opts.config })
         await kernel.changes.discard.execute({
@@ -33,7 +32,7 @@ export function registerChangeDiscard(parent: Command): void {
           output({ result: 'ok', name }, fmt)
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

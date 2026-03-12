@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { listSkills } from '@specd/skills'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import { vlen, pad } from '../../helpers/table.js'
 import { KNOWN_AGENTS } from '../../helpers/known-agents.js'
 import { fileExists } from '../../helpers/file-exists.js'
@@ -43,8 +43,7 @@ export function registerSkillsList(parent: Command): void {
     .action(async (opts: { agent?: string; format: string }) => {
       try {
         if (opts.agent !== undefined && !(opts.agent in KNOWN_AGENTS)) {
-          process.stderr.write(`error: unknown agent '${opts.agent}'\n`)
-          process.exit(1)
+          cliError(`unknown agent '${opts.agent}'`, opts.format)
         }
 
         const skills = listSkills()
@@ -95,7 +94,7 @@ export function registerSkillsList(parent: Command): void {
           output(rows, fmt)
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

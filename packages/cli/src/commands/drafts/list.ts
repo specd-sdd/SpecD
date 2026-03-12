@@ -107,7 +107,7 @@ export function registerDraftsList(parent: Command): void {
           )
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

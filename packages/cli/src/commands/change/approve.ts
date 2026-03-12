@@ -38,7 +38,7 @@ export function registerChangeApprove(parent: Command): void {
           output({ result: 'ok', gate: 'spec', name }, fmt)
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 
@@ -67,7 +67,7 @@ export function registerChangeApprove(parent: Command): void {
           output({ result: 'ok', gate: 'signoff', name }, fmt)
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 import { collect } from '../../helpers/collect.js'
 
@@ -37,10 +37,10 @@ export function registerChangeEdit(parent: Command): void {
             opts.addSpec.length > 0 || opts.removeSpec.length > 0 || opts.description !== undefined
 
           if (!hasChanges) {
-            process.stderr.write(
-              'error: at least one of --add-spec, --remove-spec, or --description must be provided\n',
+            cliError(
+              'at least one of --add-spec, --remove-spec, or --description must be provided',
+              opts.format,
             )
-            process.exit(1)
           }
 
           const addSpecIds =
@@ -87,7 +87,7 @@ export function registerChangeEdit(parent: Command): void {
             )
           }
         } catch (err) {
-          handleError(err)
+          handleError(err, opts.format)
         }
       },
     )

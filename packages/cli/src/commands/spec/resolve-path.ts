@@ -2,7 +2,7 @@ import * as path from 'node:path'
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 
 /**
  * Registers the `spec resolve-path` subcommand on the given parent command.
@@ -46,10 +46,10 @@ export function registerSpecResolvePath(parent: Command): void {
         }
 
         if (result === null) {
-          process.stderr.write(
-            `error: path does not fall under any configured workspace's specsPath: ${absolute}\n`,
+          cliError(
+            `path does not fall under any configured workspace's specsPath: ${absolute}`,
+            opts.format,
           )
-          process.exit(1)
         }
 
         const fmt = parseFormat(opts.format)
@@ -66,7 +66,7 @@ export function registerSpecResolvePath(parent: Command): void {
           )
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

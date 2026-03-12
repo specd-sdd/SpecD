@@ -3,7 +3,7 @@ import { stringify } from 'yaml'
 import { SpecPath } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
@@ -29,18 +29,14 @@ export function registerSpecGenerateMetadata(parent: Command): void {
           const parsed = parseSpecId(specPath, config)
 
           if (opts.force === true && opts.write !== true) {
-            process.stderr.write('error: --force requires --write\n')
-            process.exit(1)
-            return
+            cliError('--force requires --write', opts.format)
           }
 
           const specId = `${parsed.workspace}:${parsed.capabilityPath}`
           const result = await kernel.specs.generateMetadata.execute({ specId })
 
           if (!result.hasExtraction) {
-            process.stderr.write('error: schema has no metadataExtraction declarations\n')
-            process.exit(1)
-            return
+            cliError('schema has no metadataExtraction declarations', opts.format)
           }
 
           const yamlContent = stringify(result.metadata, { lineWidth: 0 })
@@ -68,7 +64,7 @@ export function registerSpecGenerateMetadata(parent: Command): void {
             }
           }
         } catch (err) {
-          handleError(err)
+          handleError(err, opts.format)
         }
       },
     )

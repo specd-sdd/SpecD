@@ -35,7 +35,7 @@ export function registerChangeSkipArtifact(parent: Command): void {
             output({ result: 'ok', name, artifactId }, fmt)
           }
         } catch (err) {
-          handleError(err)
+          handleError(err, opts.format)
         }
       },
     )

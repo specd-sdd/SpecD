@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 
 /**
  * Registers the `discarded show` subcommand on the given parent command.
@@ -21,8 +21,7 @@ export function registerDiscardedShow(parent: Command): void {
 
         const isDiscarded = change.history.some((e: { type: string }) => e.type === 'discarded')
         if (!isDiscarded) {
-          process.stderr.write(`error: change '${name}' is not in discarded\n`)
-          process.exit(1)
+          cliError(`change '${name}' is not in discarded`, opts.format)
         }
 
         // Find the discarded event for reason
@@ -55,7 +54,7 @@ export function registerDiscardedShow(parent: Command): void {
           )
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

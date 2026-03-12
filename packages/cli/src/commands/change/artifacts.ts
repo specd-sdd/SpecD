@@ -101,7 +101,7 @@ export function registerChangeArtifacts(parent: Command): void {
           )
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

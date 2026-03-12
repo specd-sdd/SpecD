@@ -98,9 +98,59 @@
 - **WHEN** a command is run with `--format toon`
 - **THEN** stdout contains a TOON-encoded representation of the same data model as the JSON output
 
-#### Scenario: Errors always go to stderr regardless of format
+#### Scenario: Errors go to stderr regardless of format
 
 - **GIVEN** a domain error occurs during a command run with `--format json`
 - **WHEN** the command fails
 - **THEN** stderr contains an `error:` line in plain text
+
+#### Scenario: Errors in text format produce empty stdout
+
+- **GIVEN** a domain error occurs during a command run with `--format text`
+- **WHEN** the command fails
+- **THEN** stderr contains an `error:` line in plain text
 - **AND** stdout is empty
+
+### Requirement: Structured error output
+
+#### Scenario: JSON format produces structured error on stdout
+
+- **GIVEN** a domain error with code `CHANGE_NOT_FOUND` occurs
+- **WHEN** the command was run with `--format json`
+- **THEN** stdout contains valid JSON: `{"result": "error", "code": "CHANGE_NOT_FOUND", "message": "...", "exitCode": 1}`
+- **AND** stderr still contains the `error:` line in plain text
+
+#### Scenario: TOON format produces structured error on stdout
+
+- **GIVEN** a domain error occurs
+- **WHEN** the command was run with `--format toon`
+- **THEN** stdout contains a TOON-encoded error object with `result`, `code`, `message`, and `exitCode`
+- **AND** stderr still contains the `error:` line in plain text
+
+#### Scenario: Schema error produces structured error in JSON format
+
+- **GIVEN** a `SchemaNotFoundError` occurs
+- **WHEN** the command was run with `--format json`
+- **THEN** stdout contains `{"result": "error", "code": "SCHEMA_NOT_FOUND", "message": "...", "exitCode": 3}`
+- **AND** stderr contains a `fatal:` line in plain text
+
+#### Scenario: Unexpected system error does not produce structured stdout
+
+- **GIVEN** an unexpected error (not a `SpecdError` subclass) occurs
+- **WHEN** the command was run with `--format json`
+- **THEN** stderr contains a `fatal:` line in plain text
+- **AND** stdout is empty
+
+#### Scenario: Hook failure produces structured error in JSON format
+
+- **GIVEN** a hook failure occurs
+- **WHEN** the command was run with `--format json`
+- **THEN** stdout contains `{"result": "error", "code": "HOOK_FAILED", "message": "...", "exitCode": 2}`
+- **AND** stderr contains the hook error in plain text
+
+#### Scenario: Text format errors do not produce structured stdout
+
+- **GIVEN** a domain error occurs
+- **WHEN** the command was run with `--format text` (or without `--format`)
+- **THEN** stdout is empty
+- **AND** stderr contains the `error:` line in plain text

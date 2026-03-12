@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
@@ -56,7 +56,7 @@ describe('change validate', () => {
       .parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'auth/login'])
       .catch(() => {})
 
-    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
     expect(stdout()).toContain('validation failed')
     expect(stdout()).toContain('missing required section')
   })
@@ -159,6 +159,6 @@ describe('change validate', () => {
     expect(parsed.passed).toBe(false)
     expect(parsed.failures.length).toBeGreaterThan(0)
     expect(parsed.failures[0].artifactId).toBe('spec')
-    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 })

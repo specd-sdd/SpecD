@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import { collect } from '../../helpers/collect.js'
 
 /**
@@ -40,15 +40,11 @@ export function registerChangeDeps(parent: Command): void {
 
           const hasOp = opts.add.length > 0 || opts.remove.length > 0 || opts.set.length > 0
           if (!hasOp) {
-            process.stderr.write(
-              'error: at least one of --add, --remove, or --set must be provided\n',
-            )
-            process.exit(1)
+            cliError('at least one of --add, --remove, or --set must be provided', opts.format)
           }
 
           if (opts.set.length > 0 && (opts.add.length > 0 || opts.remove.length > 0)) {
-            process.stderr.write('error: --set is mutually exclusive with --add and --remove\n')
-            process.exit(1)
+            cliError('--set is mutually exclusive with --add and --remove', opts.format)
           }
 
           const result = await kernel.changes.updateSpecDeps.execute({
@@ -75,7 +71,7 @@ export function registerChangeDeps(parent: Command): void {
             )
           }
         } catch (err) {
-          handleError(err)
+          handleError(err, opts.format)
         }
       },
     )

@@ -4,7 +4,7 @@ import { SpecPath, checkMetadataFreshness, parseMetadata, NodeContentHasher } fr
 const hasher = new NodeContentHasher()
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
@@ -29,16 +29,13 @@ export function registerSpecMetadata(parent: Command): void {
         })
 
         if (result === null) {
-          process.stderr.write(`error: spec '${specPath}' not found\n`)
-          process.exit(1)
+          cliError(`spec '${specPath}' not found`, opts.format)
         }
 
         const metadataArtifact = result.artifacts.get('.specd-metadata.yaml')
 
         if (metadataArtifact === undefined) {
-          process.stderr.write(`error: no .specd-metadata.yaml for spec '${specPath}'\n`)
-          process.exit(1)
-          return
+          cliError(`no .specd-metadata.yaml for spec '${specPath}'`, opts.format)
         }
 
         const metadata = parseMetadata(metadataArtifact.content)
@@ -115,7 +112,7 @@ export function registerSpecMetadata(parent: Command): void {
           output(jsonObj, fmt)
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

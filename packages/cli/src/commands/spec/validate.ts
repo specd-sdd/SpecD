@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
@@ -24,8 +24,7 @@ export function registerSpecValidate(parent: Command): void {
       ) => {
         try {
           if (specPath === undefined && opts.all !== true && opts.workspace === undefined) {
-            process.stderr.write('error: specify a spec path, --all, or --workspace <name>\n')
-            process.exit(1)
+            cliError('specify a spec path, --all, or --workspace <name>', opts.format)
           }
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
@@ -38,8 +37,7 @@ export function registerSpecValidate(parent: Command): void {
           } else if (opts.workspace !== undefined) {
             const wsNames = config.workspaces.map((w) => w.name)
             if (!wsNames.includes(opts.workspace)) {
-              process.stderr.write(`error: unknown workspace '${opts.workspace}'\n`)
-              process.exit(1)
+              cliError(`unknown workspace '${opts.workspace}'`, opts.format)
             }
             inputWorkspace = opts.workspace
           }
@@ -53,8 +51,7 @@ export function registerSpecValidate(parent: Command): void {
           const fmt = parseFormat(opts.format)
 
           if (inputSpecPath !== undefined && result.totalSpecs === 0) {
-            process.stderr.write(`error: spec not found '${inputSpecPath}'\n`)
-            process.exit(1)
+            cliError(`spec not found '${inputSpecPath}'`, opts.format)
           }
 
           if (fmt === 'text') {
@@ -74,7 +71,7 @@ export function registerSpecValidate(parent: Command): void {
                   `validation failed ${entry.spec}:\n${[...lines, ...warnLines].join('\n')}`,
                   'text',
                 )
-                process.exit(1)
+                process.exitCode = 1
               }
             } else {
               const failedEntries = result.entries.filter((e) => !e.passed)
@@ -93,17 +90,17 @@ export function registerSpecValidate(parent: Command): void {
                     process.stdout.write(`    warning: ${w.artifactId} — ${w.description}\n`)
                   }
                 }
-                process.exit(1)
+                process.exitCode = 1
               }
             }
           } else {
             output(result, fmt)
             if (result.failed > 0) {
-              process.exit(1)
+              process.exitCode = 1
             }
           }
         } catch (err) {
-          handleError(err)
+          handleError(err, opts.format)
         }
       },
     )

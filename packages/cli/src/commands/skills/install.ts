@@ -3,7 +3,7 @@ import { getSkill, listSkills } from '@specd/skills'
 import { createVcsAdapter } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { KNOWN_AGENTS } from '../../helpers/known-agents.js'
@@ -28,8 +28,7 @@ export function registerSkillsInstall(parent: Command): void {
       ) => {
         try {
           if (!(opts.agent in KNOWN_AGENTS)) {
-            process.stderr.write(`error: unknown agent '${opts.agent}'\n`)
-            process.exit(1)
+            cliError(`unknown agent '${opts.agent}'`, opts.format)
           }
 
           const agentConfig = KNOWN_AGENTS[opts.agent]!
@@ -43,8 +42,7 @@ export function registerSkillsInstall(parent: Command): void {
               : (() => {
                   const s = getSkill(skillName)
                   if (s === undefined) {
-                    process.stderr.write(`error: skill '${skillName}' not found\n`)
-                    process.exit(1)
+                    cliError(`skill '${skillName}' not found`, opts.format)
                   }
                   return [s]
                 })()
@@ -79,10 +77,10 @@ export function registerSkillsInstall(parent: Command): void {
               const vcs = await createVcsAdapter()
               await vcs.rootDir()
             } catch {
-              process.stderr.write(
-                'error: not inside a VCS repository — use --global or run from inside a repo\n',
+              cliError(
+                'not inside a VCS repository — use --global or run from inside a repo',
+                opts.format,
               )
-              process.exit(1)
             }
 
             const { config, kernel } = await resolveCliContext({ configPath: opts.config })
@@ -92,8 +90,7 @@ export function registerSkillsInstall(parent: Command): void {
             try {
               await fs.stat(configPath)
             } catch {
-              process.stderr.write('error: specd.yaml not found — run specd project init first\n')
-              process.exit(1)
+              cliError('specd.yaml not found — run specd project init first', opts.format)
             }
 
             const commandsDir = agentConfig.projectDir(config.projectRoot)
@@ -121,7 +118,7 @@ export function registerSkillsInstall(parent: Command): void {
             }
           }
         } catch (err) {
-          handleError(err)
+          handleError(err, opts.format)
         }
       },
     )

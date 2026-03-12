@@ -190,7 +190,7 @@ export function registerSpecList(parent: Command): void {
             )
           }
         } catch (err) {
-          handleError(err)
+          handleError(err, opts.format)
         }
       },
     )

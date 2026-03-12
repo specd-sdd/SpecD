@@ -53,7 +53,7 @@ export function registerChangeValidate(parent: Command): void {
             )
             const allLines = [...errorLines, ...warningLines]
             output(`validation failed ${name}/${fullSpecPath}:\n${allLines.join('\n')}`, 'text')
-            process.exit(1)
+            process.exitCode = 1
           }
         } else {
           output(
@@ -65,11 +65,11 @@ export function registerChangeValidate(parent: Command): void {
             fmt,
           )
           if (!passed) {
-            process.exit(1)
+            process.exitCode = 1
           }
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }
