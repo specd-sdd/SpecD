@@ -106,6 +106,7 @@ export function registerSpecMetadata(parent: Command): void {
           if (metadata.generatedBy !== undefined) jsonObj.generatedBy = metadata.generatedBy
           jsonObj.contentHashes = hashEntries
           if (metadata.dependsOn !== undefined) jsonObj.dependsOn = metadata.dependsOn
+          if (metadata.keywords !== undefined) jsonObj.keywords = metadata.keywords
           jsonObj.rules = effectiveRules
           jsonObj.constraints = effectiveConstraints
           jsonObj.scenarios = effectiveScenarios
