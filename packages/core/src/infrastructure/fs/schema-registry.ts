@@ -2,7 +2,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { isEnoent } from './is-enoent.js'
 import { createRequire } from 'node:module'
-import { type SchemaRegistry, type SchemaEntry } from '../../application/ports/schema-registry.js'
+import {
+  type SchemaRegistry,
+  type SchemaEntry,
+  type SchemaRawResult,
+} from '../../application/ports/schema-registry.js'
 import { Schema } from '../../domain/value-objects/schema.js'
 import { SchemaValidationError } from '../../domain/errors/schema-validation-error.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
@@ -61,6 +65,24 @@ export class FsSchemaRegistry implements SchemaRegistry {
     ref: string,
     workspaceSchemasPaths: ReadonlyMap<string, string>,
   ): Promise<Schema | null> {
+    const raw = await this.resolveRaw(ref, workspaceSchemasPaths)
+    if (raw === null) return null
+    return buildSchema(ref, raw.data, raw.templates)
+  }
+
+  /**
+   * Resolves a schema reference and returns the intermediate representation
+   * (parsed YAML data, templates, and resolved path) without building the
+   * final domain `Schema`.
+   *
+   * @param ref - The schema reference as declared in `specd.yaml`
+   * @param workspaceSchemasPaths - Map of workspace name to its resolved `schemasPath`
+   * @returns The raw resolution result, or `null` if the file was not found
+   */
+  async resolveRaw(
+    ref: string,
+    workspaceSchemasPaths: ReadonlyMap<string, string>,
+  ): Promise<SchemaRawResult | null> {
     let resolvedPath: string | null = null
     let content: string | null = null
 
@@ -95,15 +117,11 @@ export class FsSchemaRegistry implements SchemaRegistry {
       }
     }
 
-    // Parse and validate YAML structure (infrastructure layer)
     const data = parseSchemaYaml(ref, content)
-
-    // Load template files for artifacts that declare them
     const schemaDir = path.dirname(resolvedPath)
-    const templates = await this._loadTemplates(ref, data.artifacts, schemaDir)
+    const templates = await this._loadTemplates(ref, data.artifacts ?? [], schemaDir)
 
-    // Build domain Schema (pure domain service)
-    return buildSchema(ref, data, templates)
+    return { data, templates, resolvedPath }
   }
 
   /**

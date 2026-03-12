@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { type SchemaOperations } from '../domain/services/merge-schema-layers.js'
 
 /**
  * A lifecycle hook declared in the project-level `workflow` section of `specd.yaml`.
@@ -7,8 +8,8 @@ import { z } from 'zod'
  * Unlike schema workflow steps, project-level steps may not declare `requires`.
  */
 export type SpecdWorkflowHook =
-  | { readonly type: 'run'; readonly command: string }
-  | { readonly type: 'instruction'; readonly text: string }
+  | { readonly id: string; readonly type: 'run'; readonly command: string }
+  | { readonly id: string; readonly type: 'instruction'; readonly text: string }
 
 /**
  * A project-level workflow step from `specd.yaml`.
@@ -136,6 +137,10 @@ export interface SpecdConfig {
   readonly contextExcludeSpecs?: readonly string[]
   /** When `true`, specd may invoke an LLM for enriched output (default: `false`). */
   readonly llmOptimizedContext?: boolean
+  /** Schema plugin references from `specd.yaml`, in declaration order. */
+  readonly schemaPlugins?: readonly string[]
+  /** Inline schema override operations from `specd.yaml`. */
+  readonly schemaOverrides?: SchemaOperations
 }
 
 /** Minimal shape check for {@link isSpecdConfig} — validates the structural signature. */

@@ -4,6 +4,18 @@ import {
   type TaskCompletionCheck,
 } from './validation-rule.js'
 
+/** A rule entry with identity and text, used in `rules.pre` / `rules.post`. */
+export interface RuleEntry {
+  readonly id: string
+  readonly text: string
+}
+
+/** Pre- and post-instruction rules on an artifact type. */
+export interface ArtifactRules {
+  readonly pre: readonly RuleEntry[]
+  readonly post: readonly RuleEntry[]
+}
+
 /** Where an artifact lives after the change is archived. */
 export type ArtifactScope = 'spec' | 'change'
 
@@ -72,6 +84,11 @@ export interface ArtifactTypeProps {
    * Declares how to detect task completion within this artifact's file content.
    */
   readonly taskCompletionCheck?: TaskCompletionCheck
+  /**
+   * Pre- and post-instruction rules. `pre` rules are injected before the
+   * artifact instruction; `post` rules are injected after.
+   */
+  readonly rules?: ArtifactRules
 }
 
 /**
@@ -96,6 +113,7 @@ export class ArtifactType {
   private readonly _deltaValidations: readonly ValidationRule[]
   private readonly _preHashCleanup: readonly PreHashCleanup[]
   private readonly _taskCompletionCheck: TaskCompletionCheck | undefined
+  private readonly _rules: ArtifactRules | undefined
 
   /**
    * Creates a new `ArtifactType` from schema configuration.
@@ -118,6 +136,7 @@ export class ArtifactType {
     this._deltaValidations = [...props.deltaValidations]
     this._preHashCleanup = [...props.preHashCleanup]
     this._taskCompletionCheck = props.taskCompletionCheck
+    this._rules = props.rules
   }
 
   /** Stable identifier for this artifact type (e.g. `"specs"`, `"tasks"`). */
@@ -193,5 +212,10 @@ export class ArtifactType {
   /** Task completion detection config, or `undefined` if using defaults. */
   get taskCompletionCheck(): TaskCompletionCheck | undefined {
     return this._taskCompletionCheck
+  }
+
+  /** Pre- and post-instruction rules, or `undefined` if none declared. */
+  get rules(): ArtifactRules | undefined {
+    return this._rules
   }
 }

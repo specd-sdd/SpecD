@@ -22,6 +22,7 @@ import { GetSpec } from '../application/use-cases/get-spec.js'
 import { SaveSpecMetadata } from '../application/use-cases/save-spec-metadata.js'
 import { InvalidateSpecMetadata } from '../application/use-cases/invalidate-spec-metadata.js'
 import { GetActiveSchema } from '../application/use-cases/get-active-schema.js'
+import { ResolveSchema } from '../application/use-cases/resolve-schema.js'
 import { InitProject } from '../application/use-cases/init-project.js'
 import { RecordSkillInstall } from '../application/use-cases/record-skill-install.js'
 import { GetSkillsManifest } from '../application/use-cases/get-skills-manifest.js'
@@ -234,7 +235,15 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       get: new GetSpec(i.specs),
       saveMetadata: new SaveSpecMetadata(i.specs, i.yaml),
       invalidateMetadata: new InvalidateSpecMetadata(i.specs, i.yaml),
-      getActiveSchema: new GetActiveSchema(i.schemas, i.schemaRef, i.workspaceSchemasPaths),
+      getActiveSchema: new GetActiveSchema(
+        new ResolveSchema(
+          i.schemas,
+          i.schemaRef,
+          i.workspaceSchemasPaths,
+          i.schemaPlugins,
+          i.schemaOverrides,
+        ),
+      ),
       validate: new ValidateSpecs(
         i.specs,
         i.schemas,

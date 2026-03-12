@@ -25,7 +25,15 @@ export {
   type SelectorRaw,
   type ValidationRuleRaw,
   type MetadataExtractionRaw,
+  type RuleEntryRaw,
+  type ArtifactRulesRaw,
 } from './build-schema.js'
+export {
+  mergeSchemaLayers,
+  type SchemaLayer,
+  type SchemaLayerSource,
+  type SchemaOperations,
+} from './merge-schema-layers.js'
 export {
   type SelectorNode,
   findNodes,

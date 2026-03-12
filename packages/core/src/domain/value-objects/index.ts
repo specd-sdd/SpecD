@@ -18,5 +18,7 @@ export {
   type ArtifactTypeProps,
   type ArtifactScope,
   type ArtifactFormat,
+  type RuleEntry,
+  type ArtifactRules,
 } from './artifact-type.js'
-export { Schema } from './schema.js'
+export { Schema, type SchemaKind } from './schema.js'

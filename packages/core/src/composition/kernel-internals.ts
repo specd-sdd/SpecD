@@ -63,6 +63,12 @@ export interface KernelInternals {
   readonly schemaRef: string
   /** Map of workspace name → absolute schemas directory path. */
   readonly workspaceSchemasPaths: ReadonlyMap<string, string>
+  /** Schema plugin references from config, in declaration order. */
+  readonly schemaPlugins: readonly string[]
+  /** Inline schema override operations from config. */
+  readonly schemaOverrides:
+    | import('../domain/services/merge-schema-layers.js').SchemaOperations
+    | undefined
 }
 
 /**
@@ -145,5 +151,7 @@ export function createKernelInternals(
     yaml: new NodeYamlSerializer(),
     schemaRef: config.schemaRef,
     workspaceSchemasPaths,
+    schemaPlugins: config.schemaPlugins ?? [],
+    schemaOverrides: config.schemaOverrides,
   }
 }

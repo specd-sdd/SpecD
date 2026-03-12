@@ -7,7 +7,12 @@ export {
 } from './spec-repository.js'
 export { ChangeRepository, type ChangeRepositoryConfig } from './change-repository.js'
 export { ArchiveRepository, type ArchiveRepositoryConfig } from './archive-repository.js'
-export { type SchemaRegistry, type SchemaEntry, type Schema } from './schema-registry.js'
+export {
+  type SchemaRegistry,
+  type SchemaEntry,
+  type SchemaRawResult,
+  type Schema,
+} from './schema-registry.js'
 export { type HookRunner, type HookResult, type HookVariables } from './hook-runner.js'
 export { type ActorResolver } from './actor-resolver.js'
 export { type VcsAdapter } from './vcs-adapter.js'

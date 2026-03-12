@@ -2,6 +2,9 @@ import { ArtifactType } from './artifact-type.js'
 import { type MetadataExtraction } from './metadata-extraction.js'
 import { type WorkflowStep } from './workflow-step.js'
 
+/** Schema kind discriminator. */
+export type SchemaKind = 'schema' | 'schema-plugin'
+
 /**
  * A fully-parsed schema loaded from a `schema.yaml` file.
  *
@@ -12,8 +15,10 @@ import { type WorkflowStep } from './workflow-step.js'
  * Use `artifact(id)` for O(1) lookup instead of iterating `artifacts()`.
  */
 export class Schema {
+  private readonly _kind: SchemaKind
   private readonly _name: string
   private readonly _version: number
+  private readonly _extends: string | undefined
   private readonly _artifacts: readonly ArtifactType[]
   private readonly _artifactIndex: ReadonlyMap<string, ArtifactType>
   private readonly _metadataExtraction: MetadataExtraction | undefined
@@ -23,21 +28,27 @@ export class Schema {
   /**
    * Creates a fully-resolved schema instance.
    *
+   * @param kind - The schema kind (`schema` or `schema-plugin`)
    * @param name - The resolved schema name (e.g. `"@specd/schema-std"`, `"my-team-schema"`)
    * @param version - The schema version integer, monotonically increasing
    * @param artifacts - Artifact type definitions in schema-declared order
    * @param workflow - Workflow step configurations in schema-declared order
    * @param metadataExtraction - Optional metadata extraction declarations
+   * @param extendsRef - Optional parent schema reference
    */
   constructor(
+    kind: SchemaKind,
     name: string,
     version: number,
     artifacts: readonly ArtifactType[],
     workflow: readonly WorkflowStep[],
     metadataExtraction?: MetadataExtraction,
+    extendsRef?: string,
   ) {
+    this._kind = kind
     this._name = name
     this._version = version
+    this._extends = extendsRef
     this._artifacts = artifacts
     this._artifactIndex = new Map(artifacts.map((a) => [a.id, a]))
     this._metadataExtraction = metadataExtraction
@@ -109,5 +120,24 @@ export class Schema {
    */
   workflowStep(step: string): WorkflowStep | null {
     return this._workflowIndex.get(step) ?? null
+  }
+
+  /**
+   * The schema kind discriminator (`schema` or `schema-plugin`).
+   *
+   * @returns The schema kind
+   */
+  kind(): SchemaKind {
+    return this._kind
+  }
+
+  /**
+   * The parent schema reference from `extends`, or `undefined` if this schema
+   * does not extend another.
+   *
+   * @returns The parent schema reference, or `undefined`
+   */
+  extendsRef(): string | undefined {
+    return this._extends
   }
 }

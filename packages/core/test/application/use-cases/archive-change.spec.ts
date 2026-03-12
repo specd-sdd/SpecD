@@ -406,7 +406,7 @@ describe('ArchiveChange', () => {
           {
             step: 'archiving',
             requires: [],
-            hooks: { pre: [{ type: 'run', command: 'pnpm test' }], post: [] },
+            hooks: { pre: [{ id: 'run-tests', type: 'run', command: 'pnpm test' }], post: [] },
           },
         ],
       )
@@ -463,7 +463,7 @@ describe('ArchiveChange', () => {
           {
             step: 'archiving',
             requires: [],
-            hooks: { pre: [{ type: 'run', command: 'pnpm test' }], post: [] },
+            hooks: { pre: [{ id: 'run-tests', type: 'run', command: 'pnpm test' }], post: [] },
           },
         ],
       )
@@ -497,7 +497,7 @@ describe('ArchiveChange', () => {
           {
             step: 'archiving',
             requires: [],
-            hooks: { pre: [{ type: 'run', command: 'fail' }], post: [] },
+            hooks: { pre: [{ id: 'fail-hook', type: 'run', command: 'fail' }], post: [] },
           },
         ],
       )
@@ -539,7 +539,7 @@ describe('ArchiveChange', () => {
           {
             step: 'archiving',
             requires: [],
-            hooks: { pre: [{ type: 'run', command: 'schema-pre' }], post: [] },
+            hooks: { pre: [{ id: 'schema-pre', type: 'run', command: 'schema-pre' }], post: [] },
           },
         ],
       )
@@ -560,7 +560,7 @@ describe('ArchiveChange', () => {
         '/repo',
         '/changes',
         {
-          pre: [{ type: 'run', command: 'project-pre' }],
+          pre: [{ id: 'project-pre', type: 'run', command: 'project-pre' }],
           post: [],
         },
       )
@@ -584,7 +584,7 @@ describe('ArchiveChange', () => {
           {
             step: 'archiving',
             requires: [],
-            hooks: { pre: [], post: [{ type: 'run', command: 'schema-post' }] },
+            hooks: { pre: [], post: [{ id: 'schema-post', type: 'run', command: 'schema-post' }] },
           },
         ],
       )
@@ -606,7 +606,7 @@ describe('ArchiveChange', () => {
         '/changes',
         {
           pre: [],
-          post: [{ type: 'run', command: 'project-post' }],
+          post: [{ id: 'project-post', type: 'run', command: 'project-post' }],
         },
       )
       await uc.execute({ name: 'my-change' })
@@ -638,7 +638,7 @@ describe('ArchiveChange', () => {
         '/repo',
         '/changes',
         {
-          pre: [{ type: 'run', command: 'project-pre' }],
+          pre: [{ id: 'project-pre', type: 'run', command: 'project-pre' }],
           post: [],
         },
       )
@@ -671,7 +671,7 @@ describe('ArchiveChange', () => {
         '/changes',
         {
           pre: [],
-          post: [{ type: 'run', command: 'project-post' }],
+          post: [{ id: 'project-post', type: 'run', command: 'project-post' }],
         },
       )
       const result = await uc.execute({ name: 'my-change' })
@@ -692,7 +692,7 @@ describe('ArchiveChange', () => {
             step: 'archiving',
             requires: [],
             hooks: {
-              pre: [{ type: 'instruction', text: 'Review delta specs' }],
+              pre: [{ id: 'review-instruction', type: 'instruction', text: 'Review delta specs' }],
               post: [],
             },
           },
@@ -964,7 +964,10 @@ describe('ArchiveChange', () => {
           {
             step: 'archiving',
             requires: [],
-            hooks: { pre: [], post: [{ type: 'run', command: 'git commit -m archive' }] },
+            hooks: {
+              pre: [],
+              post: [{ id: 'git-commit', type: 'run', command: 'git commit -m archive' }],
+            },
           },
         ],
       )
@@ -1012,7 +1015,7 @@ describe('ArchiveChange', () => {
           {
             step: 'archiving',
             requires: [],
-            hooks: { pre: [], post: [{ type: 'run', command: 'git push' }] },
+            hooks: { pre: [], post: [{ id: 'git-push', type: 'run', command: 'git push' }] },
           },
         ],
       )

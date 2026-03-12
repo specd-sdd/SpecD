@@ -341,10 +341,20 @@ export class CompileContext {
       }
     }
 
-    // Part 2: Schema instruction for active artifact
+    // Part 2: Artifact rules.pre + schema instruction + delta + rules.post
     const activeArtifactType =
       input.activeArtifact !== undefined ? schema.artifact(input.activeArtifact) : null
 
+    // Part 2a: rules.pre (before instruction)
+    if (activeArtifactType !== null) {
+      const preRules = activeArtifactType.rules?.pre
+      if (preRules !== undefined && preRules.length > 0) {
+        const ruleLines = preRules.map((r) => `- ${r.text}`).join('\n')
+        parts.push(`## Pre-instruction rules: ${activeArtifactType.id}\n\n${ruleLines}`)
+      }
+    }
+
+    // Part 2b: Schema instruction
     if (activeArtifactType !== null) {
       const instruction = activeArtifactType.instruction
       if (instruction !== undefined) {
@@ -416,7 +426,16 @@ export class CompileContext {
       }
     }
 
-    // Part 4: Project artifact rules for active artifact
+    // Part 4: rules.post (after delta context)
+    if (activeArtifactType !== null) {
+      const postRules = activeArtifactType.rules?.post
+      if (postRules !== undefined && postRules.length > 0) {
+        const ruleLines = postRules.map((r) => `- ${r.text}`).join('\n')
+        parts.push(`## Post-instruction rules: ${activeArtifactType.id}\n\n${ruleLines}`)
+      }
+    }
+
+    // Legacy: Project artifact rules for active artifact (deprecated, use schema rules instead)
     if (activeArtifactType !== null) {
       const rules = input.config.artifactRules?.[activeArtifactType.id]
       if (rules !== undefined && rules.length > 0) {

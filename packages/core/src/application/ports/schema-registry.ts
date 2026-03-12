@@ -1,6 +1,23 @@
 import { type Schema } from '../../domain/value-objects/schema.js'
+import { type SchemaYamlData } from '../../domain/services/build-schema.js'
 
 export type { Schema }
+
+/**
+ * Intermediate result from {@link SchemaRegistry.resolveRaw}, containing the
+ * parsed YAML data, loaded templates, and the resolved file path.
+ *
+ * Used by `ResolveSchema` to access the intermediate representation needed for
+ * the merge pipeline before domain construction.
+ */
+export interface SchemaRawResult {
+  /** The parsed and Zod-validated intermediate data (before domain construction). */
+  readonly data: SchemaYamlData
+  /** Loaded template content keyed by relative path. */
+  readonly templates: ReadonlyMap<string, string>
+  /** The absolute path of the resolved schema file (used for extends cycle detection). */
+  readonly resolvedPath: string
+}
 
 /**
  * A discovered schema entry returned by {@link SchemaRegistry.list}.
@@ -63,6 +80,22 @@ export interface SchemaRegistry {
    * @returns The resolved schema, or `null` if the file was not found
    */
   resolve(ref: string, workspaceSchemasPaths: ReadonlyMap<string, string>): Promise<Schema | null>
+
+  /**
+   * Resolves a schema reference and returns the intermediate representation
+   * (parsed YAML data, templates, and resolved path) without building the
+   * final domain `Schema`.
+   *
+   * Used by `ResolveSchema` for the merge pipeline where raw data is needed.
+   *
+   * @param ref - The schema reference as declared in `specd.yaml`
+   * @param workspaceSchemasPaths - Map of workspace name to its resolved `schemasPath`
+   * @returns The raw resolution result, or `null` if the file was not found
+   */
+  resolveRaw(
+    ref: string,
+    workspaceSchemasPaths: ReadonlyMap<string, string>,
+  ): Promise<SchemaRawResult | null>
 
   /**
    * Lists all schemas discoverable from the given workspace schema paths and
