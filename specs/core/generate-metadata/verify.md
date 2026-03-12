@@ -20,13 +20,13 @@
 
 - **GIVEN** the `specId` references a workspace not present in the injected spec repositories
 - **WHEN** `GenerateSpecMetadata` is executed
-- **THEN** it returns `{ metadata: {}, hasExtraction: true }`
+- **THEN** it throws `WorkspaceNotFoundError`
 
 #### Scenario: Spec not found
 
 - **GIVEN** the workspace exists but the spec path does not resolve to a spec
 - **WHEN** `GenerateSpecMetadata` is executed
-- **THEN** it returns `{ metadata: {}, hasExtraction: true }`
+- **THEN** it throws `SpecNotFoundError`
 
 ### Requirement: Artifact loading and parsing
 

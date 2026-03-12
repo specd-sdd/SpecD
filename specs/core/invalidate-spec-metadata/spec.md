@@ -14,12 +14,14 @@ When executed, the use case reads the existing `.specd-metadata.yaml`, removes t
 
 All fields other than `contentHashes` remain unchanged in the rewritten file. The use case does not validate the remaining content against the strict schema — it is a targeted mutation, not a full rewrite.
 
+### Requirement: Error on unknown workspace or spec
+
+If the workspace does not exist in the configured repositories, the use case throws `WorkspaceNotFoundError`. If the spec does not exist in the workspace, it throws `SpecNotFoundError`.
+
 ### Requirement: Returns null when not applicable
 
 The use case returns `null` (no-op) when:
 
-- The workspace does not exist in the configured repositories
-- The spec does not exist in the workspace
 - The spec has no `.specd-metadata.yaml` file
 - The file content is not a YAML mapping (e.g. scalar, null)
 

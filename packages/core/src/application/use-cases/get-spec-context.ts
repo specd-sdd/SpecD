@@ -4,6 +4,8 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { type ContextWarning } from './_shared/context-warning.js'
+import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
+import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 
@@ -91,26 +93,12 @@ export class GetSpecContext {
 
     const repo = this._specs.get(input.workspace)
     if (repo === undefined) {
-      return {
-        entries: [],
-        warnings: [
-          { type: 'unknown-workspace', message: `Workspace '${input.workspace}' not found` },
-        ],
-      }
+      throw new WorkspaceNotFoundError(input.workspace)
     }
 
     const spec = await repo.get(input.specPath)
     if (spec === null) {
-      return {
-        entries: [],
-        warnings: [
-          {
-            type: 'missing-spec',
-            path: input.specPath.toString(),
-            message: `Spec '${input.workspace}:${input.specPath.toString()}' not found`,
-          },
-        ],
-      }
+      throw new SpecNotFoundError(`${input.workspace}:${input.specPath.toString()}`)
     }
 
     const artifacts = new Map<string, { content: string }>()

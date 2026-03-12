@@ -2,6 +2,8 @@ import { type Spec } from '../../domain/entities/spec.js'
 import { type SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
+import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
+import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 
 /** Input for the {@link GetSpec} use case. */
 export interface GetSpecInput {
@@ -45,12 +47,12 @@ export class GetSpec {
   async execute(input: GetSpecInput): Promise<GetSpecResult | null> {
     const repo = this._specRepos.get(input.workspace)
     if (repo === undefined) {
-      return null
+      throw new WorkspaceNotFoundError(input.workspace)
     }
 
     const spec = await repo.get(input.specPath)
     if (spec === null) {
-      return null
+      throw new SpecNotFoundError(`${input.workspace}:${input.specPath.toFsPath('/')}`)
     }
 
     const artifacts = new Map<string, SpecArtifact>()

@@ -3,6 +3,8 @@ import { GetSpecContext } from '../../../src/application/use-cases/get-spec-cont
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { makeSpecRepository, makeContentHasher } from './helpers.js'
+import { WorkspaceNotFoundError } from '../../../src/application/errors/workspace-not-found-error.js'
+import { SpecNotFoundError } from '../../../src/application/errors/spec-not-found-error.js'
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -47,33 +49,29 @@ describe('GetSpecContext', () => {
     expect(result.warnings).toHaveLength(0)
   })
 
-  it('returns empty entries when workspace not found', async () => {
+  it('throws WorkspaceNotFoundError when workspace not found', async () => {
     const specRepos = new Map([['default', makeSpecRepository()]])
 
     const uc = new GetSpecContext(specRepos, makeContentHasher())
-    const result = await uc.execute({
-      workspace: 'nonexistent',
-      specPath: SpecPath.parse('auth/login'),
-    })
-
-    expect(result.entries).toEqual([])
-    expect(result.warnings).toHaveLength(1)
-    expect(result.warnings[0]!.type).toBe('unknown-workspace')
+    await expect(
+      uc.execute({
+        workspace: 'nonexistent',
+        specPath: SpecPath.parse('auth/login'),
+      }),
+    ).rejects.toThrow(WorkspaceNotFoundError)
   })
 
-  it('returns empty entries when spec not found', async () => {
+  it('throws SpecNotFoundError when spec not found', async () => {
     const repo = makeSpecRepository({ specs: [] })
     const specRepos = new Map([['default', repo]])
 
     const uc = new GetSpecContext(specRepos, makeContentHasher())
-    const result = await uc.execute({
-      workspace: 'default',
-      specPath: SpecPath.parse('nonexistent/spec'),
-    })
-
-    expect(result.entries).toEqual([])
-    expect(result.warnings).toHaveLength(1)
-    expect(result.warnings[0]!.type).toBe('missing-spec')
+    await expect(
+      uc.execute({
+        workspace: 'default',
+        specPath: SpecPath.parse('nonexistent/spec'),
+      }),
+    ).rejects.toThrow(SpecNotFoundError)
   })
 
   it('returns warnings for stale metadata', async () => {

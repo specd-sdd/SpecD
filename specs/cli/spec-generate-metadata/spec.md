@@ -35,6 +35,10 @@ With `--write`, the command generates metadata, persists it via `SaveSpecMetadat
 
 `--force` requires `--write`. Without `--write`, the command writes `error: --force requires --write` to stderr and exits with code 1. With `--write`, the command passes `force: true` to `SaveSpecMetadata` to skip conflict detection.
 
+### Requirement: Error — spec not found
+
+If the spec or workspace does not exist, the core use case throws `SpecNotFoundError` or `WorkspaceNotFoundError`. The error propagates through `handleError` which writes `error: ...` to stderr and exits with code 1.
+
 ### Requirement: Error — no metadataExtraction
 
 If the core use case returns `hasExtraction: false` (schema has no `metadataExtraction` declarations), the command writes `error: schema has no metadataExtraction declarations` to stderr and exits with code 1.
