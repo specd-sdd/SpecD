@@ -14,18 +14,18 @@ import { type MetadataExtraction } from '../../../src/domain/value-objects/metad
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Simple renderer that returns label or renders children recursively. */
+/** Simple renderer that returns label or renders children recursively (with trailing newline like real parsers). */
 const renderer: SubtreeRenderer = {
   renderSubtree(node: SelectorNode): string {
     if (node.children === undefined || node.children.length === 0) {
-      return node.value !== undefined && node.value !== null
-        ? String(node.value)
-        : (node.label ?? '')
+      const text =
+        node.value !== undefined && node.value !== null ? String(node.value) : (node.label ?? '')
+      return text + '\n'
     }
     return node.children
       .map((c) => renderer.renderSubtree(c))
       .filter(Boolean)
-      .join('\n')
+      .join('')
   },
 }
 
@@ -169,7 +169,7 @@ describe('extractContent', () => {
     expect(result).toHaveLength(2)
     expect(result[0]).toEqual({
       label: 'Auth',
-      items: ['Must validate tokens\n\nMust check expiry'],
+      items: ['Must validate tokens\nMust check expiry'],
     })
     expect(result[1]).toEqual({
       label: 'Logging',
@@ -437,7 +437,7 @@ describe('extractMetadata', () => {
 
     const result = extractMetadata(extraction, asts, renderers)
     expect(result.rules).toEqual([
-      { requirement: 'Selector fields', rules: ['type is required\n\nmatches is optional'] },
+      { requirement: 'Selector fields', rules: ['type is required\nmatches is optional'] },
       { requirement: 'Multi-match', rules: ['multiple matches are returned'] },
     ])
   })

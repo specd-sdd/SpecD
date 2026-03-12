@@ -43,7 +43,7 @@ export function registerSpecGenerateMetadata(parent: Command): void {
             return
           }
 
-          const yamlContent = stringify(result.metadata, { lineWidth: 120 })
+          const yamlContent = stringify(result.metadata, { lineWidth: 0 })
 
           if (opts.write === true) {
             await kernel.specs.saveMetadata.execute({
