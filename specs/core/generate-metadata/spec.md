@@ -16,7 +16,7 @@ The use case resolves the active schema via `SchemaRegistry.resolve()`. If the s
 
 ### Requirement: Spec resolution
 
-The use case parses `specId` via `parseSpecId()` to obtain a workspace name and capability path. It looks up the workspace's `SpecRepository` from the injected map. If the workspace is unknown or the spec is not found via `SpecRepository.get()`, the use case returns `{ metadata: {}, hasExtraction: true }` — extraction is available but there is nothing to extract from.
+The use case parses `specId` via `parseSpecId()` to obtain a workspace name and capability path. It looks up the workspace's `SpecRepository` from the injected map. If the workspace is unknown, it throws `WorkspaceNotFoundError`. If the spec is not found via `SpecRepository.get()`, it throws `SpecNotFoundError`.
 
 ### Requirement: Artifact loading and parsing
 

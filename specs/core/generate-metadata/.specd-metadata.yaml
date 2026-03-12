@@ -1,54 +1,59 @@
 title: Generate Spec Metadata
-description: The GenerateSpecMetadata use case produces .specd-metadata.yaml content deterministically from schema-declared extraction rules, without LLM involvement. It resolves a spec ID, loads its artifacts, parses them into ASTs, runs the schema's metadataExtraction engine, computes content hashes, and returns the assembled metadata.
+description: The `GenerateSpecMetadata` use case produces `.specd-metadata.yaml` content deterministically from schema-declared extraction rules, without LLM involvement. It resolves a spec ID, loads its artifacts, parses them into ASTs, runs the schema's `metadataExtraction` engine, computes content hashes, and returns the assembled metadata.
+dependsOn:
+  - core/spec-metadata
+  - core/content-extraction
+  - core/schema-format
+  - core/spec-id-format
 context:
-  - The GenerateSpecMetadata use case produces .specd-metadata.yaml content deterministically from schema-declared extraction rules, without LLM involvement. It resolves a spec ID, loads its artifacts, parses them into ASTs, runs the schema's metadataExtraction engine, computes content hashes, and returns the assembled metadata.
+  - The `GenerateSpecMetadata` use case produces `.specd-metadata.yaml` content deterministically from schema-declared extraction rules, without LLM involvement. It resolves a spec ID, loads its artifacts, parses them into ASTs, runs the schema's `metadataExtraction` engine, computes content hashes, and returns the assembled metadata.
 rules:
   - requirement: Input and output
     rules:
-      - "The use case takes a specId string (e.g. 'core/change' or 'billing:invoices/create'). It returns { metadata: SpecMetadata, hasExtraction: boolean }. metadata contains the extracted fields plus content hashes and a generatedBy marker. hasExtraction indicates whether the active schema declares any metadataExtraction rules."
+      - "The use case takes a `specId` string (e.g. `'core/change'` or `'billing:invoices/create'`). It returns `{ metadata: SpecMetadata, hasExtraction: boolean }`. `metadata` contains the extracted fields plus content hashes and a `generatedBy` marker. `hasExtraction` indicates whether the active schema declares any `metadataExtraction` rules."
   - requirement: Schema resolution
     rules:
-      - 'The use case resolves the active schema via SchemaRegistry.resolve(). If the schema reference cannot be resolved, it throws SchemaNotFoundError. If the resolved schema has no metadataExtraction declarations, the use case returns { metadata: {}, hasExtraction: false } immediately — there is nothing to extract.'
+      - 'The use case resolves the active schema via `SchemaRegistry.resolve()`. If the schema reference cannot be resolved, it throws `SchemaNotFoundError`. If the resolved schema has no `metadataExtraction` declarations, the use case returns `{ metadata: {}, hasExtraction: false }` immediately — there is nothing to extract.'
   - requirement: Spec resolution
     rules:
-      - "The use case parses specId via parseSpecId() to obtain a workspace name and capability path. It looks up the workspace's SpecRepository from the injected map. If the workspace is unknown or the spec is not found via SpecRepository.get(), the use case returns { metadata: {}, hasExtraction: true } — extraction is available but there is nothing to extract from."
+      - The use case parses `specId` via `parseSpecId()` to obtain a workspace name and capability path. It looks up the workspace's `SpecRepository` from the injected map. If the workspace is unknown, it throws `WorkspaceNotFoundError`. If the spec is not found via `SpecRepository.get()`, it throws `SpecNotFoundError`.
   - requirement: Artifact loading and parsing
     rules:
       - |-
-        The use case iterates over the schema's artifact type declarations, filtering to scope: 'spec' artifacts. For each artifact:
-        1. Resolves the filename from the artifact's output field (last path segment)
-        2. Infers the format via inferFormat(), falling back to 'plaintext' if no format is declared or inferred
-        3. Looks up a parser from ArtifactParserRegistry for the format
-        4. Loads the artifact content via SpecRepository.artifact()
+        The use case iterates over the schema's artifact type declarations, filtering to `scope: 'spec'` artifacts. For each artifact:
+        1. Resolves the filename from the artifact's `output` field (last path segment)
+        2. Infers the format via `inferFormat()`, falling back to `'plaintext'` if no format is declared or inferred
+        3. Looks up a parser from `ArtifactParserRegistry` for the format
+        4. Loads the artifact content via `SpecRepository.artifact()`
         Artifacts with no matching parser or no content on disk are silently skipped.
   - requirement: Metadata extraction
     rules:
       - |-
-        The use case calls extractMetadata() with:
-        * The schema's metadataExtraction declarations
+        The use case calls `extractMetadata()` with:
+        * The schema's `metadataExtraction` declarations
         * Parsed ASTs keyed by artifact type ID
         * Renderers from the artifact parsers
         * A transform map (see resolveSpecPath transform)
-        The extraction engine produces fields including title, description, dependsOn, keywords, rules, constraints, scenarios, and context.
+        The extraction engine produces fields including `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, `scenarios`, and `context`.
   - requirement: resolveSpecPath transform
     rules:
       - |-
-        The use case registers a resolveSpecPath transform that converts relative spec paths to spec IDs. Given a value like ../foo/spec.md:
-        1. Strips any anchor fragment (e.g. #section)
-        2. Matches the pattern ../\<path>/spec.md
+        The use case registers a `resolveSpecPath` transform that converts relative spec paths to spec IDs. Given a value like `../foo/spec.md`:
+        1. Strips any anchor fragment (e.g. `#section`)
+        2. Matches the pattern `../<path>/spec.md`
         3. Resolves the path relative to the current spec's parent directory
-        Values that do not match the ../\*/spec.md pattern are filtered out (the transform returns null).
+        Values that do not match the `../*/spec.md` pattern are filtered out (the transform returns `null`).
   - requirement: Content hashes
     rules:
-      - After extraction, the use case computes a SHA-256 hash for each artifact file that was successfully loaded, using ContentHasher.hash(). The resulting contentHashes map is keyed by the resolved filename (e.g. spec.md, verify.md). Only artifacts with content on disk are included.
+      - After extraction, the use case computes a SHA-256 hash for each artifact file that was successfully loaded, using `ContentHasher.hash()`. The resulting `contentHashes` map is keyed by the resolved filename (e.g. `spec.md`, `verify.md`). Only artifacts with content on disk are included.
   - requirement: Assembled result
     rules:
       - |-
         The final metadata object merges:
-        * All fields from extractMetadata() output
-        * contentHashes from the hashing step
-        * generatedBy: 'core'
-        The result is returned with hasExtraction: true.
+        * All fields from `extractMetadata()` output
+        * `contentHashes` from the hashing step
+        * `generatedBy: 'core'`
+        The result is returned with `hasExtraction: true`.
 constraints:
   - No LLM involvement — extraction is purely deterministic via the schema's metadataExtraction engine
   - Delegates to extractMetadata() domain service for all extraction logic — the use case orchestrates but does not implement extraction
@@ -74,7 +79,7 @@ scenarios:
     when:
       - GenerateSpecMetadata is executed
     then:
-      - 'it returns { metadata: {}, hasExtraction: true }'
+      - it throws WorkspaceNotFoundError
   - requirement: Spec resolution
     name: Spec not found
     given:
@@ -82,7 +87,7 @@ scenarios:
     when:
       - GenerateSpecMetadata is executed
     then:
-      - 'it returns { metadata: {}, hasExtraction: true }'
+      - it throws SpecNotFoundError
   - requirement: Artifact loading and parsing
     name: Artifact with unknown parser format skipped
     given:
@@ -161,6 +166,6 @@ scenarios:
       - the returned metadata contains both the extractMetadata() output fields and contentHashes
       - AND hasExtraction is true
 contentHashes:
-  spec.md: sha256:6fae9ba295b169ca77ee49bb47eb54dbc2caf9a559e80577cb9a897e6b387fa9
-  verify.md: sha256:304efa9c2090e63583e22bf7acbf2f29d00e3f254f2a19736935951f2c53ff9a
+  spec.md: sha256:efeb43fd88361cca904c51762aa34f710392692c606a27c756a9bc57fcb6cd13
+  verify.md: sha256:579e2bd0876a862f23ef4bd51a744c4d88df385029519470c670fe04b64298b9
 generatedBy: core

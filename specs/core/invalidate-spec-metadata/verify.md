@@ -26,17 +26,19 @@
 - **WHEN** `InvalidateSpecMetadata` is executed
 - **THEN** the rewritten file contains `title: 'Auth'`, `description: 'Handles auth'`, and `rules` exactly as before
 
-### Requirement: Returns null when not applicable
+### Requirement: Error on unknown workspace or spec
 
 #### Scenario: Unknown workspace
 
 - **WHEN** `InvalidateSpecMetadata` is executed with a workspace that does not exist
-- **THEN** the result is `null`
+- **THEN** it throws `WorkspaceNotFoundError`
 
 #### Scenario: Unknown spec
 
 - **WHEN** `InvalidateSpecMetadata` is executed for a spec path that does not exist
-- **THEN** the result is `null`
+- **THEN** it throws `SpecNotFoundError`
+
+### Requirement: Returns null when not applicable
 
 #### Scenario: No metadata file
 

@@ -5,6 +5,8 @@ import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
 import { type ValidationFailure, type ValidationWarning } from './validate-artifacts.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
+import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
+import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
@@ -97,12 +99,12 @@ export class ValidateSpecs {
       const { workspace, capPath: capabilityPath } = parseSpecId(input.specPath)
       const specRepo = this._specs.get(workspace)
       if (specRepo === undefined) {
-        return { entries: [], totalSpecs: 0, passed: 0, failed: 0 }
+        throw new WorkspaceNotFoundError(workspace)
       }
       const specPath = SpecPath.parse(capabilityPath)
       const spec = await specRepo.get(specPath)
       if (spec === null) {
-        return { entries: [], totalSpecs: 0, passed: 0, failed: 0 }
+        throw new SpecNotFoundError(input.specPath)
       }
       const entry = await this._validateSpec(
         specRepo,
@@ -115,7 +117,7 @@ export class ValidateSpecs {
     } else if (input.workspace !== undefined) {
       const specRepo = this._specs.get(input.workspace)
       if (specRepo === undefined) {
-        return { entries: [], totalSpecs: 0, passed: 0, failed: 0 }
+        throw new WorkspaceNotFoundError(input.workspace)
       }
       const specs = await specRepo.list()
       for (const spec of specs) {

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { SaveSpecMetadata } from '../../../src/application/use-cases/save-spec-metadata.js'
 import { MetadataValidationError } from '../../../src/domain/errors/metadata-validation-error.js'
 import { DependsOnOverwriteError } from '../../../src/domain/errors/depends-on-overwrite-error.js'
+import { WorkspaceNotFoundError } from '../../../src/application/errors/workspace-not-found-error.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { makeSpecRepository } from './helpers.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
@@ -111,15 +112,16 @@ describe('SaveSpecMetadata — write-time validation', () => {
     }
   })
 
-  it('returns null for unknown workspace (validation passes first)', async () => {
+  it('throws WorkspaceNotFoundError for unknown workspace', async () => {
     const { uc } = makeUseCase([spec])
-    const result = await uc.execute({
-      workspace: 'unknown',
-      specPath,
-      content: VALID_BASE,
-      force: true,
-    })
-    expect(result).toBeNull()
+    await expect(
+      uc.execute({
+        workspace: 'unknown',
+        specPath,
+        content: VALID_BASE,
+        force: true,
+      }),
+    ).rejects.toThrow(WorkspaceNotFoundError)
   })
 })
 

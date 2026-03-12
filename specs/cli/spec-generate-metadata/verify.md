@@ -9,6 +9,20 @@
 - **WHEN** `specd spec generate-metadata` is invoked without a `<specPath>` argument
 - **THEN** the command exits with an error
 
+### Requirement: Error — spec not found
+
+#### Scenario: Unknown spec exits 1
+
+- **WHEN** `specd spec generate-metadata core:core/nonexistent --write` is invoked
+- **THEN** stderr contains `error: Spec 'core:core/nonexistent' not found`
+- **AND** exits with code 1
+
+#### Scenario: Unknown workspace exits 1
+
+- **WHEN** `specd spec generate-metadata fake:auth/login --write` is invoked
+- **THEN** stderr contains an `error:` message about the unknown workspace
+- **AND** exits with code 1
+
 ### Requirement: Error — no metadataExtraction
 
 #### Scenario: Schema has no metadataExtraction

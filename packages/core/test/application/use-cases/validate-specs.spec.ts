@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { ValidateSpecs } from '../../../src/application/use-cases/validate-specs.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
+import { WorkspaceNotFoundError } from '../../../src/application/errors/workspace-not-found-error.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import {
@@ -115,7 +116,7 @@ describe('ValidateSpecs', () => {
     expect(result.failed).toBe(1)
   })
 
-  it('returns empty entries when workspace not found', async () => {
+  it('throws WorkspaceNotFoundError when workspace not found', async () => {
     const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
     const schema = makeSchema([specType])
     const specRepos = new Map([['default', makeSpecRepository()]])
@@ -127,13 +128,10 @@ describe('ValidateSpecs', () => {
       'test',
       new Map(),
     )
-    const result = await uc.execute({
-      workspace: 'nonexistent',
-    })
-
-    expect(result.entries).toEqual([])
-    expect(result.totalSpecs).toBe(0)
-    expect(result.passed).toBe(0)
-    expect(result.failed).toBe(0)
+    await expect(
+      uc.execute({
+        workspace: 'nonexistent',
+      }),
+    ).rejects.toThrow(WorkspaceNotFoundError)
   })
 })

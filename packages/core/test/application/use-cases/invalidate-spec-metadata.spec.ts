@@ -4,6 +4,8 @@ import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { makeSpecRepository } from './helpers.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { NodeYamlSerializer } from '../../../src/infrastructure/node/yaml-serializer.js'
+import { WorkspaceNotFoundError } from '../../../src/application/errors/workspace-not-found-error.js'
+import { SpecNotFoundError } from '../../../src/application/errors/spec-not-found-error.js'
 
 const specPath = SpecPath.parse('auth/login')
 const spec = new Spec('default', specPath, ['spec.md'])
@@ -69,18 +71,18 @@ describe('InvalidateSpecMetadata', () => {
     expect(result!.spec).toBe('default:auth/login')
   })
 
-  it('returns null for unknown workspace', async () => {
+  it('throws WorkspaceNotFoundError for unknown workspace', async () => {
     const { uc } = makeUseCase({ specs: [spec] })
 
-    const result = await uc.execute({ workspace: 'unknown', specPath })
-    expect(result).toBeNull()
+    await expect(uc.execute({ workspace: 'unknown', specPath })).rejects.toThrow(
+      WorkspaceNotFoundError,
+    )
   })
 
-  it('returns null for unknown spec', async () => {
+  it('throws SpecNotFoundError for unknown spec', async () => {
     const { uc } = makeUseCase({ specs: [] })
 
-    const result = await uc.execute({ workspace: 'default', specPath })
-    expect(result).toBeNull()
+    await expect(uc.execute({ workspace: 'default', specPath })).rejects.toThrow(SpecNotFoundError)
   })
 
   it('returns null when no metadata file exists', async () => {

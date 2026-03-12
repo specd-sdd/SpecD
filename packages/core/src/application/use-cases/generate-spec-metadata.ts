@@ -5,6 +5,8 @@ import { type SchemaRegistry } from '../ports/schema-registry.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
+import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
+import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
@@ -90,13 +92,13 @@ export class GenerateSpecMetadata {
     const { workspace, capPath } = parseSpecId(input.specId)
     const specRepo = this._specs.get(workspace)
     if (specRepo === undefined) {
-      return { metadata: {}, hasExtraction: true }
+      throw new WorkspaceNotFoundError(workspace)
     }
 
     const specPath = SpecPath.parse(capPath)
     const spec = await specRepo.get(specPath)
     if (spec === null) {
-      return { metadata: {}, hasExtraction: true }
+      throw new SpecNotFoundError(input.specId)
     }
 
     // Load and parse spec-scoped artifacts

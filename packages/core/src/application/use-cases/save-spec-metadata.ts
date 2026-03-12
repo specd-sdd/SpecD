@@ -8,6 +8,8 @@ import {
 } from '../../domain/services/parse-metadata.js'
 import { MetadataValidationError } from '../../domain/errors/metadata-validation-error.js'
 import { DependsOnOverwriteError } from '../../domain/errors/depends-on-overwrite-error.js'
+import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
+import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 
 /** Input for the {@link SaveSpecMetadata} use case. */
 export interface SaveSpecMetadataInput {
@@ -72,12 +74,12 @@ export class SaveSpecMetadata {
 
     const repo = this._specRepos.get(input.workspace)
     if (repo === undefined) {
-      return null
+      throw new WorkspaceNotFoundError(input.workspace)
     }
 
     const spec = await repo.get(input.specPath)
     if (spec === null) {
-      return null
+      throw new SpecNotFoundError(`${input.workspace}:${input.specPath.toFsPath('/')}`)
     }
 
     // Load existing metadata artifact for conflict detection and dependsOn check
