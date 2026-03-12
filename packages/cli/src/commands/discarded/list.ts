@@ -13,6 +13,7 @@ import { colWidth, renderTable } from '../../helpers/table.js'
 export function registerDiscardedList(parent: Command): void {
   parent
     .command('list')
+    .allowExcessArguments(false)
     .description('List all discarded changes')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -45,6 +46,10 @@ export function registerDiscardedList(parent: Command): void {
               date: evt?.at.toISOString().slice(0, 10) ?? '',
               by: evt?.by.name ?? '',
               reason: evt?.reason ?? '',
+              superseded:
+                evt?.supersededBy && evt.supersededBy.length > 0
+                  ? `→ ${evt.supersededBy.join(', ')}`
+                  : '',
             }))
             output(
               renderTable(
@@ -82,8 +87,15 @@ export function registerDiscardedList(parent: Command): void {
                     ),
                     overflow: 'wrap',
                   },
+                  {
+                    header: 'SUPERSEDED',
+                    width: colWidth(
+                      'SUPERSEDED',
+                      rows.map((r) => r.superseded),
+                    ),
+                  },
                 ],
-                rows.map((r) => [r.name, r.date, r.by, r.reason]),
+                rows.map((r) => [r.name, r.date, r.by, r.reason, r.superseded]),
               ),
               'text',
             )
