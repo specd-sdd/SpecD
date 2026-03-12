@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
@@ -24,7 +24,11 @@ import { loadConfig } from '../../src/load-config.js'
 import { createCliKernel } from '../../src/kernel.js'
 import { registerSpecWriteMetadata } from '../../src/commands/spec/write-metadata.js'
 import * as fsPromises from 'node:fs/promises'
-import { ArtifactConflictError } from '@specd/core'
+import {
+  ArtifactConflictError,
+  MetadataValidationError,
+  DependsOnOverwriteError,
+} from '@specd/core'
 
 function setup() {
   const config = makeMockConfig()
@@ -202,5 +206,59 @@ describe('spec write-metadata', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toContain('error:')
+  })
+
+  it('exits 1 on MetadataValidationError', async () => {
+    const { kernel, stdout, stderr } = setup()
+    vi.mocked(fsPromises.readFile).mockResolvedValue(validYaml)
+    kernel.specs.saveMetadata.execute.mockRejectedValue(
+      new MetadataValidationError('title: Required'),
+    )
+
+    const program = makeProgram()
+    registerSpecWriteMetadata(program.command('spec'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'spec',
+        'write-metadata',
+        'auth/login',
+        '--input',
+        '/tmp/metadata.yaml',
+      ])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('error:')
+    expect(stderr()).toContain('Metadata validation failed')
+    expect(stdout()).toBe('')
+  })
+
+  it('exits 1 on DependsOnOverwriteError', async () => {
+    const { kernel, stdout, stderr } = setup()
+    vi.mocked(fsPromises.readFile).mockResolvedValue(validYaml)
+    kernel.specs.saveMetadata.execute.mockRejectedValue(
+      new DependsOnOverwriteError(['core:config', 'core:schema-format'], ['core:change']),
+    )
+
+    const program = makeProgram()
+    registerSpecWriteMetadata(program.command('spec'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'spec',
+        'write-metadata',
+        'auth/login',
+        '--input',
+        '/tmp/metadata.yaml',
+      ])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('error:')
+    expect(stderr()).toContain('dependsOn would change')
+    expect(stdout()).toBe('')
   })
 })

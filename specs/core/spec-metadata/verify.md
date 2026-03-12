@@ -121,6 +121,67 @@
 - **WHEN** `parseMetadata` reads the file
 - **THEN** it returns `{}` without throwing — read path never blocks operations
 
+### Requirement: dependsOn overwrite protection
+
+#### Scenario: dependsOn entries removed — error thrown
+
+- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:config']`
+- **THEN** a `DependsOnOverwriteError` is thrown with `existingDeps` and `incomingDeps`
+- **AND** the file is not written
+
+#### Scenario: dependsOn entries added — error thrown
+
+- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:config', 'core:schema-format', 'core:change']`
+- **THEN** a `DependsOnOverwriteError` is thrown
+- **AND** the file is not written
+
+#### Scenario: dependsOn entries replaced — error thrown
+
+- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:change', 'core:schema-format']`
+- **THEN** a `DependsOnOverwriteError` is thrown
+- **AND** the file is not written
+
+#### Scenario: dependsOn dropped entirely — error thrown
+
+- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **WHEN** `SaveSpecMetadata` is executed with content that has no `dependsOn`
+- **THEN** a `DependsOnOverwriteError` is thrown
+- **AND** the file is not written
+
+#### Scenario: Same dependsOn in different order — allowed
+
+- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:schema-format', 'core:config']`
+- **THEN** the file is written successfully — order is not significant
+
+#### Scenario: dependsOn change with force — allowed
+
+- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **WHEN** `SaveSpecMetadata` is executed with `force: true` and content that has `dependsOn: ['core:change']`
+- **THEN** the file is written successfully — force bypasses the check
+
+#### Scenario: No existing metadata — new dependsOn allowed
+
+- **GIVEN** no existing `.specd-metadata.yaml` for the spec
+- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:config']`
+- **THEN** the file is written successfully
+
+#### Scenario: Existing metadata without dependsOn — new dependsOn allowed
+
+- **GIVEN** existing `.specd-metadata.yaml` has no `dependsOn` field
+- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:config']`
+- **THEN** the file is written successfully — adding dependsOn to a spec that had none is allowed
+
+#### Scenario: Error message includes removed and added entries
+
+- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:change']`
+- **THEN** the error message includes the removed entries (`core:config`, `core:schema-format`) and the added entry (`core:change`)
+- **AND** the message includes a hint to use `--force`
+
 ### Requirement: Deterministic generation at archive time
 
 #### Scenario: Metadata generated after archive

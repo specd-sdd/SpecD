@@ -51,3 +51,30 @@
 - **WHEN** `specd spec generate-metadata auth/login --force` is invoked without `--write`
 - **THEN** the command writes `error: --force requires --write` to stderr
 - **AND** exits with code 1
+
+### Requirement: Error — dependsOn overwrite (write mode)
+
+#### Scenario: dependsOn change in write mode exits 1
+
+- **GIVEN** existing metadata has `dependsOn: [core:config, core:schema-format]`
+- **AND** the generated metadata has `dependsOn: [core:change]`
+- **WHEN** `specd spec generate-metadata auth/login --write` is invoked without `--force`
+- **THEN** the command writes `error: dependsOn would change` to stderr
+- **AND** exits with code 1
+- **AND** stdout is empty
+
+#### Scenario: Write mode JSON output on dependsOn error
+
+- **GIVEN** existing metadata has `dependsOn: [core:config]`
+- **AND** the generated metadata has `dependsOn: [core:change]`
+- **WHEN** `specd spec generate-metadata auth/login --write --format json` is invoked without `--force`
+- **THEN** the command exits with code 1
+- **AND** stderr contains `error: dependsOn would change`
+- **AND** stdout is empty
+
+#### Scenario: --write --force bypasses dependsOn check
+
+- **GIVEN** existing metadata has `dependsOn: [core:config]`
+- **AND** the generated metadata has `dependsOn: [core:change]`
+- **WHEN** `specd spec generate-metadata auth/login --write --force` is invoked
+- **THEN** the write succeeds

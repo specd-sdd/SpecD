@@ -30,6 +30,11 @@ rules:
   - requirement: Error — no metadataExtraction
     rules:
       - 'If the core use case returns hasExtraction: false (schema has no metadataExtraction declarations), the command writes error: schema has no metadataExtraction declarations to stderr and exits with code 1.'
+  - requirement: Error — dependsOn overwrite (write mode)
+    rules:
+      - |-
+        When --write is used and --force is not set, if the generated metadata would change existing dependsOn entries, SaveSpecMetadata throws a DependsOnOverwriteError. The error propagates through handleError which writes error: dependsOn would change (...) to stderr and exits with code 1. Stdout remains empty on error.
+        When --write --force is used, the overwrite check is skipped entirely.
 constraints:
   - The command contains no business logic — all generation is delegated to GenerateSpecMetadata and all writing to SaveSpecMetadata
   - 'YAML serialization uses lineWidth: 0 for literal scalars'
@@ -84,7 +89,38 @@ scenarios:
     then:
       - 'the command writes error: --force requires --write to stderr'
       - AND exits with code 1
+  - requirement: Error — dependsOn overwrite (write mode)
+    name: dependsOn change in write mode exits 1
+    given:
+      - 'existing metadata has dependsOn: [core:config, core:schema-format]'
+      - 'AND the generated metadata has dependsOn: [core:change]'
+    when:
+      - specd spec generate-metadata auth/login --write is invoked without --force
+    then:
+      - 'the command writes error: dependsOn would change to stderr'
+      - AND exits with code 1
+      - AND stdout is empty
+  - requirement: Error — dependsOn overwrite (write mode)
+    name: Write mode JSON output on dependsOn error
+    given:
+      - 'existing metadata has dependsOn: [core:config]'
+      - 'AND the generated metadata has dependsOn: [core:change]'
+    when:
+      - specd spec generate-metadata auth/login --write --format json is invoked without --force
+    then:
+      - the command exits with code 1
+      - 'AND stderr contains error: dependsOn would change'
+      - AND stdout is empty
+  - requirement: Error — dependsOn overwrite (write mode)
+    name: --write --force bypasses dependsOn check
+    given:
+      - 'existing metadata has dependsOn: [core:config]'
+      - 'AND the generated metadata has dependsOn: [core:change]'
+    when:
+      - specd spec generate-metadata auth/login --write --force is invoked
+    then:
+      - the write succeeds
 contentHashes:
-  spec.md: sha256:d9eda741431e4068cfffb9da1d9453ddbb365ccb9dd5243dd66d58b0cc025ce0
-  verify.md: sha256:6412ab6f1593b7717bb1d97159dc70f868afe06a835777a87e3ed111c1b697ef
+  spec.md: sha256:81190c00da6bca2e57ccf2f3680bb85de298d60fe01466c38d6dfde520c30960
+  verify.md: sha256:dc060af184157b1f11bfbf6ad8d75f62d900a34980f7642122d8052cb84abd1a
 generatedBy: core

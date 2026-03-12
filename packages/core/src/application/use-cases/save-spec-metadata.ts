@@ -2,8 +2,12 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type YamlSerializer } from '../ports/yaml-serializer.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
-import { strictSpecMetadataSchema } from '../../domain/services/parse-metadata.js'
+import {
+  specMetadataSchema,
+  strictSpecMetadataSchema,
+} from '../../domain/services/parse-metadata.js'
 import { MetadataValidationError } from '../../domain/errors/metadata-validation-error.js'
+import { DependsOnOverwriteError } from '../../domain/errors/depends-on-overwrite-error.js'
 
 /** Input for the {@link SaveSpecMetadata} use case. */
 export interface SaveSpecMetadataInput {
@@ -76,12 +80,28 @@ export class SaveSpecMetadata {
       return null
     }
 
-    // Load existing metadata artifact for conflict detection hash
+    // Load existing metadata artifact for conflict detection and dependsOn check
     let originalHash: string | undefined
     if (input.force !== true) {
       const existing = await repo.artifact(spec, '.specd-metadata.yaml')
       if (existing !== null) {
         originalHash = existing.originalHash
+
+        // Check if dependsOn would be overwritten
+        const existingParsed = this._yaml.parse(existing.content)
+        if (existingParsed !== null && typeof existingParsed === 'object') {
+          const existingMeta = specMetadataSchema.safeParse(existingParsed)
+          if (existingMeta.success) {
+            const existingDeps = existingMeta.data.dependsOn ?? []
+            const incomingDeps = validation.data.dependsOn ?? []
+            if (
+              existingDeps.length > 0 &&
+              !DependsOnOverwriteError.areSame(existingDeps, incomingDeps)
+            ) {
+              throw new DependsOnOverwriteError(existingDeps, incomingDeps)
+            }
+          }
+        }
       }
     }
 

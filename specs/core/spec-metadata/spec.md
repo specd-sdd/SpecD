@@ -100,6 +100,25 @@ If validation fails, `SaveSpecMetadata` throws a `MetadataValidationError` (a do
 
 Unknown top-level keys are allowed (`.passthrough()`) to support forward-compatible extensions.
 
+### Requirement: dependsOn overwrite protection
+
+Existing `dependsOn` entries are considered curated — they may have been manually added, verified by a human, or set via `change.specDependsOn`. `SaveSpecMetadata` must prevent silent overwrites:
+
+1. When `force` is not set: before writing, read the existing `.specd-metadata.yaml` from disk
+2. Parse both existing and incoming metadata to extract their `dependsOn` arrays
+3. Compare the two arrays **ignoring order** (sorted comparison)
+4. If the existing metadata has `dependsOn` entries and the incoming `dependsOn` differs → throw `DependsOnOverwriteError`
+5. If the existing metadata has no `dependsOn` (absent or empty array) → allow any incoming `dependsOn`
+6. When `force` is set: skip this check entirely
+
+`DependsOnOverwriteError` is a domain error extending `SpecdError` with code `DEPENDS_ON_OVERWRITE`. It exposes:
+
+- `existingDeps: readonly string[]` — the entries currently on disk
+- `incomingDeps: readonly string[]` — the entries in the incoming content
+- A human-readable message listing which entries would be removed and which would be added
+
+A static helper `DependsOnOverwriteError.areSame(a, b)` compares two `dependsOn` arrays for equality ignoring order.
+
 ### Requirement: Deterministic generation at archive time
 
 `.specd-metadata.yaml` is generated deterministically by core as part of the `ArchiveChange` use case. After merging deltas and syncing specs, `ArchiveChange` generates metadata for each modified spec:
@@ -149,6 +168,7 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 - Staleness warnings are advisory only — they do not block any operation
 - The LLM must not include the spec itself in its own `dependsOn` list
 - `SaveSpecMetadata` must validate content against `specMetadataSchema` before writing — structurally invalid content is rejected with `MetadataValidationError`
+- `SaveSpecMetadata` must check for `dependsOn` overwrite before writing — changed `dependsOn` without `force` is rejected with `DependsOnOverwriteError`
 - Reading metadata (`parseMetadata`) remains lenient — it returns `{}` on invalid input so that downstream operations are never blocked by a malformed file on disk
 
 ## Spec Dependencies
