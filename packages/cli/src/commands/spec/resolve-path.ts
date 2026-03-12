@@ -33,7 +33,7 @@ export function registerSpecResolvePath(parent: Command): void {
           if (repo === undefined) continue
 
           const resolved = await repo.resolveFromPath(absolute)
-          if (resolved !== null) {
+          if (resolved !== null && 'specId' in resolved) {
             if (result === null || ws.specsPath.length > result.specsPathLength) {
               result = {
                 specPath: resolved.specPath.toString(),
