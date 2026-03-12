@@ -12,6 +12,7 @@ import { handleError, cliError } from '../../handle-error.js'
 export function registerChangeContext(parent: Command): void {
   parent
     .command('context <name> <step>')
+    .allowExcessArguments(false)
     .description('Compile the instruction context for a lifecycle step')
     .option('--artifact <id>', 'the active artifact ID (for designing step)')
     .option('--rules', 'include only rules sections in spec content')

@@ -15,6 +15,7 @@ import { parseSpecId } from '../../helpers/spec-path.js'
 export function registerSpecMetadata(parent: Command): void {
   parent
     .command('metadata <specPath>')
+    .allowExcessArguments(false)
     .description('Show the metadata for a spec')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

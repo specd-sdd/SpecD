@@ -51,12 +51,6 @@ constraints:
   - Errors always go to stderr as plain text regardless of --format
   - --format only affects stdout
 scenarios:
-  - requirement: Command signature
-    name: Extra arguments rejected
-    when:
-      - specd drafts list some-name is run with an unexpected positional argument
-    then:
-      - the command exits with code 1 and prints a usage error to stderr
   - requirement: Output format — text
     name: Drafts listed with correct fields
     given:
@@ -124,5 +118,5 @@ scenarios:
       - 'AND stderr contains an error: message'
 contentHashes:
   spec.md: sha256:fcbd813e4b01307cbefbe79f60eb91e950b1534da03c1135822a2c3019bcf372
-  verify.md: sha256:ec74b9a9be5f4ea6b5b5c0272c6fa27c04d8de59bbcefbb811762bfeb97eb5b2
+  verify.md: sha256:849dc8dff0cc3c149ec2d71ed8e7f44fb795f9737c16b797226c346c72446e51
 generatedBy: core

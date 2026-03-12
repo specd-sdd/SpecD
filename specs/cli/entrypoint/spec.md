@@ -67,8 +67,13 @@ Structured error output is only emitted for known error types — subtypes of `S
 
 When `--format` is `text` (the default), errors go to stderr only and stdout remains empty — no change from the existing behaviour for human users.
 
+### Requirement: Excess arguments rejected
+
+Every leaf command rejects unexpected positional arguments. If a user passes more positional arguments than the command declares, the command exits with code 1 and prints a usage error to stderr. This prevents silent typos and misremembered syntax from being ignored.
+
 ## Constraints
 
+- Every leaf command must call `.allowExcessArguments(false)` so Commander rejects extra positional arguments
 - `--config` must be the first flag processed, before any sub-command-specific flag parsing
 - Config discovery halts at the git repository root; it does not cross repository boundaries
 - Stdout and stderr must be independent streams — no interleaving of normal output and error messages

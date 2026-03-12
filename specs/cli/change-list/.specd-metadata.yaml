@@ -51,12 +51,6 @@ constraints:
   - Only active changes (in changes/) are listed; drafted and discarded changes have their own noun groups
   - No filtering by state or workspace in v1
 scenarios:
-  - requirement: Command signature
-    name: Extra arguments rejected
-    when:
-      - specd change list some-name is run with an unexpected positional argument
-    then:
-      - the command exits with code 1 and prints a usage error to stderr
   - requirement: Output format
     name: Only active changes shown
     given:
@@ -109,5 +103,5 @@ scenarios:
       - AND the process exits with code 0
 contentHashes:
   spec.md: sha256:7c3577023c36563a63d53cce2eb20c14c6a8135cf48586da2ef442e2834d89a4
-  verify.md: sha256:6eb6fb8cc8224a15511e5b06a9f353c1d58d93bcb278fca51b6be4b8a8587ffe
+  verify.md: sha256:7a089cf30a3c0b8fbe7b83de9863d70735f49b55598f0bd8721d9ad4def7998b
 generatedBy: core

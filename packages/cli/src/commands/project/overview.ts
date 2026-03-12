@@ -67,6 +67,7 @@ function sideBySide(left: string, right: string, gap = 2): string {
 export function registerProjectOverview(parent: Command): void {
   parent
     .command('overview')
+    .allowExcessArguments(false)
     .description('Show a visual dashboard of the project status')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

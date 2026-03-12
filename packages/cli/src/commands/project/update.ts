@@ -15,6 +15,7 @@ import { KNOWN_AGENTS } from '../../helpers/known-agents.js'
 export function registerProjectUpdate(parent: Command): void {
   parent
     .command('update')
+    .allowExcessArguments(false)
     .description('Update the project after upgrading specd')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

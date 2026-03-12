@@ -12,6 +12,7 @@ import { collect } from '../../helpers/collect.js'
 export function registerChangeDeps(parent: Command): void {
   parent
     .command('deps <name> <specId>')
+    .allowExcessArguments(false)
     .description('Manage declared dependencies for a spec within a change')
     .option('--add <id>', 'add a dependency spec ID (repeatable)', collect, [] as string[])
     .option('--remove <id>', 'remove a dependency spec ID (repeatable)', collect, [] as string[])

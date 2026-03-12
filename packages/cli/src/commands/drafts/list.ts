@@ -13,6 +13,7 @@ import { colWidth, renderTable } from '../../helpers/table.js'
 export function registerDraftsList(parent: Command): void {
   parent
     .command('list')
+    .allowExcessArguments(false)
     .description('List all drafted (shelved) changes')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

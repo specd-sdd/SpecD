@@ -15,6 +15,7 @@ import { parseSpecId } from '../../helpers/spec-path.js'
 export function registerSpecWriteMetadata(parent: Command): void {
   parent
     .command('write-metadata <specPath>')
+    .allowExcessArguments(false)
     .description('Write .specd-metadata.yaml for a spec')
     .option('--input <file>', 'read YAML content from a file instead of stdin')
     .option('--force', 'skip conflict detection and overwrite unconditionally')

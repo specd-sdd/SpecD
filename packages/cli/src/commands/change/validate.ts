@@ -12,6 +12,7 @@ import { parseSpecId } from '../../helpers/spec-path.js'
 export function registerChangeValidate(parent: Command): void {
   parent
     .command('validate <name> <specPath>')
+    .allowExcessArguments(false)
     .description('Validate artifact files against the active schema')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

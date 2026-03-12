@@ -11,6 +11,7 @@ import { handleError, cliError } from '../../handle-error.js'
 export function registerSkillsShow(parent: Command): void {
   parent
     .command('show <name>')
+    .allowExcessArguments(false)
     .description('Show the content of a skill')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .action((name: string, opts: { format: string }) => {

@@ -2,13 +2,6 @@
 
 ## Requirements
 
-### Requirement: Command signature
-
-#### Scenario: Extra arguments rejected
-
-- **WHEN** `specd spec list some-arg` is run with an unexpected argument
-- **THEN** the command exits with code 1 and prints a usage error to stderr
-
 ### Requirement: Title resolution
 
 #### Scenario: Title from metadata

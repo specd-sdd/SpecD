@@ -51,6 +51,7 @@ function renderEntryText(entry: SpecContextEntry): string {
 export function registerSpecContext(parent: Command): void {
   parent
     .command('context <specPath>')
+    .allowExcessArguments(false)
     .description('Show the metadata context for a spec')
     .option('--rules', 'include only rules sections')
     .option('--constraints', 'include only constraints sections')

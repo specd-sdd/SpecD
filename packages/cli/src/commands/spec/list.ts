@@ -114,6 +114,7 @@ function renderWorkspaceGroup(
 export function registerSpecList(parent: Command): void {
   parent
     .command('list')
+    .allowExcessArguments(false)
     .description('List all available specs across all workspaces')
     .option('--summary', 'include a short description for each spec')
     .option(

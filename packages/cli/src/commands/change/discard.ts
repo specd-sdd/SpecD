@@ -11,6 +11,7 @@ import { handleError, cliError } from '../../handle-error.js'
 export function registerChangeDiscard(parent: Command): void {
   parent
     .command('discard <name>')
+    .allowExcessArguments(false)
     .description('Permanently discard a change')
     .requiredOption('--reason <text>', 'mandatory explanation for discarding')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
