@@ -1,0 +1,53 @@
+# Verification: Spec Generate-Metadata
+
+## Requirements
+
+### Requirement: Command signature
+
+#### Scenario: Missing path argument
+
+- **WHEN** `specd spec generate-metadata` is invoked without a `<specPath>` argument
+- **THEN** the command exits with an error
+
+### Requirement: Error — no metadataExtraction
+
+#### Scenario: Schema has no metadataExtraction
+
+- **WHEN** the core use case returns `hasExtraction: false`
+- **THEN** the command writes `error: schema has no metadataExtraction declarations` to stderr
+- **AND** exits with code 1
+
+### Requirement: Default output (no --write)
+
+#### Scenario: Text format outputs YAML to stdout
+
+- **GIVEN** the core use case returns metadata with `title: 'Login'` and `generatedBy: 'core'`
+- **WHEN** `specd spec generate-metadata auth/login` is invoked without `--write`
+- **THEN** stdout contains the YAML representation including `title: Login` and `generatedBy: core`
+
+#### Scenario: JSON format outputs spec and metadata
+
+- **GIVEN** the core use case returns metadata with `title: 'Login'`
+- **WHEN** `specd spec generate-metadata auth/login --format json` is invoked
+- **THEN** stdout contains a JSON object with `spec: "default:auth/login"` and `metadata` containing the extracted fields
+
+### Requirement: Write mode
+
+#### Scenario: Write persists metadata and confirms
+
+- **WHEN** `specd spec generate-metadata auth/login --write` is invoked
+- **THEN** `SaveSpecMetadata` is called with the generated YAML content
+- **AND** stdout contains `wrote .specd-metadata.yaml for default:auth/login`
+
+### Requirement: Force flag
+
+#### Scenario: Write with force passes force flag
+
+- **WHEN** `specd spec generate-metadata auth/login --write --force` is invoked
+- **THEN** `SaveSpecMetadata` is called with `force: true`
+
+#### Scenario: Force without write exits with error
+
+- **WHEN** `specd spec generate-metadata auth/login --force` is invoked without `--write`
+- **THEN** the command writes `error: --force requires --write` to stderr
+- **AND** exits with code 1
