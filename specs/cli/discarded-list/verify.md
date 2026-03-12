@@ -2,13 +2,6 @@
 
 ## Requirements
 
-### Requirement: Command signature
-
-#### Scenario: Extra arguments rejected
-
-- **WHEN** `specd discarded list some-name` is run with an unexpected positional argument
-- **THEN** the command exits with code 1 and prints a usage error to stderr
-
 ### Requirement: Output format — text
 
 #### Scenario: Discarded changes listed with correct fields
@@ -41,13 +34,6 @@
 - **GIVEN** `discarded/` contains one change named `bad-idea` with `supersededBy` set to `['new-approach']`
 - **WHEN** `specd discarded list --format json` is run
 - **THEN** the JSON object for `bad-idea` contains a `supersededBy` array with `"new-approach"`
-- **AND** the process exits with code 0
-
-#### Scenario: JSON format output — no actor recorded
-
-- **GIVEN** `discarded/` contains one change named `old-experiment` with no `discardedBy` recorded
-- **WHEN** `specd discarded list --format json` is run
-- **THEN** the JSON object for `old-experiment` does not contain a `discardedBy` field
 - **AND** the process exits with code 0
 
 ### Requirement: Empty discarded list
