@@ -67,12 +67,6 @@ constraints:
   - 'Section flags (--rules, --constraints, --scenarios) only filter spec content; project context: entries are always rendered in full regardless of section flags'
 scenarios:
   - requirement: Command signature
-    name: Extra arguments rejected
-    when:
-      - specd project context some-arg is run with an unexpected argument
-    then:
-      - the command exits with code 1 and prints a usage error to stderr
-  - requirement: Command signature
     name: --depth without --follow-deps
     when:
       - specd project context --depth 2 is run without --follow-deps
@@ -199,5 +193,5 @@ scenarios:
       - AND the spec content is still included using the metadataExtraction fallback
 contentHashes:
   spec.md: sha256:92a85f5ea6f0c4dca876dc9f638602ba1484634c93af2062520351108ea71b24
-  verify.md: sha256:c563c4d8310b4be5696183f9b4a6bcdc41f77b15ad0749cbe3d51f02819649b5
+  verify.md: sha256:845226c2f2195dee7d3341aa01ce15bdf609078cb1f932cc83df1d91ccc6cf7b
 generatedBy: core

@@ -15,6 +15,7 @@ import { KNOWN_AGENTS } from '../../helpers/known-agents.js'
 export function registerSkillsUpdate(parent: Command): void {
   parent
     .command('update')
+    .allowExcessArguments(false)
     .description('Update installed skills from the skills registry')
     .option('--agent <id>', 'restrict update to one agent')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

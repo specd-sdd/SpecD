@@ -2,13 +2,6 @@
 
 ## Requirements
 
-### Requirement: Command signature
-
-#### Scenario: Extra arguments rejected
-
-- **WHEN** `specd archive list some-name` is run with an unexpected positional argument
-- **THEN** the command exits with code 1 and prints a usage error to stderr
-
 ### Requirement: Output format — text
 
 #### Scenario: Archived changes listed with correct fields

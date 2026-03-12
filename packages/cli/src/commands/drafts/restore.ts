@@ -11,6 +11,7 @@ import { handleError } from '../../handle-error.js'
 export function registerDraftsRestore(parent: Command): void {
   parent
     .command('restore <name>')
+    .allowExcessArguments(false)
     .description('Restore a drafted change back to active changes')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

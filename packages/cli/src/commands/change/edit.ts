@@ -13,6 +13,7 @@ import { collect } from '../../helpers/collect.js'
 export function registerChangeEdit(parent: Command): void {
   parent
     .command('edit <name>')
+    .allowExcessArguments(false)
     .description('Edit the spec scope of a change')
     .option('--add-spec <id>', 'add a spec path (repeatable)', collect, [] as string[])
     .option('--remove-spec <id>', 'remove a spec path (repeatable)', collect, [] as string[])

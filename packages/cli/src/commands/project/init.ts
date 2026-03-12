@@ -73,6 +73,7 @@ async function installSkillsForAgents(
 export function registerProjectInit(parent: Command): void {
   parent
     .command('init')
+    .allowExcessArguments(false)
     .description('Initialise a new SpecD project')
     .option('--schema <ref>', 'schema reference (e.g. @specd/schema-std)')
     .option('--workspace <id>', 'default workspace ID', 'default')

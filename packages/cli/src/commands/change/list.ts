@@ -85,6 +85,7 @@ function renderChangeList(changes: Change[]): string {
 export function registerChangeList(parent: Command): void {
   parent
     .command('list')
+    .allowExcessArguments(false)
     .description('List all active changes')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

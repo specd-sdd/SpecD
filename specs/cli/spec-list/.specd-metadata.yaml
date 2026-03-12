@@ -129,12 +129,6 @@ constraints:
   - Summary is never a hard error — if extraction fails for any reason, the spec is still listed without it
   - Status resolution errors (I/O failures reading artifacts for hashing) result in stale status, not a hard error
 scenarios:
-  - requirement: Command signature
-    name: Extra arguments rejected
-    when:
-      - specd spec list some-arg is run with an unexpected argument
-    then:
-      - the command exits with code 1 and prints a usage error to stderr
   - requirement: Title resolution
     name: Title from metadata
     given:
@@ -325,5 +319,5 @@ scenarios:
       - AND the process exits with code 0
 contentHashes:
   spec.md: sha256:ea858081eb1d3bf32bf7ade1aad9ca7ce88be1b50bcdd69c907709985ba375cc
-  verify.md: sha256:96a1542fb1ddfd8abe83923b590f1a40f6dbb96336e4e8f6c19dbef2502f0df8
+  verify.md: sha256:071f71184904847d961fc3afd3e760d619cddc15ff0201634ea24c38dfb84967
 generatedBy: core

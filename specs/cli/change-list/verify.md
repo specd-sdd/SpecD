@@ -2,13 +2,6 @@
 
 ## Requirements
 
-### Requirement: Command signature
-
-#### Scenario: Extra arguments rejected
-
-- **WHEN** `specd change list some-name` is run with an unexpected positional argument
-- **THEN** the command exits with code 1 and prints a usage error to stderr
-
 ### Requirement: Output format
 
 #### Scenario: Only active changes shown

@@ -12,6 +12,7 @@ import { handleError, cliError } from '../../handle-error.js'
 export function registerProjectContext(parent: Command): void {
   parent
     .command('context')
+    .allowExcessArguments(false)
     .description('Compile and print the project-level context block')
     .option('--rules', 'include only rules sections in spec content')
     .option('--constraints', 'include only constraints sections in spec content')

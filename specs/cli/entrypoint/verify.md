@@ -80,6 +80,13 @@
 - **WHEN** a system error occurs
 - **THEN** no stack trace is printed to stderr
 
+### Requirement: Excess arguments rejected
+
+#### Scenario: Extra positional argument rejected
+
+- **WHEN** any leaf command is run with an unexpected extra positional argument (e.g. `specd change list some-name`)
+- **THEN** the command exits with code 1 and prints a usage error to stderr
+
 ### Requirement: Output format flag
 
 #### Scenario: Text format produces human-readable output

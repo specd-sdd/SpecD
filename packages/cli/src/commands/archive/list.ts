@@ -12,6 +12,7 @@ import { colWidth, renderTable } from '../../helpers/table.js'
 export function registerArchiveList(parent: Command): void {
   parent
     .command('list')
+    .allowExcessArguments(false)
     .description('List all archived changes')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

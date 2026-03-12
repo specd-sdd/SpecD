@@ -16,6 +16,7 @@ import { KNOWN_AGENTS } from '../../helpers/known-agents.js'
 export function registerSkillsInstall(parent: Command): void {
   parent
     .command('install <name>')
+    .allowExcessArguments(false)
     .description('Install a skill (or "all") for an agent')
     .option('--agent <id>', 'agent to install for (e.g. claude)', 'claude')
     .option('--global', 'install globally to the user-level commands directory')

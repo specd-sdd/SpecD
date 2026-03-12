@@ -13,6 +13,7 @@ import { parseSpecId } from '../../helpers/spec-path.js'
 export function registerSpecShow(parent: Command): void {
   parent
     .command('show <specPath>')
+    .allowExcessArguments(false)
     .description('Show the contents of a spec')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

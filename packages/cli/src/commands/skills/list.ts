@@ -37,6 +37,7 @@ async function resolveProjectRoot(): Promise<string> {
 export function registerSkillsList(parent: Command): void {
   parent
     .command('list')
+    .allowExcessArguments(false)
     .description('List all available skills')
     .option('--agent <id>', 'check installation status for this agent (e.g. claude)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

@@ -11,6 +11,7 @@ import { handleError, cliError } from '../../handle-error.js'
 export function registerDiscardedShow(parent: Command): void {
   parent
     .command('show <name>')
+    .allowExcessArguments(false)
     .description('Show details of a discarded change')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

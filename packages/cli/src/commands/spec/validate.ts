@@ -12,6 +12,7 @@ import { parseSpecId } from '../../helpers/spec-path.js'
 export function registerSpecValidate(parent: Command): void {
   parent
     .command('validate [specPath]')
+    .allowExcessArguments(false)
     .description('Validate spec artifacts against the active schema')
     .option('--all', 'validate all specs across all workspaces')
     .option('--workspace <name>', 'validate all specs in a workspace')

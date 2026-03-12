@@ -46,12 +46,6 @@ constraints:
   - All paths in the output are absolute — the same values as in the resolved SpecdConfig
   - This command is read-only
 scenarios:
-  - requirement: Command signature
-    name: Extra arguments rejected
-    when:
-      - specd config show some-arg is run with an unexpected argument
-    then:
-      - the command exits with code 1 and prints a usage error to stderr
   - requirement: Output format
     name: Text output shows all sections
     given:
@@ -97,5 +91,5 @@ scenarios:
       - 'AND stderr contains an error: message describing the discovery failure'
 contentHashes:
   spec.md: sha256:80492c519f45572480a2a0a49675893450b4ecdcdf6de549f4457b8d6688a1ef
-  verify.md: sha256:6558e166cb27fe670112ab018fda687f79d9bd4730f201560dfd1b72dba806f1
+  verify.md: sha256:9635c5f461912c17d5a051f1dc25481399af010e9e7e5e5ec2219a8f349e88e8
 generatedBy: core

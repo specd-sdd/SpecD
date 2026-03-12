@@ -13,6 +13,7 @@ import { collect } from '../../helpers/collect.js'
 export function registerChangeCreate(parent: Command): void {
   parent
     .command('create <name>')
+    .allowExcessArguments(false)
     .description('Create a new change')
     .option('--spec <id>', 'spec path (repeatable)', collect, [] as string[])
     .option('--description <text>', 'change description (informational)')

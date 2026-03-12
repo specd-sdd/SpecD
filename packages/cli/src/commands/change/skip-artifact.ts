@@ -11,6 +11,7 @@ import { handleError } from '../../handle-error.js'
 export function registerChangeSkipArtifact(parent: Command): void {
   parent
     .command('skip-artifact <name> <artifactId>')
+    .allowExcessArguments(false)
     .description('Explicitly skip an optional artifact')
     .option('--reason <text>', 'reason for skipping')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

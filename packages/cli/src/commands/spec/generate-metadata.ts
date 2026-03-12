@@ -14,6 +14,7 @@ import { parseSpecId } from '../../helpers/spec-path.js'
 export function registerSpecGenerateMetadata(parent: Command): void {
   parent
     .command('generate-metadata <specPath>')
+    .allowExcessArguments(false)
     .description('Generate .specd-metadata.yaml deterministically from schema extraction rules')
     .option('--write', 'write the generated metadata to the spec directory')
     .option('--force', 'overwrite existing metadata without conflict detection (requires --write)')

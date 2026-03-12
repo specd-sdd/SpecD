@@ -4,11 +4,6 @@
 
 ### Requirement: Command signature
 
-#### Scenario: Extra arguments rejected
-
-- **WHEN** `specd project context some-arg` is run with an unexpected argument
-- **THEN** the command exits with code 1 and prints a usage error to stderr
-
 #### Scenario: --depth without --follow-deps
 
 - **WHEN** `specd project context --depth 2` is run without `--follow-deps`

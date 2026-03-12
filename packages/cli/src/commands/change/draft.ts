@@ -11,6 +11,7 @@ import { handleError } from '../../handle-error.js'
 export function registerChangeDraft(parent: Command): void {
   parent
     .command('draft <name>')
+    .allowExcessArguments(false)
     .description('Shelve a change to drafts/')
     .option('--reason <text>', 'reason for shelving')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

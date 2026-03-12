@@ -11,6 +11,7 @@ import { handleError } from '../../handle-error.js'
 export function registerArchiveShow(parent: Command): void {
   parent
     .command('show <name>')
+    .allowExcessArguments(false)
     .description('Show details of an archived change')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

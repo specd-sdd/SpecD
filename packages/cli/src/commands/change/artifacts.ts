@@ -12,6 +12,7 @@ import { vlen, pad } from '../../helpers/table.js'
 export function registerChangeArtifacts(parent: Command): void {
   parent
     .command('artifacts <name>')
+    .allowExcessArguments(false)
     .description('Show artifact files for a change')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

@@ -15,6 +15,7 @@ const VALID_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
 export function registerChangeTransition(parent: Command): void {
   parent
     .command('transition <name> <step>')
+    .allowExcessArguments(false)
     .description('Transition a change to a new lifecycle state')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

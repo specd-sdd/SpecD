@@ -63,12 +63,6 @@ constraints:
   - This command is read-only
   - Artifact instruction, deltaInstruction, and validations are not included in the output — this command focuses on structure, not content
 scenarios:
-  - requirement: Command signature
-    name: Extra arguments rejected
-    when:
-      - specd schema show some-arg is run with an unexpected argument
-    then:
-      - the command exits with code 1 and prints a usage error to stderr
   - requirement: Output format
     name: Text output shows schema name, artifacts, and workflow
     given:
@@ -123,5 +117,5 @@ scenarios:
       - 'AND stderr contains a fatal: message'
 contentHashes:
   spec.md: sha256:e9a0379298433081496cbcf63fda2b9e476778df81f39f9c33a407d386abc27e
-  verify.md: sha256:753dd268e2df3857993cf716fa13887a2d4243c626fba0fded99048bd4ae1eb6
+  verify.md: sha256:c0323c9b8e5fe80de7437a4a5864cbe29b2cd519b81c0a98cc430c297b4dcc82
 generatedBy: core

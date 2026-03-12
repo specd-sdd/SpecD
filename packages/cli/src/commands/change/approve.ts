@@ -15,6 +15,7 @@ export function registerChangeApprove(parent: Command): void {
 
   approveCmd
     .command('spec <name>')
+    .allowExcessArguments(false)
     .description('Record a spec approval')
     .requiredOption('--reason <text>', 'rationale for approval')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
@@ -44,6 +45,7 @@ export function registerChangeApprove(parent: Command): void {
 
   approveCmd
     .command('signoff <name>')
+    .allowExcessArguments(false)
     .description('Record a sign-off')
     .requiredOption('--reason <text>', 'rationale for sign-off')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

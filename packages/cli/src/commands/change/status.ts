@@ -11,6 +11,7 @@ import { handleError } from '../../handle-error.js'
 export function registerChangeStatus(parent: Command): void {
   parent
     .command('status <name>')
+    .allowExcessArguments(false)
     .description('Show the status of a change')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

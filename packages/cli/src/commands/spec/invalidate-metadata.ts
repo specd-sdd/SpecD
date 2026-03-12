@@ -13,6 +13,7 @@ import { parseSpecId } from '../../helpers/spec-path.js'
 export function registerSpecInvalidateMetadata(parent: Command): void {
   parent
     .command('invalidate-metadata <specPath>')
+    .allowExcessArguments(false)
     .description('Invalidate .specd-metadata.yaml by removing contentHashes (marks as stale)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
