@@ -550,3 +550,4 @@ workflow:
 
 - [`specs/core/artifact-ast/spec.md`](../artifact-ast/spec.md) — normalized AST format produced and consumed by all adapters; defines node types, `label`/`value` semantics, and round-trip contract
 - [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields, node type vocabulary, and multi/no-match semantics
+- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — schema artifact configuration including `deltaValidations` rules for structural validation of delta files
