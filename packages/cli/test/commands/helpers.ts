@@ -126,6 +126,7 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     edit: { execute: vi.fn() },
     skipArtifact: { execute: vi.fn() },
     compile: { execute: vi.fn() },
+    updateSpecDeps: { execute: vi.fn() },
   }
 
   const specs = {
