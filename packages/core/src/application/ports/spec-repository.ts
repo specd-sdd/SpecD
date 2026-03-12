@@ -86,16 +86,23 @@ export abstract class SpecRepository extends Repository {
    * the reference spec. Relative resolution is pure computation (no I/O);
    * absolute resolution may require filesystem access.
    *
-   * Returns `null` if the path does not belong to this workspace or does not
-   * point to a valid spec. Implementations that do not support path-based
-   * resolution (e.g. HTTP) may always return `null`.
+   * Returns one of:
+   * - `{ specPath, specId }` — resolved within this workspace
+   * - `{ crossWorkspaceHint }` — relative path escaped this workspace;
+   *   the caller should try other repositories with the hint segments
+   * - `null` — not a valid spec link
    *
    * @param inputPath - Absolute path or relative spec link (e.g. `../storage/spec.md`)
    * @param from - Reference spec for relative resolution (required when `inputPath` is relative)
-   * @returns The resolved spec path and ID, or `null` if no match
+   * @returns The resolved result, a cross-workspace hint, or `null`
    */
   abstract resolveFromPath(
     inputPath: string,
     from?: SpecPath,
-  ): Promise<{ specPath: SpecPath; specId: string } | null>
+  ): Promise<ResolveFromPathResult | null>
 }
+
+/** Result of {@link SpecRepository.resolveFromPath}. */
+export type ResolveFromPathResult =
+  | { readonly specPath: SpecPath; readonly specId: string }
+  | { readonly crossWorkspaceHint: readonly string[] }

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -432,8 +433,9 @@ describe('FsSpecRepository', () => {
       const result = await ctx.repo.resolveFromPath(path.join(ctx.specsPath, 'auth', 'login'))
 
       expect(result).not.toBeNull()
-      expect(result!.specPath.toString()).toBe('auth/login')
-      expect(result!.specId).toBe('default:auth/login')
+      assert(result !== null && 'specId' in result)
+      expect(result.specPath.toString()).toBe('auth/login')
+      expect(result.specId).toBe('default:auth/login')
     })
 
     it('given a file path, resolves to the parent directory', async () => {
@@ -444,7 +446,8 @@ describe('FsSpecRepository', () => {
       )
 
       expect(result).not.toBeNull()
-      expect(result!.specPath.toString()).toBe('auth/login')
+      assert(result !== null && 'specId' in result)
+      expect(result.specPath.toString()).toBe('auth/login')
     })
 
     it('given a path not under specsPath, returns null', async () => {
@@ -486,8 +489,9 @@ describe('FsSpecRepository', () => {
       const result = await repo.resolveFromPath(path.join(specsPath, 'change'))
 
       expect(result).not.toBeNull()
-      expect(result!.specPath.toString()).toBe('core/change')
-      expect(result!.specId).toBe('core:core/change')
+      assert(result !== null && 'specId' in result)
+      expect(result.specPath.toString()).toBe('core/change')
+      expect(result.specId).toBe('core:core/change')
 
       await fs.rm(tmpDir, { recursive: true, force: true })
     })
@@ -504,8 +508,9 @@ describe('FsSpecRepository', () => {
       const result = await ctx.repo.resolveFromPath('../signup/spec.md', from)
 
       expect(result).not.toBeNull()
-      expect(result!.specPath.toString()).toBe('auth/signup')
-      expect(result!.specId).toBe('default:auth/signup')
+      assert(result !== null && 'specId' in result)
+      expect(result.specPath.toString()).toBe('auth/signup')
+      expect(result.specId).toBe('default:auth/signup')
     })
 
     it('given a relative path with anchor fragment, strips anchor', async () => {
@@ -513,7 +518,8 @@ describe('FsSpecRepository', () => {
       const result = await ctx.repo.resolveFromPath('../signup/spec.md#overview', from)
 
       expect(result).not.toBeNull()
-      expect(result!.specPath.toString()).toBe('auth/signup')
+      assert(result !== null && 'specId' in result)
+      expect(result.specPath.toString()).toBe('auth/signup')
     })
 
     it('given a relative path without from, returns null', async () => {
@@ -546,10 +552,23 @@ describe('FsSpecRepository', () => {
       const result = await repo.resolveFromPath('../storage/spec.md', from)
 
       expect(result).not.toBeNull()
-      expect(result!.specPath.toString()).toBe('core/storage')
-      expect(result!.specId).toBe('core:core/storage')
+      assert(result !== null && 'specId' in result)
+      expect(result.specPath.toString()).toBe('core/storage')
+      expect(result.specId).toBe('core:core/storage')
 
       await fs.rm(tmpDir, { recursive: true, force: true })
+    })
+
+    it('given a cross-workspace relative path, returns crossWorkspaceHint', async () => {
+      const from = SpecPath.parse('auth/login')
+      const result = await ctx.repo.resolveFromPath('../../core/config/spec.md', from)
+
+      expect(result).not.toBeNull()
+      expect(result).toHaveProperty('crossWorkspaceHint')
+      expect((result as { crossWorkspaceHint: string[] }).crossWorkspaceHint).toEqual([
+        'core',
+        'config',
+      ])
     })
   })
 
