@@ -16,10 +16,12 @@ specd schema show [--format text|json|toon]
 
 ### Requirement: Output format
 
-In `text` mode (default), the command prints two sections:
+In `text` mode (default), the command prints the schema metadata followed by two sections:
 
 ```
-schema: <name>  version: <N>
+schema: <name>  version: <N>  kind: <kind>
+extends: <ref>  (only if present)
+plugins: <count> applied  (only if schemaPlugins is non-empty)
 
 artifacts:
   <id>  <scope>  <optional>  requires=[<id>,...]
@@ -36,7 +38,8 @@ In `json` or `toon` mode, the output is (encoded in the respective format):
 
 ```json
 {
-  "schema": {"name": "...", "version": N},
+  "schema": {"name": "...", "version": N, "kind": "schema", "extends": "..."},
+  "plugins": ["@specd/plugin-rfc"],
   "artifacts": [
     {
       "id": "...",

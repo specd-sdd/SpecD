@@ -31,6 +31,8 @@ The function MUST be synchronous — it performs no I/O.
 - `name` (string) — schema name
 - `version` (number) — schema version
 - `description` (string, optional) — human-readable summary
+- `kind` (`'schema' | 'schema-plugin'`) — schema type discriminator
+- `extends` (string, optional) — parent schema reference
 - `artifacts` (array of `ArtifactYamlData`) — artifact entries, each with the same fields as the YAML artifact definition but using `| undefined` for optional fields
 - `workflow` (array of `WorkflowStep`, optional) — already-transformed workflow step objects
 - `metadataExtraction` (`MetadataExtractionRaw`, optional) — raw metadata extraction block with `| undefined` on optional fields
@@ -40,6 +42,12 @@ The infrastructure layer is responsible for parsing YAML and validating with Zod
 ### Requirement: Artifact ID format validation
 
 `buildSchema` SHALL validate that every `artifact.id` matches `/^[a-z][a-z0-9-]*$/`. If an ID fails this check, the function MUST throw `SchemaValidationError` with a message indicating which artifact index and the invalid ID.
+
+Note: `id` fields on array entries (hooks, validations, rules, preHashCleanup, metadataExtraction) must also match `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` and be unique within their array.
+
+### Requirement: Array entry ID validation
+
+`buildSchema` SHALL validate that every array entry `id` (in hooks, validations, deltaValidations, rules.pre, rules.post, preHashCleanup, and metadataExtraction array entries) matches `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` (1-64 chars) and is unique within its immediate array. Violations throw `SchemaValidationError`.
 
 ### Requirement: Artifact ID uniqueness validation
 
@@ -98,6 +106,7 @@ This function is currently in `infrastructure/zod/selector-schema.ts` and MUST b
 - Convert `validations` and `deltaValidations` arrays via `buildValidationRule`
 - Convert `preHashCleanup` entries
 - Convert `taskCompletionCheck` if present
+- Convert `rules` (with `pre` and `post` arrays of `{ id, text }` entries) if present
 - Pass the template content string (not the path) as the `template` property on `ArtifactType`
 - Default `optional` to `false`, `delta` to `false`, and `requires` to `[]` when omitted
 
@@ -107,7 +116,7 @@ This function is currently in `infrastructure/zod/selector-schema.ts` and MUST b
 
 ### Requirement: Schema entity construction
 
-After all validation passes, `buildSchema` SHALL construct and return a `Schema` entity by calling `new Schema(name, version, artifacts, workflow, metadataExtraction)` with the fully converted domain objects.
+After all validation passes, `buildSchema` SHALL construct and return a `Schema` entity by calling `new Schema(name, version, artifacts, workflow, metadataExtraction)` with the fully converted domain objects, passing `kind` and `extends` to the Schema constructor.
 
 ## Constraints
 
@@ -125,3 +134,4 @@ After all validation passes, `buildSchema` SHALL construct and return a `Schema`
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — the schema YAML format that defines the input structure
 - [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — `Extractor` and `FieldMapping` value objects built by sub-functions
 - [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — `Selector` value object built by `buildSelector`
+- [`specs/core/schema-merge/spec.md`](../schema-merge/spec.md) — schema merge behaviour for schemas with `extends`

@@ -14,11 +14,49 @@ The delta mechanism — file format, AST selectors, application algorithm, and s
 
 A schema file must be a valid YAML document with the following top-level fields:
 
+- `kind` (`schema` | `schema-plugin`, required) — discriminates full schemas from plugins; see Requirement: Schema kind field
 - `name` (string, required) — machine identifier, e.g. `spec-driven`
 - `version` (integer, required) — schema version, monotonically increasing
 - `description` (string, optional) — human-readable summary
-- `artifacts` (array, required) — one entry per artifact type
-- `workflow` (array, optional) — named phases of the change lifecycle, each with optional artifact prerequisites and hooks; see Requirement: Workflow
+- `extends` (string, optional) — reference to a parent schema; see Requirement: Schema extends
+- `artifacts` (array, required for `kind: schema`) — one entry per artifact type
+- `workflow` (array, optional, only valid for `kind: schema`) — named phases of the change lifecycle, each with optional artifact prerequisites and hooks; see Requirement: Workflow
+
+### Requirement: Schema kind field
+
+Every schema file must declare a `kind` field:
+
+- `kind: schema` — a full schema with `artifacts`, `workflow`, `metadataExtraction`, and optional `extends`. `artifacts` is required; `workflow` and `metadataExtraction` are optional.
+- `kind: schema-plugin` — a partial schema containing only `description` and merge operations. `artifacts`, `workflow`, `metadataExtraction`, and `extends` are not valid on a plugin and must be rejected at validation time.
+
+Omitting `kind` is a `SchemaValidationError`.
+
+### Requirement: Schema extends
+
+A schema with `kind: schema` may declare an `extends` field — a string referencing another schema. The reference uses the same convention as the `schema` field in `specd.yaml` (npm package, workspace-qualified, bare name, or path). The referenced schema must also have `kind: schema`.
+
+Extends chains are permitted: schema A may extend schema B which extends schema C. The chain is resolved recursively until a schema with no `extends` is reached (the root). The root schema is the base; each child in the chain is applied as a merge layer in order from root to leaf.
+
+Cycles in the extends chain must be detected and produce a `SchemaValidationError` identifying the cycle. Detection uses the resolved schema file path to avoid false positives from different references pointing to the same file.
+
+`kind: schema-plugin` must not declare `extends` — it is a validation error.
+
+### Requirement: Array entry identity
+
+Every entry in the following schema arrays must carry an `id` field:
+
+- `workflow[].hooks.pre[]` and `workflow[].hooks.post[]`
+- `artifacts[].validations[]`
+- `artifacts[].deltaValidations[]`
+- `artifacts[].rules.pre[]` and `artifacts[].rules.post[]`
+- `artifacts[].preHashCleanup[]`
+- `metadataExtraction` array entries (entries in `rules[]`, `constraints[]`, `scenarios[]`, `context[]`)
+
+Format: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters. IDs must be unique within their immediate array. Duplicate IDs within the same array produce a `SchemaValidationError`.
+
+Workflow steps use `step` as their identity field instead of `id`. Artifact entries use their existing `id` field.
+
+Single-entry metadata fields (`title`, `description`, `dependsOn`, `keywords`) do not have `id` — they are scalars, not array entries.
 
 ### Requirement: Artifact definition
 
@@ -38,7 +76,11 @@ Each entry in `artifacts` must include:
 - `deltaValidations` (array, optional) — structural validation rules checked against the normalized YAML AST of the delta file before application; see Requirement: Delta validation rules. Only valid when `delta: true`.
 - `validations` (array, optional) — structural validation rules for the base artifact (after delta application); see Requirement: Validation rules
 - `metadataExtraction` (object, optional) — top-level declaration of how to extract metadata fields from artifact content; see Requirement: Metadata extraction
-- `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has a `pattern` (regex string) and a `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
+- `rules` (object, optional) — constraint text blocks injected by `CompileContext` around the artifact's `instruction`:
+  - `pre` (array, optional) — entries injected **before** the instruction. Each entry: `{ id: string, text: string }`.
+  - `post` (array, optional) — entries injected **after** the instruction. Each entry: `{ id: string, text: string }`.
+    `id` follows the standard array entry identity format. `text` is injected verbatim as a constraint block.
+- `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has `id` (string, required — standard array entry identity format), `pattern` (regex string), and `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
 - `taskCompletionCheck` (object, optional) — declares how to detect task completion within this artifact's file content. Used to gate the `implementing → verifying` transition: if the artifact is listed in the `implementing` step's `requires`, all items matching `incompletePattern` must be absent (zero matches) before the transition is allowed. Both fields are optional and default to markdown checkbox syntax:
   - `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item
   - `completePattern` (string, regex, default `^\s*-\s+\[x\]`, case-insensitive) — matches a complete task item
@@ -182,10 +224,10 @@ Entries must include:
 - `requires` (array of artifact IDs, optional) — artifacts that must be `complete` before this step is available; empty or omitted means always available
 - `hooks` (object, optional) — hooks for this step's boundaries; each key is `pre` or `post`, each value is an array of `instruction:` or `run:` hook entries
 
-Every hook entry is either:
+Every hook entry must include an `id` field (standard array entry identity format) and exactly one of:
 
-- `{ instruction: string }` — AI context injected when this step is compiled; used to guide agent behaviour during this phase
-- `{ run: string }` — shell command executed at the phase boundary; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`
+- `{ id: string, instruction: string }` — AI context injected when this step is compiled; used to guide agent behaviour during this phase
+- `{ id: string, run: string }` — shell command executed at the phase boundary; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`
 
 **`pre` hook failure** — if a `run:` hook exits with a non-zero code, the step is aborted and the user is informed of the failure. The agent should offer to attempt to fix the problem before retrying.
 
@@ -193,22 +235,20 @@ Every hook entry is either:
 
 The order of entries in `workflow` is the intended progression of the change lifecycle and is used by tooling to display status. It does not enforce sequential blocking between consecutive steps — each step is independently gated by its own `requires`.
 
-`specd.yaml` uses the same `workflow` format to add project-level hooks. Each entry only accepts `step` and `hooks` — `requires` is not valid in `specd.yaml` workflow entries and must be rejected at load time. Entries are matched by `step` name; schema hooks fire first, then project hooks, within the same `pre`/`post` event.
+Project-level hook additions are no longer declared via a `workflow` section in `specd.yaml`. Instead, they are expressed as `schemaOverrides` targeting `workflow[].hooks` — see [`specs/core/config/spec.md`](../config/spec.md).
 
-### Requirement: Project-level artifactRules
+### Requirement: Schema plugin kind
 
-`artifactRules` in `specd.yaml` allows teams to add per-artifact constraints without forking the schema. Each key is an artifact ID; each value is an array of rule strings. `CompileContext` injects them alongside the schema-defined instruction as a distinct constraints block.
+A schema file with `kind: schema-plugin` is a partial schema that provides only merge operations for composing with a base schema. A plugin must declare:
 
-```yaml
-# specd.yaml
-artifactRules:
-  specs:
-    - 'All requirements must reference the relevant RFC number'
-  design:
-    - 'Architecture decisions must note which ADR they relate to'
-```
+- `kind: schema-plugin` (required)
+- `name` (string, required) — plugin identifier
+- `version` (integer, required) — plugin version
+- `description` (string, optional) — human-readable summary
 
-Rule keys are validated against the active schema's artifact IDs on load. Unknown keys produce a warning but do not prevent startup. Rules are additive — they extend the schema's instruction, not replace it.
+A plugin must not declare `artifacts`, `workflow`, `metadataExtraction`, or `extends` — these are validation errors. The plugin's customisation intent is expressed via `schemaOverrides`-style operations when referenced in `specd.yaml`'s `schemaPlugins`. The plugin file itself contains the operations inline under top-level operation keys (`create`, `remove`, `set`, `append`, `prepend`).
+
+Plugins are resolved using the same reference conventions as schemas (npm, workspace-qualified, bare name, path).
 
 ### Requirement: Schema resolution
 
@@ -227,14 +267,18 @@ If the resolved file does not exist, `resolve()` must return `null`; the caller 
 
 `SchemaRegistry.resolve()` must validate the parsed YAML against a Zod schema before constructing the `Schema` object. Unknown top-level fields must be ignored (forward compatibility). Structural mismatches and semantic errors must produce a `SchemaValidationError` — a domain error extending `SpecdError` — before any domain object construction takes place. Validation covers:
 
+- `kind` missing or not one of `schema` | `schema-plugin`
+- `kind: schema-plugin` declaring `artifacts`, `workflow`, `metadataExtraction`, or `extends`
 - Duplicate `artifact.id` within `artifacts`
 - Duplicate `workflow[].step` within `workflow`
 - `artifact.id` not matching `/^[a-z][a-z0-9-]*$/`
+- Array entry `id` not matching `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` or exceeding 64 characters
+- Duplicate `id` within the same array (hooks, validations, rules, deltaValidations, preHashCleanup, metadataExtraction entries)
 - Unknown artifact ID referenced in `artifact.requires`
 - Circular dependency in artifact `requires` graph
 - Non-optional artifact hard-depending on an optional artifact
 - `deltaValidations` declared on an artifact with `delta: false`
-- `requires` present in a `specd.yaml` workflow entry
+- Cycle in `extends` chain (detected via resolved file path)
 
 ### Requirement: verify.md format
 
@@ -262,20 +306,26 @@ The `verify` artifact in the schema should declare `requires: [spec]` — scenar
 
 ## Constraints
 
+- `kind` is required on every schema file; must be `schema` or `schema-plugin`
+- `kind: schema-plugin` must not declare `artifacts`, `workflow`, `metadataExtraction`, or `extends`
+- `extends` is only valid on `kind: schema`; cycles in extends chains are a validation error
 - `artifact.id` must match `/^[a-z][a-z0-9-]*$/` and must be unique within a schema
+- Array entry `id` must match `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/`, 1–64 characters, unique within its immediate array
 - `artifact.scope` must be `spec` or `change`; it is required and has no default
 - `artifact.optional` defaults to `false`; a non-optional artifact with `scope: spec` must be present in every spec directory and every change
+- `artifact.rules.pre` and `artifact.rules.post` are optional arrays of `{ id, text }` entries
 - `workflow[].step` must be unique — duplicate step names in the same `workflow` array are a schema validation error
+- Every hook entry must include an `id` field alongside its `instruction` or `run` field
 - `requires` must not contain cycles; circular dependencies in the artifact graph are a schema validation error
 - If artifact A is `optional: true`, any artifact that lists A in its `requires` must also be `optional: true`
 - `deltaValidations` is only valid on artifacts with `delta: true`; declaring `deltaValidations` on a non-delta artifact is a schema validation error
-- `requires` in `specd.yaml` workflow entries is invalid and must be rejected at load time; only `step` and `hooks` are accepted
 - The order of entries in `workflow` is the intended display order for tooling; it does not enforce sequential blocking between consecutive steps
 - Delta file format, selector model, and application constraints are defined in `specs/core/delta-format/spec.md`
 
 ## Schema Example
 
 ```yaml
+kind: schema
 name: schema-example
 version: 1
 description: Proposal → specs → design → tasks workflow
@@ -300,26 +350,35 @@ artifacts:
     instruction: |
       Create specification files defining WHAT the system should do.
       Do not include WHEN/THEN scenarios — those go in verify.md.
+    rules:
+      post:
+        - id: normative-language
+          text: 'Use SHALL / MUST for normative statements.'
     delta: true
     deltaValidations:
-      - type: sequence-item
+      - id: added-has-scenario
+        type: sequence-item
         where:
           op: 'added|modified'
         contentMatches: '#### Scenario:'
         required: true
     validations:
-      - type: section
+      - id: has-purpose
+        type: section
         matches: '^Purpose$'
         required: true
-      - type: section
+      - id: has-requirements
+        type: section
         matches: '^Requirements$'
         required: true
         children:
-          - type: section
+          - id: has-requirement-block
+            type: section
             matches: '^Requirement:'
             required: true
             children:
-              - type: section
+              - id: has-scenario
+                type: section
                 matches: '^Scenario:'
                 required: true
 
@@ -336,15 +395,18 @@ artifacts:
       Only include scenarios that add information beyond what the requirement prose already states.
     delta: true
     validations:
-      - type: section
+      - id: has-requirements
+        type: section
         matches: '^Requirements$'
         required: true
         children:
-          - type: section
+          - id: has-requirement-block
+            type: section
             matches: '^Requirement:'
             required: true
             children:
-              - type: section
+              - id: has-scenario
+                type: section
                 matches: '^Scenario:'
                 required: true
 
@@ -371,7 +433,8 @@ artifacts:
       If a design document (design.md) exists, use it to inform the task breakdown.
       If it does not exist, derive tasks from the specs alone.
     preHashCleanup:
-      - pattern: '^\s*-\s+\[x\]'
+      - id: normalize-checkboxes
+        pattern: '^\s*-\s+\[x\]'
         replacement: '- [ ]'
     taskCompletionCheck:
       incompletePattern: '^\s*-\s+\[ \]'
@@ -384,29 +447,37 @@ workflow:
     requires: [tasks]
     hooks:
       pre:
-        - instruction: |
+        - id: read-tasks
+          instruction: |
             Read pending tasks, work through them one by one,
             mark each complete as you go. Pause if you hit a blocker.
       post:
-        - run: 'pnpm test'
-        - instruction: |
+        - id: run-tests
+          run: 'pnpm test'
+        - id: confirm-tests
+          instruction: |
             Confirm all tests pass before marking implementing complete.
   - step: verifying
     requires: [verify]
     hooks:
       pre:
-        - instruction: |
+        - id: run-scenarios
+          instruction: |
             Run through each scenario in verify.md and confirm the implementation satisfies it.
   - step: archiving
     requires: [specs, tasks]
     hooks:
       pre:
-        - run: 'pnpm test'
-        - instruction: |
+        - id: run-tests
+          run: 'pnpm test'
+        - id: review-deltas
+          instruction: |
             Review the delta files before confirming the archive.
       post:
-        - run: 'git checkout -b specd/{{change.name}}'
-        - instruction: |
+        - id: create-branch
+          run: 'git checkout -b specd/{{change.name}}'
+        - id: summarise
+          instruction: |
             Summarise what changed in this archive.
 
 metadataExtraction:
@@ -421,7 +492,8 @@ metadataExtraction:
       selector: { type: section, matches: '^Overview$|^Purpose$' }
       extract: content
   rules:
-    - artifact: specs
+    - id: spec-requirements
+      artifact: specs
       extractor:
         selector:
           type: section
@@ -431,7 +503,8 @@ metadataExtraction:
         strip: '^Requirement:\s*'
         extract: content
   constraints:
-    - artifact: specs
+    - id: spec-constraints
+      artifact: specs
       extractor:
         selector:
           type: list-item
@@ -444,6 +517,7 @@ metadataExtraction:
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta file format, ArtifactParser port, and structural validation rules
 - [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `validations`, `deltaValidations`, and `metadataExtraction`
 - [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — `Extractor` and `FieldMapping` value objects used in `metadataExtraction` declarations
+- [`specs/core/schema-merge/spec.md`](../schema-merge/spec.md) — merge engine for `extends`, plugins, and overrides
 
 ## ADRs
 

@@ -33,6 +33,13 @@ The loader MUST parse the config file as YAML. If the file contains invalid YAML
 
 After parsing, the loader MUST validate the resulting object against a Zod schema that enforces the structural shape defined in `specs/core/config/spec.md`. Any structural mismatch — missing required fields, wrong types, unknown adapter values — MUST produce a `ConfigValidationError` with the Zod issue path and message. Validation MUST occur before any path resolution or domain object construction.
 
+The Zod schema MUST additionally enforce:
+
+- `schemaPlugins` is an optional array of strings
+- `schemaOverrides` is an optional object with five optional keys: `create`, `remove`, `set`, `append`, `prepend`
+
+The loader MUST NOT accept `artifactRules` or `workflow` at the top level of `specd.yaml` — these fields have been removed. If either field is present, the loader SHOULD emit a warning suggesting migration to `schemaOverrides`.
+
 ### Requirement: Default workspace is required
 
 The loader MUST verify that `workspaces.default` exists in the parsed config. If the `default` workspace is absent, `load()` MUST throw `ConfigValidationError` with a message indicating that `workspaces.default` is required.
@@ -78,7 +85,7 @@ Workspace qualifiers MUST match `/^[a-z][a-z0-9-]*$/`. Path segments MUST match 
 
 ### Requirement: Workflow and context entry mapping
 
-The loader MUST map raw `workflow` entries from YAML to typed `SpecdWorkflowStep` objects, converting `{ run }` hooks to `{ type: 'run', command }` and `{ instruction }` hooks to `{ type: 'instruction', text }`.
+The loader MUST map `schemaPlugins` as an array of strings and `schemaOverrides` as a typed operations object preserving the five operation keys (`create`, `remove`, `set`, `append`, `prepend`).
 
 The loader MUST map raw `context` entries preserving their `{ file }` or `{ instruction }` shape.
 
@@ -103,4 +110,5 @@ Every validation failure during `load()` — missing config file, invalid YAML, 
 
 - [`specs/core/config/spec.md`](../config/spec.md) — `SpecdConfig` structure, field semantics, YAML format, and validation rules
 - [`specs/core/composition/spec.md`](../composition/spec.md) — composition layer design and factory conventions
+- [`specs/core/schema-merge/spec.md`](../schema-merge/spec.md) — schema merge operations and `schemaOverrides` structure
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port and adapter design

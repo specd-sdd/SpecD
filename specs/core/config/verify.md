@@ -164,34 +164,42 @@
 - **WHEN** a template string contains `{{unknown}}`
 - **THEN** the literal string `{{unknown}}` is used and a warning is emitted
 
-### Requirement: Workflow additions
+### Requirement: Schema plugins
 
-#### Scenario: Project hook appended
+#### Scenario: Plugin resolved and applied
 
-- **WHEN** both the schema and `specd.yaml` define hooks for `archive.post`
-- **THEN** schema hooks fire first, project hooks second, within the same lifecycle point
+- **GIVEN** `schemaPlugins: ['@specd/plugin-rfc']` is declared and the plugin package is installed
+- **WHEN** the schema is resolved
+- **THEN** the plugin's operations are applied as a merge layer after the base schema's extends chain
 
-#### Scenario: requires in project workflow entry
+#### Scenario: Plugin reference not found
 
-- **WHEN** a project-level workflow entry includes a `requires` field
-- **THEN** specd must reject it with a validation error on startup
+- **WHEN** `schemaPlugins` references a plugin that cannot be resolved
+- **THEN** specd exits with `SchemaNotFoundError`
 
-#### Scenario: Hook for step not in schema
+#### Scenario: Plugin reference points to a full schema
 
-- **WHEN** a project-level workflow entry names a step not declared in the schema's workflow
-- **THEN** the hooks are registered for that step; they fire if the step is ever invoked, and a warning is emitted at startup
+- **WHEN** `schemaPlugins` references a file with `kind: schema` instead of `kind: schema-plugin`
+- **THEN** specd exits with `SchemaValidationError`
 
-### Requirement: Project-level artifact rules
+### Requirement: Schema overrides
 
-#### Scenario: Rules injected
+#### Scenario: Override appends rules to an artifact
 
-- **WHEN** `artifactRules.specs` is set
-- **THEN** `CompileContext` includes those strings in the compiled context for the `specs` artifact as constraints the agent must follow
+- **GIVEN** `schemaOverrides.append.artifacts: [{ id: specs, rules: { post: [{ id: rfc, text: '...' }] } }]`
+- **WHEN** the schema is resolved
+- **THEN** the `specs` artifact's `rules.post` includes the `rfc` entry
 
-#### Scenario: Unknown artifact ID
+#### Scenario: Override removes a workflow hook
 
-- **WHEN** `artifactRules` contains a key not matching any artifact ID in the active schema
-- **THEN** specd emits a warning at startup and ignores those rules
+- **GIVEN** `schemaOverrides.remove.workflow: [{ step: implementing, hooks: { post: [{ id: run-tests }] } }]`
+- **WHEN** the schema is resolved
+- **THEN** the `implementing` step no longer has the `run-tests` hook
+
+#### Scenario: Invalid override structure rejected at startup
+
+- **WHEN** `schemaOverrides` contains an unknown operation key (e.g. `modify`)
+- **THEN** specd exits with `ConfigValidationError`
 
 ### Requirement: LLM optimization
 
@@ -360,8 +368,8 @@
 
 #### Scenario: Warning does not block startup
 
-- **WHEN** `specd.yaml` has an `artifactRules` key for an unknown artifact
-- **THEN** a warning is printed but the command proceeds normally
+- **WHEN** `specd.yaml` has a deprecated field like `artifactRules` or `workflow`
+- **THEN** a migration warning is printed but the command proceeds normally
 
 #### Scenario: specd init requires no existing config
 

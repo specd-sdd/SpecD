@@ -151,12 +151,19 @@
 - **AND** no `activeArtifact` is provided
 - **THEN** no artifact instructions are included in the instruction block — artifacts already exist at this point
 
-#### Scenario: artifactRules injected for the active artifact only
+#### Scenario: rules.pre injected before the schema instruction for the active artifact
 
-- **GIVEN** `artifactRules.spec: ['All requirements must use SHALL/MUST']` and `artifactRules.verify: ['Scenarios must use GIVEN/WHEN/THEN']`
+- **GIVEN** the resolved schema declares `artifacts.spec.rules.pre: [{ text: 'All requirements must use normative language.' }]`
 - **AND** `CompileContext.execute` is called with `activeArtifact: 'spec'`
-- **THEN** `result.instructionBlock` includes the `spec` rules after the schema instruction
-- **AND** does not include the `verify` rules
+- **THEN** `result.instructionBlock` includes `'All requirements must use normative language.'` before the schema instruction for `spec`
+- **AND** no `rules.pre` content from other artifacts is injected
+
+#### Scenario: rules.post injected for the active artifact only
+
+- **GIVEN** the resolved schema declares `artifacts.spec.rules.post: [{ text: 'All requirements must use SHALL/MUST' }]` and `artifacts.verify.rules.post: [{ text: 'Scenarios must use GIVEN/WHEN/THEN' }]`
+- **AND** `CompileContext.execute` is called with `activeArtifact: 'spec'`
+- **THEN** `result.instructionBlock` includes `'All requirements must use SHALL/MUST'` after the schema instruction for `spec`
+- **AND** does not include the `verify` rules.post content
 - **AND** the schema instruction is not replaced
 
 #### Scenario: Step hooks fire once regardless of artifact iteration

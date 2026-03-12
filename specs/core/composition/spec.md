@@ -45,6 +45,25 @@ The kernel is a convenience — it is not the mandatory entry point. Callers tha
 
 `SpecdConfig` is a plain TypeScript interface with no methods. It represents the fully resolved configuration for a project. The kernel and use-case factories accept it but do not know how it was produced. `SpecdConfig` is defined in `domain/` or `application/` — not in `infrastructure/` or `composition/`.
 
+`SpecdConfig` includes the following fields relevant to schema customisation:
+
+- `schemaPlugins` (`readonly string[]`, optional) — schema-plugin references in declaration order
+- `schemaOverrides` (`SchemaOperations | undefined`, optional) — inline merge operations
+
+The fields `artifactRules` and `workflow` (project-level hook additions) are no longer part of `SpecdConfig` — they have been replaced by `schemaOverrides`.
+
+### Requirement: ResolveSchema factory wiring
+
+`createResolveSchema(config: SpecdConfig)` must construct a `ResolveSchema` use case with:
+
+- The `SchemaRegistry` adapter
+- `config.schema` as the schema reference
+- The resolved workspace schemas paths map
+- `config.schemaPlugins` (defaulting to `[]` if absent)
+- `config.schemaOverrides` (defaulting to `undefined` if absent)
+
+`createGetActiveSchema(config: SpecdConfig)` must construct `GetActiveSchema` with a `ResolveSchema` instance from `createResolveSchema(config)`.
+
 ## Constraints
 
 - `composition/` is the only directory in `@specd/core` permitted to import from `infrastructure/`
@@ -58,6 +77,7 @@ The kernel is a convenience — it is not the mandatory entry point. Callers tha
 ## Spec Dependencies
 
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md)
+- [`specs/core/resolve-schema/spec.md`](../resolve-schema/spec.md) — `ResolveSchema` use case wiring
 
 ## ADRs
 

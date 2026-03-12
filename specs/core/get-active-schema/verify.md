@@ -7,43 +7,40 @@
 #### Scenario: Execute called without arguments
 
 - **WHEN** `execute()` is called with no arguments
-- **THEN** the call succeeds and uses the `schemaRef` and `workspaceSchemasPaths` provided at construction
+- **THEN** the call succeeds and uses the `ResolveSchema` instance provided at construction
 
-### Requirement: Resolves the schema via SchemaRegistry
+### Requirement: Delegates to ResolveSchema
 
-#### Scenario: Registry receives construction-time parameters
+#### Scenario: ResolveSchema receives construction-time parameters
 
-- **GIVEN** the use case was constructed with `schemaRef: "@specd/schema-std"` and a workspace schemas map
+- **GIVEN** the use case was constructed with a `ResolveSchema` instance configured for `"@specd/schema-std"`
 - **WHEN** `execute()` is called
-- **THEN** `SchemaRegistry.resolve` is called with `"@specd/schema-std"` and the same workspace schemas map
+- **THEN** `resolveSchema.execute()` is called
 
 ### Requirement: Returns the resolved Schema on success
 
-#### Scenario: Schema resolved from npm package
+#### Scenario: Schema resolved with extends and plugins
 
-- **GIVEN** `SchemaRegistry.resolve` returns a valid `Schema` object
+- **GIVEN** `ResolveSchema.execute()` returns a valid `Schema` object (after resolving extends, plugins, and overrides)
 - **WHEN** `execute()` is called
 - **THEN** the returned promise resolves to that `Schema` object
 
-### Requirement: Throws SchemaNotFoundError when resolution fails
+#### Scenario: Schema not found
 
-#### Scenario: Schema reference not found
-
-- **GIVEN** `SchemaRegistry.resolve` returns `null`
+- **GIVEN** `ResolveSchema.execute()` throws `SchemaNotFoundError`
 - **WHEN** `execute()` is called
-- **THEN** a `SchemaNotFoundError` is thrown
-- **AND** the error message contains the schema reference string
+- **THEN** the `SchemaNotFoundError` propagates to the caller
 
-#### Scenario: Workspace schema path does not exist
+#### Scenario: Schema validation failure
 
-- **GIVEN** the `schemaRef` is `"#billing:my-schema"` and the billing schemas path does not contain `my-schema/`
+- **GIVEN** `ResolveSchema.execute()` throws `SchemaValidationError` (e.g. extends cycle, plugin kind mismatch)
 - **WHEN** `execute()` is called
-- **THEN** a `SchemaNotFoundError` is thrown with the reference `"#billing:my-schema"`
+- **THEN** the `SchemaValidationError` propagates to the caller
 
 ### Requirement: Construction dependencies
 
 #### Scenario: Multiple executions resolve the same reference
 
-- **GIVEN** the use case was constructed with `schemaRef: "@specd/schema-std"`
+- **GIVEN** the use case was constructed with a `ResolveSchema` instance
 - **WHEN** `execute()` is called twice
-- **THEN** `SchemaRegistry.resolve` is called twice with the same `"@specd/schema-std"` reference
+- **THEN** `resolveSchema.execute()` is called twice
