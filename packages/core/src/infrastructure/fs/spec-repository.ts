@@ -7,6 +7,7 @@ import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-err
 import {
   SpecRepository,
   type SpecRepositoryConfig,
+  type ResolveFromPathResult,
 } from '../../application/ports/spec-repository.js'
 import { isEnoent } from './is-enoent.js'
 import { writeFileAtomic } from './write-atomic.js'
@@ -213,7 +214,7 @@ export class FsSpecRepository extends SpecRepository {
   override async resolveFromPath(
     inputPath: string,
     from?: SpecPath,
-  ): Promise<{ specPath: SpecPath; specId: string } | null> {
+  ): Promise<ResolveFromPathResult | null> {
     if (!path.isAbsolute(inputPath)) {
       return this._resolveRelative(inputPath, from)
     }
@@ -246,29 +247,52 @@ export class FsSpecRepository extends SpecRepository {
    * Resolves a relative spec link (e.g. `../storage/spec.md`) to a spec
    * identity, using `from` as the reference point. Pure computation, no I/O.
    *
+   * When the path escapes the workspace (more `..` than parent segments),
+   * returns a `crossWorkspaceHint` with the remaining forward segments
+   * so the caller can try other repositories.
+   *
    * @param relativePath - Relative path, possibly with anchor fragment
    * @param from - The spec from which the link originates
-   * @returns The resolved spec path and ID, or `null` if not resolvable
+   * @returns Resolved result, cross-workspace hint, or `null`
    */
-  private _resolveRelative(
-    relativePath: string,
-    from?: SpecPath,
-  ): { specPath: SpecPath; specId: string } | null {
+  private _resolveRelative(relativePath: string, from?: SpecPath): ResolveFromPathResult | null {
     if (from === undefined) return null
 
     // Strip anchor fragments
     const cleanPath = relativePath.replace(/#.*$/, '')
 
-    // Must match ../path/spec.md pattern
-    const match = cleanPath.match(/^\.\.\/(.+?)\/spec\.md$/)
-    if (match === null) return null
+    // Must end with /spec.md and start with ../
+    if (!cleanPath.startsWith('../') || !cleanPath.endsWith('/spec.md')) return null
 
-    // Resolve relative to the from spec's parent directory
-    const fromParts = from.toString().split('/')
-    const parentParts = fromParts.slice(0, -1)
-    const resolvedParts = match[1]!.split('/')
+    // Remove trailing /spec.md and split into segments
+    const rawParts = cleanPath.slice(0, -'/spec.md'.length).split('/')
 
-    const segments = [...parentParts, ...resolvedParts]
+    // Resolve against the from spec's directory
+    const baseParts = from.toString().split('/')
+
+    const forwardParts: string[] = []
+    let escaped = false
+
+    for (const part of rawParts) {
+      if (part === '..') {
+        if (baseParts.length === 0) {
+          escaped = true
+        } else {
+          baseParts.pop()
+        }
+      } else if (part !== '.') {
+        forwardParts.push(part)
+      }
+    }
+
+    // If baseParts is empty, the path reached or crossed the workspace root
+    if (escaped || baseParts.length === 0) {
+      return forwardParts.length > 0 ? { crossWorkspaceHint: forwardParts } : null
+    }
+
+    const segments = [...baseParts, ...forwardParts]
+    if (segments.length === 0) return null
+
     const specPath = SpecPath.fromSegments(segments)
     const specId = this.workspace() + ':' + specPath.toString()
     return { specPath, specId }

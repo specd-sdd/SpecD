@@ -133,8 +133,27 @@ export class GenerateSpecMetadata {
       resolvedDeps = []
       for (const raw of extracted.dependsOn) {
         const result = await specRepo.resolveFromPath(raw, specPath)
-        if (result !== null) {
+        if (result === null) continue
+
+        if ('specId' in result) {
           resolvedDeps.push(result.specId)
+        } else {
+          // Cross-workspace: try other repos
+          const hint = result.crossWorkspaceHint.join('/')
+          const matches: string[] = []
+          for (const [, otherRepo] of this._specs) {
+            if (otherRepo === specRepo) continue
+            const found = await otherRepo.get(SpecPath.parse(hint))
+            if (found !== null) {
+              matches.push(otherRepo.workspace() + ':' + hint)
+            }
+          }
+          if (matches.length === 1) {
+            resolvedDeps.push(matches[0]!)
+          } else if (matches.length > 1) {
+            // Ambiguous — add all and let the user decide
+            resolvedDeps.push(...matches)
+          }
         }
       }
     }

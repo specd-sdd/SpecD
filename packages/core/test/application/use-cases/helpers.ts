@@ -9,7 +9,10 @@ import { Schema } from '../../../src/domain/value-objects/schema.js'
 import { type MetadataExtraction } from '../../../src/domain/value-objects/metadata-extraction.js'
 import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
 import { ChangeRepository } from '../../../src/application/ports/change-repository.js'
-import { SpecRepository } from '../../../src/application/ports/spec-repository.js'
+import {
+  SpecRepository,
+  type ResolveFromPathResult,
+} from '../../../src/application/ports/spec-repository.js'
 import { type SchemaRegistry } from '../../../src/application/ports/schema-registry.js'
 import {
   type ArtifactParser,
@@ -206,7 +209,7 @@ class StubSpecRepository extends SpecRepository {
   override async resolveFromPath(
     _inputPath: string,
     _from?: SpecPath,
-  ): Promise<{ specPath: SpecPath; specId: string } | null> {
+  ): Promise<ResolveFromPathResult | null> {
     return null
   }
 }
