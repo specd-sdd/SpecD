@@ -1,130 +1,124 @@
-title: Archive List
-description: Defines the `specd archive list` command, which lists all archived changes in the archive directory configured by `storage.archivePath`, sorted by archive date descending (most recent first).
+generatedBy: 'agent'
+title: 'Archive List'
+description: >
+  Specifies the specd archive list command, which enumerates all archived changes
+  from the configured archive directory and presents them sorted by archive date
+  descending. The command supports text, JSON, and toon output formats controlled
+  by the --format flag, and handles empty archives and I/O errors gracefully.
+keywords:
+  - 'archive-list'
+  - 'cli-command'
+  - 'archived-changes'
+  - 'output-format'
+  - 'json-output'
+  - 'toon-output'
+  - 'archive-directory'
 dependsOn:
-  - cli:cli/entrypoint
-  - core:core/change
-context:
-  - Defines the `specd archive list` command, which lists all archived changes in the archive directory configured by `storage.archivePath`, sorted by archive date descending (most recent first).
+  - 'cli:cli/entrypoint'
+  - 'core:core/change'
+contentHashes:
+  'spec.md': 'sha256:0aa7cbb2555a46f0c2a2950045b3d8edf92af805230f15f5815f06070a40c29f'
+  'verify.md': 'sha256:f8c7f2c0bd256dfbd2b375366129a64ade7eba4aa87a710cc1b22bb0db064c70'
 rules:
-  - requirement: Command signature
+  - requirement: 'Command signature'
     rules:
-      - |-
-        ```
-        specd archive list [--format text|json|toon]
-        ```
-
-        No positional arguments. The `--format` flag controls output encoding; defaults to `text`.
-  - requirement: Output format — text
+      - 'The command signature is specd archive list [--format text|json|toon] with no positional arguments.'
+      - 'The --format flag controls output encoding and defaults to text.'
+  - requirement: 'Output format — text'
     rules:
-      - |-
-        The command prints a human-readable table to stdout. Changes are sorted by archive date descending (most recently archived first).
-
-        The output has an inverse-video column header row `NAME  DATE` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group).
-  - requirement: Output format — JSON
+      - 'The command prints a human-readable table to stdout with changes sorted by archive date descending.'
+      - 'The table has an inverse-video column header row showing NAME and DATE above the data rows.'
+      - 'Column widths are computed at render time from the widest value across all rows for each column.'
+  - requirement: 'Output format — JSON'
     rules:
-      - |-
-        When `--format json` is passed, the command writes a JSON array to stdout:
-
-        ```json
-        [
-          {
-            "name": "...",
-            "archivedName": "...",
-            "workspace": "...",
-            "archivedAt": "...",
-            "archivedBy": { "name": "...", "email": "..." },
-            "artifacts": ["..."]
-          }
-        ]
-        ```
-
-        One object per archived change, sorted by archive date descending. `archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs.
-  - requirement: Output format — toon
+      - 'When --format json is passed, the command writes a JSON array to stdout with one object per archived change sorted by archive date descending.'
+      - 'Each JSON object contains name, archivedName, workspace, archivedAt, archivedBy, and artifacts fields.'
+      - 'The archivedBy field is omitted when not recorded.'
+      - 'The artifacts field is an array of artifact type IDs.'
+  - requirement: 'Output format — toon'
     rules:
-      - When `--format toon` is passed, the command writes the same data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout.
-  - requirement: Empty archive
+      - 'When --format toon is passed, the command writes the same data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout.'
+  - requirement: 'Empty archive'
     rules:
-      - If there are no archived changes, the command prints `no archived changes` to stdout in text mode, or `[]` in JSON/toon mode, and exits with code 0.
-  - requirement: Error cases
+      - 'If there are no archived changes, the command prints no archived changes to stdout in text mode.'
+      - 'If there are no archived changes, the command prints [] in JSON or toon mode.'
+      - 'The command exits with code 0 when the archive is empty.'
+  - requirement: 'Error cases'
     rules:
-      - '* If an I/O error occurs while reading the archive directory, the command exits with code 3 and prints an `error:` message to stderr.'
+      - 'If an I/O error occurs while reading the archive directory, the command exits with code 3 and prints an error: message to stderr.'
 constraints:
-  - The archive path is determined by storage.archivePath in specd.yaml
-  - Errors always go to stderr as plain text regardless of --format
-  - --format only affects stdout
+  - 'The archive path is determined by storage.archivePath in specd.yaml.'
+  - 'Errors always go to stderr as plain text regardless of --format.'
+  - '--format only affects stdout.'
 scenarios:
-  - requirement: Command signature
-    name: Extra arguments rejected
+  - requirement: 'Command signature'
+    name: 'Extra arguments rejected'
     when:
-      - specd archive list some-name is run with an unexpected positional argument
+      - 'specd archive list some-name is run with an unexpected positional argument'
     then:
-      - the command exits with code 1 and prints a usage error to stderr
-  - requirement: Output format — text
-    name: Archived changes listed with correct fields
+      - 'the command exits with code 1 and prints a usage error to stderr'
+  - requirement: 'Output format — text'
+    name: 'Archived changes listed with correct fields'
     given:
       - 'the archive directory contains two changes: add-oauth-login (workspace default, archived 2024-01-15, actor alice) and update-billing (workspace billing, archived 2024-01-10, no actor recorded)'
     when:
-      - specd archive list is run
+      - 'specd archive list is run'
     then:
-      - stdout contains one row for each change showing name, workspace, and date
-      - AND the row for add-oauth-login includes by alice
-      - AND the row for update-billing does not include a by segment
-      - AND the process exits with code 0
-  - requirement: Output format — text
-    name: Rows sorted by archive date descending
+      - 'stdout contains one row for each change showing name, workspace, and date'
+      - 'the row for add-oauth-login includes by alice'
+      - 'the row for update-billing does not include a by segment'
+      - 'the process exits with code 0'
+  - requirement: 'Output format — text'
+    name: 'Rows sorted by archive date descending'
     given:
-      - the archive contains change older-change archived before newer-change
+      - 'the archive contains change older-change archived before newer-change'
     when:
-      - specd archive list is run
+      - 'specd archive list is run'
     then:
-      - newer-change appears before older-change in the output
-  - requirement: Output format — JSON
-    name: JSON format output
+      - 'newer-change appears before older-change in the output'
+  - requirement: 'Output format — JSON'
+    name: 'JSON format output'
     given:
-      - the archive directory contains one change named add-oauth-login with workspace default, archived at 2024-01-15T12:00:00.000Z, actor alice, and artifacts ['spec']
+      - 'the archive directory contains one change named add-oauth-login with workspace default, archived at 2024-01-15T12:00:00.000Z, actor alice, and artifacts [spec]'
     when:
-      - specd archive list --format json is run
+      - 'specd archive list --format json is run'
     then:
-      - stdout is a JSON array with one object containing name, archivedName, workspace, archivedAt, archivedBy, and artifacts fields
-      - AND the object does not contain state or specIds fields
-      - AND the process exits with code 0
-  - requirement: Output format — JSON
-    name: JSON format output — no actor recorded
+      - 'stdout is a JSON array with one object containing name, archivedName, workspace, archivedAt, archivedBy, and artifacts fields'
+      - 'the object does not contain state or specIds fields'
+      - 'the process exits with code 0'
+  - requirement: 'Output format — JSON'
+    name: 'JSON format output — no actor recorded'
     given:
-      - the archive directory contains one change named update-billing with no archivedBy recorded
+      - 'the archive directory contains one change named update-billing with no archivedBy recorded'
     when:
-      - specd archive list --format json is run
+      - 'specd archive list --format json is run'
     then:
-      - the JSON object for update-billing does not contain an archivedBy field
-      - AND the process exits with code 0
-  - requirement: Empty archive
-    name: No archived changes — text
+      - 'the JSON object for update-billing does not contain an archivedBy field'
+      - 'the process exits with code 0'
+  - requirement: 'Empty archive'
+    name: 'No archived changes — text'
     given:
-      - the archive directory is empty
+      - 'the archive directory is empty'
     when:
-      - specd archive list is run
+      - 'specd archive list is run'
     then:
-      - stdout contains no archived changes
-      - AND the process exits with code 0
-  - requirement: Empty archive
-    name: No archived changes — JSON
+      - 'stdout contains no archived changes'
+      - 'the process exits with code 0'
+  - requirement: 'Empty archive'
+    name: 'No archived changes — JSON'
     given:
-      - the archive directory is empty
+      - 'the archive directory is empty'
     when:
-      - specd archive list --format json is run
+      - 'specd archive list --format json is run'
     then:
-      - stdout is []
-      - AND the process exits with code 0
-  - requirement: Error cases
-    name: I/O error reading archive directory
+      - 'stdout is []'
+      - 'the process exits with code 0'
+  - requirement: 'Error cases'
+    name: 'I/O error reading archive directory'
     given:
-      - the archive directory cannot be read due to a permissions error
+      - 'the archive directory cannot be read due to a permissions error'
     when:
-      - specd archive list is run
+      - 'specd archive list is run'
     then:
-      - the command exits with code 3
-      - 'AND stderr contains an error: message'
-contentHashes:
-  spec.md: sha256:0aa7cbb2555a46f0c2a2950045b3d8edf92af805230f15f5815f06070a40c29f
-  verify.md: sha256:f8c7f2c0bd256dfbd2b375366129a64ade7eba4aa87a710cc1b22bb0db064c70
-generatedBy: core
+      - 'the command exits with code 3'
+      - 'stderr contains an error: message'
