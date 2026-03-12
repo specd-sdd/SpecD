@@ -19,8 +19,10 @@ rules:
     rules:
       - |-
         The use case returns `null` (no-op) when:
+
         * The spec has no `.specd-metadata.yaml` file
         * The file content is not a YAML mapping (e.g. scalar, null)
+
         In all other cases it returns `{ spec: '<workspace>:<path>' }`.
   - requirement: No strict validation on write
     rules:

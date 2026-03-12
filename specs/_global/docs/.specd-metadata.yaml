@@ -16,11 +16,13 @@ rules:
         ├── core/       # @specd/core API and domain model documentation
         └── schemas/    # Schema authoring guide
         ```
+
         No documentation lives outside `docs/` except `README.md` at the project root and `AGENTS.md` / `CLAUDE.md` for agent instructions.
   - requirement: ADR format
     rules:
       - |-
         Every Architecture Decision Record follows the [MADR](https://adr.github.io/madr/) format (Markdown Architectural Decision Records) verbatim, with one project-specific addition: a `### Spec` sub-section inside `## More Information` linking to the spec(s) that capture constraints derived from this decision.
+
         ```markdown
         ---
         status: '{proposed | rejected | accepted | deprecated | … | superseded by ADR-0123}'
@@ -93,6 +95,7 @@ rules:
 
         - [`specs/path/to/spec.md`](../../specs/path/to/spec.md)
         ```
+
         `## Decision Drivers`, `## Considered Options`, `## Pros and Cons of the Options`, and `## More Information` are optional — omit them when they add no value. `### Confirmation` inside `## Decision Outcome` is always present. `### Spec` inside `## More Information` is always present.
   - requirement: ADR numbering
     rules:
@@ -113,11 +116,14 @@ rules:
     rules:
       - |-
         All functions, methods, classes, type aliases, and interfaces in all packages must have JSDoc comments — not just public exports. This enables IDE tooling, API doc generation, and self-describing code for both agents and human contributors.
+
         JSDoc must include:
+
         * A description of what the symbol does or represents
         * `@param` for each parameter with a description
         * `@returns` describing the return value (omit for `void` and constructors)
         * `@throws` for each error type the function can throw
+
         ```typescript
         /**
          * Merges a delta spec into a base spec using the schema's delta configuration.

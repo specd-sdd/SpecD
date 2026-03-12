@@ -12,6 +12,7 @@ rules:
         ```
         specd change archive <name> [--format text|json|toon]
         ```
+
         * `<name>` — required positional; the name of the change to archive
         * `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Prerequisites
@@ -21,6 +22,7 @@ rules:
     rules:
       - |-
         The command delegates to the `ArchiveChange` use case, which:
+
         1. Merges all spec delta artifacts into the permanent spec directories
         2. Moves the change directory to the archive location determined by `storage.archivePattern`
         3. Records the archive operation in the change history
@@ -31,8 +33,10 @@ rules:
     rules:
       - |-
         On success, output depends on `--format`:
+
         * `text` (default): prints to stdout:
         * `json` or `toon`: outputs the following to stdout (encoded in the respective format):
+
         where `<archive-path>` is the path to the archived change directory relative to the project root.
   - requirement: Error cases
     rules:

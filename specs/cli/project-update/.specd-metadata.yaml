@@ -13,6 +13,7 @@ rules:
         ```
         specd project update [--format text|json|toon]
         ```
+
         * `--format text|json|toon` — optional; output format, defaults to `text`.
   - requirement: Skills update step
     rules:
@@ -21,12 +22,16 @@ rules:
     rules:
       - |-
         In `text` mode, the command prefixes each sub-step's output with a step label:
+
         ```
         skills: updated my-skill → /path/to/.claude/commands/my-skill.md
         skills: updated my-other-skill → /path/to/.claude/commands/my-other-skill.md
         ```
+
         If there is nothing to update (no skills recorded, all steps are no-ops), the command prints `project is up to date` and exits with code 0.
+
         In `json` or `toon` mode, the output is an object grouping results by step:
+
         ```json
         { "skills": [{ "name": "...", "path": "...", "status": "updated|skipped", "warning": "..." }] }
         ```

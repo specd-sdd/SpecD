@@ -18,12 +18,14 @@ rules:
     rules:
       - |-
         `specd` uses the following exit codes uniformly across all commands:
+
         | Code | Meaning                                                                                             |
         | ---- | --------------------------------------------------------------------------------------------------- |
         | 0    | Success                                                                                             |
         | 1    | User or domain error (change not found, invalid state transition, validation failure, config error) |
         | 2    | Hook failure (a `run:` hook exited with a non-zero status)                                          |
         | 3    | System error (unhandled exception, I/O error, schema resolution failure)                            |
+
         No other exit codes are used. When a hook fails, the hook's own stdout/stderr is forwarded verbatim and `specd` exits with code 2.
   - requirement: Error message format
     rules:
@@ -32,14 +34,17 @@ rules:
     rules:
       - |-
         Every `specd` command accepts a `--format text|json|toon` flag at the end of its flag list, defaulting to `text`. The three values are:
+
         * `text` — human-readable visual output (the default behaviour)
         * `json` — machine-friendly JSON written to stdout
         * `toon` — LLM-friendly Token-Oriented Object Notation (TOON) encoding of the same data model as `json`, written to stdout
+
         Errors always go to stderr as plain `error:` or `fatal:` text for human consumption and logging.
   - requirement: Structured error output
     rules:
       - |-
         When `--format` is `json` or `toon`, errors are **also** written to stdout in the corresponding structured format so that programmatic consumers (LLMs, scripts, CI) can parse them without reading stderr. The structured error object contains:
+
         ```json
         {
           "result": "error",
@@ -48,11 +53,14 @@ rules:
           "exitCode": 1
         }
         ```
+
         * `result` — always the string `"error"`
         * `code` — the machine-readable error code from the `SpecdError` subclass (e.g. `DEPENDS_ON_OVERWRITE`, `CHANGE_NOT_FOUND`, `HOOK_FAILED`, `SCHEMA_NOT_FOUND`)
         * `message` — the same message written to stderr (without the `error:`/`fatal:` prefix)
         * `exitCode` — the numeric exit code (1, 2, or 3)
+
         Structured error output is only emitted for known error types — subtypes of `SpecdError` that carry a machine-readable `code`. Generic or unexpected errors (exit code 3 from unhandled exceptions) are written to stderr only; stdout remains empty.
+
         When `--format` is `text` (the default), errors go to stderr only and stdout remains empty — no change from the existing behaviour for human users.
 constraints:
   - --config must be the first flag processed, before any sub-command-specific flag parsing

@@ -11,7 +11,9 @@ rules:
     rules:
       - |-
         `specd spec validate [specPath] [--all] [--workspace <name>] [--format text|json|toon] [--config <path>]`
+
         Exactly one scope must be provided:
+
         * `<specPath>` — validate a single spec
         * `--all` — validate all specs across all workspaces
         * `--workspace <name>` — validate all specs in a workspace

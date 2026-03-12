@@ -12,6 +12,7 @@ rules:
         ```
         specd change skip-artifact <name> <artifact-id> [--reason <text>] [--format text|json|toon]
         ```
+
         * `<name>` — required positional; the name of the change
         * `<artifact-id>` — required positional; the artifact type ID to mark as skipped (e.g. `proposal`)
         * `--reason <text>` — optional; a human-readable explanation for skipping the artifact
@@ -20,6 +21,7 @@ rules:
     rules:
       - |-
         The command invokes the `SkipArtifact` use case, which calls `Artifact.markSkipped()` on the named artifact and appends an `artifact-skipped` event to the change history. The `validatedHash` is set to the sentinel `"__skipped__"`, transitioning the artifact's effective status to `skipped`.
+
         This command is the only permitted path through which an artifact reaches `skipped` status. An agent must call this command explicitly when it decides not to produce an optional artifact — it cannot simply omit the file.
   - requirement: Optional artifacts only
     rules:
@@ -28,6 +30,7 @@ rules:
     rules:
       - |-
         On success, output depends on `--format`:
+
         * `text` (default): prints to stdout:
         * `json` or `toon`: outputs (encoded in the respective format):
   - requirement: Error cases

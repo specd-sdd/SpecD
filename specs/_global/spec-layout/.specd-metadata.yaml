@@ -13,13 +13,16 @@ rules:
     rules:
       - |-
         Each spec lives in its own named subdirectory and contains two files: `spec.md` and `verify.md`. The subdirectory name is kebab-case and describes the topic concisely.
+
         * `spec.md` — what the system does: requirements, constraints, examples, rationale
         * `verify.md` — how to confirm it works: WHEN/THEN scenarios
+
         The two files are always paired. `spec.md` contains no WHEN/THEN scenarios; `verify.md` contains no requirement prose.
   - requirement: spec.md structure
     rules:
       - |-
         Every `spec.md` must follow this structure. Sections marked *optional* may be omitted if not applicable; all other sections are required.
+
         ```markdown
         # <Title>
 
@@ -54,11 +57,13 @@ rules:
         <!-- Links to ADRs that motivated or constrain this spec.
              If none, omit this section. -->
         ```
+
         `## Overview`, `## Requirements`, and `## Spec Dependencies` are mandatory. All other sections are included when they add value.
   - requirement: verify.md structure
     rules:
       - |-
         Every `verify.md` must follow this structure. Scenarios are grouped under requirement headings using the same `### Requirement: <name>` pattern as `spec.md` — this is required for AST-based delta selectors to locate scenario nodes by heading when changes are applied to `verify.md`.
+
         ```markdown
         # Verification: <Title>
 
@@ -73,6 +78,7 @@ rules:
         - **THEN** <expected outcome>
         - **AND** <additional assertion> <!-- optional -->
         ```
+
         Only scenarios that add information beyond what the requirement prose already states are included. Scenarios that merely restate the obvious happy path are omitted.
   - requirement: Spec Dependencies section
     rules:

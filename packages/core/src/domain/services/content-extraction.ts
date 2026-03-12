@@ -87,7 +87,7 @@ function extractText(
   if (mode === 'both') return `${node.label ?? ''}\n${renderer.renderSubtree(node)}`
   // Content mode: render children only (skip the node's own heading/label)
   if (node.children && node.children.length > 0) {
-    return node.children.map((c) => renderer.renderSubtree(c)).join('')
+    return node.children.map((c) => renderer.renderSubtree(c)).join('\n')
   }
   return renderer.renderSubtree(node)
 }

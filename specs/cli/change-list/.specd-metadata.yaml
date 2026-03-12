@@ -12,26 +12,37 @@ rules:
         ```
         specd change list [--format text|json|toon]
         ```
+
         * `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Output format
     rules:
       - |-
         The command prints a human-readable table to stdout showing only active changes (in `changes/`). Changes are sorted by `createdAt` ascending (oldest first).
+
         The output has an inverse-video column header row `NAME  STATE  SPECS  SCHEMA` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group).
+
         Each data row shows:
+
         ```
           <name>  <state>  <specIds>  <schema-name>@<schema-version>
         ```
+
         where `<specIds>` is a comma-separated list of the spec IDs on the change.
+
         When a description is set on the change, a dim indented description line is printed below the main row:
+
         ```
             <description>
         ```
+
         Description sub-rows are NOT part of the column structure — they are printed outside the fixed-width grid.
+
         In `json` or `toon` format, the output is an array of objects:
+
         ```json
         [{"name":"...","state":"...","specIds":[...],"schema":{"name":"...","version":N},"description":"..."}]
         ```
+
         `description` is omitted from the JSON object when not set.
   - requirement: Empty output
     rules:

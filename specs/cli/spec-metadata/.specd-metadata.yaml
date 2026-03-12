@@ -13,17 +13,20 @@ rules:
         ```
         specd spec metadata <workspace:capability-path> [--format text|json|toon]
         ```
+
         * `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
         * `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Behaviour
     rules:
       - |-
         The command reads `.specd-metadata.yaml` for the given spec and renders its contents in a structured form. For each file listed in `contentHashes`, it computes the current SHA-256 hash of the file on disk and compares it against the recorded hash, reporting whether the metadata is fresh or stale per file.
+
         If `.specd-metadata.yaml` does not exist, the command exits with code 1.
   - requirement: Output format
     rules:
       - |-
         In `text` mode (default):
+
         ```
         spec: <workspace>:<capability-path>
 
@@ -42,8 +45,11 @@ rules:
         constraints: <N>
         scenarios:  <N>
         ```
+
         Sections with no content are omitted. `rules`, `constraints`, and `scenarios` show counts only in text mode. `generatedBy` shows which mechanism produced the metadata (`core` for deterministic extraction, `agent` for LLM-generated).
+
         In `json` or `toon` mode, the full parsed metadata is output including all rules, constraints, and scenarios (encoded in the respective format):
+
         ```json
         {
           "spec": "workspace:cap/path",
@@ -60,6 +66,7 @@ rules:
           "scenarios": [...]
         }
         ```
+
         `fresh` at the top level is `true` only when all `contentHashes` entries are fresh.
   - requirement: Error cases
     rules:

@@ -12,11 +12,13 @@ rules:
         ```
         specd schema show [--format text|json|toon]
         ```
+
         * `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Output format
     rules:
       - |-
         In `text` mode (default), the command prints two sections:
+
         ```
         schema: <name>  version: <N>
 
@@ -28,8 +30,11 @@ rules:
           <step>  requires=[<id>,...]
           ...
         ```
+
         where `<optional>` is `optional` or `required`, and `requires` lists the artifact IDs or step names that must be complete before this entry is available. The `requires` field is omitted when empty.
+
         In `json` or `toon` mode, the output is (encoded in the respective format):
+
         ```json
         {
           "schema": {"name": "...", "version": N},

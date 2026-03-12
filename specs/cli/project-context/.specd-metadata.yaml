@@ -15,18 +15,22 @@ rules:
           [--follow-deps [--depth <n>]]
           [--format text|json|toon]
         ```
+
         * `--rules` — when present, includes only the rules sections of spec content in the output
         * `--constraints` — when present, includes only the constraints sections of spec content in the output
         * `--scenarios` — when present, includes only the scenarios sections of spec content in the output
         * `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. By default (without this flag) `dependsOn` traversal is not performed.
         * `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`
         * `--format text|json|toon` — optional; output format, defaults to `text`
+
         When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block.
   - requirement: Behaviour
     rules:
       - |-
         The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active. No `dependsOn` traversal is performed — that requires a change.
+
         Concretely:
+
         1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)
         2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)
         3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set
@@ -35,7 +39,9 @@ rules:
     rules:
       - |-
         In `text` mode (default), the compiled context block is printed to stdout verbatim — the same text `CompileContext` would produce for the project entries and spec content sections, with no additional framing added by the CLI. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.
+
         In `json` or `toon` mode, the output is (encoded in the respective format):
+
         ```json
         {
           "contextEntries": ["...", "..."],
@@ -43,6 +49,7 @@ rules:
           "warnings": []
         }
         ```
+
         where `contextEntries` are the rendered project `context:` entries, `specs` are the matched specs with their rendered metadata content, and `warnings` lists any advisory conditions (missing files, stale metadata, unknown workspaces, etc.).
   - requirement: Warnings
     rules:

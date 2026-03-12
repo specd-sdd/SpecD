@@ -11,21 +11,25 @@ rules:
     rules:
       - |-
         The command is registered as `generate-metadata <specPath>` on the `spec` parent command. It accepts:
+
         * `--write` — persist the generated metadata to the spec directory
         * `--force` — skip conflict detection when writing (requires `--write`)
         * `--format <fmt>` — output format: `text|json|toon` (default `text`)
         * `--config <path>` — path to `specd.yaml`
+
         The `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands.
   - requirement: Default output (no --write)
     rules:
       - |-
         Without `--write`, the command generates metadata and outputs it to stdout without persisting:
+
         * **Text format:** outputs the generated YAML content, trimmed of trailing whitespace
         * **JSON/toon format:** outputs `{ spec: "<workspace:path>", metadata: <object> }`
   - requirement: Write mode
     rules:
       - |-
         With `--write`, the command generates metadata, persists it via `SaveSpecMetadata`, and outputs a confirmation:
+
         * **Text format:** `wrote .specd-metadata.yaml for <workspace:path>`
         * **JSON/toon format:** `{ result: "ok", spec: "<workspace:path>", written: true }`
   - requirement: Force flag
@@ -41,6 +45,7 @@ rules:
     rules:
       - |-
         When `--write` is used and `--force` is not set, if the generated metadata would change existing `dependsOn` entries, `SaveSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` which writes `error: dependsOn would change (...)` to stderr and exits with code 1. Stdout remains empty on error.
+
         When `--write --force` is used, the overwrite check is skipped entirely.
 constraints:
   - The command contains no business logic — all generation is delegated to GenerateSpecMetadata and all writing to SaveSpecMetadata

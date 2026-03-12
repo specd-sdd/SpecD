@@ -13,6 +13,7 @@ rules:
     rules:
       - |-
         A workspace declares the following properties:
+
         | Property              | Required           | Default (`default` ws) | Default (non-`default` ws)            | Description                                                            |
         | --------------------- | ------------------ | ---------------------- | ------------------------------------- | ---------------------------------------------------------------------- |
         | `specs`               | always             | —                      | —                                     | Storage adapter and path where this workspace's spec files live        |
@@ -22,6 +23,7 @@ rules:
         | `prefix`              | no                 | (none)                 | (none)                                | Logical path prefix prepended to all capability paths                  |
         | `contextIncludeSpecs` | no                 | —                      | `['*']` (all specs in this workspace) | Workspace-level include patterns applied when this workspace is active |
         | `contextExcludeSpecs` | no                 | —                      | (none)                                | Workspace-level exclude patterns applied when this workspace is active |
+
         All relative paths resolve from the directory containing `specd.yaml`.
   - requirement: External workspace inference
     rules:
@@ -30,33 +32,41 @@ rules:
     rules:
       - |-
         Ownership describes the project's relationship to a workspace's specs:
+
         | Ownership  | Meaning                                                           |
         | ---------- | ----------------------------------------------------------------- |
         | `owned`    | The project owns these specs; changes are freely proposed         |
         | `shared`   | The project co-owns these specs; changes may require coordination |
         | `readOnly` | The project reads but does not modify these specs                 |
+
         Ownership defaults to `owned` for the `default` workspace and `readOnly` for non-`default` workspaces. Ownership affects whether changes can target specs in the workspace and whether approval gates apply.
   - requirement: Prefix semantics
     rules:
       - |-
         When a workspace declares a `prefix`, the prefix is prepended to all capability paths in that workspace. A spec stored at `architecture/` on disk becomes `<prefix>/architecture` in the specd model. When no prefix is declared, specs use bare capability paths.
+
         Prefixes may be single-segment (`_global`) or multi-segment (`team/shared/core`). Two workspaces may share the same prefix — the prefix is not a unique identifier; the workspace name is.
+
         Invalid prefix syntax produces a `ConfigValidationError` at startup.
   - requirement: Workspace-qualified spec IDs
     rules:
       - |-
         Every spec is identified by a fully-qualified spec ID in the format `workspace:capabilityPath`. The colon separates the workspace name from the capability path; `/` always belongs to the capability path.
+
         A bare path (no colon) is shorthand for `default:path`. An unknown workspace qualifier in a spec ID is rejected with an error.
+
         Internally, specd always uses the fully-qualified form. The bare-path shorthand is a user-facing convenience only.
   - requirement: Active workspace determination
     rules:
       - |-
         A workspace is considered active in the context of a change when at least one of the change's `specIds` belongs to that workspace. Active workspaces determine which workspace-level context patterns are applied during context compilation.
+
         The set of active workspaces is derived at runtime from `specIds` via the `workspaces` computed getter, which extracts the workspace component of each spec ID using `parseSpecId()`. It is not a persisted field.
   - requirement: Primary workspace
     rules:
       - |-
         The primary workspace of a change is the first entry in the computed `change.workspaces` (derived from `specIds`). It is used for:
+
         * Archive path template resolution (`{{change.workspace}}`)
         * Default metadata attribution when archiving
   - requirement: Port-per-workspace pattern
@@ -66,23 +76,29 @@ rules:
     rules:
       - |-
         Each workspace may declare `contextIncludeSpecs` and `contextExcludeSpecs` patterns. These are applied only when the workspace is active:
+
         * Omitting the workspace qualifier in a workspace-level pattern means "this workspace" (not `default`)
         * `['*']` means all specs in this workspace
         * `['auth/*']` means specs under `auth/` in this workspace
+
         Workspace-level patterns are evaluated after project-level patterns. Specs added via `dependsOn` traversal are never subject to exclude patterns.
   - requirement: Cross-workspace references
     rules:
       - |-
         Specs may reference other specs in different workspaces using the qualified form (`billing:payments/invoices`) in `dependsOn`, context patterns, and delta targets. Schema references use `#workspace:name` syntax to resolve schemas from another workspace's local schema directory.
+
         References to unknown workspaces are handled differently by context:
+
         * At configuration validation time: error (abort)
         * At runtime (context compilation): warning and skip
   - requirement: Workspace directory structure in changes
     rules:
       - |-
         Change artifacts always include an explicit workspace segment in the path, even for single-workspace changes:
+
         * New spec artifacts: `specs/<workspace>/<capability-path>/<artifact-filename>`
         * Delta files: `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`
+
         This ensures multi-workspace changes are unambiguous and tooling can resolve the correct repository without inspecting configuration.
   - requirement: Sole source of truth
     rules:

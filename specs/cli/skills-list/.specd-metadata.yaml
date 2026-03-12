@@ -11,20 +11,26 @@ rules:
         ```
         specd skills list [--agent claude] [--format text|json|toon]
         ```
+
         * `--agent <id>` — optional; the agent to check installation status against (e.g. `claude`). When omitted, installation status is not shown.
         * `--format text|json|toon` — optional; output format, defaults to `text`.
   - requirement: Output format
     rules:
       - |-
         In `text` mode (default), the command prints one row per skill to stdout:
+
         ```
         <name>  <description>  <installed>
         ```
+
         Where `<installed>` is `installed` or `not installed` when `--agent` is provided, and omitted otherwise.
+
         In `json` or `toon` mode, the output is an array:
+
         ```json
         [{ "name": "...", "description": "...", "installed": true }]
         ```
+
         `installed` is omitted from each object when `--agent` is not provided.
   - requirement: Empty skill set
     rules:
@@ -33,7 +39,9 @@ rules:
     rules:
       - |-
         When `--agent <id>` is provided, the command checks whether a file named `<name>.md` exists in the agent's project-level or user-level commands directory. For example, for `claude` these are `<git-root>/.claude/commands/` and `~/.claude/commands/`. The resolution of the commands directory for a given agent ID is defined per agent.
+
         A skill is considered `installed` if the file exists in either location.
+
         If the agent ID is not recognised, the command exits with code 1 and prints an `error:` message to stderr.
 constraints:
   - The command is read-only — it never installs or modifies any files

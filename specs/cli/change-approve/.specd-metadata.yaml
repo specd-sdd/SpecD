@@ -13,6 +13,7 @@ rules:
         specd change approve spec <name> --reason <text> [--format text|json|toon]
         specd change approve signoff <name> --reason <text> [--format text|json|toon]
         ```
+
         * `spec` / `signoff` — required sub-verb selecting which approval gate to exercise
         * `<name>` — required positional; the name of the change to approve
         * `--reason <text>` — required; a human-readable explanation for the approval decision
@@ -30,8 +31,10 @@ rules:
     rules:
       - |-
         On success, output depends on `--format`:
+
         * `text` (default): prints to stdout:
         * `json` or `toon`: outputs the following to stdout (encoded in the respective format):
+
         where `<gate>` is `spec` or `signoff`.
   - requirement: Error cases
     rules:

@@ -7,6 +7,7 @@ rules:
     rules:
       - |-
         All commits follow the format:
+
         ```
         <type>(<scope>): <description>
 
@@ -31,11 +32,13 @@ rules:
     rules:
       - |-
         Scope must match the short package name (without `@specd/` prefix):
+
         ```
         feat(core): add ChangeState value object
         fix(cli): handle missing specd.yaml gracefully
         chore(root): update turbo to 2.1.0
         ```
+
         Use `root` for changes at the monorepo root. Use `all` only for changes that genuinely touch all packages.
   - requirement: Description in imperative mood
     rules:
@@ -44,7 +47,9 @@ rules:
     rules:
       - |-
         Each commit must represent a single coherent change. Unrelated modifications must never be combined into one commit, even if they were made in the same session. The guiding question is: can this commit be reverted or cherry-picked without affecting anything else?
+
         Group changes by the smallest meaningful unit — a single fix, a single feature addition, a single refactor, a documentation update for one spec. When a session produces changes across multiple files for different reasons, they must be staged and committed separately.
+
         ```
         # Good — each commit has a single reason to exist
         docs(root): add scenarios to architecture spec
@@ -58,6 +63,7 @@ rules:
     rules:
       - |-
         Breaking changes are marked with `!` after the type/scope and explained in the footer:
+
         ```
         feat(core)!: rename SpecRepository.find to SpecRepository.get
 
@@ -68,7 +74,9 @@ rules:
     rules:
       - |-
         Commit conventions must be automatically enforced by commitlint via a husky `commit-msg` hook. Commits that violate the format are rejected at commit time before they reach the repository.
+
         commitlint configuration must:
+
         * Extend `@commitlint/config-conventional` as the base
         * Restrict `scope-enum` to the known specd package names: `core`, `cli`, `mcp`, `skills`, `schema-std`, `schema-openspec`, `plugin-claude`, `plugin-copilot`, `plugin-codex`, `root`, `all`
         * Enforce `subject-case: lower-case`
@@ -79,10 +87,12 @@ rules:
     rules:
       - |-
         Commit bodies are optional and used only when the subject line and diff cannot fully explain the change. When a body is present it must follow a consistent structure.
+
         * Use setext-style section headers (`===` for primary, `---` for secondary) — never ATX headers (`###`), which conflict with git comment syntax
         * Wrap all technical terms in backticks: filenames (`spec.md`), symbols (`mergeSpecs`), types (`DeltaConfig`), commands (`pnpm test`)
         * Limit body lines to 100 characters
         * Include at minimum a `Context` and `Changes` section when a body is present; add `Impact` or `Breaking` when they add value
+
         ```
         feat(core): add RENAMED operation to mergeSpecs
 

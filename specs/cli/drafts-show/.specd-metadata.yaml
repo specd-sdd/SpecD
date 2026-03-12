@@ -12,12 +12,14 @@ rules:
         ```
         specd drafts show <name> [--format text|json|toon]
         ```
+
         * `<name>` — required positional; the name of the drafted change to show
         * `--format` — controls output encoding; defaults to `text`
   - requirement: Output format — text
     rules:
       - |-
         The command prints metadata for the change to stdout:
+
         ```
         name:    <name>
         state:   <state>
@@ -28,6 +30,7 @@ rules:
     rules:
       - |-
         When `--format json` is passed, the command writes a single JSON object to stdout:
+
         ```json
         {"name":"...","state":"...","specIds":[...],"schema":{"name":"...","version":N}}
         ```

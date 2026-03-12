@@ -12,8 +12,10 @@ rules:
     rules:
       - |-
         Every use-case factory supports two call signatures:
+
         * `createArchiveChange(config: SpecdConfig)` — extracts all required values from a fully resolved config object
         * `createArchiveChange(context: ArchiveChangeContext, options: FsArchiveChangeOptions)` — accepts domain context and adapter options explicitly
+
         Both signatures are public exports. The explicit form is used in tests and in scenarios where only a subset of the config is available. The `SpecdConfig` form is used by the kernel and by delivery mechanisms that have already loaded config.
   - requirement: Internal ports are never exported
     rules:
@@ -22,6 +24,7 @@ rules:
     rules:
       - |-
         `createKernel(config: SpecdConfig)` calls every use-case factory with the given config and returns an object containing all pre-wired use cases. The kernel object groups use cases by domain area:
+
         ```typescript
         const kernel = createKernel(config)
         kernel.changes.archive // ArchiveChange
@@ -29,6 +32,7 @@ rules:
         kernel.specs.approve // ApproveSpec
         // …
         ```
+
         The kernel is a convenience — it is not the mandatory entry point. Callers that need a single use case call its factory directly.
   - requirement: ConfigLoader is an application port
     rules:

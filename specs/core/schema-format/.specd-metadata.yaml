@@ -1,7 +1,9 @@
 title: Schema Format
 description: |-
   A specd schema is a YAML file that defines the artifact workflow for a project. It specifies which artifacts exist, how they relate to each other, how they are validated, which sections to extract for AI context, and what instructions the AI should follow when creating each artifact.
+
   Schemas are resolved at runtime via `SchemaRegistry`. Each project specifies a schema name in `specd.yaml`; the registry locates the corresponding `schema.yaml` by checking three locations in order: the project-local schemas directory (configured in `specd.yaml`, default `specd/schemas/`), the user's global override directory, and installed npm packages named `@specd/schema-*`.
+
   The delta mechanism — file format, AST selectors, application algorithm, and structural validation — is defined in [`specs/core/delta-format/spec.md`](../delta-format/spec.md).
 dependsOn:
   - core:core/delta-format
@@ -10,13 +12,16 @@ dependsOn:
 context:
   - |-
     A specd schema is a YAML file that defines the artifact workflow for a project. It specifies which artifacts exist, how they relate to each other, how they are validated, which sections to extract for AI context, and what instructions the AI should follow when creating each artifact.
+
     Schemas are resolved at runtime via `SchemaRegistry`. Each project specifies a schema name in `specd.yaml`; the registry locates the corresponding `schema.yaml` by checking three locations in order: the project-local schemas directory (configured in `specd.yaml`, default `specd/schemas/`), the user's global override directory, and installed npm packages named `@specd/schema-*`.
+
     The delta mechanism — file format, AST selectors, application algorithm, and structural validation — is defined in [`specs/core/delta-format/spec.md`](../delta-format/spec.md).
 rules:
   - requirement: Schema file structure
     rules:
       - |-
         A schema file must be a valid YAML document with the following top-level fields:
+
         * `name` (string, required) — machine identifier, e.g. `spec-driven`
         * `version` (integer, required) — schema version, monotonically increasing
         * `description` (string, optional) — human-readable summary
@@ -26,6 +31,7 @@ rules:
     rules:
       - |-
         Each entry in `artifacts` must include:
+
         * `id` (string, required) — unique identifier within the schema, e.g. `proposal`, `specs`, `design`, `tasks`
         * `scope` (`spec` | `change`, required) — declares where this artifact lives after the change is archived. `spec` means the artifact file is synced to the `SpecRepository` (e.g. `spec.md`, `verify.md` — files that become part of the project's permanent spec record). `change` means the artifact stays only in the change directory and is never synced (e.g. `proposal.md`, `tasks.md` — working documents used during the change process).
         * `optional` (boolean, optional, default `false`) — when `false`, `ValidateArtifacts` requires this artifact to be present in the change before validation can pass. When `true`, the artifact may be absent without failing validation; if present, it is validated and (for `scope: spec` artifacts) synced normally. `scope` and `optional` are independent.
@@ -48,6 +54,7 @@ rules:
     rules:
       - |-
         Template files are bundled alongside `schema.yaml` in a `templates/` subdirectory by convention. The `template` field is a path relative to the directory containing `schema.yaml`. `SchemaRegistry.resolve()` reads all referenced template files at load time and makes their content available in the resolved schema. Template content is plain text — no interpolation or placeholder substitution is performed. HTML comments (`<!-- ... -->`) are valid template content and are preserved as-is in the scaffolded file; they serve as guidance hints for the AI generating the artifact.
+
         ```
         specd/schemas/spec-driven/
         ├── schema.yaml
@@ -61,15 +68,22 @@ rules:
     rules:
       - |-
         `validations` on an artifact defines structural constraints checked by `ValidateArtifacts` against the artifact content (after delta application for `scope: spec` artifacts). Each rule identifies nodes in the normalized artifact AST and asserts that they exist and optionally satisfy further constraints.
+
         A validation rule is an object with:
+
         **Node identification** — one of two mutually exclusive approaches:
+
         * **Selector fields** — the selector fields defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md): `type`, `matches`, `contains`, `parent`, `index`, `where`. Identifies nodes by type, label pattern, value pattern, ancestry, or position.
         * **`path`** (string) — a JSONPath expression (RFC 9535) evaluated against the normalized AST. Use when the structural query requires more expressive power than the selector fields provide.
+
         **Additional fields** — compatible with both identification styles:
+
         * `required` (boolean, optional, default `true`) — whether absence of a matching node is an error (`true`) or a warning (`false`)
         * `contentMatches` (string, optional) — a regex matched case-insensitively against the serialized text of the matched node's subtree; `ArtifactParser` serializes the subtree to its native format before matching; useful for asserting that a node's full rendered content contains expected text regardless of its internal AST structure
         * `children` (array, optional) — sub-rules evaluated with each matched node as root; each entry is a full validation rule
+
         A rule passes vacuously when it matches zero nodes — no error or warning is produced.
+
         ```yaml
         validations:
           # Selector fields: structural checks with readable syntax
@@ -99,9 +113,13 @@ rules:
     rules:
       - |-
         `deltaValidations` on a schema artifact defines rules that `ValidateArtifacts` checks against the delta file before application. It works identically to `validations` — each rule uses the same structure and evaluation semantics — but the document is the **normalized YAML AST of the delta file** rather than the artifact content. Only valid when `delta: true`.
+
         The delta file is a YAML sequence of operation entries. When parsed by the YAML adapter, each entry becomes a `sequence-item` containing a `mapping` with `pair` nodes for `op`, `selector`, `content`, `position`, etc. The `where` field on `sequence-item` rules is particularly useful here for correlated checks — asserting that the same entry satisfies multiple field conditions simultaneously.
+
         Each rule uses the same structure as `validations` rules: selector fields or `path` for node identification, plus `required`, `contentMatches`, and `children`.
+
         A rule passes vacuously when it matches zero nodes.
+
         ```yaml
         deltaValidations:
           # At least one added/modified entry must contribute content containing a Scenario.
@@ -123,13 +141,17 @@ rules:
     rules:
       - |-
         Any spec file touched by a delta — whether created via an `added` operation or modified via a `modified` or `removed` operation — requires explicit approval before the change can be archived. Approval is tracked per spec ID, not per change.
+
         `specd archive` must refuse to proceed if any spec touched by the change has not been approved. `specd approve <spec-path>` records the approval for that spec within the current change.
+
         A spec created by an `added` operation also requires approval: someone must take ownership of the new spec, even if ownership is granted by the same person who submitted the change.
   - requirement: Metadata extraction
     rules:
       - |-
         `metadataExtraction` is a top-level schema field that declares how to extract metadata fields from artifact content using selectors and the existing parser infrastructure. It enables deterministic metadata generation without LLM involvement. `CompileContext` and `GetProjectContext` use these declarations as a fallback when `.specd-metadata.yaml` is absent or stale.
+
         Each metadata field maps to one or more `MetadataExtractorEntry` objects with:
+
         * `artifact` (string, required) — the artifact ID whose content to extract from (e.g. `specs`, `verify`)
         * `extractor` (object, required) — an `Extractor` declaring how to extract content:
           * `selector` (selector, required) — identifies which node(s) to extract, using the selector model defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md)
@@ -139,36 +161,50 @@ rules:
           * `groupBy` (`label`, optional) — group matched nodes by their label
           * `transform` (string, optional) — named post-processing callback (e.g. `resolveSpecPath`)
           * `fields` (object, optional) — structured field mapping for complex objects (e.g. scenarios)
+
         Supported metadata fields: `title`, `description`, `dependsOn`, `keywords` (single-entry), `rules`, `constraints`, `scenarios`, `context` (array-entry).
   - requirement: Artifact scope
     rules:
       - |-
         `scope` on an artifact is the single source of truth for what constitutes a complete spec and what files are expected in the spec directory. It has three responsibilities:
+
         1. **Spec directory layout** — artifacts with `scope: spec` (and `optional: false`) are the files specd expects to find in every `specs/<name>/` directory. When compiling context, specd reads all of them.
         2. **Existing spec validation** — `specd validate` checks that every spec directory in the project contains all non-optional `scope: spec` artifact files; missing files are reported as validation errors.
         3. **Change validation** — `ValidateArtifacts` requires all non-optional artifacts (regardless of scope) to be present in the change before validation can pass.
+
         `scope: change` artifacts (e.g. `proposal.md`, `tasks.md`) are working documents used during the change process. They are validated in the change but never synced to the `SpecRepository`. `scope: spec` artifacts (e.g. `spec.md`, `verify.md`) are merged or copied into the `SpecRepository` during `ArchiveChange`.
   - requirement: Workflow
     rules:
       - |-
         `workflow` is an array of named lifecycle phase definitions for a change. Each entry describes a distinct phase — such as designing specs, applying changes, verifying work, or archiving — and declares what artifact conditions must be met for that phase to become active, along with any hooks to run at phase boundaries.
+
         Steps are not limited to AI agent invocations. They may represent human review phases, automated checks, artifact generation, or any recurring activity in the change lifecycle. `CompileContext` uses step definitions to gate context compilation and to inject phase-specific instructions and hooks into the AI context.
+
         \> The canonical set of lifecycle step names and their semantics is defined in a dedicated spec (TBD). The schema format only defines the structure of step entries — step naming conventions are out of scope here.
+
         Entries must include:
+
         * `step` (string, required) — step name identifying a phase of the change lifecycle
         * `requires` (array of artifact IDs, optional) — artifacts that must be `complete` before this step is available; empty or omitted means always available
         * `hooks` (object, optional) — hooks for this step's boundaries; each key is `pre` or `post`, each value is an array of `instruction:` or `run:` hook entries
+
         Every hook entry is either:
+
         * `{ instruction: string }` — AI context injected when this step is compiled; used to guide agent behaviour during this phase
         * `{ run: string }` — shell command executed at the phase boundary; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`
+
         **`pre` hook failure** — if a `run:` hook exits with a non-zero code, the step is aborted and the user is informed of the failure. The agent should offer to attempt to fix the problem before retrying.
+
         **`post` hook failure** — the step has already completed, so the operation is not rolled back. After each failing `run:` hook, the user is prompted to choose: continue with the remaining hooks, or stop.
+
         The order of entries in `workflow` is the intended progression of the change lifecycle and is used by tooling to display status. It does not enforce sequential blocking between consecutive steps — each step is independently gated by its own `requires`.
+
         `specd.yaml` uses the same `workflow` format to add project-level hooks. Each entry only accepts `step` and `hooks` — `requires` is not valid in `specd.yaml` workflow entries and must be rejected at load time. Entries are matched by `step` name; schema hooks fire first, then project hooks, within the same `pre`/`post` event.
   - requirement: Project-level artifactRules
     rules:
       - |-
         `artifactRules` in `specd.yaml` allows teams to add per-artifact constraints without forking the schema. Each key is an artifact ID; each value is an array of rule strings. `CompileContext` injects them alongside the schema-defined instruction as a distinct constraints block.
+
         ```yaml
         # specd.yaml
         artifactRules:
@@ -177,21 +213,26 @@ rules:
           design:
             - 'Architecture decisions must note which ADR they relate to'
         ```
+
         Rule keys are validated against the active schema's artifact IDs on load. Unknown keys produce a warning but do not prevent startup. Rules are additive — they extend the schema's instruction, not replace it.
   - requirement: Schema resolution
     rules:
       - |-
         `SchemaRegistry.resolve(ref)` interprets the `schema` value from `specd.yaml` using a prefix convention. The prefix determines exactly where to look — there is no implicit fallback across multiple locations:
+
         * **`@scope/name`** (starts with `@`) — npm package. Loads from `node_modules/@scope/name/schema.yaml`.
         * **`#workspace:name`** — workspace-qualified name. Loads from `workspaces.<workspace>.schemas.fs.path/<name>/schema.yaml`.
         * **`#name`** or **bare name** (no prefix, not a path) — equivalent to `#default:name`. Loads from `workspaces.default.schemas.fs.path/<name>/schema.yaml`.
         * **Relative or absolute path** — direct file reference. Relative paths are resolved from the directory containing `specd.yaml`.
+
         `SchemaRegistry.resolve()` receives the full `ref` string and a resolved map of workspace schema paths. It does not read `specd.yaml` itself.
+
         If the resolved file does not exist, `resolve()` must return `null`; the caller is responsible for converting `null` to `SchemaNotFoundError`.
   - requirement: Schema validation on load
     rules:
       - |-
         `SchemaRegistry.resolve()` must validate the parsed YAML against a Zod schema before constructing the `Schema` object. Unknown top-level fields must be ignored (forward compatibility). Structural mismatches and semantic errors must produce a `SchemaValidationError` — a domain error extending `SpecdError` — before any domain object construction takes place. Validation covers:
+
         * Duplicate `artifact.id` within `artifacts`
         * Duplicate `workflow[].step` within `workflow`
         * `artifact.id` not matching `/^[a-z][a-z0-9-]*$/`
@@ -204,7 +245,9 @@ rules:
     rules:
       - |-
         `verify.md` is the verification artifact for a spec. It contains WHEN/THEN scenarios that describe how to confirm the system behaves correctly. It is always paired with a `spec.md` — the spec describes what the system does; the verify file describes how to check it.
+
         The file groups scenarios under `### Requirement: <name>` headings that mirror the `spec.md` structure. This is required — using the same heading pattern as the `spec` artifact allows `ValidateArtifacts` to correlate requirements with their verification scenarios.
+
         ```markdown
         # Verification: <spec name>
 
@@ -218,7 +261,9 @@ rules:
         - **THEN** <expected outcome>
         - **AND** <additional assertion> (optional)
         ```
+
         Only scenarios that add information beyond what the requirement prose already states are included. Scenarios that merely restate the happy path from the spec are omitted.
+
         The `verify` artifact in the schema should declare `requires: [spec]` — scenarios are written after the spec is stable. The `workflow.verify` step should declare `requires: [verify]`.
 constraints:
   - artifact.id must match /^[a-z][a-z0-9-]*$/ and must be unique within a schema

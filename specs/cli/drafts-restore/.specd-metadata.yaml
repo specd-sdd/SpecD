@@ -12,6 +12,7 @@ rules:
         ```
         specd drafts restore <name> [--format text|json|toon]
         ```
+
         * `<name>` — required positional; the name of the drafted change to restore
         * `--format` — controls output encoding; defaults to `text`
   - requirement: Behaviour
@@ -21,6 +22,7 @@ rules:
     rules:
       - |-
         On success, the command prints a single line to stdout:
+
         ```
         restored change <name>
         ```
@@ -28,9 +30,11 @@ rules:
     rules:
       - |-
         When `--format json` is passed, the command writes a JSON object to stdout on success:
+
         ```json
         { "result": "ok", "name": "..." }
         ```
+
         When `--format toon` is passed, the same data model is written in Token-Oriented Object Notation (toon).
   - requirement: Error cases
     rules:

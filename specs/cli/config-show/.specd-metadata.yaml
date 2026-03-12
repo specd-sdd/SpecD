@@ -12,11 +12,13 @@ rules:
         ```
         specd config show [--format text|json|toon]
         ```
+
         * `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Output format
     rules:
       - |-
         In `text` mode (default), the command prints the resolved config as structured key-value output:
+
         ```
         projectRoot:  <absolute-path>
         schemaRef:    <schema-ref>
@@ -32,6 +34,7 @@ rules:
           discarded: <absolute-path>
           archive:   <absolute-path>
         ```
+
         In `json` or `toon` mode, the output is the full `SpecdConfig` object encoded in the respective format, with all paths resolved to absolute values.
   - requirement: Sensitive fields
     rules:

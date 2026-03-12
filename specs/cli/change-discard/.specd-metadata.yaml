@@ -12,6 +12,7 @@ rules:
         ```
         specd change discard <name> --reason <text> [--format text|json|toon]
         ```
+
         * `<name>` — required positional; the name of the change to discard
         * `--reason <text>` — required; a human-readable explanation for discarding the change
         * `--format text|json|toon` — optional; output format, defaults to `text`
@@ -22,6 +23,7 @@ rules:
     rules:
       - |-
         On success, output depends on `--format`:
+
         * `text` (default): prints a single line to stdout:
         * `json` or `toon`: outputs the following to stdout (encoded in the respective format):
   - requirement: Error cases

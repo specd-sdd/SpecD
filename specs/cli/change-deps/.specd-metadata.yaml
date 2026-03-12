@@ -18,6 +18,7 @@ rules:
           [--format text|json|toon]
           [--config <path>]
         ```
+
         * `<name>` — required positional; the change name
         * `<specId>` — required positional; the spec within the change whose dependencies are being managed (must be in `change.specIds`)
         * `--add <id>` — repeatable; adds dependency spec IDs to this spec's `dependsOn`
@@ -28,12 +29,16 @@ rules:
     rules:
       - |-
         **Text format (default):**
+
         ```
         updated deps for <specId> in change <name>
         dependsOn: dep1, dep2, dep3
         ```
+
         When no dependencies remain: `dependsOn: (none)`
+
         **JSON/toon format:**
+
         ```json
         {
           "result": "ok",
@@ -46,6 +51,7 @@ rules:
     rules:
       - |-
         All errors exit with code 1 and write to stderr:
+
         * Change not found
         * `specId` not in `change.specIds`
         * `--set` used with `--add` or `--remove`

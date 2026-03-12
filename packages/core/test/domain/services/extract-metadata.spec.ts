@@ -169,7 +169,7 @@ describe('extractContent', () => {
     expect(result).toHaveLength(2)
     expect(result[0]).toEqual({
       label: 'Auth',
-      items: ['Must validate tokens\nMust check expiry'],
+      items: ['Must validate tokens\n\nMust check expiry'],
     })
     expect(result[1]).toEqual({
       label: 'Logging',
@@ -437,7 +437,7 @@ describe('extractMetadata', () => {
 
     const result = extractMetadata(extraction, asts, renderers)
     expect(result.rules).toEqual([
-      { requirement: 'Selector fields', rules: ['type is required\nmatches is optional'] },
+      { requirement: 'Selector fields', rules: ['type is required\n\nmatches is optional'] },
       { requirement: 'Multi-match', rules: ['multiple matches are returned'] },
     ])
   })

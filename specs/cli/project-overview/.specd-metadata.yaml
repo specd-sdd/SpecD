@@ -12,12 +12,14 @@ rules:
         ```
         specd project overview [--format text|json|toon] [--config <path>]
         ```
+
         * `--format text|json|toon` — optional; output format. Defaults to `text`.
         * `--config <path>` — optional; path to `specd.yaml`. Uses standard config discovery when omitted.
   - requirement: Text dashboard
     rules:
       - |-
         In `text` mode the command outputs:
+
         1. **Banner** — the SpecD ASCII logo rendered above the dashboard.
         2. **Outer container** — a rounded `boxen` box with the title `SpecD project overview` centred at the top and a cyan border.
         3. **Project box** — an inner box labelled `Project` showing:
@@ -31,6 +33,7 @@ rules:
     rules:
       - |-
         In `json` or `toon` mode the command outputs a single object:
+
         ```json
         {
           "projectRoot": "<absolute-path>",
@@ -47,15 +50,18 @@ rules:
           }
         }
         ```
+
         No banner or box decoration is included in non-text output.
   - requirement: Data sources
     rules:
       - |-
         All data is fetched via the kernel:
+
         * `kernel.specs.list` — list all specs across all workspaces.
         * `kernel.changes.list` — list active changes.
         * `kernel.changes.listDrafts` — list draft changes.
         * `kernel.changes.listDiscarded` — list discarded changes.
+
         All four queries run in parallel.
   - requirement: Config dependency
     rules:
