@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
@@ -70,7 +70,7 @@ describe('spec validate', () => {
 
     expect(stdout()).toContain('validation failed default:auth/login:')
     expect(stdout()).toContain('error: specs')
-    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   it('shows summary for --all when all pass', async () => {
@@ -116,7 +116,7 @@ describe('spec validate', () => {
 
     expect(stdout()).toContain('validated 2 specs: 1 passed, 1 failed')
     expect(stdout()).toContain('FAIL  default:billing/inv')
-    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(process.exitCode).toBe(1)
   })
 
   it('filters by workspace with --workspace', async () => {

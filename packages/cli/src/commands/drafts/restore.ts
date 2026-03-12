@@ -25,7 +25,7 @@ export function registerDraftsRestore(parent: Command): void {
           output({ result: 'ok', name }, fmt)
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

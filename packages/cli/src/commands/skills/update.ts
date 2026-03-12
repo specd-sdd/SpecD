@@ -2,7 +2,7 @@ import { type Command } from 'commander'
 import { getSkill } from '@specd/skills'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { KNOWN_AGENTS } from '../../helpers/known-agents.js'
@@ -22,8 +22,7 @@ export function registerSkillsUpdate(parent: Command): void {
     .action(async (opts: { agent?: string; format: string; config?: string }) => {
       try {
         if (opts.agent !== undefined && !(opts.agent in KNOWN_AGENTS)) {
-          process.stderr.write(`error: unknown agent '${opts.agent}'\n`)
-          process.exit(1)
+          cliError(`unknown agent '${opts.agent}'`, opts.format)
         }
 
         const { config, kernel } = await resolveCliContext({ configPath: opts.config })
@@ -97,7 +96,7 @@ export function registerSkillsUpdate(parent: Command): void {
           )
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

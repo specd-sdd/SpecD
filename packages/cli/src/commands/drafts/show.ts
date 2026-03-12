@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 
 /**
  * Registers the `drafts show` subcommand on the given parent command.
@@ -20,8 +20,7 @@ export function registerDraftsShow(parent: Command): void {
         const { change } = await kernel.changes.status.execute({ name })
 
         if (!change.isDrafted) {
-          process.stderr.write(`error: change '${name}' is not in drafts\n`)
-          process.exit(1)
+          cliError(`change '${name}' is not in drafts`, opts.format)
         }
 
         const fmt = parseFormat(opts.format)
@@ -46,7 +45,7 @@ export function registerDraftsShow(parent: Command): void {
           )
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

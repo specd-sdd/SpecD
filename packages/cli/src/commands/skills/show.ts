@@ -1,7 +1,7 @@
 import { type Command } from 'commander'
 import { getSkill } from '@specd/skills'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 
 /**
  * Registers the `skills show` subcommand on the given parent command.
@@ -17,8 +17,7 @@ export function registerSkillsShow(parent: Command): void {
       try {
         const skill = getSkill(name)
         if (skill === undefined) {
-          process.stderr.write(`error: skill '${name}' not found\n`)
-          process.exit(1)
+          cliError(`skill '${name}' not found`, opts.format)
         }
         const fmt = parseFormat(opts.format)
         if (fmt === 'text') {
@@ -27,7 +26,7 @@ export function registerSkillsShow(parent: Command): void {
           output({ name: skill.name, description: skill.description, content: skill.content }, fmt)
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

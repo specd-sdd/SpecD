@@ -2,7 +2,7 @@ import { type Command } from 'commander'
 import { type CompileContextConfig, type SpecSection } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 
 /**
  * Registers the `project context` subcommand on the given parent command.
@@ -36,8 +36,7 @@ export function registerProjectContext(parent: Command): void {
       }) => {
         try {
           if (opts.depth !== undefined && !opts.followDeps) {
-            process.stderr.write('error: --depth requires --follow-deps\n')
-            process.exit(1)
+            cliError('--depth requires --follow-deps', opts.format)
           }
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
@@ -102,7 +101,7 @@ export function registerProjectContext(parent: Command): void {
             )
           }
         } catch (err) {
-          handleError(err)
+          handleError(err, opts.format)
         }
       },
     )

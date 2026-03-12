@@ -2,7 +2,7 @@ import { type Command } from 'commander'
 import { type ChangeState, VALID_TRANSITIONS } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 
 /** All valid `ChangeState` values. */
 const VALID_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
@@ -21,10 +21,7 @@ export function registerChangeTransition(parent: Command): void {
     .action(async (name: string, step: string, opts: { format: string; config?: string }) => {
       try {
         if (!(VALID_STATES as string[]).includes(step)) {
-          process.stderr.write(
-            `error: invalid state '${step}'. valid states: ${VALID_STATES.join(', ')}\n`,
-          )
-          process.exit(1)
+          cliError(`invalid state '${step}'. valid states: ${VALID_STATES.join(', ')}`, opts.format)
         }
 
         const { config, kernel } = await resolveCliContext({ configPath: opts.config })
@@ -46,7 +43,7 @@ export function registerChangeTransition(parent: Command): void {
           output({ result: 'ok', name, from: fromState, to: change.state }, fmt)
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

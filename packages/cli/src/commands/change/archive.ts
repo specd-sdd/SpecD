@@ -2,7 +2,7 @@ import { type Command } from 'commander'
 import * as path from 'node:path'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 
 /**
  * Registers the `change archive` subcommand on the given parent command.
@@ -24,11 +24,8 @@ export function registerChangeArchive(parent: Command): void {
         const archivePath = path.relative(config.projectRoot, result.archiveDirPath)
 
         if (result.postHookFailures.length > 0) {
-          for (const cmd of result.postHookFailures) {
-            process.stderr.write(`error: post-archive hook '${cmd}' failed\n`)
-          }
-          process.exit(2)
-          return
+          const cmds = result.postHookFailures.join(', ')
+          cliError(`post-archive hook(s) failed: ${cmds}`, opts.format, 2)
         }
 
         const fmt = parseFormat(opts.format)
@@ -45,7 +42,7 @@ export function registerChangeArchive(parent: Command): void {
           )
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

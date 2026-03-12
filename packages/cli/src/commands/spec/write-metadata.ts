@@ -4,7 +4,7 @@ import { parse as parseYaml } from 'yaml'
 import { SpecPath } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
@@ -42,9 +42,7 @@ export function registerSpecWriteMetadata(parent: Command): void {
             parseYaml(content)
           } catch (yamlErr) {
             const msg = yamlErr instanceof Error ? yamlErr.message : String(yamlErr)
-            process.stderr.write(`error: invalid YAML: ${msg}\n`)
-            process.exit(1)
-            return
+            cliError(`invalid YAML: ${msg}`, opts.format)
           }
 
           const result = await kernel.specs.saveMetadata.execute({
@@ -55,9 +53,7 @@ export function registerSpecWriteMetadata(parent: Command): void {
           })
 
           if (result === null) {
-            process.stderr.write(`error: spec '${specPath}' not found\n`)
-            process.exit(1)
-            return
+            cliError(`spec '${specPath}' not found`, opts.format)
           }
 
           const fmt = parseFormat(opts.format)
@@ -67,7 +63,7 @@ export function registerSpecWriteMetadata(parent: Command): void {
             output({ result: 'ok', spec: result.spec }, fmt)
           }
         } catch (err) {
-          handleError(err)
+          handleError(err, opts.format)
         }
       },
     )

@@ -45,7 +45,7 @@ export function registerChangeCreate(parent: Command): void {
             output({ result: 'ok', name, state: change.state }, fmt)
           }
         } catch (err) {
-          handleError(err)
+          handleError(err, opts.format)
         }
       },
     )

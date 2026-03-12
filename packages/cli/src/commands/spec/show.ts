@@ -2,7 +2,7 @@ import { type Command } from 'commander'
 import { SpecPath } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
@@ -27,8 +27,7 @@ export function registerSpecShow(parent: Command): void {
         })
 
         if (result === null) {
-          process.stderr.write(`error: spec '${specPath}' not found\n`)
-          process.exit(1)
+          cliError(`spec '${specPath}' not found`, opts.format)
         }
 
         // Filter out internal metadata — not user-facing spec content
@@ -53,7 +52,7 @@ export function registerSpecShow(parent: Command): void {
           )
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

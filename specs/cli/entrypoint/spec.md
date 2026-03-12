@@ -43,7 +43,29 @@ Every `specd` command accepts a `--format text|json|toon` flag at the end of its
 - `json` — machine-friendly JSON written to stdout
 - `toon` — LLM-friendly Token-Oriented Object Notation (TOON) encoding of the same data model as `json`, written to stdout
 
-Errors always go to stderr as plain `error:` or `fatal:` text regardless of the `--format` value. The `--format` flag affects stdout output only.
+Errors always go to stderr as plain `error:` or `fatal:` text for human consumption and logging.
+
+### Requirement: Structured error output
+
+When `--format` is `json` or `toon`, errors are **also** written to stdout in the corresponding structured format so that programmatic consumers (LLMs, scripts, CI) can parse them without reading stderr. The structured error object contains:
+
+```json
+{
+  "result": "error",
+  "code": "<MACHINE_READABLE_CODE>",
+  "message": "<human-readable description>",
+  "exitCode": 1
+}
+```
+
+- `result` — always the string `"error"`
+- `code` — the machine-readable error code from the `SpecdError` subclass (e.g. `DEPENDS_ON_OVERWRITE`, `CHANGE_NOT_FOUND`, `HOOK_FAILED`, `SCHEMA_NOT_FOUND`)
+- `message` — the same message written to stderr (without the `error:`/`fatal:` prefix)
+- `exitCode` — the numeric exit code (1, 2, or 3)
+
+Structured error output is only emitted for known error types — subtypes of `SpecdError` that carry a machine-readable `code`. Generic or unexpected errors (exit code 3 from unhandled exceptions) are written to stderr only; stdout remains empty.
+
+When `--format` is `text` (the default), errors go to stderr only and stdout remains empty — no change from the existing behaviour for human users.
 
 ## Constraints
 
@@ -52,6 +74,7 @@ Errors always go to stderr as plain `error:` or `fatal:` text regardless of the 
 - Stdout and stderr must be independent streams — no interleaving of normal output and error messages
 - Exit code 2 is reserved exclusively for hook failures; domain errors from hooks (e.g. the hook emits an error message and exits 1) still yield exit code 2
 - `--format` never affects stderr — errors are always plain text on stderr regardless of format
+- When `--format` is `json` or `toon`, errors are written to both stderr (plain text) and stdout (structured) — stderr for humans/logs, stdout for programmatic consumers
 
 ## Examples
 

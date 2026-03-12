@@ -155,7 +155,7 @@ export function registerProjectOverview(parent: Command): void {
 
         process.stdout.write(dashboard + '\n')
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

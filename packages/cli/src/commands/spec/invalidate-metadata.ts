@@ -2,7 +2,7 @@ import { type Command } from 'commander'
 import { SpecPath } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
@@ -27,9 +27,7 @@ export function registerSpecInvalidateMetadata(parent: Command): void {
         })
 
         if (result === null) {
-          process.stderr.write(`error: spec '${specPath}' not found or has no metadata\n`)
-          process.exit(1)
-          return
+          cliError(`spec '${specPath}' not found or has no metadata`, opts.format)
         }
 
         const fmt = parseFormat(opts.format)
@@ -39,7 +37,7 @@ export function registerSpecInvalidateMetadata(parent: Command): void {
           output({ result: 'ok', spec: result.spec }, fmt)
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

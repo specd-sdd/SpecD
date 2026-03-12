@@ -41,7 +41,7 @@ export function registerArchiveShow(parent: Command): void {
           )
         }
       } catch (err) {
-        handleError(err)
+        handleError(err, opts.format)
       }
     })
 }

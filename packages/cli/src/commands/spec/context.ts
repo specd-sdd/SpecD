@@ -2,7 +2,7 @@ import { type Command } from 'commander'
 import { SpecPath, type SpecContextEntry } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError } from '../../handle-error.js'
+import { handleError, cliError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
 
 /**
@@ -75,8 +75,7 @@ export function registerSpecContext(parent: Command): void {
         try {
           // Validate --depth requires --follow-deps
           if (opts.depth !== undefined && !opts.followDeps) {
-            process.stderr.write('error: --depth requires --follow-deps\n')
-            process.exit(1)
+            cliError('--depth requires --follow-deps', opts.format)
           }
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
@@ -104,8 +103,7 @@ export function registerSpecContext(parent: Command): void {
           }
 
           if (result.entries.length === 0) {
-            process.stderr.write(`error: spec '${specPath}' not found\n`)
-            process.exit(1)
+            cliError(`spec '${specPath}' not found`, opts.format)
           }
 
           if (fmt === 'text') {
@@ -127,7 +125,7 @@ export function registerSpecContext(parent: Command): void {
             output({ specs: jsonSpecs, warnings }, fmt)
           }
         } catch (err) {
-          handleError(err)
+          handleError(err, opts.format)
         }
       },
     )
