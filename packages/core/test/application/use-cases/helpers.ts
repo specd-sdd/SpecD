@@ -204,7 +204,8 @@ class StubSpecRepository extends SpecRepository {
   }
 
   override async resolveFromPath(
-    _absolutePath: string,
+    _inputPath: string,
+    _from?: SpecPath,
   ): Promise<{ specPath: SpecPath; specId: string } | null> {
     return null
   }

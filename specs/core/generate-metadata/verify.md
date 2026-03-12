@@ -50,25 +50,25 @@
 - **WHEN** `GenerateSpecMetadata` is executed
 - **THEN** the result metadata contains extracted fields such as `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, and `scenarios`
 
-### Requirement: resolveSpecPath transform
+### Requirement: dependsOn resolution
 
-#### Scenario: Relative spec path resolved to sibling spec ID
+#### Scenario: Relative spec path resolved to qualified spec ID
 
-- **GIVEN** the current spec has capability path `core/change` and extraction yields `../storage/spec.md`
-- **WHEN** the `resolveSpecPath` transform runs
-- **THEN** the value is resolved to `core/storage`
+- **GIVEN** the current spec is in workspace `core` with capability path `core/change` and extraction yields `dependsOn: ['../storage/spec.md']`
+- **WHEN** the use case resolves dependsOn via `SpecRepository.resolveFromPath`
+- **THEN** the value is resolved to `core:core/storage`
 
 #### Scenario: Path with anchor fragment
 
-- **GIVEN** extraction yields `../storage/spec.md#some-section`
-- **WHEN** the `resolveSpecPath` transform runs
-- **THEN** the anchor is stripped and the value resolves to `core/storage`
+- **GIVEN** extraction yields `dependsOn: ['../storage/spec.md#some-section']`
+- **WHEN** the use case resolves dependsOn via `SpecRepository.resolveFromPath`
+- **THEN** the anchor is stripped and the value resolves to `core:core/storage`
 
 #### Scenario: Non-matching pattern filtered out
 
-- **GIVEN** extraction yields a value like `https://example.com` or `./local-file.md`
-- **WHEN** the `resolveSpecPath` transform runs
-- **THEN** the value is filtered out (returns null)
+- **GIVEN** extraction yields a `dependsOn` value like `https://example.com` or `./local-file.md`
+- **WHEN** the use case resolves dependsOn via `SpecRepository.resolveFromPath`
+- **THEN** the value is filtered out (repository returns null)
 
 ### Requirement: Content hashes
 

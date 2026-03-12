@@ -498,6 +498,59 @@ describe('FsSpecRepository', () => {
 
       expect(result).toBeNull()
     })
+
+    it('given a relative path with from, resolves to sibling spec', async () => {
+      const from = SpecPath.parse('auth/login')
+      const result = await ctx.repo.resolveFromPath('../signup/spec.md', from)
+
+      expect(result).not.toBeNull()
+      expect(result!.specPath.toString()).toBe('auth/signup')
+      expect(result!.specId).toBe('default:auth/signup')
+    })
+
+    it('given a relative path with anchor fragment, strips anchor', async () => {
+      const from = SpecPath.parse('auth/login')
+      const result = await ctx.repo.resolveFromPath('../signup/spec.md#overview', from)
+
+      expect(result).not.toBeNull()
+      expect(result!.specPath.toString()).toBe('auth/signup')
+    })
+
+    it('given a relative path without from, returns null', async () => {
+      const result = await ctx.repo.resolveFromPath('../signup/spec.md')
+
+      expect(result).toBeNull()
+    })
+
+    it('given a non-matching relative path, returns null', async () => {
+      const from = SpecPath.parse('auth/login')
+      const result = await ctx.repo.resolveFromPath('./local-file.md', from)
+
+      expect(result).toBeNull()
+    })
+
+    it('given a relative path with prefix-configured repo, prepends prefix', async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-spec-resolve-'))
+      const specsPath = path.join(tmpDir, 'specs')
+      await fs.mkdir(specsPath, { recursive: true })
+
+      const repo = new FsSpecRepository({
+        workspace: 'core',
+        ownership: 'owned',
+        isExternal: false,
+        specsPath,
+        prefix: 'core',
+      })
+
+      const from = SpecPath.parse('core/change')
+      const result = await repo.resolveFromPath('../storage/spec.md', from)
+
+      expect(result).not.toBeNull()
+      expect(result!.specPath.toString()).toBe('core/storage')
+      expect(result!.specId).toBe('core:core/storage')
+
+      await fs.rm(tmpDir, { recursive: true, force: true })
+    })
   })
 
   // ---- delete ----

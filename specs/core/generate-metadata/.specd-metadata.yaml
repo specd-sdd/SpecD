@@ -1,10 +1,10 @@
 title: Generate Spec Metadata
 description: The `GenerateSpecMetadata` use case produces `.specd-metadata.yaml` content deterministically from schema-declared extraction rules, without LLM involvement. It resolves a spec ID, loads its artifacts, parses them into ASTs, runs the schema's `metadataExtraction` engine, computes content hashes, and returns the assembled metadata.
 dependsOn:
-  - core/spec-metadata
-  - core/content-extraction
-  - core/schema-format
-  - core/spec-id-format
+  - core:core/spec-metadata
+  - core:core/content-extraction
+  - core:core/schema-format
+  - core:core/spec-id-format
 context:
   - The `GenerateSpecMetadata` use case produces `.specd-metadata.yaml` content deterministically from schema-declared extraction rules, without LLM involvement. It resolves a spec ID, loads its artifacts, parses them into ASTs, runs the schema's `metadataExtraction` engine, computes content hashes, and returns the assembled metadata.
 rules:
@@ -35,14 +35,9 @@ rules:
         * Renderers from the artifact parsers
         * A transform map (see resolveSpecPath transform)
         The extraction engine produces fields including `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, `scenarios`, and `context`.
-  - requirement: resolveSpecPath transform
+  - requirement: dependsOn resolution
     rules:
-      - |-
-        The use case registers a `resolveSpecPath` transform that converts relative spec paths to spec IDs. Given a value like `../foo/spec.md`:
-        1. Strips any anchor fragment (e.g. `#section`)
-        2. Matches the pattern `../<path>/spec.md`
-        3. Resolves the path relative to the current spec's parent directory
-        Values that do not match the `../*/spec.md` pattern are filtered out (the transform returns `null`).
+      - After extraction, if `dependsOn` contains raw relative paths (e.g. `../storage/spec.md`), the use case resolves each entry via `SpecRepository.resolveFromPath(rawPath, specPath)`. The repository handles anchor stripping, pattern matching, and workspace-qualified spec ID construction. Entries that the repository cannot resolve are filtered out.
   - requirement: Content hashes
     rules:
       - After extraction, the use case computes a SHA-256 hash for each artifact file that was successfully loaded, using `ContentHasher.hash()`. The resulting `contentHashes` map is keyed by the resolved filename (e.g. `spec.md`, `verify.md`). Only artifacts with content on disk are included.
@@ -112,30 +107,30 @@ scenarios:
       - GenerateSpecMetadata is executed
     then:
       - the result metadata contains extracted fields such as title, description, dependsOn, keywords, rules, constraints, and scenarios
-  - requirement: resolveSpecPath transform
-    name: Relative spec path resolved to sibling spec ID
+  - requirement: dependsOn resolution
+    name: Relative spec path resolved to qualified spec ID
     given:
-      - the current spec has capability path core/change and extraction yields ../storage/spec.md
+      - "the current spec is in workspace core with capability path core/change and extraction yields dependsOn: ['../storage/spec.md']"
     when:
-      - the resolveSpecPath transform runs
+      - the use case resolves dependsOn via SpecRepository.resolveFromPath
     then:
-      - the value is resolved to core/storage
-  - requirement: resolveSpecPath transform
+      - the value is resolved to core:core/storage
+  - requirement: dependsOn resolution
     name: Path with anchor fragment
     given:
-      - extraction yields ../storage/spec.md#some-section
+      - "extraction yields dependsOn: ['../storage/spec.md#some-section']"
     when:
-      - the resolveSpecPath transform runs
+      - the use case resolves dependsOn via SpecRepository.resolveFromPath
     then:
-      - the anchor is stripped and the value resolves to core/storage
-  - requirement: resolveSpecPath transform
+      - the anchor is stripped and the value resolves to core:core/storage
+  - requirement: dependsOn resolution
     name: Non-matching pattern filtered out
     given:
-      - extraction yields a value like https://example.com or ./local-file.md
+      - extraction yields a dependsOn value like https://example.com or ./local-file.md
     when:
-      - the resolveSpecPath transform runs
+      - the use case resolves dependsOn via SpecRepository.resolveFromPath
     then:
-      - the value is filtered out (returns null)
+      - the value is filtered out (repository returns null)
   - requirement: Content hashes
     name: Hashes computed for loaded artifacts
     given:
@@ -166,6 +161,6 @@ scenarios:
       - the returned metadata contains both the extractMetadata() output fields and contentHashes
       - AND hasExtraction is true
 contentHashes:
-  spec.md: sha256:efeb43fd88361cca904c51762aa34f710392692c606a27c756a9bc57fcb6cd13
-  verify.md: sha256:579e2bd0876a862f23ef4bd51a744c4d88df385029519470c670fe04b64298b9
+  spec.md: sha256:210373dd79dcfb723a6f8819e7b9038841cd013a693c2dd5196a5bc4967e5671
+  verify.md: sha256:fe59cc90e251d4dafbc5efbaf3d700791717aaedea931e90ce5f359a5dd5407c
 generatedBy: core
