@@ -3,6 +3,7 @@ description: A delta file expresses changes to an artifact as a sequence of stru
 dependsOn:
   - core:core/artifact-ast
   - core:core/selector-model
+  - core:core/schema-format
 context:
   - A delta file expresses changes to an artifact as a sequence of structured AST operations. Rather than encoding diffs as inline text markers, deltas are separate YAML documents that address artifact nodes by type and identifying property. The `ArtifactParser` port abstracts parsing, delta application, and serialisation across all supported file types — markdown, JSON, YAML, and plain text.
 rules:
@@ -481,6 +482,6 @@ scenarios:
     then:
       - validation fails with the appropriate error
 contentHashes:
-  spec.md: sha256:4ce36a58cad314234cd93ed00f6159c22ce8b445c5c3faf3f04b9982ad8245e4
+  spec.md: sha256:d2b3b22b6aa6b5ae7b26d73fd142b0a45b91e3b907cdb2dc9d3135a77b8d85a3
   verify.md: sha256:e28b9f1e35c48f3d40a4ca87a6917668bf102ba544bd4726ec084113f05d2ff7
 generatedBy: core
