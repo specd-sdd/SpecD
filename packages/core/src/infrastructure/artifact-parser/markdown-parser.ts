@@ -42,14 +42,19 @@ interface MdastRoot extends MdastParent {
 }
 
 /**
- * Extracts plain text from inline MDAST nodes.
+ * Extracts text from inline MDAST nodes, preserving link syntax.
  *
  * @param nodes - The inline MDAST nodes to extract text from
- * @returns The concatenated text content of all inline nodes
+ * @returns The concatenated text content with markdown links preserved as `[text](url)`
  */
 function extractText(nodes: readonly MdastInline[]): string {
   return nodes
     .map((n) => {
+      if (n.type === 'link') {
+        const text = Array.isArray(n.children) ? extractText(n.children) : ''
+        const url = (n as unknown as { url: string }).url ?? ''
+        return `[${text}](${url})`
+      }
       if (typeof n.value === 'string') return n.value
       if (Array.isArray(n.children)) return extractText(n.children)
       return ''
@@ -71,8 +76,9 @@ interface StackEntry {
  */
 function convertBlockNode(node: MdastNode): ArtifactNode | null {
   if (node.type === 'paragraph') {
-    const text = extractText((node as MdastParent).children as MdastInline[])
-    return { type: 'paragraph', value: text }
+    const inlines = (node as MdastParent).children as MdastInline[]
+    const text = extractText(inlines)
+    return { type: 'paragraph', value: text, _inlines: inlines }
   }
 
   if (node.type === 'code') {
@@ -127,11 +133,14 @@ function convertBlockNode(node: MdastNode): ArtifactNode | null {
  */
 function convertListItem(item: MdastParent): ArtifactNode {
   const textParts: string[] = []
+  const inlineParts: MdastInline[][] = []
   const subLists: ArtifactNode[] = []
 
   for (const child of item.children) {
     if (child.type === 'paragraph') {
-      textParts.push(extractText((child as MdastParent).children as MdastInline[]))
+      const inlines = (child as MdastParent).children as MdastInline[]
+      textParts.push(extractText(inlines))
+      inlineParts.push(inlines)
     } else if (child.type === 'list') {
       const converted = convertBlockNode(child)
       if (converted) subLists.push(converted)
@@ -139,10 +148,16 @@ function convertListItem(item: MdastParent): ArtifactNode {
   }
 
   const label = textParts.join(' ')
+  const _inlines =
+    inlineParts.length === 1
+      ? inlineParts[0]
+      : inlineParts.flatMap((p, i) =>
+          i > 0 ? [{ type: 'text', value: ' ' } as MdastInline, ...p] : p,
+        )
   if (subLists.length > 0) {
-    return { type: 'list-item', label, children: subLists }
+    return { type: 'list-item', label, _inlines, children: subLists }
   }
-  return { type: 'list-item', label }
+  return { type: 'list-item', label, _inlines }
 }
 
 /** {@link ArtifactParser} implementation for Markdown files. */
@@ -306,10 +321,13 @@ export class MarkdownParser implements ArtifactParser {
     }
 
     if (node.type === 'paragraph') {
+      const inlines = node._inlines as MdastInline[] | undefined
       return [
         {
           type: 'paragraph',
-          children: [{ type: 'text', value: typeof node.value === 'string' ? node.value : '' }],
+          children: inlines ?? [
+            { type: 'text', value: typeof node.value === 'string' ? node.value : '' },
+          ],
         },
       ]
     }
@@ -330,10 +348,11 @@ export class MarkdownParser implements ArtifactParser {
 
     if (node.type === 'list') {
       const listItems: MdastNode[] = (node.children ?? []).map((item) => {
+        const inlines = item._inlines as MdastInline[] | undefined
         const itemContent: MdastNode[] = [
           {
             type: 'paragraph',
-            children: [{ type: 'text', value: item.label ?? '' }],
+            children: inlines ?? [{ type: 'text', value: item.label ?? '' }],
           },
         ]
         for (const subNode of item.children ?? []) {
