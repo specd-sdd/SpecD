@@ -72,51 +72,51 @@ rules:
 
         #### kernel.changes
 
-        | Kernel path | Use case class | Spec | Description |
-        |---|---|---|---|
-        | `changes.repo` | `ChangeRepository` | — | Underlying repository for adapter-level queries |
-        | `changes.create` | `CreateChange` | [create-change](../create-change/spec.md) | Creates a new change |
-        | `changes.status` | `GetStatus` | [get-status](../get-status/spec.md) | Reports lifecycle state and artifact statuses |
-        | `changes.transition` | `TransitionChange` | [transition-change](../transition-change/spec.md) | Performs a lifecycle state transition |
-        | `changes.draft` | `DraftChange` | [draft-change](../draft-change/spec.md) | Shelves a change to drafts |
-        | `changes.restore` | `RestoreChange` | [restore-change](../restore-change/spec.md) | Recovers a drafted change |
-        | `changes.discard` | `DiscardChange` | [discard-change](../discard-change/spec.md) | Permanently abandons a change |
-        | `changes.archive` | `ArchiveChange` | [archive-change](../archive-change/spec.md) | Finalises a change: merges deltas, moves to archive |
-        | `changes.validate` | `ValidateArtifacts` | [validate-artifacts](../validate-artifacts/spec.md) | Validates artifact files against the active schema |
-        | `changes.compile` | `CompileContext` | [compile-context](../compile-context/spec.md) | Assembles the instruction block for a lifecycle step |
-        | `changes.list` | `ListChanges` | [list-changes](../list-changes/spec.md) | Lists all active changes |
-        | `changes.listDrafts` | `ListDrafts` | [list-drafts](../list-drafts/spec.md) | Lists all drafted changes |
-        | `changes.listDiscarded` | `ListDiscarded` | [list-discarded](../list-discarded/spec.md) | Lists all discarded changes |
-        | `changes.edit` | `EditChange` | [edit-change](../edit-change/spec.md) | Edits the spec scope of a change |
-        | `changes.skipArtifact` | `SkipArtifact` | [skip-artifact](../skip-artifact/spec.md) | Explicitly skips an optional artifact |
-        | `changes.updateSpecDeps` | `UpdateSpecDeps` | [update-spec-deps](../update-spec-deps/spec.md) | Updates declared dependencies for a spec |
-        | `changes.listArchived` | `ListArchived` | [list-archived](../list-archived/spec.md) | Lists all archived changes |
-        | `changes.getArchived` | `GetArchivedChange` | [get-archived-change](../get-archived-change/spec.md) | Retrieves a single archived change by name |
+        | Kernel path              | Use case class      | Spec                                                  | Description                                          |
+        | ------------------------ | ------------------- | ----------------------------------------------------- | ---------------------------------------------------- |
+        | `changes.repo`           | `ChangeRepository`  | —                                                     | Underlying repository for adapter-level queries      |
+        | `changes.create`         | `CreateChange`      | [create-change](../create-change/spec.md)             | Creates a new change                                 |
+        | `changes.status`         | `GetStatus`         | [get-status](../get-status/spec.md)                   | Reports lifecycle state and artifact statuses        |
+        | `changes.transition`     | `TransitionChange`  | [transition-change](../transition-change/spec.md)     | Performs a lifecycle state transition                |
+        | `changes.draft`          | `DraftChange`       | [draft-change](../draft-change/spec.md)               | Shelves a change to drafts                           |
+        | `changes.restore`        | `RestoreChange`     | [restore-change](../restore-change/spec.md)           | Recovers a drafted change                            |
+        | `changes.discard`        | `DiscardChange`     | [discard-change](../discard-change/spec.md)           | Permanently abandons a change                        |
+        | `changes.archive`        | `ArchiveChange`     | [archive-change](../archive-change/spec.md)           | Finalises a change: merges deltas, moves to archive  |
+        | `changes.validate`       | `ValidateArtifacts` | [validate-artifacts](../validate-artifacts/spec.md)   | Validates artifact files against the active schema   |
+        | `changes.compile`        | `CompileContext`    | [compile-context](../compile-context/spec.md)         | Assembles the instruction block for a lifecycle step |
+        | `changes.list`           | `ListChanges`       | [list-changes](../list-changes/spec.md)               | Lists all active changes                             |
+        | `changes.listDrafts`     | `ListDrafts`        | [list-drafts](../list-drafts/spec.md)                 | Lists all drafted changes                            |
+        | `changes.listDiscarded`  | `ListDiscarded`     | [list-discarded](../list-discarded/spec.md)           | Lists all discarded changes                          |
+        | `changes.edit`           | `EditChange`        | [edit-change](../edit-change/spec.md)                 | Edits the spec scope of a change                     |
+        | `changes.skipArtifact`   | `SkipArtifact`      | [skip-artifact](../skip-artifact/spec.md)             | Explicitly skips an optional artifact                |
+        | `changes.updateSpecDeps` | `UpdateSpecDeps`    | [update-spec-deps](../update-spec-deps/spec.md)       | Updates declared dependencies for a spec             |
+        | `changes.listArchived`   | `ListArchived`      | [list-archived](../list-archived/spec.md)             | Lists all archived changes                           |
+        | `changes.getArchived`    | `GetArchivedChange` | [get-archived-change](../get-archived-change/spec.md) | Retrieves a single archived change by name           |
 
         #### kernel.specs
 
-        | Kernel path | Use case class | Spec | Description |
-        |---|---|---|---|
-        | `specs.repos` | `ReadonlyMap<string, SpecRepository>` | — | Spec repositories keyed by workspace name |
-        | `specs.approveSpec` | `ApproveSpec` | [approve-spec](../approve-spec/spec.md) | Records a spec approval and transitions state |
-        | `specs.approveSignoff` | `ApproveSignoff` | [approve-signoff](../approve-signoff/spec.md) | Records a sign-off and transitions state |
-        | `specs.list` | `ListSpecs` | [list-specs](../list-specs/spec.md) | Lists all specs across all workspaces |
-        | `specs.get` | `GetSpec` | [get-spec](../get-spec/spec.md) | Loads a spec and all artifact files |
-        | `specs.saveMetadata` | `SaveSpecMetadata` | [save-spec-metadata](../save-spec-metadata/spec.md) | Writes a `.specd-metadata.yaml` file |
-        | `specs.invalidateMetadata` | `InvalidateSpecMetadata` | [invalidate-spec-metadata](../invalidate-spec-metadata/spec.md) | Invalidates a spec's metadata |
-        | `specs.getActiveSchema` | `GetActiveSchema` | [get-active-schema](../get-active-schema/spec.md) | Resolves and returns the active schema |
-        | `specs.validate` | `ValidateSpecs` | [validate-specs](../validate-specs/spec.md) | Validates spec artifacts against schema rules |
-        | `specs.generateMetadata` | `GenerateSpecMetadata` | [generate-metadata](../generate-metadata/spec.md) | Generates deterministic metadata from extraction rules |
-        | `specs.getContext` | `GetSpecContext` | [get-spec-context](../get-spec-context/spec.md) | Builds structured context entries with dependency traversal |
+        | Kernel path                | Use case class                        | Spec                                                            | Description                                                 |
+        | -------------------------- | ------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
+        | `specs.repos`              | `ReadonlyMap<string, SpecRepository>` | —                                                               | Spec repositories keyed by workspace name                   |
+        | `specs.approveSpec`        | `ApproveSpec`                         | [approve-spec](../approve-spec/spec.md)                         | Records a spec approval and transitions state               |
+        | `specs.approveSignoff`     | `ApproveSignoff`                      | [approve-signoff](../approve-signoff/spec.md)                   | Records a sign-off and transitions state                    |
+        | `specs.list`               | `ListSpecs`                           | [list-specs](../list-specs/spec.md)                             | Lists all specs across all workspaces                       |
+        | `specs.get`                | `GetSpec`                             | [get-spec](../get-spec/spec.md)                                 | Loads a spec and all artifact files                         |
+        | `specs.saveMetadata`       | `SaveSpecMetadata`                    | [save-spec-metadata](../save-spec-metadata/spec.md)             | Writes a `.specd-metadata.yaml` file                        |
+        | `specs.invalidateMetadata` | `InvalidateSpecMetadata`              | [invalidate-spec-metadata](../invalidate-spec-metadata/spec.md) | Invalidates a spec's metadata                               |
+        | `specs.getActiveSchema`    | `GetActiveSchema`                     | [get-active-schema](../get-active-schema/spec.md)               | Resolves and returns the active schema                      |
+        | `specs.validate`           | `ValidateSpecs`                       | [validate-specs](../validate-specs/spec.md)                     | Validates spec artifacts against schema rules               |
+        | `specs.generateMetadata`   | `GenerateSpecMetadata`                | [generate-metadata](../generate-metadata/spec.md)               | Generates deterministic metadata from extraction rules      |
+        | `specs.getContext`         | `GetSpecContext`                      | [get-spec-context](../get-spec-context/spec.md)                 | Builds structured context entries with dependency traversal |
 
         #### kernel.project
 
-        | Kernel path | Use case class | Spec | Description |
-        |---|---|---|---|
-        | `project.init` | `InitProject` | [init-project](../init-project/spec.md) | Initialises a new specd project |
+        | Kernel path                  | Use case class       | Spec                                                    | Description                                     |
+        | ---------------------------- | -------------------- | ------------------------------------------------------- | ----------------------------------------------- |
+        | `project.init`               | `InitProject`        | [init-project](../init-project/spec.md)                 | Initialises a new specd project                 |
         | `project.recordSkillInstall` | `RecordSkillInstall` | [record-skill-install](../record-skill-install/spec.md) | Records that skills were installed for an agent |
-        | `project.getSkillsManifest` | `GetSkillsManifest` | [get-skills-manifest](../get-skills-manifest/spec.md) | Reads the installed skills manifest |
-        | `project.getProjectContext` | `GetProjectContext` | [get-project-context](../get-project-context/spec.md) | Compiles the project-level context block |
+        | `project.getSkillsManifest`  | `GetSkillsManifest`  | [get-skills-manifest](../get-skills-manifest/spec.md)   | Reads the installed skills manifest             |
+        | `project.getProjectContext`  | `GetProjectContext`  | [get-project-context](../get-project-context/spec.md)   | Compiles the project-level context block        |
 
         Adding, removing, or renaming an entry in this table is a contract change and must be reflected in both the `Kernel` interface and `createKernel`.
 constraints:
@@ -250,6 +250,6 @@ scenarios:
     then:
       - the kernel object and its nested groups are not expected to change — there is no addUseCase() or removeUseCase() mechanism
 contentHashes:
-  spec.md: sha256:cdeac2dc6c61cf755b0e083f74f9b14092efcc468a2df1f753fc4de4c827ee7f
+  spec.md: sha256:fadfb6454cb9d7fabd6bdab3cdf8cdab81732834f2aff85064739bab30bcda24
   verify.md: sha256:557d6d97d8856cc560a5f2053f0b71916836b377d8e4c5bb0b34fa9a73ebe958
 generatedBy: core
