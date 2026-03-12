@@ -31,11 +31,15 @@ rules:
     rules:
       - |-
         When a collection of resources must be loaded, the initial load returns lightweight metadata objects (references, identifiers, display fields) without reading file content or parsing heavy structures. Full content is fetched explicitly and on demand.
+
         This pattern applies across the codebase:
+
         * **Repositories** — `list()` returns metadata objects (`Spec`, `Change`, `ArchivedChange`) without artifact file content; content is loaded via a separate `artifact()` call.
         * **`SchemaRegistry`** — `list()` returns `SchemaEntry` objects (ref, name, source) without parsing `schema.yaml`; the full `Schema` is loaded via `resolve()`.
         * **Any future collection port** — `list()` or `search()` returns a reference/metadata type; a `get()` or `load()` call fetches the full resource.
+
         The metadata type must carry enough information to be useful standalone (for display, filtering, selection) and must include the reference or identifier needed to fetch the full resource.
+
         Content is never pre-loaded speculatively. If a use case needs the full resource, it calls the explicit load method.
   - requirement: Immutability preference
     rules:

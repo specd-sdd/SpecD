@@ -22,6 +22,7 @@ rules:
     rules:
       - |-
         When a port has constructor arguments that are invariant across all implementations (e.g. `scope`, `ownership`, `isExternal`), it is defined as an `abstract class` rather than an `interface`. The abstract class sets those fields in its constructor and exposes them as methods. All storage operations are declared `abstract`. This lets the TypeScript compiler enforce both the construction contract and the method contract without relying on ESLint or convention.
+
         All methods on port abstract classes — including the shared ones from the base — are explicit methods, never property signatures.
   - requirement: Pure functions for stateless domain services
     rules:
@@ -33,9 +34,11 @@ rules:
     rules:
       - |-
         Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes three levels of factory:
+
         * **Use-case factories** — one per use case; construct all required ports internally and return the pre-wired use case. Internal ports with a single concrete implementation are constructed here and never exported. Each factory supports two call signatures: `createX(config: SpecdConfig)` and `createX(context, options)`.
         * **Kernel** — `createKernel(config: SpecdConfig)` calls every use-case factory and returns all use cases grouped by domain area. It is a convenience, not a mandatory entry point.
         * **Config loader port** — `ConfigLoader` is defined in `application/ports/` and resolves a `SpecdConfig` from one or more sources. Implementations live in `infrastructure/`.
+
         Concrete adapter classes and repository-level factories are never exported from `index.ts`. Delivery mechanisms (CLI, MCP) import only use-case factories, the kernel, and the config loader port — never ports, infrastructure classes, or use case constructors.
   - requirement: YAML inputs validated at the infrastructure boundary
     rules:

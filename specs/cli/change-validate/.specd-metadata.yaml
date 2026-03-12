@@ -13,6 +13,7 @@ rules:
         ```
         specd change validate <name> <workspace:capability-path> [--format text|json|toon]
         ```
+
         * `<name>` — required positional; the name of the change to validate
         * `<workspace:capability-path>` — required positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`.
         * `--format text|json|toon` — optional; output format, defaults to `text`
@@ -23,16 +24,21 @@ rules:
     rules:
       - |-
         In `text` mode (default), when all artifacts pass:
+
         ```
         validated <name>/<workspace:capability-path>: all artifacts pass
         ```
+
         In `text` mode, when there are warnings but no failures:
+
         ```
         validated <name>/<workspace:capability-path>: pass (N warning(s))
         warning: <artifactId> — <description>
         ...
         ```
+
         In `json` or `toon` mode, the output is (encoded in the respective format):
+
         ```json
         { "passed": true, "failures": [], "warnings": [{ "artifactId": "...", "description": "..." }] }
         ```
@@ -40,6 +46,7 @@ rules:
     rules:
       - |-
         In `text` mode, the command prints each failure to stdout, exits with code 1:
+
         ```
         validation failed <name>/<workspace:capability-path>:
           error: <artifactId> — <description>
@@ -47,10 +54,13 @@ rules:
           warning: <artifactId> — <description>
           ...
         ```
+
         In `json` or `toon` mode, the output is (encoded in the respective format):
+
         ```json
         {"passed": false, "failures": [{"artifactId": "...", "description": "..."}], "warnings": [...]}
         ```
+
         The process exits with code 1 when `passed` is `false`, regardless of format.
   - requirement: Spec ID not in change
     rules:

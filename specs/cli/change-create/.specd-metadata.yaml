@@ -13,6 +13,7 @@ rules:
         ```
         specd change create <name> [--spec <id>...] [--format text|json|toon]
         ```
+
         * `<name>` — required positional; the unique slug name for the new change (e.g. `add-auth-flow`)
         * `--spec <id>` — optional repeatable flag; one or more spec IDs being created or modified. Each `<id>` is `[<workspace>:]<capability-path>` — the workspace qualifier is optional and defaults to `default` when omitted (e.g. `--spec auth/login` means `default:auth/login`, `--spec billing/invoices` with an explicit workspace would be `--spec billing-ws:billing/invoices`). When omitted, the change is created with an empty specIds list — specs can be added later via `change edit`.
         * `--description <text>` — optional; a short free-text description of the change's purpose, stored in the manifest
@@ -27,8 +28,10 @@ rules:
     rules:
       - |-
         On success, output depends on `--format`:
+
         * `text` (default): prints a single line to stdout:
         * `json` or `toon`: outputs the following to stdout (encoded in the respective format):
+
         No further output is produced.
   - requirement: Duplicate name error
     rules:

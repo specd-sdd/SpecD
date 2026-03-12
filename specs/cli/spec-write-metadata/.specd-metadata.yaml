@@ -11,10 +11,12 @@ rules:
     rules:
       - |-
         The command is registered as `write-metadata <specPath>` on the `spec` parent command. It accepts:
+
         * `--input <file>` — read YAML content from a file path instead of stdin
         * `--force` — skip conflict detection and overwrite unconditionally
         * `--format <fmt>` — output format: `text|json|toon` (default `text`)
         * `--config <path>` — path to `specd.yaml`
+
         The `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands.
   - requirement: Content source
     rules:
@@ -44,6 +46,7 @@ rules:
     rules:
       - |-
         If `--force` is not set and the incoming metadata would change existing `dependsOn` entries, `SaveSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` which writes `error: dependsOn would change (...)` to stderr and exits with code 1. Stdout remains empty on error.
+
         When `--force` is set, the overwrite check is skipped entirely.
 constraints:
   - The command contains no business logic — all writing is delegated to the SaveSpecMetadata use case

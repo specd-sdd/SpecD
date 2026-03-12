@@ -14,6 +14,7 @@ rules:
     rules:
       - |-
         The change directory root contains `manifest.json` and all change-scoped artifacts declared by the active schema. Change-scoped artifacts have no workspace or capability-path prefix — they are always flat at the root. The exact filenames are defined by the schema (e.g. `proposal.md`, `tasks.md`, `design.md` in `schema-std`).
+
         ```
         <changes>/<timestamp>-<name>/
         ├── manifest.json
@@ -21,30 +22,39 @@ rules:
         ├── <change-artifact>
         └── <change-artifact>         ← optional artifacts only present if produced
         ```
+
         `manifest.json` is the source of truth for the change entity. Artifact files are the working documents produced during the lifecycle. No other file types live at the root.
   - requirement: New spec-scoped artifacts
     rules:
       - |-
         When a change creates new spec-scoped artifacts (e.g. a new `spec.md` or `verify.md` for a capability that does not yet exist), those files are placed under `specs/<workspace>/<capability-path>/` within the change directory. The `<workspace>` segment matches the workspace ID from `specd.yaml` (e.g. `default`). The `<capability-path>` is the spec path within that workspace (e.g. `core/config`).
+
         ```
         specs/<workspace>/<capability-path>/<artifact-filename>
         ```
+
         Examples:
+
         * `specs/default/core/config/spec.md`
         * `specs/default/auth/login/verify.md`
         * `specs/billing/invoices/spec.md`
+
         This layout mirrors the permanent spec directory structure so that the files can be synced without path transformation during `ArchiveChange`. At archive time, the file at `specs/<workspace>/<capability-path>/<filename>` in the change directory is written to `<workspace.specs.path>/<capability-path>/<filename>` in the project.
   - requirement: Delta files
     rules:
       - |-
         When a change modifies an existing spec-scoped artifact, a delta file is produced instead of rewriting the artifact in full. Delta files live under `deltas/<workspace>/<capability-path>/` and are named `<artifact-filename>.delta.yaml`.
+
         ```
         deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml
         ```
+
         Examples:
+
         * `deltas/default/core/config/spec.md.delta.yaml`
         * `deltas/default/auth/login/verify.md.delta.yaml`
         * `deltas/billing/invoices/spec.md.delta.yaml`
+
         Delta files are change artifacts — they are never synced to the permanent spec directories. The `deltas/` prefix separates them unambiguously from new spec files under `specs/`.
   - requirement: Workspace segment is always present
     rules:
@@ -53,6 +63,7 @@ rules:
     rules:
       - |-
         A change directory at full capacity — with both new specs and delta files for multiple workspaces — has this structure:
+
         ```
         <changes>/<timestamp>-<name>/
         ├── manifest.json
@@ -75,6 +86,7 @@ rules:
                 └── <capability-path>/
                     └── <artifact-filename>.delta.yaml
         ```
+
         A change that only creates new specs has no `deltas/` subtree. A change that only modifies existing specs has no `specs/` subtree. Both may be present simultaneously when a change creates some new specs and modifies others.
 constraints:
   - Change-scoped artifacts are always flat at the change directory root — no workspace or capability-path prefix

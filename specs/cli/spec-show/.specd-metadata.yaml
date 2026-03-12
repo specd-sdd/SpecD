@@ -11,21 +11,27 @@ rules:
         ```
         specd spec show <workspace:capability-path> [--format text|json|toon]
         ```
+
         * `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
         * `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Output format
     rules:
       - |-
         In `text` mode (default), the command prints each artifact file for the spec in schema-declared order. Each file is preceded by a header line:
+
         ```
         --- <filename> ---
         <content>
         ```
+
         All artifact files declared by the schema with scope `spec` are printed. Files that do not exist on disk are skipped silently.
+
         In `json` or `toon` mode, the output is an array (encoded in the respective format):
+
         ```json
         [{ "filename": "...", "content": "..." }]
         ```
+
         Each entry corresponds to one artifact file present on disk, in schema-declared order. Files that do not exist on disk are omitted.
   - requirement: Error cases
     rules:

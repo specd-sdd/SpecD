@@ -12,17 +12,22 @@ rules:
         ```
         specd change artifacts <name> [--format text|json|toon]
         ```
+
         * `<name>` — required positional; the name of the change
         * `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Output format
     rules:
       - |-
         In `text` mode (default), each artifact is listed on one line:
+
         ```
         <artifact-id>  <effectiveStatus>  <exists>  <absolute-path>
         ```
+
         where `<exists>` is `yes` or `no`, and `<absolute-path>` is the full filesystem path to the artifact file within the change directory (whether or not the file currently exists on disk).
+
         In `json` or `toon` mode, the output is (encoded in the respective format):
+
         ```json
         {
           "name": "<change-name>",
@@ -38,6 +43,7 @@ rules:
           ]
         }
         ```
+
         Artifacts are listed in schema-declared order. `changeDir` is the absolute path to the root of the change directory.
   - requirement: Error cases
     rules:

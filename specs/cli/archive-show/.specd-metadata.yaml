@@ -12,23 +12,27 @@ rules:
         ```
         specd archive show <name> [--format text|json|toon]
         ```
+
         * `<name>` — required positional; the name of the archived change to show
         * `--format` — controls output encoding; defaults to `text`
   - requirement: Output format — text
     rules:
       - |-
         The command prints metadata for the change to stdout:
+
         ```
         name:    <name>
         state:   archivable
         specs:   <specId>, ...
         schema:  <schema-name>@<version>
         ```
+
         The `state` field is always `archivable` for archived changes.
   - requirement: Output format — JSON
     rules:
       - |-
         When `--format json` is passed, the command writes a single JSON object to stdout:
+
         ```json
         {"name":"...","state":"archivable","specIds":[...],"schema":{"name":"...","version":N}}
         ```

@@ -17,11 +17,13 @@ rules:
           [--description <text>]
           [--format text|json|toon]
         ```
+
         * `<name>` — required positional; the name of the change to edit
         * `--add-spec <id>` — repeatable; adds a spec ID to `specIds`. `<id>` follows the same `[<workspace>:]<capability-path>` format as `change create`, defaulting to `default` workspace when prefix is omitted
         * `--remove-spec <id>` — repeatable; removes a spec ID from `specIds`
         * `--description <text>` — optional; sets or replaces the free-text description of the change
         * `--format text|json|toon` — optional; output format, defaults to `text`
+
         At least one flag must be provided; running with no flags is a CLI usage error (exit code 1).
   - requirement: Workspace derivation
     rules:
@@ -36,6 +38,7 @@ rules:
     rules:
       - |-
         On success, output depends on `--format`:
+
         * `text` (default): prints to stdout: If approval invalidation occurred, a warning is also printed to stderr:
         * `json` or `toon`: outputs (encoded in the respective format):
   - requirement: Error cases

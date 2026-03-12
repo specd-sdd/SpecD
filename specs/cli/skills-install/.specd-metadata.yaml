@@ -13,6 +13,7 @@ rules:
         ```
         specd skills install <name|all> [--agent claude] [--global] [--format text|json|toon]
         ```
+
         * `<name|all>` — required positional; the name of a specific skill to install, or `all` to install every skill in `@specd/skills`.
         * `--agent <id>` — optional; the target agent (e.g. `claude`). Defaults to `claude`.
         * `--global` — optional; installs to the user-level commands directory instead of the project-level directory. Without this flag, installation is project-level.
@@ -24,7 +25,9 @@ rules:
     rules:
       - |-
         The CLI resolves the target path based on the agent ID and scope. Each agent ID maps to a commands directory — for example, `claude` uses `<git-root>/.claude/commands/` (project-level) and `~/.claude/commands/` (user-level). The resolution of the commands directory for a given agent ID is defined per agent.
+
         If the agent ID is not recognised, the command exits with code 1 and prints an `error:` message to stderr.
+
         The target directory is created if it does not exist. The CLI writes the file directly to disk — this is adapter-layer filesystem work, not domain logic.
   - requirement: Overwrite behaviour
     rules:
@@ -33,6 +36,7 @@ rules:
     rules:
       - |-
         After a successful **project-level** install, the CLI calls `RecordSkillInstall` from `@specd/core`, passing the agent id and the list of installed skill names. `RecordSkillInstall` uses `ConfigWriter` to update the skills manifest in `specd.yaml`. The CLI has no knowledge of `specd.yaml`'s format — it only provides the typed input.
+
         * User-level installs (`--global`) do **not** call `RecordSkillInstall` — global installs are not tracked.
         * If `specd.yaml` does not exist, `RecordSkillInstall` returns a `ProjectNotInitialisedError`. The CLI exits with code 1 and prints an `error:` message **before** writing any skill files.
   - requirement: Output on success

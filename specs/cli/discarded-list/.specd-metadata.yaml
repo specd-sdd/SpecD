@@ -12,16 +12,19 @@ rules:
         ```
         specd discarded list [--format text|json|toon]
         ```
+
         No positional arguments. The `--format` flag controls output encoding; defaults to `text`.
   - requirement: Output format — text
     rules:
       - |-
         The command prints a human-readable table to stdout. Changes are sorted by discard date descending (most recently discarded first).
+
         The output has an inverse-video column header row `NAME  DATE  BY  REASON` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group). The REASON column uses wrap overflow capped at 60 characters.
   - requirement: Output format — JSON
     rules:
       - |-
         When `--format json` is passed, the command writes a JSON array to stdout:
+
         ```json
         [
           {
@@ -33,6 +36,7 @@ rules:
           }
         ]
         ```
+
         One object per discarded change, sorted by discard date descending. `supersededBy` is omitted when empty. `discardedBy` is omitted when not recorded.
   - requirement: Output format — toon
     rules:

@@ -21,19 +21,23 @@ rules:
     rules:
       - |-
         The use case iterates over the schema's artifact type declarations, filtering to `scope: 'spec'` artifacts. For each artifact:
+
         1. Resolves the filename from the artifact's `output` field (last path segment)
         2. Infers the format via `inferFormat()`, falling back to `'plaintext'` if no format is declared or inferred
         3. Looks up a parser from `ArtifactParserRegistry` for the format
         4. Loads the artifact content via `SpecRepository.artifact()`
+
         Artifacts with no matching parser or no content on disk are silently skipped.
   - requirement: Metadata extraction
     rules:
       - |-
         The use case calls `extractMetadata()` with:
+
         * The schema's `metadataExtraction` declarations
         * Parsed ASTs keyed by artifact type ID
         * Renderers from the artifact parsers
         * A transform map (see resolveSpecPath transform)
+
         The extraction engine produces fields including `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, `scenarios`, and `context`.
   - requirement: dependsOn resolution
     rules:
@@ -45,9 +49,11 @@ rules:
     rules:
       - |-
         The final metadata object merges:
+
         * All fields from `extractMetadata()` output
         * `contentHashes` from the hashing step
         * `generatedBy: 'core'`
+
         The result is returned with `hasExtraction: true`.
 constraints:
   - No LLM involvement — extraction is purely deterministic via the schema's metadataExtraction engine

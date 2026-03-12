@@ -13,6 +13,7 @@ rules:
         ```
         specd spec resolve-path <path> [--format text|json|toon] [--config <path>]
         ```
+
         * `<path>` — required positional; filesystem path (absolute or relative to cwd) pointing to a spec directory or a file within one (e.g. `specs/core/change/spec.md` or `specs/core/change`)
         * `--format` — optional; output format, defaults to `text`
         * `--config` — optional; path to `specd.yaml`
@@ -29,11 +30,15 @@ rules:
     rules:
       - |-
         In `text` mode (default), the command prints the spec identifier to stdout:
+
         ```
         workspace:capability-path
         ```
+
         For example: `core:core/change`.
+
         In `json` or `toon` mode, the output is an object:
+
         ```json
         {
           "workspace": "core",

@@ -9,6 +9,7 @@ rules:
     rules:
       - |-
         A selector is a YAML object with the following fields:
+
         * `type` (string, required) — the node type; must be one of the values returned by `ArtifactParser.nodeTypes()` for the target file format
         * `matches` (string, optional) — a regular expression matched case-insensitively against the node's `label` (heading text for markdown sections, key name for JSON/YAML pairs, etc.); a plain string like `"Login"` matches any label containing that text; anchors and special characters work as expected (`"^Requirement:"`, `"^Requirements$"`)
         * `contains` (string, optional) — a regular expression matched case-insensitively against the node's `value` (paragraph text, scalar pair value, etc.); useful for finding leaf nodes by content rather than by identity
@@ -20,21 +21,25 @@ rules:
     rules:
       - |-
         All adapters normalize to the AST format defined in [`specs/core/artifact-ast/spec.md`](../artifact-ast/spec.md). The node types addressable by selectors are the same types produced by each adapter:
+
         * Markdown: `document`, `section`, `paragraph`, `list`, `list-item`, `code-block`, `thematic-break`
         * JSON: `document`, `object`, `property`, `array`, `array-item`
         * YAML: `document`, `mapping`, `pair`, `sequence`, `sequence-item`
         * Plain text: `document`, `paragraph`, `line`
+
         The `label` field on a node is the identifying value evaluated by `matches`; the `value` field is the scalar content evaluated by `contains`.
   - requirement: Multi-match behaviour
     rules:
       - |-
         When multiple nodes match a selector, the outcome depends on the calling context:
+
         * In **delta entries** (`modified`, `removed`) — `apply` must reject with a `DeltaApplicationError`; selectors in delta operations must resolve to exactly one node.
         * In **validation rules** and **metadata extraction** — multiple matches are expected and each matched node is processed individually.
   - requirement: No-match behaviour
     rules:
       - |-
         When a selector matches zero nodes:
+
         * In **delta entries** — `apply` must reject with a `DeltaApplicationError` for `selector` on `modified` and `removed` entries. `position.after` and `position.before` selectors in `added` entries are warnings, not errors — insertion falls back to the end of the parent scope.
         * In **validation rules** — a rule passes vacuously when it matches zero nodes (no error or warning is produced).
 constraints:

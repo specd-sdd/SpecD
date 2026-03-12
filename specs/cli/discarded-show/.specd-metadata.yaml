@@ -12,23 +12,27 @@ rules:
         ```
         specd discarded show <name> [--format text|json|toon]
         ```
+
         * `<name>` — required positional; the name of the discarded change to show
         * `--format` — controls output encoding; defaults to `text`
   - requirement: Output format — text
     rules:
       - |-
         The command prints metadata for the change to stdout:
+
         ```
         name:    <name>
         specs:   <specId>, ...
         schema:  <schema-name>@<version>
         reason:  <discard reason>
         ```
+
         The `reason` value comes from the `discarded` event in the change history.
   - requirement: Output format — JSON
     rules:
       - |-
         When `--format json` is passed, the command writes a single JSON object to stdout:
+
         ```json
         {"name":"...","specIds":[...],"schema":{"name":"...","version":N},"reason":"..."}
         ```

@@ -17,6 +17,7 @@ rules:
     rules:
       - |-
         Artifact status (`missing`, `in-progress`, `complete`, `skipped`) must be derived at load time — it must not be stored directly in the manifest. The manifest stores only `validatedHash` per artifact. `FsChangeRepository` must compute status using this precedence:
+
         1. `validatedHash === "__skipped__"` → `skipped` (only valid for `optional: true` artifacts)
         2. File absent (and no sentinel) → `missing`
         3. File present and cleaned hash matches `validatedHash` → `complete`

@@ -12,16 +12,19 @@ rules:
         ```
         specd archive list [--format text|json|toon]
         ```
+
         No positional arguments. The `--format` flag controls output encoding; defaults to `text`.
   - requirement: Output format — text
     rules:
       - |-
         The command prints a human-readable table to stdout. Changes are sorted by archive date descending (most recently archived first).
+
         The output has an inverse-video column header row `NAME  DATE` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group).
   - requirement: Output format — JSON
     rules:
       - |-
         When `--format json` is passed, the command writes a JSON array to stdout:
+
         ```json
         [
           {
@@ -34,6 +37,7 @@ rules:
           }
         ]
         ```
+
         One object per archived change, sorted by archive date descending. `archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs.
   - requirement: Output format — toon
     rules:
