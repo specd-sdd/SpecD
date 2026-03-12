@@ -508,6 +508,50 @@ describe('FsChangeRepository', () => {
     })
   })
 
+  describe('specDependsOn round-trip', () => {
+    it('given a change with specDependsOn, when saved and loaded, then specDependsOn is preserved', async () => {
+      const change = makeChange('add-auth')
+      change.setSpecDependsOn('auth/login', ['auth/shared', 'auth/jwt'])
+      await ctx.repo.save(change)
+
+      const loaded = await ctx.repo.get('add-auth')
+      expect(loaded).not.toBeNull()
+      expect([...loaded!.specDependsOn.entries()]).toEqual([
+        ['auth/login', ['auth/shared', 'auth/jwt']],
+      ])
+    })
+
+    it('given a change without specDependsOn, when saved and loaded, then specDependsOn is empty', async () => {
+      const change = makeChange('add-auth')
+      await ctx.repo.save(change)
+
+      const loaded = await ctx.repo.get('add-auth')
+      expect(loaded).not.toBeNull()
+      expect(loaded!.specDependsOn.size).toBe(0)
+    })
+
+    it('given a change with specDependsOn, when saved, then manifest.json omits specDependsOn when empty', async () => {
+      const change = makeChange('add-auth')
+      await ctx.repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
+      const raw = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      expect(parsed['specDependsOn']).toBeUndefined()
+    })
+
+    it('given a change with specDependsOn, when saved, then manifest.json includes specDependsOn as a record', async () => {
+      const change = makeChange('add-auth')
+      change.setSpecDependsOn('auth/login', ['auth/shared'])
+      await ctx.repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
+      const raw = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      expect(parsed['specDependsOn']).toEqual({ 'auth/login': ['auth/shared'] })
+    })
+  })
+
   describe('event serialization', () => {
     it('given a change with optional event fields, when saved and loaded, then optional fields are preserved', async () => {
       const change = makeChange('add-auth')
