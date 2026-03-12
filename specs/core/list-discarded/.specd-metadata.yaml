@@ -1,0 +1,64 @@
+title: ListDiscarded
+description: The `ListDiscarded` use case retrieves all discarded changes from the default workspace. Discarded changes are those that have been marked for removal but remain in storage until permanently deleted or archived.
+dependsOn:
+  - core:core/change
+  - core:core/kernel
+context:
+  - The `ListDiscarded` use case retrieves all discarded changes from the default workspace. Discarded changes are those that have been marked for removal but remain in storage until permanently deleted or archived.
+rules:
+  - requirement: Returns all discarded changes
+    rules:
+      - '`ListDiscarded.execute()` MUST return all changes that are in the discarded lifecycle state. The result MUST be sorted by creation order, oldest first.'
+  - requirement: Returns Change entities without content
+    rules:
+      - The returned `Change[]` MUST contain artifact state (status, validated hashes) but MUST NOT include artifact file content. Content is loaded on demand through separate use cases.
+  - requirement: Constructor accepts a ChangeRepository
+    rules:
+      - '`ListDiscarded` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDiscarded()` to retrieve discarded changes.'
+  - requirement: Returns an empty array when no discarded changes exist
+    rules:
+      - When the repository contains no discarded changes, `execute()` MUST return an empty array. It MUST NOT throw.
+scenarios:
+  - requirement: Returns all discarded changes
+    name: Multiple discarded changes exist
+    given:
+      - 'the repository contains three discarded changes created in order: alpha, beta, gamma'
+    when:
+      - execute() is called
+    then:
+      - 'the result contains all three changes in creation order: alpha, beta, gamma'
+  - requirement: Returns all discarded changes
+    name: Active and drafted changes are excluded
+    given:
+      - the repository contains discarded change alpha, active change beta, and drafted change gamma
+    when:
+      - execute() is called
+    then:
+      - the result contains only alpha
+  - requirement: Returns Change entities without content
+    name: Changes have artifact state but no content
+    when:
+      - execute() returns a list of changes
+    then:
+      - each Change has its artifact map populated with status and validated hashes
+      - AND no artifact file content is loaded
+  - requirement: Returns an empty array when no discarded changes exist
+    name: Repository is empty
+    given:
+      - the repository contains no changes at all
+    when:
+      - execute() is called
+    then:
+      - the result is an empty array
+  - requirement: Returns an empty array when no discarded changes exist
+    name: All changes are active or drafted
+    given:
+      - the repository contains only active and drafted changes
+    when:
+      - execute() is called
+    then:
+      - the result is an empty array
+contentHashes:
+  spec.md: sha256:e8ac7228737a18abfd02c0760642c9222ae4238b1ee82f9ab961c64bf5f7b62c
+  verify.md: sha256:13bff06f9a2e6a18078569bfb4b3e172032f9fe4782b17d53bc72da5b2dfac09
+generatedBy: core

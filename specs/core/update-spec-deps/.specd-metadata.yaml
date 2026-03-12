@@ -1,0 +1,151 @@
+title: UpdateSpecDeps
+description: 'The `UpdateSpecDeps` use case updates the declared `dependsOn` dependencies for a single spec within a change. Dependencies are stored in `change.specDependsOn` and used by `CompileContext` as the highest-priority source for `dependsOn` resolution. The use case supports three mutually exclusive operations: add, remove, and set (replace all).'
+dependsOn:
+  - core:core/change
+  - core:core/spec-id-format
+  - core:core/compile-context
+  - core:core/composition
+context:
+  - 'The `UpdateSpecDeps` use case updates the declared `dependsOn` dependencies for a single spec within a change. Dependencies are stored in `change.specDependsOn` and used by `CompileContext` as the highest-priority source for `dependsOn` resolution. The use case supports three mutually exclusive operations: add, remove, and set (replace all).'
+rules:
+  - requirement: Input contract
+    rules:
+      - |-
+        `UpdateSpecDeps.execute` SHALL accept an `UpdateSpecDepsInput` with the following fields:
+
+        * `name` (required, string) — the change slug
+        * `specId` (required, string) — the spec whose dependencies are being updated; MUST be present in the change's `specIds`
+        * `add` (optional, readonly string array) — dependency spec IDs to merge with existing dependencies
+        * `remove` (optional, readonly string array) — dependency spec IDs to remove from existing dependencies
+        * `set` (optional, readonly string array) — replaces all dependencies for the spec
+  - requirement: Change lookup
+    rules:
+      - The use case MUST load the change by `name` via `ChangeRepository.get`. If no change with the given name exists, it MUST throw `ChangeNotFoundError`.
+  - requirement: Spec must belong to the change
+    rules:
+      - The `specId` MUST be present in `change.specIds`. If it is not, the use case MUST throw an `Error` indicating the spec is not in the change.
+  - requirement: Mutual exclusivity of set vs add/remove
+    rules:
+      - '`set` MUST NOT be used together with `add` or `remove`. If both `set` and either `add` or `remove` are provided, the use case MUST throw an `Error`.'
+  - requirement: At least one operation required
+    rules:
+      - If none of `add`, `remove`, or `set` are provided, the use case MUST throw an `Error` indicating that at least one operation must be specified.
+  - requirement: Set replaces all dependencies
+    rules:
+      - When `set` is provided, the use case MUST replace the entire dependency list for the spec with the given array, discarding any previously stored dependencies.
+  - requirement: Remove validates existence
+    rules:
+      - When `remove` is provided, each spec ID in the list MUST exist in the current dependencies for the spec. If any ID is not found, the use case MUST throw an `Error` identifying the missing dependency. Removals are applied sequentially — the first missing ID aborts the operation.
+  - requirement: Add is idempotent
+    rules:
+      - When `add` is provided, each spec ID is added only if it is not already present in the current dependencies (after any removals). Duplicates are silently skipped.
+  - requirement: Remove is applied before add
+    rules:
+      - When both `remove` and `add` are provided in the same call, removals MUST be processed first, followed by additions.
+  - requirement: Persistence and output
+    rules:
+      - |-
+        After computing the new dependency list, the use case MUST:
+
+        1. Call `change.setSpecDependsOn(specId, result)` to update the change entity
+        2. Persist the change via `ChangeRepository.save`
+        3. Return an `UpdateSpecDepsResult` containing `specId` and the resulting `dependsOn` array
+constraints:
+  - Updating specDependsOn does NOT trigger approval invalidation — this is a dependency metadata operation, not a spec scope change
+  - The use case does not resolve actor identity — dependency updates are not recorded as actor-attributed events
+  - Dependency spec IDs are parsed via parseSpecId for format validation but the function is lenient and does not throw on invalid formats
+scenarios:
+  - requirement: Change lookup
+    name: Change does not exist
+    when:
+      - execute is called with a name that does not exist in the repository
+    then:
+      - it throws ChangeNotFoundError
+  - requirement: Spec must belong to the change
+    name: Spec ID not in change
+    given:
+      - "a change with specIds: ['auth/login']"
+    when:
+      - "execute is called with specId: 'billing/invoices'"
+    then:
+      - it throws an Error indicating the spec is not in the change
+  - requirement: Mutual exclusivity of set vs add/remove
+    name: Set used together with add
+    when:
+      - execute is called with both set and add provided
+    then:
+      - it throws an Error stating set is mutually exclusive with add and remove
+  - requirement: Mutual exclusivity of set vs add/remove
+    name: Set used together with remove
+    when:
+      - execute is called with both set and remove provided
+    then:
+      - it throws an Error stating set is mutually exclusive with add and remove
+  - requirement: At least one operation required
+    name: No operation specified
+    when:
+      - execute is called with none of add, remove, or set
+    then:
+      - it throws an Error indicating at least one operation must be provided
+  - requirement: Set replaces all dependencies
+    name: Set overwrites existing dependencies
+    given:
+      - a change where spec 'auth/login' has dependencies ['core/session']
+    when:
+      - "execute is called with set: ['billing/invoices', 'core/config']"
+    then:
+      - the resulting dependsOn is ['billing/invoices', 'core/config']
+  - requirement: Set replaces all dependencies
+    name: Set with empty array clears dependencies
+    given:
+      - a change where spec 'auth/login' has dependencies ['core/session']
+    when:
+      - 'execute is called with set: []'
+    then:
+      - the resulting dependsOn is []
+  - requirement: Remove validates existence
+    name: Removing a dependency not in current deps
+    given:
+      - a change where spec 'auth/login' has dependencies ['core/session']
+    when:
+      - "execute is called with remove: ['billing/invoices']"
+    then:
+      - it throws an Error indicating the dependency was not found
+  - requirement: Add is idempotent
+    name: Adding a dependency already present
+    given:
+      - a change where spec 'auth/login' has dependencies ['core/session']
+    when:
+      - "execute is called with add: ['core/session']"
+    then:
+      - the resulting dependsOn is ['core/session'] (no duplicate)
+  - requirement: Remove is applied before add
+    name: Remove and add in same call
+    given:
+      - a change where spec 'auth/login' has dependencies ['core/session', 'core/config']
+    when:
+      - "execute is called with remove: ['core/session'] and add: ['billing/invoices']"
+    then:
+      - the resulting dependsOn is ['core/config', 'billing/invoices']
+  - requirement: Persistence and output
+    name: Change is persisted and result returned
+    given:
+      - a successful update operation
+    when:
+      - execute completes
+    then:
+      - change.setSpecDependsOn is called with the spec ID and computed dependency list
+      - AND ChangeRepository.save is called
+      - AND the returned UpdateSpecDepsResult contains both specId and dependsOn
+  - requirement: Persistence and output
+    name: Dependencies with no prior state
+    given:
+      - a change where spec 'auth/login' has no existing specDependsOn entry
+    when:
+      - "execute is called with add: ['core/session']"
+    then:
+      - the resulting dependsOn is ['core/session']
+contentHashes:
+  spec.md: sha256:91503603517986c65337358bec230d330f4c1968724328f09356162dbacd72d7
+  verify.md: sha256:63bdd375e985f436928bd5eacfaa2fabc028319be4fb5087795e069fbd8e0310
+generatedBy: core

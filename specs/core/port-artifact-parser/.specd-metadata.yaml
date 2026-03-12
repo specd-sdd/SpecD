@@ -1,0 +1,188 @@
+title: ArtifactParser Port
+description: '`ArtifactParser` and `ArtifactParserRegistry` define the application-layer port for file-type-specific parsing, delta application, and serialization. Each supported file format (markdown, YAML, JSON, plaintext) has a corresponding infrastructure adapter implementing this port. The registry collects all adapters keyed by format name.'
+dependsOn:
+  - default:_global/architecture
+  - core:core/artifact-ast
+  - core:core/delta-format
+  - core:core/selector-model
+context:
+  - '`ArtifactParser` and `ArtifactParserRegistry` define the application-layer port for file-type-specific parsing, delta application, and serialization. Each supported file format (markdown, YAML, JSON, plaintext) has a corresponding infrastructure adapter implementing this port. The registry collects all adapters keyed by format name.'
+rules:
+  - requirement: ArtifactParser interface shape
+    rules:
+      - |-
+        The port MUST be declared as a TypeScript `interface` named `ArtifactParser`. It SHALL define the following members:
+
+        * `fileExtensions: readonly string[]` — the file extensions this adapter handles
+        * `parse(content: string): ArtifactAST` — parse content into a normalised AST
+        * `apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): ArtifactAST` — apply delta entries to an AST
+        * `serialize(ast: ArtifactAST): string` — serialise an AST back to native format
+        * `renderSubtree(node: ArtifactNode): string` — serialise a single node and its descendants
+        * `nodeTypes(): readonly NodeTypeDescriptor[]` — describe addressable node types for the format
+        * `outline(ast: ArtifactAST): readonly OutlineEntry[]` — produce a navigable summary of addressable nodes
+        * `deltaInstructions(): string` — return format-specific static text for delta generation context
+        * `parseDelta(content: string): readonly DeltaEntry[]` — parse a YAML delta file into typed entries
+  - requirement: ArtifactParserRegistry type
+    rules:
+      - The `ArtifactParserRegistry` type MUST be declared as `ReadonlyMap<string, ArtifactParser>`, keyed by format name. Standard format names are `'markdown'`, `'json'`, `'yaml'`, and `'plaintext'`.
+  - requirement: Parse contract
+    rules:
+      - 'The `parse` method MUST accept a `content: string` parameter and return an `ArtifactAST` containing a single `root` node. The AST MUST be a normalised, format-independent tree structure.'
+  - requirement: Apply contract — atomic selector resolution
+    rules:
+      - The `apply` method MUST resolve all selectors before applying any operation. If any selector fails to resolve (no match or ambiguous match), the entire application MUST be rejected with a `DeltaApplicationError`. Partial application SHALL NOT occur.
+  - requirement: Serialize round-trip
+    rules:
+      - Calling `serialize(parse(content))` MUST produce output that, when parsed again, yields an equivalent AST. Implementations SHOULD preserve formatting where practical, but semantic equivalence is the binding constraint.
+  - requirement: RenderSubtree contract
+    rules:
+      - The `renderSubtree` method MUST accept a single `ArtifactNode` and return the native format string for that node and all its descendants. This is used by `ValidateArtifacts` for `contentMatches` evaluation and by the metadata extraction engine.
+  - requirement: NodeTypes contract
+    rules:
+      - The `nodeTypes` method MUST return a static array of `NodeTypeDescriptor` entries describing every addressable node type for the format. Each descriptor MUST include `type`, `identifiedBy`, and `description`.
+  - requirement: Outline contract
+    rules:
+      - The `outline` method MUST return a simplified navigable summary of the artifact's addressable nodes, suitable for injection into LLM context during delta generation.
+  - requirement: DeltaInstructions contract
+    rules:
+      - 'The `deltaInstructions` method MUST return a format-specific static text block that is injected verbatim when `delta: true` is active for an artifact.'
+  - requirement: ParseDelta contract
+    rules:
+      - The `parseDelta` method MUST accept a YAML delta file's raw content and return a typed array of `DeltaEntry` objects. Only the YAML adapter is expected to return a non-empty result; other adapters MAY return an empty array.
+  - requirement: ArtifactAST shape
+    rules:
+      - 'The `ArtifactAST` interface MUST contain a single `root: ArtifactNode` property.'
+  - requirement: ArtifactNode shape
+    rules:
+      - |-
+        The `ArtifactNode` interface MUST contain:
+
+        * `type: string` — the node type identifier
+        * `label?: string` — optional label
+        * `value?: string | number | boolean | null` — optional scalar value
+        * `children?: readonly ArtifactNode[]` — optional child nodes
+        * `level?: number` — present on markdown section nodes
+        * `ordered?: boolean` — present on markdown list nodes
+        * Arbitrary extra fields via an index signature for adapter-specific metadata
+  - requirement: DeltaEntry shape
+    rules:
+      - |-
+        Each `DeltaEntry` MUST contain:
+
+        * `op: 'added' | 'modified' | 'removed'` — the operation type
+        * `selector?: Selector` — optional node selector
+        * `position?: DeltaPosition` — optional positioning directive
+        * `rename?: string` — optional new name for rename operations
+        * `content?: string` — optional content payload
+        * `value?: unknown` — optional value payload
+        * `strategy?: 'replace' | 'append' | 'merge-by'` — optional merge strategy
+        * `mergeKey?: string` — optional key for `merge-by` strategy
+  - requirement: Supporting type shapes
+    rules:
+      - |-
+        * `NodeTypeDescriptor` MUST contain `type: string`, `identifiedBy: readonly string[]`, and `description: string`.
+        * `OutlineEntry` MUST contain `type: string`, `label: string`, `depth: number`, and optional `children: readonly OutlineEntry[]`.
+constraints:
+  - The port lives in application/ports/ per the hexagonal architecture rule
+  - No direct dependency on any parsing library (remark, yaml, etc.) at the port level
+  - Domain services never reference concrete parsers — only this port interface
+  - Selector and DeltaPosition are domain value objects imported from domain/value-objects/
+scenarios:
+  - requirement: ArtifactParser interface shape
+    name: Implementation satisfies the contract
+    given:
+      - a concrete class implementing ArtifactParser
+    when:
+      - the class implements all required methods and the fileExtensions property
+    then:
+      - it compiles and can be instantiated
+  - requirement: ArtifactParserRegistry type
+    name: Registry keyed by format name
+    given:
+      - an ArtifactParserRegistry instance
+    when:
+      - queried with "markdown", "json", "yaml", or "plaintext"
+    then:
+      - each key returns the corresponding ArtifactParser adapter
+  - requirement: Parse contract
+    name: Valid content produces an AST with a root node
+    when:
+      - parse is called with valid content for the format
+    then:
+      - it returns an ArtifactAST whose root property is a non-null ArtifactNode
+  - requirement: Apply contract — atomic selector resolution
+    name: All selectors resolve successfully
+    given:
+      - a valid AST and delta entries whose selectors all match exactly one node
+    when:
+      - apply is called
+    then:
+      - a new AST is returned with all operations applied
+  - requirement: Apply contract — atomic selector resolution
+    name: One selector fails to resolve
+    given:
+      - a valid AST and delta entries where one selector matches no node
+    when:
+      - apply is called
+    then:
+      - it throws a DeltaApplicationError and no changes are applied
+  - requirement: Apply contract — atomic selector resolution
+    name: Ambiguous selector match
+    given:
+      - a valid AST and a delta entry whose selector matches multiple nodes
+    when:
+      - apply is called
+    then:
+      - it throws a DeltaApplicationError
+  - requirement: Serialize round-trip
+    name: Parse then serialize produces equivalent content
+    given:
+      - a valid content string
+    when:
+      - parse is called followed by serialize
+    then:
+      - parsing the serialized output produces an AST equivalent to the original
+  - requirement: RenderSubtree contract
+    name: Single node renders to native format
+    given:
+      - an ArtifactNode from a parsed AST
+    when:
+      - renderSubtree is called with that node
+    then:
+      - it returns a string in the artifact's native format representing that node and all its descendants
+  - requirement: ParseDelta contract
+    name: YAML adapter parses delta content
+    given:
+      - the YAML adapter and valid delta YAML content
+    when:
+      - parseDelta is called
+    then:
+      - it returns a non-empty array of DeltaEntry objects
+  - requirement: ParseDelta contract
+    name: Non-YAML adapter returns empty array
+    given:
+      - a markdown or plaintext adapter
+    when:
+      - parseDelta is called with any content
+    then:
+      - it MAY return an empty array
+  - requirement: ArtifactNode shape
+    name: Markdown section node has level
+    given:
+      - a markdown AST containing a heading
+    when:
+      - the corresponding ArtifactNode is inspected
+    then:
+      - it has a level property indicating the heading depth
+  - requirement: ArtifactNode shape
+    name: Markdown list node has ordered flag
+    given:
+      - a markdown AST containing an ordered list
+    when:
+      - the corresponding ArtifactNode is inspected
+    then:
+      - it has ordered set to true
+contentHashes:
+  spec.md: sha256:207bf0f4b4fe487330b55e35bf2c088baf141937b40d57a3a2a485db69d1995c
+  verify.md: sha256:34b0b1eb61ec808a622483e5baac27f2631543e0039174475181c8990ddef5b5
+generatedBy: core

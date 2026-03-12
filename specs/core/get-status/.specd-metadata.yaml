@@ -1,0 +1,89 @@
+title: GetStatus
+description: The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each attached artifact. Artifact statuses are computed by cascading through dependency chains -- an artifact whose hashes match may still be `in-progress` if any of its required dependencies are not `complete`.
+dependsOn:
+  - core:core/change
+  - core:core/kernel
+context:
+  - The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each attached artifact. Artifact statuses are computed by cascading through dependency chains -- an artifact whose hashes match may still be `in-progress` if any of its required dependencies are not `complete`.
+rules:
+  - requirement: Accepts a change name as input
+    rules:
+      - '`GetStatus.execute()` MUST accept a `GetStatusInput` containing a `name` string that identifies the change to look up.'
+  - requirement: Returns the change and its artifact statuses
+    rules:
+      - |-
+        On success, `execute()` MUST return a `GetStatusResult` containing:
+
+        * `change` -- the loaded `Change` entity with its current artifact state
+        * `artifactStatuses` -- an array of `ArtifactStatusEntry` objects, one per artifact attached to the change
+
+        Each `ArtifactStatusEntry` MUST contain:
+
+        * `type` -- the artifact type identifier (e.g. `'proposal'`, `'spec'`)
+        * `effectiveStatus` -- the effective `ArtifactStatus` after cascading through required dependencies via `Change.effectiveStatus(type)`
+  - requirement: Throws ChangeNotFoundError for unknown changes
+    rules:
+      - If no change with the given name exists in the repository, `execute()` MUST throw a `ChangeNotFoundError` with code `CHANGE_NOT_FOUND`. It MUST NOT return `null`.
+  - requirement: Constructor accepts a ChangeRepository
+    rules:
+      - '`GetStatus` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.get(name)` to load the change.'
+  - requirement: Reports effective status for every artifact
+    rules:
+      - The `artifactStatuses` array MUST contain exactly one entry per artifact in the change's artifact map. It MUST NOT omit artifacts and MUST NOT include entries for artifacts that do not exist on the change.
+constraints:
+  - The use case does not modify the change -- it is a read-only query
+  - Artifact content is not loaded; only status metadata is returned
+  - The effective status computation is delegated to the Change entity, not performed by the use case itself
+scenarios:
+  - requirement: Returns the change and its artifact statuses
+    name: Change with multiple artifacts
+    given:
+      - a change add-login exists with artifacts proposal (complete) and spec (in-progress)
+    when:
+      - "execute({ name: 'add-login' }) is called"
+    then:
+      - the result contains the Change entity for add-login
+      - 'AND artifactStatuses has two entries: one for proposal and one for spec'
+      - AND each entry's effectiveStatus reflects the value returned by Change.effectiveStatus(type)
+  - requirement: Returns the change and its artifact statuses
+    name: Change with no artifacts
+    given:
+      - a change empty-change exists with an empty artifact map
+    when:
+      - "execute({ name: 'empty-change' }) is called"
+    then:
+      - the result contains the Change entity
+      - AND artifactStatuses is an empty array
+  - requirement: Throws ChangeNotFoundError for unknown changes
+    name: Change does not exist
+    when:
+      - "execute({ name: 'nonexistent' }) is called"
+    then:
+      - a ChangeNotFoundError is thrown with code CHANGE_NOT_FOUND
+      - AND the error message contains 'nonexistent'
+  - requirement: Reports effective status for every artifact
+    name: Effective status cascades through dependencies
+    given:
+      - a change has artifact spec that depends on proposal
+      - AND spec hashes match (would be complete in isolation)
+      - AND proposal is in-progress
+    when:
+      - execute() is called for this change
+    then:
+      - the effectiveStatus for spec is in-progress (cascaded from its dependency)
+      - AND the effectiveStatus for proposal is in-progress
+  - requirement: Reports effective status for every artifact
+    name: Skipped artifacts satisfy dependencies
+    given:
+      - a change has artifact spec that depends on proposal
+      - AND proposal is skipped
+      - AND spec hashes match
+    when:
+      - execute() is called for this change
+    then:
+      - the effectiveStatus for spec is complete
+      - AND the effectiveStatus for proposal is skipped
+contentHashes:
+  spec.md: sha256:98c66e49f7115b411df4f0f75bc323b46566afc7774c4b7148ff527c2bc8439d
+  verify.md: sha256:ccad98397cc59411e45892cea0099e8cbc13e1c9c00e9c64afd2ef2a2163d180
+generatedBy: core
