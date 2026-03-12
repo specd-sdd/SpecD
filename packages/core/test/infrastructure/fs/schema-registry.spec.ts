@@ -35,6 +35,7 @@ async function writeSchemaFile(dir: string, name: string, content: string): Prom
 }
 
 const MINIMAL_SCHEMA = `
+kind: schema
 name: minimal
 version: 1
 artifacts:
@@ -44,6 +45,7 @@ artifacts:
 `
 
 const FULL_SCHEMA = `
+kind: schema
 name: full-schema
 version: 2
 description: Full test schema
@@ -63,7 +65,8 @@ artifacts:
     requires:
       - proposal
     validations:
-      - selector:
+      - id: has-requirements
+        selector:
           type: section
           matches: '^Requirements$'
         required: true
@@ -82,10 +85,13 @@ workflow:
     requires: [specs]
     hooks:
       pre:
-        - instruction: 'Review the specs before implementing.'
-        - run: 'echo start'
+        - id: review-specs
+          instruction: 'Review the specs before implementing.'
+        - id: echo-start
+          run: 'echo start'
       post:
-        - run: 'pnpm test'
+        - id: run-tests
+          run: 'pnpm test'
 `
 
 let ctx: RegistryContext
@@ -194,6 +200,7 @@ describe('Schema validation on load — full schema', () => {
 describe('Schema validation on load — unknown field ignored', () => {
   it('ignores unknown top-level fields (forward compatibility)', async () => {
     const content = `
+kind: schema
 name: compat
 version: 1
 artifacts:
@@ -212,6 +219,7 @@ futureField: ignored
 describe('Schema validation on load — missing required field', () => {
   it('throws SchemaValidationError when name is missing', async () => {
     const content = `
+kind: schema
 version: 1
 artifacts:
   - id: spec
@@ -226,6 +234,7 @@ artifacts:
 
   it('throws SchemaValidationError when artifacts is missing', async () => {
     const content = `
+kind: schema
 name: no-artifacts
 version: 1
 `
@@ -239,6 +248,7 @@ version: 1
 describe('Schema validation on load — duplicate artifact ID', () => {
   it('throws SchemaValidationError for duplicate artifact IDs', async () => {
     const content = `
+kind: schema
 name: dup-id
 version: 1
 artifacts:
@@ -259,6 +269,7 @@ artifacts:
 describe('Schema validation on load — duplicate workflow step', () => {
   it('throws SchemaValidationError for duplicate workflow step names', async () => {
     const content = `
+kind: schema
 name: dup-step
 version: 1
 artifacts:
@@ -279,6 +290,7 @@ workflow:
 describe('Schema validation on load — unknown artifact ID in requires', () => {
   it('throws SchemaValidationError when requires references a non-existent artifact', async () => {
     const content = `
+kind: schema
 name: bad-requires
 version: 1
 artifacts:
@@ -298,6 +310,7 @@ artifacts:
 describe('Artifact definition — circular dependency in artifact graph', () => {
   it('throws SchemaValidationError when artifacts form a cycle in requires', async () => {
     const content = `
+kind: schema
 name: cycle
 version: 1
 artifacts:
@@ -322,6 +335,7 @@ artifacts:
 describe('Artifact definition — non-optional artifact requires optional artifact', () => {
   it('throws SchemaValidationError when non-optional artifact requires optional artifact', async () => {
     const content = `
+kind: schema
 name: opt-violation
 version: 1
 artifacts:
@@ -344,6 +358,7 @@ artifacts:
 describe('Artifact definition — deltaValidations on non-delta artifact', () => {
   it('throws SchemaValidationError when deltaValidations is declared without delta:true', async () => {
     const content = `
+kind: schema
 name: bad-delta-validations
 version: 1
 artifacts:
@@ -352,7 +367,8 @@ artifacts:
     output: spec.md
     delta: false
     deltaValidations:
-      - selector:
+      - id: has-section
+        selector:
           type: section
         required: true
 `
@@ -369,6 +385,7 @@ describe('Template resolution — template loaded at resolve time', () => {
       ctx.defaultSchemasPath,
       'with-template',
       `
+kind: schema
 name: with-template
 version: 1
 artifacts:
@@ -399,6 +416,7 @@ describe('Template resolution — template file not found', () => {
       ctx.defaultSchemasPath,
       'missing-template',
       `
+kind: schema
 name: missing-template
 version: 1
 artifacts:
@@ -509,6 +527,7 @@ describe('resolve — workspace-qualified ref with unknown workspace', () => {
 describe('resolve — relative path resolves from configDir', () => {
   it('resolves ./ paths relative to configDir, not cwd', async () => {
     const schemaContent = `
+kind: schema
 name: relative-schema
 version: 1
 artifacts: []

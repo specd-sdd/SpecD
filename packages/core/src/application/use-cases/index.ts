@@ -23,6 +23,7 @@ export {
   type InvalidateSpecMetadataResult,
 } from './invalidate-spec-metadata.js'
 export { type GetActiveSchema } from './get-active-schema.js'
+export { type ResolveSchema } from './resolve-schema.js'
 export { type InitProject } from './init-project.js'
 export { type RecordSkillInstall, type RecordSkillInstallInput } from './record-skill-install.js'
 export { type GetSkillsManifest, type GetSkillsManifestInput } from './get-skills-manifest.js'

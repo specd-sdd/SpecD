@@ -236,6 +236,9 @@ export function makeSchemaRegistry(schema: Schema | null = null): SchemaRegistry
     async resolve(): Promise<Schema | null> {
       return schema
     },
+    async resolveRaw() {
+      return null
+    },
     async list() {
       return []
     },
@@ -300,9 +303,10 @@ export function makeSchema(
   workflow: WorkflowStep[] = [],
 ): Schema {
   if (Array.isArray(optsOrArtifacts)) {
-    return new Schema('test-schema', 1, optsOrArtifacts, workflow)
+    return new Schema('schema', 'test-schema', 1, optsOrArtifacts, workflow)
   }
   return new Schema(
+    'schema',
     optsOrArtifacts.name ?? 'test-schema',
     1,
     optsOrArtifacts.artifacts ?? [],

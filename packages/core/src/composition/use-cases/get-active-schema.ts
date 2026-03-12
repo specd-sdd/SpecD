@@ -1,6 +1,8 @@
 import * as path from 'node:path'
 import { GetActiveSchema } from '../../application/use-cases/get-active-schema.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
+import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 
 /** Filesystem adapter options for `createGetActiveSchema(options)`. */
@@ -9,6 +11,8 @@ export interface FsGetActiveSchemaOptions {
   readonly configDir: string
   readonly schemaRef: string
   readonly workspaceSchemasPaths: ReadonlyMap<string, string>
+  readonly schemaPlugins?: readonly string[]
+  readonly schemaOverrides?: SchemaOperations
 }
 
 /** Extra options when constructing from a `SpecdConfig`. */
@@ -60,15 +64,25 @@ export function createGetActiveSchema(
         workspaceSchemasPaths.set(ws.name, ws.schemasPath)
       }
     }
-    return new GetActiveSchema(schemas, schemaRef, workspaceSchemasPaths)
+    const resolveSchema = new ResolveSchema(
+      schemas,
+      schemaRef,
+      workspaceSchemasPaths,
+      configOrOptions.schemaPlugins ?? [],
+      configOrOptions.schemaOverrides,
+    )
+    return new GetActiveSchema(resolveSchema)
   }
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: configOrOptions.nodeModulesPaths,
     configDir: configOrOptions.configDir,
   })
-  return new GetActiveSchema(
+  const resolveSchema = new ResolveSchema(
     schemas,
     configOrOptions.schemaRef,
     configOrOptions.workspaceSchemasPaths,
+    configOrOptions.schemaPlugins ?? [],
+    configOrOptions.schemaOverrides,
   )
+  return new GetActiveSchema(resolveSchema)
 }

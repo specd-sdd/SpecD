@@ -3,6 +3,7 @@ import {
   ArtifactType,
   type ArtifactScope,
   type ArtifactFormat,
+  type ArtifactRules,
 } from '../value-objects/artifact-type.js'
 import { type WorkflowStep } from '../value-objects/workflow-step.js'
 import {
@@ -35,6 +36,7 @@ export interface SelectorRaw {
 
 /** Raw validation rule shape with `| undefined` on optional fields. */
 export interface ValidationRuleRaw {
+  id: string
   selector?: SelectorRaw | undefined
   path?: string | undefined
   required?: boolean | undefined
@@ -68,8 +70,9 @@ export interface ExtractorRaw {
   fields?: Record<string, FieldMappingRaw> | undefined
 }
 
-/** Raw metadata extractor entry shape. */
+/** Raw metadata extractor entry shape. Array entries require `id`; scalar entries do not. */
 export interface MetadataExtractorEntryRaw {
+  id?: string | undefined
   artifact: string
   extractor: ExtractorRaw
 }
@@ -88,6 +91,7 @@ export interface MetadataExtractionRaw {
 
 /** Raw pre-hash cleanup entry shape. */
 export interface PreHashCleanupRaw {
+  id: string
   pattern: string
   replacement: string
 }
@@ -96,6 +100,18 @@ export interface PreHashCleanupRaw {
 export interface TaskCompletionCheckRaw {
   incompletePattern?: string | undefined
   completePattern?: string | undefined
+}
+
+/** Raw rule entry shape ({ id, text }) for artifact rules.pre / rules.post. */
+export interface RuleEntryRaw {
+  id: string
+  text: string
+}
+
+/** Raw artifact rules block shape. */
+export interface ArtifactRulesRaw {
+  pre?: readonly RuleEntryRaw[] | undefined
+  post?: readonly RuleEntryRaw[] | undefined
 }
 
 /** Raw artifact entry shape from validated YAML. */
@@ -115,16 +131,29 @@ export interface ArtifactYamlData {
   deltaValidations?: readonly ValidationRuleRaw[] | undefined
   preHashCleanup?: readonly PreHashCleanupRaw[] | undefined
   taskCompletionCheck?: TaskCompletionCheckRaw | undefined
+  rules?: ArtifactRulesRaw | undefined
+}
+
+/** Raw schema operations block for schema-plugins. Permissive shape validated at merge time. */
+export interface SchemaOperationsRaw {
+  readonly create?: Record<string, unknown> | undefined
+  readonly remove?: Record<string, unknown> | undefined
+  readonly set?: Record<string, unknown> | undefined
+  readonly append?: Record<string, unknown> | undefined
+  readonly prepend?: Record<string, unknown> | undefined
 }
 
 /** Validated intermediate structure from a parsed `schema.yaml` file. */
 export interface SchemaYamlData {
+  readonly kind: 'schema' | 'schema-plugin'
   readonly name: string
   readonly version: number
   readonly description?: string | undefined
-  readonly artifacts: readonly ArtifactYamlData[]
+  readonly extends?: string | undefined
+  readonly artifacts?: readonly ArtifactYamlData[] | undefined
   readonly workflow?: readonly WorkflowStep[] | undefined
   readonly metadataExtraction?: MetadataExtractionRaw | undefined
+  readonly operations?: SchemaOperationsRaw | undefined
 }
 
 // ---------------------------------------------------------------------------
@@ -307,6 +336,14 @@ function buildArtifactType(
     deltaValidations,
     preHashCleanup,
     ...(taskCompletionCheck !== undefined ? { taskCompletionCheck } : {}),
+    ...(raw.rules !== undefined
+      ? {
+          rules: {
+            pre: raw.rules.pre ?? [],
+            post: raw.rules.post ?? [],
+          } satisfies ArtifactRules,
+        }
+      : {}),
   })
 }
 
@@ -402,8 +439,9 @@ export function buildSchema(
   const idSet = new Set<string>()
   const idPattern = /^[a-z][a-z0-9-]*$/
   const artifacts: ArtifactType[] = []
+  const rawArtifacts = data.artifacts ?? []
 
-  for (const [i, raw] of data.artifacts.entries()) {
+  for (const [i, raw] of rawArtifacts.entries()) {
     const ctx = `artifacts[${i}]`
 
     if (!idPattern.test(raw.id)) {
@@ -444,5 +482,13 @@ export function buildSchema(
       ? buildMetadataExtraction(data.metadataExtraction)
       : undefined
 
-  return new Schema(data.name, data.version, artifacts, workflow, metadataExtraction)
+  return new Schema(
+    data.kind,
+    data.name,
+    data.version,
+    artifacts,
+    workflow,
+    metadataExtraction,
+    data.extends,
+  )
 }

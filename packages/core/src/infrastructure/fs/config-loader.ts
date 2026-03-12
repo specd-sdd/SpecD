@@ -50,8 +50,8 @@ const FsStorageZodSchema = z.object({
 })
 
 const HookEntryRawZodSchema = z.union([
-  z.object({ run: z.string() }),
-  z.object({ instruction: z.string() }),
+  z.object({ id: z.string(), run: z.string() }),
+  z.object({ id: z.string(), instruction: z.string() }),
 ])
 
 const WorkflowStepRawZodSchema = z
@@ -211,6 +211,17 @@ const WorkspaceRawZodSchema = z.object({
   contextExcludeSpecs: z.array(z.string()).optional(),
 })
 
+/** Permissive Zod schema for schemaOverrides — semantic validation happens at merge time. */
+const SchemaOverridesZodSchema = z
+  .object({
+    create: z.record(z.unknown()).optional(),
+    remove: z.record(z.unknown()).optional(),
+    set: z.record(z.unknown()).optional(),
+    append: z.record(z.unknown()).optional(),
+    prepend: z.record(z.unknown()).optional(),
+  })
+  .strict()
+
 const SpecdYamlZodSchema = z.object({
   schema: z.string(),
   workspaces: z.record(WorkspaceRawZodSchema),
@@ -232,6 +243,8 @@ const SpecdYamlZodSchema = z.object({
   contextIncludeSpecs: z.array(z.string()).optional(),
   contextExcludeSpecs: z.array(z.string()).optional(),
   llmOptimizedContext: z.boolean().optional(),
+  schemaPlugins: z.array(z.string()).optional(),
+  schemaOverrides: SchemaOverridesZodSchema.optional(),
 })
 
 // ---------------------------------------------------------------------------
@@ -338,9 +351,15 @@ function formatZodPath(issuePath: ReadonlyArray<string | number>): string {
  * @param h - The raw hook entry (`{ run }` or `{ instruction }`)
  * @returns A typed `SpecdWorkflowHook`
  */
-function toWorkflowHook(h: { run: string } | { instruction: string }): SpecdWorkflowHook {
-  if ('run' in h) return { type: 'run', command: h.run }
-  return { type: 'instruction', text: (h as { instruction: string }).instruction }
+function toWorkflowHook(
+  h: { id: string; run: string } | { id: string; instruction: string },
+): SpecdWorkflowHook {
+  if ('run' in h) return { id: h.id, type: 'run', command: h.run }
+  return {
+    id: h.id,
+    type: 'instruction',
+    text: (h as { id: string; instruction: string }).instruction,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -527,6 +546,13 @@ export class FsConfigLoader implements ConfigLoader {
         : {}),
       ...(data.llmOptimizedContext !== undefined
         ? { llmOptimizedContext: data.llmOptimizedContext }
+        : {}),
+      ...(data.schemaPlugins !== undefined ? { schemaPlugins: data.schemaPlugins } : {}),
+      ...(data.schemaOverrides !== undefined
+        ? {
+            schemaOverrides:
+              data.schemaOverrides as import('../../domain/services/merge-schema-layers.js').SchemaOperations,
+          }
         : {}),
     }
   }

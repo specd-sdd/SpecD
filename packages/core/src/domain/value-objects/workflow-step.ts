@@ -6,6 +6,8 @@
  */
 export type HookEntry =
   | {
+      /** Unique identifier for this hook entry within its array. */
+      readonly id: string
       /** Discriminant: this is a shell execution hook. */
       readonly type: 'run'
       /**
@@ -16,6 +18,8 @@ export type HookEntry =
       readonly command: string
     }
   | {
+      /** Unique identifier for this hook entry within its array. */
+      readonly id: string
       /** Discriminant: this is an agent instruction injection hook. */
       readonly type: 'instruction'
       /** The instruction text to inject into the compiled context block. */

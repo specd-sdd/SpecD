@@ -223,6 +223,7 @@ function makeStubChangeRepo(change?: Change) {
 function makeStubSchemaRegistry(schema: Schema | null): SchemaRegistry {
   return {
     resolve: async () => schema,
+    resolveRaw: async () => null,
     list: async () => [],
   }
 }
@@ -302,7 +303,7 @@ describe('CompileContext', () => {
 
     it('throws SchemaMismatchError when active schema name differs from change schema name', async () => {
       const change = makeChange('my-change', { schemaName: 'schema-a' })
-      const schema = new Schema('schema-b', 1, [], [])
+      const schema = new Schema('schema', 'schema-b', 1, [], [])
 
       const { sut } = makeSut({ change, schema })
 
@@ -866,8 +867,8 @@ describe('CompileContext', () => {
         requires: [],
         hooks: {
           pre: [
-            { type: 'instruction', text: 'Review delta specs' },
-            { type: 'run', command: 'pnpm test' },
+            { id: 'review-delta', type: 'instruction', text: 'Review delta specs' },
+            { id: 'run-test', type: 'run', command: 'pnpm test' },
           ],
           post: [],
         },
@@ -893,7 +894,7 @@ describe('CompileContext', () => {
         step: 'designing',
         requires: [],
         hooks: {
-          pre: [{ type: 'instruction', text: 'Plan your approach first.' }],
+          pre: [{ id: 'test-hook', type: 'instruction', text: 'Plan your approach first.' }],
           post: [],
         },
       }
@@ -932,7 +933,7 @@ describe('CompileContext', () => {
         step: 'designing',
         requires: [],
         hooks: {
-          pre: [{ type: 'instruction', text: 'Schema pre-hook.' }],
+          pre: [{ id: 'test-hook', type: 'instruction', text: 'Schema pre-hook.' }],
           post: [],
         },
       }
@@ -940,7 +941,7 @@ describe('CompileContext', () => {
         step: 'designing',
         requires: [],
         hooks: {
-          pre: [{ type: 'instruction', text: 'Config pre-hook.' }],
+          pre: [{ id: 'test-hook', type: 'instruction', text: 'Config pre-hook.' }],
           post: [],
         },
       }
@@ -1491,7 +1492,7 @@ describe('CompileContext', () => {
         step: 'designing',
         requires: [],
         hooks: {
-          pre: [{ type: 'instruction', text: 'Review before starting.' }],
+          pre: [{ id: 'test-hook', type: 'instruction', text: 'Review before starting.' }],
           post: [],
         },
       }
