@@ -55,6 +55,8 @@ import { registerConfigShow } from './commands/config/show.js'
 
 // schema
 import { registerSchemaShow } from './commands/schema/show.js'
+import { registerSchemaFork } from './commands/schema/fork.js'
+import { registerSchemaExtend } from './commands/schema/extend.js'
 
 // skills
 import { registerSkillsList } from './commands/skills/list.js'
@@ -140,6 +142,8 @@ registerConfigShow(configCmd)
 // ---- schema ----
 const schemaCmd = program.command('schema').description('Schema introspection')
 registerSchemaShow(schemaCmd)
+registerSchemaFork(schemaCmd)
+registerSchemaExtend(schemaCmd)
 
 // ---- skills ----
 const skillsCmd = program.command('skills').description('Manage agent skills')
