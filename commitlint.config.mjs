@@ -15,6 +15,7 @@ export default {
         'plugin-claude',
         'plugin-copilot',
         'plugin-codex',
+        'code-graph',
         'root',
         'all',
       ],
