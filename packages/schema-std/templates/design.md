@@ -3,6 +3,16 @@
 
 # Design: {{change.name}}
 
+## Goals / Non-Goals
+
+**Goals:**
+
+<!-- What this design aims to achieve — the specific outcomes that matter. -->
+
+**Non-Goals:**
+
+<!-- What is explicitly out of scope for this change, even if related. -->
+
 ## Approach
 
 <!-- High-level technical approach. How will we implement this? -->

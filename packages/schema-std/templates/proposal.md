@@ -15,9 +15,24 @@
 
 <!-- High-level description of what we want to build or change. -->
 
-## Scope
+## Specs affected
 
-<!-- What is in scope for this change? What is explicitly out of scope? -->
+### New specs
+
+<!-- Specs to be created. Each becomes specs/<workspace>/<capability-path>/spec.md -->
+
+- `<workspace>:<capability-path>`: <!-- brief description of what this spec covers -->
+
+### Modified specs
+
+<!-- Existing specs whose requirements are changing. Each needs a delta file.
+     Only list if spec-level behaviour changes — not just implementation. -->
+
+- `<workspace>:<capability-path>`: <!-- what requirement is changing and why -->
+
+## Impact
+
+<!-- Affected code areas, APIs, data models, or external dependencies. -->
 
 ## Open questions
 

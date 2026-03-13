@@ -15,20 +15,23 @@ artifacts:
       Create the proposal document that establishes WHY this change is needed.
 
       Sections to include:
-      - **Why**: 1–2 sentences on the problem or opportunity. What is broken or missing? Why now?
-      - **What changes**: Bullet list of the concrete changes — new capabilities, modified
-        behaviour, removals. Mark breaking changes explicitly.
-      - **Specs affected**: List every spec that will be created or modified.
-        - New specs: each becomes a new `<workspace>:<capability-path>` spec.
-        - Modified specs: each needs a delta file. Run `specd spec list --format json --summary` to see
-          existing specs with their exact paths and a summary for discovery, and
-          `specd spec show <workspace>:<capability-path> --format json` for full review before filling this in.
+      - **Motivation**: 1–2 sentences on the problem or opportunity. What is broken or missing? Why now?
+      - **Current behaviour**: What happens today. What is missing or broken.
+      - **Proposed solution**: High-level description of what we want to build or change.
+      - **Specs affected**: List every spec that will be created or modified, split into
+        two subsections:
+        - **New specs**: each becomes `specs/<workspace>/<capability-path>/spec.md`.
+          Format: `<workspace>:<capability-path>`: brief description.
+        - **Modified specs**: existing specs whose requirements change. Each needs a delta file.
+          Run `specd spec list --format json --summary` to discover existing specs, and
+          `specd spec show <workspace>:<capability-path> --format json` for full review.
+          Format: `<workspace>:<capability-path>`: what requirement is changing and why.
       - **Impact**: Affected code areas, APIs, data models, or external dependencies.
       - **Open questions**: Unresolved decisions that must be settled before spec work begins.
 
-      This section is the contract between proposal and specs — every spec listed here
-      will need a corresponding `<workspace>:<capability-path>` spec. Research existing specs
-      before filling it in.
+      The "Specs affected" section is the contract between proposal and specs — every spec
+      listed there will need a corresponding file or delta. Research existing specs before
+      filling it in.
 
       Keep it concise (1–2 pages). Focus on the "why", not the "how" — implementation
       details belong in design.md.
@@ -51,10 +54,14 @@ artifacts:
       template.
 
       Format requirements:
-      - Include a Purpose section explaining what this capability is and why it exists.
+      - Include a Purpose section: start with WHY this spec exists, then briefly describe what it covers.
       - Use `### Requirement: <name>` for each requirement.
       - Use SHALL / MUST for normative statements. Avoid "should" or "may" for hard rules.
       - Do not include WHEN/THEN scenarios here — those go in verify.md.
+
+      Before writing each spec, review the proposal's "Open questions" section. If any
+      open question affects the spec you are writing, ask the user to resolve it before
+      proceeding — do not make assumptions about unresolved decisions.
 
       Common pitfalls:
       - Using the wrong heading level. Requirements are `###`, never `##` or `####`.
@@ -87,9 +94,9 @@ artifacts:
         selector must match the exact heading text.
       - Writing a full spec file instead of a delta — never rewrite an existing spec.
     validations:
-      - id: has-purpose-or-overview
+      - id: has-purpose
         type: section
-        matches: '^Purpose$|^Overview$'
+        matches: '^Purpose$'
         required: true
       - id: has-requirements
         type: section
@@ -121,8 +128,10 @@ artifacts:
       - Group scenarios under `### Requirement: <name>` headings.
         The heading text must match the corresponding requirement in spec.md exactly —
         same wording, same order.
-      - Each scenario: `#### Scenario: <name>` with WHEN / THEN lines.
-        Scenarios use exactly four hashtags. Never three, never bullets.
+      - Each scenario: `#### Scenario: <name>` with optional GIVEN, then WHEN / THEN lines.
+        Use GIVEN when the precondition is not obvious from context. Each clause (GIVEN,
+        WHEN, THEN) can be followed by AND or OR lines for additional conditions or
+        assertions. Scenarios use exactly four hashtags. Never three, never bullets.
 
       Only write scenarios that add information beyond what the requirement prose already
       states. Do not restate the happy path if it is obvious from the requirement itself.
@@ -236,16 +245,16 @@ artifacts:
 
       Example:
       ```
-      ## 1. Setup
+      ## 1. Domain model
 
-      - [ ] 1.1 Create module structure
-      - [ ] 1.2 Add dependencies
+      - [ ] 1.1 Define value objects and entity interfaces
+      - [ ] 1.2 Implement state transition logic
 
-      ## 2. Core implementation
+      ## 2. Infrastructure
 
-      - [ ] 2.1 Implement <requirement A>
-      - [ ] 2.2 Add unit tests for <requirement A>
-      - [ ] 2.3 Implement <requirement B>
+      - [ ] 2.1 Add filesystem adapter for persistence
+      - [ ] 2.2 Write integration tests against real storage
+      - [ ] 2.3 Wire adapter into composition factory
       ```
 
       Each task should be verifiable — you know unambiguously when it is done.
@@ -268,7 +277,7 @@ metadataExtraction:
   description:
     artifact: specs
     extractor:
-      selector: { type: section, matches: '^Overview$|^Purpose$' }
+      selector: { type: section, matches: '^Purpose$' }
       extract: content
   dependsOn:
     artifact: specs
@@ -323,7 +332,7 @@ metadataExtraction:
     - id: spec-overview
       artifact: specs
       extractor:
-        selector: { type: section, matches: '^Overview$|^Purpose$' }
+        selector: { type: section, matches: '^Purpose$' }
         extract: content
 
 # ── workflows ──────────────────────────────────────────────────────────────────
