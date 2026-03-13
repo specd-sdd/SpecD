@@ -1,0 +1,156 @@
+# Symbol Model
+
+## Purpose
+
+A code graph needs a unified, language-agnostic representation of source code structure before any persistence, traversal, or impact analysis can operate on it. The symbol model defines the domain entities and value objects that represent files, symbols, and the relationships between them — the foundational vocabulary for the entire `@specd/code-graph` package.
+
+## Requirements
+
+### Requirement: File node
+
+A `FileNode` SHALL represent a single source file in the workspace. It contains:
+
+- **`path`** (`string`) — workspace-relative, forward-slash-normalized, unique per workspace. This is the node's identity.
+- **`language`** (`string`) — language identifier (e.g. `typescript`, `python`). Determined by the language adapter at index time.
+- **`contentHash`** (`string`) — hash of the file's content at last index. Used for incremental diffing.
+- **`workspace`** (`string`) — the workspace root this file belongs to.
+- **`embedding`** (`Float32Array | undefined`) — optional vector embedding for semantic search. Deferred to v2+.
+
+Two `FileNode` values are equal if and only if their `path` and `workspace` fields match.
+
+### Requirement: Spec node
+
+A `SpecNode` SHALL represent a spec directory in the workspace. It contains:
+
+- **`specId`** (`string`) — the spec identifier in `workspace:package/topic` format (e.g. `core:core/change`, `_global:_global/architecture`). This is the node's identity.
+- **`path`** (`string`) — workspace-relative path to the spec directory (e.g. `specs/core/change`).
+- **`title`** (`string`) — the spec title extracted from the `# Title` heading in `spec.md`.
+- **`dependsOn`** (`string[]`) — ordered list of spec IDs this spec depends on, extracted from `.specd-metadata.yaml` or the `## Spec Dependencies` section in `spec.md`.
+
+Two `SpecNode` values are equal if their `specId` fields match.
+
+### Requirement: Symbol node
+
+A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:
+
+- **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line`. The same symbol at the same location always produces the same id.
+- **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).
+- **`kind`** (`SymbolKind`) — the category of this symbol.
+- **`filePath`** (`string`) — workspace-relative path of the file containing this symbol.
+- **`line`** (`number`) — 1-based line number of the symbol's declaration.
+- **`column`** (`number`) — 0-based column offset of the symbol's declaration.
+
+The `id` field is the symbol's identity for graph operations. Two `SymbolNode` values with the same `id` are considered the same symbol.
+
+### Requirement: SymbolKind enum
+
+`SymbolKind` SHALL be a closed string enum with the following members:
+
+- `function`
+- `class`
+- `method`
+- `variable`
+- `type`
+- `interface`
+- `enum`
+
+No other values are permitted. Language adapters MUST map language-specific constructs to one of these kinds or skip the construct entirely.
+
+### Requirement: Relation types
+
+Relations between nodes SHALL be represented as typed edges. Each relation has a `source`, `target`, and `type`. The following relation types are defined:
+
+| Type         | Source | Target | Meaning                                | Phase |
+| ------------ | ------ | ------ | -------------------------------------- | ----- |
+| `IMPORTS`    | File   | File   | Source file imports from target file   | v1.5  |
+| `DEFINES`    | File   | Symbol | File contains the symbol's declaration | v2    |
+| `CALLS`      | Symbol | Symbol | Source symbol invokes target symbol    | v2    |
+| `EXPORTS`    | File   | Symbol | File exports the symbol as public API  | v2    |
+| `DEPENDS_ON` | Spec   | Spec   | Spec depends on target spec            | v1.5  |
+| `COVERS`     | Spec   | File   | Spec covers the target file            | v2+   |
+
+Relations are directional. `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`, and `DEPENDS_ON` are populated by the indexer. `COVERS` is populated by spec-to-code mapping (deferred to v2+).
+
+### Requirement: Relation value object
+
+A `Relation` SHALL be a value object containing:
+
+- **`source`** (`string`) — the id or path of the source node.
+- **`target`** (`string`) — the id or path of the target node.
+- **`type`** (`RelationType`) — one of the relation types defined above.
+- **`metadata`** (`Record<string, unknown> | undefined`) — optional adapter-specific metadata (e.g. import specifier, call site line number).
+
+Two `Relation` values are equal if `source`, `target`, and `type` all match.
+
+### Requirement: Immutability
+
+All model types — `FileNode`, `SymbolNode`, `Relation`, and any aggregate containing them — SHALL be immutable value objects. Properties MUST be `readonly`. Mutations to the graph happen exclusively through the `GraphStore` port's atomic upsert operations, which replace entire file-scoped slices. There is no in-place mutation API.
+
+### Requirement: Error types
+
+`@specd/code-graph` SHALL define its own `CodeGraphError` base class extending `Error`. All package-specific errors MUST extend `CodeGraphError`. This package has no dependency on `@specd/core` and MUST NOT use `SpecdError` or any core error type.
+
+Specific error subclasses include:
+
+- `InvalidSymbolKindError` — when a symbol kind value is not in the `SymbolKind` enum
+- `InvalidRelationTypeError` — when a relation type value is not in the defined set
+- `DuplicateSymbolIdError` — when two symbols in the same file produce the same deterministic id
+
+## Constraints
+
+- All model types are value objects — no identity beyond structural equality (except `SymbolNode.id` which is deterministic)
+- `SymbolKind` is a closed enum — adding a new kind requires a spec change
+- `RelationType` is a closed set — adding a new type requires a spec change
+- No dependency on `@specd/core` — this is a standalone package
+- `embedding` on `FileNode` is deferred to v2+ — adapters MUST NOT populate it until the embedding pipeline is implemented
+- `COVERS` relations are deferred to v2+ — the type exists in the model but is not populated by any v1.5/v2 process
+- `DEPENDS_ON` relations are populated by the indexer in v1.5, reading from `.specd-metadata.yaml` or `spec.md`
+
+## Examples
+
+```typescript
+// FileNode
+const file: FileNode = {
+  path: 'src/domain/entities/change.ts',
+  language: 'typescript',
+  contentHash: 'sha256:abc123...',
+  workspace: '/Users/dev/project',
+  embedding: undefined,
+}
+
+// SymbolNode
+const symbol: SymbolNode = {
+  id: 'src/domain/entities/change.ts:function:createChange:42',
+  name: 'createChange',
+  kind: SymbolKind.Function,
+  filePath: 'src/domain/entities/change.ts',
+  line: 42,
+  column: 0,
+}
+
+// SpecNode
+const spec: SpecNode = {
+  specId: 'core:core/change',
+  path: 'specs/core/change',
+  title: 'Change',
+  dependsOn: ['core:core/config', 'core:core/storage'],
+}
+
+// Relation
+const relation: Relation = {
+  source: 'src/commands/create.ts',
+  target: 'src/domain/entities/change.ts',
+  type: RelationType.IMPORTS,
+}
+
+// Spec dependency relation
+const specRelation: Relation = {
+  source: 'core:core/change',
+  target: 'core:core/config',
+  type: RelationType.DEPENDS_ON,
+}
+```
+
+## Spec Dependencies
+
+- [`specs/_global/conventions/spec.md`](../../_global/conventions/spec.md) — naming conventions, immutability patterns
