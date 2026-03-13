@@ -5,7 +5,8 @@
 
 ## Purpose
 
-<!-- One paragraph: what does this component/feature/system do and why does it exist? -->
+<!-- 2–4 sentences: start with WHY this spec exists (the problem or need),
+     then briefly describe WHAT it covers to give the reader context. -->
 
 ## Requirements
 
