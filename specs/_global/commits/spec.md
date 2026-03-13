@@ -1,8 +1,8 @@
 # Commit Conventions
 
-## Overview
+## Purpose
 
-specd uses Conventional Commits. Every commit message must be machine-parseable for changelog generation and release automation.
+Inconsistent commit messages make changelogs unreliable and automated releases impossible. specd uses Conventional Commits so that every message is machine-parseable for changelog generation and release automation. The format is enforced at commit time by commitlint.
 
 ## Requirements
 

@@ -1,8 +1,8 @@
 # Project Context
 
-## Overview
+## Purpose
 
-Defines the `specd project context` command, which compiles and prints the full project-level context: the `context:` entries from `specd.yaml` followed by the content of all specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns. This is the context block an agent would receive regardless of any specific change or lifecycle step.
+Agents need a way to retrieve the baseline project context -- instructions and specs that apply regardless of which change they are working on. The `specd project context` command compiles and prints the full project-level context: the `context:` entries from `specd.yaml` followed by all specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns.
 
 ## Requirements
 

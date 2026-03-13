@@ -1,8 +1,8 @@
 # Drafts Restore
 
-## Overview
+## Purpose
 
-Defines the `specd drafts restore <name>` command, which recovers a drafted change from `drafts/` back to `changes/`. This command replaces the former `specd change restore` command.
+When paused work is ready to resume, it needs to move back to the active list without losing any lifecycle state or history. `specd drafts restore <name>` recovers a drafted change from `drafts/` back to `changes/`, preserving its state exactly as it was when drafted.
 
 ## Requirements
 

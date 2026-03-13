@@ -1,8 +1,8 @@
 # ValidateArtifacts
 
-## Overview
+## Purpose
 
-`ValidateArtifacts` is the application use case that checks a change's artifact files against the active schema and marks them complete. It is the only path through which an artifact may reach `complete` status. It enforces required artifacts, validates structural rules, detects delta conflicts, and invalidates any outstanding approval when artifact content has changed since the approval was recorded.
+Artifacts must be structurally valid and conflict-free before a change can progress, yet no other code path is allowed to mark an artifact complete — a single chokepoint is needed to enforce this invariant. `ValidateArtifacts` is that chokepoint: it checks a change's artifact files against the active schema, enforces required artifacts, validates structural rules, detects delta conflicts, invalidates any outstanding approval when content has changed, and is the only path through which an artifact may reach `complete` status.
 
 ## Requirements
 

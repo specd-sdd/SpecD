@@ -1,8 +1,8 @@
 # Spec Write-Metadata
 
-## Overview
+## Purpose
 
-The `specd spec write-metadata` command writes a `.specd-metadata.yaml` file for a given spec. It accepts YAML content from stdin or a file and persists it through the `SaveSpecMetadata` use case, which delegates to `SpecRepository.save()` for conflict detection and atomic writes.
+Agents and scripts that produce metadata externally need a safe way to persist it without bypassing validation or conflict detection. The `specd spec write-metadata` command writes a `.specd-metadata.yaml` file for a given spec, accepting YAML content from stdin or a file and persisting it through the `SaveSpecMetadata` use case for conflict detection and atomic writes.
 
 ## Requirements
 

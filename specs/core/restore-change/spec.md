@@ -1,8 +1,8 @@
 # RestoreChange
 
-## Overview
+## Purpose
 
-The `RestoreChange` use case recovers a drafted change by appending a `restored` event to its history. The repository implementation moves the change directory from `drafts/` back to `changes/` when persisted.
+Drafted changes are only useful if they can be brought back into the active working set when the user is ready to resume. The `RestoreChange` use case recovers a drafted change by appending a `restored` event to its history, and the repository implementation moves the change directory from `drafts/` back to `changes/` when persisted.
 
 ## Requirements
 

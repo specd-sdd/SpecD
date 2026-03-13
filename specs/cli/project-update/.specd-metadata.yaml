@@ -1,11 +1,11 @@
 title: Project Update
-description: Defines the `specd project update` command, which updates a specd project after upgrading the `specd` package. In v1 it runs `specd skills update` for all agents declared in `specd.yaml`. The command is designed as a single entry point for project maintenance so that future update tasks (plugin sync, config migration, etc.) can be added here without changing the user's workflow.
+description: After upgrading specd, installed skill files and other project artifacts can fall out of sync with the new package version. The `specd project update` command provides a single entry point for post-upgrade maintenance; in v1 it runs `specd skills update` for all agents declared in `specd.yaml`, and is designed so future tasks (plugin sync, config migration, etc.) can be added without changing the user's workflow.
 dependsOn:
   - cli:cli/entrypoint
   - cli:cli/skills-update
   - core:core/config
 context:
-  - Defines the `specd project update` command, which updates a specd project after upgrading the `specd` package. In v1 it runs `specd skills update` for all agents declared in `specd.yaml`. The command is designed as a single entry point for project maintenance so that future update tasks (plugin sync, config migration, etc.) can be added here without changing the user's workflow.
+  - After upgrading specd, installed skill files and other project artifacts can fall out of sync with the new package version. The `specd project update` command provides a single entry point for post-upgrade maintenance; in v1 it runs `specd skills update` for all agents declared in `specd.yaml`, and is designed so future tasks (plugin sync, config migration, etc.) can be added without changing the user's workflow.
 rules:
   - requirement: Command signature
     rules:
@@ -103,6 +103,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:b850bc5d4400b96a1a7d0c819c1524fcdc4727403bf1393151fbed60f86f2241
+  spec.md: sha256:2fa732a04f5dd21f049a723d11c6051f23785deb92e0c205ccfb0d3e0f86b8e7
   verify.md: sha256:5eca73ac38e4e1eeb855d02b0ad671ee37d8a4a48e9b9891d781aa72a4d29f70
 generatedBy: core

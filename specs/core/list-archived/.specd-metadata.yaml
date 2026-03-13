@@ -1,12 +1,12 @@
 title: ListArchived
-description: '`ListArchived` is the application use case that retrieves all archived changes in the default workspace. It is a read-only query with no side effects, no input parameters, and no lifecycle hooks.'
+description: Teams need to browse the history of completed spec work — for audits, onboarding, or tracing when a particular spec was last modified. `ListArchived` retrieves all archived changes in the default workspace as a read-only query with no side effects, no input parameters, and no lifecycle hooks.
 dependsOn:
   - core:core/archive-change
   - core:core/storage
   - core:core/kernel
   - default:_global/architecture
 context:
-  - '`ListArchived` is the application use case that retrieves all archived changes in the default workspace. It is a read-only query with no side effects, no input parameters, and no lifecycle hooks.'
+  - Teams need to browse the history of completed spec work — for audits, onboarding, or tracing when a particular spec was last modified. `ListArchived` retrieves all archived changes in the default workspace as a read-only query with no side effects, no input parameters, and no lifecycle hooks.
 rules:
   - requirement: Ports and constructor
     rules:
@@ -75,6 +75,6 @@ scenarios:
       - each call returns the same result
       - AND no repository write methods are invoked
 contentHashes:
-  spec.md: sha256:aa629637855c8522450e4b1b11f872d257ebfa98be77f4b32ad8c6b9e572647c
+  spec.md: sha256:60f73d682d909a2bc57cd717d03331fe95a131041517421ebd21498a5c112775
   verify.md: sha256:e412860467e5540bc0c5576b4e0bea9646649b6b268757d59920752a632fda09
 generatedBy: core

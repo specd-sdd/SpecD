@@ -1,8 +1,8 @@
 # Content Extraction
 
-## Overview
+## Purpose
 
-The content extraction engine is a generic domain service that pulls structured data from artifact ASTs using declarative `Extractor` configurations. It is the foundation for deterministic metadata generation, and is designed to be reused by future features such as compliance gates, impact analysis, and status field extraction.
+Multiple features — metadata generation, compliance gates, impact analysis — need to pull structured data from artifact files, but hard-coding extraction logic per feature would be brittle and duplicative. The content extraction engine solves this with a generic domain service that extracts structured data from artifact ASTs using declarative `Extractor` configurations. It is the foundation for deterministic metadata generation and is designed to be reused by future features.
 
 ## Requirements
 

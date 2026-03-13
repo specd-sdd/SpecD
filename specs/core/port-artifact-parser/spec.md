@@ -1,8 +1,8 @@
 # ArtifactParser Port
 
-## Overview
+## Purpose
 
-`ArtifactParser` and `ArtifactParserRegistry` define the application-layer port for file-type-specific parsing, delta application, and serialization. Each supported file format (markdown, YAML, JSON, plaintext) has a corresponding infrastructure adapter implementing this port. The registry collects all adapters keyed by format name.
+Artifacts come in multiple file formats (markdown, YAML, JSON, plaintext), each with its own parsing, delta, and serialization semantics, so domain services need a uniform interface to operate on any format without importing concrete parsing libraries. `ArtifactParser` and `ArtifactParserRegistry` define this application-layer port — each supported format has a corresponding infrastructure adapter, and the registry collects all adapters keyed by format name.
 
 ## Requirements
 

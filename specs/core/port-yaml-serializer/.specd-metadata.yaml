@@ -1,9 +1,9 @@
 title: YamlSerializer Port
-description: '`YamlSerializer` is an application-layer port that defines the contract for YAML parsing and serialization. It keeps the application layer free from direct YAML library dependencies, following the architecture rule that parsing belongs at the infrastructure boundary.'
+description: YAML parsing and serialization are pervasive in specd (configs, manifests, schemas), but the architecture rule places parsing at the infrastructure boundary, so use cases must not import a YAML library directly. `YamlSerializer` is the application-layer port that defines the contract for YAML parsing and serialization, keeping consumers decoupled from any specific library.
 dependsOn:
   - default:_global/architecture
 context:
-  - '`YamlSerializer` is an application-layer port that defines the contract for YAML parsing and serialization. It keeps the application layer free from direct YAML library dependencies, following the architecture rule that parsing belongs at the infrastructure boundary.'
+  - YAML parsing and serialization are pervasive in specd (configs, manifests, schemas), but the architecture rule places parsing at the infrastructure boundary, so use cases must not import a YAML library directly. `YamlSerializer` is the application-layer port that defines the contract for YAML parsing and serialization, keeping consumers decoupled from any specific library.
 rules:
   - requirement: Abstract class shape
     rules:
@@ -117,6 +117,6 @@ scenarios:
     then:
       - the return value is identical each time
 contentHashes:
-  spec.md: sha256:7aa360b772c8230c7ce1db4a9c0c7fe17d2483e36bfa50173a760529055619d4
+  spec.md: sha256:1bfb23ee62845bac0df20dbba58267d6cad8f180f4fecd2a453dfc622ff76784
   verify.md: sha256:369c0fae41c14cde9cb5f59ec14f4633c0f0d57e40bd7e8613c1dc6892075f8c
 generatedBy: core

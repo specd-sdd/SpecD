@@ -1,12 +1,12 @@
 title: ArtifactParser Port
-description: '`ArtifactParser` and `ArtifactParserRegistry` define the application-layer port for file-type-specific parsing, delta application, and serialization. Each supported file format (markdown, YAML, JSON, plaintext) has a corresponding infrastructure adapter implementing this port. The registry collects all adapters keyed by format name.'
+description: Artifacts come in multiple file formats (markdown, YAML, JSON, plaintext), each with its own parsing, delta, and serialization semantics, so domain services need a uniform interface to operate on any format without importing concrete parsing libraries. `ArtifactParser` and `ArtifactParserRegistry` define this application-layer port — each supported format has a corresponding infrastructure adapter, and the registry collects all adapters keyed by format name.
 dependsOn:
   - default:_global/architecture
   - core:core/artifact-ast
   - core:core/delta-format
   - core:core/selector-model
 context:
-  - '`ArtifactParser` and `ArtifactParserRegistry` define the application-layer port for file-type-specific parsing, delta application, and serialization. Each supported file format (markdown, YAML, JSON, plaintext) has a corresponding infrastructure adapter implementing this port. The registry collects all adapters keyed by format name.'
+  - Artifacts come in multiple file formats (markdown, YAML, JSON, plaintext), each with its own parsing, delta, and serialization semantics, so domain services need a uniform interface to operate on any format without importing concrete parsing libraries. `ArtifactParser` and `ArtifactParserRegistry` define this application-layer port — each supported format has a corresponding infrastructure adapter, and the registry collects all adapters keyed by format name.
 rules:
   - requirement: ArtifactParser interface shape
     rules:
@@ -183,6 +183,6 @@ scenarios:
     then:
       - it has ordered set to true
 contentHashes:
-  spec.md: sha256:207bf0f4b4fe487330b55e35bf2c088baf141937b40d57a3a2a485db69d1995c
+  spec.md: sha256:0aa5a207a59cbe4242d2b3fec8e8fdb45ebfee668b711071a0265bb569b05dfa
   verify.md: sha256:34b0b1eb61ec808a622483e5baac27f2631543e0039174475181c8990ddef5b5
 generatedBy: core

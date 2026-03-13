@@ -1,11 +1,11 @@
 title: change deps
-description: "`specd change deps <name> <specId>` manages the declared `dependsOn` dependencies for a single spec within an active change. Dependencies are stored in the change manifest's `specDependsOn` field and used by `CompileContext` as the highest-priority source for `dependsOn` resolution."
+description: When a spec depends on other specs for context, those relationships need to be declared so that `CompileContext` can include them automatically. `specd change deps <name> <specId>` manages the `dependsOn` dependencies for a single spec within an active change, stored in the change manifest's `specDependsOn` field and used as the highest-priority source for `dependsOn` resolution.
 dependsOn:
   - core:core/change
   - core:core/change-manifest
   - core:core/compile-context
 context:
-  - "`specd change deps <name> <specId>` manages the declared `dependsOn` dependencies for a single spec within an active change. Dependencies are stored in the change manifest's `specDependsOn` field and used by `CompileContext` as the highest-priority source for `dependsOn` resolution."
+  - When a spec depends on other specs for context, those relationships need to be declared so that `CompileContext` can include them automatically. `specd change deps <name> <specId>` manages the `dependsOn` dependencies for a single spec within an active change, stored in the change manifest's `specDependsOn` field and used as the highest-priority source for `dependsOn` resolution.
 rules:
   - requirement: Command signature
     rules:
@@ -146,6 +146,6 @@ scenarios:
       - the command exits with code 1
       - AND stderr indicates the dep was not found
 contentHashes:
-  spec.md: sha256:2d8039c72f6569d4d3560d550c9daa437bcf5f76a2b3ca054d91f0e1e7e82e23
+  spec.md: sha256:1a365d2bbe35cbdf71c261df58a13ff3812f2ac15fa390694bc4e82c18595eea
   verify.md: sha256:55c01a890fe4b920e7d5b002c5ed72a6220a428bfaa8d62a529dbeaa51190088
 generatedBy: core

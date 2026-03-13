@@ -1,8 +1,8 @@
 # ArchiveChange
 
-## Overview
+## Purpose
 
-`ArchiveChange` is the application use case that finalises a completed change: merges its delta artifacts into the project specs, moves the change directory to the archive, and fires lifecycle hooks before and after. It is gated on `archivable` state — the change must have completed the full lifecycle before it can be archived.
+Once a change has completed its full lifecycle, its spec modifications need to be applied to the project and the change itself preserved for posterity — but this finalization involves delta merging, hook execution, and metadata generation that must happen atomically and in the right order. `ArchiveChange` is the use case that merges delta artifacts into project specs, moves the change directory to the archive, and fires lifecycle hooks before and after. It is gated on `archivable` state.
 
 ## Requirements
 

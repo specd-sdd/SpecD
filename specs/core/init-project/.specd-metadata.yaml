@@ -1,10 +1,10 @@
 title: InitProject
-description: The `InitProject` use case initialises a new specd project by delegating to the `ConfigWriter` port. It writes `specd.yaml`, creates required storage directories, and updates `.gitignore`. It is the entry point for `specd init` and the only use case that creates a project configuration from scratch.
+description: Before a project can use specd, it needs a valid `specd.yaml`, storage directories, and gitignore entries — bootstrapping that must happen through a single coordinated operation. `InitProject` is the use case that handles this by delegating to the `ConfigWriter` port to write `specd.yaml`, create required storage directories, and update `.gitignore`. It is the entry point for `specd init` and the only use case that creates a project configuration from scratch.
 dependsOn:
   - core:core/config
   - default:_global/architecture
 context:
-  - The `InitProject` use case initialises a new specd project by delegating to the `ConfigWriter` port. It writes `specd.yaml`, creates required storage directories, and updates `.gitignore`. It is the entry point for `specd init` and the only use case that creates a project configuration from scratch.
+  - Before a project can use specd, it needs a valid `specd.yaml`, storage directories, and gitignore entries — bootstrapping that must happen through a single coordinated operation. `InitProject` is the use case that handles this by delegating to the `ConfigWriter` port to write `specd.yaml`, create required storage directories, and update `.gitignore`. It is the entry point for `specd init` and the only use case that creates a project configuration from scratch.
 rules:
   - requirement: Accepts InitProjectOptions as input
     rules:
@@ -95,6 +95,6 @@ scenarios:
       - specd.local.yaml is listed in the project's .gitignore
       - AND a .gitignore inside the archive directory excludes .specd-index.jsonl
 contentHashes:
-  spec.md: sha256:321d7b0331010aecec66c9ef2c8e041b1a37f88d924a398d369f6c7b6d3b5841
+  spec.md: sha256:5c5a9418c075eac4661db20f02dfeb386964049a6c5ca1dde45f01a0c10bceb5
   verify.md: sha256:d9597a9d6fbb5ee9c7162e60d978c85ed9c1e213a61f1c859cc1cd5003c05248
 generatedBy: core

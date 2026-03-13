@@ -1,8 +1,8 @@
 # Project Update
 
-## Overview
+## Purpose
 
-Defines the `specd project update` command, which updates a specd project after upgrading the `specd` package. In v1 it runs `specd skills update` for all agents declared in `specd.yaml`. The command is designed as a single entry point for project maintenance so that future update tasks (plugin sync, config migration, etc.) can be added here without changing the user's workflow.
+After upgrading specd, installed skill files and other project artifacts can fall out of sync with the new package version. The `specd project update` command provides a single entry point for post-upgrade maintenance; in v1 it runs `specd skills update` for all agents declared in `specd.yaml`, and is designed so future tasks (plugin sync, config migration, etc.) can be added without changing the user's workflow.
 
 ## Requirements
 

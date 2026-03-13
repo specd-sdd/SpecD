@@ -1,8 +1,8 @@
 # Skills Install
 
-## Overview
+## Purpose
 
-Defines the `specd skills install <name|all>` command. The CLI reads skill content from `@specd/skills`, resolves the agent-specific target path, and writes the skill file to disk. It then calls `RecordSkillInstall` in `@specd/core` to persist the installation in the project manifest. Core never touches skill files; the CLI never touches `specd.yaml`.
+Manually copying skill files into agent command directories is tedious and easy to get wrong. The `specd skills install <name|all>` command reads skill content from `@specd/skills`, writes it to the agent-specific target path, and calls `RecordSkillInstall` in `@specd/core` to persist the installation in the project manifest.
 
 ## Requirements
 

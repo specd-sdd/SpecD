@@ -1,9 +1,9 @@
 title: Spec Context
-description: Defines the `specd spec context <workspace:capability-path>` command, which prints the metadata summary for a single spec as it would appear in an AI context block, with optional section filtering and dependency traversal.
+description: Agents need structured spec content they can consume directly as context, without parsing raw Markdown themselves. The `specd spec context <workspace:capability-path>` command prints the metadata summary for a single spec as it would appear in an AI context block, with optional section filtering and dependency traversal.
 dependsOn:
   - cli:cli/entrypoint
 context:
-  - Defines the `specd spec context <workspace:capability-path>` command, which prints the metadata summary for a single spec as it would appear in an AI context block, with optional section filtering and dependency traversal.
+  - Agents need structured spec content they can consume directly as context, without parsing raw Markdown themselves. The `specd spec context <workspace:capability-path>` command prints the metadata summary for a single spec as it would appear in an AI context block, with optional section filtering and dependency traversal.
 rules:
   - requirement: Command signature
     rules:
@@ -203,6 +203,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:9ddef932866c4a8c43283c546a6d5d5247ecb52f87fadbeedad13474b2b55159
+  spec.md: sha256:384bed82e06e189a5f00304d86bd4d8294a4a8714f2ca6ab101cc2e117b267cb
   verify.md: sha256:8f6ac25d68ee48399d8d01a03aa8b112453cf72378c50b075beb0b8337b70277
 generatedBy: core

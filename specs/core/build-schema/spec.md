@@ -1,8 +1,8 @@
 # Build Schema
 
-## Overview
+## Purpose
 
-`buildSchema` is a pure domain service that constructs a `Schema` entity from validated intermediate data and pre-loaded template contents. It is the boundary between infrastructure-level parsing/validation (Zod schemas, YAML parsing, file I/O) and the domain model. All I/O — template loading, file reading, YAML parsing — happens before this function is called; the adapter is responsible for providing fully resolved inputs.
+The domain model must not depend on infrastructure concerns like YAML parsing, Zod schemas, or filesystem I/O, yet a `Schema` entity still needs to be constructed from parsed data with full semantic validation. `buildSchema` is a pure domain service that sits at this boundary: it receives validated intermediate data and pre-loaded template contents, performs semantic checks (ID uniqueness, dependency cycles, template references), and constructs the `Schema` entity. All I/O happens before this function is called; the adapter provides fully resolved inputs.
 
 ## Requirements
 

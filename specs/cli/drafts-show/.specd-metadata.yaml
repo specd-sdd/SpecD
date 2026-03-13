@@ -1,10 +1,10 @@
 title: Drafts Show
-description: Defines the `specd drafts show <name>` command, which displays basic metadata for a single drafted change.
+description: Before restoring a drafted change, users need to inspect its metadata to confirm it is the right one. `specd drafts show <name>` displays basic metadata — name, state, specs, and schema — for a single change in `drafts/`.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd drafts show <name>` command, which displays basic metadata for a single drafted change.
+  - Before restoring a drafted change, users need to inspect its metadata to confirm it is the right one. `specd drafts show <name>` displays basic metadata — name, state, specs, and schema — for a single change in `drafts/`.
 rules:
   - requirement: Command signature
     rules:
@@ -88,6 +88,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:e19d44267f1dba4fe8506b68dda113393559f877624624196b8ab55483a9c824
+  spec.md: sha256:744c378c5cfb9aee8d8edf4590f46fd2cfae5123b07f3b3c4a47a6e4c42f0756
   verify.md: sha256:fd7702fd207eddc9f47332118ee16c01ed286d43028bebe5e2842ea444ab36f0
 generatedBy: core

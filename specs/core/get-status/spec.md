@@ -1,8 +1,8 @@
 # GetStatus
 
-## Overview
+## Purpose
 
-The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each attached artifact. Artifact statuses are computed by cascading through dependency chains -- an artifact whose hashes match may still be `in-progress` if any of its required dependencies are not `complete`.
+Users and tooling need a quick way to see where a change stands — both its lifecycle state and which artifacts are actually ready — without loading file content. The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each artifact, cascading through dependency chains so that an artifact whose hashes match may still show `in-progress` if any of its required dependencies are not `complete`.
 
 ## Requirements
 

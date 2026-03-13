@@ -1,8 +1,8 @@
 # Spec ID Format
 
-## Overview
+## Purpose
 
-A **spec ID** is the canonical string that identifies a spec within a specd project. Every spec belongs to exactly one workspace and has a capability path within that workspace. This spec defines the canonical format, parsing rules, and storage conventions for spec IDs to eliminate ambiguity between workspace prefixes and capability path segments.
+Without a single canonical format for referencing specs, workspace prefixes and capability path segments become ambiguous — different subsystems would parse the same string differently. This spec defines the canonical spec ID format, parsing rules, and storage conventions, ensuring every spec is identified unambiguously as a `workspace:capabilityPath` string across all of specd.
 
 ## Requirements
 

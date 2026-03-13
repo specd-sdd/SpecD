@@ -1,8 +1,8 @@
 # ApproveSignoff
 
-## Overview
+## Purpose
 
-The `ApproveSignoff` use case records a signoff on a change and transitions it to the `signed-off` state. It enforces that the signoff gate is enabled, computes artifact hashes using schema-defined pre-hash cleanup rules, and persists the updated change. This is the only path through the signoff gate in the change lifecycle.
+After implementation, a final human signoff is needed to confirm the change is ready for archival, with artifact hashes captured to detect any post-signoff modifications. The `ApproveSignoff` use case records a signoff on a change and transitions it to the `signed-off` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the signoff gate in the change lifecycle.
 
 ## Requirements
 

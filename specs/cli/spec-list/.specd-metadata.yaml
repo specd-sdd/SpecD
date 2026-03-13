@@ -1,9 +1,9 @@
 title: Spec List
-description: Defines the `specd spec list` command, which lists all specs in all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.
+description: Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. The `specd spec list` command lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.
 dependsOn:
   - cli:cli/entrypoint
 context:
-  - Defines the `specd spec list` command, which lists all specs in all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.
+  - Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. The `specd spec list` command lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.
 rules:
   - requirement: Command signature
     rules:
@@ -318,6 +318,6 @@ scenarios:
       - stdout contains no workspaces configured
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:ea858081eb1d3bf32bf7ade1aad9ca7ce88be1b50bcdd69c907709985ba375cc
+  spec.md: sha256:3f7d681c1cc79dfa8076a1bbcf6318b65a3759d661a6655367751cb9ab918b34
   verify.md: sha256:071f71184904847d961fc3afd3e760d619cddc15ff0201634ea24c38dfb84967
 generatedBy: core

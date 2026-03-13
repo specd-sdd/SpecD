@@ -1,8 +1,8 @@
 # Actor Resolver Port
 
-## Overview
+## Purpose
 
-`ActorResolver` is an application-layer port interface that resolves the identity of the current actor performing an operation. Use cases that record change history events depend on this port to obtain the actor's name and email without coupling to a specific identity provider (git config, SSO, environment variables, etc.).
+Change history events must record who performed an operation, but the identity source varies across environments (git config, SSO, environment variables), so use cases cannot depend on any single provider. `ActorResolver` is the application-layer port interface that resolves the current actor's name and email, letting identity providers be swapped without affecting consumers.
 
 ## Requirements
 

@@ -1,12 +1,12 @@
 title: ApproveSpec
-description: The `ApproveSpec` use case records a spec approval on a change and transitions it to the `spec-approved` state. It enforces that the spec approval gate is enabled, computes artifact hashes using schema-defined pre-hash cleanup rules, and persists the updated change. This is the only path through the spec approval gate in the change lifecycle.
+description: Changes need a controlled gate where a human confirms the spec is correct before implementation proceeds, and artifact hashes must be captured at that moment to detect later tampering. The `ApproveSpec` use case records a spec approval on a change and transitions it to the `spec-approved` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the spec approval gate in the change lifecycle.
 dependsOn:
   - core:core/change
   - core:core/schema-format
   - core:core/composition
   - core:core/kernel
 context:
-  - The `ApproveSpec` use case records a spec approval on a change and transitions it to the `spec-approved` state. It enforces that the spec approval gate is enabled, computes artifact hashes using schema-defined pre-hash cleanup rules, and persists the updated change. This is the only path through the spec approval gate in the change lifecycle.
+  - Changes need a controlled gate where a human confirms the spec is correct before implementation proceeds, and artifact hashes must be captured at that moment to detect later tampering. The `ApproveSpec` use case records a spec approval on a change and transitions it to the `spec-approved` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the spec approval gate in the change lifecycle.
 rules:
   - requirement: Gate guard
     rules:
@@ -129,6 +129,6 @@ scenarios:
       - name, reason, and approvalsSpec are all required
       - AND all fields are readonly
 contentHashes:
-  spec.md: sha256:01225d40680b28be93eb8f578b7570bc385a51421293748007c5470324c80809
+  spec.md: sha256:4410ff617bcc5e4f89288735901706dab1b811455e101642df9f68ee41e1575b
   verify.md: sha256:ace3cf15e0831ccb82a0fe1838f9c1ae9493fc2cca9b98644b07c0aedb109769
 generatedBy: core

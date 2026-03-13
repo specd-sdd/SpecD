@@ -1,11 +1,11 @@
 title: Get Spec
-description: The `GetSpec` use case loads a single spec and all of its artifact files by workspace name and spec path. It is the primary query for reading a complete spec with its content, used by delivery mechanisms that need to display or process spec artifacts.
+description: Delivery mechanisms need to display or process a complete spec with all its artifacts, but loading and assembling those pieces requires coordinating workspace lookup, spec resolution, and multi-file artifact loading. The `GetSpec` use case handles this by loading a single spec and all of its artifact files by workspace name and spec path, serving as the primary query for reading a complete spec.
 dependsOn:
   - core:core/storage
   - core:core/workspace
   - core:core/spec-id-format
 context:
-  - The `GetSpec` use case loads a single spec and all of its artifact files by workspace name and spec path. It is the primary query for reading a complete spec with its content, used by delivery mechanisms that need to display or process spec artifacts.
+  - Delivery mechanisms need to display or process a complete spec with all its artifacts, but loading and assembling those pieces requires coordinating workspace lookup, spec resolution, and multi-file artifact loading. The `GetSpec` use case handles this by loading a single spec and all of its artifact files by workspace name and spec path, serving as the primary query for reading a complete spec.
 rules:
   - requirement: Resolve workspace from input
     rules:
@@ -76,6 +76,6 @@ scenarios:
       - the result contains the Spec entity at result.spec
       - AND the result contains a Map at result.artifacts keyed by filename
 contentHashes:
-  spec.md: sha256:cc4b6c44ab1d4299db7c68b7964642d8f7accb8c8ff6e6996bf60385a44537a0
+  spec.md: sha256:3bf9173e01fd28e9a4b3e45bb95905904cd5342f60f9ec813f74b3e4efc2fba2
   verify.md: sha256:d08df2b0cca89147ab83a9588b0102e91f5a959734ac69a9e55998ad1d60c597
 generatedBy: core

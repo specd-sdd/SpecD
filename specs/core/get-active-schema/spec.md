@@ -1,8 +1,8 @@
 # GetActiveSchema
 
-## Overview
+## Purpose
 
-The `GetActiveSchema` use case resolves and returns the active schema for the project. It delegates to `ResolveSchema` which orchestrates the full resolution pipeline (base schema → extends chain → plugins → overrides → merge → build). This is the canonical way for delivery mechanisms to obtain the project's schema without duplicating resolution logic.
+Delivery mechanisms (CLI, MCP, plugins) need a single canonical way to obtain the project's resolved schema without duplicating multi-step resolution logic. `GetActiveSchema` provides this by delegating to `ResolveSchema`, which orchestrates the full pipeline (base schema, extends chain, plugins, overrides, merge, build), and returning the resulting `Schema` entity.
 
 ## Requirements
 

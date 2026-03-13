@@ -1,8 +1,8 @@
 # UpdateSpecDeps
 
-## Overview
+## Purpose
 
-The `UpdateSpecDeps` use case updates the declared `dependsOn` dependencies for a single spec within a change. Dependencies are stored in `change.specDependsOn` and used by `CompileContext` as the highest-priority source for `dependsOn` resolution. The use case supports three mutually exclusive operations: add, remove, and set (replace all).
+Spec dependencies must be captured during authoring — before metadata files exist — so that `CompileContext` can resolve the full dependency graph from the start. The `UpdateSpecDeps` use case updates the declared `dependsOn` dependencies for a single spec within a change, storing them in `change.specDependsOn` as the highest-priority source for resolution. It supports three mutually exclusive operations: add, remove, and set (replace all).
 
 ## Requirements
 

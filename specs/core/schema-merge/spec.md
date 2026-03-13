@@ -1,8 +1,8 @@
 # Schema Merge
 
-## Overview
+## Purpose
 
-`mergeSchemaLayers` is a pure domain service that applies customisation layers to a base schema's intermediate representation (`SchemaYamlData`). It is the engine behind `extends`, `schemaPlugins`, and `schemaOverrides` — all three mechanisms are reduced to an ordered list of layers, each containing a subset of the five merge operations. The function produces a new `SchemaYamlData` that can be passed to `buildSchema` for domain object construction.
+Schemas need to be customisable through inheritance, plugins, and project-level overrides without mutating the original definitions. `mergeSchemaLayers` is a pure domain service that applies customisation layers to a base schema's intermediate representation (`SchemaYamlData`), serving as the engine behind `extends`, `schemaPlugins`, and `schemaOverrides`. All three mechanisms are reduced to an ordered list of layers, each containing a subset of five merge operations, and the function produces a new `SchemaYamlData` ready for `buildSchema`.
 
 ## Requirements
 

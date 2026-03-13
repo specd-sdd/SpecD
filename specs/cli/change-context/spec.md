@@ -1,8 +1,8 @@
 # Change Context
 
-## Overview
+## Purpose
 
-Defines the `specd change context <name> <step> [--artifact <id>]` command, which compiles and prints the full instruction block an AI agent receives when entering a lifecycle step for a named change.
+AI agents need a single command to retrieve all relevant instructions — schema rules, spec content, delta context, and step hooks — so they can operate on a change without manual assembly. `specd change context <name> <step> [--artifact <id>]` compiles and prints the full instruction block an agent receives when entering a lifecycle step for a named change.
 
 ## Requirements
 

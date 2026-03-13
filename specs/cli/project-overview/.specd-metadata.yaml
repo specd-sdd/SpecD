@@ -1,10 +1,10 @@
 title: Project Overview
-description: Defines the `specd project overview` command, which displays a visual dashboard summarising the current state of a SpecD project. In text mode the dashboard renders an ASCII box layout showing project metadata, spec counts per workspace, and change counts by state. In `json` or `toon` mode it outputs a structured data object with the same information.
+description: Users joining a project or returning after time away need a quick snapshot of what exists and what is in flight. The `specd project overview` command displays a visual dashboard summarising the current state of a SpecD project -- project metadata, spec counts per workspace, and change counts by state -- as an ASCII box layout in text mode or a structured data object in `json`/`toon` mode.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/config
 context:
-  - Defines the `specd project overview` command, which displays a visual dashboard summarising the current state of a SpecD project. In text mode the dashboard renders an ASCII box layout showing project metadata, spec counts per workspace, and change counts by state. In `json` or `toon` mode it outputs a structured data object with the same information.
+  - Users joining a project or returning after time away need a quick snapshot of what exists and what is in flight. The `specd project overview` command displays a visual dashboard summarising the current state of a SpecD project -- project metadata, spec counts per workspace, and change counts by state -- as an ASCII box layout in text mode or a structured data object in `json`/`toon` mode.
 rules:
   - requirement: Command signature
     rules:
@@ -157,6 +157,6 @@ scenarios:
       - the process exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:3d9433766cb1cbff14e357811f26b624dabab1a2087dadf76853e5a0602324b0
+  spec.md: sha256:3d65ca6b22861758d8ab35ad0ce77c69f61bc00b6f27dc69c10820dad8195b4f
   verify.md: sha256:5203a234c44f306ddfbe7c3c6520ca82208f312c39f898513e26a416f54ef4cf
 generatedBy: core

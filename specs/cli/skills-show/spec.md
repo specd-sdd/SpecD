@@ -1,8 +1,8 @@
 # Skills Show
 
-## Overview
+## Purpose
 
-Defines the `specd skills show <name>` command, which prints the full content of a named skill bundled in `@specd/skills`.
+Before installing a skill, users may want to review its full content to understand what it does. The `specd skills show <name>` command prints the full markdown content of a named skill bundled in `@specd/skills`.
 
 ## Requirements
 

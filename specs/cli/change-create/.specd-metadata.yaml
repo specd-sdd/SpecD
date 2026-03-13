@@ -1,11 +1,11 @@
 title: Change Create
-description: Defines the `specd change create <name> --spec <id>...` command, which creates a new change and persists it to the repository.
+description: Users need a way to start tracking a new unit of spec work before any artifacts exist. `specd change create <name> [--spec <id>...]` creates a new change and persists it to the repository, optionally scoping it to one or more specs upfront.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
   - core:core/spec-id-format
 context:
-  - Defines the `specd change create <name> --spec <id>...` command, which creates a new change and persists it to the repository.
+  - Users need a way to start tracking a new unit of spec work before any artifacts exist. `specd change create <name> [--spec <id>...]` creates a new change and persists it to the repository, optionally scoping it to one or more specs upfront.
 rules:
   - requirement: Command signature
     rules:
@@ -102,6 +102,6 @@ scenarios:
       - AND name is "add-login"
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:591f221b6302d368fd5adeb7465c360961f0c944501c92100688b22fca6fd998
+  spec.md: sha256:613809cfa79f05cc850d6e03b0b5aa7ffaa4f9f6acc389c2ea31eabbbc1feff3
   verify.md: sha256:d9f0bf5ac247d4f81ba40cf6bdfa4f95771c4fedb4698a857722138458627eec
 generatedBy: core

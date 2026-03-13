@@ -1,5 +1,5 @@
 title: GetProjectContext
-description: The `GetProjectContext` use case compiles the project-level context block without requiring a specific change or lifecycle step. It performs steps 1-4 of the context compilation pipeline (project `context:` entries, project-level include/exclude patterns) with all configured workspaces treated as active. This is the change-independent counterpart to `CompileContext`, suitable for project-wide tooling queries.
+description: "Tooling sometimes needs the project's compiled spec context without an active change — for example, when generating agent instructions or answering project-wide queries. `GetProjectContext` provides this by compiling the project-level context block (steps 1-4 of the compilation pipeline: `context:` entries, project-level include/exclude patterns) with all configured workspaces treated as active. It is the change-independent counterpart to `CompileContext`."
 dependsOn:
   - core:core/config
   - core:core/compile-context
@@ -7,7 +7,7 @@ dependsOn:
   - core:core/schema-format
   - default:_global/architecture
 context:
-  - The `GetProjectContext` use case compiles the project-level context block without requiring a specific change or lifecycle step. It performs steps 1-4 of the context compilation pipeline (project `context:` entries, project-level include/exclude patterns) with all configured workspaces treated as active. This is the change-independent counterpart to `CompileContext`, suitable for project-wide tooling queries.
+  - "Tooling sometimes needs the project's compiled spec context without an active change — for example, when generating agent instructions or answering project-wide queries. `GetProjectContext` provides this by compiling the project-level context block (steps 1-4 of the compilation pipeline: `context:` entries, project-level include/exclude patterns) with all configured workspaces treated as active. It is the change-independent counterpart to `CompileContext`."
 rules:
   - requirement: Accepts GetProjectContextInput as input
     rules:
@@ -238,6 +238,6 @@ scenarios:
     then:
       - the spec's content contains only the spec heading with no body
 contentHashes:
-  spec.md: sha256:e2739d319d403fd35d58be0c8af1a97e3943725abcee8c3e62a3cf07ac5d61dd
+  spec.md: sha256:4f98101e63088c88e552322db24d91e5c910537a62aab6198d52554274266efc
   verify.md: sha256:1c3f3bda7fd2341d9f6a7d008d96b6266a3cfaf3a9dddc9234c35f9ddf5ed9bf
 generatedBy: core

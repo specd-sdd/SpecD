@@ -1,10 +1,10 @@
 title: DraftChange
-description: The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history. The repository implementation moves the change directory from `changes/` to `drafts/` when persisted.
+description: Users need to pause work on a change without losing its state or history — for example, to context-switch or wait on a dependency. The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history, and the repository implementation moves the change directory from `changes/` to `drafts/` when persisted.
 dependsOn:
   - core:core/change
   - default:_global/architecture
 context:
-  - The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history. The repository implementation moves the change directory from `changes/` to `drafts/` when persisted.
+  - Users need to pause work on a change without losing its state or history — for example, to context-switch or wait on a dependency. The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history, and the repository implementation moves the change directory from `changes/` to `drafts/` when persisted.
 rules:
   - requirement: Input contract
     rules:
@@ -80,6 +80,6 @@ scenarios:
     then:
       - ChangeRepository.save was called with the updated Change instance
 contentHashes:
-  spec.md: sha256:12768e3336771c8d8d4a58a3372d092cda20ddabc38cc7a8aba9039e16bbae1e
+  spec.md: sha256:73a5e6930ee44e0b7089f7c6dcb42d2400693494ebad0a4b12822449db3b2f7f
   verify.md: sha256:8cd6751e58d1e2961758223307496eb2b9a487673186800f856edd73cff68c45
 generatedBy: core

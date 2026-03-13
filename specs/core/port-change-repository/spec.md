@@ -1,8 +1,8 @@
 # ChangeRepository Port
 
-## Overview
+## Purpose
 
-`ChangeRepository` is the application-layer port for reading and writing changes. It extends the shared `Repository` base class for interface consistency but operates globally — changes are stored in a single `changes/` directory, not per-workspace. This spec defines the contract that all implementations must satisfy.
+Without an abstraction over change storage, use cases would couple directly to filesystem layout and I/O, making them untestable and locked to a single storage strategy. `ChangeRepository` is the application-layer port for reading and writing changes, extending the shared `Repository` base class for interface consistency while operating globally — changes live in a single `changes/` directory, not per-workspace. This spec defines the contract that all implementations must satisfy.
 
 ## Requirements
 

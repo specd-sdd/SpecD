@@ -1,8 +1,8 @@
 # VCS Adapter Factory
 
-## Overview
+## Purpose
 
-`createVcsAdapter` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `VcsAdapter` implementation. It is the single entry point for obtaining a `VcsAdapter` — callers never construct concrete adapters directly.
+specd must work across git, hg, and svn repositories (and outside VCS entirely) without callers knowing which system is active. `createVcsAdapter` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `VcsAdapter` implementation, serving as the single entry point so that callers never construct concrete adapters directly.
 
 ## Requirements
 

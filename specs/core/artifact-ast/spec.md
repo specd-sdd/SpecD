@@ -1,8 +1,8 @@
 # Artifact AST
 
-## Overview
+## Purpose
 
-Every `ArtifactParser` adapter must produce and consume a normalized AST format — a plain JSON-serializable tree of nodes. This format is the contract between parsers, the delta application engine, the selector model, and validation rules. Adapter internals (which parsing library is used, how the native AST is built) are not specified here.
+Parsers, the delta engine, selectors, and validation rules all operate on artifact content, and without a shared tree format each would depend on parser internals, making them tightly coupled to specific file types. The normalized AST solves this by defining a plain JSON-serializable tree of nodes that every `ArtifactParser` adapter must produce and consume. This format is the contract between all these components; adapter internals (which parsing library is used, how the native AST is built) are not specified here.
 
 ## Requirements
 

@@ -1,5 +1,5 @@
 title: SpecRepository Port
-description: '`SpecRepository` is the application-layer port for reading and writing specs within a single workspace. It extends the shared `Repository` base class — `workspace()`, `ownership()`, and `isExternal()` are set at construction time and are immutable. Use cases that need multiple workspaces receive a separate `SpecRepository` instance per workspace. This spec defines the contract that all implementations must satisfy.'
+description: Use cases need to read and write specs without knowing how or where they are stored on disk, so a port boundary is essential for testability and storage-strategy independence. `SpecRepository` is the application-layer port for reading and writing specs within a single workspace, extending the shared `Repository` base class with immutable `workspace()`, `ownership()`, and `isExternal()` accessors set at construction time. Use cases that need multiple workspaces receive a separate `SpecRepository` instance per workspace.
 dependsOn:
   - default:_global/architecture
   - core:core/change
@@ -7,7 +7,7 @@ dependsOn:
   - core:core/workspace
   - core:core/spec-id-format
 context:
-  - '`SpecRepository` is the application-layer port for reading and writing specs within a single workspace. It extends the shared `Repository` base class — `workspace()`, `ownership()`, and `isExternal()` are set at construction time and are immutable. Use cases that need multiple workspaces receive a separate `SpecRepository` instance per workspace. This spec defines the contract that all implementations must satisfy.'
+  - Use cases need to read and write specs without knowing how or where they are stored on disk, so a port boundary is essential for testability and storage-strategy independence. `SpecRepository` is the application-layer port for reading and writing specs within a single workspace, extending the shared `Repository` base class with immutable `workspace()`, `ownership()`, and `isExternal()` accessors set at construction time. Use cases that need multiple workspaces receive a separate `SpecRepository` instance per workspace.
 rules:
   - requirement: Inheritance from Repository base
     rules:
@@ -171,6 +171,6 @@ scenarios:
     then:
       - null is returned
 contentHashes:
-  spec.md: sha256:622b0d09b135043b7d17df1278e3ee69e5ce203fc66598743a3202e11f92e068
+  spec.md: sha256:fa5c60ae41367fc4057c8bd0840c02d0a0cf15f2a3057ddbab90368573b6093c
   verify.md: sha256:34f0a78d9f68ab75cc66d679bc518e35452dd85283684073e4eb49b927cb16a2
 generatedBy: core

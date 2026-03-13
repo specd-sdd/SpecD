@@ -1,8 +1,8 @@
 # Config Show
 
-## Overview
+## Purpose
 
-Defines the `specd config show` command, which prints the fully-resolved project configuration as loaded from `specd.yaml`. Useful for debugging config discovery, verifying paths, and inspecting approval gate settings.
+When config discovery or path resolution behaves unexpectedly, users need to see exactly what specd resolved. The `specd config show` command prints the fully-resolved project configuration as loaded from `specd.yaml`, including absolute paths, workspace mappings, and approval gate settings.
 
 ## Requirements
 

@@ -1,10 +1,10 @@
 title: Actor Resolver Port
-description: "`ActorResolver` is an application-layer port interface that resolves the identity of the current actor performing an operation. Use cases that record change history events depend on this port to obtain the actor's name and email without coupling to a specific identity provider (git config, SSO, environment variables, etc.)."
+description: Change history events must record who performed an operation, but the identity source varies across environments (git config, SSO, environment variables), so use cases cannot depend on any single provider. `ActorResolver` is the application-layer port interface that resolves the current actor's name and email, letting identity providers be swapped without affecting consumers.
 dependsOn:
   - default:_global/architecture
   - core:core/actor-resolver
 context:
-  - "`ActorResolver` is an application-layer port interface that resolves the identity of the current actor performing an operation. Use cases that record change history events depend on this port to obtain the actor's name and email without coupling to a specific identity provider (git config, SSO, environment variables, etc.)."
+  - Change history events must record who performed an operation, but the identity source varies across environments (git config, SSO, environment variables), so use cases cannot depend on any single provider. `ActorResolver` is the application-layer port interface that resolves the current actor's name and email, letting identity providers be swapped without affecting consumers.
 rules:
   - requirement: identity returns the current actor
     rules:
@@ -74,6 +74,6 @@ scenarios:
       - the promise MUST reject with an Error whose message indicates no VCS was detected
       - AND no I/O or subprocess invocation SHALL occur
 contentHashes:
-  spec.md: sha256:7840734302699b1d3177811841967075b21706597016b9c01dfb283d8aaa3842
+  spec.md: sha256:60104d459ae300c5cbd0f5151372d32633ba8634958e35291166ffd7104cc363
   verify.md: sha256:569797288dc300794dd66bd49cb84e1c0e191e3f4cd6e5ca71c7f317301b7395
 generatedBy: core

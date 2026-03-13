@@ -1,8 +1,8 @@
 # Kernel
 
-## Overview
+## Purpose
 
-The kernel is the public entry point of `@specd/core`. It assembles all use cases from a resolved `SpecdConfig` and exposes them as a typed object grouped by domain area. Delivery mechanisms (CLI, MCP, plugins) consume use cases exclusively through the kernel interface — it defines the contract between `@specd/core` and its consumers.
+Consumers of `@specd/core` need a single, stable entry point that exposes every use case without requiring knowledge of internal wiring or adapter construction. The kernel serves this role: it assembles all use cases from a resolved `SpecdConfig` and exposes them as a typed object grouped by domain area. Delivery mechanisms (CLI, MCP, plugins) consume use cases exclusively through the kernel interface, which defines the contract between `@specd/core` and its consumers.
 
 ## Requirements
 

@@ -1,10 +1,10 @@
 title: Schema Show
-description: Defines the `specd schema show` command, which prints the active schema's declared artifacts and workflow steps. Primarily useful for agents entering a new project to understand what they need to produce and in what order.
+description: Agents entering a new project need to know what artifacts they must produce and in what order, without reading raw schema YAML. The `specd schema show` command prints the active schema's declared artifacts and workflow steps in a structured, human- and machine-readable form.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/schema-format
 context:
-  - Defines the `specd schema show` command, which prints the active schema's declared artifacts and workflow steps. Primarily useful for agents entering a new project to understand what they need to produce and in what order.
+  - Agents entering a new project need to know what artifacts they must produce and in what order, without reading raw schema YAML. The `specd schema show` command prints the active schema's declared artifacts and workflow steps in a structured, human- and machine-readable form.
 rules:
   - requirement: Command signature
     rules:
@@ -17,10 +17,12 @@ rules:
   - requirement: Output format
     rules:
       - |-
-        In `text` mode (default), the command prints two sections:
+        In `text` mode (default), the command prints the schema metadata followed by two sections:
 
         ```
-        schema: <name>  version: <N>
+        schema: <name>  version: <N>  kind: <kind>
+        extends: <ref>  (only if present)
+        plugins: <count> applied  (only if schemaPlugins is non-empty)
 
         artifacts:
           <id>  <scope>  <optional>  requires=[<id>,...]
@@ -37,7 +39,8 @@ rules:
 
         ```json
         {
-          "schema": {"name": "...", "version": N},
+          "schema": {"name": "...", "version": N, "kind": "schema", "extends": "..."},
+          "plugins": ["@specd/plugin-rfc"],
           "artifacts": [
             {
               "id": "...",
@@ -64,14 +67,30 @@ constraints:
   - Artifact instruction, deltaInstruction, and validations are not included in the output — this command focuses on structure, not content
 scenarios:
   - requirement: Output format
-    name: Text output shows schema name, artifacts, and workflow
+    name: Text output shows schema name, kind, artifacts, and workflow
     given:
-      - a valid schema with name specd-std version 1 and declared artifacts and workflow steps
+      - 'a valid schema with name specd-std version 1, kind: schema, and declared artifacts and workflow steps'
     when:
       - specd schema show is run
     then:
-      - 'stdout contains the schema name and version, an artifacts: section, and a workflow: section'
+      - 'stdout contains the schema name, version, and kind, an artifacts: section, and a workflow: section'
       - AND the process exits with code 0
+  - requirement: Output format
+    name: Text output shows extends when present
+    given:
+      - "a schema that declares extends: '@specd/schema-std'"
+    when:
+      - specd schema show is run
+    then:
+      - 'stdout contains extends: @specd/schema-std'
+  - requirement: Output format
+    name: Text output shows plugin count when plugins are configured
+    given:
+      - "specd.yaml declares schemaPlugins: ['@specd/plugin-rfc']"
+    when:
+      - specd schema show is run
+    then:
+      - 'stdout contains plugins: 1 applied'
   - requirement: Output format
     name: Optional and required artifacts distinguished
     given:
@@ -101,8 +120,8 @@ scenarios:
     when:
       - specd schema show --format json is run
     then:
-      - stdout is valid JSON with schema, artifacts, and workflow
-      - AND schema has name and version
+      - stdout is valid JSON with schema, plugins, artifacts, and workflow
+      - AND schema has name, version, kind, and optionally extends
       - AND each artifact entry has id, scope, optional, requires, format, and delta
       - AND each workflow entry has step and requires
       - AND the process exits with code 0
@@ -116,6 +135,6 @@ scenarios:
       - the command exits with code 3
       - 'AND stderr contains a fatal: message'
 contentHashes:
-  spec.md: sha256:e9a0379298433081496cbcf63fda2b9e476778df81f39f9c33a407d386abc27e
-  verify.md: sha256:c0323c9b8e5fe80de7437a4a5864cbe29b2cd519b81c0a98cc430c297b4dcc82
+  spec.md: sha256:a83474386cf6cf0ccb05ba73fb65a910ceaced95b29f951ae178736342212231
+  verify.md: sha256:b2e6b3f5a957b83b3fb8e3c6d64ecc00a2cf8d001161c7912a3a4bfa2efef063
 generatedBy: core

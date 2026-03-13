@@ -1,11 +1,11 @@
 title: Skills Update
-description: Defines the `specd skills update` command, which reinstalls all skills recorded in the project manifest from the currently installed `@specd/skills` package. Used after upgrading specd to pick up changes to bundled skill files. The CLI calls `GetSkillsManifest` from `@specd/core` to read what is recorded, then resolves content from `@specd/skills` and writes the files itself — following the same responsibility split as `specd skills install`.
+description: After upgrading specd, installed skill files can be outdated relative to the new `@specd/skills` bundle. The `specd skills update` command reinstalls all skills recorded in the project manifest from the currently installed package, reading the manifest via `GetSkillsManifest` from `@specd/core` and writing files itself -- following the same responsibility split as `specd skills install`.
 dependsOn:
   - cli:cli/entrypoint
   - cli:cli/skills-install
   - core:core/config
 context:
-  - Defines the `specd skills update` command, which reinstalls all skills recorded in the project manifest from the currently installed `@specd/skills` package. Used after upgrading specd to pick up changes to bundled skill files. The CLI calls `GetSkillsManifest` from `@specd/core` to read what is recorded, then resolves content from `@specd/skills` and writes the files itself — following the same responsibility split as `specd skills install`.
+  - After upgrading specd, installed skill files can be outdated relative to the new `@specd/skills` bundle. The `specd skills update` command reinstalls all skills recorded in the project manifest from the currently installed package, reading the manifest via `GetSkillsManifest` from `@specd/core` and writing files itself -- following the same responsibility split as `specd skills install`.
 rules:
   - requirement: Command signature
     rules:
@@ -102,6 +102,6 @@ scenarios:
     then:
       - stdout is a valid JSON array where each object has name, path, and status fields
 contentHashes:
-  spec.md: sha256:964fb358381707c7c631c6d72c254bed74e0dab60a6dab9fac8226d095ef4935
+  spec.md: sha256:5fda762402e10369aa6b9e3a5fdccba901d8ca6b934852c247d8ca7093c9e143
   verify.md: sha256:187eaa94fc16aca86ee478d4775a61be392a0e625d909348c7b21c37e7ced80c
 generatedBy: core

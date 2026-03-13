@@ -1,11 +1,11 @@
 title: Storage
-description: "specd's storage layer is defined by port interfaces in `@specd/core`. All storage behavior is adapter-specific; the domain and application layers have no knowledge of where data lives. The v1 implementation ships one adapter for all storage ports: `fs` (local filesystem)."
+description: "The domain and application layers must remain agnostic to where changes, drafts, and archives physically live, so that future storage backends can be swapped without touching business logic. specd's storage layer achieves this through port interfaces in `@specd/core` with adapter-specific implementations; the v1 implementation ships one adapter for all storage ports: `fs` (local filesystem)."
 dependsOn:
   - default:_global/architecture
   - core:core/change
   - core:core/change-manifest
 context:
-  - "specd's storage layer is defined by port interfaces in `@specd/core`. All storage behavior is adapter-specific; the domain and application layers have no knowledge of where data lives. The v1 implementation ships one adapter for all storage ports: `fs` (local filesystem)."
+  - "The domain and application layers must remain agnostic to where changes, drafts, and archives physically live, so that future storage backends can be swapped without touching business logic. specd's storage layer achieves this through port interfaces in `@specd/core` with adapter-specific implementations; the v1 implementation ships one adapter for all storage ports: `fs` (local filesystem)."
 rules:
   - requirement: Change directory naming
     rules:
@@ -179,6 +179,6 @@ scenarios:
     then:
       - manifest.json contains the fields and structure defined in the change-manifest spec
 contentHashes:
-  spec.md: sha256:3cca70d83c24ff3837cc1d6758ddd50e7b05c24d57b7c3097efe776985f94e75
+  spec.md: sha256:a9e75a7056654d220ea45c2ffb9ffe4bf6461e72352207e2ff23c45966024b8c
   verify.md: sha256:785e2517a5cdbfa31327baa503c34eaf87da3d7bc28ece40ee8c70ad639d05f6
 generatedBy: core

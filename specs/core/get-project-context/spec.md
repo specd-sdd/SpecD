@@ -1,8 +1,8 @@
 # GetProjectContext
 
-## Overview
+## Purpose
 
-The `GetProjectContext` use case compiles the project-level context block without requiring a specific change or lifecycle step. It performs steps 1-4 of the context compilation pipeline (project `context:` entries, project-level include/exclude patterns) with all configured workspaces treated as active. This is the change-independent counterpart to `CompileContext`, suitable for project-wide tooling queries.
+Tooling sometimes needs the project's compiled spec context without an active change — for example, when generating agent instructions or answering project-wide queries. `GetProjectContext` provides this by compiling the project-level context block (steps 1-4 of the compilation pipeline: `context:` entries, project-level include/exclude patterns) with all configured workspaces treated as active. It is the change-independent counterpart to `CompileContext`.
 
 ## Requirements
 

@@ -1,10 +1,10 @@
 title: Change Transition
-description: Defines the `specd change transition <name> <step>` command, which advances a change to the next lifecycle state.
+description: Changes must progress through a governed lifecycle so that hooks, validations, and approval gates fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, running any declared pre/post hooks and transparently routing through approval gates when enabled.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd change transition <name> <step>` command, which advances a change to the next lifecycle state.
+  - Changes must progress through a governed lifecycle so that hooks, validations, and approval gates fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, running any declared pre/post hooks and transparently routing through approval gates when enabled.
 rules:
   - requirement: Command signature
     rules:
@@ -113,6 +113,6 @@ scenarios:
       - stdout is valid JSON with result equal to "ok", name equal to "my-change", from equal to "drafting", and to equal to "designing"
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:0d775563a21f31b1106db9d218d9e88622dba2b2a7f1c22a5f56daa2ddd433a2
+  spec.md: sha256:ce0798d1ab8473999065661763e8f92b75ecf1a2eea05b5271c3da62b0cf05d3
   verify.md: sha256:a701af16254846adc9c9e1325e6f701fa816b4c8c80d5c1a3a8b91cbf5676cc3
 generatedBy: core

@@ -1,10 +1,10 @@
 title: DiscardChange
-description: The `DiscardChange` use case permanently abandons a change by appending a `discarded` event to its history. The repository implementation moves the change directory to `discarded/` when persisted. Discarding is a terminal operation — discarded changes cannot be restored.
+description: Sometimes a change becomes obsolete or is superseded, and the team needs a way to permanently abandon it while preserving an audit trail of why. The `DiscardChange` use case appends a `discarded` event to the change's history and the repository moves its directory to `discarded/`. Discarding is a terminal operation — discarded changes cannot be restored.
 dependsOn:
   - core:core/change
   - default:_global/architecture
 context:
-  - The `DiscardChange` use case permanently abandons a change by appending a `discarded` event to its history. The repository implementation moves the change directory to `discarded/` when persisted. Discarding is a terminal operation — discarded changes cannot be restored.
+  - Sometimes a change becomes obsolete or is superseded, and the team needs a way to permanently abandon it while preserving an audit trail of why. The `DiscardChange` use case appends a `discarded` event to the change's history and the repository moves its directory to `discarded/`. Discarding is a terminal operation — discarded changes cannot be restored.
 rules:
   - requirement: Input contract
     rules:
@@ -82,6 +82,6 @@ scenarios:
     then:
       - ChangeRepository.save was called with the updated Change instance
 contentHashes:
-  spec.md: sha256:c4f42e7b7cf859dd705c26c9672698b54a18f8b527cfa37ca800a073005d0c06
+  spec.md: sha256:0e8949fe122c0359afab06dccdaeadc6a45ba7975bff0dfebad675bac9709254
   verify.md: sha256:c73162b7734b352b993215b726e20b91ed107a41adc131d823a5f6a9692989d2
 generatedBy: core

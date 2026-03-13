@@ -1,11 +1,11 @@
 title: Spec Metadata
-description: Defines the `specd spec metadata <workspace:capability-path>` command, which displays the parsed contents of a spec's `.specd-metadata.yaml` in a structured form, including freshness status for each recorded content hash.
+description: When debugging context issues or verifying metadata freshness, users need to inspect what is actually recorded in a spec's metadata file. The `specd spec metadata <workspace:capability-path>` command displays the parsed contents of a spec's `.specd-metadata.yaml` in a structured form, including freshness status for each recorded content hash.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/spec-metadata
   - core:core/spec-id-format
 context:
-  - Defines the `specd spec metadata <workspace:capability-path>` command, which displays the parsed contents of a spec's `.specd-metadata.yaml` in a structured form, including freshness status for each recorded content hash.
+  - When debugging context issues or verifying metadata freshness, users need to inspect what is actually recorded in a spec's metadata file. The `specd spec metadata <workspace:capability-path>` command displays the parsed contents of a spec's `.specd-metadata.yaml` in a structured form, including freshness status for each recorded content hash.
 rules:
   - requirement: Command signature
     rules:
@@ -150,6 +150,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:4ffa48b6b3444a70d09082638f968feca102c642eafed3f18d694dd0c05e53d9
+  spec.md: sha256:facb5c95d9cf11c77ae12f2c2e5c2b25568a9391323a6bba38041e4b11e1ce4d
   verify.md: sha256:09e83a3b69ac6f6d3ff36bc9c24d23ea9b3baf3bc8a24748e3a29ec5e403ad73
 generatedBy: core

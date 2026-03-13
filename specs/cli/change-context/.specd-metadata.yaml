@@ -1,10 +1,10 @@
 title: Change Context
-description: Defines the `specd change context <name> <step> [--artifact <id>]` command, which compiles and prints the full instruction block an AI agent receives when entering a lifecycle step for a named change.
+description: AI agents need a single command to retrieve all relevant instructions — schema rules, spec content, delta context, and step hooks — so they can operate on a change without manual assembly. `specd change context <name> <step> [--artifact <id>]` compiles and prints the full instruction block an agent receives when entering a lifecycle step for a named change.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd change context <name> <step> [--artifact <id>]` command, which compiles and prints the full instruction block an AI agent receives when entering a lifecycle step for a named change.
+  - AI agents need a single command to retrieve all relevant instructions — schema rules, spec content, delta context, and step hooks — so they can operate on a change without manual assembly. `specd change context <name> <step> [--artifact <id>]` compiles and prints the full instruction block an agent receives when entering a lifecycle step for a named change.
 rules:
   - requirement: Command signature
     rules:
@@ -164,6 +164,6 @@ scenarios:
       - AND instructionBlock contains the compiled instruction text
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:23fe04efcfe9e2764519589b60662dcd726786158fa77b8d68ec8670582233e3
+  spec.md: sha256:6581b2fc50921a231784c6978ee6da347d081c0257ae4b06f028ade39fd38603
   verify.md: sha256:5416bd02524183c7e4a75902ee3f7640dcca4c52d72fc4277d240cf5a8757f7d
 generatedBy: core

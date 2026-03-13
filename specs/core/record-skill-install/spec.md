@@ -1,8 +1,8 @@
 # RecordSkillInstall
 
-## Overview
+## Purpose
 
-The `RecordSkillInstall` use case records that a set of skills was installed for a specific agent by updating the `skills` section of `specd.yaml`. It delegates to the `ConfigWriter` port and performs no business logic beyond passing the input through.
+When skills are installed for an agent, the project's `specd.yaml` must be updated to track which skills are active so that future installs can deduplicate and updates can detect drift. `RecordSkillInstall` handles this by delegating to the `ConfigWriter` port to update the `skills` section, performing no business logic beyond passing the input through.
 
 ## Requirements
 

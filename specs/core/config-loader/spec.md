@@ -1,8 +1,8 @@
 # Config Loader
 
-## Overview
+## Purpose
 
-`createConfigLoader` is the composition factory that produces a `ConfigLoader` instance for delivery mechanisms. It encapsulates filesystem-based config discovery, YAML parsing, Zod validation, path resolution, and workspace inference. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`.
+Delivery mechanisms need to load and validate `specd.yaml` without knowing the details of filesystem discovery, YAML parsing, Zod validation, or path resolution. `createConfigLoader` is the composition factory that encapsulates all of this and produces a `ConfigLoader` instance. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`.
 
 ## Requirements
 

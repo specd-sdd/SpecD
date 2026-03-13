@@ -1,8 +1,8 @@
 # Spec List
 
-## Overview
+## Purpose
 
-Defines the `specd spec list` command, which lists all specs in all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.
+Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. The `specd spec list` command lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.
 
 ## Requirements
 

@@ -1,8 +1,8 @@
 # Discarded Show
 
-## Overview
+## Purpose
 
-Defines the `specd discarded show <name>` command, which displays basic metadata for a single discarded change, including the reason it was discarded.
+When reviewing past decisions, users need to see why a change was abandoned — not just that it was. `specd discarded show <name>` displays basic metadata for a single discarded change, including the recorded discard reason.
 
 ## Requirements
 

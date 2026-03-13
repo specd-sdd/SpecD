@@ -1,8 +1,8 @@
 # Snapshot Hasher
 
-## Overview
+## Purpose
 
-`hashFiles` is a pure domain service that computes SHA-256 content hashes for a set of files. It is used to record a content fingerprint at validation time so that infrastructure adapters can detect drift — a file has drifted if its current hash differs from the one stored at last validation.
+Detecting whether an artifact has changed since it was last validated requires a stable, deterministic content fingerprint that can be stored and compared later. `hashFiles` is a pure domain service that computes SHA-256 content hashes for a set of files, recording a fingerprint at validation time so that infrastructure adapters can detect drift — a file has drifted if its current hash differs from the one stored at last validation.
 
 ## Requirements
 

@@ -1,9 +1,9 @@
 title: Skills List
-description: Defines the `specd skills list` command, which lists all skills bundled in `@specd/skills` and reports whether each is currently installed for the target agent.
+description: Users need to discover what skills are available and which ones are already installed for their agent. The `specd skills list` command lists all skills bundled in `@specd/skills` and optionally reports each skill's installation status for a target agent.
 dependsOn:
   - cli:cli/entrypoint
 context:
-  - Defines the `specd skills list` command, which lists all skills bundled in `@specd/skills` and reports whether each is currently installed for the target agent.
+  - Users need to discover what skills are available and which ones are already installed for their agent. The `specd skills list` command lists all skills bundled in `@specd/skills` and optionally reports each skill's installation status for a target agent.
 rules:
   - requirement: Command signature
     rules:
@@ -107,6 +107,6 @@ scenarios:
     then:
       - my-skill is reported as not installed
 contentHashes:
-  spec.md: sha256:d4bda0dafb5d298133b24eb9d5abfcb7460ff2ebf260da25b5a261e1d4adde4c
+  spec.md: sha256:480aadc7f1246a2a422d9be223d1b96d5b5057c266b7d82aba856430b4abb120
   verify.md: sha256:db06e3bd813089f6e697bfb1b4d8a339a2be8965b8dac0de067dc1dab17bd7c6
 generatedBy: core

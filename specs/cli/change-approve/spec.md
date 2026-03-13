@@ -1,8 +1,8 @@
 # Change Approve
 
-## Overview
+## Purpose
 
-Defines the `specd change approve spec <name> --reason <text>` and `specd change approve signoff <name> --reason <text>` commands, which record human approval decisions at the two optional approval gates.
+Approval gates exist so that a human can explicitly sign off before work proceeds past critical checkpoints. `specd change approve spec` and `specd change approve signoff` record these human approval decisions, requiring a reason so each gate clearance is traceable.
 
 ## Requirements
 

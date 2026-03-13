@@ -1,12 +1,12 @@
 title: ApproveSignoff
-description: The `ApproveSignoff` use case records a signoff on a change and transitions it to the `signed-off` state. It enforces that the signoff gate is enabled, computes artifact hashes using schema-defined pre-hash cleanup rules, and persists the updated change. This is the only path through the signoff gate in the change lifecycle.
+description: After implementation, a final human signoff is needed to confirm the change is ready for archival, with artifact hashes captured to detect any post-signoff modifications. The `ApproveSignoff` use case records a signoff on a change and transitions it to the `signed-off` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the signoff gate in the change lifecycle.
 dependsOn:
   - core:core/change
   - core:core/schema-format
   - core:core/composition
   - core:core/kernel
 context:
-  - The `ApproveSignoff` use case records a signoff on a change and transitions it to the `signed-off` state. It enforces that the signoff gate is enabled, computes artifact hashes using schema-defined pre-hash cleanup rules, and persists the updated change. This is the only path through the signoff gate in the change lifecycle.
+  - After implementation, a final human signoff is needed to confirm the change is ready for archival, with artifact hashes captured to detect any post-signoff modifications. The `ApproveSignoff` use case records a signoff on a change and transitions it to the `signed-off` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the signoff gate in the change lifecycle.
 rules:
   - requirement: Gate guard
     rules:
@@ -129,6 +129,6 @@ scenarios:
       - name, reason, and approvalsSignoff are all required
       - AND all fields are readonly
 contentHashes:
-  spec.md: sha256:bffefc8a09de5532fb77432acd811f908f0c968962c087b5dd6d228cdcab0791
+  spec.md: sha256:afcc1e4848f339031421442b6fe54a03c80e6f29caf4f6a13be9af66d278d5cd
   verify.md: sha256:f4f2dd06a8ef74c593ef000083c63fabceb38b2c5643f397ce7fd343b37929bb
 generatedBy: core

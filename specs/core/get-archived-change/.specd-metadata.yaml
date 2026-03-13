@@ -1,5 +1,5 @@
 title: GetArchivedChange
-description: '`GetArchivedChange` is the application use case that retrieves a single archived change by name. It is a read-only query that throws `ChangeNotFoundError` when the requested change does not exist in the archive.'
+description: When inspecting the archive — for audit, diffing, or post-mortem — users need to retrieve a specific archived change by name rather than scanning the full list. `GetArchivedChange` is a read-only query that looks up a single archived change by name and throws `ChangeNotFoundError` when the requested change does not exist.
 dependsOn:
   - core:core/archive-change
   - core:core/storage
@@ -7,7 +7,7 @@ dependsOn:
   - core:core/kernel
   - default:_global/architecture
 context:
-  - '`GetArchivedChange` is the application use case that retrieves a single archived change by name. It is a read-only query that throws `ChangeNotFoundError` when the requested change does not exist in the archive.'
+  - When inspecting the archive — for audit, diffing, or post-mortem — users need to retrieve a specific archived change by name rather than scanning the full list. `GetArchivedChange` is a read-only query that looks up a single archived change by name and throws `ChangeNotFoundError` when the requested change does not exist.
 rules:
   - requirement: Ports and constructor
     rules:
@@ -102,6 +102,6 @@ scenarios:
       - a ChangeNotFoundError is thrown
       - AND no repository write methods are invoked by the use case itself
 contentHashes:
-  spec.md: sha256:4ca8968ff3035ab53207c34ca94b38085a5f6833705da20f1e8561ca471d786f
+  spec.md: sha256:5b51efe4ef6dd98ba56bc886d151c650d4629ff190ce3b7fa54714683a2dc7cd
   verify.md: sha256:d24b912b459fbd70bab7081e92225935d4c8c1391277fa419c6818b5e4d6f537
 generatedBy: core

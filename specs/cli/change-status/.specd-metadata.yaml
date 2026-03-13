@@ -1,10 +1,10 @@
 title: Change Status
-description: Defines the `specd change status <name>` command, which reports the current lifecycle state and artifact statuses of a named change.
+description: Users and agents need a quick way to see where a change stands — its lifecycle state and which artifacts are done, in progress, or missing. `specd change status <name>` reports the current lifecycle state and artifact statuses of a named change.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd change status <name>` command, which reports the current lifecycle state and artifact statuses of a named change.
+  - Users and agents need a quick way to see where a change stands — its lifecycle state and which artifacts are done, in progress, or missing. `specd change status <name>` reports the current lifecycle state and artifact statuses of a named change.
 rules:
   - requirement: Command signature
     rules:
@@ -110,6 +110,6 @@ scenarios:
       - AND artifacts contains one entry with type equal to "proposal" and effectiveStatus equal to "complete"
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:bd2bacd8e426ee4180b6886cbc19e791388d144f462c84fb604083a1340cfacc
+  spec.md: sha256:f06e759d143160c9ddc0375d939a2bb05c2160197caedf92a67de8f24850a010
   verify.md: sha256:99fa75949e7c2ae65c406ff7fea61a224b3a0818695a319456441ea2e5f7c2fb
 generatedBy: core

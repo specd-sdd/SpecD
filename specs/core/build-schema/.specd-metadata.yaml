@@ -1,12 +1,13 @@
 title: Build Schema
-description: '`buildSchema` is a pure domain service that constructs a `Schema` entity from validated intermediate data and pre-loaded template contents. It is the boundary between infrastructure-level parsing/validation (Zod schemas, YAML parsing, file I/O) and the domain model. All I/O — template loading, file reading, YAML parsing — happens before this function is called; the adapter is responsible for providing fully resolved inputs.'
+description: 'The domain model must not depend on infrastructure concerns like YAML parsing, Zod schemas, or filesystem I/O, yet a `Schema` entity still needs to be constructed from parsed data with full semantic validation. `buildSchema` is a pure domain service that sits at this boundary: it receives validated intermediate data and pre-loaded template contents, performs semantic checks (ID uniqueness, dependency cycles, template references), and constructs the `Schema` entity. All I/O happens before this function is called; the adapter provides fully resolved inputs.'
 dependsOn:
   - default:_global/architecture
   - core:core/schema-format
   - core:core/content-extraction
   - core:core/selector-model
+  - core:core/schema-merge
 context:
-  - '`buildSchema` is a pure domain service that constructs a `Schema` entity from validated intermediate data and pre-loaded template contents. It is the boundary between infrastructure-level parsing/validation (Zod schemas, YAML parsing, file I/O) and the domain model. All I/O — template loading, file reading, YAML parsing — happens before this function is called; the adapter is responsible for providing fully resolved inputs.'
+  - 'The domain model must not depend on infrastructure concerns like YAML parsing, Zod schemas, or filesystem I/O, yet a `Schema` entity still needs to be constructed from parsed data with full semantic validation. `buildSchema` is a pure domain service that sits at this boundary: it receives validated intermediate data and pre-loaded template contents, performs semantic checks (ID uniqueness, dependency cycles, template references), and constructs the `Schema` entity. All I/O happens before this function is called; the adapter provides fully resolved inputs.'
 rules:
   - requirement: Pure function signature
     rules:
@@ -34,6 +35,8 @@ rules:
         * `name` (string) — schema name
         * `version` (number) — schema version
         * `description` (string, optional) — human-readable summary
+        * `kind` (`'schema' | 'schema-plugin'`) — schema type discriminator
+        * `extends` (string, optional) — parent schema reference
         * `artifacts` (array of `ArtifactYamlData`) — artifact entries, each with the same fields as the YAML artifact definition but using `| undefined` for optional fields
         * `workflow` (array of `WorkflowStep`, optional) — already-transformed workflow step objects
         * `metadataExtraction` (`MetadataExtractionRaw`, optional) — raw metadata extraction block with `| undefined` on optional fields
@@ -41,7 +44,13 @@ rules:
         The infrastructure layer is responsible for parsing YAML and validating with Zod; `buildSchema` receives the validated output. `SchemaYamlData` MUST NOT import from Zod or any infrastructure module.
   - requirement: Artifact ID format validation
     rules:
-      - '`buildSchema` SHALL validate that every `artifact.id` matches `/^[a-z][a-z0-9-]*$/`. If an ID fails this check, the function MUST throw `SchemaValidationError` with a message indicating which artifact index and the invalid ID.'
+      - |-
+        `buildSchema` SHALL validate that every `artifact.id` matches `/^[a-z][a-z0-9-]*$/`. If an ID fails this check, the function MUST throw `SchemaValidationError` with a message indicating which artifact index and the invalid ID.
+
+        Note: `id` fields on array entries (hooks, validations, rules, preHashCleanup, metadataExtraction) must also match `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` and be unique within their array.
+  - requirement: Array entry ID validation
+    rules:
+      - '`buildSchema` SHALL validate that every array entry `id` (in hooks, validations, deltaValidations, rules.pre, rules.post, preHashCleanup, and metadataExtraction array entries) matches `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` (1-64 chars) and is unique within its immediate array. Violations throw `SchemaValidationError`.'
   - requirement: Artifact ID uniqueness validation
     rules:
       - '`buildSchema` SHALL validate that no two artifacts share the same `id`. If a duplicate is found, the function MUST throw `SchemaValidationError` identifying the duplicate ID.'
@@ -93,6 +102,7 @@ rules:
         * Convert `validations` and `deltaValidations` arrays via `buildValidationRule`
         * Convert `preHashCleanup` entries
         * Convert `taskCompletionCheck` if present
+        * Convert `rules` (with `pre` and `post` arrays of `{ id, text }` entries) if present
         * Pass the template content string (not the path) as the `template` property on `ArtifactType`
         * Default `optional` to `false`, `delta` to `false`, and `requires` to `[]` when omitted
   - requirement: detectCycle helper
@@ -100,7 +110,7 @@ rules:
       - '`buildSchema` SHALL include a `detectCycle` helper function that performs depth-first traversal to detect cycles in the artifact dependency graph. It receives an artifact ID, a map of artifact IDs to their dependencies, a visited set, and a recursion stack set. It MUST return `true` if a cycle is reachable from the given ID.'
   - requirement: Schema entity construction
     rules:
-      - After all validation passes, `buildSchema` SHALL construct and return a `Schema` entity by calling `new Schema(name, version, artifacts, workflow, metadataExtraction)` with the fully converted domain objects.
+      - After all validation passes, `buildSchema` SHALL construct and return a `Schema` entity by calling `new Schema(name, version, artifacts, workflow, metadataExtraction)` with the fully converted domain objects, passing `kind` and `extends` to the Schema constructor.
 constraints:
   - buildSchema is a pure function — no I/O, no fs, no yaml, no zod imports
   - buildSchema lives in domain/services/ — it MUST NOT import from application/, infrastructure/, or composition/
@@ -291,6 +301,6 @@ scenarios:
     then:
       - the returned Schema has name() === "test", version() === 1, two artifacts accessible via artifact(id), workflow steps accessible via workflowStep(name), and metadata extraction defined
 contentHashes:
-  spec.md: sha256:33cf0e5d9b697486cbd1f7cc387f1d0ca7f59ba35c6cd730a10097c223df94fc
+  spec.md: sha256:8ca09acd0f2590bd743cdcd0b95156ef40e977ebec83e4caa82c91ce8ac1efcf
   verify.md: sha256:8f7a13d92ce6065eea0c60fe9b972729caaba6c334de1f980fb757bfe20c5d25
 generatedBy: core

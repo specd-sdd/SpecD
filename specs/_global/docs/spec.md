@@ -1,8 +1,8 @@
 # Documentation Conventions
 
-## Overview
+## Purpose
 
-All project documentation lives under `docs/`. Each subdirectory has a specific scope. Documentation is written and maintained by agents and humans alike — the same constraints apply to both.
+Scattered or inconsistently structured documentation slows onboarding and makes decisions hard to trace. All project documentation lives under `docs/`, with each subdirectory scoped to a specific concern (ADRs, CLI, MCP, core, schemas). The same constraints apply to both human and agent contributors.
 
 ## Requirements
 

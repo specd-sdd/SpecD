@@ -1,8 +1,8 @@
 # Spec Resolve Path
 
-## Overview
+## Purpose
 
-Defines the `specd spec resolve-path <path>` command, which resolves a filesystem path to a logical spec identifier. This enables tools (e.g. the spec metadata skill) to convert filesystem-relative dependency paths extracted from `spec.md` into the `workspace:prefixed/capability/path` identifiers used in `.specd-metadata.yaml` `dependsOn` fields.
+Tools and skills that encounter filesystem paths (e.g. relative links in `spec.md`) need to convert them into logical spec identifiers for use in `dependsOn` fields. The `specd spec resolve-path <path>` command resolves a filesystem path to the canonical `workspace:prefixed/capability/path` identifier used in `.specd-metadata.yaml`.
 
 ## Requirements
 

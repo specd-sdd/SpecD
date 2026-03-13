@@ -1,8 +1,8 @@
 # Spec Context
 
-## Overview
+## Purpose
 
-Defines the `specd spec context <workspace:capability-path>` command, which prints the metadata summary for a single spec as it would appear in an AI context block, with optional section filtering and dependency traversal.
+Agents need structured spec content they can consume directly as context, without parsing raw Markdown themselves. The `specd spec context <workspace:capability-path>` command prints the metadata summary for a single spec as it would appear in an AI context block, with optional section filtering and dependency traversal.
 
 ## Requirements
 

@@ -1,5 +1,5 @@
 title: Validate Specs
-description: "The `ValidateSpecs` use case validates spec artifacts against the active schema's structural rules. It supports three scoping modes: a single spec by qualified path, all specs in a workspace, or all specs across all workspaces. Only spec-scoped artifact types from the schema are validated; change-scoped artifacts are excluded."
+description: "Spec artifacts can drift from the schema's structural expectations over time, and there is no other mechanism to catch these violations before they cause downstream failures. The `ValidateSpecs` use case validates spec artifacts against the active schema's structural rules, supporting three scoping modes: a single spec by qualified path, all specs in a workspace, or all specs across all workspaces. Only spec-scoped artifact types from the schema are validated; change-scoped artifacts are excluded."
 dependsOn:
   - core:core/validate-artifacts
   - core:core/schema-format
@@ -7,7 +7,7 @@ dependsOn:
   - core:core/workspace
   - core:core/spec-id-format
 context:
-  - "The `ValidateSpecs` use case validates spec artifacts against the active schema's structural rules. It supports three scoping modes: a single spec by qualified path, all specs in a workspace, or all specs across all workspaces. Only spec-scoped artifact types from the schema are validated; change-scoped artifacts are excluded."
+  - "Spec artifacts can drift from the schema's structural expectations over time, and there is no other mechanism to catch these violations before they cause downstream failures. The `ValidateSpecs` use case validates spec artifacts against the active schema's structural rules, supporting three scoping modes: a single spec by qualified path, all specs in a workspace, or all specs across all workspaces. Only spec-scoped artifact types from the schema are validated; change-scoped artifacts are excluded."
 rules:
   - requirement: Resolve the active schema
     rules:
@@ -185,6 +185,6 @@ scenarios:
     then:
       - no failure or warning is recorded for that artifact
 contentHashes:
-  spec.md: sha256:5089b18693eedd3331c96bfa2eef453067eb761b14d9c97212bba3a619fe9d83
+  spec.md: sha256:1f03a236d4b6ccadab68b82679419290a024496b6cbeb557825e191c61261454
   verify.md: sha256:02961b677afa757dfcec6fbb8e8f948fde4b5fd988dc90566750b27416429379
 generatedBy: core

@@ -1,11 +1,11 @@
 title: Spec Write-Metadata
-description: The `specd spec write-metadata` command writes a `.specd-metadata.yaml` file for a given spec. It accepts YAML content from stdin or a file and persists it through the `SaveSpecMetadata` use case, which delegates to `SpecRepository.save()` for conflict detection and atomic writes.
+description: Agents and scripts that produce metadata externally need a safe way to persist it without bypassing validation or conflict detection. The `specd spec write-metadata` command writes a `.specd-metadata.yaml` file for a given spec, accepting YAML content from stdin or a file and persisting it through the `SaveSpecMetadata` use case for conflict detection and atomic writes.
 dependsOn:
   - default:_global/architecture
   - default:_global/conventions
   - core:core/spec-metadata
 context:
-  - The `specd spec write-metadata` command writes a `.specd-metadata.yaml` file for a given spec. It accepts YAML content from stdin or a file and persists it through the `SaveSpecMetadata` use case, which delegates to `SpecRepository.save()` for conflict detection and atomic writes.
+  - Agents and scripts that produce metadata externally need a safe way to persist it without bypassing validation or conflict detection. The `specd spec write-metadata` command writes a `.specd-metadata.yaml` file for a given spec, accepting YAML content from stdin or a file and persisting it through the `SaveSpecMetadata` use case for conflict detection and atomic writes.
 rules:
   - requirement: Command signature
     rules:
@@ -134,6 +134,6 @@ scenarios:
     then:
       - the write succeeds
 contentHashes:
-  spec.md: sha256:678ec93ff246efb607bf04e5e8b14c8f0a35fa9dde4674bcf9eecf086ef5508a
+  spec.md: sha256:8f4a830ef745a0576d845da0c9d8bc7fe27949f2f8e35144ba4e7363aad10280
   verify.md: sha256:12812dd5f32398a5e0fabffee7535eb0fabd27048c55a93553087c0bf2dbdd2a
 generatedBy: core

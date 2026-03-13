@@ -1,10 +1,10 @@
 title: Discarded Show
-description: Defines the `specd discarded show <name>` command, which displays basic metadata for a single discarded change, including the reason it was discarded.
+description: When reviewing past decisions, users need to see why a change was abandoned — not just that it was. `specd discarded show <name>` displays basic metadata for a single discarded change, including the recorded discard reason.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd discarded show <name>` command, which displays basic metadata for a single discarded change, including the reason it was discarded.
+  - When reviewing past decisions, users need to see why a change was abandoned — not just that it was. `specd discarded show <name>` displays basic metadata for a single discarded change, including the recorded discard reason.
 rules:
   - requirement: Command signature
     rules:
@@ -80,6 +80,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:258cbf0cf74952bd6e8df62e0a2d376e34c35bc736467a2eabdb077c4ba0361a
+  spec.md: sha256:49141f673af588ff4d4a960d7801ba1e8121a77a98e9a42968b58878fb50ff23
   verify.md: sha256:2d42761b06505560b718b40dfef27a470704bf4a6faa350b8548613592907a70
 generatedBy: core

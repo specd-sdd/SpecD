@@ -1,11 +1,7 @@
 title: Spec Validate
-description: |-
-  Validates spec artifacts against the active schema's structural rules. Supports
-  validating a single spec, all specs in a workspace, or all specs across all workspaces.
+description: Specs that violate the schema's structural rules can break downstream tooling and confuse agents. The `specd spec validate` command validates spec artifacts against the active schema's structural rules, supporting a single spec, all specs in a workspace, or all specs across all workspaces.
 context:
-  - |-
-    Validates spec artifacts against the active schema's structural rules. Supports
-    validating a single spec, all specs in a workspace, or all specs across all workspaces.
+  - Specs that violate the schema's structural rules can break downstream tooling and confuse agents. The `specd spec validate` command validates spec artifacts against the active schema's structural rules, supporting a single spec, all specs in a workspace, or all specs across all workspaces.
 rules:
   - requirement: Command signature
     rules:
@@ -134,6 +130,6 @@ scenarios:
       - 'stderr contains error: unknown workspace'
       - AND exit code is 1
 contentHashes:
-  spec.md: sha256:6ee3ea9d90089ab151a49548b7cdd52377acd31ef4f8c667d030e3a42b765a38
+  spec.md: sha256:aecc591baf96f7be5c457239744b010955d045eaea040163981780ee5843dfb0
   verify.md: sha256:da52f6c42b913130352afd7082e766d4de70dc99ad0eb094da5459ef45e89989
 generatedBy: core

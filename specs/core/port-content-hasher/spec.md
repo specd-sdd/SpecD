@@ -1,8 +1,8 @@
 # ContentHasher Port
 
-## Overview
+## Purpose
 
-`ContentHasher` is an application-layer port that defines the contract for computing deterministic content hashes. It isolates the application layer from specific hashing algorithms and cryptographic libraries, allowing implementations to be swapped without changing consumers.
+Artifact conflict detection and change validation rely on deterministic content hashes, but the application layer must not depend on a specific algorithm or cryptographic library. `ContentHasher` is the application-layer port that defines the contract for computing content hashes, isolating consumers from the underlying implementation so algorithms can be swapped transparently.
 
 ## Requirements
 

@@ -1,12 +1,12 @@
 title: Get Spec Context
-description: The `GetSpecContext` use case builds structured context entries for a single spec, optionally following `dependsOn` links transitively. It is used to assemble the full context an AI agent or delivery mechanism needs to understand a spec and its dependency chain. Metadata freshness is checked via SHA-256 content hashes; stale or absent metadata produces a minimal entry.
+description: AI agents and delivery mechanisms need to understand a spec together with everything it depends on, but dependency chains can be deep and metadata may be stale or missing. The `GetSpecContext` use case builds structured context entries for a single spec, optionally following `dependsOn` links transitively, to assemble the full context needed to understand a spec and its dependency chain. Metadata freshness is checked via SHA-256 content hashes; stale or absent metadata produces a minimal entry.
 dependsOn:
   - core:core/spec-metadata
   - core:core/storage
   - core:core/workspace
   - core:core/spec-id-format
 context:
-  - The `GetSpecContext` use case builds structured context entries for a single spec, optionally following `dependsOn` links transitively. It is used to assemble the full context an AI agent or delivery mechanism needs to understand a spec and its dependency chain. Metadata freshness is checked via SHA-256 content hashes; stale or absent metadata produces a minimal entry.
+  - AI agents and delivery mechanisms need to understand a spec together with everything it depends on, but dependency chains can be deep and metadata may be stale or missing. The `GetSpecContext` use case builds structured context entries for a single spec, optionally following `dependsOn` links transitively, to assemble the full context needed to understand a spec and its dependency chain. Metadata freshness is checked via SHA-256 content hashes; stale or absent metadata produces a minimal entry.
 rules:
   - requirement: Resolve workspace and spec from input
     rules:
@@ -186,6 +186,6 @@ scenarios:
     then:
       - "warnings contains an entry with type: 'missing-metadata'"
 contentHashes:
-  spec.md: sha256:89250e655d9c8b4282932a24179508a0e4332e6db82d8bdcb73efdd39eda5d77
+  spec.md: sha256:689fd868068e272bb300601f8da8482bb32aa168d979f87c0398a0d523febbae
   verify.md: sha256:96b52d357980af82008e16e89c4dba6ea5148650ddf4a31ea9ecb1dd5c8987dd
 generatedBy: core

@@ -1,5 +1,5 @@
 title: ArchiveChange
-description: '`ArchiveChange` is the application use case that finalises a completed change: merges its delta artifacts into the project specs, moves the change directory to the archive, and fires lifecycle hooks before and after. It is gated on `archivable` state — the change must have completed the full lifecycle before it can be archived.'
+description: Once a change has completed its full lifecycle, its spec modifications need to be applied to the project and the change itself preserved for posterity — but this finalization involves delta merging, hook execution, and metadata generation that must happen atomically and in the right order. `ArchiveChange` is the use case that merges delta artifacts into project specs, moves the change directory to the archive, and fires lifecycle hooks before and after. It is gated on `archivable` state.
 dependsOn:
   - core:core/change
   - core:core/schema-format
@@ -13,7 +13,7 @@ dependsOn:
   - core:core/workspace
   - core:core/spec-id-format
 context:
-  - '`ArchiveChange` is the application use case that finalises a completed change: merges its delta artifacts into the project specs, moves the change directory to the archive, and fires lifecycle hooks before and after. It is gated on `archivable` state — the change must have completed the full lifecycle before it can be archived.'
+  - Once a change has completed its full lifecycle, its spec modifications need to be applied to the project and the change itself preserved for posterity — but this finalization involves delta merging, hook execution, and metadata generation that must happen atomically and in the right order. `ArchiveChange` is the use case that merges delta artifacts into project specs, moves the change directory to the archive, and fires lifecycle hooks before and after. It is gated on `archivable` state.
 rules:
   - requirement: Ports and constructor
     rules:
@@ -314,6 +314,6 @@ scenarios:
     then:
       - ArchiveChange.execute throws and does not return a result
 contentHashes:
-  spec.md: sha256:199033e753a3b2b673c48e5997f613b923b9ce17247c1d127416278eb61a2584
+  spec.md: sha256:f75c515e440fe186f230fecf3a82cb7d65698f54272d102fc91c81f1d1b1f8c6
   verify.md: sha256:6dc4100ae7cafad7ec3a7e4ed3ebfe1241f49296c6b3bb5d34fdce106315283e
 generatedBy: core

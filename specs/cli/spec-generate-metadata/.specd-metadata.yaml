@@ -1,11 +1,11 @@
 title: Spec Generate-Metadata
-description: The `specd spec generate-metadata` command generates `.specd-metadata.yaml` content deterministically from schema extraction rules. It delegates to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence.
+description: Metadata files must be regenerated whenever spec content changes, and doing it manually is error-prone. The `specd spec generate-metadata` command generates `.specd-metadata.yaml` content deterministically from schema extraction rules, delegating to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence.
 dependsOn:
   - core:core/generate-metadata
   - core:core/spec-metadata
   - default:_global/architecture
 context:
-  - The `specd spec generate-metadata` command generates `.specd-metadata.yaml` content deterministically from schema extraction rules. It delegates to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence.
+  - Metadata files must be regenerated whenever spec content changes, and doing it manually is error-prone. The `specd spec generate-metadata` command generates `.specd-metadata.yaml` content deterministically from schema extraction rules, delegating to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence.
 rules:
   - requirement: Command signature
     rules:
@@ -147,6 +147,6 @@ scenarios:
     then:
       - the write succeeds
 contentHashes:
-  spec.md: sha256:f85ef5ef69d11ce734c362a40f4f4ceb162b5d49bb47a284e0ea276533ddb352
+  spec.md: sha256:1d2c2507f2e75fccb0b15c6cdaba04ccf3f84b07873a7b04971f89775b498f8e
   verify.md: sha256:1f32e8e0e89b22227122cf21694890260c69102a9ebbf7e2222d1942a12dfdf8
 generatedBy: core

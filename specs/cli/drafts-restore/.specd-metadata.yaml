@@ -1,10 +1,10 @@
 title: Drafts Restore
-description: Defines the `specd drafts restore <name>` command, which recovers a drafted change from `drafts/` back to `changes/`. This command replaces the former `specd change restore` command.
+description: When paused work is ready to resume, it needs to move back to the active list without losing any lifecycle state or history. `specd drafts restore <name>` recovers a drafted change from `drafts/` back to `changes/`, preserving its state exactly as it was when drafted.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd drafts restore <name>` command, which recovers a drafted change from `drafts/` back to `changes/`. This command replaces the former `specd change restore` command.
+  - When paused work is ready to resume, it needs to move back to the active list without losing any lifecycle state or history. `specd drafts restore <name>` recovers a drafted change from `drafts/` back to `changes/`, preserving its state exactly as it was when drafted.
 rules:
   - requirement: Command signature
     rules:
@@ -98,6 +98,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:6eb82860de3736b4fe99b052b0084245c854b973df18a32233da771bbc33c7d1
+  spec.md: sha256:2a8854a6a6d01e66843e3c7ca7a5a4947fe78c25373f174464db1a8e6249f00a
   verify.md: sha256:751f0f7c738c7be8c5ac7f9c27e5b0b89e34075a20db6cf737ffc954d2b3b1cb
 generatedBy: core

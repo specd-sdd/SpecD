@@ -1,9 +1,9 @@
 title: Documentation Conventions
-description: All project documentation lives under `docs/`. Each subdirectory has a specific scope. Documentation is written and maintained by agents and humans alike — the same constraints apply to both.
+description: Scattered or inconsistently structured documentation slows onboarding and makes decisions hard to trace. All project documentation lives under `docs/`, with each subdirectory scoped to a specific concern (ADRs, CLI, MCP, core, schemas). The same constraints apply to both human and agent contributors.
 dependsOn:
   - default:_global/conventions
 context:
-  - All project documentation lives under `docs/`. Each subdirectory has a specific scope. Documentation is written and maintained by agents and humans alike — the same constraints apply to both.
+  - Scattered or inconsistently structured documentation slows onboarding and makes decisions hard to trace. All project documentation lives under `docs/`, with each subdirectory scoped to a specific concern (ADRs, CLI, MCP, core, schemas). The same constraints apply to both human and agent contributors.
 rules:
   - requirement: Directory structure
     rules:
@@ -233,6 +233,6 @@ scenarios:
     then:
       - the linter must not report an error
 contentHashes:
-  spec.md: sha256:f878defaa38014eda0d78a8a34167e8591d23b62071a2b884c1e76737609d838
+  spec.md: sha256:d0539c2077488ab96460885f8b3bdc96b5c079e3968ea631abdeb90f0bec3ed9
   verify.md: sha256:2bed20f27ce16cffa390fd112ffdc02f1d36ab49c3882c1176c30c328597feb2
 generatedBy: core

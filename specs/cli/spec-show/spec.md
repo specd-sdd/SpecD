@@ -1,8 +1,8 @@
 # Spec Show
 
-## Overview
+## Purpose
 
-Defines the `specd spec show <workspace:capability-path>` command, which prints the content of a spec's artifact files to stdout.
+Users and scripts need to read the raw content of a spec without navigating the directory tree. The `specd spec show <workspace:capability-path>` command prints the content of a spec's artifact files to stdout in schema-declared order.
 
 ## Requirements
 

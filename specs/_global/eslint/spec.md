@@ -1,8 +1,8 @@
 # ESLint Rules
 
-## Overview
+## Purpose
 
-ESLint enforces the coding conventions defined in `specs/_global/conventions/spec.md`. Rules are configured in `eslint.config.js` at the monorepo root and apply to all packages. Type-aware rules are enabled for `.ts` files using each package's `tsconfig.json`.
+Conventions that rely on human discipline get violated under pressure; automated enforcement catches violations before they reach the codebase. ESLint enforces the coding conventions from `specs/_global/conventions/spec.md` plus architectural layer boundaries. Rules are configured in `eslint.config.js` at the monorepo root, apply to all packages, and use type-aware analysis for `.ts` files via each package's `tsconfig.json`.
 
 ## Requirements
 

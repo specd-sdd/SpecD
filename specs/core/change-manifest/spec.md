@@ -1,8 +1,8 @@
 # Change Manifest
 
-## Overview
+## Purpose
 
-The change manifest (`manifest.json`) is the single source of truth for a change. It lives inside the change's directory and persists the full state of the Change domain entity — identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It is written and read exclusively by `FsChangeRepository`.
+The Change entity's state must survive process restarts and be recoverable from disk alone, so there needs to be a single, well-defined file that captures everything. The change manifest (`manifest.json`) is that file — it persists identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It lives inside the change's directory and is written and read exclusively by `FsChangeRepository`.
 
 ## Requirements
 

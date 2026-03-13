@@ -1,8 +1,8 @@
 # Change Archive
 
-## Overview
+## Purpose
 
-Defines the `specd change archive <name>` command, which finalises a change by merging spec deltas into the permanent spec directories and moving the change to the archive.
+Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd change archive <name>` finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.
 
 ## Requirements
 

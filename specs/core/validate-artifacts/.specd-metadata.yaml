@@ -1,5 +1,5 @@
 title: ValidateArtifacts
-description: "`ValidateArtifacts` is the application use case that checks a change's artifact files against the active schema and marks them complete. It is the only path through which an artifact may reach `complete` status. It enforces required artifacts, validates structural rules, detects delta conflicts, and invalidates any outstanding approval when artifact content has changed since the approval was recorded."
+description: "Artifacts must be structurally valid and conflict-free before a change can progress, yet no other code path is allowed to mark an artifact complete — a single chokepoint is needed to enforce this invariant. `ValidateArtifacts` is that chokepoint: it checks a change's artifact files against the active schema, enforces required artifacts, validates structural rules, detects delta conflicts, invalidates any outstanding approval when content has changed, and is the only path through which an artifact may reach `complete` status."
 dependsOn:
   - core:core/change
   - core:core/schema-format
@@ -9,7 +9,7 @@ dependsOn:
   - default:_global/architecture
   - core:core/spec-id-format
 context:
-  - "`ValidateArtifacts` is the application use case that checks a change's artifact files against the active schema and marks them complete. It is the only path through which an artifact may reach `complete` status. It enforces required artifacts, validates structural rules, detects delta conflicts, and invalidates any outstanding approval when artifact content has changed since the approval was recorded."
+  - "Artifacts must be structurally valid and conflict-free before a change can progress, yet no other code path is allowed to mark an artifact complete — a single chokepoint is needed to enforce this invariant. `ValidateArtifacts` is that chokepoint: it checks a change's artifact files against the active schema, enforces required artifacts, validates structural rules, detects delta conflicts, invalidates any outstanding approval when content has changed, and is the only path through which an artifact may reach `complete` status."
 rules:
   - requirement: Ports and constructor
     rules:
@@ -338,6 +338,6 @@ scenarios:
     then:
       - changeRepository.save(change) is called — partial progress is persisted
 contentHashes:
-  spec.md: sha256:8782818bd8397429d69677546bb30df70b1081ba3bf51d2c9cbef439e03506ce
+  spec.md: sha256:1156b6ad074734740031d865908ac2b53f6694a34edf72a948c761102511ca76
   verify.md: sha256:e7a2776f4791714349f5fe816448efec4e7dbe1ba7cd99de282309d520697135
 generatedBy: core

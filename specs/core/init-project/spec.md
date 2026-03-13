@@ -1,8 +1,8 @@
 # InitProject
 
-## Overview
+## Purpose
 
-The `InitProject` use case initialises a new specd project by delegating to the `ConfigWriter` port. It writes `specd.yaml`, creates required storage directories, and updates `.gitignore`. It is the entry point for `specd init` and the only use case that creates a project configuration from scratch.
+Before a project can use specd, it needs a valid `specd.yaml`, storage directories, and gitignore entries — bootstrapping that must happen through a single coordinated operation. `InitProject` is the use case that handles this by delegating to the `ConfigWriter` port to write `specd.yaml`, create required storage directories, and update `.gitignore`. It is the entry point for `specd init` and the only use case that creates a project configuration from scratch.
 
 ## Requirements
 

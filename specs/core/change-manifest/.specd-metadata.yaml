@@ -1,5 +1,5 @@
 title: Change Manifest
-description: The change manifest (`manifest.json`) is the single source of truth for a change. It lives inside the change's directory and persists the full state of the Change domain entity — identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It is written and read exclusively by `FsChangeRepository`.
+description: The Change entity's state must survive process restarts and be recoverable from disk alone, so there needs to be a single, well-defined file that captures everything. The change manifest (`manifest.json`) is that file — it persists identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It lives inside the change's directory and is written and read exclusively by `FsChangeRepository`.
 dependsOn:
   - core:core/change
   - core:core/storage
@@ -7,7 +7,7 @@ dependsOn:
   - core:core/spec-id-format
   - core:core/workspace
 context:
-  - The change manifest (`manifest.json`) is the single source of truth for a change. It lives inside the change's directory and persists the full state of the Change domain entity — identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It is written and read exclusively by `FsChangeRepository`.
+  - The Change entity's state must survive process restarts and be recoverable from disk alone, so there needs to be a single, well-defined file that captures everything. The change manifest (`manifest.json`) is that file — it persists identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It lives inside the change's directory and is written and read exclusively by `FsChangeRepository`.
 rules:
   - requirement: Manifest structure
     rules:
@@ -222,6 +222,6 @@ scenarios:
     then:
       - the new transitioned event is appended to history and the entire manifest is written atomically (temp file + rename); no partial writes are visible
 contentHashes:
-  spec.md: sha256:f5df8ed0d324a82dbd4eb40266f41fbf4ffc12f9525850bc7d7a91a0dd12db73
+  spec.md: sha256:d549ec5b7b855ed32e3d66a4da93dbe39f60eb41aab09d57c701772cfa4d11c0
   verify.md: sha256:23e836325e6ef3fbb7a148af30741300d15bc021b6dbba364bd588e16ceea8c9
 generatedBy: core

@@ -1,34 +1,32 @@
 title: GetActiveSchema
-description: The `GetActiveSchema` use case resolves and returns the active schema for the project. It delegates to the `SchemaRegistry` port using the schema reference from `specd.yaml` and throws `SchemaNotFoundError` if resolution fails. This is the canonical way for delivery mechanisms to obtain the project's schema without duplicating resolution logic.
+description: Delivery mechanisms (CLI, MCP, plugins) need a single canonical way to obtain the project's resolved schema without duplicating multi-step resolution logic. `GetActiveSchema` provides this by delegating to `ResolveSchema`, which orchestrates the full pipeline (base schema, extends chain, plugins, overrides, merge, build), and returning the resulting `Schema` entity.
 dependsOn:
+  - core:core/resolve-schema
   - core:core/config
   - core:core/schema-format
   - default:_global/architecture
 context:
-  - The `GetActiveSchema` use case resolves and returns the active schema for the project. It delegates to the `SchemaRegistry` port using the schema reference from `specd.yaml` and throws `SchemaNotFoundError` if resolution fails. This is the canonical way for delivery mechanisms to obtain the project's schema without duplicating resolution logic.
+  - Delivery mechanisms (CLI, MCP, plugins) need a single canonical way to obtain the project's resolved schema without duplicating multi-step resolution logic. `GetActiveSchema` provides this by delegating to `ResolveSchema`, which orchestrates the full pipeline (base schema, extends chain, plugins, overrides, merge, build), and returning the resulting `Schema` entity.
 rules:
   - requirement: Accepts no input
     rules:
-      - '`execute()` MUST take no arguments. The schema reference and workspace schemas paths are provided at construction time, not at invocation time.'
-  - requirement: Resolves the schema via SchemaRegistry
+      - '`execute()` MUST take no arguments. All configuration is provided at construction time, not at invocation time.'
+  - requirement: Delegates to ResolveSchema
     rules:
-      - The use case MUST call `SchemaRegistry.resolve(schemaRef, workspaceSchemasPaths)` to resolve the active schema. It SHALL NOT load schema files directly or implement any resolution logic itself.
+      - 'The use case MUST call `resolveSchema.execute()` to obtain the active schema. It SHALL NOT resolve schemas directly or implement any resolution logic itself. `ResolveSchema` handles the full pipeline: base resolution, extends chain, plugins, overrides, merge, and build.'
   - requirement: Returns the resolved Schema on success
     rules:
-      - '`execute` MUST return `Promise<Schema>` — the fully-parsed schema value object resolved by the registry.'
-  - requirement: Throws SchemaNotFoundError when resolution fails
-    rules:
-      - When `SchemaRegistry.resolve` returns `null`, the use case MUST throw a `SchemaNotFoundError` with the schema reference string. It MUST NOT return `null` — the error is the only failure signal.
+      - '`execute` MUST return `Promise<Schema>` — the fully-resolved, customised schema.'
   - requirement: Construction dependencies
     rules:
       - |-
-        `GetActiveSchema` MUST be constructed with three dependencies:
+        `GetActiveSchema` MUST be constructed with one dependency:
 
-        * `schemas` (`SchemaRegistry`) — the registry port for resolving schema references.
-        * `schemaRef` (`string`) — the schema reference from `specd.yaml` (e.g. `"@specd/schema-std"`).
-        * `workspaceSchemasPaths` (`ReadonlyMap<string, string>`) — map of workspace name to absolute schemas directory path, used for workspace-qualified schema resolution.
+        * `resolveSchema` (`ResolveSchema`) — the use case that orchestrates the full schema resolution pipeline.
+
+        All lower-level dependencies (schema registry, schema ref, plugins, overrides) are provided to `ResolveSchema` at its construction time.
 constraints:
-  - The use case contains no business logic beyond null-check and error conversion.
+  - The use case contains no business logic — it is a thin delegation to ResolveSchema.
   - The schema reference is fixed at construction time — calling execute multiple times resolves the same reference.
   - The use case is async — it returns Promise<Schema>.
 scenarios:
@@ -37,49 +35,48 @@ scenarios:
     when:
       - execute() is called with no arguments
     then:
-      - the call succeeds and uses the schemaRef and workspaceSchemasPaths provided at construction
-  - requirement: Resolves the schema via SchemaRegistry
-    name: Registry receives construction-time parameters
+      - the call succeeds and uses the ResolveSchema instance provided at construction
+  - requirement: Delegates to ResolveSchema
+    name: ResolveSchema receives construction-time parameters
     given:
-      - 'the use case was constructed with schemaRef: "@specd/schema-std" and a workspace schemas map'
+      - the use case was constructed with a ResolveSchema instance configured for "@specd/schema-std"
     when:
       - execute() is called
     then:
-      - SchemaRegistry.resolve is called with "@specd/schema-std" and the same workspace schemas map
+      - resolveSchema.execute() is called
   - requirement: Returns the resolved Schema on success
-    name: Schema resolved from npm package
+    name: Schema resolved with extends and plugins
     given:
-      - SchemaRegistry.resolve returns a valid Schema object
+      - ResolveSchema.execute() returns a valid Schema object (after resolving extends, plugins, and overrides)
     when:
       - execute() is called
     then:
       - the returned promise resolves to that Schema object
-  - requirement: Throws SchemaNotFoundError when resolution fails
-    name: Schema reference not found
+  - requirement: Returns the resolved Schema on success
+    name: Schema not found
     given:
-      - SchemaRegistry.resolve returns null
+      - ResolveSchema.execute() throws SchemaNotFoundError
     when:
       - execute() is called
     then:
-      - a SchemaNotFoundError is thrown
-      - AND the error message contains the schema reference string
-  - requirement: Throws SchemaNotFoundError when resolution fails
-    name: Workspace schema path does not exist
+      - the SchemaNotFoundError propagates to the caller
+  - requirement: Returns the resolved Schema on success
+    name: Schema validation failure
     given:
-      - the schemaRef is "#billing:my-schema" and the billing schemas path does not contain my-schema/
+      - ResolveSchema.execute() throws SchemaValidationError (e.g. extends cycle, plugin kind mismatch)
     when:
       - execute() is called
     then:
-      - a SchemaNotFoundError is thrown with the reference "#billing:my-schema"
+      - the SchemaValidationError propagates to the caller
   - requirement: Construction dependencies
     name: Multiple executions resolve the same reference
     given:
-      - 'the use case was constructed with schemaRef: "@specd/schema-std"'
+      - the use case was constructed with a ResolveSchema instance
     when:
       - execute() is called twice
     then:
-      - SchemaRegistry.resolve is called twice with the same "@specd/schema-std" reference
+      - resolveSchema.execute() is called twice
 contentHashes:
-  spec.md: sha256:c36a1767a92eae651e54a54c940829f2e4bc63e5fcba7ded98df2dd0b0831f6f
-  verify.md: sha256:f575c4895c6dac56ce13dfab3ea44202ebc0686f3d2050e386178dbafd30d6eb
+  spec.md: sha256:7e311f1cacd151a8f9fd05978a289549f3128ba7a5c961ffea9d734a02e974f8
+  verify.md: sha256:6a085145a0f051fcf9eafe3a4476cfad77e8db9ed4f8c3f76406e23dc8f3ffdf
 generatedBy: core

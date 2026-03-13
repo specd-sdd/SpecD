@@ -1,10 +1,10 @@
 title: EditChange
-description: The `EditChange` use case modifies the spec scope of an existing change by adding or removing spec IDs. Workspaces are never managed directly — they are derived from the resulting `specIds` via the `Change.workspaces` getter. Any effective modification to `specIds` triggers approval invalidation.
+description: As a change evolves, its spec scope often needs to grow or shrink — but modifying the spec list has approval implications that must be enforced consistently. The `EditChange` use case adds or removes spec IDs on an existing change, derives workspaces from the resulting `specIds` via the `Change.workspaces` getter, and triggers approval invalidation whenever the spec list effectively changes.
 dependsOn:
   - core:core/change
   - core:core/composition
 context:
-  - The `EditChange` use case modifies the spec scope of an existing change by adding or removing spec IDs. Workspaces are never managed directly — they are derived from the resulting `specIds` via the `Change.workspaces` getter. Any effective modification to `specIds` triggers approval invalidation.
+  - As a change evolves, its spec scope often needs to grow or shrink — but modifying the spec list has approval implications that must be enforced consistently. The `EditChange` use case adds or removes spec IDs on an existing change, derives workspaces from the resulting `specIds` via the `Change.workspaces` getter, and triggers approval invalidation whenever the spec list effectively changes.
 rules:
   - requirement: Input contract
     rules:
@@ -129,6 +129,6 @@ scenarios:
       - AND the change is persisted
       - AND invalidated is true
 contentHashes:
-  spec.md: sha256:5f3c299ce241a1b42bdfe152e5d308fe756f659d5f7459bb440a8f401a459ca1
+  spec.md: sha256:9d8abe5566bac0bd6e1a8b93377b7f63c6637433a665be034f506e668c935623
   verify.md: sha256:ca361b2f72285373ef03bcee3edf2e6339f234c67690d728d8c4e3c93a4695c7
 generatedBy: core

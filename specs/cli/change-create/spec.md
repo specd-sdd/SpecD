@@ -1,8 +1,8 @@
 # Change Create
 
-## Overview
+## Purpose
 
-Defines the `specd change create <name> --spec <id>...` command, which creates a new change and persists it to the repository.
+Users need a way to start tracking a new unit of spec work before any artifacts exist. `specd change create <name> [--spec <id>...]` creates a new change and persists it to the repository, optionally scoping it to one or more specs upfront.
 
 ## Requirements
 

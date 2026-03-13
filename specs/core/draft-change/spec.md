@@ -1,8 +1,8 @@
 # DraftChange
 
-## Overview
+## Purpose
 
-The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history. The repository implementation moves the change directory from `changes/` to `drafts/` when persisted.
+Users need to pause work on a change without losing its state or history — for example, to context-switch or wait on a dependency. The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history, and the repository implementation moves the change directory from `changes/` to `drafts/` when persisted.
 
 ## Requirements
 

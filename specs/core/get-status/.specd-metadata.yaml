@@ -1,10 +1,10 @@
 title: GetStatus
-description: The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each attached artifact. Artifact statuses are computed by cascading through dependency chains -- an artifact whose hashes match may still be `in-progress` if any of its required dependencies are not `complete`.
+description: Users and tooling need a quick way to see where a change stands — both its lifecycle state and which artifacts are actually ready — without loading file content. The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each artifact, cascading through dependency chains so that an artifact whose hashes match may still show `in-progress` if any of its required dependencies are not `complete`.
 dependsOn:
   - core:core/change
   - core:core/kernel
 context:
-  - The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each attached artifact. Artifact statuses are computed by cascading through dependency chains -- an artifact whose hashes match may still be `in-progress` if any of its required dependencies are not `complete`.
+  - Users and tooling need a quick way to see where a change stands — both its lifecycle state and which artifacts are actually ready — without loading file content. The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each artifact, cascading through dependency chains so that an artifact whose hashes match may still show `in-progress` if any of its required dependencies are not `complete`.
 rules:
   - requirement: Accepts a change name as input
     rules:
@@ -84,6 +84,6 @@ scenarios:
       - the effectiveStatus for spec is complete
       - AND the effectiveStatus for proposal is skipped
 contentHashes:
-  spec.md: sha256:98c66e49f7115b411df4f0f75bc323b46566afc7774c4b7148ff527c2bc8439d
+  spec.md: sha256:d565fa595f7a2e28d53fd514f9c537f2d830d4b4c556756db47d849d63ed4e24
   verify.md: sha256:ccad98397cc59411e45892cea0099e8cbc13e1c9c00e9c64afd2ef2a2163d180
 generatedBy: core

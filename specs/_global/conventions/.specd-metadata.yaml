@@ -1,7 +1,7 @@
 title: Coding Conventions
-description: TypeScript conventions for the specd monorepo. These apply to all packages unless a package-level spec overrides a specific rule.
+description: Without consistent language-level conventions, a multi-package monorepo drifts into incompatible styles that slow down both humans and agents. This spec defines the TypeScript conventions for the specd monorepo — strict mode, ESM-only, naming, error handling, and more. They apply to all packages unless a package-level spec explicitly overrides a specific rule.
 context:
-  - TypeScript conventions for the specd monorepo. These apply to all packages unless a package-level spec overrides a specific rule.
+  - Without consistent language-level conventions, a multi-package monorepo drifts into incompatible styles that slow down both humans and agents. This spec defines the TypeScript conventions for the specd monorepo — strict mode, ESM-only, naming, error handling, and more. They apply to all packages unless a package-level spec explicitly overrides a specific rule.
 rules:
   - requirement: TypeScript strict mode
     rules:
@@ -132,6 +132,6 @@ scenarios:
     then:
       - it should be typed as readonly string[]
 contentHashes:
-  spec.md: sha256:c20a8be53ae62549e58054cec37581f89886f4bf1c7268c7861104e33779635d
+  spec.md: sha256:4e0dbfa804b6eee09d149e586df68d02a060e51916b596fab98dea80e47bb0dc
   verify.md: sha256:9dd5bb3432b73ff956f4900cf1ce64301e1ea79430c1ea633546b3ac61b15c99
 generatedBy: core

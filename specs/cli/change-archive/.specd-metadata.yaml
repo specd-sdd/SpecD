@@ -1,10 +1,10 @@
 title: Change Archive
-description: Defines the `specd change archive <name>` command, which finalises a change by merging spec deltas into the permanent spec directories and moving the change to the archive.
+description: Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd change archive <name>` finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd change archive <name>` command, which finalises a change by merging spec deltas into the permanent spec directories and moving the change to the archive.
+  - Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd change archive <name>` finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.
 rules:
   - requirement: Command signature
     rules:
@@ -103,6 +103,6 @@ scenarios:
       - stdout is valid JSON with result equal to "ok", name equal to "my-change", and archivePath containing the archive path
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:925f3bbb9a9446c2ba4e4d156aa8d318f1a145a9ca91fb87c71e12f4319b6d68
+  spec.md: sha256:fdbb6e177d2c55da276ce8a037707e8aa852f55defd14ffa1881dd01d2496e1f
   verify.md: sha256:9bdfc08eee69a987836597dc57debc5d5bfc26e5e9d227d50ce59b6cef863acb
 generatedBy: core

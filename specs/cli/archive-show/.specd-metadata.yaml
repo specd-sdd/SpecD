@@ -1,10 +1,10 @@
 title: Archive Show
-description: Defines the `specd archive show <name>` command, which displays basic metadata for a single archived change.
+description: When reviewing archived work, users need to inspect a specific change without restoring it. The `specd archive show <name>` command displays basic metadata for a single archived change.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd archive show <name>` command, which displays basic metadata for a single archived change.
+  - When reviewing archived work, users need to inspect a specific change without restoring it. The `specd archive show <name>` command displays basic metadata for a single archived change.
 rules:
   - requirement: Command signature
     rules:
@@ -81,6 +81,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:916489e0651105c0475577b702e3c9de4e27bf23c304dfc154b3bfbf2c09af74
+  spec.md: sha256:07f24ee95cb7c8566a716c5cd6dade427aa404c3c9c4b396b3c1b4cb061eb328
   verify.md: sha256:7ee898ee3d0f81de254abfd876574acff2495e7f7906bbe91afd4d41d0a8782f
 generatedBy: core

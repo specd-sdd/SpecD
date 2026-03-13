@@ -1,8 +1,8 @@
 # ConfigWriter Port
 
-## Overview
+## Purpose
 
-`ConfigWriter` is an application-layer port that defines the contract for creating and mutating the project configuration (`specd.yaml`). Unlike `ConfigLoader` (which is read-only), `ConfigWriter` handles the operations that initialise a project, record skill installations, and read the skills manifest.
+Project initialisation and skill installation must create and mutate `specd.yaml`, but the application layer cannot depend on filesystem or YAML libraries directly. `ConfigWriter` is the application-layer port that defines the contract for these write operations — initialising a project, recording skill installations, and reading the skills manifest — complementing the read-only `ConfigLoader`.
 
 ## Requirements
 

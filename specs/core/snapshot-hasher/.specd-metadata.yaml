@@ -1,9 +1,9 @@
 title: Snapshot Hasher
-description: '`hashFiles` is a pure domain service that computes SHA-256 content hashes for a set of files. It is used to record a content fingerprint at validation time so that infrastructure adapters can detect drift — a file has drifted if its current hash differs from the one stored at last validation.'
+description: Detecting whether an artifact has changed since it was last validated requires a stable, deterministic content fingerprint that can be stored and compared later. `hashFiles` is a pure domain service that computes SHA-256 content hashes for a set of files, recording a fingerprint at validation time so that infrastructure adapters can detect drift — a file has drifted if its current hash differs from the one stored at last validation.
 dependsOn:
   - default:_global/architecture
 context:
-  - '`hashFiles` is a pure domain service that computes SHA-256 content hashes for a set of files. It is used to record a content fingerprint at validation time so that infrastructure adapters can detect drift — a file has drifted if its current hash differs from the one stored at last validation.'
+  - Detecting whether an artifact has changed since it was last validated requires a stable, deterministic content fingerprint that can be stored and compared later. `hashFiles` is a pure domain service that computes SHA-256 content hashes for a set of files, recording a fingerprint at validation time so that infrastructure adapters can detect drift — a file has drifted if its current hash differs from the one stored at last validation.
 rules:
   - requirement: Hash format
     rules:
@@ -62,6 +62,6 @@ scenarios:
     then:
       - the result contains a valid sha256:<hex> value for that path
 contentHashes:
-  spec.md: sha256:9a61e6453994faa05f9ac901fa43be47ca1b15d2b87764f59f1a04b96dd07f83
+  spec.md: sha256:071d6bc7357a7af24d19e22330135bccf29be8ef9d211752e4d1456a985ba3f1
   verify.md: sha256:6b20ea953f6b51ed6ab7fb0dcafe409d5d6f8517c215bddaf9a5e0b933414065
 generatedBy: core

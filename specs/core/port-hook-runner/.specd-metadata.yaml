@@ -1,9 +1,9 @@
 title: HookRunner Port
-description: '`HookRunner` is an application-layer port that defines the contract for executing `run:` hook commands declared in workflow entries. It isolates the application layer from subprocess execution details, template variable expansion, and shell-specific concerns.'
+description: Workflow entries can declare `run:` hooks that execute shell commands, but the application layer must not depend on subprocess APIs, shell detection, or platform-specific execution details. `HookRunner` is the application-layer port that defines the contract for executing these hook commands, abstracting template variable expansion and shell concerns behind a single interface.
 dependsOn:
   - default:_global/architecture
 context:
-  - '`HookRunner` is an application-layer port that defines the contract for executing `run:` hook commands declared in workflow entries. It isolates the application layer from subprocess execution details, template variable expansion, and shell-specific concerns.'
+  - Workflow entries can declare `run:` hooks that execute shell commands, but the application layer must not depend on subprocess APIs, shell detection, or platform-specific execution details. `HookRunner` is the application-layer port that defines the contract for executing these hook commands, abstracting template variable expansion and shell concerns behind a single interface.
 rules:
   - requirement: Interface shape
     rules:
@@ -145,6 +145,6 @@ scenarios:
     then:
       - the {{change.name}} token is left unexpanded
 contentHashes:
-  spec.md: sha256:b329279c6aeb4ee71c69acd613c30ca135365c4af5d53f62becccd7f724fde28
+  spec.md: sha256:8ae89ecbfa598b49658dd1a31996e35b6e671c77318ed4586d4d078c1ec21e95
   verify.md: sha256:f34230bba8ec2521fe5cd36eb88acf006468aa0b9a2d5b76eb7faa5cf91f327a
 generatedBy: core

@@ -1,12 +1,12 @@
 title: List Specs
-description: The `ListSpecs` use case enumerates all specs across all configured workspaces, returning a title for each entry and optionally a short summary and metadata freshness status. It is the primary query for discovery UIs and CLI listing commands.
+description: Agents and CLI users need a single query to discover what specs exist across all workspaces without loading full spec content. The `ListSpecs` use case enumerates all specs across all configured workspaces, returning a title for each entry and optionally a short summary and metadata freshness status. It is the primary query for discovery UIs and CLI listing commands.
 dependsOn:
   - core:core/spec-metadata
   - core:core/content-extraction
   - core:core/storage
   - core:core/workspace
 context:
-  - The `ListSpecs` use case enumerates all specs across all configured workspaces, returning a title for each entry and optionally a short summary and metadata freshness status. It is the primary query for discovery UIs and CLI listing commands.
+  - Agents and CLI users need a single query to discover what specs exist across all workspaces without loading full spec content. The `ListSpecs` use case enumerates all specs across all configured workspaces, returning a title for each entry and optionally a short summary and metadata freshness status. It is the primary query for discovery UIs and CLI listing commands.
 rules:
   - requirement: Enumerate specs across all workspaces
     rules:
@@ -182,6 +182,6 @@ scenarios:
     then:
       - the entry still appears without a summary and no error is thrown
 contentHashes:
-  spec.md: sha256:c620f395c5667e0442c1784fd0ca58bb1e77b7273a26a6f10dbac16dcc976685
+  spec.md: sha256:a3aac308013e2116a5498bdac08933f1d2dd8c97caa13c165e5cf28cf4bbb1ac
   verify.md: sha256:70deb904d5f5d8fc660a316ac8ef9670e12a69da03d7260074b1e40844775bed
 generatedBy: core

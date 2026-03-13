@@ -1,7 +1,7 @@
 title: Architecture
-description: specd uses Hexagonal Architecture (Ports & Adapters) combined with Domain-Driven Design tactical patterns. The domain is the center — all I/O is pushed to the edges. These principles apply to every package in the monorepo that contains business logic. Adapter packages (CLI, MCP, plugins) follow the same pattern at their level, delegating all logic to the core.
+description: Business logic coupled to I/O becomes untestable and resistant to change. specd uses Hexagonal Architecture (Ports & Adapters) combined with DDD tactical patterns — the domain is the center, all I/O is pushed to the edges. These principles apply to every package with business logic; adapter packages (CLI, MCP, plugins) follow the same pattern at their level, delegating all logic to the core.
 context:
-  - specd uses Hexagonal Architecture (Ports & Adapters) combined with Domain-Driven Design tactical patterns. The domain is the center — all I/O is pushed to the edges. These principles apply to every package in the monorepo that contains business logic. Adapter packages (CLI, MCP, plugins) follow the same pattern at their level, delegating all logic to the core.
+  - Business logic coupled to I/O becomes untestable and resistant to change. specd uses Hexagonal Architecture (Ports & Adapters) combined with DDD tactical patterns — the domain is the center, all I/O is pushed to the edges. These principles apply to every package with business logic; adapter packages (CLI, MCP, plugins) follow the same pattern at their level, delegating all logic to the core.
 rules:
   - requirement: Layered structure for packages with business logic
     rules:
@@ -142,6 +142,6 @@ scenarios:
     then:
       - pnpm must reject it
 contentHashes:
-  spec.md: sha256:1221b89976c713e5e9fbbd2affec5adc82d1547aedfd8f9a83857bcf5c3b85f1
+  spec.md: sha256:e4b6d93d9ad5dec95baa9994ed0c6c8824868b8ca0d8fc0dbae69830cad64e50
   verify.md: sha256:dbbf29057514a748003772a3670aa33c62a8fb2a7e859ec9d9a49d49367cbbff
 generatedBy: core

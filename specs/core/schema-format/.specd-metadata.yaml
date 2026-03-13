@@ -1,32 +1,61 @@
 title: Schema Format
-description: |-
-  A specd schema is a YAML file that defines the artifact workflow for a project. It specifies which artifacts exist, how they relate to each other, how they are validated, which sections to extract for AI context, and what instructions the AI should follow when creating each artifact.
-
-  Schemas are resolved at runtime via `SchemaRegistry`. Each project specifies a schema name in `specd.yaml`; the registry locates the corresponding `schema.yaml` by checking three locations in order: the project-local schemas directory (configured in `specd.yaml`, default `specd/schemas/`), the user's global override directory, and installed npm packages named `@specd/schema-*`.
-
-  The delta mechanism — file format, AST selectors, application algorithm, and structural validation — is defined in [`specs/core/delta-format/spec.md`](../delta-format/spec.md).
+description: Without a single declarative definition of a project's artifact workflow, every tool in the ecosystem would need to hardcode artifact types, validation rules, and AI instructions independently. A specd schema is a YAML file that solves this by defining which artifacts exist, how they relate to each other, how they are validated, which sections to extract for AI context, and what instructions the AI should follow when creating each artifact. Schemas are resolved at runtime via `SchemaRegistry` using a prefix convention that checks project-local directories, user overrides, or installed npm packages. The delta mechanism (file format, AST selectors, application algorithm, structural validation) is defined in [`specs/core/delta-format/spec.md`](../delta-format/spec.md).
 dependsOn:
   - core:core/delta-format
   - core:core/selector-model
   - core:core/content-extraction
+  - core:core/schema-merge
 context:
-  - |-
-    A specd schema is a YAML file that defines the artifact workflow for a project. It specifies which artifacts exist, how they relate to each other, how they are validated, which sections to extract for AI context, and what instructions the AI should follow when creating each artifact.
-
-    Schemas are resolved at runtime via `SchemaRegistry`. Each project specifies a schema name in `specd.yaml`; the registry locates the corresponding `schema.yaml` by checking three locations in order: the project-local schemas directory (configured in `specd.yaml`, default `specd/schemas/`), the user's global override directory, and installed npm packages named `@specd/schema-*`.
-
-    The delta mechanism — file format, AST selectors, application algorithm, and structural validation — is defined in [`specs/core/delta-format/spec.md`](../delta-format/spec.md).
+  - Without a single declarative definition of a project's artifact workflow, every tool in the ecosystem would need to hardcode artifact types, validation rules, and AI instructions independently. A specd schema is a YAML file that solves this by defining which artifacts exist, how they relate to each other, how they are validated, which sections to extract for AI context, and what instructions the AI should follow when creating each artifact. Schemas are resolved at runtime via `SchemaRegistry` using a prefix convention that checks project-local directories, user overrides, or installed npm packages. The delta mechanism (file format, AST selectors, application algorithm, structural validation) is defined in [`specs/core/delta-format/spec.md`](../delta-format/spec.md).
 rules:
   - requirement: Schema file structure
     rules:
       - |-
         A schema file must be a valid YAML document with the following top-level fields:
 
+        * `kind` (`schema` | `schema-plugin`, required) — discriminates full schemas from plugins; see Requirement: Schema kind field
         * `name` (string, required) — machine identifier, e.g. `spec-driven`
         * `version` (integer, required) — schema version, monotonically increasing
         * `description` (string, optional) — human-readable summary
-        * `artifacts` (array, required) — one entry per artifact type
-        * `workflow` (array, optional) — named phases of the change lifecycle, each with optional artifact prerequisites and hooks; see Requirement: Workflow
+        * `extends` (string, optional) — reference to a parent schema; see Requirement: Schema extends
+        * `artifacts` (array, required for `kind: schema`) — one entry per artifact type
+        * `workflow` (array, optional, only valid for `kind: schema`) — named phases of the change lifecycle, each with optional artifact prerequisites and hooks; see Requirement: Workflow
+  - requirement: Schema kind field
+    rules:
+      - |-
+        Every schema file must declare a `kind` field:
+
+        * `kind: schema` — a full schema with `artifacts`, `workflow`, `metadataExtraction`, and optional `extends`. `artifacts` is required; `workflow` and `metadataExtraction` are optional.
+        * `kind: schema-plugin` — a partial schema containing only `description` and merge operations. `artifacts`, `workflow`, `metadataExtraction`, and `extends` are not valid on a plugin and must be rejected at validation time.
+
+        Omitting `kind` is a `SchemaValidationError`.
+  - requirement: Schema extends
+    rules:
+      - |-
+        A schema with `kind: schema` may declare an `extends` field — a string referencing another schema. The reference uses the same convention as the `schema` field in `specd.yaml` (npm package, workspace-qualified, bare name, or path). The referenced schema must also have `kind: schema`.
+
+        Extends chains are permitted: schema A may extend schema B which extends schema C. The chain is resolved recursively until a schema with no `extends` is reached (the root). The root schema is the base; each child in the chain is applied as a merge layer in order from root to leaf.
+
+        Cycles in the extends chain must be detected and produce a `SchemaValidationError` identifying the cycle. Detection uses the resolved schema file path to avoid false positives from different references pointing to the same file.
+
+        `kind: schema-plugin` must not declare `extends` — it is a validation error.
+  - requirement: Array entry identity
+    rules:
+      - |-
+        Every entry in the following schema arrays must carry an `id` field:
+
+        * `workflow[].hooks.pre[]` and `workflow[].hooks.post[]`
+        * `artifacts[].validations[]`
+        * `artifacts[].deltaValidations[]`
+        * `artifacts[].rules.pre[]` and `artifacts[].rules.post[]`
+        * `artifacts[].preHashCleanup[]`
+        * `metadataExtraction` array entries (entries in `rules[]`, `constraints[]`, `scenarios[]`, `context[]`)
+
+        Format: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters. IDs must be unique within their immediate array. Duplicate IDs within the same array produce a `SchemaValidationError`.
+
+        Workflow steps use `step` as their identity field instead of `id`. Artifact entries use their existing `id` field.
+
+        Single-entry metadata fields (`title`, `description`, `dependsOn`, `keywords`) do not have `id` — they are scalars, not array entries.
   - requirement: Artifact definition
     rules:
       - |-
@@ -46,7 +75,11 @@ rules:
         * `deltaValidations` (array, optional) — structural validation rules checked against the normalized YAML AST of the delta file before application; see Requirement: Delta validation rules. Only valid when `delta: true`.
         * `validations` (array, optional) — structural validation rules for the base artifact (after delta application); see Requirement: Validation rules
         * `metadataExtraction` (object, optional) — top-level declaration of how to extract metadata fields from artifact content; see Requirement: Metadata extraction
-        * `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has a `pattern` (regex string) and a `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
+        * `rules` (object, optional) — constraint text blocks injected by `CompileContext` around the artifact's `instruction`:
+          * `pre` (array, optional) — entries injected **before** the instruction. Each entry: `{ id: string, text: string }`.
+          * `post` (array, optional) — entries injected **after** the instruction. Each entry: `{ id: string, text: string }`.
+            `id` follows the standard array entry identity format. `text` is injected verbatim as a constraint block.
+        * `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has `id` (string, required — standard array entry identity format), `pattern` (regex string), and `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
         * `taskCompletionCheck` (object, optional) — declares how to detect task completion within this artifact's file content. Used to gate the `implementing → verifying` transition: if the artifact is listed in the `implementing` step's `requires`, all items matching `incompletePattern` must be absent (zero matches) before the transition is allowed. Both fields are optional and default to markdown checkbox syntax: When both patterns are present, the CLI can report progress (e.g. `3/5 tasks complete`) by counting matches of each. If `taskCompletionCheck` is omitted entirely, the defaults apply.
           * `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item
           * `completePattern` (string, regex, default `^\s*-\s+\[x\]`, case-insensitive) — matches a complete task item
@@ -188,10 +221,10 @@ rules:
         * `requires` (array of artifact IDs, optional) — artifacts that must be `complete` before this step is available; empty or omitted means always available
         * `hooks` (object, optional) — hooks for this step's boundaries; each key is `pre` or `post`, each value is an array of `instruction:` or `run:` hook entries
 
-        Every hook entry is either:
+        Every hook entry must include an `id` field (standard array entry identity format) and exactly one of:
 
-        * `{ instruction: string }` — AI context injected when this step is compiled; used to guide agent behaviour during this phase
-        * `{ run: string }` — shell command executed at the phase boundary; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`
+        * `{ id: string, instruction: string }` — AI context injected when this step is compiled; used to guide agent behaviour during this phase
+        * `{ id: string, run: string }` — shell command executed at the phase boundary; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`
 
         **`pre` hook failure** — if a `run:` hook exits with a non-zero code, the step is aborted and the user is informed of the failure. The agent should offer to attempt to fix the problem before retrying.
 
@@ -199,22 +232,20 @@ rules:
 
         The order of entries in `workflow` is the intended progression of the change lifecycle and is used by tooling to display status. It does not enforce sequential blocking between consecutive steps — each step is independently gated by its own `requires`.
 
-        `specd.yaml` uses the same `workflow` format to add project-level hooks. Each entry only accepts `step` and `hooks` — `requires` is not valid in `specd.yaml` workflow entries and must be rejected at load time. Entries are matched by `step` name; schema hooks fire first, then project hooks, within the same `pre`/`post` event.
-  - requirement: Project-level artifactRules
+        Project-level hook additions are no longer declared via a `workflow` section in `specd.yaml`. Instead, they are expressed as `schemaOverrides` targeting `workflow[].hooks` — see [`specs/core/config/spec.md`](../config/spec.md).
+  - requirement: Schema plugin kind
     rules:
       - |-
-        `artifactRules` in `specd.yaml` allows teams to add per-artifact constraints without forking the schema. Each key is an artifact ID; each value is an array of rule strings. `CompileContext` injects them alongside the schema-defined instruction as a distinct constraints block.
+        A schema file with `kind: schema-plugin` is a partial schema that provides only merge operations for composing with a base schema. A plugin must declare:
 
-        ```yaml
-        # specd.yaml
-        artifactRules:
-          specs:
-            - 'All requirements must reference the relevant RFC number'
-          design:
-            - 'Architecture decisions must note which ADR they relate to'
-        ```
+        * `kind: schema-plugin` (required)
+        * `name` (string, required) — plugin identifier
+        * `version` (integer, required) — plugin version
+        * `description` (string, optional) — human-readable summary
 
-        Rule keys are validated against the active schema's artifact IDs on load. Unknown keys produce a warning but do not prevent startup. Rules are additive — they extend the schema's instruction, not replace it.
+        A plugin must not declare `artifacts`, `workflow`, `metadataExtraction`, or `extends` — these are validation errors. The plugin's customisation intent is expressed via `schemaOverrides`-style operations when referenced in `specd.yaml`'s `schemaPlugins`. The plugin file itself contains the operations inline under top-level operation keys (`create`, `remove`, `set`, `append`, `prepend`).
+
+        Plugins are resolved using the same reference conventions as schemas (npm, workspace-qualified, bare name, path).
   - requirement: Schema resolution
     rules:
       - |-
@@ -233,14 +264,18 @@ rules:
       - |-
         `SchemaRegistry.resolve()` must validate the parsed YAML against a Zod schema before constructing the `Schema` object. Unknown top-level fields must be ignored (forward compatibility). Structural mismatches and semantic errors must produce a `SchemaValidationError` — a domain error extending `SpecdError` — before any domain object construction takes place. Validation covers:
 
+        * `kind` missing or not one of `schema` | `schema-plugin`
+        * `kind: schema-plugin` declaring `artifacts`, `workflow`, `metadataExtraction`, or `extends`
         * Duplicate `artifact.id` within `artifacts`
         * Duplicate `workflow[].step` within `workflow`
         * `artifact.id` not matching `/^[a-z][a-z0-9-]*$/`
+        * Array entry `id` not matching `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` or exceeding 64 characters
+        * Duplicate `id` within the same array (hooks, validations, rules, deltaValidations, preHashCleanup, metadataExtraction entries)
         * Unknown artifact ID referenced in `artifact.requires`
         * Circular dependency in artifact `requires` graph
         * Non-optional artifact hard-depending on an optional artifact
         * `deltaValidations` declared on an artifact with `delta: false`
-        * `requires` present in a `specd.yaml` workflow entry
+        * Cycle in `extends` chain (detected via resolved file path)
   - requirement: verify.md format
     rules:
       - |-
@@ -266,21 +301,26 @@ rules:
 
         The `verify` artifact in the schema should declare `requires: [spec]` — scenarios are written after the spec is stable. The `workflow.verify` step should declare `requires: [verify]`.
 constraints:
+  - kind is required on every schema file; must be schema or schema-plugin
+  - 'kind: schema-plugin must not declare artifacts, workflow, metadataExtraction, or extends'
+  - 'extends is only valid on kind: schema; cycles in extends chains are a validation error'
   - artifact.id must match /^[a-z][a-z0-9-]*$/ and must be unique within a schema
+  - Array entry id must match /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/, 1–64 characters, unique within its immediate array
   - artifact.scope must be spec or change; it is required and has no default
   - 'artifact.optional defaults to false; a non-optional artifact with scope: spec must be present in every spec directory and every change'
+  - artifact.rules.pre and artifact.rules.post are optional arrays of { id, text } entries
   - workflow[].step must be unique — duplicate step names in the same workflow array are a schema validation error
+  - Every hook entry must include an id field alongside its instruction or run field
   - requires must not contain cycles; circular dependencies in the artifact graph are a schema validation error
   - 'If artifact A is optional: true, any artifact that lists A in its requires must also be optional: true'
   - 'deltaValidations is only valid on artifacts with delta: true; declaring deltaValidations on a non-delta artifact is a schema validation error'
-  - requires in specd.yaml workflow entries is invalid and must be rejected at load time; only step and hooks are accepted
   - The order of entries in workflow is the intended display order for tooling; it does not enforce sequential blocking between consecutive steps
   - Delta file format, selector model, and application constraints are defined in specs/core/delta-format/spec.md
 scenarios:
   - requirement: Schema file structure
     name: Minimal valid schema
     when:
-      - a schema file contains name, version, and at least one artifact
+      - 'a schema file contains kind: schema, name, version, and at least one artifact'
     then:
       - SchemaRegistry.resolve() must return the parsed schema without error
   - requirement: Schema file structure
@@ -289,6 +329,82 @@ scenarios:
       - a schema file is missing name or version
     then:
       - SchemaRegistry.resolve() must throw a validation error
+  - requirement: Schema kind field
+    name: Missing kind field
+    when:
+      - a schema file omits the kind field
+    then:
+      - SchemaRegistry.resolve() must throw a SchemaValidationError
+  - requirement: Schema kind field
+    name: Invalid kind value
+    when:
+      - 'a schema file declares kind: extension'
+    then:
+      - SchemaRegistry.resolve() must throw a SchemaValidationError
+  - requirement: Schema kind field
+    name: Plugin with artifacts is rejected
+    when:
+      - 'a schema file declares kind: schema-plugin and also declares artifacts'
+    then:
+      - SchemaRegistry.resolve() must throw a SchemaValidationError
+  - requirement: Schema kind field
+    name: Plugin with workflow is rejected
+    when:
+      - 'a schema file declares kind: schema-plugin and also declares workflow'
+    then:
+      - SchemaRegistry.resolve() must throw a SchemaValidationError
+  - requirement: Schema extends
+    name: Simple extends chain resolved
+    given:
+      - "schema A declares extends: '#child-schema' and child-schema declares extends: '#base-schema'"
+    when:
+      - schema A is resolved
+    then:
+      - 'the resolution follows the chain: base-schema → child-schema → A, with each layer applied in order'
+  - requirement: Schema extends
+    name: Extends cycle detected
+    given:
+      - "schema A declares extends: '#b' and schema B declares extends: '#a'"
+    when:
+      - schema A is resolved
+    then:
+      - SchemaRegistry.resolve() must throw a SchemaValidationError identifying the cycle
+  - requirement: Schema extends
+    name: Plugin with extends is rejected
+    when:
+      - "a schema file declares kind: schema-plugin and also declares extends: '#base'"
+    then:
+      - SchemaRegistry.resolve() must throw a SchemaValidationError
+  - requirement: Schema extends
+    name: Extends references a non-existent schema
+    when:
+      - "a schema declares extends: '#nonexistent' and no such schema exists"
+    then:
+      - SchemaRegistry.resolve() must throw a SchemaNotFoundError
+  - requirement: Array entry identity
+    name: Valid id format accepted
+    when:
+      - 'a hook entry declares id: run-tests'
+    then:
+      - the schema loads without error
+  - requirement: Array entry identity
+    name: Invalid id format rejected
+    when:
+      - 'a hook entry declares id: Run_Tests'
+    then:
+      - SchemaRegistry.resolve() must throw a SchemaValidationError
+  - requirement: Array entry identity
+    name: Duplicate id within same array rejected
+    when:
+      - 'two entries in workflow[0].hooks.pre both declare id: run-tests'
+    then:
+      - SchemaRegistry.resolve() must throw a SchemaValidationError
+  - requirement: Array entry identity
+    name: Same id in different arrays is valid
+    when:
+      - 'workflow[0].hooks.pre has id: run-tests and workflow[1].hooks.post also has id: run-tests'
+    then:
+      - the schema loads without error — uniqueness is per-array, not global
   - requirement: Artifact definition
     name: Filename derived from glob literal segment
     when:
@@ -619,29 +735,39 @@ scenarios:
     then:
       - CompileContext must report that the step is blocked
   - requirement: Workflow
-    name: Schema and project hooks merged
+    name: Hook entries require id
     when:
-      - both the schema and specd.yaml define workflow entries for the same step
+      - a workflow[].hooks.pre entry omits the id field
     then:
-      - schema hooks fire first, followed by project hooks, within the same pre/post event
-  - requirement: Workflow
-    name: requires in specd.yaml workflow entry rejected
+      - SchemaRegistry.resolve() must throw a SchemaValidationError
+  - requirement: Artifact definition
+    name: Artifact with rules.pre and rules.post
+    given:
+      - 'an artifact declares rules: { pre: [{ id: pre-rule, text: "Before instruction" }], post: [{ id: post-rule, text: "After instruction" }] }'
     when:
-      - a specd.yaml workflow entry includes a requires field
+      - CompileContext assembles the instruction block for that artifact
     then:
-      - the config loader must reject it with a validation error
-  - requirement: Project-level artifactRules
-    name: Rules injected into compiled context
+      - pre-rule text appears before the artifact's instruction and post-rule text appears after it
+  - requirement: Artifact definition
+    name: preHashCleanup entry requires id
     when:
-      - specd.yaml defines artifactRules for artifact specs
+      - a preHashCleanup entry omits the id field
     then:
-      - CompileContext includes those rules in the compiled instruction block for the specs artifact
-  - requirement: Project-level artifactRules
-    name: Unknown artifact ID in artifactRules
+      - SchemaRegistry.resolve() must throw a SchemaValidationError
+  - requirement: Schema plugin kind
+    name: Valid plugin with operations
+    given:
+      - 'a schema file with kind: schema-plugin, name: my-plugin, version: 1, and merge operations'
     when:
-      - specd.yaml defines artifactRules for an artifact ID not present in the active schema
+      - the plugin is resolved
     then:
-      - SchemaRegistry emits a warning at load time and ignores those rules
+      - it loads successfully
+  - requirement: Schema plugin kind
+    name: Plugin with metadataExtraction is rejected
+    when:
+      - a schema-plugin declares metadataExtraction
+    then:
+      - SchemaRegistry.resolve() must throw a SchemaValidationError
   - requirement: Schema resolution
     name: npm package resolved
     when:
@@ -697,6 +823,6 @@ scenarios:
     then:
       - both spec.md and verify.md are read and included together in the LLM context
 contentHashes:
-  spec.md: sha256:006b5440f3a6c05f8a1c0f08bee04e909896becc175383e598bc3868f7c0674e
-  verify.md: sha256:6a6b08959eb0b115b0d3dafbce2fbbf70503cfa83ad2ba3037764f61cc114af8
+  spec.md: sha256:54119531c58cadb8910487efbd4fc5c82c5d44981bd75d5e4c5b299dac760032
+  verify.md: sha256:b7f9d6369f707b18356327e0ee39014c64e06b55ed9560f4790b4022d8acfe5b
 generatedBy: core

@@ -1,8 +1,8 @@
 # Selector Model
 
-## Overview
+## Purpose
 
-The selector model defines how nodes in an artifact AST are identified and addressed. Selectors are used across multiple specd mechanisms: delta entries target nodes for modification or removal, validation rules assert structural constraints, and metadata extraction declares which nodes to extract for deterministic metadata generation. The selector model is format-agnostic — the same fields apply regardless of whether the target document is markdown, JSON, YAML, or plain text.
+Delta entries, validation rules, and metadata extraction all need to identify specific nodes in an artifact AST, and each mechanism would invent its own addressing scheme without a shared model. The selector model provides that shared vocabulary, defining how nodes are identified and addressed across all specd mechanisms in a format-agnostic way — the same fields apply regardless of whether the target document is markdown, JSON, YAML, or plain text.
 
 ## Requirements
 

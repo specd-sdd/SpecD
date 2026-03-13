@@ -1,8 +1,8 @@
 # Schema Show
 
-## Overview
+## Purpose
 
-Defines the `specd schema show` command, which prints the active schema's declared artifacts and workflow steps. Primarily useful for agents entering a new project to understand what they need to produce and in what order.
+Agents entering a new project need to know what artifacts they must produce and in what order, without reading raw schema YAML. The `specd schema show` command prints the active schema's declared artifacts and workflow steps in a structured, human- and machine-readable form.
 
 ## Requirements
 

@@ -1,8 +1,8 @@
 # SkipArtifact
 
-## Overview
+## Purpose
 
-The `SkipArtifact` use case explicitly marks an optional artifact on a change as skipped. This allows a change author to signal that an artifact defined in the schema is intentionally omitted, rather than simply missing. Only optional artifacts may be skipped — required artifacts MUST be produced.
+Not every change needs every optional artifact, but the system must distinguish "intentionally omitted" from "forgotten" to avoid blocking downstream steps on missing files. The `SkipArtifact` use case explicitly marks an optional artifact as skipped, signalling deliberate omission so that dependency chains and workflow steps treat it as resolved. Only optional artifacts may be skipped — required artifacts MUST be produced.
 
 ## Requirements
 

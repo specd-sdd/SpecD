@@ -1,9 +1,9 @@
 title: Selector Model
-description: 'The selector model defines how nodes in an artifact AST are identified and addressed. Selectors are used across multiple specd mechanisms: delta entries target nodes for modification or removal, validation rules assert structural constraints, and metadata extraction declares which nodes to extract for deterministic metadata generation. The selector model is format-agnostic — the same fields apply regardless of whether the target document is markdown, JSON, YAML, or plain text.'
+description: Delta entries, validation rules, and metadata extraction all need to identify specific nodes in an artifact AST, and each mechanism would invent its own addressing scheme without a shared model. The selector model provides that shared vocabulary, defining how nodes are identified and addressed across all specd mechanisms in a format-agnostic way — the same fields apply regardless of whether the target document is markdown, JSON, YAML, or plain text.
 dependsOn:
   - core:core/artifact-ast
 context:
-  - 'The selector model defines how nodes in an artifact AST are identified and addressed. Selectors are used across multiple specd mechanisms: delta entries target nodes for modification or removal, validation rules assert structural constraints, and metadata extraction declares which nodes to extract for deterministic metadata generation. The selector model is format-agnostic — the same fields apply regardless of whether the target document is markdown, JSON, YAML, or plain text.'
+  - Delta entries, validation rules, and metadata extraction all need to identify specific nodes in an artifact AST, and each mechanism would invent its own addressing scheme without a shared model. The selector model provides that shared vocabulary, defining how nodes are identified and addressed across all specd mechanisms in a format-agnostic way — the same fields apply regardless of whether the target document is markdown, JSON, YAML, or plain text.
 rules:
   - requirement: Selector fields
     rules:
@@ -145,6 +145,6 @@ scenarios:
     then:
       - the rule passes — no error or warning is produced
 contentHashes:
-  spec.md: sha256:e08eff67de9cb034845c8f969d14a608e20ef77c170527da0f733b2f2934a94f
+  spec.md: sha256:958bbfbc7346f18f803dd09f88774b435de1d11186faebf8dbce679cdc1914b5
   verify.md: sha256:d0dad66cc0f04dd5414429cb4fe87121a1ef452ee24b4b93d200f28d3a606f52
 generatedBy: core

@@ -1,8 +1,8 @@
 # Drafts List
 
-## Overview
+## Purpose
 
-Defines the `specd drafts list` command, which lists all changes currently in `drafts/`, sorted by `createdAt` ascending.
+Shelved work is invisible to the active change list, so users need a dedicated view to see what has been parked. `specd drafts list` lists all changes currently in `drafts/`, sorted by `createdAt` ascending.
 
 ## Requirements
 

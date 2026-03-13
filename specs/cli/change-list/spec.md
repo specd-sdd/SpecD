@@ -1,8 +1,8 @@
 # Change List
 
-## Overview
+## Purpose
 
-Defines the `specd change list` command, which lists all active changes in the project (those in `changes/`).
+Teams need a quick overview of all in-flight work to coordinate and avoid conflicts. `specd change list` lists all active changes in the project (those in `changes/`), sorted by creation date.
 
 ## Requirements
 

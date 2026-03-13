@@ -1,8 +1,8 @@
 # Skills List
 
-## Overview
+## Purpose
 
-Defines the `specd skills list` command, which lists all skills bundled in `@specd/skills` and reports whether each is currently installed for the target agent.
+Users need to discover what skills are available and which ones are already installed for their agent. The `specd skills list` command lists all skills bundled in `@specd/skills` and optionally reports each skill's installation status for a target agent.
 
 ## Requirements
 

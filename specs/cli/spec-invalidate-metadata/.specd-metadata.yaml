@@ -1,11 +1,11 @@
 title: Spec Invalidate-Metadata
-description: The `specd spec invalidate-metadata` command marks a spec's `.specd-metadata.yaml` as stale by removing its `contentHashes` field. This forces metadata regeneration on the next pass without deleting the file or losing other metadata fields.
+description: Sometimes metadata needs to be forcibly marked stale without deleting the file or losing fields like `dependsOn`. The `specd spec invalidate-metadata` command marks a spec's `.specd-metadata.yaml` as stale by removing its `contentHashes` field, forcing regeneration on the next pass.
 dependsOn:
   - default:_global/architecture
   - default:_global/conventions
   - core:core/invalidate-spec-metadata
 context:
-  - The `specd spec invalidate-metadata` command marks a spec's `.specd-metadata.yaml` as stale by removing its `contentHashes` field. This forces metadata regeneration on the next pass without deleting the file or losing other metadata fields.
+  - Sometimes metadata needs to be forcibly marked stale without deleting the file or losing fields like `dependsOn`. The `specd spec invalidate-metadata` command marks a spec's `.specd-metadata.yaml` as stale by removing its `contentHashes` field, forcing regeneration on the next pass.
 rules:
   - requirement: Command signature
     rules:
@@ -56,6 +56,6 @@ scenarios:
     then:
       - "the command writes error: spec 'auth/login' not found or has no metadata to stderr and exits with code 1"
 contentHashes:
-  spec.md: sha256:abc43623bcd1a7b3fc04e5019be5107a1a8567143e73154ba236be28e290d616
+  spec.md: sha256:bff0a0fc82fe0b1889834f4ec3c038a976c131e9ea8334ddb285d271fdc70649
   verify.md: sha256:248116cecf1775bc19c1e9638c5d9e7c60850db773c30134154b52b23e314f85
 generatedBy: core
