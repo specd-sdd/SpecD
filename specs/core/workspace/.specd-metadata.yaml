@@ -1,10 +1,10 @@
 title: Workspace
-description: A workspace is the fundamental organizational unit in specd. It groups a set of specs, a code location, optional local schemas, and ownership semantics into a single named context. Every spec belongs to exactly one workspace, every change targets one or more workspaces, and context compilation, archiving, and validation all resolve resources through workspace-qualified lookups. This spec defines what a workspace is, its properties, its invariants, and how it interacts with the rest of the system.
+description: 'Projects often span multiple code repositories or teams, and specd needs a structured way to group specs, code locations, schemas, and ownership under a single named context so that cross-repo changes remain unambiguous. A workspace is this fundamental organizational unit: every spec belongs to exactly one workspace, every change targets one or more workspaces, and context compilation, archiving, and validation all resolve resources through workspace-qualified lookups. This spec defines workspace identity, properties, invariants, and interactions with the rest of the system.'
 dependsOn:
   - core:core/config
   - core:core/spec-id-format
 context:
-  - A workspace is the fundamental organizational unit in specd. It groups a set of specs, a code location, optional local schemas, and ownership semantics into a single named context. Every spec belongs to exactly one workspace, every change targets one or more workspaces, and context compilation, archiving, and validation all resolve resources through workspace-qualified lookups. This spec defines what a workspace is, its properties, its invariants, and how it interacts with the rest of the system.
+  - 'Projects often span multiple code repositories or teams, and specd needs a structured way to group specs, code locations, schemas, and ownership under a single named context so that cross-repo changes remain unambiguous. A workspace is this fundamental organizational unit: every spec belongs to exactly one workspace, every change targets one or more workspaces, and context compilation, archiving, and validation all resolve resources through workspace-qualified lookups. This spec defines workspace identity, properties, invariants, and interactions with the rest of the system.'
 rules:
   - requirement: Workspace identity
     rules:
@@ -269,6 +269,6 @@ scenarios:
       - ../billing-repo/specd.yaml is never read
       - AND all workspace properties come from the local specd.yaml
 contentHashes:
-  spec.md: sha256:17521d50c96529fd08f554d7576e1dac059ba11d1d48b37b8b99b0cee92e179c
+  spec.md: sha256:e2ac89a775310ccddeb5fbb1f59c97e9b38740ef3f9016daf2829f4b7a497165
   verify.md: sha256:90850de8eef3bc31e4be14a77c9a1c318821919cc6da70fada534aa4cf0e0a76
 generatedBy: core

@@ -1,8 +1,8 @@
 # Storage
 
-## Overview
+## Purpose
 
-specd's storage layer is defined by port interfaces in `@specd/core`. All storage behavior is adapter-specific; the domain and application layers have no knowledge of where data lives. The v1 implementation ships one adapter for all storage ports: `fs` (local filesystem).
+The domain and application layers must remain agnostic to where changes, drafts, and archives physically live, so that future storage backends can be swapped without touching business logic. specd's storage layer achieves this through port interfaces in `@specd/core` with adapter-specific implementations; the v1 implementation ships one adapter for all storage ports: `fs` (local filesystem).
 
 ## Requirements
 

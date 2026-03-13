@@ -1,8 +1,8 @@
 # Change Status
 
-## Overview
+## Purpose
 
-Defines the `specd change status <name>` command, which reports the current lifecycle state and artifact statuses of a named change.
+Users and agents need a quick way to see where a change stands — its lifecycle state and which artifacts are done, in progress, or missing. `specd change status <name>` reports the current lifecycle state and artifact statuses of a named change.
 
 ## Requirements
 

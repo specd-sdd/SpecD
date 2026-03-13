@@ -1,8 +1,8 @@
 # Spec Invalidate-Metadata
 
-## Overview
+## Purpose
 
-The `specd spec invalidate-metadata` command marks a spec's `.specd-metadata.yaml` as stale by removing its `contentHashes` field. This forces metadata regeneration on the next pass without deleting the file or losing other metadata fields.
+Sometimes metadata needs to be forcibly marked stale without deleting the file or losing fields like `dependsOn`. The `specd spec invalidate-metadata` command marks a spec's `.specd-metadata.yaml` as stale by removing its `contentHashes` field, forcing regeneration on the next pass.
 
 ## Requirements
 

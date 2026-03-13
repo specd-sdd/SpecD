@@ -1,8 +1,8 @@
 # Schema Extend
 
-## Overview
+## Purpose
 
-Defines the `specd schema extend` command, which creates a new local schema that extends an existing schema. Unlike `fork`, the new schema has an `extends` relationship with the source — it inherits all definitions and can selectively override or add to them.
+Teams that want to add or override a few artifacts without duplicating an entire schema need an inheritance mechanism. The `specd schema extend` command creates a new local schema that extends an existing one -- it inherits all definitions from the source and allows selective overrides or additions.
 
 ## Requirements
 

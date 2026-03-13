@@ -1,8 +1,8 @@
 # Change Draft
 
-## Overview
+## Purpose
 
-Defines the `specd change draft <name> [--reason <text>]` command, which shelves an active change to `drafts/` without affecting its lifecycle state.
+Sometimes work needs to be paused without losing progress or polluting the active change list. `specd change draft <name> [--reason <text>]` shelves an active change to `drafts/` without affecting its lifecycle state, keeping it recoverable at any time via `specd drafts restore`.
 
 ## Requirements
 

@@ -1,8 +1,8 @@
 # Get Spec Context
 
-## Overview
+## Purpose
 
-The `GetSpecContext` use case builds structured context entries for a single spec, optionally following `dependsOn` links transitively. It is used to assemble the full context an AI agent or delivery mechanism needs to understand a spec and its dependency chain. Metadata freshness is checked via SHA-256 content hashes; stale or absent metadata produces a minimal entry.
+AI agents and delivery mechanisms need to understand a spec together with everything it depends on, but dependency chains can be deep and metadata may be stale or missing. The `GetSpecContext` use case builds structured context entries for a single spec, optionally following `dependsOn` links transitively, to assemble the full context needed to understand a spec and its dependency chain. Metadata freshness is checked via SHA-256 content hashes; stale or absent metadata produces a minimal entry.
 
 ## Requirements
 

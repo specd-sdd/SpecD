@@ -1,10 +1,10 @@
 title: Change Approve
-description: Defines the `specd change approve spec <name> --reason <text>` and `specd change approve signoff <name> --reason <text>` commands, which record human approval decisions at the two optional approval gates.
+description: Approval gates exist so that a human can explicitly sign off before work proceeds past critical checkpoints. `specd change approve spec` and `specd change approve signoff` record these human approval decisions, requiring a reason so each gate clearance is traceable.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd change approve spec <name> --reason <text>` and `specd change approve signoff <name> --reason <text>` commands, which record human approval decisions at the two optional approval gates.
+  - Approval gates exist so that a human can explicitly sign off before work proceeds past critical checkpoints. `specd change approve spec` and `specd change approve signoff` record these human approval decisions, requiring a reason so each gate clearance is traceable.
 rules:
   - requirement: Command signatures
     rules:
@@ -113,6 +113,6 @@ scenarios:
       - stdout is valid JSON with result equal to "ok", gate equal to "spec", and name equal to "my-change"
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:62d309f826cef2ef2f842c29e934a9baf6efd770f8f26d7beb27a53acfbbaab5
+  spec.md: sha256:d573ffd82a1feef240809f61ec961bb377caba9fab02f539f05d722130b3a639
   verify.md: sha256:04928df9713e67a726b487e5a9d309a95d076a04b87318218be79f857445e075
 generatedBy: core

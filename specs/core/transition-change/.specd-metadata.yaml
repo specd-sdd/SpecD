@@ -1,10 +1,10 @@
 title: TransitionChange
-description: The `TransitionChange` use case performs a lifecycle state transition on an existing change. It implements approval-gate routing (spec approval and signoff gates), task completion checks for the `implementing` to `verifying` transition, and artifact validation clearing for the `verifying` to `implementing` transition.
+description: Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, validation clearing — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, implementing approval-gate routing, task completion checks for the `implementing` to `verifying` transition, and artifact validation clearing for the `verifying` to `implementing` transition.
 dependsOn:
   - core:core/change
   - default:_global/architecture
 context:
-  - The `TransitionChange` use case performs a lifecycle state transition on an existing change. It implements approval-gate routing (spec approval and signoff gates), task completion checks for the `implementing` to `verifying` transition, and artifact validation clearing for the `verifying` to `implementing` transition.
+  - Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, validation clearing — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, implementing approval-gate routing, task completion checks for the `implementing` to `verifying` transition, and artifact validation clearing for the `verifying` to `implementing` transition.
 rules:
   - requirement: Input contract
     rules:
@@ -169,6 +169,6 @@ scenarios:
     then:
       - ChangeRepository.save was called with the updated Change instance
 contentHashes:
-  spec.md: sha256:9903aae45fa6c7161ab7edb26c604613e166611d1e54a31607b31d794d32304b
+  spec.md: sha256:789aa7e679774a231d9f7c1a7593bb820e950b6c647247d5491e9f14e41bd9a2
   verify.md: sha256:fe69bc4650cd6f6249815eb2cd461a74888484fc88cd2eb97abdea5a1435148b
 generatedBy: core

@@ -1,9 +1,9 @@
 title: Spec Show
-description: Defines the `specd spec show <workspace:capability-path>` command, which prints the content of a spec's artifact files to stdout.
+description: Users and scripts need to read the raw content of a spec without navigating the directory tree. The `specd spec show <workspace:capability-path>` command prints the content of a spec's artifact files to stdout in schema-declared order.
 dependsOn:
   - cli:cli/entrypoint
 context:
-  - Defines the `specd spec show <workspace:capability-path>` command, which prints the content of a spec's artifact files to stdout.
+  - Users and scripts need to read the raw content of a spec without navigating the directory tree. The `specd spec show <workspace:capability-path>` command prints the content of a spec's artifact files to stdout in schema-declared order.
 rules:
   - requirement: Command signature
     rules:
@@ -92,6 +92,6 @@ scenarios:
       - AND the first entry has filename equal to "spec.md" and content equal to "# Auth Login"
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:fa9c0ccc1e566405dffe2efac7bd9a0b779836b1809af8f96d99f0057a4919f1
+  spec.md: sha256:dd0339e2ad3f2b758b9e6c32ea1b0fb1d9ee4700ccd0862fa83da040f366575b
   verify.md: sha256:1fc71844e505eec0709742b16e7bf3cbf6b325be196fb9b238ab8cc7e41b1b35
 generatedBy: core

@@ -1,10 +1,10 @@
 title: Change Discard
-description: Defines the `specd change discard <name> --reason <text>` command, which permanently abandons a change by moving it to `discarded/`.
+description: When a change is no longer viable, it should be explicitly abandoned rather than left rotting in the active list. `specd change discard <name> --reason <text>` permanently moves a change to `discarded/`, requiring a reason so the decision is auditable.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd change discard <name> --reason <text>` command, which permanently abandons a change by moving it to `discarded/`.
+  - When a change is no longer viable, it should be explicitly abandoned rather than left rotting in the active list. `specd change discard <name> --reason <text>` permanently moves a change to `discarded/`, requiring a reason so the decision is auditable.
 rules:
   - requirement: Command signature
     rules:
@@ -88,6 +88,6 @@ scenarios:
       - stdout is valid JSON with result equal to "ok" and name equal to "old-experiment"
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:8345f76202ec708060af27f970d04bfdb9a93dca73425a43f2d5d5a8f85091f3
+  spec.md: sha256:fce2ef3f126084f4ef09b2128340d557d86cb9b1858be55794dccb0f640758ca
   verify.md: sha256:389304936ed477b87d36c5c22450f605dd20f9e6b775ace4650b9e200b8f3a3d
 generatedBy: core

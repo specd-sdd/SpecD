@@ -1,8 +1,8 @@
 # Validate Specs
 
-## Overview
+## Purpose
 
-The `ValidateSpecs` use case validates spec artifacts against the active schema's structural rules. It supports three scoping modes: a single spec by qualified path, all specs in a workspace, or all specs across all workspaces. Only spec-scoped artifact types from the schema are validated; change-scoped artifacts are excluded.
+Spec artifacts can drift from the schema's structural expectations over time, and there is no other mechanism to catch these violations before they cause downstream failures. The `ValidateSpecs` use case validates spec artifacts against the active schema's structural rules, supporting three scoping modes: a single spec by qualified path, all specs in a workspace, or all specs across all workspaces. Only spec-scoped artifact types from the schema are validated; change-scoped artifacts are excluded.
 
 ## Requirements
 

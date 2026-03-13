@@ -1,12 +1,12 @@
 title: Generate Spec Metadata
-description: The `GenerateSpecMetadata` use case produces `.specd-metadata.yaml` content deterministically from schema-declared extraction rules, without LLM involvement. It resolves a spec ID, loads its artifacts, parses them into ASTs, runs the schema's `metadataExtraction` engine, computes content hashes, and returns the assembled metadata.
+description: Metadata must be producible deterministically from spec content so that every project gets a consistent baseline without requiring LLM involvement. The `GenerateSpecMetadata` use case achieves this by resolving a spec ID, loading its artifacts, parsing them into ASTs, running the schema's `metadataExtraction` engine, computing content hashes, and returning the assembled `.specd-metadata.yaml` content.
 dependsOn:
   - core:core/spec-metadata
   - core:core/content-extraction
   - core:core/schema-format
   - core:core/spec-id-format
 context:
-  - The `GenerateSpecMetadata` use case produces `.specd-metadata.yaml` content deterministically from schema-declared extraction rules, without LLM involvement. It resolves a spec ID, loads its artifacts, parses them into ASTs, runs the schema's `metadataExtraction` engine, computes content hashes, and returns the assembled metadata.
+  - Metadata must be producible deterministically from spec content so that every project gets a consistent baseline without requiring LLM involvement. The `GenerateSpecMetadata` use case achieves this by resolving a spec ID, loading its artifacts, parsing them into ASTs, running the schema's `metadataExtraction` engine, computing content hashes, and returning the assembled `.specd-metadata.yaml` content.
 rules:
   - requirement: Input and output
     rules:
@@ -167,6 +167,6 @@ scenarios:
       - the returned metadata contains both the extractMetadata() output fields and contentHashes
       - AND hasExtraction is true
 contentHashes:
-  spec.md: sha256:210373dd79dcfb723a6f8819e7b9038841cd013a693c2dd5196a5bc4967e5671
+  spec.md: sha256:2bee70f494375e29006a0f676975b6018b1522847711768811b4a8fa08fd21bc
   verify.md: sha256:fe59cc90e251d4dafbc5efbaf3d700791717aaedea931e90ce5f359a5dd5407c
 generatedBy: core

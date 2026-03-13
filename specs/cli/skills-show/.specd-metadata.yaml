@@ -1,10 +1,10 @@
 title: Skills Show
-description: Defines the `specd skills show <name>` command, which prints the full content of a named skill bundled in `@specd/skills`.
+description: Before installing a skill, users may want to review its full content to understand what it does. The `specd skills show <name>` command prints the full markdown content of a named skill bundled in `@specd/skills`.
 dependsOn:
   - cli:cli/entrypoint
   - cli:cli/skills-list
 context:
-  - Defines the `specd skills show <name>` command, which prints the full content of a named skill bundled in `@specd/skills`.
+  - Before installing a skill, users may want to review its full content to understand what it does. The `specd skills show <name>` command prints the full markdown content of a named skill bundled in `@specd/skills`.
 rules:
   - requirement: Command signature
     rules:
@@ -68,6 +68,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:bd8a6d602f76d18f1ad59595df1ac01a49f7ae48804b18847befd3f40ff0f861
+  spec.md: sha256:86ac9b1d179f22c508db5cf9c2055696a93bb095b96661dd5f4adcc5bdf6e58a
   verify.md: sha256:6de0f085e9780603e82a683482dd7219af3e1c5bb7e64db0bc826d63e760a392
 generatedBy: core

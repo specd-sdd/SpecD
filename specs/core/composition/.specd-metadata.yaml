@@ -1,9 +1,10 @@
 title: Composition Layer
-description: 'The `composition/` layer in `@specd/core` is the only layer permitted to import from `infrastructure/`. It exposes three levels of factory: use-case factories that wire ports internally, a kernel that builds all use cases from a resolved config object, and a config loader port that abstracts config sources. Delivery mechanisms (CLI, MCP) interact exclusively with this layer — they never import ports, infrastructure adapters, or use case constructors directly.'
+description: 'Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing three levels of factory: use-case factories that wire ports internally, a kernel that builds all use cases from a resolved config object, and a config loader port that abstracts config sources. CLI, MCP, and plugin adapters interact exclusively with this layer.'
 dependsOn:
   - default:_global/architecture
+  - core:core/resolve-schema
 context:
-  - 'The `composition/` layer in `@specd/core` is the only layer permitted to import from `infrastructure/`. It exposes three levels of factory: use-case factories that wire ports internally, a kernel that builds all use cases from a resolved config object, and a config loader port that abstracts config sources. Delivery mechanisms (CLI, MCP) interact exclusively with this layer — they never import ports, infrastructure adapters, or use case constructors directly.'
+  - 'Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing three levels of factory: use-case factories that wire ports internally, a kernel that builds all use cases from a resolved config object, and a config loader port that abstracts config sources. CLI, MCP, and plugin adapters interact exclusively with this layer.'
 rules:
   - requirement: Use-case factories are the unit of composition
     rules:
@@ -39,7 +40,27 @@ rules:
       - '`ConfigLoader` is defined in `application/ports/config-loader.ts` as an interface. It has a single method `load(): Promise<SpecdConfig>`. The `FsConfigLoader` implementation reads `specd.yaml` and `specd.local.yaml`, with local values taking precedence. Future implementations (`EnvConfigLoader`, `CompositeConfigLoader`) add new config sources without touching the kernel or any delivery layer.'
   - requirement: SpecdConfig is a plain typed object
     rules:
-      - '`SpecdConfig` is a plain TypeScript interface with no methods. It represents the fully resolved configuration for a project. The kernel and use-case factories accept it but do not know how it was produced. `SpecdConfig` is defined in `domain/` or `application/` — not in `infrastructure/` or `composition/`.'
+      - |-
+        `SpecdConfig` is a plain TypeScript interface with no methods. It represents the fully resolved configuration for a project. The kernel and use-case factories accept it but do not know how it was produced. `SpecdConfig` is defined in `domain/` or `application/` — not in `infrastructure/` or `composition/`.
+
+        `SpecdConfig` includes the following fields relevant to schema customisation:
+
+        * `schemaPlugins` (`readonly string[]`, optional) — schema-plugin references in declaration order
+        * `schemaOverrides` (`SchemaOperations | undefined`, optional) — inline merge operations
+
+        The fields `artifactRules` and `workflow` (project-level hook additions) are no longer part of `SpecdConfig` — they have been replaced by `schemaOverrides`.
+  - requirement: ResolveSchema factory wiring
+    rules:
+      - |-
+        `createResolveSchema(config: SpecdConfig)` must construct a `ResolveSchema` use case with:
+
+        * The `SchemaRegistry` adapter
+        * `config.schema` as the schema reference
+        * The resolved workspace schemas paths map
+        * `config.schemaPlugins` (defaulting to `[]` if absent)
+        * `config.schemaOverrides` (defaulting to `undefined` if absent)
+
+        `createGetActiveSchema(config: SpecdConfig)` must construct `GetActiveSchema` with a `ResolveSchema` instance from `createResolveSchema(config)`.
 constraints:
   - composition/ is the only directory in @specd/core permitted to import from infrastructure/
   - Concrete adapter classes (FsSpecRepository, NodeHookRunner, GitVcsAdapter, FsFileReader, FsSchemaRegistry, etc.) must not appear in src/index.ts or any re-export chain
@@ -118,6 +139,6 @@ scenarios:
     then:
       - it contains only readonly properties — no methods, no class instances
 contentHashes:
-  spec.md: sha256:e5a459a0587a6186fb5dd747577238822bd7cd829e3c800c3835a6c2a7c5ed40
+  spec.md: sha256:1bbfe84eefb1c7a7bf5f1c1ba271120f24cfbb8eb14bac7e8586d8409a1daf89
   verify.md: sha256:0c52ccb33c86395ce167e95216bf13aa6c37f22c8563efee86a04974d7b6049b
 generatedBy: core

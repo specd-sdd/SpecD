@@ -1,8 +1,8 @@
 # CompileContext
 
-## Overview
+## Purpose
 
-`CompileContext` is the application use case that assembles the instruction block an AI agent receives when entering a lifecycle step of a change. It collects context specs according to the project's include/exclude configuration, reads structured metadata from each spec's `.specd-metadata.yaml`, evaluates step availability, and combines schema instructions, artifact rules, spec content, and step hooks into a single structured output.
+AI agents entering a lifecycle step need a single, coherent instruction block that combines relevant specs, schema rules, and step hooks — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata from each spec's `.specd-metadata.yaml`, evaluates step availability, and combines schema instructions, artifact rules, spec content, and step hooks into a single structured output.
 
 ## Requirements
 

@@ -1,10 +1,10 @@
 title: ListDiscarded
-description: The `ListDiscarded` use case retrieves all discarded changes from the default workspace. Discarded changes are those that have been marked for removal but remain in storage until permanently deleted or archived.
+description: Discarded changes remain in storage for audit purposes, and teams need to review them — for example, to confirm a superseded change was properly replaced. The `ListDiscarded` use case retrieves all discarded changes from the default workspace, providing visibility into abandoned work that has not been permanently deleted.
 dependsOn:
   - core:core/change
   - core:core/kernel
 context:
-  - The `ListDiscarded` use case retrieves all discarded changes from the default workspace. Discarded changes are those that have been marked for removal but remain in storage until permanently deleted or archived.
+  - Discarded changes remain in storage for audit purposes, and teams need to review them — for example, to confirm a superseded change was properly replaced. The `ListDiscarded` use case retrieves all discarded changes from the default workspace, providing visibility into abandoned work that has not been permanently deleted.
 rules:
   - requirement: Returns all discarded changes
     rules:
@@ -59,6 +59,6 @@ scenarios:
     then:
       - the result is an empty array
 contentHashes:
-  spec.md: sha256:e8ac7228737a18abfd02c0760642c9222ae4238b1ee82f9ab961c64bf5f7b62c
+  spec.md: sha256:00d00973a7b8dce6c0978b9afe6534c07c8d03c6511b13002cc91faf50424d41
   verify.md: sha256:13bff06f9a2e6a18078569bfb4b3e172032f9fe4782b17d53bc72da5b2dfac09
 generatedBy: core

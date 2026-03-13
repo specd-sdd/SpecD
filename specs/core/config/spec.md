@@ -1,8 +1,8 @@
 # Project Configuration
 
-## Overview
+## Purpose
 
-`specd.yaml` is the single project-level configuration file for specd. It declares which schema governs the project, how specs are organised across workspaces, where changes and archives are stored, project-level workflow hooks, per-artifact constraints, and installed plugins. Every tool in the specd ecosystem reads this file — the CLI, MCP server, and plugins all derive their wiring from it.
+Every tool in the specd ecosystem needs a shared, authoritative source for project-level settings — schema selection, workspace layout, storage paths, workflow hooks, and installed plugins — to avoid each adapter hardcoding its own assumptions. `specd.yaml` is that single project-level configuration file: it declares which schema governs the project, how specs are organised across workspaces, where changes and archives are stored, per-artifact constraints, and installed plugins. The CLI, MCP server, and all plugins derive their wiring from it.
 
 ## Requirements
 

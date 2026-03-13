@@ -1,11 +1,11 @@
 title: Change Validate
-description: Defines the `specd change validate <name> <workspace:capability-path>` command, which validates a change's artifact files against the active schema for a specific spec and marks passing artifacts as complete.
+description: Before a change can advance, its artifacts must be verified against the schema to catch structural errors and missing content early. `specd change validate <name> <workspace:capability-path>` validates a change's artifact files against the active schema for a specific spec and marks passing artifacts as complete.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
   - core:core/spec-id-format
 context:
-  - Defines the `specd change validate <name> <workspace:capability-path>` command, which validates a change's artifact files against the active schema for a specific spec and marks passing artifacts as complete.
+  - Before a change can advance, its artifacts must be verified against the schema to catch structural errors and missing content early. `specd change validate <name> <workspace:capability-path>` validates a change's artifact files against the active schema for a specific spec and marks passing artifacts as complete.
 rules:
   - requirement: Command signature
     rules:
@@ -142,6 +142,6 @@ scenarios:
       - stdout is valid JSON with passed equal to false and failures containing at least one entry with artifactId and description
       - AND the process exits with code 1
 contentHashes:
-  spec.md: sha256:cbb87f7ba67f060b729e6e312fa4bf0b44d9ac2eba93a36b540663b33b20f384
+  spec.md: sha256:867685654c75655d1f0e94014fcae4e305fd6536d391e9f12058dcdd633b37f1
   verify.md: sha256:ddafe2a6265131ea5c8164f731eac3d4a516deaacf533166353b1c9f640761c2
 generatedBy: core

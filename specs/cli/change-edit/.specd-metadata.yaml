@@ -1,12 +1,12 @@
 title: Change Edit
-description: Defines the `specd change edit <name>` command, which modifies the spec scope of an existing change by adding or removing spec IDs. Workspaces are never managed directly — they are always derived from the resulting set of `specIds` after the edit.
+description: A change's scope often evolves after creation — specs get added, removed, or swapped as understanding deepens. `specd change edit <name>` modifies the spec scope of an existing change by adding or removing spec IDs. Workspaces are never managed directly — they are always derived from the resulting set of `specIds` after the edit.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
   - cli:cli/change-create
   - core:core/spec-id-format
 context:
-  - Defines the `specd change edit <name>` command, which modifies the spec scope of an existing change by adding or removing spec IDs. Workspaces are never managed directly — they are always derived from the resulting set of `specIds` after the edit.
+  - A change's scope often evolves after creation — specs get added, removed, or swapped as understanding deepens. `specd change edit <name>` modifies the spec scope of an existing change by adding or removing spec IDs. Workspaces are never managed directly — they are always derived from the resulting set of `specIds` after the edit.
 rules:
   - requirement: Command signature
     rules:
@@ -153,6 +153,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:4af2443f83a6476679d613f915b0317a042da2660949a2a79dbe93d13ade795b
+  spec.md: sha256:96284daa08447b3a6e65dce211f17b885e1f19eb3c1dd4d8c47cc33b74a9cac7
   verify.md: sha256:f8c6d4d264bbc3cccb36aa2da1bc76979ab1dffd96a9a35c62ac1f442442b2bf
 generatedBy: core

@@ -1,10 +1,10 @@
 title: Parse Schema YAML
-description: '`parseSchemaYaml` is a shared infrastructure module that extracts the YAML parsing and Zod validation logic from `FsSchemaRegistry` into a reusable, adapter-independent function. It receives raw YAML content and a schema reference string, validates the content against the `SchemaYaml` Zod schema, and returns a typed intermediate data structure (`SchemaYamlData`). This module performs structural validation only — it does not construct domain entities or perform semantic checks such as cycle detection or ID format enforcement.'
+description: Multiple `SchemaRegistry` adapters (filesystem, in-memory, remote) need to parse and structurally validate schema YAML in exactly the same way, and embedding that logic in a single adapter forces duplication. `parseSchemaYaml` extracts YAML parsing and Zod validation into a reusable, adapter-independent infrastructure function that receives raw YAML content and a schema reference string, validates against the `SchemaYaml` Zod schema, and returns a typed `SchemaYamlData` intermediate. It performs structural validation only — domain entity construction and semantic checks (cycle detection, ID format) remain the caller's responsibility.
 dependsOn:
   - default:_global/architecture
   - core:core/schema-format
 context:
-  - '`parseSchemaYaml` is a shared infrastructure module that extracts the YAML parsing and Zod validation logic from `FsSchemaRegistry` into a reusable, adapter-independent function. It receives raw YAML content and a schema reference string, validates the content against the `SchemaYaml` Zod schema, and returns a typed intermediate data structure (`SchemaYamlData`). This module performs structural validation only — it does not construct domain entities or perform semantic checks such as cycle detection or ID format enforcement.'
+  - Multiple `SchemaRegistry` adapters (filesystem, in-memory, remote) need to parse and structurally validate schema YAML in exactly the same way, and embedding that logic in a single adapter forces duplication. `parseSchemaYaml` extracts YAML parsing and Zod validation into a reusable, adapter-independent infrastructure function that receives raw YAML content and a schema reference string, validates against the `SchemaYaml` Zod schema, and returns a typed `SchemaYamlData` intermediate. It performs structural validation only — domain entity construction and semantic checks (cycle detection, ID format) remain the caller's responsibility.
 rules:
   - requirement: Module location and layer
     rules:
@@ -25,6 +25,8 @@ rules:
         * `name: string` — the schema's machine identifier
         * `version: number` — integer schema version
         * `description?: string` — optional human-readable summary
+        * `kind: 'schema' | 'schema-plugin'` — schema type discriminator
+        * `extends?: string` — optional parent schema reference
         * `artifacts: ArtifactYaml[]` — array of raw artifact definitions as validated by Zod (NOT domain `ArtifactType` instances)
         * `workflow?: WorkflowStepRaw[]` — optional array of raw workflow step definitions before domain transform
         * `metadataExtraction?` — optional metadata extraction configuration as validated by Zod
@@ -40,9 +42,15 @@ rules:
 
         * `name` is a required string
         * `version` is a required integer
+        * `kind` is a required enum (`schema` | `schema-plugin`)
+        * `extends` is an optional string, only valid when `kind: schema`
         * `artifacts` is a required array of artifact objects, each validated for required fields (`id`, `scope`, `output`) and optional fields with correct types
+        * Hook entries require an `id` field alongside `instruction` or `run`
+        * Validation/deltaValidation rule entries require an `id` field
+        * `preHashCleanup` entries require an `id` field
+        * `rules` on artifacts is an optional object with `pre` and `post` arrays of `{ id, text }`
         * `workflow` is an optional array of workflow step objects
-        * `metadataExtraction` is an optional object matching the metadata extraction schema
+        * `metadataExtraction` is an optional object matching the metadata extraction schema; array entries require an `id` field
         * Unknown top-level fields SHALL be ignored (forward compatibility via Zod's default `strip` mode)
 
         The Zod schemas for selector fields within validation rules, metadata extractors, and related structures SHALL be imported from the existing `infrastructure/zod/selector-schema.ts` module to avoid duplication.
@@ -53,6 +61,7 @@ rules:
 
         * `deltaValidations` is only valid when `delta` is `true`
         * `delta: true` is not valid when `scope` is `change`
+        * `kind: schema-plugin` must not declare `artifacts`, `workflow`, `metadataExtraction`, or `extends`
 
         These refinements SHALL produce descriptive error messages.
   - requirement: Error handling
@@ -232,6 +241,6 @@ scenarios:
     then:
       - it returns an empty string
 contentHashes:
-  spec.md: sha256:124ad1ea47b79eb2f6e4e7b899c4184784efcdf47e9ca76083908946391f652d
+  spec.md: sha256:3c47d2b1d1cb1fe1ecbb542be8b5b43ef64bf56b7144f6d698534ce723198023
   verify.md: sha256:cdf0907b47a22659c798edfa591a7b98dee12f321eab59958f217b15f47ceb6f
 generatedBy: core

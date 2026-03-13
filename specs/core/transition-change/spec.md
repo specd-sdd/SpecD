@@ -1,8 +1,8 @@
 # TransitionChange
 
-## Overview
+## Purpose
 
-The `TransitionChange` use case performs a lifecycle state transition on an existing change. It implements approval-gate routing (spec approval and signoff gates), task completion checks for the `implementing` to `verifying` transition, and artifact validation clearing for the `verifying` to `implementing` transition.
+Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, validation clearing — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, implementing approval-gate routing, task completion checks for the `implementing` to `verifying` transition, and artifact validation clearing for the `verifying` to `implementing` transition.
 
 ## Requirements
 

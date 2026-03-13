@@ -1,8 +1,8 @@
 # Actor Resolver Factory
 
-## Overview
+## Purpose
 
-`createVcsActorResolver` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `ActorResolver` implementation. It is the single entry point for obtaining an `ActorResolver` — callers never construct concrete resolvers directly.
+specd needs to identify the current user (for approvals, sign-offs, and audit trails) using whichever VCS is active, without callers coupling to a specific VCS implementation. `createVcsActorResolver` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `ActorResolver` implementation, serving as the single entry point so that callers never construct concrete resolvers directly.
 
 ## Requirements
 

@@ -1,8 +1,8 @@
 # ListArchived
 
-## Overview
+## Purpose
 
-`ListArchived` is the application use case that retrieves all archived changes in the default workspace. It is a read-only query with no side effects, no input parameters, and no lifecycle hooks.
+Teams need to browse the history of completed spec work — for audits, onboarding, or tracing when a particular spec was last modified. `ListArchived` retrieves all archived changes in the default workspace as a read-only query with no side effects, no input parameters, and no lifecycle hooks.
 
 ## Requirements
 

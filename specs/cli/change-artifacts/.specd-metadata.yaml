@@ -1,10 +1,10 @@
 title: Change Artifacts
-description: Defines the `specd change artifacts <name>` command, which lists all artifact files for a change with their absolute paths on disk, effective statuses, and whether each file currently exists. Primarily useful for agents that need to know exactly where to create or edit artifact files.
+description: Agents need to know the exact filesystem paths where artifact files should be created or edited, without guessing directory layout. `specd change artifacts <name>` lists all artifact files for a change with their absolute paths on disk, effective statuses, and whether each file currently exists.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd change artifacts <name>` command, which lists all artifact files for a change with their absolute paths on disk, effective statuses, and whether each file currently exists. Primarily useful for agents that need to know exactly where to create or edit artifact files.
+  - Agents need to know the exact filesystem paths where artifact files should be created or edited, without guessing directory layout. `specd change artifacts <name>` lists all artifact files for a change with their absolute paths on disk, effective statuses, and whether each file currently exists.
 rules:
   - requirement: Command signature
     rules:
@@ -110,6 +110,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:f22824fafc4ca09331f2f02390d8b1c2bb6959c39ff68c494e5a163d67cf230a
+  spec.md: sha256:05310103f7405206edab032f2f8bdc524da9b94a5c8fdbe15c5d756aa56d74fb
   verify.md: sha256:e9a857428358ecc5fbf562cca125fb94077c481f69ca312e84cfd3abb7fcac03
 generatedBy: core

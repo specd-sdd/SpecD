@@ -1,10 +1,10 @@
 title: Project Context
-description: 'Defines the `specd project context` command, which compiles and prints the full project-level context: the `context:` entries from `specd.yaml` followed by the content of all specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns. This is the context block an agent would receive regardless of any specific change or lifecycle step.'
+description: 'Agents need a way to retrieve the baseline project context -- instructions and specs that apply regardless of which change they are working on. The `specd project context` command compiles and prints the full project-level context: the `context:` entries from `specd.yaml` followed by all specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns.'
 dependsOn:
   - cli:cli/entrypoint
   - cli:cli/change-context
 context:
-  - 'Defines the `specd project context` command, which compiles and prints the full project-level context: the `context:` entries from `specd.yaml` followed by the content of all specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns. This is the context block an agent would receive regardless of any specific change or lifecycle step.'
+  - 'Agents need a way to retrieve the baseline project context -- instructions and specs that apply regardless of which change they are working on. The `specd project context` command compiles and prints the full project-level context: the `context:` entries from `specd.yaml` followed by all specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns.'
 rules:
   - requirement: Command signature
     rules:
@@ -192,6 +192,6 @@ scenarios:
       - 'stderr contains a warning: line for the stale spec'
       - AND the spec content is still included using the metadataExtraction fallback
 contentHashes:
-  spec.md: sha256:92a85f5ea6f0c4dca876dc9f638602ba1484634c93af2062520351108ea71b24
+  spec.md: sha256:210b4da4b21b965e1e16ff4471e46d97abbcde5fc65e1cb23738f32c851610fa
   verify.md: sha256:845226c2f2195dee7d3341aa01ce15bdf609078cb1f932cc83df1d91ccc6cf7b
 generatedBy: core

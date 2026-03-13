@@ -1,10 +1,10 @@
 title: ConfigWriter Port
-description: '`ConfigWriter` is an application-layer port that defines the contract for creating and mutating the project configuration (`specd.yaml`). Unlike `ConfigLoader` (which is read-only), `ConfigWriter` handles the operations that initialise a project, record skill installations, and read the skills manifest.'
+description: Project initialisation and skill installation must create and mutate `specd.yaml`, but the application layer cannot depend on filesystem or YAML libraries directly. `ConfigWriter` is the application-layer port that defines the contract for these write operations — initialising a project, recording skill installations, and reading the skills manifest — complementing the read-only `ConfigLoader`.
 dependsOn:
   - default:_global/architecture
   - core:core/config
 context:
-  - '`ConfigWriter` is an application-layer port that defines the contract for creating and mutating the project configuration (`specd.yaml`). Unlike `ConfigLoader` (which is read-only), `ConfigWriter` handles the operations that initialise a project, record skill installations, and read the skills manifest.'
+  - Project initialisation and skill installation must create and mutate `specd.yaml`, but the application layer cannot depend on filesystem or YAML libraries directly. `ConfigWriter` is the application-layer port that defines the contract for these write operations — initialising a project, recording skill installations, and reading the skills manifest — complementing the read-only `ConfigLoader`.
 rules:
   - requirement: Interface shape
     rules:
@@ -174,6 +174,6 @@ scenarios:
     then:
       - 'it returns { claude: ["spec-compliance"] }'
 contentHashes:
-  spec.md: sha256:0e732a44d047e9e2a9133d24655bb02238fe1c658f417d599c0824553a7593d4
+  spec.md: sha256:0f06e5747991d48f60ee41217d16386a567f0325b4a4b926e02ffd4dbf31fed6
   verify.md: sha256:5ffd02707b052e824eeece90659bcf7571677170f3be9db1b3dcbc44262dd483
 generatedBy: core

@@ -1,8 +1,8 @@
 # CreateChange
 
-## Overview
+## Purpose
 
-The `CreateChange` use case creates a new change entity and persists it to the repository. It enforces name uniqueness, resolves the current actor, and records a single `created` event as the initial history entry.
+Every spec workflow begins with a named change, so the system needs a single entry point that guarantees uniqueness and records provenance from the start. The `CreateChange` use case creates a new change entity, enforces name uniqueness, resolves the current actor, and records a single `created` event as the initial history entry.
 
 ## Requirements
 

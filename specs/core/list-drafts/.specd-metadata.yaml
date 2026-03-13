@@ -1,10 +1,10 @@
 title: ListDrafts
-description: The `ListDrafts` use case retrieves all drafted (shelved) changes from the default workspace. Drafted changes are those that have been temporarily set aside and can be restored to active status later.
+description: Users who shelve changes need visibility into what is parked so they can decide what to resume. The `ListDrafts` use case retrieves all drafted (shelved) changes from the default workspace — those temporarily set aside that can be restored to active status later.
 dependsOn:
   - core:core/change
   - core:core/kernel
 context:
-  - The `ListDrafts` use case retrieves all drafted (shelved) changes from the default workspace. Drafted changes are those that have been temporarily set aside and can be restored to active status later.
+  - Users who shelve changes need visibility into what is parked so they can decide what to resume. The `ListDrafts` use case retrieves all drafted (shelved) changes from the default workspace — those temporarily set aside that can be restored to active status later.
 rules:
   - requirement: Returns all drafted changes
     rules:
@@ -59,6 +59,6 @@ scenarios:
     then:
       - the result is an empty array
 contentHashes:
-  spec.md: sha256:872a1b8d5add206efb86efc5752cdda86714ad9f7cadb8d3ad9c81dc0f64a7f9
+  spec.md: sha256:ca9a9e2816d84565c0d8b6c21695995bdd02d5ac6c627da320052eb4d21c781d
   verify.md: sha256:8d9eb5c0c6bdfb21a0bd026893409e6856825607713195b3a4fdb48c62df9952
 generatedBy: core

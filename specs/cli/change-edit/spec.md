@@ -1,8 +1,8 @@
 # Change Edit
 
-## Overview
+## Purpose
 
-Defines the `specd change edit <name>` command, which modifies the spec scope of an existing change by adding or removing spec IDs. Workspaces are never managed directly — they are always derived from the resulting set of `specIds` after the edit.
+A change's scope often evolves after creation — specs get added, removed, or swapped as understanding deepens. `specd change edit <name>` modifies the spec scope of an existing change by adding or removing spec IDs. Workspaces are never managed directly — they are always derived from the resulting set of `specIds` after the edit.
 
 ## Requirements
 

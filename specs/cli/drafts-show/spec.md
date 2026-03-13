@@ -1,8 +1,8 @@
 # Drafts Show
 
-## Overview
+## Purpose
 
-Defines the `specd drafts show <name>` command, which displays basic metadata for a single drafted change.
+Before restoring a drafted change, users need to inspect its metadata to confirm it is the right one. `specd drafts show <name>` displays basic metadata — name, state, specs, and schema — for a single change in `drafts/`.
 
 ## Requirements
 

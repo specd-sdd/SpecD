@@ -1,8 +1,8 @@
 # Spec Generate-Metadata
 
-## Overview
+## Purpose
 
-The `specd spec generate-metadata` command generates `.specd-metadata.yaml` content deterministically from schema extraction rules. It delegates to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence.
+Metadata files must be regenerated whenever spec content changes, and doing it manually is error-prone. The `specd spec generate-metadata` command generates `.specd-metadata.yaml` content deterministically from schema extraction rules, delegating to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence.
 
 ## Requirements
 

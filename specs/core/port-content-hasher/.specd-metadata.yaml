@@ -1,9 +1,9 @@
 title: ContentHasher Port
-description: '`ContentHasher` is an application-layer port that defines the contract for computing deterministic content hashes. It isolates the application layer from specific hashing algorithms and cryptographic libraries, allowing implementations to be swapped without changing consumers.'
+description: Artifact conflict detection and change validation rely on deterministic content hashes, but the application layer must not depend on a specific algorithm or cryptographic library. `ContentHasher` is the application-layer port that defines the contract for computing content hashes, isolating consumers from the underlying implementation so algorithms can be swapped transparently.
 dependsOn:
   - default:_global/architecture
 context:
-  - '`ContentHasher` is an application-layer port that defines the contract for computing deterministic content hashes. It isolates the application layer from specific hashing algorithms and cryptographic libraries, allowing implementations to be swapped without changing consumers.'
+  - Artifact conflict detection and change validation rely on deterministic content hashes, but the application layer must not depend on a specific algorithm or cryptographic library. `ContentHasher` is the application-layer port that defines the contract for computing content hashes, isolating consumers from the underlying implementation so algorithms can be swapped transparently.
 rules:
   - requirement: Abstract class shape
     rules:
@@ -83,6 +83,6 @@ scenarios:
       - no observable state changes occur between calls
       - AND the return value is identical each time
 contentHashes:
-  spec.md: sha256:f45480e55e3b97b8066ef4355eae315bec6a1ecb4366d5382a99ab73178f6a0d
+  spec.md: sha256:d76cc091d863f17fca7d9bd265d1453ee95fc163fbd320235caff6ad74163dcf
   verify.md: sha256:b713fdfb1a91cedd0f484d8dda1981991e8612c754307603b40c37a79aae7284
 generatedBy: core

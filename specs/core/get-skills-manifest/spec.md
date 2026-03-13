@@ -1,8 +1,8 @@
 # GetSkillsManifest
 
-## Overview
+## Purpose
 
-The `GetSkillsManifest` use case reads the installed skills manifest from `specd.yaml` and returns it as a typed map of agent names to skill name arrays. It delegates to the `ConfigWriter` port's `readSkillsManifest` operation and performs no business logic beyond passing the input through.
+Commands like `specd skills list` and `specd skills update` need to know which skills are currently installed per agent without loading the full validated config. `GetSkillsManifest` provides this by reading the `skills` section of `specd.yaml` via the `ConfigWriter` port's `readSkillsManifest` operation and returning a typed map of agent names to skill name arrays.
 
 ## Requirements
 

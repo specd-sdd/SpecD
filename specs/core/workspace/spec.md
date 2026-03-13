@@ -1,8 +1,8 @@
 # Workspace
 
-## Overview
+## Purpose
 
-A workspace is the fundamental organizational unit in specd. It groups a set of specs, a code location, optional local schemas, and ownership semantics into a single named context. Every spec belongs to exactly one workspace, every change targets one or more workspaces, and context compilation, archiving, and validation all resolve resources through workspace-qualified lookups. This spec defines what a workspace is, its properties, its invariants, and how it interacts with the rest of the system.
+Projects often span multiple code repositories or teams, and specd needs a structured way to group specs, code locations, schemas, and ownership under a single named context so that cross-repo changes remain unambiguous. A workspace is this fundamental organizational unit: every spec belongs to exactly one workspace, every change targets one or more workspaces, and context compilation, archiving, and validation all resolve resources through workspace-qualified lookups. This spec defines workspace identity, properties, invariants, and interactions with the rest of the system.
 
 ## Requirements
 

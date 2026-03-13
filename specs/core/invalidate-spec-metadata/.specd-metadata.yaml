@@ -1,10 +1,10 @@
 title: Invalidate Spec Metadata
-description: The `InvalidateSpecMetadata` use case marks a spec's `.specd-metadata.yaml` as stale by removing its `contentHashes` field. Without content hashes the metadata is treated as stale by all downstream consumers (staleness detection, `spec list --metadata-status`), forcing regeneration on the next metadata pass. All other fields (title, description, rules, scenarios, etc.) are preserved.
+description: When a spec's content changes outside the normal archive flow, its metadata becomes untrustworthy but deleting the entire file would lose curated fields like `dependsOn` and `description`. The `InvalidateSpecMetadata` use case marks the metadata as stale by removing only the `contentHashes` field, which causes all downstream consumers (staleness detection, `spec list --metadata-status`) to treat it as stale and forces regeneration on the next metadata pass. All other fields (title, description, rules, scenarios, etc.) are preserved.
 dependsOn:
   - core:core/spec-metadata
   - core:core/storage
 context:
-  - The `InvalidateSpecMetadata` use case marks a spec's `.specd-metadata.yaml` as stale by removing its `contentHashes` field. Without content hashes the metadata is treated as stale by all downstream consumers (staleness detection, `spec list --metadata-status`), forcing regeneration on the next metadata pass. All other fields (title, description, rules, scenarios, etc.) are preserved.
+  - When a spec's content changes outside the normal archive flow, its metadata becomes untrustworthy but deleting the entire file would lose curated fields like `dependsOn` and `description`. The `InvalidateSpecMetadata` use case marks the metadata as stale by removing only the `contentHashes` field, which causes all downstream consumers (staleness detection, `spec list --metadata-status`) to treat it as stale and forces regeneration on the next metadata pass. All other fields (title, description, rules, scenarios, etc.) are preserved.
 rules:
   - requirement: Removes contentHashes
     rules:
@@ -87,6 +87,6 @@ scenarios:
     then:
       - the result is null — the file is not modified
 contentHashes:
-  spec.md: sha256:ea15d9cbaa690d35b98f2afe9de4b08c47bd712089522c3d6442e75526a50d69
+  spec.md: sha256:e7ffb809ff34959126b67e41eee9de12f48925058cf6d28263c055e9cba24e45
   verify.md: sha256:9e0ad7da0a1b3ff46c7edd9f9de31c98302bf51c40b36888431bf5fefdf4dac8
 generatedBy: core

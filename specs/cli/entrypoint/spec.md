@@ -1,8 +1,8 @@
 # CLI Entrypoint
 
-## Overview
+## Purpose
 
-Defines the global behaviour of the `specd` CLI that applies to every command: configuration discovery, the `--config` override flag, output conventions (stdout vs stderr), and process exit codes.
+Every subcommand needs consistent config discovery, output routing, and error reporting — without a shared entrypoint contract, each command would reimplement these concerns differently. This spec defines the global behaviour of the `specd` CLI: configuration discovery (with the `--config` override), stdout/stderr conventions, the `--format` flag, and uniform exit codes.
 
 ## Requirements
 

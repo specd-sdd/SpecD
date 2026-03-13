@@ -1,8 +1,8 @@
 # ListChanges
 
-## Overview
+## Purpose
 
-The `ListChanges` use case retrieves all active changes from the default workspace. Active changes are those that have not been drafted (shelved) or discarded. Delivery mechanisms use this to display the current working set of changes.
+Delivery mechanisms need a way to show the current working set at a glance, filtering out shelved and discarded items automatically. The `ListChanges` use case retrieves all active changes — those that have not been drafted or discarded — from the default workspace, sorted by creation order.
 
 ## Requirements
 

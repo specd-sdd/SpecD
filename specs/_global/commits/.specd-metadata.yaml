@@ -1,7 +1,7 @@
 title: Commit Conventions
-description: specd uses Conventional Commits. Every commit message must be machine-parseable for changelog generation and release automation.
+description: Inconsistent commit messages make changelogs unreliable and automated releases impossible. specd uses Conventional Commits so that every message is machine-parseable for changelog generation and release automation. The format is enforced at commit time by commitlint.
 context:
-  - specd uses Conventional Commits. Every commit message must be machine-parseable for changelog generation and release automation.
+  - Inconsistent commit messages make changelogs unreliable and automated releases impossible. specd uses Conventional Commits so that every message is machine-parseable for changelog generation and release automation. The format is enforced at commit time by commitlint.
 rules:
   - requirement: Conventional commit format
     rules:
@@ -200,6 +200,6 @@ scenarios:
     then:
       - it must be changed to setext style — ATX headers conflict with git comment markers
 contentHashes:
-  spec.md: sha256:0660ed94b800922d5db1075a1995230399e2f4d99c24cb38b63eb73989d80cbd
+  spec.md: sha256:92b6914ddc2dc244cd4b994120029dc0d2864d1d77d38e77d4223a0902d1e3ab
   verify.md: sha256:8353f0bd3f445bc84ff816668adc1cacd22bb3d5733060829d73ff848c0980f6
 generatedBy: core

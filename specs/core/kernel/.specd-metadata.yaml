@@ -1,5 +1,5 @@
 title: Kernel
-description: The kernel is the public entry point of `@specd/core`. It assembles all use cases from a resolved `SpecdConfig` and exposes them as a typed object grouped by domain area. Delivery mechanisms (CLI, MCP, plugins) consume use cases exclusively through the kernel interface — it defines the contract between `@specd/core` and its consumers.
+description: 'Consumers of `@specd/core` need a single, stable entry point that exposes every use case without requiring knowledge of internal wiring or adapter construction. The kernel serves this role: it assembles all use cases from a resolved `SpecdConfig` and exposes them as a typed object grouped by domain area. Delivery mechanisms (CLI, MCP, plugins) consume use cases exclusively through the kernel interface, which defines the contract between `@specd/core` and its consumers.'
 dependsOn:
   - default:_global/architecture
   - core:core/composition
@@ -34,8 +34,9 @@ dependsOn:
   - core:core/record-skill-install
   - core:core/get-skills-manifest
   - core:core/get-project-context
+  - core:core/resolve-schema
 context:
-  - The kernel is the public entry point of `@specd/core`. It assembles all use cases from a resolved `SpecdConfig` and exposes them as a typed object grouped by domain area. Delivery mechanisms (CLI, MCP, plugins) consume use cases exclusively through the kernel interface — it defines the contract between `@specd/core` and its consumers.
+  - 'Consumers of `@specd/core` need a single, stable entry point that exposes every use case without requiring knowledge of internal wiring or adapter construction. The kernel serves this role: it assembles all use cases from a resolved `SpecdConfig` and exposes them as a typed object grouped by domain area. Delivery mechanisms (CLI, MCP, plugins) consume use cases exclusively through the kernel interface, which defines the contract between `@specd/core` and its consumers.'
 rules:
   - requirement: Kernel interface groups use cases by domain area
     rules:
@@ -108,6 +109,7 @@ rules:
         | `specs.validate`           | `ValidateSpecs`                       | [validate-specs](../validate-specs/spec.md)                     | Validates spec artifacts against schema rules               |
         | `specs.generateMetadata`   | `GenerateSpecMetadata`                | [generate-metadata](../generate-metadata/spec.md)               | Generates deterministic metadata from extraction rules      |
         | `specs.getContext`         | `GetSpecContext`                      | [get-spec-context](../get-spec-context/spec.md)                 | Builds structured context entries with dependency traversal |
+        | `specs.resolveSchema`      | `ResolveSchema`                       | [resolve-schema](../resolve-schema/spec.md)                     | Resolves base schema with extends, plugins, and overrides   |
 
         #### kernel.project
 
@@ -250,6 +252,6 @@ scenarios:
     then:
       - the kernel object and its nested groups are not expected to change — there is no addUseCase() or removeUseCase() mechanism
 contentHashes:
-  spec.md: sha256:fadfb6454cb9d7fabd6bdab3cdf8cdab81732834f2aff85064739bab30bcda24
+  spec.md: sha256:cdf0eeefae7176d00ab18f32dc7a383130c8593097fc3a6199f40d7b1b3ce759
   verify.md: sha256:557d6d97d8856cc560a5f2053f0b71916836b377d8e4c5bb0b34fa9a73ebe958
 generatedBy: core

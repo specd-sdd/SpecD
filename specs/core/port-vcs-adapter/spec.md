@@ -1,8 +1,8 @@
 # VCS Adapter Port
 
-## Overview
+## Purpose
 
-`VcsAdapter` is an application-layer port interface that provides technology-neutral access to version-control system state. Use cases depend on this interface for repository root resolution, branch detection, working-tree cleanliness checks, revision references, and file content retrieval. Concrete implementations exist for git (and planned for hg, svn) as well as a null fallback for environments without VCS.
+Use cases need VCS state (repo root, branch, revision, file history) but must not couple to a specific tool, since the platform targets git today and may support hg or svn later. `VcsAdapter` is the application-layer port interface that provides technology-neutral access to version-control system state — repository root resolution, branch detection, working-tree cleanliness checks, revision references, and file content retrieval — with a null fallback for environments without VCS.
 
 ## Requirements
 

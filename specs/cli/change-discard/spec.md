@@ -1,8 +1,8 @@
 # Change Discard
 
-## Overview
+## Purpose
 
-Defines the `specd change discard <name> --reason <text>` command, which permanently abandons a change by moving it to `discarded/`.
+When a change is no longer viable, it should be explicitly abandoned rather than left rotting in the active list. `specd change discard <name> --reason <text>` permanently moves a change to `discarded/`, requiring a reason so the decision is auditable.
 
 ## Requirements
 

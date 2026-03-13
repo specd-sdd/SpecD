@@ -1,13 +1,14 @@
 title: Project Configuration
-description: '`specd.yaml` is the single project-level configuration file for specd. It declares which schema governs the project, how specs are organised across workspaces, where changes and archives are stored, project-level workflow hooks, per-artifact constraints, and installed plugins. Every tool in the specd ecosystem reads this file — the CLI, MCP server, and plugins all derive their wiring from it.'
+description: 'Every tool in the specd ecosystem needs a shared, authoritative source for project-level settings — schema selection, workspace layout, storage paths, workflow hooks, and installed plugins — to avoid each adapter hardcoding its own assumptions. `specd.yaml` is that single project-level configuration file: it declares which schema governs the project, how specs are organised across workspaces, where changes and archives are stored, per-artifact constraints, and installed plugins. The CLI, MCP server, and all plugins derive their wiring from it.'
 dependsOn:
   - core:core/schema-format
+  - core:core/schema-merge
   - default:_global/architecture
   - core:core/storage
   - core:core/spec-metadata
   - core:core/workspace
 context:
-  - '`specd.yaml` is the single project-level configuration file for specd. It declares which schema governs the project, how specs are organised across workspaces, where changes and archives are stored, project-level workflow hooks, per-artifact constraints, and installed plugins. Every tool in the specd ecosystem reads this file — the CLI, MCP server, and plugins all derive their wiring from it.'
+  - 'Every tool in the specd ecosystem needs a shared, authoritative source for project-level settings — schema selection, workspace layout, storage paths, workflow hooks, and installed plugins — to avoid each adapter hardcoding its own assumptions. `specd.yaml` is that single project-level configuration file: it declares which schema governs the project, how specs are organised across workspaces, where changes and archives are stored, per-artifact constraints, and installed plugins. The CLI, MCP server, and all plugins derive their wiring from it.'
 rules:
   - requirement: Config file location and format
     rules:
@@ -204,39 +205,51 @@ rules:
         | `{{codeRoot}}`         | The resolved absolute path to the active workspace's `codeRoot` |
 
         Unknown variables in a template are left as-is and a warning is emitted.
-  - requirement: Workflow additions
+  - requirement: Schema plugins
     rules:
       - |-
-        `specd.yaml` may include a `workflow` section to add project-level hooks to the change lifecycle steps declared in the schema. Entries are matched to schema workflow entries by `step` name; schema hooks fire first, then project hooks. `requires` is not valid in project-level workflow entries and must be rejected.
+        `specd.yaml` may include a `schemaPlugins` field — an array of schema-plugin references. Each reference uses the same convention as the `schema` field (npm package, workspace-qualified, bare name, or path). Plugins are resolved and applied as merge layers after the base schema's `extends` chain, in declaration order.
 
         ```yaml
-        workflow:
-          - step: archiving
-            hooks:
-              post:
-                - run: 'pnpm run notify-team'
-                - run: 'git checkout -b specd/{{change.name}}'
-          - step: implementing
-            hooks:
-              pre:
-                - instruction: |
-                    Prefer editing existing files over creating new ones.
+        schemaPlugins:
+          - '@specd/plugin-rfc'
+          - '#my-plugin'
         ```
-  - requirement: Project-level artifact rules
+
+        Each referenced file must have `kind: schema-plugin`. If a reference resolves to a file with `kind: schema`, startup must fail with `SchemaValidationError`. If a reference cannot be resolved, startup must fail with `SchemaNotFoundError`.
+  - requirement: Schema overrides
     rules:
       - |-
-        `specd.yaml` may include an `artifactRules` section to add per-artifact constraints without forking the schema. Keys are artifact IDs; values are arrays of constraint strings. `CompileContext` injects them as a distinct block in the compiled instruction, after the schema's instruction.
+        `specd.yaml` may include a `schemaOverrides` field — an inline block containing merge operations applied after all plugins. The structure mirrors the `SchemaOperations` interface from the merge engine:
 
         ```yaml
-        artifactRules:
-          specs:
-            - 'All requirements must reference the relevant RFC number'
-            - 'Scenarios must use WHEN/THEN/AND format'
-          design:
-            - 'Architecture decisions must reference an ADR'
+        schemaOverrides:
+          append:
+            artifacts:
+              - id: specs
+                rules:
+                  post:
+                    - id: rfc-reference
+                      text: 'All requirements must reference the relevant RFC number'
+            workflow:
+              - step: archiving
+                hooks:
+                  post:
+                    - id: notify-team
+                      run: 'pnpm run notify-team'
+          remove:
+            workflow:
+              - step: implementing
+                hooks:
+                  post:
+                    - id: run-tests
+          set:
+            description: 'Custom project schema description'
         ```
 
-        Keys are validated against the active schema's artifact IDs at startup. Unknown keys emit a warning but do not prevent startup.
+        The five operations (`create`, `remove`, `set`, `append`, `prepend`) are all optional. They follow the same semantics as `mergeSchemaLayers` — see [`specs/core/schema-merge/spec.md`](../schema-merge/spec.md).
+
+        `schemaOverrides` is validated structurally at startup (correct shape, valid operation keys). Semantic validation (e.g. removing a non-existent entry) happens at schema resolution time when the merge engine processes the override layer.
   - requirement: Context spec selection
     rules:
       - |-
@@ -436,15 +449,14 @@ rules:
         * `adapter` is missing in any `specs`, `schemas`, or storage section
         * Unknown adapter value in any `specs`, `schemas`, or storage section
         * Required adapter-specific fields are absent (e.g. `fs.path` missing when `adapter: fs`)
-        * `requires` field present in a project-level `workflow` entry
         * Storage path (`changes.fs.path` or `archive.fs.path`) resolves outside the repo root
         * Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax (e.g. `*` in a disallowed position)
+        * `schemaPlugins` entry is not a valid string reference
+        * `schemaOverrides` has an invalid structure (unknown operation keys, wrong types)
 
         The following conditions emit **warnings** but allow startup to proceed:
 
-        * Unknown key in `artifactRules` (no matching artifact ID in the active schema)
         * Duplicate workspace names (YAML retains last-wins; warn about the pattern)
-        * Project-level workflow entry names a step not declared in the schema
         * Unknown workspace qualifier in a `contextIncludeSpecs` or `contextExcludeSpecs` pattern (runtime only — `specd config validate` treats this as an error)
 constraints:
   - schema is required — specd cannot start without a schema reference
@@ -452,7 +464,6 @@ constraints:
   - specd.local.yaml is always .gitignored; specd init must add it automatically
   - When specd.local.yaml is present it is the sole active config — specd.yaml is not read
   - specd.local.yaml must be a complete, valid config on its own; partial overrides are not supported
-  - requires is not valid in project-level workflow entries — only step and hooks are accepted
   - Workspace names must match /^[a-z][a-z0-9-]*$/; default is reserved for the local project workspace
   - ownership values are limited to readOnly, shared, and owned
   - isExternal is not declared — it is inferred by the application layer from whether the resolved specs.fs.path is outside the project repo root
@@ -656,36 +667,48 @@ scenarios:
       - a template string contains {{unknown}}
     then:
       - the literal string {{unknown}} is used and a warning is emitted
-  - requirement: Workflow additions
-    name: Project hook appended
+  - requirement: Schema plugins
+    name: Plugin resolved and applied
+    given:
+      - "schemaPlugins: ['@specd/plugin-rfc'] is declared and the plugin package is installed"
     when:
-      - both the schema and specd.yaml define hooks for archive.post
+      - the schema is resolved
     then:
-      - schema hooks fire first, project hooks second, within the same lifecycle point
-  - requirement: Workflow additions
-    name: requires in project workflow entry
+      - the plugin's operations are applied as a merge layer after the base schema's extends chain
+  - requirement: Schema plugins
+    name: Plugin reference not found
     when:
-      - a project-level workflow entry includes a requires field
+      - schemaPlugins references a plugin that cannot be resolved
     then:
-      - specd must reject it with a validation error on startup
-  - requirement: Workflow additions
-    name: Hook for step not in schema
+      - specd exits with SchemaNotFoundError
+  - requirement: Schema plugins
+    name: Plugin reference points to a full schema
     when:
-      - a project-level workflow entry names a step not declared in the schema's workflow
+      - 'schemaPlugins references a file with kind: schema instead of kind: schema-plugin'
     then:
-      - the hooks are registered for that step; they fire if the step is ever invoked, and a warning is emitted at startup
-  - requirement: Project-level artifact rules
-    name: Rules injected
+      - specd exits with SchemaValidationError
+  - requirement: Schema overrides
+    name: Override appends rules to an artifact
+    given:
+      - "schemaOverrides.append.artifacts: [{ id: specs, rules: { post: [{ id: rfc, text: '...' }] } }]"
     when:
-      - artifactRules.specs is set
+      - the schema is resolved
     then:
-      - CompileContext includes those strings in the compiled context for the specs artifact as constraints the agent must follow
-  - requirement: Project-level artifact rules
-    name: Unknown artifact ID
+      - the specs artifact's rules.post includes the rfc entry
+  - requirement: Schema overrides
+    name: Override removes a workflow hook
+    given:
+      - 'schemaOverrides.remove.workflow: [{ step: implementing, hooks: { post: [{ id: run-tests }] } }]'
     when:
-      - artifactRules contains a key not matching any artifact ID in the active schema
+      - the schema is resolved
     then:
-      - specd emits a warning at startup and ignores those rules
+      - the implementing step no longer has the run-tests hook
+  - requirement: Schema overrides
+    name: Invalid override structure rejected at startup
+    when:
+      - schemaOverrides contains an unknown operation key (e.g. modify)
+    then:
+      - specd exits with ConfigValidationError
   - requirement: LLM optimization
     name: Flag absent — deterministic mode
     given:
@@ -881,9 +904,9 @@ scenarios:
   - requirement: Startup validation
     name: Warning does not block startup
     when:
-      - specd.yaml has an artifactRules key for an unknown artifact
+      - specd.yaml has a deprecated field like artifactRules or workflow
     then:
-      - a warning is printed but the command proceeds normally
+      - a migration warning is printed but the command proceeds normally
   - requirement: Startup validation
     name: specd init requires no existing config
     when:
@@ -947,6 +970,6 @@ scenarios:
     then:
       - it reads /shared/instructions.md directly, without resolving relative to the specd.yaml directory
 contentHashes:
-  spec.md: sha256:1c27d4b607f6c198de72b61ae4bb7639fee5ab4dc330ea5c9daea80d047c1fd3
-  verify.md: sha256:1f68b76a90ebd403b257cfaddfd2acb71d7720864000cc19ad9602d09ef48f1f
+  spec.md: sha256:cf05ab3e98427f27223c3d508b1d5d0db8721a0048bda09d9df0cb4eef9f35e7
+  verify.md: sha256:c9f290865dacbf67a4ad32ca00745e34db5eb720275b132ba588aa0dac41294e
 generatedBy: core

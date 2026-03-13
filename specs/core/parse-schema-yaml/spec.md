@@ -1,8 +1,8 @@
 # Parse Schema YAML
 
-## Overview
+## Purpose
 
-`parseSchemaYaml` is a shared infrastructure module that extracts the YAML parsing and Zod validation logic from `FsSchemaRegistry` into a reusable, adapter-independent function. It receives raw YAML content and a schema reference string, validates the content against the `SchemaYaml` Zod schema, and returns a typed intermediate data structure (`SchemaYamlData`). This module performs structural validation only — it does not construct domain entities or perform semantic checks such as cycle detection or ID format enforcement.
+Multiple `SchemaRegistry` adapters (filesystem, in-memory, remote) need to parse and structurally validate schema YAML in exactly the same way, and embedding that logic in a single adapter forces duplication. `parseSchemaYaml` extracts YAML parsing and Zod validation into a reusable, adapter-independent infrastructure function that receives raw YAML content and a schema reference string, validates against the `SchemaYaml` Zod schema, and returns a typed `SchemaYamlData` intermediate. It performs structural validation only — domain entity construction and semantic checks (cycle detection, ID format) remain the caller's responsibility.
 
 ## Requirements
 

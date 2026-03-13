@@ -1,8 +1,8 @@
 # Change Directory Layout
 
-## Overview
+## Purpose
 
-A change directory is the working area for a single in-progress change. It holds the manifest, all artifacts produced during the change lifecycle, and delta files for spec-scoped artifacts that modify existing specs. This spec defines the internal structure of a change directory and the conventions that govern where each file type lives within it.
+Without a well-defined directory layout, tooling cannot reliably locate manifests, artifacts, or delta files — especially in multi-workspace changes. This spec defines the internal structure of a change directory: where the manifest lives, where change-scoped and spec-scoped artifacts are placed, and the conventions for delta files that modify existing specs.
 
 ## Requirements
 

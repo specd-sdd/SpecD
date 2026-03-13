@@ -1,11 +1,11 @@
 title: Skills Install
-description: Defines the `specd skills install <name|all>` command. The CLI reads skill content from `@specd/skills`, resolves the agent-specific target path, and writes the skill file to disk. It then calls `RecordSkillInstall` in `@specd/core` to persist the installation in the project manifest. Core never touches skill files; the CLI never touches `specd.yaml`.
+description: Manually copying skill files into agent command directories is tedious and easy to get wrong. The `specd skills install <name|all>` command reads skill content from `@specd/skills`, writes it to the agent-specific target path, and calls `RecordSkillInstall` in `@specd/core` to persist the installation in the project manifest.
 dependsOn:
   - cli:cli/entrypoint
   - cli:cli/skills-list
   - core:core/config
 context:
-  - Defines the `specd skills install <name|all>` command. The CLI reads skill content from `@specd/skills`, resolves the agent-specific target path, and writes the skill file to disk. It then calls `RecordSkillInstall` in `@specd/core` to persist the installation in the project manifest. Core never touches skill files; the CLI never touches `specd.yaml`.
+  - Manually copying skill files into agent command directories is tedious and easy to get wrong. The `specd skills install <name|all>` command reads skill content from `@specd/skills`, writes it to the agent-specific target path, and calls `RecordSkillInstall` in `@specd/core` to persist the installation in the project manifest.
 rules:
   - requirement: Command signature
     rules:
@@ -178,6 +178,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:c2f4ab57290050ada8ef98d0cd0c6725255ff4207f652b8c1db32af78ac4b733
+  spec.md: sha256:dd916effa95b4f48f58446e2388e69eaaf884fefe1ff83d68a1e1819f0efbe8f
   verify.md: sha256:a94d7e1e59858878fe005cf434023be35d153051a5235779c3571cc927e95a6d
 generatedBy: core

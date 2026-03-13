@@ -1,11 +1,11 @@
 title: Actor Resolver Factory
-description: '`createVcsActorResolver` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `ActorResolver` implementation. It is the single entry point for obtaining an `ActorResolver` — callers never construct concrete resolvers directly.'
+description: specd needs to identify the current user (for approvals, sign-offs, and audit trails) using whichever VCS is active, without callers coupling to a specific VCS implementation. `createVcsActorResolver` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `ActorResolver` implementation, serving as the single entry point so that callers never construct concrete resolvers directly.
 dependsOn:
   - core:core/vcs-adapter
   - core:core/composition
   - default:_global/architecture
 context:
-  - '`createVcsActorResolver` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `ActorResolver` implementation. It is the single entry point for obtaining an `ActorResolver` — callers never construct concrete resolvers directly.'
+  - specd needs to identify the current user (for approvals, sign-offs, and audit trails) using whichever VCS is active, without callers coupling to a specific VCS implementation. `createVcsActorResolver` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `ActorResolver` implementation, serving as the single entry point so that callers never construct concrete resolvers directly.
 rules:
   - requirement: Detection probes in priority order
     rules:
@@ -86,6 +86,6 @@ scenarios:
     then:
       - the returned object satisfies the ActorResolver interface
 contentHashes:
-  spec.md: sha256:405497d6d295cae648f6aae216092cd3c8887ec576eedc2bf92b04d90be7200b
+  spec.md: sha256:387eebed5c4839f419741c051d675fd823f113aaaa0c7b651e23749c4ac4a052
   verify.md: sha256:420873478065199c01bab497c9d554431afed355706a0115613544e20e6cf558
 generatedBy: core

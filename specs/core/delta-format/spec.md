@@ -1,8 +1,8 @@
 # Delta Format
 
-## Overview
+## Purpose
 
-A delta file expresses changes to an artifact as a sequence of structured AST operations. Rather than encoding diffs as inline text markers, deltas are separate YAML documents that address artifact nodes by type and identifying property. The `ArtifactParser` port abstracts parsing, delta application, and serialisation across all supported file types — markdown, JSON, YAML, and plain text.
+Inline text diffs are fragile and format-unaware, making them unreliable for modifying structured artifacts like specs, configs, and schemas. Delta files solve this by expressing changes as a sequence of structured AST operations in separate YAML documents that address artifact nodes by type and identifying property. The `ArtifactParser` port abstracts parsing, delta application, and serialisation across all supported file types — markdown, JSON, YAML, and plain text.
 
 ## Requirements
 

@@ -1,8 +1,8 @@
 # ListDiscarded
 
-## Overview
+## Purpose
 
-The `ListDiscarded` use case retrieves all discarded changes from the default workspace. Discarded changes are those that have been marked for removal but remain in storage until permanently deleted or archived.
+Discarded changes remain in storage for audit purposes, and teams need to review them — for example, to confirm a superseded change was properly replaced. The `ListDiscarded` use case retrieves all discarded changes from the default workspace, providing visibility into abandoned work that has not been permanently deleted.
 
 ## Requirements
 

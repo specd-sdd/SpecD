@@ -1,8 +1,8 @@
 # DiscardChange
 
-## Overview
+## Purpose
 
-The `DiscardChange` use case permanently abandons a change by appending a `discarded` event to its history. The repository implementation moves the change directory to `discarded/` when persisted. Discarding is a terminal operation — discarded changes cannot be restored.
+Sometimes a change becomes obsolete or is superseded, and the team needs a way to permanently abandon it while preserving an audit trail of why. The `DiscardChange` use case appends a `discarded` event to the change's history and the repository moves its directory to `discarded/`. Discarding is a terminal operation — discarded changes cannot be restored.
 
 ## Requirements
 

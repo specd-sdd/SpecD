@@ -1,5 +1,5 @@
 title: Spec ID Format
-description: A **spec ID** is the canonical string that identifies a spec within a specd project. Every spec belongs to exactly one workspace and has a capability path within that workspace. This spec defines the canonical format, parsing rules, and storage conventions for spec IDs to eliminate ambiguity between workspace prefixes and capability path segments.
+description: Without a single canonical format for referencing specs, workspace prefixes and capability path segments become ambiguous — different subsystems would parse the same string differently. This spec defines the canonical spec ID format, parsing rules, and storage conventions, ensuring every spec is identified unambiguously as a `workspace:capabilityPath` string across all of specd.
 dependsOn:
   - core:core/change
   - core:core/change-manifest
@@ -7,7 +7,7 @@ dependsOn:
   - core:core/compile-context
   - core:core/workspace
 context:
-  - A **spec ID** is the canonical string that identifies a spec within a specd project. Every spec belongs to exactly one workspace and has a capability path within that workspace. This spec defines the canonical format, parsing rules, and storage conventions for spec IDs to eliminate ambiguity between workspace prefixes and capability path segments.
+  - Without a single canonical format for referencing specs, workspace prefixes and capability path segments become ambiguous — different subsystems would parse the same string differently. This spec defines the canonical spec ID format, parsing rules, and storage conventions, ensuring every spec is identified unambiguously as a `workspace:capabilityPath` string across all of specd.
 rules:
   - requirement: Canonical format
     rules:
@@ -126,6 +126,6 @@ scenarios:
     then:
       - it is normalized to default:auth/login before reaching the domain layer
 contentHashes:
-  spec.md: sha256:1c1de092b2d84d3a6c4adfd0f21469e2566c1a32669d79c2c988e75c8ea1b8e6
+  spec.md: sha256:08080d5f58a6d16dfec2c2a23875aee5c725199a166a1fb9199b5e2372f13fe6
   verify.md: sha256:f9023f0a7de7d50e232e3a5d07456bc5ad2a86f29167e5ec10017e490d9d989a
 generatedBy: core

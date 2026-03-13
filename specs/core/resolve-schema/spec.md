@@ -1,10 +1,8 @@
 # ResolveSchema
 
-## Overview
+## Purpose
 
-`ResolveSchema` is the application use case that orchestrates the full schema resolution pipeline: resolve the base schema file, resolve the `extends` chain recursively, resolve schema plugins, apply all merge layers via `mergeSchemaLayers`, and construct the final `Schema` entity via `buildSchema`. It is the single entry point for obtaining a fully-resolved, customised schema.
-
-`GetActiveSchema` delegates to `ResolveSchema` — it no longer resolves schemas directly.
+Schema resolution involves multiple steps (base lookup, extends chain, plugin merging, overrides) that must execute in a precise order, and scattering this logic across callers would lead to duplication and inconsistency. `ResolveSchema` is the application use case that orchestrates the full resolution pipeline — base schema file, recursive `extends` chain, schema plugins, merge layers via `mergeSchemaLayers`, and final `Schema` construction via `buildSchema` — providing a single entry point for obtaining a fully-resolved, customised schema. `GetActiveSchema` delegates to `ResolveSchema` rather than resolving schemas directly.
 
 ## Requirements
 

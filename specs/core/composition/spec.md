@@ -1,8 +1,8 @@
 # Composition Layer
 
-## Overview
+## Purpose
 
-The `composition/` layer in `@specd/core` is the only layer permitted to import from `infrastructure/`. It exposes three levels of factory: use-case factories that wire ports internally, a kernel that builds all use cases from a resolved config object, and a config loader port that abstracts config sources. Delivery mechanisms (CLI, MCP) interact exclusively with this layer — they never import ports, infrastructure adapters, or use case constructors directly.
+Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing three levels of factory: use-case factories that wire ports internally, a kernel that builds all use cases from a resolved config object, and a config loader port that abstracts config sources. CLI, MCP, and plugin adapters interact exclusively with this layer.
 
 ## Requirements
 

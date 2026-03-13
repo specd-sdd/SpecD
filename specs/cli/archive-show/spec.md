@@ -1,8 +1,8 @@
 # Archive Show
 
-## Overview
+## Purpose
 
-Defines the `specd archive show <name>` command, which displays basic metadata for a single archived change.
+When reviewing archived work, users need to inspect a specific change without restoring it. The `specd archive show <name>` command displays basic metadata for a single archived change.
 
 ## Requirements
 

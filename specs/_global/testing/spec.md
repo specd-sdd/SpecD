@@ -1,8 +1,8 @@
 # Testing Conventions
 
-## Overview
+## Purpose
 
-Testing strategy for the specd monorepo. The domain and application layers must be fully covered by unit tests with mocked ports. Integration tests cover infrastructure adapters.
+Untested domain logic and leaky port boundaries erode confidence in every change. This spec defines the testing strategy for the specd monorepo: domain and application layers are fully covered by unit tests with mocked ports, while integration tests exercise infrastructure adapters against real (temporary) filesystems.
 
 ## Requirements
 

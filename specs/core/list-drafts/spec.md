@@ -1,8 +1,8 @@
 # ListDrafts
 
-## Overview
+## Purpose
 
-The `ListDrafts` use case retrieves all drafted (shelved) changes from the default workspace. Drafted changes are those that have been temporarily set aside and can be restored to active status later.
+Users who shelve changes need visibility into what is parked so they can decide what to resume. The `ListDrafts` use case retrieves all drafted (shelved) changes from the default workspace — those temporarily set aside that can be restored to active status later.
 
 ## Requirements
 

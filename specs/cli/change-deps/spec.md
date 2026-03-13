@@ -1,8 +1,8 @@
 # change deps
 
-## Overview
+## Purpose
 
-`specd change deps <name> <specId>` manages the declared `dependsOn` dependencies for a single spec within an active change. Dependencies are stored in the change manifest's `specDependsOn` field and used by `CompileContext` as the highest-priority source for `dependsOn` resolution.
+When a spec depends on other specs for context, those relationships need to be declared so that `CompileContext` can include them automatically. `specd change deps <name> <specId>` manages the `dependsOn` dependencies for a single spec within an active change, stored in the change manifest's `specDependsOn` field and used as the highest-priority source for `dependsOn` resolution.
 
 ## Requirements
 

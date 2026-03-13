@@ -1,13 +1,15 @@
 title: SchemaRegistry Port
-description: '`SchemaRegistry` is an application-layer port that defines the contract for discovering and resolving schemas. It decouples the application layer from the specifics of where schemas are stored (npm packages, workspace directories, or filesystem paths), allowing implementations to be swapped without changing consumers.'
+description: Schemas can originate from npm packages, workspace directories, or arbitrary filesystem paths, so use cases need a single resolution interface to avoid coupling to any one source. `SchemaRegistry` is the application-layer port that defines the contract for discovering and resolving schemas, allowing implementations to be swapped without changing consumers.
 dependsOn:
   - default:_global/architecture
+  - core:core/parse-schema-yaml
+  - core:core/resolve-schema
 context:
-  - '`SchemaRegistry` is an application-layer port that defines the contract for discovering and resolving schemas. It decouples the application layer from the specifics of where schemas are stored (npm packages, workspace directories, or filesystem paths), allowing implementations to be swapped without changing consumers.'
+  - Schemas can originate from npm packages, workspace directories, or arbitrary filesystem paths, so use cases need a single resolution interface to avoid coupling to any one source. `SchemaRegistry` is the application-layer port that defines the contract for discovering and resolving schemas, allowing implementations to be swapped without changing consumers.
 rules:
   - requirement: Interface shape
     rules:
-      - 'The port MUST be declared as a TypeScript `interface` named `SchemaRegistry` with two methods: `resolve` and `list`. It SHALL NOT be an abstract class, because there are no invariant constructor arguments shared across all implementations.'
+      - 'The port MUST be declared as a TypeScript `interface` named `SchemaRegistry` with three methods: `resolve`, `resolveRaw`, and `list`. It SHALL NOT be an abstract class, because there are no invariant constructor arguments shared across all implementations.'
   - requirement: Resolve method signature
     rules:
       - |-
@@ -28,6 +30,23 @@ rules:
         * Relative or absolute filesystem path — loaded directly from that path
 
         There SHALL be no implicit multi-level fallback between these resolution strategies.
+  - requirement: ResolveRaw method signature
+    rules:
+      - |-
+        The `resolveRaw` method MUST accept the same two parameters as `resolve`:
+
+        1. `ref: string` — the schema reference
+        2. `workspaceSchemasPaths: ReadonlyMap<string, string>` — workspace-to-schemasPath map
+
+        It MUST return `Promise<SchemaRawResult | null>`. `SchemaRawResult` is an object containing:
+
+        * `data: SchemaYamlData` — the parsed and Zod-validated intermediate data (before domain construction)
+        * `templates: ReadonlyMap<string, string>` — loaded template content keyed by relative path
+        * `resolvedPath: string` — the absolute path of the resolved schema file (used for extends cycle detection)
+
+        This method is used by `ResolveSchema` to obtain the intermediate representation needed for the merge pipeline. The existing `resolve` method continues to return the fully-built `Schema` entity for consumers that do not need the merge pipeline.
+
+        A `null` return indicates the resolved file does not exist.
   - requirement: List method signature
     rules:
       - |-
@@ -61,7 +80,7 @@ scenarios:
     given:
       - a concrete class implementing SchemaRegistry
     when:
-      - the class implements both resolve and list
+      - the class implements resolve, resolveRaw, and list
     then:
       - it compiles and can be instantiated
   - requirement: Resolve method signature
@@ -112,6 +131,28 @@ scenarios:
       - resolve is called with "./custom/schema.yaml"
     then:
       - the implementation loads from that path directly without prefix routing
+  - requirement: ResolveRaw method signature
+    name: ResolveRaw returns intermediate data on success
+    given:
+      - a valid schema reference
+    when:
+      - resolveRaw is called
+    then:
+      - it returns a SchemaRawResult with data (SchemaYamlData), templates (Map), and resolvedPath (string)
+  - requirement: ResolveRaw method signature
+    name: ResolveRaw returns null for missing schema
+    given:
+      - a reference to a non-existent schema file
+    when:
+      - resolveRaw is called
+    then:
+      - it returns null
+  - requirement: ResolveRaw method signature
+    name: ResolveRaw uses same prefix routing as resolve
+    when:
+      - resolveRaw is called with "@specd/schema-std"
+    then:
+      - it resolves from the same location as resolve would
   - requirement: List result ordering
     name: Workspace entries appear before npm entries
     given:
@@ -137,6 +178,6 @@ scenarios:
     then:
       - source is "npm" and workspace is undefined
 contentHashes:
-  spec.md: sha256:0247203e905e37f7e59aa07d720cc9106928b3a6a9528ae44a8693a1909aeb04
-  verify.md: sha256:09d34067cb95a8c416a2e80dc19e6dec82f1682043ab49988cde9642ab7a88f1
+  spec.md: sha256:3725f5220777b5f6764bdea5ba4806455b228984d59d51b1ad8e21acbd50217c
+  verify.md: sha256:87548080b879683bdeeb8116974730146ff656dfdd8238db6f99dc961b510c89
 generatedBy: core

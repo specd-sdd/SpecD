@@ -1,8 +1,8 @@
 # SpecRepository Port
 
-## Overview
+## Purpose
 
-`SpecRepository` is the application-layer port for reading and writing specs within a single workspace. It extends the shared `Repository` base class — `workspace()`, `ownership()`, and `isExternal()` are set at construction time and are immutable. Use cases that need multiple workspaces receive a separate `SpecRepository` instance per workspace. This spec defines the contract that all implementations must satisfy.
+Use cases need to read and write specs without knowing how or where they are stored on disk, so a port boundary is essential for testability and storage-strategy independence. `SpecRepository` is the application-layer port for reading and writing specs within a single workspace, extending the shared `Repository` base class with immutable `workspace()`, `ownership()`, and `isExternal()` accessors set at construction time. Use cases that need multiple workspaces receive a separate `SpecRepository` instance per workspace.
 
 ## Requirements
 

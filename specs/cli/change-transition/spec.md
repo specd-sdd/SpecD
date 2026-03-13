@@ -1,8 +1,8 @@
 # Change Transition
 
-## Overview
+## Purpose
 
-Defines the `specd change transition <name> <step>` command, which advances a change to the next lifecycle state.
+Changes must progress through a governed lifecycle so that hooks, validations, and approval gates fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, running any declared pre/post hooks and transparently routing through approval gates when enabled.
 
 ## Requirements
 

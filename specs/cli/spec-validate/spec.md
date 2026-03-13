@@ -1,9 +1,8 @@
 # Spec Validate
 
-## Overview
+## Purpose
 
-Validates spec artifacts against the active schema's structural rules. Supports
-validating a single spec, all specs in a workspace, or all specs across all workspaces.
+Specs that violate the schema's structural rules can break downstream tooling and confuse agents. The `specd spec validate` command validates spec artifacts against the active schema's structural rules, supporting a single spec, all specs in a workspace, or all specs across all workspaces.
 
 ## Requirements
 

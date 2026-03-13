@@ -1,8 +1,8 @@
 # Spec Layout
 
-## Overview
+## Purpose
 
-specd specs are organised by scope and live under `specs/` at the monorepo root. Global constraints that apply to all packages live under `specs/_global/`; package-internal specs live under `specs/<package>/`. Every spec subdirectory contains two files: `spec.md` (requirements and design) and `verify.md` (WHEN/THEN scenarios).
+Without a consistent layout, specs become hard to discover and tooling cannot locate them reliably. specd specs are organised by scope under `specs/` at the monorepo root — global constraints in `specs/_global/`, package-internal specs in `specs/<package>/`. Every spec subdirectory contains two files: `spec.md` (requirements and design) and `verify.md` (WHEN/THEN scenarios).
 
 ## Requirements
 
@@ -30,9 +30,10 @@ Every `spec.md` must follow this structure. Sections marked _optional_ may be om
 ```markdown
 # <Title>
 
-## Overview
+## Purpose
 
-<!-- 1–3 sentences describing what this spec covers and why it exists. -->
+<!-- 1–3 sentences: start with WHY this spec exists (the problem or need),
+     then briefly describe WHAT it covers to give the reader context. -->
 
 ## Requirements
 
@@ -62,7 +63,7 @@ Every `spec.md` must follow this structure. Sections marked _optional_ may be om
      If none, omit this section. -->
 ```
 
-`## Overview`, `## Requirements`, and `## Spec Dependencies` are mandatory. All other sections are included when they add value.
+`## Purpose`, `## Requirements`, and `## Spec Dependencies` are mandatory. All other sections are included when they add value.
 
 ### Requirement: verify.md structure
 
@@ -77,10 +78,12 @@ Every `verify.md` must follow this structure. Scenarios are grouped under requir
 
 #### Scenario: <Name>
 
-- **GIVEN** <precondition> <!-- optional; use when precondition is not obvious -->
+- **GIVEN** <precondition> <!-- optional; omit when obvious from context -->
+- **AND/OR** <additional precondition> <!-- optional; repeat as needed -->
 - **WHEN** <condition>
+- **AND/OR** <additional condition> <!-- optional; repeat as needed -->
 - **THEN** <expected outcome>
-- **AND** <additional assertion> <!-- optional -->
+- **AND/OR** <additional assertion> <!-- optional; repeat as needed -->
 ```
 
 Only scenarios that add information beyond what the requirement prose already states are included. Scenarios that merely restate the obvious happy path are omitted.

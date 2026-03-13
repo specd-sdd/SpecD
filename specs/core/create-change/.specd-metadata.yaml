@@ -1,10 +1,10 @@
 title: CreateChange
-description: The `CreateChange` use case creates a new change entity and persists it to the repository. It enforces name uniqueness, resolves the current actor, and records a single `created` event as the initial history entry.
+description: Every spec workflow begins with a named change, so the system needs a single entry point that guarantees uniqueness and records provenance from the start. The `CreateChange` use case creates a new change entity, enforces name uniqueness, resolves the current actor, and records a single `created` event as the initial history entry.
 dependsOn:
   - core:core/change
   - default:_global/architecture
 context:
-  - The `CreateChange` use case creates a new change entity and persists it to the repository. It enforces name uniqueness, resolves the current actor, and records a single `created` event as the initial history entry.
+  - Every spec workflow begins with a named change, so the system needs a single entry point that guarantees uniqueness and records provenance from the start. The `CreateChange` use case creates a new change entity, enforces name uniqueness, resolves the current actor, and records a single `created` event as the initial history entry.
 rules:
   - requirement: Input contract
     rules:
@@ -107,6 +107,6 @@ scenarios:
     then:
       - ChangeRepository.save was called with the returned Change instance
 contentHashes:
-  spec.md: sha256:dcb33a0963f904b9a41cc564a8d6a08d9ab75d396f480178ad054a659699ad73
+  spec.md: sha256:4973ed490b86512197deccd946b324637748872d950bad5385ddefea6cc0ed54
   verify.md: sha256:8cef0ea9f2f8a5891939c851ace9f600f00a3b72cf1820e9fe50bbbca8b28ac2
 generatedBy: core

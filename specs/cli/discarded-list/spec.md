@@ -1,8 +1,8 @@
 # Discarded List
 
-## Overview
+## Purpose
 
-Defines the `specd discarded list` command, which lists all discarded changes in `discarded/`, sorted by discard date descending (most recently discarded first).
+Discarded changes serve as an audit trail of abandoned work — without a listing command, users would have to inspect the filesystem directly. `specd discarded list` lists all discarded changes in `discarded/`, sorted by discard date descending (most recently discarded first).
 
 ## Requirements
 

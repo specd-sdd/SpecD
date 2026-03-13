@@ -1,8 +1,8 @@
 # Generate Spec Metadata
 
-## Overview
+## Purpose
 
-The `GenerateSpecMetadata` use case produces `.specd-metadata.yaml` content deterministically from schema-declared extraction rules, without LLM involvement. It resolves a spec ID, loads its artifacts, parses them into ASTs, runs the schema's `metadataExtraction` engine, computes content hashes, and returns the assembled metadata.
+Metadata must be producible deterministically from spec content so that every project gets a consistent baseline without requiring LLM involvement. The `GenerateSpecMetadata` use case achieves this by resolving a spec ID, loading its artifacts, parsing them into ASTs, running the schema's `metadataExtraction` engine, computing content hashes, and returning the assembled `.specd-metadata.yaml` content.
 
 ## Requirements
 

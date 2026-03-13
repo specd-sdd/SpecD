@@ -1,8 +1,8 @@
 # SaveSpecMetadata
 
-## Overview
+## Purpose
 
-`SaveSpecMetadata` is a use case in the application layer of `@specd/core` that writes a `.specd-metadata.yaml` file for a given spec. It validates the incoming YAML content, protects curated `dependsOn` entries from silent overwrite, delegates conflict detection to the repository layer, and persists the artifact to disk. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata).
+Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming YAML content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the `.specd-metadata.yaml` artifact to disk. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata).
 
 ## Requirements
 

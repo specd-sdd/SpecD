@@ -1,10 +1,10 @@
 title: VCS Adapter Port
-description: '`VcsAdapter` is an application-layer port interface that provides technology-neutral access to version-control system state. Use cases depend on this interface for repository root resolution, branch detection, working-tree cleanliness checks, revision references, and file content retrieval. Concrete implementations exist for git (and planned for hg, svn) as well as a null fallback for environments without VCS.'
+description: Use cases need VCS state (repo root, branch, revision, file history) but must not couple to a specific tool, since the platform targets git today and may support hg or svn later. `VcsAdapter` is the application-layer port interface that provides technology-neutral access to version-control system state — repository root resolution, branch detection, working-tree cleanliness checks, revision references, and file content retrieval — with a null fallback for environments without VCS.
 dependsOn:
   - default:_global/architecture
   - core:core/vcs-adapter
 context:
-  - '`VcsAdapter` is an application-layer port interface that provides technology-neutral access to version-control system state. Use cases depend on this interface for repository root resolution, branch detection, working-tree cleanliness checks, revision references, and file content retrieval. Concrete implementations exist for git (and planned for hg, svn) as well as a null fallback for environments without VCS.'
+  - Use cases need VCS state (repo root, branch, revision, file history) but must not couple to a specific tool, since the platform targets git today and may support hg or svn later. `VcsAdapter` is the application-layer port interface that provides technology-neutral access to version-control system state — repository root resolution, branch detection, working-tree cleanliness checks, revision references, and file content retrieval — with a null fallback for environments without VCS.
 rules:
   - requirement: rootDir returns the repository root
     rules:
@@ -127,6 +127,6 @@ scenarios:
     then:
       - the promise MUST resolve to null
 contentHashes:
-  spec.md: sha256:123a2893cf09b71868089cf854beaeb0b987c5bc6f4c5ec978a2b56f154b01ec
+  spec.md: sha256:3d24a96240915744df9438fc55eb3a4e5f6d9b5a3677266aea3c8bdedda09294
   verify.md: sha256:a0107d8fe62875c687eea4184be9505f2b7609735f985c52ddacbabbb69dcc88
 generatedBy: core

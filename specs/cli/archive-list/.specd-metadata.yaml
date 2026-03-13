@@ -1,10 +1,10 @@
 title: Archive List
-description: Defines the `specd archive list` command, which lists all archived changes in the archive directory configured by `storage.archivePath`, sorted by archive date descending (most recent first).
+description: Teams need a way to review past work without digging through the archive directory by hand. The `specd archive list` command lists all archived changes from the directory configured by `storage.archivePath`, sorted by archive date descending (most recent first).
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd archive list` command, which lists all archived changes in the archive directory configured by `storage.archivePath`, sorted by archive date descending (most recent first).
+  - Teams need a way to review past work without digging through the archive directory by hand. The `specd archive list` command lists all archived changes from the directory configured by `storage.archivePath`, sorted by archive date descending (most recent first).
 rules:
   - requirement: Command signature
     rules:
@@ -119,6 +119,6 @@ scenarios:
       - the command exits with code 3
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:0aa7cbb2555a46f0c2a2950045b3d8edf92af805230f15f5815f06070a40c29f
+  spec.md: sha256:157652f52f395582c194b44354cf51bc92662cc72f940ff27cd26f9aae73d316
   verify.md: sha256:0b197577883bb58d311f7289890b48abf2a50eb1bc1d90263d5f6933519e72b7
 generatedBy: core

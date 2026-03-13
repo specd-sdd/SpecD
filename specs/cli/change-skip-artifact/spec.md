@@ -1,8 +1,8 @@
 # Change Skip Artifact
 
-## Overview
+## Purpose
 
-Defines the `specd change skip-artifact <name> <artifact-id> [--reason <text>]` command, which explicitly marks an optional artifact as skipped when an agent or human decides not to produce it.
+Optional artifacts that won't be produced must be explicitly skipped — simply omitting the file would leave the change stuck with a `missing` artifact that blocks transitions. `specd change skip-artifact <name> <artifact-id> [--reason <text>]` marks an optional artifact as skipped so the lifecycle can proceed.
 
 ## Requirements
 

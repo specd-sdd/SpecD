@@ -1,10 +1,10 @@
 title: SaveSpecMetadata
-description: '`SaveSpecMetadata` is a use case in the application layer of `@specd/core` that writes a `.specd-metadata.yaml` file for a given spec. It validates the incoming YAML content, protects curated `dependsOn` entries from silent overwrite, delegates conflict detection to the repository layer, and persists the artifact to disk. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata).'
+description: "Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming YAML content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the `.specd-metadata.yaml` artifact to disk. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata)."
 dependsOn:
   - core:core/spec-metadata
   - default:_global/architecture
 context:
-  - '`SaveSpecMetadata` is a use case in the application layer of `@specd/core` that writes a `.specd-metadata.yaml` file for a given spec. It validates the incoming YAML content, protects curated `dependsOn` entries from silent overwrite, delegates conflict detection to the repository layer, and persists the artifact to disk. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata).'
+  - "Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming YAML content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the `.specd-metadata.yaml` artifact to disk. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata)."
 rules:
   - requirement: Input contract
     rules:
@@ -215,6 +215,6 @@ scenarios:
       - it receives a ReadonlyMap<string, SpecRepository> and a YamlSerializer
       - AND it does not construct any infrastructure adapters internally
 contentHashes:
-  spec.md: sha256:fa1b0a2144621f4b95214419b8bd47006934becf39f242d79124ce5285f26eec
+  spec.md: sha256:c0136ce8cff1e31f47050a2631eacab3250515f355a9fc895cbd173779d8cc7f
   verify.md: sha256:693d8aeff3dd223e3dc29dc1373c10494851031d867d3441db4f6fee445ca5ad
 generatedBy: core

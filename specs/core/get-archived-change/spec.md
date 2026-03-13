@@ -1,8 +1,8 @@
 # GetArchivedChange
 
-## Overview
+## Purpose
 
-`GetArchivedChange` is the application use case that retrieves a single archived change by name. It is a read-only query that throws `ChangeNotFoundError` when the requested change does not exist in the archive.
+When inspecting the archive — for audit, diffing, or post-mortem — users need to retrieve a specific archived change by name rather than scanning the full list. `GetArchivedChange` is a read-only query that looks up a single archived change by name and throws `ChangeNotFoundError` when the requested change does not exist.
 
 ## Requirements
 

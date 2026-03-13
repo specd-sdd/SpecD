@@ -1,10 +1,10 @@
 title: ListChanges
-description: The `ListChanges` use case retrieves all active changes from the default workspace. Active changes are those that have not been drafted (shelved) or discarded. Delivery mechanisms use this to display the current working set of changes.
+description: Delivery mechanisms need a way to show the current working set at a glance, filtering out shelved and discarded items automatically. The `ListChanges` use case retrieves all active changes — those that have not been drafted or discarded — from the default workspace, sorted by creation order.
 dependsOn:
   - core:core/change
   - core:core/kernel
 context:
-  - The `ListChanges` use case retrieves all active changes from the default workspace. Active changes are those that have not been drafted (shelved) or discarded. Delivery mechanisms use this to display the current working set of changes.
+  - Delivery mechanisms need a way to show the current working set at a glance, filtering out shelved and discarded items automatically. The `ListChanges` use case retrieves all active changes — those that have not been drafted or discarded — from the default workspace, sorted by creation order.
 rules:
   - requirement: Returns all active changes
     rules:
@@ -59,6 +59,6 @@ scenarios:
     then:
       - the result is an empty array
 contentHashes:
-  spec.md: sha256:f17a8301d510751a7ab51e85eafacc9c8f18e6de2fc7cfff6e66d8e4d45816b7
+  spec.md: sha256:20623e8013601485d3a00f6a27bb48f34dfdf6af274f2c07f856f5cb7713d173
   verify.md: sha256:f98ffd36e45ccf402d477f2929390f6ddb6dd3dc0c94bfdbbf56ec50cee9968d
 generatedBy: core

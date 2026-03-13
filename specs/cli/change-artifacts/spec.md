@@ -1,8 +1,8 @@
 # Change Artifacts
 
-## Overview
+## Purpose
 
-Defines the `specd change artifacts <name>` command, which lists all artifact files for a change with their absolute paths on disk, effective statuses, and whether each file currently exists. Primarily useful for agents that need to know exactly where to create or edit artifact files.
+Agents need to know the exact filesystem paths where artifact files should be created or edited, without guessing directory layout. `specd change artifacts <name>` lists all artifact files for a change with their absolute paths on disk, effective statuses, and whether each file currently exists.
 
 ## Requirements
 

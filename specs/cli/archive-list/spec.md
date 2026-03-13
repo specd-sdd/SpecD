@@ -1,8 +1,8 @@
 # Archive List
 
-## Overview
+## Purpose
 
-Defines the `specd archive list` command, which lists all archived changes in the archive directory configured by `storage.archivePath`, sorted by archive date descending (most recent first).
+Teams need a way to review past work without digging through the archive directory by hand. The `specd archive list` command lists all archived changes from the directory configured by `storage.archivePath`, sorted by archive date descending (most recent first).
 
 ## Requirements
 

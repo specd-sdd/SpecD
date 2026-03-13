@@ -1,8 +1,8 @@
 # FileReader Port
 
-## Overview
+## Purpose
 
-`FileReader` is an application-layer port that defines the contract for reading arbitrary files from the filesystem by absolute path. It decouples application logic (e.g. `CompileContext`) from concrete `fs` imports, and returns `null` for missing files instead of throwing.
+Application logic such as `CompileContext` must read arbitrary files but cannot import `node:fs` directly without violating the hexagonal boundary. `FileReader` is the application-layer port that defines the contract for reading files by absolute path, returning `null` for missing files instead of throwing, so consumers stay decoupled from concrete filesystem APIs.
 
 ## Requirements
 

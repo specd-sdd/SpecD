@@ -1,8 +1,8 @@
 # HookRunner Port
 
-## Overview
+## Purpose
 
-`HookRunner` is an application-layer port that defines the contract for executing `run:` hook commands declared in workflow entries. It isolates the application layer from subprocess execution details, template variable expansion, and shell-specific concerns.
+Workflow entries can declare `run:` hooks that execute shell commands, but the application layer must not depend on subprocess APIs, shell detection, or platform-specific execution details. `HookRunner` is the application-layer port that defines the contract for executing these hook commands, abstracting template variable expansion and shell concerns behind a single interface.
 
 ## Requirements
 

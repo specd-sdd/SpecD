@@ -1,8 +1,8 @@
 # SchemaRegistry Port
 
-## Overview
+## Purpose
 
-`SchemaRegistry` is an application-layer port that defines the contract for discovering and resolving schemas. It decouples the application layer from the specifics of where schemas are stored (npm packages, workspace directories, or filesystem paths), allowing implementations to be swapped without changing consumers.
+Schemas can originate from npm packages, workspace directories, or arbitrary filesystem paths, so use cases need a single resolution interface to avoid coupling to any one source. `SchemaRegistry` is the application-layer port that defines the contract for discovering and resolving schemas, allowing implementations to be swapped without changing consumers.
 
 ## Requirements
 

@@ -1,8 +1,8 @@
 # Get Spec
 
-## Overview
+## Purpose
 
-The `GetSpec` use case loads a single spec and all of its artifact files by workspace name and spec path. It is the primary query for reading a complete spec with its content, used by delivery mechanisms that need to display or process spec artifacts.
+Delivery mechanisms need to display or process a complete spec with all its artifacts, but loading and assembling those pieces requires coordinating workspace lookup, spec resolution, and multi-file artifact loading. The `GetSpec` use case handles this by loading a single spec and all of its artifact files by workspace name and spec path, serving as the primary query for reading a complete spec.
 
 ## Requirements
 

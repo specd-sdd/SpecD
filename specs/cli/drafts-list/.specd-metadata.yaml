@@ -1,10 +1,10 @@
 title: Drafts List
-description: Defines the `specd drafts list` command, which lists all changes currently in `drafts/`, sorted by `createdAt` ascending.
+description: Shelved work is invisible to the active change list, so users need a dedicated view to see what has been parked. `specd drafts list` lists all changes currently in `drafts/`, sorted by `createdAt` ascending.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd drafts list` command, which lists all changes currently in `drafts/`, sorted by `createdAt` ascending.
+  - Shelved work is invisible to the active change list, so users need a dedicated view to see what has been parked. `specd drafts list` lists all changes currently in `drafts/`, sorted by `createdAt` ascending.
 rules:
   - requirement: Command signature
     rules:
@@ -117,6 +117,6 @@ scenarios:
       - the command exits with code 3
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:fcbd813e4b01307cbefbe79f60eb91e950b1534da03c1135822a2c3019bcf372
+  spec.md: sha256:18ae55ebddf9ac36335e1f5a9e1859955d011a861aae6d54456546977883bc69
   verify.md: sha256:849dc8dff0cc3c149ec2d71ed8e7f44fb795f9737c16b797226c346c72446e51
 generatedBy: core

@@ -1,8 +1,8 @@
 # Project Overview
 
-## Overview
+## Purpose
 
-Defines the `specd project overview` command, which displays a visual dashboard summarising the current state of a SpecD project. In text mode the dashboard renders an ASCII box layout showing project metadata, spec counts per workspace, and change counts by state. In `json` or `toon` mode it outputs a structured data object with the same information.
+Users joining a project or returning after time away need a quick snapshot of what exists and what is in flight. The `specd project overview` command displays a visual dashboard summarising the current state of a SpecD project -- project metadata, spec counts per workspace, and change counts by state -- as an ASCII box layout in text mode or a structured data object in `json`/`toon` mode.
 
 ## Requirements
 

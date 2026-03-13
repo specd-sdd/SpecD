@@ -1,8 +1,8 @@
 # Architecture
 
-## Overview
+## Purpose
 
-specd uses Hexagonal Architecture (Ports & Adapters) combined with Domain-Driven Design tactical patterns. The domain is the center — all I/O is pushed to the edges. These principles apply to every package in the monorepo that contains business logic. Adapter packages (CLI, MCP, plugins) follow the same pattern at their level, delegating all logic to the core.
+Business logic coupled to I/O becomes untestable and resistant to change. specd uses Hexagonal Architecture (Ports & Adapters) combined with DDD tactical patterns — the domain is the center, all I/O is pushed to the edges. These principles apply to every package with business logic; adapter packages (CLI, MCP, plugins) follow the same pattern at their level, delegating all logic to the core.
 
 ## Requirements
 

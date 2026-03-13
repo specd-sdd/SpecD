@@ -1,10 +1,10 @@
 title: Change Skip Artifact
-description: Defines the `specd change skip-artifact <name> <artifact-id> [--reason <text>]` command, which explicitly marks an optional artifact as skipped when an agent or human decides not to produce it.
+description: Optional artifacts that won't be produced must be explicitly skipped — simply omitting the file would leave the change stuck with a `missing` artifact that blocks transitions. `specd change skip-artifact <name> <artifact-id> [--reason <text>]` marks an optional artifact as skipped so the lifecycle can proceed.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd change skip-artifact <name> <artifact-id> [--reason <text>]` command, which explicitly marks an optional artifact as skipped when an agent or human decides not to produce it.
+  - Optional artifacts that won't be produced must be explicitly skipped — simply omitting the file would leave the change stuck with a `missing` artifact that blocks transitions. `specd change skip-artifact <name> <artifact-id> [--reason <text>]` marks an optional artifact as skipped so the lifecycle can proceed.
 rules:
   - requirement: Command signature
     rules:
@@ -111,6 +111,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:299993f76b1ed10927151ec829dda05aca5ce549dbf9d399d4fd19bea4aa298e
+  spec.md: sha256:3fd71baeda362c276062c8291453746e34074570d75acbe7778bf2d3e9255fa4
   verify.md: sha256:75dcc774e681f5bf9095ceb6c4fb78efdf1a3bfec5f67385ad016eed09b72651
 generatedBy: core

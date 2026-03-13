@@ -1,8 +1,8 @@
 # Spec Metadata
 
-## Overview
+## Purpose
 
-Each spec directory in a specd project may contain a `.specd-metadata.yaml` file alongside its content artifacts. This file records machine-readable metadata about the spec — specifically its declared context dependencies and a hash of the spec content at the time those dependencies were last derived. It is generated deterministically by core at archive time using the schema's `metadataExtraction` engine, and is not part of the schema artifact system.
+Tooling and AI agents need a compact, machine-readable summary of each spec — its dependencies, content hashes, rules, and scenarios — without parsing the full artifact files every time. Each spec directory may contain a `.specd-metadata.yaml` file alongside its content artifacts, recording this metadata. It is generated deterministically by core at archive time using the schema's `metadataExtraction` engine and is not part of the schema artifact system; content hashes enable staleness detection so consumers know when to regenerate.
 
 ## Requirements
 

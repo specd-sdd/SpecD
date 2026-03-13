@@ -1,10 +1,10 @@
 title: RecordSkillInstall
-description: The `RecordSkillInstall` use case records that a set of skills was installed for a specific agent by updating the `skills` section of `specd.yaml`. It delegates to the `ConfigWriter` port and performs no business logic beyond passing the input through.
+description: When skills are installed for an agent, the project's `specd.yaml` must be updated to track which skills are active so that future installs can deduplicate and updates can detect drift. `RecordSkillInstall` handles this by delegating to the `ConfigWriter` port to update the `skills` section, performing no business logic beyond passing the input through.
 dependsOn:
   - core:core/config
   - default:_global/architecture
 context:
-  - The `RecordSkillInstall` use case records that a set of skills was installed for a specific agent by updating the `skills` section of `specd.yaml`. It delegates to the `ConfigWriter` port and performs no business logic beyond passing the input through.
+  - When skills are installed for an agent, the project's `specd.yaml` must be updated to track which skills are active so that future installs can deduplicate and updates can detect drift. `RecordSkillInstall` handles this by delegating to the `ConfigWriter` port to update the `skills` section, performing no business logic beyond passing the input through.
 rules:
   - requirement: Accepts RecordSkillInstallInput as input
     rules:
@@ -76,6 +76,6 @@ scenarios:
     then:
       - comments and key order outside the skills section are preserved
 contentHashes:
-  spec.md: sha256:1c14685937297935deaf702ec2a73dd1ec303647bbbe45bc5f9ce63a5176360c
+  spec.md: sha256:49754f153d7d6ca46675b39f534109291e19958254ec1019493f60d1ad2f62e5
   verify.md: sha256:ba8f44f56379ca3c58d8687ee5b34f9a76f4f99fd5277876a7ce10afea8a87f5
 generatedBy: core

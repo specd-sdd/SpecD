@@ -1,10 +1,10 @@
 title: Discarded List
-description: Defines the `specd discarded list` command, which lists all discarded changes in `discarded/`, sorted by discard date descending (most recently discarded first).
+description: Discarded changes serve as an audit trail of abandoned work — without a listing command, users would have to inspect the filesystem directly. `specd discarded list` lists all discarded changes in `discarded/`, sorted by discard date descending (most recently discarded first).
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd discarded list` command, which lists all discarded changes in `discarded/`, sorted by discard date descending (most recently discarded first).
+  - Discarded changes serve as an audit trail of abandoned work — without a listing command, users would have to inspect the filesystem directly. `specd discarded list` lists all discarded changes in `discarded/`, sorted by discard date descending (most recently discarded first).
 rules:
   - requirement: Command signature
     rules:
@@ -117,6 +117,6 @@ scenarios:
       - the command exits with code 3
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:6687aacca13e143e236e85b8a2b7c87e003515532b8b6c80d831bd9b4e5a2d38
+  spec.md: sha256:c75ccf2f355149e14263176f4d6d1c2a0382f650f67c2e39d646fa4a0baacea1
   verify.md: sha256:fc0a23133bc8229fb6a8af3020c7b1ac37a8986623562d8e98100d0fefe7701f
 generatedBy: core

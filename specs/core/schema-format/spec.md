@@ -1,12 +1,8 @@
 # Schema Format
 
-## Overview
+## Purpose
 
-A specd schema is a YAML file that defines the artifact workflow for a project. It specifies which artifacts exist, how they relate to each other, how they are validated, which sections to extract for AI context, and what instructions the AI should follow when creating each artifact.
-
-Schemas are resolved at runtime via `SchemaRegistry`. Each project specifies a schema name in `specd.yaml`; the registry locates the corresponding `schema.yaml` by checking three locations in order: the project-local schemas directory (configured in `specd.yaml`, default `specd/schemas/`), the user's global override directory, and installed npm packages named `@specd/schema-*`.
-
-The delta mechanism — file format, AST selectors, application algorithm, and structural validation — is defined in [`specs/core/delta-format/spec.md`](../delta-format/spec.md).
+Without a single declarative definition of a project's artifact workflow, every tool in the ecosystem would need to hardcode artifact types, validation rules, and AI instructions independently. A specd schema is a YAML file that solves this by defining which artifacts exist, how they relate to each other, how they are validated, which sections to extract for AI context, and what instructions the AI should follow when creating each artifact. Schemas are resolved at runtime via `SchemaRegistry` using a prefix convention that checks project-local directories, user overrides, or installed npm packages. The delta mechanism (file format, AST selectors, application algorithm, structural validation) is defined in [`specs/core/delta-format/spec.md`](../delta-format/spec.md).
 
 ## Requirements
 

@@ -1,8 +1,8 @@
 # Schema Fork
 
-## Overview
+## Purpose
 
-Defines the `specd schema fork` command, which copies an existing schema into the project's local schemas directory as a new independent schema. The forked schema has no `extends` relationship — it is a full standalone copy that the team can modify freely.
+Teams that need full control over a schema's artifacts and workflow cannot get it through extension alone -- they need a standalone copy they can modify freely. The `specd schema fork` command copies an existing schema into the project's local schemas directory as a new independent schema with no `extends` relationship.
 
 ## Requirements
 

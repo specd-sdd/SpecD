@@ -1,8 +1,8 @@
 # Project Init
 
-## Overview
+## Purpose
 
-Defines the `specd project init` command, which bootstraps a new specd project. When run interactively (stdout is a TTY and no configuration flags are provided), it presents a guided wizard with a welcome header, prompts for project settings, and an agent selection step. When run non-interactively (flags provided, or stdout is not a TTY, or `--format json|toon`), it proceeds silently with the supplied or default values. All file creation is delegated to the `InitProject` use case in `@specd/core`.
+Getting a specd project off the ground requires creating a config file, storage directories, and optionally installing agent skills -- doing this manually is tedious and error-prone. The `specd project init` command bootstraps a new specd project, presenting a guided wizard in interactive mode or proceeding silently with flags in non-interactive mode. All file creation is delegated to the `InitProject` use case in `@specd/core`.
 
 ## Requirements
 

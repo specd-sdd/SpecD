@@ -1,9 +1,9 @@
 title: CLI Entrypoint
-description: 'Defines the global behaviour of the `specd` CLI that applies to every command: configuration discovery, the `--config` override flag, output conventions (stdout vs stderr), and process exit codes.'
+description: 'Every subcommand needs consistent config discovery, output routing, and error reporting — without a shared entrypoint contract, each command would reimplement these concerns differently. This spec defines the global behaviour of the `specd` CLI: configuration discovery (with the `--config` override), stdout/stderr conventions, the `--format` flag, and uniform exit codes.'
 dependsOn:
   - core:core/config
 context:
-  - 'Defines the global behaviour of the `specd` CLI that applies to every command: configuration discovery, the `--config` override flag, output conventions (stdout vs stderr), and process exit codes.'
+  - 'Every subcommand needs consistent config discovery, output routing, and error reporting — without a shared entrypoint contract, each command would reimplement these concerns differently. This spec defines the global behaviour of the `specd` CLI: configuration discovery (with the `--config` override), stdout/stderr conventions, the `--format` flag, and uniform exit codes.'
 rules:
   - requirement: Configuration discovery
     rules:
@@ -255,6 +255,6 @@ scenarios:
       - stdout is empty
       - 'AND stderr contains the error: line in plain text'
 contentHashes:
-  spec.md: sha256:d33529ee31896ceba3c8b8cd317862b5318636d29f33df250d7f3aa4d9aac722
+  spec.md: sha256:ed9c11d3a126ec29a58d00c04336f8b43cdbf9ea14a7bbfaad4ece622e00fb24
   verify.md: sha256:249cca51e3d5d5052752d223b8caaf4500862b08e6a8946d5d4bfe67cd64d9b7
 generatedBy: core

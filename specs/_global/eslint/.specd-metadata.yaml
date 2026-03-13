@@ -1,9 +1,9 @@
 title: ESLint Rules
-description: ESLint enforces the coding conventions defined in `specs/_global/conventions/spec.md`. Rules are configured in `eslint.config.js` at the monorepo root and apply to all packages. Type-aware rules are enabled for `.ts` files using each package's `tsconfig.json`.
+description: Conventions that rely on human discipline get violated under pressure; automated enforcement catches violations before they reach the codebase. ESLint enforces the coding conventions from `specs/_global/conventions/spec.md` plus architectural layer boundaries. Rules are configured in `eslint.config.js` at the monorepo root, apply to all packages, and use type-aware analysis for `.ts` files via each package's `tsconfig.json`.
 dependsOn:
   - default:_global/conventions
 context:
-  - ESLint enforces the coding conventions defined in `specs/_global/conventions/spec.md`. Rules are configured in `eslint.config.js` at the monorepo root and apply to all packages. Type-aware rules are enabled for `.ts` files using each package's `tsconfig.json`.
+  - Conventions that rely on human discipline get violated under pressure; automated enforcement catches violations before they reach the codebase. ESLint enforces the coding conventions from `specs/_global/conventions/spec.md` plus architectural layer boundaries. Rules are configured in `eslint.config.js` at the monorepo root, apply to all packages, and use type-aware analysis for `.ts` files via each package's `tsconfig.json`.
 rules:
   - requirement: No any type
     rules:
@@ -99,6 +99,6 @@ scenarios:
     then:
       - the linter must report an error
 contentHashes:
-  spec.md: sha256:945bb39cd0799331a16708873794d264be81911a1e98aed567aac5448f58fa98
+  spec.md: sha256:bb7638ba1c0533ed27594fcd42c049d41f20870f5d4e46617b9b4becea4aa181
   verify.md: sha256:158f656872560db796e95015fbc18ebd42510dc6944ce64052d8224244859ab6
 generatedBy: core

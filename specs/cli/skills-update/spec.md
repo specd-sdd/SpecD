@@ -1,8 +1,8 @@
 # Skills Update
 
-## Overview
+## Purpose
 
-Defines the `specd skills update` command, which reinstalls all skills recorded in the project manifest from the currently installed `@specd/skills` package. Used after upgrading specd to pick up changes to bundled skill files. The CLI calls `GetSkillsManifest` from `@specd/core` to read what is recorded, then resolves content from `@specd/skills` and writes the files itself — following the same responsibility split as `specd skills install`.
+After upgrading specd, installed skill files can be outdated relative to the new `@specd/skills` bundle. The `specd skills update` command reinstalls all skills recorded in the project manifest from the currently installed package, reading the manifest via `GetSkillsManifest` from `@specd/core` and writing files itself -- following the same responsibility split as `specd skills install`.
 
 ## Requirements
 

@@ -1,10 +1,10 @@
 title: Content Extraction
-description: The content extraction engine is a generic domain service that pulls structured data from artifact ASTs using declarative `Extractor` configurations. It is the foundation for deterministic metadata generation, and is designed to be reused by future features such as compliance gates, impact analysis, and status field extraction.
+description: Multiple features — metadata generation, compliance gates, impact analysis — need to pull structured data from artifact files, but hard-coding extraction logic per feature would be brittle and duplicative. The content extraction engine solves this with a generic domain service that extracts structured data from artifact ASTs using declarative `Extractor` configurations. It is the foundation for deterministic metadata generation and is designed to be reused by future features.
 dependsOn:
   - core:core/selector-model
   - core:core/artifact-ast
 context:
-  - The content extraction engine is a generic domain service that pulls structured data from artifact ASTs using declarative `Extractor` configurations. It is the foundation for deterministic metadata generation, and is designed to be reused by future features such as compliance gates, impact analysis, and status field extraction.
+  - Multiple features — metadata generation, compliance gates, impact analysis — need to pull structured data from artifact files, but hard-coding extraction logic per feature would be brittle and duplicative. The content extraction engine solves this with a generic domain service that extracts structured data from artifact ASTs using declarative `Extractor` configurations. It is the foundation for deterministic metadata generation and is designed to be reused by future features.
 rules:
   - requirement: Extractor value object
     rules:
@@ -256,6 +256,6 @@ scenarios:
     then:
       - the result is returned without transformation — no error is thrown
 contentHashes:
-  spec.md: sha256:40fe98181e1d2a62b75df822986708ba402b2c87bca7e8f0bfc408a71d8c349b
+  spec.md: sha256:27602d6cf0f1f7081846580acd2f6e5e7e2e62a1d12a8cb1c1934cde07d6fd10
   verify.md: sha256:43cbcac5b37f298dc7121ae7ff7c436ed79813c0c672d830d1e86b15c045d37e
 generatedBy: core

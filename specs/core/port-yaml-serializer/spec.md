@@ -1,8 +1,8 @@
 # YamlSerializer Port
 
-## Overview
+## Purpose
 
-`YamlSerializer` is an application-layer port that defines the contract for YAML parsing and serialization. It keeps the application layer free from direct YAML library dependencies, following the architecture rule that parsing belongs at the infrastructure boundary.
+YAML parsing and serialization are pervasive in specd (configs, manifests, schemas), but the architecture rule places parsing at the infrastructure boundary, so use cases must not import a YAML library directly. `YamlSerializer` is the application-layer port that defines the contract for YAML parsing and serialization, keeping consumers decoupled from any specific library.
 
 ## Requirements
 

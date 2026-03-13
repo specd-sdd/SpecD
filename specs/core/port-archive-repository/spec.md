@@ -1,8 +1,8 @@
 # ArchiveRepository Port
 
-## Overview
+## Purpose
 
-`ArchiveRepository` is the application-layer port for archiving and querying archived changes within a single workspace. It extends the shared `Repository` base class. The archive is append-only: once a change is archived it is never mutated. An `index.jsonl` file at the archive root provides O(1) appends and fast lookup without scanning the filesystem. This spec defines the contract that all implementations must satisfy.
+Archiving completed changes must be decoupled from their active-change storage so the archive can enforce its own append-only semantics and indexing strategy independently. `ArchiveRepository` is the application-layer port for archiving and querying archived changes within a single workspace, extending the shared `Repository` base class. The archive is append-only — once a change is archived it is never mutated — and an `index.jsonl` file at the archive root provides O(1) appends and fast lookup without scanning the filesystem.
 
 ## Requirements
 

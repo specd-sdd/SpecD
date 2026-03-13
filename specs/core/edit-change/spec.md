@@ -1,8 +1,8 @@
 # EditChange
 
-## Overview
+## Purpose
 
-The `EditChange` use case modifies the spec scope of an existing change by adding or removing spec IDs. Workspaces are never managed directly — they are derived from the resulting `specIds` via the `Change.workspaces` getter. Any effective modification to `specIds` triggers approval invalidation.
+As a change evolves, its spec scope often needs to grow or shrink — but modifying the spec list has approval implications that must be enforced consistently. The `EditChange` use case adds or removes spec IDs on an existing change, derives workspaces from the resulting `specIds` via the `Change.workspaces` getter, and triggers approval invalidation whenever the spec list effectively changes.
 
 ## Requirements
 

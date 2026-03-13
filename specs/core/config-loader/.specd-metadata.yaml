@@ -1,11 +1,12 @@
 title: Config Loader
-description: '`createConfigLoader` is the composition factory that produces a `ConfigLoader` instance for delivery mechanisms. It encapsulates filesystem-based config discovery, YAML parsing, Zod validation, path resolution, and workspace inference. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`.'
+description: Delivery mechanisms need to load and validate `specd.yaml` without knowing the details of filesystem discovery, YAML parsing, Zod validation, or path resolution. `createConfigLoader` is the composition factory that encapsulates all of this and produces a `ConfigLoader` instance. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`.
 dependsOn:
   - core:core/config
   - core:core/composition
+  - core:core/schema-merge
   - default:_global/architecture
 context:
-  - '`createConfigLoader` is the composition factory that produces a `ConfigLoader` instance for delivery mechanisms. It encapsulates filesystem-based config discovery, YAML parsing, Zod validation, path resolution, and workspace inference. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`.'
+  - Delivery mechanisms need to load and validate `specd.yaml` without knowing the details of filesystem discovery, YAML parsing, Zod validation, or path resolution. `createConfigLoader` is the composition factory that encapsulates all of this and produces a `ConfigLoader` instance. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`.
 rules:
   - requirement: Factory signature and return type
     rules:
@@ -33,6 +34,13 @@ rules:
         The loader MUST parse the config file as YAML. If the file contains invalid YAML syntax, `load()` MUST throw `ConfigValidationError` with a message describing the parse error.
 
         After parsing, the loader MUST validate the resulting object against a Zod schema that enforces the structural shape defined in `specs/core/config/spec.md`. Any structural mismatch — missing required fields, wrong types, unknown adapter values — MUST produce a `ConfigValidationError` with the Zod issue path and message. Validation MUST occur before any path resolution or domain object construction.
+
+        The Zod schema MUST additionally enforce:
+
+        * `schemaPlugins` is an optional array of strings
+        * `schemaOverrides` is an optional object with five optional keys: `create`, `remove`, `set`, `append`, `prepend`
+
+        The loader MUST NOT accept `artifactRules` or `workflow` at the top level of `specd.yaml` — these fields have been removed. If either field is present, the loader SHOULD emit a warning suggesting migration to `schemaOverrides`.
   - requirement: Default workspace is required
     rules:
       - The loader MUST verify that `workspaces.default` exists in the parsed config. If the `default` workspace is absent, `load()` MUST throw `ConfigValidationError` with a message indicating that `workspaces.default` is required.
@@ -77,7 +85,7 @@ rules:
   - requirement: Workflow and context entry mapping
     rules:
       - |-
-        The loader MUST map raw `workflow` entries from YAML to typed `SpecdWorkflowStep` objects, converting `{ run }` hooks to `{ type: 'run', command }` and `{ instruction }` hooks to `{ type: 'instruction', text }`.
+        The loader MUST map `schemaPlugins` as an array of strings and `schemaOverrides` as a typed operations object preserving the five operation keys (`create`, `remove`, `set`, `append`, `prepend`).
 
         The loader MUST map raw `context` entries preserving their `{ file }` or `{ instruction }` shape.
   - requirement: Approvals default to false
@@ -432,6 +440,6 @@ scenarios:
     then:
       - it is an instance of ConfigValidationError
 contentHashes:
-  spec.md: sha256:10f85f77f09c69e5d85facd513c02728e56d40eb51ac7f49b95685ddf8f5977a
+  spec.md: sha256:ac3a250741457fb0915f986db760ca6e21e0691a305f2dc626399a405b9f064f
   verify.md: sha256:746e58694d5e8f64a0dc6517d32794e5dfc4d2c15a6f13db6d4d03b82d646492
 generatedBy: core

@@ -1,8 +1,8 @@
 # ApproveSpec
 
-## Overview
+## Purpose
 
-The `ApproveSpec` use case records a spec approval on a change and transitions it to the `spec-approved` state. It enforces that the spec approval gate is enabled, computes artifact hashes using schema-defined pre-hash cleanup rules, and persists the updated change. This is the only path through the spec approval gate in the change lifecycle.
+Changes need a controlled gate where a human confirms the spec is correct before implementation proceeds, and artifact hashes must be captured at that moment to detect later tampering. The `ApproveSpec` use case records a spec approval on a change and transitions it to the `spec-approved` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the spec approval gate in the change lifecycle.
 
 ## Requirements
 

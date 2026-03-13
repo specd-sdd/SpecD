@@ -1,10 +1,10 @@
 title: Change Draft
-description: Defines the `specd change draft <name> [--reason <text>]` command, which shelves an active change to `drafts/` without affecting its lifecycle state.
+description: Sometimes work needs to be paused without losing progress or polluting the active change list. `specd change draft <name> [--reason <text>]` shelves an active change to `drafts/` without affecting its lifecycle state, keeping it recoverable at any time via `specd drafts restore`.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Defines the `specd change draft <name> [--reason <text>]` command, which shelves an active change to `drafts/` without affecting its lifecycle state.
+  - Sometimes work needs to be paused without losing progress or polluting the active change list. `specd change draft <name> [--reason <text>]` shelves an active change to `drafts/` without affecting its lifecycle state, keeping it recoverable at any time via `specd drafts restore`.
 rules:
   - requirement: Command signature
     rules:
@@ -89,6 +89,6 @@ scenarios:
       - stdout is valid JSON with result equal to "ok" and name equal to "my-change"
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:7222fbe41e4a18a89068834fcae15b28674d1bf2275b9058ccbbe7332cec0c28
+  spec.md: sha256:ca8c37fc6199b53333686460e19d5120ff9f63c05294268410ac03774099d074
   verify.md: sha256:0f77f98c97c78c66be75e340ff6ca5ea159ca4c1c18da20e32823c435e064ca2
 generatedBy: core
