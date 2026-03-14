@@ -4,7 +4,7 @@ dependsOn:
   - core:core/schema-format
   - core:core/schema-merge
   - core:core/build-schema
-  - core:core/port-schema-registry
+  - core:core/schema-registry-port
   - core:core/config
   - default:_global/architecture
 context:

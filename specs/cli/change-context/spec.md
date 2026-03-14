@@ -2,7 +2,7 @@
 
 ## Purpose
 
-AI agents need a single command to retrieve all relevant instructions — schema rules, spec content, delta context, and step hooks — so they can operate on a change without manual assembly. `specd change context <name> <step> [--artifact <id>]` compiles and prints the full instruction block an agent receives when entering a lifecycle step for a named change.
+AI agents need a single command to retrieve all relevant context — spec content, project context entries, and step availability — so they can operate on a change without manual assembly. `specd change context <name> <step>` compiles and prints the context block an agent receives when entering a lifecycle step for a named change. Artifact instructions and step hook instructions are separate concerns retrieved via `specd change artifact-instruction` and `specd change hook-instruction` respectively.
 
 ## Requirements
 
@@ -10,7 +10,6 @@ AI agents need a single command to retrieve all relevant instructions — schema
 
 ```
 specd change context <name> <step>
-  [--artifact <id>]
   [--rules] [--constraints] [--scenarios]
   [--follow-deps [--depth <n>]]
   [--format text|json|toon]
@@ -18,7 +17,6 @@ specd change context <name> <step>
 
 - `<name>` — required positional; the name of the change to compile context for
 - `<step>` — required positional; the lifecycle step being entered (e.g. `designing`, `implementing`, `verifying`)
-- `--artifact <id>` — optional; the artifact ID currently being generated. When present, only that artifact's instruction and rules are injected.
 - `--rules` — when present, includes only the rules sections of spec content in the output
 - `--constraints` — when present, includes only the constraints sections of spec content in the output
 - `--scenarios` — when present, includes only the scenarios sections of spec content in the output
@@ -34,23 +32,23 @@ The command invokes the `CompileContext` use case. The `CompileContextConfig`, `
 
 ### Requirement: Output
 
-In `text` or `toon` mode (default `text`), the compiled instruction block is printed to stdout verbatim. No framing or additional headers are added by the CLI.
+In `text` or `toon` mode (default `text`), the compiled context block is printed to stdout verbatim. No framing or additional headers are added by the CLI.
 
 In `json` mode, the output is:
 
 ```json
-{ "instructionBlock": "...", "stepAvailable": true, "blockingArtifacts": [], "warnings": [] }
+{ "contextBlock": "...", "stepAvailable": true, "blockingArtifacts": [], "warnings": [] }
 ```
 
-where `instructionBlock` contains the full compiled instruction text, `stepAvailable` reflects whether the requested step is currently available, `blockingArtifacts` lists any blocking artifact IDs, and `warnings` lists any warning strings from the use case.
+where `contextBlock` contains the full compiled context text, `stepAvailable` reflects whether the requested step is currently available, `blockingArtifacts` lists any blocking artifact IDs, and `warnings` lists any warning strings from the use case.
 
 ### Requirement: Step availability warning
 
-If the requested step is not currently available (i.e. `stepAvailable: false`), the command prints a warning to stderr listing the blocking artifacts and still prints the instruction block to stdout. The process exits with code 0.
+If the requested step is not currently available (i.e. `stepAvailable: false`), the command prints a warning to stderr listing the blocking artifacts and still prints the context block to stdout. The process exits with code 0.
 
 ### Requirement: Context warnings
 
-Any warnings from the `CompileContext` use case (stale metadata, missing specs, unknown workspaces, cycles) are printed to stderr as `warning:` lines. The instruction block is still printed to stdout and the process exits with code 0.
+Any warnings from the `CompileContext` use case (stale metadata, missing specs, unknown workspaces, cycles) are printed to stderr as `warning:` lines. The context block is still printed to stdout and the process exits with code 0.
 
 ### Requirement: Error cases
 
@@ -59,17 +57,16 @@ Any warnings from the `CompileContext` use case (stale metadata, missing specs, 
 
 ## Constraints
 
-- The raw instruction block is the sole stdout output — no wrapping, no summary header
-- All warnings go to stderr; the instruction block goes to stdout
+- The raw context block is the sole stdout output — no wrapping, no summary header
+- All warnings go to stderr; the context block goes to stdout
 - `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed
 - `--depth` without `--follow-deps` is a CLI usage error (exit code 1)
-- Section flags (`--rules`, `--constraints`, `--scenarios`) only filter spec content; schema instructions, delta context, artifact rules, step hooks, and available steps are unaffected
+- Section flags (`--rules`, `--constraints`, `--scenarios`) only filter spec content; available steps are unaffected
 
 ## Examples
 
 ```
 specd change context add-oauth-login designing
-specd change context add-oauth-login designing --artifact spec
 specd change context add-oauth-login implementing
 specd change context add-oauth-login implementing --rules --constraints
 specd change context add-oauth-login implementing --follow-deps --depth 1
@@ -78,4 +75,6 @@ specd change context add-oauth-login implementing --follow-deps --depth 1
 ## Spec Dependencies
 
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/core/change/spec.md`](../../core/change/spec.md) — lifecycle steps, specDependsOn
+- [`specs/core/compile-context/spec.md`](../../core/compile-context/spec.md) — `CompileContext` use case, result shape
+- [`specs/core/get-artifact-instruction/spec.md`](../../core/get-artifact-instruction/spec.md) — artifact instructions (separate concern)
+- [`specs/core/get-hook-instructions/spec.md`](../../core/get-hook-instructions/spec.md) — step hook instructions (separate concern)
