@@ -376,7 +376,7 @@ describe('CompileContext', () => {
 
       // billing specs should NOT be included — billing workspace is not active
       // The spec content section should not contain 'billing:'
-      expect(result.instructionBlock).not.toContain('billing:payments')
+      expect(result.contextBlock).not.toContain('billing:payments')
     })
 
     it('applies project-level exclude before workspace-level patterns', async () => {
@@ -398,7 +398,7 @@ describe('CompileContext', () => {
         },
       })
 
-      expect(result.instructionBlock).not.toContain('drafts/old-spec')
+      expect(result.contextBlock).not.toContain('drafts/old-spec')
     })
 
     it('applies workspace-level exclude after workspace-level include', async () => {
@@ -426,7 +426,7 @@ describe('CompileContext', () => {
         },
       })
 
-      expect(result.instructionBlock).not.toContain('internal/notes')
+      expect(result.contextBlock).not.toContain('internal/notes')
     })
 
     it('dependsOn traversal adds specs not matched by include patterns', async () => {
@@ -462,7 +462,7 @@ describe('CompileContext', () => {
       })
 
       // auth/jwt should appear via dependsOn from auth/login
-      expect(result.instructionBlock).toContain('auth/jwt')
+      expect(result.contextBlock).toContain('auth/jwt')
       expect(result.warnings.filter((w) => w.type === 'cycle')).toHaveLength(0)
     })
 
@@ -500,7 +500,7 @@ describe('CompileContext', () => {
         followDeps: true,
       })
 
-      expect(result.instructionBlock).toContain('auth/jwt')
+      expect(result.contextBlock).toContain('auth/jwt')
     })
 
     it('spec appears only once even if matched by multiple include patterns', async () => {
@@ -521,7 +521,7 @@ describe('CompileContext', () => {
       })
 
       // Count how many times 'auth/login' appears in spec content
-      const matches = result.instructionBlock.split('auth/login').length - 1
+      const matches = result.contextBlock.split('auth/login').length - 1
       expect(matches).toBe(1)
     })
   })
@@ -715,39 +715,28 @@ describe('CompileContext', () => {
     })
   })
 
-  describe('Requirement: Assembled instruction block', () => {
-    it('injects instruction context entry verbatim before schema instruction', async () => {
+  describe('Requirement: Assembled context block', () => {
+    it('injects instruction context entry verbatim', async () => {
       const change = makeChange('my-change')
-      const schema = makeSchema({
-        artifacts: [makeArtifactType('spec', { instruction: 'Create specifications carefully.' })],
-      })
+      const schema = makeSchema()
 
       const { sut } = makeSut({ change, schema })
 
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        activeArtifact: 'spec',
 
         config: {
           context: [{ instruction: 'Always prefer editing existing files.' }],
         },
       })
 
-      const instructionIdx = result.instructionBlock.indexOf(
-        'Always prefer editing existing files.',
-      )
-      const schemaInstrIdx = result.instructionBlock.indexOf('Create specifications carefully.')
-      expect(instructionIdx).toBeGreaterThanOrEqual(0)
-      expect(schemaInstrIdx).toBeGreaterThanOrEqual(0)
-      expect(instructionIdx).toBeLessThan(schemaInstrIdx)
+      expect(result.contextBlock).toContain('Always prefer editing existing files.')
     })
 
-    it('reads file context entry via FileReader and injects before schema instruction', async () => {
+    it('reads file context entry via FileReader and injects into context block', async () => {
       const change = makeChange('my-change')
-      const schema = makeSchema({
-        artifacts: [makeArtifactType('spec', { instruction: 'Schema instruction.' })],
-      })
+      const schema = makeSchema()
       const fileReader: FileReader = {
         read: async (path: string) => (path === 'specd-bootstrap.md' ? '# specd Bootstrap' : null),
       }
@@ -757,18 +746,13 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        activeArtifact: 'spec',
 
         config: {
           context: [{ file: 'specd-bootstrap.md' }],
         },
       })
 
-      const fileIdx = result.instructionBlock.indexOf('# specd Bootstrap')
-      const schemaIdx = result.instructionBlock.indexOf('Schema instruction.')
-      expect(fileIdx).toBeGreaterThanOrEqual(0)
-      expect(schemaIdx).toBeGreaterThanOrEqual(0)
-      expect(fileIdx).toBeLessThan(schemaIdx)
+      expect(result.contextBlock).toContain('# specd Bootstrap')
     })
 
     it('emits a warning for a missing file context entry and skips it', async () => {
@@ -794,13 +778,10 @@ describe('CompileContext', () => {
       expect(fileWarnings[0]?.path).toBe('does-not-exist.md')
     })
 
-    it('includes schema instruction only for the active artifact', async () => {
+    it('does not include artifact instructions in the context block', async () => {
       const change = makeChange('my-change')
       const schema = makeSchema({
-        artifacts: [
-          makeArtifactType('spec', { instruction: 'Create specifications...' }),
-          makeArtifactType('verify', { instruction: 'Write scenarios...' }),
-        ],
+        artifacts: [makeArtifactType('spec', { instruction: 'Create specifications...' })],
       })
 
       const { sut } = makeSut({ change, schema })
@@ -808,60 +789,14 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        activeArtifact: 'spec',
 
         config: noOp,
       })
 
-      expect(result.instructionBlock).toContain('Create specifications...')
-      expect(result.instructionBlock).not.toContain('Write scenarios...')
+      expect(result.contextBlock).not.toContain('Create specifications...')
     })
 
-    it('includes no artifact instruction when activeArtifact is absent', async () => {
-      const change = makeChange('my-change')
-      const schema = makeSchema({
-        artifacts: [makeArtifactType('spec', { instruction: 'Spec instruction text.' })],
-      })
-
-      const { sut } = makeSut({ change, schema })
-
-      const result = await sut.execute({
-        name: 'my-change',
-        step: 'implementing',
-        // no activeArtifact
-
-        config: noOp,
-      })
-
-      expect(result.instructionBlock).not.toContain('Spec instruction text.')
-    })
-
-    it('injects artifactRules only for the active artifact', async () => {
-      const change = makeChange('my-change')
-      const schema = makeSchema({
-        artifacts: [makeArtifactType('spec'), makeArtifactType('verify')],
-      })
-
-      const { sut } = makeSut({ change, schema })
-
-      const result = await sut.execute({
-        name: 'my-change',
-        step: 'designing',
-        activeArtifact: 'spec',
-
-        config: {
-          artifactRules: {
-            spec: ['All requirements must use SHALL/MUST'],
-            verify: ['Scenarios must use GIVEN/WHEN/THEN'],
-          },
-        },
-      })
-
-      expect(result.instructionBlock).toContain('All requirements must use SHALL/MUST')
-      expect(result.instructionBlock).not.toContain('Scenarios must use GIVEN/WHEN/THEN')
-    })
-
-    it('includes instruction hooks but excludes run hooks from the instruction block', async () => {
+    it('does not include instruction hooks in the context block', async () => {
       const workflowStep: WorkflowStep = {
         step: 'archiving',
         requires: [],
@@ -885,86 +820,8 @@ describe('CompileContext', () => {
         config: noOp,
       })
 
-      expect(result.instructionBlock).toContain('Review delta specs')
-      expect(result.instructionBlock).not.toContain('pnpm test')
-    })
-
-    it('step hooks fire once regardless of artifact iteration', async () => {
-      const workflowStep: WorkflowStep = {
-        step: 'designing',
-        requires: [],
-        hooks: {
-          pre: [{ id: 'test-hook', type: 'instruction', text: 'Plan your approach first.' }],
-          post: [],
-        },
-      }
-      const change = makeChange('my-change')
-      const schema = makeSchema({
-        artifacts: [makeArtifactType('spec'), makeArtifactType('tasks')],
-        workflow: [workflowStep],
-      })
-
-      const { sut } = makeSut({ change, schema })
-
-      // First call: activeArtifact = 'spec'
-      const result1 = await sut.execute({
-        name: 'my-change',
-        step: 'designing',
-        activeArtifact: 'spec',
-
-        config: noOp,
-      })
-
-      // Second call: activeArtifact = 'tasks'
-      const result2 = await sut.execute({
-        name: 'my-change',
-        step: 'designing',
-        activeArtifact: 'tasks',
-
-        config: noOp,
-      })
-
-      expect(result1.instructionBlock).toContain('Plan your approach first.')
-      expect(result2.instructionBlock).toContain('Plan your approach first.')
-    })
-
-    it('includes schema instruction hooks merged before config-level hooks', async () => {
-      const schemaStep: WorkflowStep = {
-        step: 'designing',
-        requires: [],
-        hooks: {
-          pre: [{ id: 'test-hook', type: 'instruction', text: 'Schema pre-hook.' }],
-          post: [],
-        },
-      }
-      const configStep: WorkflowStep = {
-        step: 'designing',
-        requires: [],
-        hooks: {
-          pre: [{ id: 'test-hook', type: 'instruction', text: 'Config pre-hook.' }],
-          post: [],
-        },
-      }
-      const change = makeChange('my-change')
-      const schema = makeSchema({ workflow: [schemaStep] })
-
-      const { sut } = makeSut({ change, schema })
-
-      const result = await sut.execute({
-        name: 'my-change',
-        step: 'designing',
-
-        config: {
-          workflow: [configStep],
-        },
-      })
-
-      const schemaHookIdx = result.instructionBlock.indexOf('Schema pre-hook.')
-      const configHookIdx = result.instructionBlock.indexOf('Config pre-hook.')
-      expect(schemaHookIdx).toBeGreaterThanOrEqual(0)
-      expect(configHookIdx).toBeGreaterThanOrEqual(0)
-      // Schema hooks appear before config hooks
-      expect(schemaHookIdx).toBeLessThan(configHookIdx)
+      expect(result.contextBlock).not.toContain('Review delta specs')
+      expect(result.contextBlock).not.toContain('pnpm test')
     })
 
     it('lists all schema workflow steps with availability annotations', async () => {
@@ -990,9 +847,9 @@ describe('CompileContext', () => {
         config: noOp,
       })
 
-      expect(result.instructionBlock).toContain('designing: available')
-      expect(result.instructionBlock).toContain('implementing: unavailable')
-      expect(result.instructionBlock).toContain('tasks')
+      expect(result.contextBlock).toContain('designing: available')
+      expect(result.contextBlock).toContain('implementing: unavailable')
+      expect(result.contextBlock).toContain('tasks')
     })
 
     it('injects spec description from fresh metadata into spec content', async () => {
@@ -1019,7 +876,7 @@ describe('CompileContext', () => {
         config: { contextIncludeSpecs: ['default:auth/login'] },
       })
 
-      expect(result.instructionBlock).toContain('Handles user authentication flows.')
+      expect(result.contextBlock).toContain('Handles user authentication flows.')
       expect(result.warnings.filter((w) => w.type === 'stale-metadata')).toHaveLength(0)
     })
 
@@ -1118,9 +975,9 @@ describe('CompileContext', () => {
         },
       })
 
-      const agentsIdx = result.instructionBlock.indexOf('AGENTS content')
-      const inlineIdx = result.instructionBlock.indexOf('Inline note.')
-      const bootstrapIdx = result.instructionBlock.indexOf('Bootstrap content')
+      const agentsIdx = result.contextBlock.indexOf('AGENTS content')
+      const inlineIdx = result.contextBlock.indexOf('Inline note.')
+      const bootstrapIdx = result.contextBlock.indexOf('Bootstrap content')
 
       expect(agentsIdx).toBeLessThan(inlineIdx)
       expect(inlineIdx).toBeLessThan(bootstrapIdx)
@@ -1227,7 +1084,7 @@ describe('CompileContext', () => {
       })
 
       // billing workspace NOT active → billing:payments must NOT appear in output
-      expect(result.instructionBlock).not.toContain('billing:payments')
+      expect(result.contextBlock).not.toContain('billing:payments')
     })
   })
 
@@ -1298,8 +1155,8 @@ describe('CompileContext', () => {
       })
 
       // The spec content should be present even though output has glob pattern
-      expect(result.instructionBlock).toContain('Some requirements.')
-      expect(result.instructionBlock).toContain('Spec: default:auth/login')
+      expect(result.contextBlock).toContain('Some requirements.')
+      expect(result.contextBlock).toContain('Spec: default:auth/login')
     })
   })
 
@@ -1339,10 +1196,10 @@ describe('CompileContext', () => {
         config: { contextIncludeSpecs: ['default:auth/login'] },
       })
 
-      expect(result.instructionBlock).toContain('Auth login spec.')
-      expect(result.instructionBlock).toContain('Must validate tokens')
-      expect(result.instructionBlock).toContain('Passwords must be hashed')
-      expect(result.instructionBlock).toContain('Login works')
+      expect(result.contextBlock).toContain('Auth login spec.')
+      expect(result.contextBlock).toContain('Must validate tokens')
+      expect(result.contextBlock).toContain('Passwords must be hashed')
+      expect(result.contextBlock).toContain('Login works')
     })
 
     it('renders only rules when sections is ["rules"]', async () => {
@@ -1362,10 +1219,10 @@ describe('CompileContext', () => {
         sections: ['rules'],
       })
 
-      expect(result.instructionBlock).toContain('Must validate tokens')
-      expect(result.instructionBlock).not.toContain('Auth login spec.')
-      expect(result.instructionBlock).not.toContain('Passwords must be hashed')
-      expect(result.instructionBlock).not.toContain('Login works')
+      expect(result.contextBlock).toContain('Must validate tokens')
+      expect(result.contextBlock).not.toContain('Auth login spec.')
+      expect(result.contextBlock).not.toContain('Passwords must be hashed')
+      expect(result.contextBlock).not.toContain('Login works')
     })
 
     it('renders rules and constraints when sections is ["rules", "constraints"]', async () => {
@@ -1385,10 +1242,10 @@ describe('CompileContext', () => {
         sections: ['rules', 'constraints'],
       })
 
-      expect(result.instructionBlock).toContain('Must validate tokens')
-      expect(result.instructionBlock).toContain('Passwords must be hashed')
-      expect(result.instructionBlock).not.toContain('Auth login spec.')
-      expect(result.instructionBlock).not.toContain('Login works')
+      expect(result.contextBlock).toContain('Must validate tokens')
+      expect(result.contextBlock).toContain('Passwords must be hashed')
+      expect(result.contextBlock).not.toContain('Auth login spec.')
+      expect(result.contextBlock).not.toContain('Login works')
     })
 
     it('filters fallback metadataExtraction by section when sections is set', async () => {
@@ -1469,50 +1326,34 @@ describe('CompileContext', () => {
         sections: ['rules'],
       })
 
-      expect(result.instructionBlock).toContain('Some rules.')
-      expect(result.instructionBlock).not.toContain('Some constraints.')
+      expect(result.contextBlock).toContain('Some rules.')
+      expect(result.contextBlock).not.toContain('Some constraints.')
     })
 
-    it('sections filter does not affect schema instructions, hooks, or available steps', async () => {
+    it('sections filter does not affect available steps', async () => {
       const specRepo = makeSpecRepo([loginSpec], {
         'auth/login/.specd-metadata.yaml': metadataWithAllSections(),
         'auth/login/spec.md': specContent,
       })
-      const specArtifact = new ArtifactType({
-        id: 'spec',
-        scope: 'spec',
-        output: 'spec.md',
-        requires: [],
-        validations: [],
-        deltaValidations: [],
-        preHashCleanup: [],
-        instruction: 'Write a spec.',
-      })
       const workflowStep: WorkflowStep = {
         step: 'designing',
         requires: [],
-        hooks: {
-          pre: [{ id: 'test-hook', type: 'instruction', text: 'Review before starting.' }],
-          post: [],
-        },
+        hooks: { pre: [], post: [] },
       }
       const change = makeChange('my-change')
-      const schema = makeSchema({ artifacts: [specArtifact], workflow: [workflowStep] })
+      const schema = makeSchema({ workflow: [workflowStep] })
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
 
       const result = await sut.execute({
         name: 'my-change',
         step: 'designing',
-        activeArtifact: 'spec',
 
         config: { contextIncludeSpecs: ['default:auth/login'] },
         sections: ['constraints'],
       })
 
-      // Schema instruction and hooks still present even with section filter
-      expect(result.instructionBlock).toContain('Write a spec.')
-      expect(result.instructionBlock).toContain('[pre] Review before starting.')
-      expect(result.instructionBlock).toContain('designing')
+      // Available steps are always included regardless of sections filter
+      expect(result.contextBlock).toContain('designing')
     })
   })
 
@@ -1561,12 +1402,12 @@ describe('CompileContext', () => {
       })
 
       // B is the direct dep seed (depth 0), C is at depth 1 — both appear
-      expect(result.instructionBlock).toContain('Spec B')
-      expect(result.instructionBlock).toContain('Spec C')
+      expect(result.contextBlock).toContain('Spec B')
+      expect(result.contextBlock).toContain('Spec C')
       // D is at depth 2 — should NOT appear
-      expect(result.instructionBlock).not.toContain('Spec D')
+      expect(result.contextBlock).not.toContain('Spec D')
       // A is a specId, not a dependsOn target — not included via step 5
-      expect(result.instructionBlock).not.toContain('Spec A')
+      expect(result.contextBlock).not.toContain('Spec A')
     })
 
     it('unlimited depth includes all transitive deps', async () => {
@@ -1606,10 +1447,10 @@ describe('CompileContext', () => {
       })
 
       // B and C are transitive deps of A and should appear
-      expect(result.instructionBlock).toContain('Spec B')
-      expect(result.instructionBlock).toContain('Spec C')
+      expect(result.contextBlock).toContain('Spec B')
+      expect(result.contextBlock).toContain('Spec C')
       // A is a specId, not a dependsOn target — not included via step 5
-      expect(result.instructionBlock).not.toContain('Spec A')
+      expect(result.contextBlock).not.toContain('Spec A')
     })
 
     it('followDeps false skips traversal even with specIds that have dependsOn', async () => {
@@ -1644,8 +1485,8 @@ describe('CompileContext', () => {
       })
 
       // Neither A nor B should appear — dependsOn traversal requires followDeps to be included
-      expect(result.instructionBlock).not.toContain('Spec A')
-      expect(result.instructionBlock).not.toContain('Spec B')
+      expect(result.contextBlock).not.toContain('Spec A')
+      expect(result.contextBlock).not.toContain('Spec B')
     })
   })
 

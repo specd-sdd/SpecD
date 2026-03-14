@@ -30,6 +30,9 @@ import { GetProjectContext } from '../application/use-cases/get-project-context.
 import { ValidateSpecs } from '../application/use-cases/validate-specs.js'
 import { GetSpecContext } from '../application/use-cases/get-spec-context.js'
 import { GenerateSpecMetadata } from '../application/use-cases/generate-spec-metadata.js'
+import { RunStepHooks } from '../application/use-cases/run-step-hooks.js'
+import { GetHookInstructions } from '../application/use-cases/get-hook-instructions.js'
+import { GetArtifactInstruction } from '../application/use-cases/get-artifact-instruction.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SpecdConfig } from '../application/specd-config.js'
@@ -82,6 +85,12 @@ export interface Kernel {
     listArchived: ListArchived
     /** Retrieves a single archived change by name. */
     getArchived: GetArchivedChange
+    /** Executes `run:` hooks for a workflow step and phase. */
+    runStepHooks: RunStepHooks
+    /** Returns `instruction:` hook text for a workflow step and phase. */
+    getHookInstructions: GetHookInstructions
+    /** Returns artifact-specific instructions, rules, and delta guidance. */
+    getArtifactInstruction: GetArtifactInstruction
   }
   /** Use cases that operate on specs and approval gates. */
   specs: {
@@ -147,9 +156,8 @@ export interface KernelOptions {
 export function createKernel(config: SpecdConfig, options?: KernelOptions): Kernel {
   const i = createKernelInternals(config, options)
 
-  // Resolve project-level archiving hooks from config workflow
-  const archivingStep = config.workflow?.find((s) => s.step === 'archiving')
-  const projectHooks = archivingStep !== undefined ? archivingStep.hooks : undefined
+  // Project-level workflow hooks from config (used by ArchiveChange and future use cases)
+  const projectWorkflowHooks = config.workflow
 
   return {
     changes: {
@@ -180,9 +188,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
         i.yaml,
         i.schemaRef,
         i.workspaceSchemasPaths,
-        config.projectRoot,
-        config.storage.changesPath,
-        projectHooks,
+        projectWorkflowHooks,
       ),
       validate: new ValidateArtifacts(
         i.changes,
@@ -212,6 +218,31 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       updateSpecDeps: new UpdateSpecDeps(i.changes),
       listArchived: new ListArchived(i.archive),
       getArchived: new GetArchivedChange(i.archive),
+      runStepHooks: new RunStepHooks(
+        i.changes,
+        i.hooks,
+        i.schemas,
+        i.schemaRef,
+        i.workspaceSchemasPaths,
+        projectWorkflowHooks,
+      ),
+      getHookInstructions: new GetHookInstructions(
+        i.changes,
+        i.schemas,
+        i.expander,
+        i.schemaRef,
+        i.workspaceSchemasPaths,
+        projectWorkflowHooks,
+      ),
+      getArtifactInstruction: new GetArtifactInstruction(
+        i.changes,
+        i.specs,
+        i.schemas,
+        i.parsers,
+        i.expander,
+        i.schemaRef,
+        i.workspaceSchemasPaths,
+      ),
     },
     specs: {
       repos: i.specs,
