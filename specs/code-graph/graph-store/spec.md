@@ -39,7 +39,7 @@ The port follows the project's hexagonal architecture: it is defined in `domain/
 - **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches
 - **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, or file path
 
-`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kind` (SymbolKind), `filePath` (exact match or glob).
+`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kind` (SymbolKind), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments).
 
 ### Requirement: Graph statistics
 
@@ -59,7 +59,8 @@ The concrete `LadybugGraphStore` adapter SHALL use LadybugDB as the storage engi
 The adapter MUST:
 
 - Create the `.specd/` directory and database file on first `open()` if they do not exist
-- Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`
+- Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text.
+
 - Use parameterized Cypher queries for all operations (no string interpolation of user data)
 - Support schema migration: if the database schema version does not match the expected version, migrate on `open()`
 

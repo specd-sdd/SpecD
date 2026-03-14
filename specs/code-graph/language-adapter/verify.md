@@ -54,6 +54,28 @@
 - **WHEN** `extractSymbols()` is called
 - **THEN** a `SymbolNode` with `name: 'UserRepository'`, `kind: 'interface'` is returned
 
+#### Scenario: JSDoc comment extracted with symbol
+
+- **GIVEN** content containing:
+  ```typescript
+  /** Creates a user in the system. */
+  export function createUser(name: string) {}
+  ```
+- **WHEN** `extractSymbols()` is called
+- **THEN** the `createUser` symbol has `comment: '/** Creates a user in the system. */'`
+
+#### Scenario: Multi-line JSDoc extracted
+
+- **GIVEN** content with a multi-line JSDoc block before a class declaration
+- **WHEN** `extractSymbols()` is called
+- **THEN** `comment` contains the full JSDoc text including newlines
+
+#### Scenario: No comment yields undefined
+
+- **GIVEN** content containing a function with no preceding comment
+- **WHEN** `extractSymbols()` is called
+- **THEN** the symbol's `comment` is `undefined`
+
 #### Scenario: EXPORTS relation created for exported symbol
 
 - **GIVEN** content containing `export function createUser() { ... }`

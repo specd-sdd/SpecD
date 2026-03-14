@@ -39,6 +39,7 @@ A `SymbolNode` SHALL represent a named code construct extracted from a file. It 
 - **`filePath`** (`string`) — workspace-relative path of the file containing this symbol.
 - **`line`** (`number`) — 1-based line number of the symbol's declaration.
 - **`column`** (`number`) — 0-based column offset of the symbol's declaration.
+- **`comment`** (`string | undefined`) — the raw comment or JSDoc text immediately preceding the symbol's declaration. Stored verbatim (no parsing) to enable full-text search. Language adapters extract this from the AST; symbols without a preceding comment have `undefined`.
 
 The `id` field is the symbol's identity for graph operations. Two `SymbolNode` values with the same `id` are considered the same symbol.
 
@@ -126,6 +127,7 @@ const symbol: SymbolNode = {
   filePath: 'src/domain/entities/change.ts',
   line: 42,
   column: 0,
+  comment: '/** Creates a new Change entity from the given parameters. */',
 }
 
 // SpecNode

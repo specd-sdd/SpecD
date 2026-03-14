@@ -44,6 +44,18 @@
 - **WHEN** their ids are computed
 - **THEN** the ids are different
 
+#### Scenario: Comment extracted from JSDoc
+
+- **GIVEN** a TypeScript file with `/** Computes the hash. */` immediately before `function computeHash()`
+- **WHEN** the symbol is extracted
+- **THEN** `comment` is `'/** Computes the hash. */'`
+
+#### Scenario: Symbol without comment
+
+- **GIVEN** a function declaration with no preceding comment
+- **WHEN** the symbol is extracted
+- **THEN** `comment` is `undefined`
+
 ### Requirement: SymbolKind enum
 
 #### Scenario: Invalid kind rejected
