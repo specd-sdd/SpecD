@@ -588,7 +588,7 @@ export class LadybugGraphStore extends GraphStore {
    * @returns The escaped string.
    */
   private escape(value: string): string {
-    return value.replaceAll("'", "\\'").replaceAll('\\', '\\\\')
+    return value.replaceAll('\\', '\\\\').replaceAll("'", "\\'")
   }
 
   /**
