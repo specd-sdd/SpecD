@@ -58,6 +58,12 @@ import { registerSchemaShow } from './commands/schema/show.js'
 import { registerSchemaFork } from './commands/schema/fork.js'
 import { registerSchemaExtend } from './commands/schema/extend.js'
 
+// graph
+import { registerGraphIndex } from './commands/graph/index-graph.js'
+import { registerGraphStats } from './commands/graph/stats.js'
+import { registerGraphFind } from './commands/graph/find.js'
+import { registerGraphImpact } from './commands/graph/impact.js'
+
 // skills
 import { registerSkillsList } from './commands/skills/list.js'
 import { registerSkillsShow } from './commands/skills/show.js'
@@ -151,5 +157,12 @@ registerSkillsList(skillsCmd)
 registerSkillsShow(skillsCmd)
 registerSkillsInstall(skillsCmd)
 registerSkillsUpdate(skillsCmd)
+
+// ---- graph ----
+const graphCmd = program.command('graph').description('Code graph intelligence')
+registerGraphIndex(graphCmd)
+registerGraphStats(graphCmd)
+registerGraphFind(graphCmd)
+registerGraphImpact(graphCmd)
 
 program.parseAsync(process.argv).catch(handleError)
