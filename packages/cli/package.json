@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.9.1",
+    "@specd/code-graph": "workspace:*",
     "@specd/core": "workspace:*",
     "@specd/plugin-claude": "workspace:*",
     "@specd/plugin-codex": "workspace:*",
