@@ -1,10 +1,10 @@
 title: Change Transition
-description: Changes must progress through a governed lifecycle so that hooks, validations, and approval gates fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, running any declared pre/post hooks and transparently routing through approval gates when enabled.
+description: Changes must progress through a governed lifecycle so that validations and approval gates fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled. Workflow hooks are not executed by this command — `instruction:` hooks are injected into the agent context by `CompileContext`, and `run:` hooks are invoked by the agent via separate CLI calls or external hook mechanisms.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
 context:
-  - Changes must progress through a governed lifecycle so that hooks, validations, and approval gates fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, running any declared pre/post hooks and transparently routing through approval gates when enabled.
+  - Changes must progress through a governed lifecycle so that validations and approval gates fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled. Workflow hooks are not executed by this command — `instruction:` hooks are injected into the agent context by `CompileContext`, and `run:` hooks are invoked by the agent via separate CLI calls or external hook mechanisms.
 rules:
   - requirement: Command signature
     rules:
@@ -25,9 +25,6 @@ rules:
         * When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`
 
         The user always specifies the logical target state; routing is transparent.
-  - requirement: Pre- and post-hooks
-    rules:
-      - When transitioning to a step that has `run:` hooks declared (in the schema or project-level workflow), the CLI runs them in order before or after the transition (as declared). If a hook exits with a non-zero status, the CLI exits with code 2.
   - requirement: Output on success
     rules:
       - |-
@@ -45,7 +42,6 @@ rules:
       - If transitioning `implementing → verifying` and any artifact has incomplete task items (matching `taskCompletionCheck.incompletePattern`), the command exits with code 1 and prints an `error:` message to stderr naming the blocking artifact.
 constraints:
   - The user specifies the logical target state; the CLI never exposes the routing logic in its help text
-  - Hook failures (exit code 2) take precedence over transition success
 scenarios:
   - requirement: Command signature
     name: Missing arguments
@@ -71,15 +67,6 @@ scenarios:
     then:
       - the change transitions to pending-signoff
       - 'AND stdout shows transitioned my-change: done → pending-signoff'
-  - requirement: Pre- and post-hooks
-    name: Hook failure
-    given:
-      - 'the target step has a run: pre-hook that exits with code 1'
-    when:
-      - specd change transition my-change implementing is run
-    then:
-      - the process exits with code 2
-      - AND the hook's output is forwarded
   - requirement: Output on success
     name: Successful direct transition
     when:
@@ -113,6 +100,6 @@ scenarios:
       - stdout is valid JSON with result equal to "ok", name equal to "my-change", from equal to "drafting", and to equal to "designing"
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:ce0798d1ab8473999065661763e8f92b75ecf1a2eea05b5271c3da62b0cf05d3
-  verify.md: sha256:a701af16254846adc9c9e1325e6f701fa816b4c8c80d5c1a3a8b91cbf5676cc3
+  spec.md: sha256:3d401be24381556c2caa88156cc1d81c12751e580a656767b10483fe810edfad
+  verify.md: sha256:24c350c57736e64bc9c58211633b1dd861482288abb43c33ae01537c3e719080
 generatedBy: core

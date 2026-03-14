@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Changes must progress through a governed lifecycle so that hooks, validations, and approval gates fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, running any declared pre/post hooks and transparently routing through approval gates when enabled.
+Changes must progress through a governed lifecycle so that validations and approval gates fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled. Workflow hooks are not executed by this command — `instruction:` hooks are injected into the agent context by `CompileContext`, and `run:` hooks are invoked by the agent via separate CLI calls or external hook mechanisms.
 
 ## Requirements
 
@@ -24,10 +24,6 @@ The CLI passes the `approvalsSpec` and `approvalsSignoff` flags from the loaded 
 - When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`
 
 The user always specifies the logical target state; routing is transparent.
-
-### Requirement: Pre- and post-hooks
-
-When transitioning to a step that has `run:` hooks declared (in the schema or project-level workflow), the CLI runs them in order before or after the transition (as declared). If a hook exits with a non-zero status, the CLI exits with code 2.
 
 ### Requirement: Output on success
 
@@ -58,7 +54,6 @@ If transitioning `implementing → verifying` and any artifact has incomplete ta
 ## Constraints
 
 - The user specifies the logical target state; the CLI never exposes the routing logic in its help text
-- Hook failures (exit code 2) take precedence over transition success
 
 ## Examples
 
