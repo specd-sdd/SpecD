@@ -1,0 +1,28 @@
+import { registerDynamicLanguage, type DynamicLangRegistrations } from '@ast-grep/napi'
+
+let registered = false
+
+/**
+ * Loads a CJS language grammar module via require and returns it typed.
+ * @param moduleName - The npm package name to load.
+ * @returns The language registration object.
+ */
+function loadLang(moduleName: string): DynamicLangRegistrations[string] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-return
+  return require(moduleName)
+}
+
+/**
+ * Registers dynamic tree-sitter language grammars (Python, Go, PHP).
+ * Safe to call multiple times — only registers once.
+ */
+export function ensureLanguagesRegistered(): void {
+  if (registered) return
+  registered = true
+
+  registerDynamicLanguage({
+    python: loadLang('@ast-grep/lang-python'),
+    go: loadLang('@ast-grep/lang-go'),
+    php: loadLang('@ast-grep/lang-php'),
+  })
+}
