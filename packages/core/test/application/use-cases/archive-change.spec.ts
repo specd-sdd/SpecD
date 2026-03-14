@@ -152,8 +152,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await expect(uc.execute({ name: 'missing' })).rejects.toThrow(ChangeNotFoundError)
     })
@@ -175,8 +173,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaNotFoundError)
     })
@@ -236,8 +232,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(InvalidStateTransitionError)
     })
@@ -259,8 +253,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaMismatchError)
     })
@@ -282,8 +274,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       const result = await uc.execute({ name: 'my-change' })
       expect(result.archivedChange).toBeDefined()
@@ -307,8 +297,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       const result = await uc.execute({ name: 'add-auth-flow' })
 
@@ -329,8 +317,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -371,8 +357,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -439,8 +423,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -481,8 +463,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -515,8 +495,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -557,12 +535,15 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
-        {
-          pre: [{ id: 'project-pre', type: 'run', command: 'project-pre' }],
-          post: [],
-        },
+        [
+          {
+            step: 'archiving',
+            hooks: {
+              pre: [{ id: 'project-pre', type: 'run' as const, command: 'project-pre' }],
+              post: [],
+            },
+          },
+        ],
       )
       await uc.execute({ name: 'my-change' })
 
@@ -602,12 +583,15 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
-        {
-          pre: [],
-          post: [{ id: 'project-post', type: 'run', command: 'project-post' }],
-        },
+        [
+          {
+            step: 'archiving',
+            hooks: {
+              pre: [],
+              post: [{ id: 'project-post', type: 'run' as const, command: 'project-post' }],
+            },
+          },
+        ],
       )
       await uc.execute({ name: 'my-change' })
 
@@ -635,12 +619,15 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
-        {
-          pre: [{ id: 'project-pre', type: 'run', command: 'project-pre' }],
-          post: [],
-        },
+        [
+          {
+            step: 'archiving',
+            hooks: {
+              pre: [{ id: 'project-pre', type: 'run' as const, command: 'project-pre' }],
+              post: [],
+            },
+          },
+        ],
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -667,12 +654,15 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
-        {
-          pre: [],
-          post: [{ id: 'project-post', type: 'run', command: 'project-post' }],
-        },
+        [
+          {
+            step: 'archiving',
+            hooks: {
+              pre: [],
+              post: [{ id: 'project-post', type: 'run' as const, command: 'project-post' }],
+            },
+          },
+        ],
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -712,8 +702,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -768,8 +756,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -822,8 +808,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(DeltaApplicationError)
@@ -867,8 +851,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -898,8 +880,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -931,8 +911,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -985,8 +963,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1033,8 +1009,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       const result = await uc.execute({ name: 'my-change' })
 

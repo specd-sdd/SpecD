@@ -12,7 +12,7 @@ export {
   type TaskCompletionCheck,
 } from './validation-rule.js'
 export { type HookEntry, type WorkflowStep } from './workflow-step.js'
-export { HookResult, type HookVariables } from './hook-result.js'
+export { HookResult } from './hook-result.js'
 export {
   ArtifactType,
   type ArtifactTypeProps,

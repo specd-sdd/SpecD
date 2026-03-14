@@ -7,7 +7,7 @@ import { HookFailedError } from '../../domain/errors/hook-failed-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type ArchiveRepository } from '../ports/archive-repository.js'
-import { type HookRunner, type HookVariables } from '../ports/hook-runner.js'
+import { type HookRunner, type TemplateVariables } from '../ports/hook-runner.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
@@ -64,14 +64,13 @@ export class ArchiveChange {
   private readonly _yaml: YamlSerializer
   private readonly _schemaRef: string
   private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
-  private readonly _projectRoot: string
-  private readonly _changesPath: string
-  private readonly _projectHooks:
-    | {
-        readonly pre: readonly HookEntry[]
-        readonly post: readonly HookEntry[]
-      }
-    | undefined
+  private readonly _projectWorkflowHooks: readonly {
+    readonly step: string
+    readonly hooks: {
+      readonly pre: readonly HookEntry[]
+      readonly post: readonly HookEntry[]
+    }
+  }[]
 
   /**
    * Creates a new `ArchiveChange` use case instance.
@@ -88,11 +87,7 @@ export class ArchiveChange {
    * @param yaml - YAML serializer for metadata content
    * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
    * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
-   * @param projectRoot - Absolute path to the project root
-   * @param changesPath - Absolute path to the changes directory
-   * @param projectHooks - Project-level hooks for the `archiving` workflow step
-   * @param projectHooks.pre - Pre-archive hook entries
-   * @param projectHooks.post - Post-archive hook entries
+   * @param projectWorkflowHooks - Project-level workflow hook definitions from `specd.yaml`
    */
   constructor(
     changes: ChangeRepository,
@@ -107,12 +102,13 @@ export class ArchiveChange {
     yaml: YamlSerializer,
     schemaRef: string,
     workspaceSchemasPaths: ReadonlyMap<string, string>,
-    projectRoot: string,
-    changesPath: string,
-    projectHooks?: {
-      readonly pre: readonly HookEntry[]
-      readonly post: readonly HookEntry[]
-    },
+    projectWorkflowHooks?: readonly {
+      readonly step: string
+      readonly hooks: {
+        readonly pre: readonly HookEntry[]
+        readonly post: readonly HookEntry[]
+      }
+    }[],
   ) {
     this._changes = changes
     this._specs = specs
@@ -126,9 +122,7 @@ export class ArchiveChange {
     this._yaml = yaml
     this._schemaRef = schemaRef
     this._workspaceSchemasPaths = workspaceSchemasPaths
-    this._projectRoot = projectRoot
-    this._changesPath = changesPath
-    this._projectHooks = projectHooks
+    this._projectWorkflowHooks = projectWorkflowHooks ?? []
   }
 
   /**
@@ -157,11 +151,10 @@ export class ArchiveChange {
     // --- Archivable guard ---
     change.assertArchivable()
 
-    // --- Build hook variables from config-derived + runtime inputs ---
+    // --- Build contextual template variables ---
     const workspace = change.workspaces[0] ?? 'default'
-    const hookVariables: HookVariables = {
-      project: { root: this._projectRoot },
-      change: { name: input.name, workspace, path: this._changesPath },
+    const hookVariables: TemplateVariables = {
+      change: { name: input.name, workspace, path: this._changes.changePath(change) },
     }
 
     // --- Pre-archive hooks (schema first, then project-level) ---
@@ -175,8 +168,9 @@ export class ArchiveChange {
         }
       }
     }
-    if (this._projectHooks !== undefined) {
-      for (const hook of this._projectHooks.pre) {
+    const projectArchivingStep = this._projectWorkflowHooks.find((s) => s.step === 'archiving')
+    if (projectArchivingStep !== undefined) {
+      for (const hook of projectArchivingStep.hooks.pre) {
         if (hook.type !== 'run') continue
         const result = await this._hooks.run(hook.command, hookVariables)
         if (!result.isSuccess()) {
@@ -283,8 +277,8 @@ export class ArchiveChange {
         }
       }
     }
-    if (this._projectHooks !== undefined) {
-      for (const hook of this._projectHooks.post) {
+    if (projectArchivingStep !== undefined) {
+      for (const hook of projectArchivingStep.hooks.post) {
         if (hook.type !== 'run') continue
         const result = await this._hooks.run(hook.command, hookVariables)
         if (!result.isSuccess()) {

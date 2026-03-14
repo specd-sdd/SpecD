@@ -12,6 +12,7 @@ import { type VcsAdapter } from '../application/ports/vcs-adapter.js'
 import { type HookRunner } from '../application/ports/hook-runner.js'
 import { type ConfigWriter } from '../application/ports/config-writer.js'
 import { type YamlSerializer } from '../application/ports/yaml-serializer.js'
+import { TemplateExpander } from '../application/template-expander.js'
 import { GitActorResolver } from '../infrastructure/git/actor-resolver.js'
 import { GitVcsAdapter } from '../infrastructure/git/vcs-adapter.js'
 import { NodeHookRunner } from '../infrastructure/node/hook-runner.js'
@@ -57,6 +58,8 @@ export interface KernelInternals {
   readonly hooks: HookRunner
   /** Config writer for project init and skill recording. */
   readonly configWriter: ConfigWriter
+  /** Template expander for hook commands and instruction text. */
+  readonly expander: TemplateExpander
   /** YAML serializer for metadata operations. */
   readonly yaml: YamlSerializer
   /** Schema reference string from config. */
@@ -136,6 +139,8 @@ export function createKernelInternals(
     }
   }
 
+  const expander = new TemplateExpander({ project: { root: config.projectRoot } })
+
   return {
     changes,
     archive,
@@ -146,9 +151,10 @@ export function createKernelInternals(
     files: new FsFileReader(),
     actor: new GitActorResolver(),
     vcs: new GitVcsAdapter(),
-    hooks: new NodeHookRunner(),
+    hooks: new NodeHookRunner(expander),
     configWriter: new FsConfigWriter(),
     yaml: new NodeYamlSerializer(),
+    expander,
     schemaRef: config.schemaRef,
     workspaceSchemasPaths,
     schemaPlugins: config.schemaPlugins ?? [],
