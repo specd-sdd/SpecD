@@ -83,6 +83,10 @@ class StubChangeRepository extends ChangeRepository {
     throw new Error('not implemented')
   }
 
+  override changePath(change: Change): string {
+    return `/test/changes/${change.name}`
+  }
+
   override async artifactExists(_change: Change, _filename: string): Promise<boolean> {
     return false
   }
