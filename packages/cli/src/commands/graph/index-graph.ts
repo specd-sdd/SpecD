@@ -44,6 +44,7 @@ export function registerGraphIndex(parent: Command): void {
         } finally {
           await provider.close()
         }
+        process.exit(0)
       } catch (err) {
         handleError(err, opts.format)
       }
