@@ -8,7 +8,7 @@ Once a change has completed its full lifecycle, its spec modifications need to b
 
 ### Requirement: Ports and constructor
 
-`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `HookRunner`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaRegistry`, `SaveSpecMetadata`, `YamlSerializer`, `schemaRef`, `workspaceSchemasPaths`, `projectRoot`, `changesPath`, and `projectHooks`.
+`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `HookRunner`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaRegistry`, `SaveSpecMetadata`, `YamlSerializer`, `schemaRef`, `workspaceSchemasPaths`, and `projectWorkflowHooks`.
 
 ```typescript
 class ArchiveChange {
@@ -24,16 +24,14 @@ class ArchiveChange {
     yaml: YamlSerializer,
     schemaRef: string,
     workspaceSchemasPaths: ReadonlyMap<string, string>,
-    projectRoot: string,
-    changesPath: string,
-    projectHooks: ProjectHooks,
+    projectWorkflowHooks: ProjectWorkflowHooks,
   )
 }
 ```
 
-`schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. `projectRoot` is the absolute path to the project root (the directory containing `specd.yaml`). `changesPath` is the absolute path to the changes directory. `projectHooks` contains the project-level workflow hook definitions from `specd.yaml`. All are injected at kernel composition time, not passed per invocation.
+`schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml` — `ArchiveChange` filters internally for the `archiving` step. All are injected at kernel composition time, not passed per invocation.
 
-`hookVariables` is built internally by `ArchiveChange` from `projectRoot` and `changesPath` — the caller does not provide it.
+`ArchiveChange` builds the contextual `TemplateVariables` (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, and passes them to `HookRunner.run()`. Built-in variables (e.g. `project.root`) are already present in the `TemplateExpander` that `HookRunner` uses internally — `ArchiveChange` does not interact with the expander directly.
 
 `specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec ID's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.
 
@@ -153,7 +151,8 @@ If metadata generation fails for a spec (e.g. extraction produces no required fi
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `apply()`, `DeltaApplicationError`, `ArtifactParserRegistry`
 - [`specs/core/validate-artifacts/spec.md`](../validate-artifacts/spec.md) — artifact validation gate before archive
 - [`specs/core/storage/spec.md`](../storage/spec.md) — archive directory naming, `index.jsonl`, `FsArchiveRepository.archive()`
-- [`specs/core/config/spec.md`](../config/spec.md) — workflow hook structure, `run:` vs `instruction:` entries, template variables
+- [`specs/core/config/spec.md`](../config/spec.md) — workflow hook structure, `run:` vs `instruction:` entries
+- [`specs/core/template-variables/spec.md`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — deterministic metadata generation at archive time; `SaveSpecMetadata` for writing
 - [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — `extractMetadata()` engine used to extract metadata fields from spec artifacts
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port-per-workspace pattern; manual DI at entry points

@@ -3,7 +3,7 @@ description: Teams that need full control over a schema's artifacts and workflow
 dependsOn:
   - cli:cli/entrypoint
   - core:core/schema-format
-  - core:core/port-schema-registry
+  - core:core/schema-registry-port
 context:
   - Teams that need full control over a schema's artifacts and workflow cannot get it through extension alone -- they need a standalone copy they can modify freely. The `specd schema fork` command copies an existing schema into the project's local schemas directory as a new independent schema with no `extends` relationship.
 rules:

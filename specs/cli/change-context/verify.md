@@ -16,17 +16,12 @@
 
 ### Requirement: Output
 
-#### Scenario: Instruction block printed verbatim
+#### Scenario: Context block printed verbatim
 
 - **WHEN** `specd change context my-change designing` is run
-- **THEN** stdout contains the compiled instruction block exactly as returned by CompileContext
+- **THEN** stdout contains the compiled context block exactly as returned by CompileContext
 - **AND** no framing headers are added
 - **AND** the process exits with code 0
-
-#### Scenario: With artifact flag
-
-- **WHEN** `specd change context my-change designing --artifact spec` is run
-- **THEN** stdout includes only the `spec` artifact instruction (not all artifact instructions)
 
 #### Scenario: dependsOn not followed by default
 
@@ -38,7 +33,7 @@
 
 - **GIVEN** a spec in context has `dependsOn` entries pointing to other specs
 - **WHEN** `specd change context my-change implementing --follow-deps` is run
-- **THEN** the instruction block includes content from the dependent specs as well
+- **THEN** the context block includes content from the dependent specs as well
 
 #### Scenario: --depth limits traversal
 
@@ -50,14 +45,14 @@
 
 - **GIVEN** specs in context have description, rules, constraints, and scenarios in their metadata
 - **WHEN** `specd change context my-change implementing --rules --constraints` is run
-- **THEN** the instruction block contains rules and constraints sections from each spec
+- **THEN** the context block contains rules and constraints sections from each spec
 - **AND** description and scenarios sections are not present
 
 #### Scenario: No section flags includes all sections
 
 - **GIVEN** specs in context have all metadata sections populated
 - **WHEN** `specd change context my-change implementing` is run without section flags
-- **THEN** the instruction block contains description, rules, constraints, and scenarios from each spec
+- **THEN** the context block contains description, rules, constraints, and scenarios from each spec
 
 ### Requirement: Step availability warning
 
@@ -66,7 +61,7 @@
 - **GIVEN** the step `implementing` has blocking artifacts
 - **WHEN** `specd change context my-change implementing` is run
 - **THEN** stderr contains a `warning:` line listing the blocking artifacts
-- **AND** stdout still contains the instruction block
+- **AND** stdout still contains the context block
 - **AND** the process exits with code 0
 
 ### Requirement: Context warnings
@@ -76,7 +71,7 @@
 - **GIVEN** a spec included in context has stale metadata
 - **WHEN** `specd change context my-change designing` is run
 - **THEN** stderr contains a `warning:` line for the stale spec
-- **AND** the instruction block is still printed to stdout
+- **AND** the context block is still printed to stdout
 - **AND** the process exits with code 0
 
 ### Requirement: Error cases
@@ -89,9 +84,9 @@
 
 ### Requirement: Output
 
-#### Scenario: JSON output contains instructionBlock and warnings
+#### Scenario: JSON output contains contextBlock and warnings
 
 - **WHEN** `specd change context my-change designing --format json` is run
-- **THEN** stdout is valid JSON with `instructionBlock`, `stepAvailable`, `blockingArtifacts`, and `warnings`
-- **AND** `instructionBlock` contains the compiled instruction text
+- **THEN** stdout is valid JSON with `contextBlock`, `stepAvailable`, `blockingArtifacts`, and `warnings`
+- **AND** `contextBlock` contains the compiled context text
 - **AND** the process exits with code 0

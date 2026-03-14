@@ -3,7 +3,7 @@ description: Teams that want to add or override a few artifacts without duplicat
 dependsOn:
   - cli:cli/entrypoint
   - core:core/schema-format
-  - core:core/port-schema-registry
+  - core:core/schema-registry-port
 context:
   - Teams that want to add or override a few artifacts without duplicating an entire schema need an inheritance mechanism. The `specd schema extend` command creates a new local schema that extends an existing one -- it inherits all definitions from the source and allows selective overrides or additions.
 rules:
