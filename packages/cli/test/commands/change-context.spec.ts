@@ -19,7 +19,7 @@ import { createCliKernel } from '../../src/kernel.js'
 import { registerChangeContext } from '../../src/commands/change/context.js'
 
 const mockResult = {
-  instructionBlock: '# Designing step instructions\n\nDo this.',
+  contextBlock: '# Designing step instructions\n\nDo this.',
   stepAvailable: true,
   blockingArtifacts: [] as string[],
   warnings: [] as { message: string }[],
@@ -62,7 +62,7 @@ describe('change context', () => {
     expect(stdout()).toContain('Do this.')
   })
 
-  it('outputs JSON with instructionBlock, stepAvailable, blockingArtifacts, warnings', async () => {
+  it('outputs JSON with contextBlock, stepAvailable, blockingArtifacts, warnings', async () => {
     const { stdout } = setup()
 
     const program = makeProgram()
@@ -79,31 +79,10 @@ describe('change context', () => {
     ])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed.instructionBlock).toContain('Designing step instructions')
+    expect(parsed.contextBlock).toContain('Designing step instructions')
     expect(parsed.stepAvailable).toBe(true)
     expect(Array.isArray(parsed.blockingArtifacts)).toBe(true)
     expect(Array.isArray(parsed.warnings)).toBe(true)
-  })
-
-  it('passes --artifact flag to use case', async () => {
-    const { kernel } = setup()
-    captureStdout()
-
-    const program = makeProgram()
-    registerChangeContext(program.command('change'))
-    await program.parseAsync([
-      'node',
-      'specd',
-      'change',
-      'context',
-      'my-change',
-      'designing',
-      '--artifact',
-      'spec',
-    ])
-
-    const call = kernel.changes.compile.execute.mock.calls[0]![0]
-    expect(call.activeArtifact).toBe('spec')
   })
 
   it('passes --follow-deps flag to use case', async () => {

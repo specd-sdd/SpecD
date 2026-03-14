@@ -93,3 +93,19 @@ export {
   type ValidateSpecsResult,
   type SpecValidationEntry,
 } from './validate-specs.js'
+export {
+  type RunStepHooks,
+  type RunStepHooksInput,
+  type RunStepHooksResult,
+  type RunStepHookEntry,
+} from './run-step-hooks.js'
+export {
+  type GetHookInstructions,
+  type GetHookInstructionsInput,
+  type GetHookInstructionsResult,
+} from './get-hook-instructions.js'
+export {
+  type GetArtifactInstruction,
+  type GetArtifactInstructionInput,
+  type GetArtifactInstructionResult,
+} from './get-artifact-instruction.js'

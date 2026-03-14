@@ -13,8 +13,7 @@ export function registerChangeContext(parent: Command): void {
   parent
     .command('context <name> <step>')
     .allowExcessArguments(false)
-    .description('Compile the instruction context for a lifecycle step')
-    .option('--artifact <id>', 'the active artifact ID (for designing step)')
+    .description('Compile the context block for a lifecycle step')
     .option('--rules', 'include only rules sections in spec content')
     .option('--constraints', 'include only constraints sections in spec content')
     .option('--scenarios', 'include only scenarios sections in spec content')
@@ -31,7 +30,6 @@ export function registerChangeContext(parent: Command): void {
         name: string,
         step: string,
         opts: {
-          artifact?: string
           rules?: boolean
           constraints?: boolean
           scenarios?: boolean
@@ -73,13 +71,6 @@ export function registerChangeContext(parent: Command): void {
                   ),
                 }
               : {}),
-            ...(config.artifactRules !== undefined
-              ? {
-                  artifactRules: Object.fromEntries(
-                    Object.entries(config.artifactRules).map(([k, v]) => [k, [...v]]),
-                  ),
-                }
-              : {}),
             ...(config.contextIncludeSpecs !== undefined
               ? { contextIncludeSpecs: [...config.contextIncludeSpecs] }
               : {}),
@@ -97,7 +88,6 @@ export function registerChangeContext(parent: Command): void {
           const result = await kernel.changes.compile.execute({
             name,
             step,
-            ...(opts.artifact !== undefined ? { activeArtifact: opts.artifact } : {}),
             config: compileConfig,
             ...(opts.followDeps ? { followDeps: true } : {}),
             ...(opts.depth !== undefined ? { depth: opts.depth } : {}),
@@ -116,11 +106,11 @@ export function registerChangeContext(parent: Command): void {
 
           const fmt = parseFormat(opts.format)
           if (fmt === 'text') {
-            output(result.instructionBlock, 'text')
+            output(result.contextBlock, 'text')
           } else {
             output(
               {
-                instructionBlock: result.instructionBlock,
+                contextBlock: result.contextBlock,
                 stepAvailable: result.stepAvailable,
                 blockingArtifacts: result.blockingArtifacts,
                 warnings: result.warnings.map((w) => w.message),
