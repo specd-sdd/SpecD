@@ -100,6 +100,12 @@
 - **WHEN** `findSymbols({ name: 'create*' })` is called
 - **THEN** `createUser` and `createOrder` are returned
 
+#### Scenario: findSymbols filters by comment text
+
+- **GIVEN** symbols with comments containing "validates user input" and "computes hash"
+- **WHEN** `findSymbols({ comment: 'validates' })` is called
+- **THEN** only the symbol with "validates user input" in its comment is returned
+
 ### Requirement: Graph statistics
 
 #### Scenario: Statistics reflect current state

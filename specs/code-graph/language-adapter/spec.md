@@ -34,6 +34,7 @@ The following extensions are mapped for the built-in TypeScript adapter:
 A built-in `TypeScriptLanguageAdapter` SHALL handle `typescript`, `tsx`, `javascript`, and `jsx` files using `@ast-grep/napi` for Tree-sitter parsing. It MUST extract:
 
 - **Symbols**: functions (named + arrow assigned to const), classes, methods, exported variables, type aliases, interfaces, enums
+- **Comments**: For each extracted symbol, the adapter extracts the raw text of the immediately preceding comment block (JSDoc `/** ... */`, block `/* ... */`, or contiguous line comments `// ...`). The comment is stored verbatim in `SymbolNode.comment`. If no comment precedes the declaration, `comment` is `undefined`.
 - **Relations**: `DEFINES` (file → symbol), `EXPORTS` (file → exported symbol), `IMPORTS` (file → file via import specifier resolution), `CALLS` (symbol → symbol via call expressions)
 
 The adapter maps TypeScript/JavaScript constructs to `SymbolKind` values:
