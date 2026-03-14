@@ -25,15 +25,6 @@
 - **THEN** the change transitions to `pending-signoff`
 - **AND** stdout shows `transitioned my-change: done → pending-signoff`
 
-### Requirement: Pre- and post-hooks
-
-#### Scenario: Hook failure
-
-- **GIVEN** the target step has a `run:` pre-hook that exits with code 1
-- **WHEN** `specd change transition my-change implementing` is run
-- **THEN** the process exits with code 2
-- **AND** the hook's output is forwarded
-
 ### Requirement: Output on success
 
 #### Scenario: Successful direct transition
