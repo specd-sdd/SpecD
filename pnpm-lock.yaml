@@ -103,14 +103,24 @@ importers:
   packages/code-graph:
     dependencies:
       '@ast-grep/napi':
-        specifier: ^0.36.0
-        version: 0.36.3
+        specifier: ^0.41.1
+        version: 0.41.1
       ignore:
         specifier: ^7.0.0
         version: 7.0.5
       lbug:
         specifier: ^0.14.0
         version: 0.14.3
+    devDependencies:
+      '@ast-grep/lang-go':
+        specifier: ^0.0.5
+        version: 0.0.5
+      '@ast-grep/lang-php':
+        specifier: ^0.0.6
+        version: 0.0.6
+      '@ast-grep/lang-python':
+        specifier: ^0.0.5
+        version: 0.0.5
 
   packages/core:
     dependencies:
@@ -172,63 +182,90 @@ importers:
 
 packages:
 
-  '@ast-grep/napi-darwin-arm64@0.36.3':
-    resolution: {integrity: sha512-uM0Hrm5gcHqaBL64ktmPBFMTorTlPKWsUfi0E2Cg09GJfeYWvZmicCqgd7qVtjURmQvFQdb4JSqHIkJvws6Uqw==}
+  '@ast-grep/lang-go@0.0.5':
+    resolution: {integrity: sha512-rPrTHtT2wDmyAi8tXe3xb3T94GrdXUwynt97l2AIULviQjEjzrewscUO3n0WkwQBuiKU78CDx+27PsmsykUlPQ==}
+    peerDependencies:
+      tree-sitter-cli: 0.25.8
+    peerDependenciesMeta:
+      tree-sitter-cli:
+        optional: true
+
+  '@ast-grep/lang-php@0.0.6':
+    resolution: {integrity: sha512-jga+/CwVK8buGTows2ypRv3brP0OSzle+RcAXk3CsachlfUPvEualJ0z+1bwIJQAnTAGntfA5kyB9wSJV/vItQ==}
+    peerDependencies:
+      tree-sitter-cli: 0.25.8
+    peerDependenciesMeta:
+      tree-sitter-cli:
+        optional: true
+
+  '@ast-grep/lang-python@0.0.5':
+    resolution: {integrity: sha512-gbNwaCPvuyZFEG4y6zwylLRLsh1DWiOeLeZ/aWOlYRR0nxoXimuMPank6psT88rijnD6esBLWhFq6kkFhndzjQ==}
+    peerDependencies:
+      tree-sitter-cli: 0.25.8
+    peerDependenciesMeta:
+      tree-sitter-cli:
+        optional: true
+
+  '@ast-grep/napi-darwin-arm64@0.41.1':
+    resolution: {integrity: sha512-sZHwg/oD6YB2y4VD8ZMeMHBq/ONil+mx+bB61YAiGQB+8UCMSFxJupvtNICB/BnIFqcPCVz/jCaSdbASLrbXQQ==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [darwin]
 
-  '@ast-grep/napi-darwin-x64@0.36.3':
-    resolution: {integrity: sha512-wEMeQw8lRL66puG2m8m0kDRQDtubygj59HA/cmut2V5SPx/13BN3wuEk6JPv97gqGUCUGhG2+5Z6UZ/Ll2q01Q==}
+  '@ast-grep/napi-darwin-x64@0.41.1':
+    resolution: {integrity: sha512-SL9hGB8sKvPnLUcigiDQrhohL7N4ujy1+t885kGcBkMXR73JT05OpPmvw0AWmg8l2iH1e5uNK/ZjnV/lSkynxQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [darwin]
 
-  '@ast-grep/napi-linux-arm64-gnu@0.36.3':
-    resolution: {integrity: sha512-sMsTMaUjW7SM8KPbLviCSBuM4zgJcwvie1yZI92HKSlFzC7ABe7X7UvyUREB+JwqccDVEL5yOJAjqB8eFSCizw==}
+  '@ast-grep/napi-linux-arm64-gnu@0.41.1':
+    resolution: {integrity: sha512-mkNQpkm1jvnIdeRMnEWZ4Q0gNGApoNTMAoJRVmY11CkA4C/vIdNIjxj7UB61xV42Ng/A7Fw8mQUQuFos0lAKPQ==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
 
-  '@ast-grep/napi-linux-arm64-musl@0.36.3':
-    resolution: {integrity: sha512-2XRmNYuovZu0Pa4J3or4PKMkQZnXXfpVcCrPwWB/2ytX7XUo+TWLgYE8rPVnJOyw5zujkveFb0XUrro9mQgLzw==}
+  '@ast-grep/napi-linux-arm64-musl@0.41.1':
+    resolution: {integrity: sha512-0G3cHyc+8A945aLie55bLZ+oaEBer0EFlyP/GlwRAx4nn5vGBct1hVTxSexWJ6AxnnRNPlN0mvswVwXiE7H7gA==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
 
-  '@ast-grep/napi-linux-x64-gnu@0.36.3':
-    resolution: {integrity: sha512-mTwPRbBi1feGqR2b5TWC5gkEDeRi8wfk4euF5sKNihfMGHj6pdfINHQ3QvLVO4C7z0r/wgWLAvditFA0b997dg==}
+  '@ast-grep/napi-linux-x64-gnu@0.41.1':
+    resolution: {integrity: sha512-+aNiCik3iTMtUrMp1k2yIMjby1U64EydTH1qotlx+fh8YvwrwwxZWct7NlurY3MILgT/WONSxhHKmL5NsbB4dw==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
 
-  '@ast-grep/napi-linux-x64-musl@0.36.3':
-    resolution: {integrity: sha512-tMGPrT+zuZzJK6n1cD1kOii7HYZE9gUXjwtVNE/uZqXEaWP6lmkfoTMbLjnxEe74VQbmaoDGh1/cjrDBnqC6Uw==}
+  '@ast-grep/napi-linux-x64-musl@0.41.1':
+    resolution: {integrity: sha512-rBrZSx5za3OliYcJcUrbLct+1+8oxh8ZEjYPiLCybe4FhspNKGM952g8a4sjgRuwbKS9BstYO9Fz+wthFnaFUQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
 
-  '@ast-grep/napi-win32-arm64-msvc@0.36.3':
-    resolution: {integrity: sha512-7pFyr9+dyV+4cBJJ1I57gg6PDXP3GBQeVAsEEitzEruxx4Hb4cyNro54gGtlsS+6ty+N0t004tPQxYO2VrsPIg==}
+  '@ast-grep/napi-win32-arm64-msvc@0.41.1':
+    resolution: {integrity: sha512-uNRHM3a1qFN0SECJDCEDVy1b0N75JNhJE2O/2BhDkDo0qM8kEewf9jRtG1fwpgZbMK2KoKvMHU/KQ73fWN44Zw==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [win32]
 
-  '@ast-grep/napi-win32-ia32-msvc@0.36.3':
-    resolution: {integrity: sha512-MPAgccH9VscRaFuEBMzDGPS+3c4cKNVGIVJ7WSNa1nZtLQ0eFEaPJ7pyDnCezgVSxfNFVYBvKyyF/vcm7Qc9+A==}
+  '@ast-grep/napi-win32-ia32-msvc@0.41.1':
+    resolution: {integrity: sha512-uNPQwGUBGIbCX+WhEIfYJf/VrS7o5+vJvT4MVEHI8aVJnpjcFsLrFI0hIv044OXxnleOo2HUvEmjOrub//at/Q==}
     engines: {node: '>= 10'}
     cpu: [ia32]
     os: [win32]
 
-  '@ast-grep/napi-win32-x64-msvc@0.36.3':
-    resolution: {integrity: sha512-TIVtuSbXhty9kaSEfr4ULWx5PAuUeGgUkFaR60lmOs7sGTWgpig+suwKfTmevoAblFknCW/aMHOwziwJoUZA6A==}
+  '@ast-grep/napi-win32-x64-msvc@0.41.1':
+    resolution: {integrity: sha512-xFp68OCUEmWYcqoreZFaf2xwMhm/22Qf6bR2Qyn8WNVY9RF4m4+k5K+7Wn+n9xy0vHUPhtFd1So/SvuaqLHEoA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
 
-  '@ast-grep/napi@0.36.3':
-    resolution: {integrity: sha512-ExypohE8L7FvKBHxu7UpwcV9XVfyS+AqNZKyKIfxYwJyD9l7Gw6pmMYd7J2uopJsPEIUf44/emEFds6nFUx/dw==}
+  '@ast-grep/napi@0.41.1':
+    resolution: {integrity: sha512-OYQVWBbb43af2lTSCayMS7wsZ20nl+fw6LGVl/5zSuHTZRNfANknKLk3wMA4y7RIaAiIwrldAmI6GNZeIDRTkQ==}
     engines: {node: '>= 10'}
+
+  '@ast-grep/setup-lang@0.0.6':
+    resolution: {integrity: sha512-aSYZNF5nGQMxnwiA3Lcc8zi0AtpGlug47ADgqCgP/2n7p922FbnW7vo1rbW4kKjW72B/3mDdN7uvYidv8JnPnw==}
 
   '@babel/code-frame@7.29.0':
     resolution: {integrity: sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw==}
@@ -2479,44 +2516,58 @@ packages:
 
 snapshots:
 
-  '@ast-grep/napi-darwin-arm64@0.36.3':
+  '@ast-grep/lang-go@0.0.5':
+    dependencies:
+      '@ast-grep/setup-lang': 0.0.6
+
+  '@ast-grep/lang-php@0.0.6':
+    dependencies:
+      '@ast-grep/setup-lang': 0.0.6
+
+  '@ast-grep/lang-python@0.0.5':
+    dependencies:
+      '@ast-grep/setup-lang': 0.0.6
+
+  '@ast-grep/napi-darwin-arm64@0.41.1':
     optional: true
 
-  '@ast-grep/napi-darwin-x64@0.36.3':
+  '@ast-grep/napi-darwin-x64@0.41.1':
     optional: true
 
-  '@ast-grep/napi-linux-arm64-gnu@0.36.3':
+  '@ast-grep/napi-linux-arm64-gnu@0.41.1':
     optional: true
 
-  '@ast-grep/napi-linux-arm64-musl@0.36.3':
+  '@ast-grep/napi-linux-arm64-musl@0.41.1':
     optional: true
 
-  '@ast-grep/napi-linux-x64-gnu@0.36.3':
+  '@ast-grep/napi-linux-x64-gnu@0.41.1':
     optional: true
 
-  '@ast-grep/napi-linux-x64-musl@0.36.3':
+  '@ast-grep/napi-linux-x64-musl@0.41.1':
     optional: true
 
-  '@ast-grep/napi-win32-arm64-msvc@0.36.3':
+  '@ast-grep/napi-win32-arm64-msvc@0.41.1':
     optional: true
 
-  '@ast-grep/napi-win32-ia32-msvc@0.36.3':
+  '@ast-grep/napi-win32-ia32-msvc@0.41.1':
     optional: true
 
-  '@ast-grep/napi-win32-x64-msvc@0.36.3':
+  '@ast-grep/napi-win32-x64-msvc@0.41.1':
     optional: true
 
-  '@ast-grep/napi@0.36.3':
+  '@ast-grep/napi@0.41.1':
     optionalDependencies:
-      '@ast-grep/napi-darwin-arm64': 0.36.3
-      '@ast-grep/napi-darwin-x64': 0.36.3
-      '@ast-grep/napi-linux-arm64-gnu': 0.36.3
-      '@ast-grep/napi-linux-arm64-musl': 0.36.3
-      '@ast-grep/napi-linux-x64-gnu': 0.36.3
-      '@ast-grep/napi-linux-x64-musl': 0.36.3
-      '@ast-grep/napi-win32-arm64-msvc': 0.36.3
-      '@ast-grep/napi-win32-ia32-msvc': 0.36.3
-      '@ast-grep/napi-win32-x64-msvc': 0.36.3
+      '@ast-grep/napi-darwin-arm64': 0.41.1
+      '@ast-grep/napi-darwin-x64': 0.41.1
+      '@ast-grep/napi-linux-arm64-gnu': 0.41.1
+      '@ast-grep/napi-linux-arm64-musl': 0.41.1
+      '@ast-grep/napi-linux-x64-gnu': 0.41.1
+      '@ast-grep/napi-linux-x64-musl': 0.41.1
+      '@ast-grep/napi-win32-arm64-msvc': 0.41.1
+      '@ast-grep/napi-win32-ia32-msvc': 0.41.1
+      '@ast-grep/napi-win32-x64-msvc': 0.41.1
+
+  '@ast-grep/setup-lang@0.0.6': {}
 
   '@babel/code-frame@7.29.0':
     dependencies:

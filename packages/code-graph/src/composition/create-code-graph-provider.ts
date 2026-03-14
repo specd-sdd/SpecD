@@ -2,6 +2,9 @@ import { type LanguageAdapter } from '../domain/value-objects/language-adapter.j
 import { LadybugGraphStore } from '../infrastructure/ladybug/ladybug-graph-store.js'
 import { AdapterRegistry } from '../infrastructure/tree-sitter/adapter-registry.js'
 import { TypeScriptLanguageAdapter } from '../infrastructure/tree-sitter/typescript-language-adapter.js'
+import { PythonLanguageAdapter } from '../infrastructure/tree-sitter/python-language-adapter.js'
+import { GoLanguageAdapter } from '../infrastructure/tree-sitter/go-language-adapter.js'
+import { PhpLanguageAdapter } from '../infrastructure/tree-sitter/php-language-adapter.js'
 import { IndexCodeGraph } from '../application/use-cases/index-code-graph.js'
 import { CodeGraphProvider } from './code-graph-provider.js'
 
@@ -21,6 +24,9 @@ export function createCodeGraphProvider(options: CodeGraphOptions): CodeGraphPro
 
   const registry = new AdapterRegistry()
   registry.register(new TypeScriptLanguageAdapter())
+  registry.register(new PythonLanguageAdapter())
+  registry.register(new GoLanguageAdapter())
+  registry.register(new PhpLanguageAdapter())
 
   if (options.adapters) {
     for (const adapter of options.adapters) {
