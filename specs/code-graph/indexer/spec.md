@@ -28,6 +28,10 @@ The indexer SHALL compute a content hash for each discovered file and compare it
 
 Files whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison.
 
+Changed files are removed from the store before bulk load, because CSV `COPY FROM` cannot upsert — it can only insert. Removing changed files first ensures the bulk load inserts fresh data without conflicts.
+
+To force a full re-index, callers MUST call `GraphStore.clear()` before `execute()`. This removes all stored data, causing every file to be treated as new.
+
 ### Requirement: File discovery
 
 The indexer SHALL walk the workspace directory recursively to discover source files. It MUST:
@@ -39,14 +43,41 @@ The indexer SHALL walk the workspace directory recursively to discover source fi
 
 The discovery phase produces a list of workspace-relative file paths with forward-slash normalization.
 
-### Requirement: Phased extraction
+### Requirement: Single-pass extraction with in-memory index
 
-Extraction SHALL proceed in two phases to ensure symbols exist before resolving cross-references:
+Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:
 
-- **Phase 1** — For each file: extract symbols via the language adapter, create `DEFINES` and `EXPORTS` relations, and upsert the `FileNode` with its symbols and file-level relations into the store.
-- **Phase 2** — For each file: extract `IMPORTS` and `CALLS` relations using the import map built from Phase 1 data, and update the file's relations in the store.
+- **Pass 1 (Extract symbols)** — For each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). For PHP files with namespace declarations, build a qualified name map. No store queries are needed.
+- **Pass 2 (Resolve imports + CALLS)** — For each file: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). For relative imports, find the target file's symbols by path. For monorepo package imports, find by name within the package prefix. For PHP qualified names, match against the namespace map. Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations. Accumulate all relations.
+- **Bulk load** — After both passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.
 
-This two-phase approach ensures that all symbol definitions are available in the store before call resolution attempts to reference them.
+This two-pass approach ensures all symbols exist in the index before import/call resolution, while avoiding any store queries during extraction.
+
+### Requirement: Chunked processing
+
+Files are grouped into chunks where each chunk's total source size does not exceed a configurable byte budget (default: 20 MB). Each chunk is processed sequentially — file content strings from completed chunks are eligible for garbage collection, bounding peak memory usage.
+
+The chunk budget is configurable via `IndexOptions.chunkBytes`.
+
+### Requirement: Progress reporting
+
+`IndexOptions` accepts an optional `onProgress` callback `(percent: number, phase: string) => void`. The indexer reports granular progress:
+
+- 0-5%: File discovery and content hashing
+- 5-7%: Diff computation and cleanup of deleted/changed files
+- 7-50%: Pass 1 — symbol extraction (updates per file)
+- 50-80%: Pass 2 — import resolution and CALLS extraction (updates per file)
+- 80-83%: Spec discovery
+- 83-95%: Bulk loading (updates per table and relation batch)
+- 100%: Done
+
+Progress updates include a detail string (e.g. `"150/460 files"`) for phases that process individual items.
+
+### Requirement: Monorepo package resolution
+
+When the workspace root contains a `pnpm-workspace.yaml` file, the indexer discovers all monorepo packages by parsing the `packages` globs and reading each `package.json` name field. For non-relative import specifiers (e.g. `@specd/core`), the indexer checks this map and searches the in-memory `SymbolIndex` for symbols with the imported name within the matching package's file path prefix.
+
+The monorepo package map is computed lazily (once per indexing run).
 
 ### Requirement: Error isolation
 
@@ -79,10 +110,11 @@ The indexer SHALL discover spec directories under `specs/` and build `SpecNode` 
 1. Read `.specd-metadata.yaml` if it exists — extract `dependsOn` as the primary source
 2. If no `.specd-metadata.yaml` exists, parse the `## Spec Dependencies` section in `spec.md` — extract linked spec paths and convert them to spec IDs
 3. Extract the spec title from the `# Title` heading in `spec.md`
-4. Create a `SpecNode` and upsert it into the store
-5. Create a `DEPENDS_ON` relation for each entry in `dependsOn`
+4. Compute a `contentHash` (SHA-256 of `spec.md` + `.specd-metadata.yaml` content) and include it in the `SpecNode`
+5. Create a `SpecNode` and upsert it into the store
+6. Create a `DEPENDS_ON` relation for each entry in `dependsOn`
 
-Spec discovery follows the same incremental model as source files: content hashes are computed from `spec.md` + `.specd-metadata.yaml` combined, and only changed specs are re-processed.
+Spec discovery follows the same incremental model as source files: the `contentHash` is compared against the stored hash, and only specs with changed hashes are re-processed. Unchanged specs are skipped entirely.
 
 Spec indexing runs as an additional phase after source file indexing (Phase 1 and Phase 2). It does not depend on source file data and could run in parallel, but sequencing after source indexing simplifies the implementation.
 
@@ -91,7 +123,7 @@ Spec indexing runs as an additional phase after source file indexing (Phase 1 an
 - The `GraphStore` must be opened before calling the use case — the indexer does not manage store lifecycle
 - Discovery always uses forward-slash-normalized workspace-relative paths
 - Hardcoded exclusion directories cannot be overridden (they are always excluded)
-- Phase 2 depends on Phase 1 completing for all files — they are not interleaved per file
+- Pass 2 depends on Pass 1 completing for all files — they are not interleaved per file
 - Per-file errors are collected, not thrown — only infrastructure errors abort the run
 - Spec indexing uses `.specd-metadata.yaml` as the primary source for `dependsOn`; falls back to parsing `spec.md` links
 - No dependency on `@specd/core`

@@ -44,6 +44,14 @@
 - **WHEN** `IndexCodeGraph.execute()` is called
 - **THEN** the file is extracted and upserted as a new entry
 
+#### Scenario: Changed files removed from store before bulk load
+
+- **GIVEN** a store containing `src/utils.ts` with hash `abc`
+- **AND** `src/utils.ts` on disk now has hash `def`
+- **WHEN** `IndexCodeGraph.execute()` is called
+- **THEN** `src/utils.ts` is removed from the store before bulk load
+- **AND** the re-extracted data is inserted via `bulkLoad()`
+
 ### Requirement: File discovery
 
 #### Scenario: node_modules excluded
@@ -71,20 +79,63 @@
 - **WHEN** file discovery runs
 - **THEN** `docs/readme.md` is not in the discovered files
 
-### Requirement: Phased extraction
+### Requirement: Single-pass extraction with in-memory index
 
-#### Scenario: Phase 2 can resolve cross-file calls
+#### Scenario: Pass 2 can resolve cross-file calls
 
 - **GIVEN** file A defines `createUser` and file B calls `createUser` via import
-- **WHEN** indexing runs with two phases
-- **THEN** Phase 1 stores `createUser` as a symbol in the graph
-- **AND** Phase 2 resolves the call from file B to the `createUser` symbol and creates a `CALLS` relation
+- **WHEN** indexing runs with two passes
+- **THEN** Pass 1 registers `createUser` in the in-memory `SymbolIndex`
+- **AND** Pass 2 resolves the call from file B to the `createUser` symbol and creates a `CALLS` relation
 
-#### Scenario: Phase 2 runs after all Phase 1 completes
+#### Scenario: Pass 2 runs after all Pass 1 completes
 
 - **GIVEN** a workspace with files A, B, and C where B imports from C
 - **WHEN** indexing runs
-- **THEN** all files have their symbols stored (Phase 1) before any `CALLS`/`IMPORTS` resolution (Phase 2) begins
+- **THEN** all files have their symbols registered in the `SymbolIndex` (Pass 1) before any `CALLS`/`IMPORTS` resolution (Pass 2) begins
+
+#### Scenario: Bulk load writes all data at once
+
+- **GIVEN** a workspace with 10 files
+- **WHEN** both passes complete
+- **THEN** `GraphStore.bulkLoad()` is called once with all accumulated files, symbols, and relations
+
+### Requirement: Chunked processing
+
+#### Scenario: Files grouped by byte budget
+
+- **GIVEN** a workspace with files totaling 50 MB and a chunk budget of 20 MB
+- **WHEN** Pass 1 runs
+- **THEN** files are processed in at least 3 chunks
+- **AND** file content strings from completed chunks are eligible for garbage collection
+
+#### Scenario: Custom chunk budget respected
+
+- **GIVEN** `IndexOptions.chunkBytes` is set to 5 MB
+- **WHEN** indexing runs
+- **THEN** chunks do not exceed 5 MB of source content
+
+### Requirement: Progress reporting
+
+#### Scenario: Progress callback receives granular updates
+
+- **GIVEN** an `onProgress` callback is provided in `IndexOptions`
+- **WHEN** indexing runs
+- **THEN** the callback is called with increasing percent values from 0 to 100
+- **AND** phase strings describe the current activity (e.g. `"Pass 1"`, `"Pass 2"`, `"Bulk load"`)
+- **AND** detail strings are included for per-file phases (e.g. `"150/460 files"`)
+
+### Requirement: Monorepo package resolution
+
+#### Scenario: Monorepo package imports resolved via pnpm-workspace.yaml
+
+- **GIVEN** a workspace with `pnpm-workspace.yaml` defining `packages: ['packages/*']`
+- **AND** `packages/core/package.json` has `name: '@specd/core'`
+- **AND** file B imports `createUser` from `@specd/core`
+- **AND** file A in `packages/core/` defines `createUser`
+- **WHEN** Pass 2 resolves imports
+- **THEN** an `IMPORTS` relation is created from file B to file A
+- **AND** a `CALLS` relation is created from the calling symbol to `createUser`
 
 ### Requirement: Spec dependency indexing
 
@@ -110,10 +161,10 @@
 
 #### Scenario: Incremental spec indexing skips unchanged specs
 
-- **GIVEN** a spec was indexed with combined hash `abc` from `spec.md` + `.specd-metadata.yaml`
+- **GIVEN** a spec was indexed with `contentHash` `abc` computed from `spec.md` + `.specd-metadata.yaml`
 - **AND** neither file has changed
 - **WHEN** spec indexing runs again
-- **THEN** the spec is skipped
+- **THEN** the spec is skipped because its `contentHash` matches the stored hash
 
 #### Scenario: Global specs indexed
 

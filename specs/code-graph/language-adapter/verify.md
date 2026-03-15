@@ -88,6 +88,38 @@
 - **WHEN** `extractRelations()` is called with the appropriate import map
 - **THEN** an `IMPORTS` relation from the current file to the resolved target file is returned
 
+### Requirement: Import declaration extraction
+
+#### Scenario: TypeScript named imports parsed
+
+- **GIVEN** content containing `import { createUser, type Config } from '@specd/core'`
+- **WHEN** `extractImportedNames()` is called
+- **THEN** two declarations are returned: `createUser` and `Config`, both with specifier `'@specd/core'` and `isRelative: false`
+
+#### Scenario: Relative import detected
+
+- **GIVEN** content containing `import { helper } from './utils.js'`
+- **WHEN** `extractImportedNames()` is called
+- **THEN** one declaration is returned with `isRelative: true` and specifier `'./utils.js'`
+
+#### Scenario: Aliased import preserves both names
+
+- **GIVEN** content containing `import { foo as bar } from './mod.js'`
+- **WHEN** `extractImportedNames()` is called
+- **THEN** the declaration has `originalName: 'foo'` and `localName: 'bar'`
+
+#### Scenario: Python relative import
+
+- **GIVEN** content containing `from .utils import helper`
+- **WHEN** `extractImportedNames()` is called on a Python adapter
+- **THEN** one declaration is returned with `isRelative: true`
+
+#### Scenario: Go imports are never relative
+
+- **GIVEN** content containing `import "fmt"`
+- **WHEN** `extractImportedNames()` is called on a Go adapter
+- **THEN** the declaration has `isRelative: false`
+
 ### Requirement: Call resolution
 
 #### Scenario: Call resolved via import map
@@ -103,11 +135,11 @@
 - **WHEN** `extractRelations()` is called
 - **THEN** no `CALLS` relation is created for that call and no error is thrown
 
-#### Scenario: Top-level call has file as context
+#### Scenario: Top-level call silently dropped
 
 - **GIVEN** a call expression `init()` at module top level (not inside any function or class)
 - **WHEN** `extractRelations()` is called
-- **THEN** the caller is represented as the file (via `DEFINES` context), not a symbol
+- **THEN** no `CALLS` relation is created for that call
 
 ### Requirement: Adapter registry
 

@@ -41,6 +41,22 @@
 - **WHEN** `upsertFile()` is called for a file path not yet in the store
 - **THEN** a new `FileNode` is created along with its symbols and relations
 
+### Requirement: Additive relation insertion
+
+#### Scenario: addRelations preserves existing data
+
+- **GIVEN** a store with symbols A (in file1) and B (in file2) and no CALLS relations
+- **WHEN** `addRelations([{ source: A.id, target: B.id, type: 'CALLS' }])` is called
+- **THEN** the CALLS relation exists in the store
+- **AND** all existing file, symbol, and relation data is preserved
+
+#### Scenario: addRelations survives file re-upsert
+
+- **GIVEN** a CALLS relation from symbol A (file1) to symbol B (file2) added via `addRelations`
+- **WHEN** `upsertFile` is called for file2 (re-indexing it)
+- **THEN** the CALLS relation from A to B is deleted (because B is removed and re-created)
+- **AND** this is expected — the indexer re-adds CALLS in Phase 3 after all upserts
+
 ### Requirement: File removal
 
 #### Scenario: Remove deletes file and all associated data

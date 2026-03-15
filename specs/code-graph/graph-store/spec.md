@@ -20,6 +20,12 @@ The port follows the project's hexagonal architecture: it is defined in `domain/
 
 `GraphStore` SHALL provide `upsertFile(file: FileNode, symbols: SymbolNode[], relations: Relation[]): Promise<void>`. This operation MUST be atomic: it removes all existing symbols and relations for the given file path and replaces them with the provided data in a single transaction. If the transaction fails, the previous state for that file is preserved.
 
+### Requirement: Additive relation insertion
+
+`GraphStore` SHALL provide `addRelations(relations: Relation[]): Promise<void>`. This operation adds relations to the store without removing any existing data. It is used for cross-file relations (e.g. `CALLS` between symbols in different files) that must not be deleted when either file is re-upserted.
+
+Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely additive.
+
 ### Requirement: File removal
 
 `GraphStore` SHALL provide `removeFile(filePath: string): Promise<void>`. This operation MUST atomically remove the `FileNode`, all `SymbolNode` entries with that `filePath`, and all `Relation` entries where the file or any of its symbols appear as `source` or `target`.
@@ -39,7 +45,7 @@ The port follows the project's hexagonal architecture: it is defined in `domain/
 - **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches
 - **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, or file path
 
-`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kind` (SymbolKind), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments).
+`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kind` (SymbolKind), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive).
 
 ### Requirement: Graph statistics
 
@@ -64,6 +70,8 @@ The adapter MUST:
 - Use parameterized Cypher queries for all operations (no string interpolation of user data)
 - Support schema migration: if the database schema version does not match the expected version, migrate on `open()`
 
+The adapter uses CSV-based bulk loading (`COPY FROM`) for large datasets via the `bulkLoad()` method. Relations are loaded in batches of 500 to prevent LadybugDB from blocking. The `IGNORE_ERRORS=true` flag is used for relation COPY operations to silently skip rows referencing non-existent nodes (dangling imports to external files).
+
 ### Requirement: Spec upsert and removal
 
 `GraphStore` SHALL provide:
@@ -72,6 +80,13 @@ The adapter MUST:
 - **`removeSpec(specId: string): Promise<void>`** — removes the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target.
 
 These follow the same atomic pattern as `upsertFile` / `removeFile`.
+
+The Spec node table includes:
+
+- `specId STRING` — primary key
+- `path STRING`
+- `title STRING`
+- `contentHash STRING` — hash of spec content for incremental diffing
 
 ### Requirement: Bulk operations
 

@@ -25,6 +25,7 @@ A `SpecNode` SHALL represent a spec directory in the workspace. It contains:
 - **`specId`** (`string`) — the spec identifier in `workspace:package/topic` format (e.g. `core:core/change`, `_global:_global/architecture`). This is the node's identity.
 - **`path`** (`string`) — workspace-relative path to the spec directory (e.g. `specs/core/change`).
 - **`title`** (`string`) — the spec title extracted from the `# Title` heading in `spec.md`.
+- **`contentHash`** (`string`) — hash of the spec's content at last index. Computed from `spec.md` + `.specd-metadata.yaml`. Used for incremental diffing.
 - **`dependsOn`** (`string[]`) — ordered list of spec IDs this spec depends on, extracted from `.specd-metadata.yaml` or the `## Spec Dependencies` section in `spec.md`.
 
 Two `SpecNode` values are equal if their `specId` fields match.
@@ -83,6 +84,17 @@ A `Relation` SHALL be a value object containing:
 
 Two `Relation` values are equal if `source`, `target`, and `type` all match.
 
+### Requirement: Import declaration
+
+An `ImportDeclaration` SHALL represent a parsed import statement extracted from source code. It contains:
+
+- **`localName`** (`string`) — the identifier used locally in the importing file
+- **`originalName`** (`string`) — the identifier as declared in the source module
+- **`specifier`** (`string`) — the raw import specifier string
+- **`isRelative`** (`boolean`) — true if the specifier is a relative path
+
+`ImportDeclaration` is a pure syntactic representation — it contains no resolution information. The indexer resolves specifiers to files and symbol ids using the adapter registry and monorepo package map.
+
 ### Requirement: Immutability
 
 All model types — `FileNode`, `SymbolNode`, `Relation`, and any aggregate containing them — SHALL be immutable value objects. Properties MUST be `readonly`. Mutations to the graph happen exclusively through the `GraphStore` port's atomic upsert operations, which replace entire file-scoped slices. There is no in-place mutation API.
@@ -135,6 +147,7 @@ const spec: SpecNode = {
   specId: 'core:core/change',
   path: 'specs/core/change',
   title: 'Change',
+  contentHash: 'sha256:def456...',
   dependsOn: ['core:core/config', 'core:core/storage'],
 }
 
