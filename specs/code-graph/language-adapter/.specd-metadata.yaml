@@ -91,12 +91,12 @@ rules:
 
         Each adapter reads its language's package manifest:
 
-        | Language   | Manifest file      | Identity field        |
-        | ---------- | ------------------ | --------------------- |
-        | TypeScript | `package.json`     | `name`                |
-        | Python     | `pyproject.toml`   | `[project].name`      |
-        | Go         | `go.mod`           | `module`              |
-        | PHP        | `composer.json`    | `name`                |
+        | Language   | Manifest file    | Identity field   |
+        | ---------- | ---------------- | ---------------- |
+        | TypeScript | `package.json`   | `name`           |
+        | Python     | `pyproject.toml` | `[project].name` |
+        | Go         | `go.mod`         | `module`         |
+        | PHP        | `composer.json`  | `name`           |
 
         The `repoRoot` parameter is resolved by the CLI/MCP layer using the VCS adapter (`VcsAdapter.rootDir()`), making it VCS-agnostic (git, hg, svn). When not provided, the search walks up to the filesystem root.
 
@@ -110,27 +110,27 @@ rules:
 
         * **`resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined`** — given a non-relative import specifier and the list of known package names, returns which package the specifier refers to. Each language has its own rules:
 
-        | Language   | Specifier example                  | Package extraction rule                                |
-        | ---------- | ---------------------------------- | ------------------------------------------------------ |
-        | TypeScript | `@specd/core`                      | Scoped: first two segments. Bare: first segment.       |
-        | Go         | `github.com/acme/auth/models`      | Longest matching prefix from known packages.           |
-        | Python     | `acme_auth.models`                 | First segment, normalized (hyphens ↔ underscores).     |
-        | PHP        | (uses qualified names, not this)   | Not applicable — PHP resolves via `extractNamespace`.  |
+        | Language   | Specifier example                | Package extraction rule                               |
+        | ---------- | -------------------------------- | ----------------------------------------------------- |
+        | TypeScript | `@specd/core`                    | Scoped: first two segments. Bare: first segment.      |
+        | Go         | `github.com/acme/auth/models`    | Longest matching prefix from known packages.          |
+        | Python     | `acme_auth.models`               | First segment, normalized (hyphens ↔ underscores).    |
+        | PHP        | (uses qualified names, not this) | Not applicable — PHP resolves via `extractNamespace`. |
 
         * **`resolveRelativeImportPath?(fromFile: string, specifier: string): string`** — given the importing file path and a relative specifier, returns the resolved file path. Each language has its own rules for extension mapping and path resolution:
 
-        | Language   | Resolution rules                                              |
-        | ---------- | ------------------------------------------------------------- |
-        | TypeScript | `.js` → `.ts`, extensionless → `.ts`, `../` path traversal   |
-        | Python     | `.` = current package, `..` = parent, adds `.py` extension    |
-        | Go         | Not applicable — Go imports are never relative                |
-        | PHP        | Not applicable — PHP imports are never relative               |
+        | Language   | Resolution rules                                           |
+        | ---------- | ---------------------------------------------------------- |
+        | TypeScript | `.js` → `.ts`, extensionless → `.ts`, `../` path traversal |
+        | Python     | `.` = current package, `..` = parent, adds `.py` extension |
+        | Go         | Not applicable — Go imports are never relative             |
+        | PHP        | Not applicable — PHP imports are never relative            |
 
         * **`buildQualifiedName?(namespace: string, symbolName: string): string`** — builds a fully qualified name from a namespace and symbol name. Used by languages like PHP where imports are resolved via namespace-qualified names rather than package names.
 
-        | Language   | Example                                      |
-        | ---------- | -------------------------------------------- |
-        | PHP        | `App\Models` + `User` → `App\Models\User`   |
+        | Language | Example                                   |
+        | -------- | ----------------------------------------- |
+        | PHP      | `App\Models` + `User` → `App\Models\User` |
 
         When these methods are not implemented, the indexer skips the corresponding resolution step for that language. The indexer MUST NOT contain any language-specific resolution logic — all specifier parsing, path resolution, and qualified name construction is delegated to adapters.
   - requirement: Tree-sitter query patterns
@@ -481,6 +481,6 @@ scenarios:
     then:
       - it returns 'App\\Models\\User'
 contentHashes:
-  spec.md: sha256:af603635e62758392d7dd8cf3fd8c6c831f0af74fdff7ff7066b9ea2a45c5e30
+  spec.md: sha256:d85e0e838da8ab68a47575ebe329b88109ff9ca727f1f5e23054f88006e21bf4
   verify.md: sha256:eac94d0313162ba332ba778598a7e70b5ca8d380b529ad154566442d25f745f2
 generatedBy: core

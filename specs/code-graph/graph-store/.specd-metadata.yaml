@@ -83,7 +83,20 @@ rules:
         * `specId STRING` — primary key
         * `path STRING`
         * `title STRING`
-        * `contentHash STRING` — hash of spec content for incremental diffing
+        * `description STRING` — from `.specd-metadata.yaml`
+        * `contentHash STRING` — hash of concatenated artifacts (excluding `.specd-metadata.yaml`)
+        * `content STRING` — concatenated artifact text for full-text search
+        * `workspace STRING`
+  - requirement: Full-text search
+    rules:
+      - |-
+        `GraphStore` SHALL provide:
+
+        * **`searchSymbols(query: string, limit?: number): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.name` and `Symbol.comment`. Returns results ranked by BM25 score descending.
+        * **`searchSpecs(query: string, limit?: number): Promise<Array<{ spec: SpecNode; score: number }>>`** — full-text search across `Spec.title`, `Spec.description`, and `Spec.content`. Returns results ranked by BM25 score descending.
+        * **`rebuildFtsIndexes(): Promise<void>`** — drops and recreates FTS indexes. Must be called after bulk data changes because LadybugDB FTS indexes are not automatically updated on insert.
+
+        Default limit is 20. The `LadybugGraphStore` implementation uses `QUERY_FTS_INDEX` with `k := 1000` internally and applies `ORDER BY score DESC LIMIT n` to get the true top-k results.
   - requirement: Bulk operations
     rules:
       - '`GraphStore` SHALL provide `clear(): Promise<void>` to remove all nodes and relations (full re-index), `getAllFiles(): Promise<FileNode[]>` to retrieve all file nodes, and `getAllSpecs(): Promise<SpecNode[]>` to retrieve all spec nodes (both for incremental diff computation).'
@@ -288,6 +301,6 @@ scenarios:
     then:
       - 12 SpecNode entries are returned
 contentHashes:
-  spec.md: sha256:2b2afce2667ef95f71688b7c9b872acb1bdeace512569fbe8ad40cbafb75921b
+  spec.md: sha256:1336b749c365314a278261b45d476273adf07344b08e2806037500d58dd872fd
   verify.md: sha256:a54044aaef872c72e836bbbf8eb60f2b4b6bb74e16b8ed0be4f8b6a05b783746
 generatedBy: core

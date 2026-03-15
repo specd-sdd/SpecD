@@ -180,4 +180,30 @@ export class CodeGraphProvider {
   async detectChanges(changedFiles: string[]): Promise<ChangeDetectionResult> {
     return detectChanges(this.store, changedFiles)
   }
+
+  /**
+   * Full-text search across symbols (name and comment).
+   * @param query - The search query string.
+   * @param limit - Maximum results to return.
+   * @returns Matching symbols with BM25 scores, ordered by relevance.
+   */
+  async searchSymbols(
+    query: string,
+    limit?: number,
+  ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
+    return this.store.searchSymbols(query, limit)
+  }
+
+  /**
+   * Full-text search across specs (title, description, and content).
+   * @param query - The search query string.
+   * @param limit - Maximum results to return.
+   * @returns Matching specs with BM25 scores, ordered by relevance.
+   */
+  async searchSpecs(
+    query: string,
+    limit?: number,
+  ): Promise<Array<{ spec: SpecNode; score: number }>> {
+    return this.store.searchSpecs(query, limit)
+  }
 }

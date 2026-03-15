@@ -60,9 +60,9 @@ export async function buildWorkspaceTargets(
  *
  * For each spec in the repository:
  * 1. Lists all specs
- * 2. Loads spec.md content for title extraction and hashing
- * 3. Loads .specd-metadata.yaml for dependency extraction
- * 4. Builds DiscoveredSpec with specId, title, contentHash, dependsOn
+ * 2. Loads `.specd-metadata.yaml` for title, description, and dependencies
+ * 3. Loads remaining artifacts for content and hashing (excluding metadata)
+ * 4. Builds DiscoveredSpec with all fields
  *
  * @param repo - The spec repository for this workspace, or undefined if not found.
  * @param workspace - The workspace name.
@@ -78,54 +78,60 @@ async function resolveSpecsFromRepo(
   const results: DiscoveredSpec[] = []
 
   for (const spec of specs) {
-    // Load all artifacts, ordered: spec.md first (if present), then rest alphabetically
-    const filenames = [...spec.filenames]
-    const ordered: string[] = []
-    const specMdIdx = filenames.indexOf('spec.md')
-    if (specMdIdx !== -1) {
-      ordered.push('spec.md')
-      filenames.splice(specMdIdx, 1)
-    }
-    ordered.push(...filenames.sort())
-
-    // Concatenate all artifact contents for hashing
-    let hashSource = ''
+    // Read metadata for title, description, dependsOn
     let title = 'Untitled'
-    let specMdContent: string | undefined
+    let description = ''
+    let dependsOn: string[] = []
+    const metadata = await repo.artifact(spec, '.specd-metadata.yaml')
+    if (metadata) {
+      title = extractMetadataField(metadata.content, 'title') ?? 'Untitled'
+      description = extractMetadataField(metadata.content, 'description') ?? ''
+      dependsOn = extractDependsOnFromMetadata(metadata.content)
+    }
 
+    // Build content: all artifacts EXCEPT .specd-metadata.yaml
+    // spec.md first if present, then rest alphabetically
+    const contentFilenames = spec.filenames.filter((f) => f !== '.specd-metadata.yaml')
+    const ordered: string[] = []
+    const idx = contentFilenames.indexOf('spec.md')
+    if (idx !== -1) {
+      ordered.push('spec.md')
+    }
+    ordered.push(...contentFilenames.filter((f) => f !== 'spec.md').sort())
+
+    let content = ''
+    let specMdContent: string | undefined
     for (const filename of ordered) {
       const artifact = await repo.artifact(spec, filename)
       if (artifact) {
-        hashSource += artifact.content
+        content += artifact.content
         if (filename === 'spec.md') {
           specMdContent = artifact.content
-          title = extractTitle(artifact.content)
         }
       }
     }
 
-    if (hashSource === '') continue
+    if (content === '' && !metadata) continue
 
-    // Extract dependsOn from metadata or spec.md
-    let dependsOn: string[] = []
-    if (ordered.includes('.specd-metadata.yaml')) {
-      const metadata = await repo.artifact(spec, '.specd-metadata.yaml')
-      if (metadata) {
-        dependsOn = extractDependsOnFromMetadata(metadata.content)
+    // Fallback: if no metadata, extract title from spec.md and dependsOn from links
+    if (!metadata) {
+      if (specMdContent) {
+        title = extractTitle(specMdContent)
+        dependsOn = extractDependsOnFromSpec(specMdContent)
       }
-    } else if (specMdContent) {
-      dependsOn = extractDependsOnFromSpec(specMdContent)
     }
 
     const specId = `${spec.workspace}:${spec.name.toString()}`
-    const contentHash = computeHash(hashSource)
+    const contentHash = computeHash(content)
 
     results.push({
       spec: {
         specId,
         path: spec.name.toString(),
         title,
+        description,
         contentHash,
+        content,
         dependsOn,
         workspace,
       },
@@ -134,6 +140,26 @@ async function resolveSpecsFromRepo(
   }
 
   return results
+}
+
+/**
+ * Extracts a top-level scalar field from a YAML metadata file.
+ * @param content - The raw YAML content.
+ * @param field - The field name to extract (e.g. `title`, `description`).
+ * @returns The field value, or undefined if not found.
+ */
+function extractMetadataField(content: string, field: string): string | undefined {
+  const match = content.match(new RegExp(`^${field}:\\s*(.+)$`, 'm'))
+  if (!match?.[1]) return undefined
+  let value = match[1].trim()
+  // Strip surrounding quotes (YAML scalar quoting)
+  if (
+    (value.startsWith("'") && value.endsWith("'")) ||
+    (value.startsWith('"') && value.endsWith('"'))
+  ) {
+    value = value.slice(1, -1)
+  }
+  return value
 }
 
 /**

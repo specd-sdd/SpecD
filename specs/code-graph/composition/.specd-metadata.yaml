@@ -17,6 +17,7 @@ rules:
 
         * **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`
         * **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getStatistics()` — delegates to `GraphStore`
+        * **Search**: `searchSymbols(query, limit?)`, `searchSpecs(query, limit?)` — full-text search with BM25 ranking, delegates to `GraphStore`
         * **Maintenance**: `clear(): Promise<void>` — removes all data from the store (for full re-index)
         * **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
         * **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `detectChanges(changedFiles)` — delegates to impact functions
@@ -56,7 +57,8 @@ rules:
         * `createCodeGraphProvider` — factory function
         * `CodeGraphProvider` — type only (for type annotations, not construction)
         * `CodeGraphOptions` — options type for the factory
-        * `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).
+        * `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, `DiscoveredSpec` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).
+        * `discoverSpecsFromDir` — utility for discovering specs from a directory (used by CLI/MCP integration layers)
         * `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult` — traversal/impact types
         * `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType` — model types
         * `SymbolQuery`, `GraphStatistics` — query types
@@ -200,6 +202,6 @@ scenarios:
       - its package.json has a dependency on @specd/core
       - AND the primary factory accepts SpecdConfig from @specd/core
 contentHashes:
-  spec.md: sha256:f656cf4930aaaba2318090357f3e265155ca1a19ca00bc80508970ee57d26d3f
+  spec.md: sha256:758812c6d212400879b7ce48e741320dc56a55de087e590a583ddcc4453bfb24
   verify.md: sha256:60a27521edc9df6b0533098b8315c2a387098392d09ecdc38c9a6eeff95fd82c
 generatedBy: core

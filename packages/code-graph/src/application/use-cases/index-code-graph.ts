@@ -478,6 +478,10 @@ export class IndexCodeGraph {
       }
     }
 
+    // Rebuild FTS indexes after data changes
+    progress(96, 'Rebuilding search indexes')
+    await this.store.rebuildFtsIndexes()
+
     progress(100, 'Done')
 
     const workspaces: WorkspaceIndexBreakdown[] = options.workspaces.map((ws) => {
