@@ -62,27 +62,3 @@ export class HookResult {
     return this._exitCode === 0
   }
 }
-
-/**
- * Template variables available for substitution in `run:` hook command strings.
- *
- * Variables use the `{{key.path}}` syntax (e.g. `{{change.name}}`).
- * `change` is absent for lifecycle points that have no active change
- * (e.g. `pre-explore`).
- */
-export interface HookVariables {
-  /** Active change context, present when a change is active. */
-  readonly change?: {
-    /** The change's kebab-case name (e.g. `"add-oauth-login"`). */
-    readonly name: string
-    /** The workspace the change belongs to (e.g. `"auth"`). */
-    readonly workspace: string
-    /** Absolute filesystem path to the change directory. */
-    readonly path: string
-  }
-  /** Project-level context, always present. */
-  readonly project: {
-    /** Absolute filesystem path to the git repository root. */
-    readonly root: string
-  }
-}

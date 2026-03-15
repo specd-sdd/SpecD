@@ -19,6 +19,9 @@ import { registerChangeSkipArtifact } from './commands/change/skip-artifact.js'
 import { registerChangeDeps } from './commands/change/deps.js'
 import { registerChangeDiscard } from './commands/change/discard.js'
 import { registerChangeArchive } from './commands/change/archive.js'
+import { registerChangeRunHooks } from './commands/change/run-hooks.js'
+import { registerChangeHookInstruction } from './commands/change/hook-instruction.js'
+import { registerChangeArtifactInstruction } from './commands/change/artifact-instruction.js'
 
 // drafts
 import { registerDraftsList } from './commands/drafts/list.js'
@@ -105,6 +108,9 @@ registerChangeSkipArtifact(changeCmd)
 registerChangeDeps(changeCmd)
 registerChangeDiscard(changeCmd)
 registerChangeArchive(changeCmd)
+registerChangeRunHooks(changeCmd)
+registerChangeHookInstruction(changeCmd)
+registerChangeArtifactInstruction(changeCmd)
 
 // ---- drafts ----
 const draftsCmd = program.command('drafts').description('Manage drafted changes')

@@ -40,7 +40,13 @@ export {
   type GetStatusResult,
   type ArtifactStatusEntry,
 } from './get-status.js'
-export { type TransitionChange, type TransitionChangeInput } from './transition-change.js'
+export {
+  type TransitionChange,
+  type TransitionChangeInput,
+  type TransitionChangeResult,
+  type TransitionProgressEvent,
+  type OnTransitionProgress,
+} from './transition-change.js'
 export { type DraftChange, type DraftChangeInput } from './draft-change.js'
 export { type RestoreChange, type RestoreChangeInput } from './restore-change.js'
 export { type DiscardChange, type DiscardChangeInput } from './discard-change.js'
@@ -93,3 +99,21 @@ export {
   type ValidateSpecsResult,
   type SpecValidationEntry,
 } from './validate-specs.js'
+export {
+  type RunStepHooks,
+  type RunStepHooksInput,
+  type RunStepHooksResult,
+  type RunStepHookEntry,
+  type HookProgressEvent,
+  type OnHookProgress,
+} from './run-step-hooks.js'
+export {
+  type GetHookInstructions,
+  type GetHookInstructionsInput,
+  type GetHookInstructionsResult,
+} from './get-hook-instructions.js'
+export {
+  type GetArtifactInstruction,
+  type GetArtifactInstructionInput,
+  type GetArtifactInstructionResult,
+} from './get-artifact-instruction.js'

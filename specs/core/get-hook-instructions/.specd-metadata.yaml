@@ -1,0 +1,163 @@
+title: GetHookInstructions
+description: 'Workflow steps declare `instruction:` hooks — text blocks that guide agent behaviour at step boundaries. These instructions are distinct from context (specs, metadata, artifact rules) and must be retrieved separately. `GetHookInstructions` is the sole consumer of `instruction:` hooks: it returns instruction text for a given step and phase, optionally filtered by hook ID. Both native specd skills and external agent tools (e.g. Claude Code hooks) use this to retrieve step instructions independently from context compilation.'
+dependsOn:
+  - core:core/hook-execution-model
+  - core:core/schema-format
+  - core:core/config
+  - core:core/change
+  - core:core/template-variables
+context:
+  - 'Workflow steps declare `instruction:` hooks — text blocks that guide agent behaviour at step boundaries. These instructions are distinct from context (specs, metadata, artifact rules) and must be retrieved separately. `GetHookInstructions` is the sole consumer of `instruction:` hooks: it returns instruction text for a given step and phase, optionally filtered by hook ID. Both native specd skills and external agent tools (e.g. Claude Code hooks) use this to retrieve step instructions independently from context compilation.'
+rules:
+  - requirement: Ports and constructor
+    rules:
+      - |-
+        `GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaRegistry`, `TemplateExpander`, `schemaRef`, `workspaceSchemasPaths`, and `projectWorkflowHooks`.
+
+        ```typescript
+        class GetHookInstructions {
+          constructor(
+            changes: ChangeRepository,
+            schemas: SchemaRegistry,
+            templates: TemplateExpander,
+            schemaRef: string,
+            workspaceSchemasPaths: ReadonlyMap<string, string>,
+            projectWorkflowHooks: ProjectWorkflowHooks,
+          )
+        }
+        ```
+
+        `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml`. `GetHookInstructions` filters internally for the requested step. If `undefined`, it defaults to `[]`.
+
+        `TemplateExpander.expand()` is called on each instruction text before returning it (verbatim expansion, no shell escaping). The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander.
+
+        This use case does not need `HookRunner` — it only reads and expands instruction text, it never executes commands.
+  - requirement: Input
+    rules:
+      - |-
+        `GetHookInstructions.execute` receives:
+
+        * `name` (string, required) — the change name
+        * `step` (string, required) — the workflow step name
+        * `phase` (`'pre'` | `'post'`, required) — which hook phase to query
+        * `only` (string, optional) — when provided, filters to a single hook by its `id`
+  - requirement: Change lookup
+    rules:
+      - '`GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.'
+  - requirement: Schema name guard
+    rules:
+      - After resolving the schema, `GetHookInstructions` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`.
+  - requirement: Step resolution
+    rules:
+      - |-
+        `GetHookInstructions` first validates that `step` is a valid `ChangeState` (a lifecycle state defined by the domain). If it is not, it MUST throw `StepNotValidError`.
+
+        If the step is a valid lifecycle state, `GetHookInstructions` looks up the workflow step entry via `schema.workflowStep(step)`. If no matching entry exists (the schema does not declare hooks for this state), the use case returns `{ phase, instructions: [] }` — no error is thrown.
+  - requirement: Instruction collection
+    rules:
+      - |-
+        For the matched step and phase, `GetHookInstructions` MUST collect `instruction:` hooks in the following order:
+
+        1. Schema-level hooks from `workflow[step].hooks[phase]` — only entries with an `instruction:` key, in declaration order
+        2. Project-level hooks from `projectWorkflowHooks` targeting the same step and phase — only entries with an `instruction:` key, in declaration order
+
+        `run:` entries MUST be skipped — they are not instruction text.
+  - requirement: Hook filtering with --only
+    rules:
+      - When `only` is provided, the result MUST contain only the hook whose `id` matches. If no hook matches the ID, the use case MUST throw `HookNotFoundError` with reason `'not-found'`. If the ID matches a `run:` hook instead of an `instruction:` hook, the use case MUST throw `HookNotFoundError` with reason `'wrong-type'`.
+  - requirement: Result shape
+    rules:
+      - |-
+        `GetHookInstructions.execute` MUST return a result object containing:
+
+        * `phase` (`'pre'` | `'post'`) — the queried phase (always matches the input)
+        * `instructions` — array of instruction entries, each with:
+          * `id` (string) — the hook's `id`
+          * `text` (string) — the instruction text verbatim
+
+        When no `instruction:` hooks exist for the step+phase, the result is `{ phase, instructions: [] }`.
+constraints:
+  - This use case is read-only — it does not modify the change or execute any commands
+  - 'run: hooks are always excluded from results'
+  - Schema-level hooks precede project-level hooks, consistent with hook ordering
+  - This use case does not evaluate step availability — it returns instructions regardless of whether the step is currently available
+scenarios:
+  - requirement: Schema name guard
+    name: Schema mismatch throws SchemaMismatchError
+    given:
+      - a change created with schema spec-driven
+      - AND the active schema in specd.yaml is custom-schema
+    when:
+      - GetHookInstructions.execute is called
+    then:
+      - SchemaMismatchError is thrown
+  - requirement: Step resolution
+    name: Invalid step name throws StepNotValidError
+    given:
+      - a valid schema
+    when:
+      - 'GetHookInstructions.execute is called with step: "reviewing"'
+    then:
+      - StepNotValidError is thrown indicating reviewing is not a valid lifecycle state
+  - requirement: Step resolution
+    name: Valid state without workflow entry returns empty
+    given:
+      - a schema with workflow steps [designing, implementing, verifying, archiving]
+    when:
+      - 'GetHookInstructions.execute is called with step: "ready" and phase: "pre"'
+    then:
+      - 'the result is { phase: "pre", instructions: [] }'
+  - requirement: Instruction collection
+    name: Only instruction hooks are collected
+    given:
+      - 'a step with hooks.pre: [{ id: "guidance", instruction: "Read tasks" }, { id: "lint", run: "pnpm lint" }, { id: "review", instruction: "Review changes" }]'
+    when:
+      - GetHookInstructions collects hooks for the pre phase
+    then:
+      - 'the result contains [{ id: "guidance", text: "Read tasks" }, { id: "review", text: "Review changes" }]'
+      - AND lint is not included
+  - requirement: Instruction collection
+    name: Schema hooks precede project hooks
+    given:
+      - 'schema pre instruction hooks [{ id: "s-read", instruction: "Schema instruction" }]'
+      - 'AND project pre instruction hooks [{ id: "p-read", instruction: "Project instruction" }]'
+    when:
+      - GetHookInstructions collects hooks for the pre phase
+    then:
+      - the result is [s-read, p-read] in that order
+  - requirement: Hook filtering with --only
+    name: Single instruction hook returned by ID
+    given:
+      - 'pre hooks [{ id: "guidance", instruction: "Read tasks" }, { id: "review", instruction: "Review changes" }]'
+    when:
+      - 'GetHookInstructions.execute is called with only: "review"'
+    then:
+      - 'the result contains only { id: "review", text: "Review changes" }'
+  - requirement: Hook filtering with --only
+    name: Filtering by run hook ID throws error
+    given:
+      - 'pre hooks [{ id: "lint", run: "pnpm lint" }]'
+    when:
+      - 'GetHookInstructions.execute is called with only: "lint"'
+    then:
+      - 'a domain error is thrown — run: hooks are not queryable via this use case'
+  - requirement: Hook filtering with --only
+    name: Unknown hook ID throws error
+    given:
+      - 'pre hooks [{ id: "guidance", instruction: "Read tasks" }]'
+    when:
+      - 'GetHookInstructions.execute is called with only: "nonexistent"'
+    then:
+      - a domain error is thrown
+  - requirement: Result shape
+    name: No instruction hooks returns empty array
+    given:
+      - 'a step with only run: hooks in the pre phase'
+    when:
+      - 'GetHookInstructions.execute is called with phase: "pre"'
+    then:
+      - 'the result is { phase: "pre", instructions: [] }'
+contentHashes:
+  spec.md: sha256:86fccec4434643773a6c1dd3ecde4bd84b2d9ce6e0d3ef6c36447e4b2e4b817b
+  verify.md: sha256:4341fc297188bd9be49dba589d299fe60d194805557d3e002c646e538ea000ee
+generatedBy: core

@@ -1,20 +1,23 @@
 title: Change Transition
-description: Changes must progress through a governed lifecycle so that hooks, validations, and approval gates fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, running any declared pre/post hooks and transparently routing through approval gates when enabled.
+description: Changes must progress through a governed lifecycle so that validations, approval gates, requires enforcement, and hooks fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled, enforcing workflow `requires`, and executing `run:` hooks at step boundaries by default.
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
+  - core:core/transition-change
+  - core:core/hook-execution-model
 context:
-  - Changes must progress through a governed lifecycle so that hooks, validations, and approval gates fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, running any declared pre/post hooks and transparently routing through approval gates when enabled.
+  - Changes must progress through a governed lifecycle so that validations, approval gates, requires enforcement, and hooks fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled, enforcing workflow `requires`, and executing `run:` hooks at step boundaries by default.
 rules:
   - requirement: Command signature
     rules:
       - |-
         ```
-        specd change transition <name> <step> [--format text|json|toon]
+        specd change transition <name> <step> [--no-hooks] [--format text|json|toon]
         ```
 
         * `<name>` — required positional; the name of the change to transition
         * `<step>` — required positional; the target lifecycle state (e.g. `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`)
+        * `--no-hooks` — optional flag; skips `run:` hook execution, allowing the caller to manage hooks separately via `specd change run-hooks`
         * `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Approval-gate routing
     rules:
@@ -25,9 +28,20 @@ rules:
         * When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`
 
         The user always specifies the logical target state; routing is transparent.
-  - requirement: Pre- and post-hooks
+  - requirement: Hook execution
     rules:
-      - When transitioning to a step that has `run:` hooks declared (in the schema or project-level workflow), the CLI runs them in order before or after the transition (as declared). If a hook exits with a non-zero status, the CLI exits with code 2.
+      - By default, the `TransitionChange` use case executes `run:` hooks for the target workflow step (pre-hooks before the state change, post-hooks after). When `--no-hooks` is passed, hook execution is skipped — the caller is responsible for invoking hooks via `specd change run-hooks`.
+  - requirement: Progress output
+    rules:
+      - |-
+        The CLI passes an `onProgress` callback to the use case that renders step-by-step feedback to stdout:
+
+        * `requires-check` → `✓ artifactId [complete]` or `✗ artifactId [status]`
+        * `hook-start` → spinner `⠋ phase › hookId: command`
+        * `hook-done` → `✓ hookId (exit 0)` or `✗ hookId (exit N)`
+        * `transitioned` → `✓ from → to`
+
+        Progress output is only rendered in `text` format. JSON and toon formats include progress data in the structured output.
   - requirement: Output on success
     rules:
       - |-
@@ -37,15 +51,20 @@ rules:
         * `json` or `toon`: outputs the following to stdout (encoded in the respective format):
 
         where `<to>` is the effective target state after routing.
+  - requirement: Post-hook failure warning
+    rules:
+      - 'If any post-hooks failed, the CLI reports them as warnings. In `text` format, prints `warning: post-hook(s) failed: <commands>`. In structured formats, includes `postHookFailures` in the output. The command exits with code 2 if post-hooks failed.'
   - requirement: Invalid transition error
     rules:
       - If the transition is not valid from the current state, the command exits with code 1 and prints an `error:` message to stderr.
   - requirement: Incomplete tasks error
     rules:
       - If transitioning `implementing → verifying` and any artifact has incomplete task items (matching `taskCompletionCheck.incompletePattern`), the command exits with code 1 and prints an `error:` message to stderr naming the blocking artifact.
+  - requirement: Unsatisfied requires error
+    rules:
+      - If the target workflow step has `requires` and any required artifact is not `complete` or `skipped`, the command exits with code 1 and prints an `error:` message to stderr.
 constraints:
   - The user specifies the logical target state; the CLI never exposes the routing logic in its help text
-  - Hook failures (exit code 2) take precedence over transition success
 scenarios:
   - requirement: Command signature
     name: Missing arguments
@@ -71,15 +90,6 @@ scenarios:
     then:
       - the change transitions to pending-signoff
       - 'AND stdout shows transitioned my-change: done → pending-signoff'
-  - requirement: Pre- and post-hooks
-    name: Hook failure
-    given:
-      - 'the target step has a run: pre-hook that exits with code 1'
-    when:
-      - specd change transition my-change implementing is run
-    then:
-      - the process exits with code 2
-      - AND the hook's output is forwarded
   - requirement: Output on success
     name: Successful direct transition
     when:
@@ -113,6 +123,6 @@ scenarios:
       - stdout is valid JSON with result equal to "ok", name equal to "my-change", from equal to "drafting", and to equal to "designing"
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:ce0798d1ab8473999065661763e8f92b75ecf1a2eea05b5271c3da62b0cf05d3
-  verify.md: sha256:a701af16254846adc9c9e1325e6f701fa816b4c8c80d5c1a3a8b91cbf5676cc3
+  spec.md: sha256:e5121a3c097b4be32ad1f8eb32806108eca96dc973e4a8970c7b69687d78d102
+  verify.md: sha256:24c350c57736e64bc9c58211633b1dd861482288abb43c33ae01537c3e719080
 generatedBy: core

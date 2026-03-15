@@ -26,6 +26,12 @@ import { ContentHasher } from '../../../src/application/ports/content-hasher.js'
 import { NodeContentHasher } from '../../../src/infrastructure/node/content-hasher.js'
 import { type HookRunner } from '../../../src/application/ports/hook-runner.js'
 import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
+import {
+  RunStepHooks,
+  type RunStepHooksResult,
+  type RunStepHooksInput,
+  type OnHookProgress,
+} from '../../../src/application/use-cases/run-step-hooks.js'
 import { type ActorResolver } from '../../../src/application/ports/actor-resolver.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 
@@ -81,6 +87,10 @@ class StubChangeRepository extends ChangeRepository {
     _options?: { force?: boolean },
   ): Promise<void> {
     throw new Error('not implemented')
+  }
+
+  override changePath(change: Change): string {
+    return `/test/changes/${change.name}`
   }
 
   override async artifactExists(_change: Change, _filename: string): Promise<boolean> {
@@ -364,4 +374,25 @@ export function makeParsers(
     ['markdown', markdown],
     ['yaml', yaml],
   ])
+}
+
+/**
+ * Stub `RunStepHooks` that returns a configurable result without actually
+ * running any hooks.
+ *
+ * By default returns `{ hooks: [], success: true, failedHook: null }`.
+ */
+export function makeRunStepHooks(
+  overrides?: Partial<{
+    execute: (input: RunStepHooksInput, onProgress?: OnHookProgress) => Promise<RunStepHooksResult>
+  }>,
+): RunStepHooks {
+  const defaultExecute = async (): Promise<RunStepHooksResult> => ({
+    hooks: [],
+    success: true,
+    failedHook: null,
+  })
+  return {
+    execute: overrides?.execute ?? defaultExecute,
+  } as unknown as RunStepHooks
 }

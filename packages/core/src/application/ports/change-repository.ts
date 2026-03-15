@@ -132,6 +132,16 @@ export abstract class ChangeRepository extends Repository {
    * @param filename - The artifact filename to check (e.g. `"proposal.md"`)
    * @returns `true` if the file exists, `false` otherwise
    */
+  /**
+   * Returns the absolute filesystem path to the active change directory.
+   *
+   * Used by use cases to build the `change.path` template variable.
+   *
+   * @param change - The change whose path is needed
+   * @returns Absolute path to the change directory
+   */
+  abstract changePath(change: Change): string
+
   abstract artifactExists(change: Change, filename: string): Promise<boolean>
 
   /**

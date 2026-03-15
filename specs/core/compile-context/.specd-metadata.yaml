@@ -1,17 +1,18 @@
 title: CompileContext
-description: "AI agents entering a lifecycle step need a single, coherent instruction block that combines relevant specs, schema rules, and step hooks — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata from each spec's `.specd-metadata.yaml`, evaluates step availability, and combines schema instructions, artifact rules, spec content, and step hooks into a single structured output."
+description: "AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata from each spec's `.specd-metadata.yaml`, evaluates step availability, and combines project context entries, spec content, and available steps into a single structured output. Artifact instructions and step hooks are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively."
 dependsOn:
   - core:core/change
   - core:core/config
-  - core:core/schema-merge
   - core:core/spec-metadata
   - core:core/schema-format
   - core:core/delta-format
   - core:core/selector-model
   - core:core/spec-id-format
   - core:core/workspace
+  - core:core/get-artifact-instruction
+  - core:core/get-hook-instructions
 context:
-  - "AI agents entering a lifecycle step need a single, coherent instruction block that combines relevant specs, schema rules, and step hooks — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata from each spec's `.specd-metadata.yaml`, evaluates step availability, and combines schema instructions, artifact rules, spec content, and step hooks into a single structured output."
+  - "AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata from each spec's `.specd-metadata.yaml`, evaluates step availability, and combines project context entries, spec content, and available steps into a single structured output. Artifact instructions and step hooks are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively."
 rules:
   - requirement: Ports and constructor
     rules:
@@ -34,7 +35,7 @@ rules:
 
         `schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. Both are injected at kernel composition time, not passed per invocation.
 
-        `ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `CompileContext` uses it to look up the correct adapter when injecting delta context for a delta-capable artifact.
+        `ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `CompileContext` uses it for the `metadataExtraction` fallback path when metadata is absent or stale.
 
         `specs` is keyed by workspace name (e.g. `'default'`, `'billing'`). The bootstrap layer constructs one `SpecRepository` instance per workspace declared in `specd.yaml` and passes them all here. `CompileContext` does not create or configure repositories — it only reads from them.
 
@@ -48,11 +49,10 @@ rules:
 
         * `name` — the change name to compile context for
         * `step` — the lifecycle step name being entered (e.g. `'designing'`, `'implementing'`, `'verifying'`, `'archiving'`)
-        * `activeArtifact` (optional) — the artifact ID currently active in the step's iteration. Only applicable to the `designing` step, which traverses the artifact DAG and calls `CompileContext` once per artifact being created. Steps after `ready` (`implementing`, `verifying`, `archiving`) do not use this field — their artifacts already exist by that point. When present, only this artifact's `instruction`, `rules.pre`, and `rules.post` are injected. When absent, no artifact instructions or rules are injected.
         * `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, and per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`
         * `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1–4 are included.
         * `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.
-        * `sections` (optional) — when present, restricts the metadata content rendered for each spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, all available sections are rendered (description + rules + constraints + scenarios). `sections` applies only to spec content (step 5 of the assembled instruction block) — it does not affect schema instructions, delta context, artifact rules, step hooks, or available steps.
+        * `sections` (optional) — when present, restricts the metadata content rendered for each spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, all available sections are rendered (description + rules + constraints + scenarios). `sections` applies only to spec content — it does not affect project context entries or available steps.
   - requirement: Schema name guard
     rules:
       - After resolving the schema from config, `CompileContext` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before any context collection or instruction assembly.
@@ -110,24 +110,16 @@ rules:
         `CompileContext` must evaluate whether the requested step is available for the current change. A step is available if all artifact IDs in the matching `workflow` entry's `requires` list (the entry whose `step` field equals the requested step name) have effective status `complete` or `skipped` via `change.effectiveStatus(type)`. A skipped optional artifact satisfies the requirement in the same way a completed artifact does.
 
         If the step is not available (one or more required artifacts are neither `complete` nor `skipped`), `CompileContext` must include the availability status and the list of blocking artifacts in the result. It must not throw — unavailability is surfaced to the caller, not treated as an error.
-  - requirement: Assembled instruction block
+  - requirement: Assembled context block
     rules:
       - |-
-        `CompileContext` must assemble the instruction block by combining the following components in order:
+        `CompileContext` must assemble the context block by combining the following components in order:
 
         1. **Project context entries** — for each entry in `config.context` (in declaration order): resolve `instruction` values verbatim; resolve `file` values by reading the file at the given path relative to the `specd.yaml` directory and injecting its content verbatim. Missing files emit a warning and are skipped. This block appears before all other content.
-        2. **Artifact rules.pre** — if `activeArtifact` is present and the artifact (as resolved from the schema) declares `rules.pre`, inject all pre-rule `text` entries in declaration order before the schema instruction.
-        3. **Schema instruction** — if `activeArtifact` is present, include that artifact's `instruction` field from the schema if present. If `activeArtifact` is absent, no artifact instruction is injected.
-        4. **Delta context** — if `activeArtifact` is present and the artifact has `delta: true`, inject three sub-blocks in order:
-           * **Format instructions** — call `parsers.get(artifact.format).deltaInstructions()` and inject the result verbatim. This explains selector syntax, op semantics, `content` vs `value`, file location (`deltas/<workspace>/<capability-path>/<filename>.delta.yaml`), and includes a concrete format-specific example.
-           * **Domain instructions** — inject the artifact's `deltaInstruction` field if present. This describes which domain concepts (requirements, scenarios, etc.) to add, modify, or remove.
-           * **Existing artifact outlines** — for each spec ID in `change.specIds`, read the corresponding artifact file from the `SpecRepository` for that workspace, parse it via `ArtifactParser.parse()`, call `outline(ast)`, and inject the result as a compact, labelled structure. If the file does not exist (new spec, not yet modified), skip it silently. This block is omitted entirely if no existing artifacts are found.
-        5. **Artifact rules.post** — if `activeArtifact` is present and the artifact declares `rules.post`, inject all post-rule `text` entries in declaration order after the schema instruction (and delta context).
-        6. **Spec content** — for each spec in the collected context set, include its content using the following strategy. When `sections` is present, only the listed sections are rendered; when absent, all available sections are included (description + rules + constraints + scenarios).
+        2. **Spec content** — for each spec in the collected context set, include its content using the following strategy. When `sections` is present, only the listed sections are rendered; when absent, all available sections are included (description + rules + constraints + scenarios).
            * If `.specd-metadata.yaml` exists and is fresh: include the requested sections from the metadata. This is the compact, machine-optimised representation.
            * If metadata is absent or stale: fall back to the schema's `metadataExtraction` declarations. For each declared metadata field (rules, constraints, scenarios, etc.), the extraction engine loads the referenced artifact from `SpecRepository`, parses it via `ArtifactParser.parse()`, runs the declared extractors against the AST, and produces the same structured output as fresh metadata would. Only sections matching the `sections` filter are included when present. Extractors whose selectors match no nodes are silently skipped. Emit a staleness warning for this spec.
-        7. **Step hooks** — for the requested step, include all `instruction:` entries from the matching workflow step's `hooks.pre` and `hooks.post`, in declaration order (schema hooks before project-level hooks). Each entry is prefixed with `[pre]` or `[post]` according to its hook list. `run:` entries are not included — they are executed at archive time, not injected as AI context.
-        8. **Available steps** — list all steps declared in the schema's `workflow[]`, each annotated with whether it is currently available. Unavailable steps must name the blocking artifacts.
+        3. **Available steps** — list all steps declared in the schema's `workflow[]`, each annotated with whether it is currently available. Unavailable steps must name the blocking artifacts.
   - requirement: Result shape
     rules:
       - |-
@@ -135,7 +127,7 @@ rules:
 
         * `stepAvailable: boolean` — whether the requested step is currently available
         * `blockingArtifacts: string[]` — artifact IDs blocking the step (empty if available)
-        * `instructionBlock: string` — the fully assembled instruction text to inject into the AI context
+        * `contextBlock: string` — the fully assembled context text
         * `warnings: ContextWarning[]` — stale metadata warnings and any other advisory conditions
 
         `CompileContext` must not throw on availability failures. It must throw on `ChangeNotFoundError` (change not found) and on schema resolution errors.
@@ -146,7 +138,7 @@ rules:
     rules:
       - If a pattern or `dependsOn` entry references a workspace name that has no corresponding `SpecRepository` in the `specs` map (e.g. `billing:auth/*` when `billing` was not wired at bootstrap), `CompileContext` must emit a warning and skip the path. It must not throw.
 constraints:
-  - Project context entries (step 1) always appear first in the instruction block, before schema instructions and spec content
+  - Project context entries always appear first in the context block, before spec content
   - Missing file references in context emit a warning and are skipped — no error
   - Steps 1–4 (include/exclude patterns) are applied before dependsOn traversal (step 5)
   - Specs added via dependsOn traversal are never removed by exclude rules
@@ -154,16 +146,11 @@ constraints:
   - CompileContext must not perform direct filesystem reads — all file access goes through SpecRepository (for spec files) or FileReader (for config.context file entries)
   - The caller resolves the config and constructs all SpecRepository and FileReader instances before calling the constructor
   - The specs map must contain one entry per workspace declared in specd.yaml; workspaces missing from the map produce a warning, not an error
-  - Artifact instructions, delta context, rules.pre, and rules.post are included only when activeArtifact is provided — and only for that artifact
-  - rules.pre entries are injected before the artifact instruction; rules.post entries are injected after the artifact instruction (and delta context)
-  - 'Delta context (format instructions + domain instructions + outlines) is injected only when activeArtifact has delta: true'
-  - Existing artifact outlines are injected per spec ID in change.specIds; missing files are silently skipped
-  - ArtifactParserRegistry must contain an adapter for every format value declared in the schema's artifacts; a missing adapter must emit a warning and skip the delta context block — no error
-  - Step hooks (pre/post) fire once per step, not once per artifact iteration
-  - 'instruction: hook entries are included in the compiled output, each prefixed with [pre] or [post]; run: hook entries are not'
+  - Artifact instructions, rules, and delta context are NOT part of the context block — they are retrieved via GetArtifactInstruction
+  - 'instruction: hook entries are NOT part of the context block — they are retrieved via GetHookInstructions'
   - 'dependsOn traversal is opt-in via followDeps: true; when absent or false, step 5 is skipped entirely'
   - 'depth is only meaningful when followDeps: true; it limits traversal levels (1 = direct deps only)'
-  - sections applies only to spec content rendering; schema instructions, delta context, rules.pre, rules.post, step hooks, and available steps are unaffected
+  - sections applies only to spec content rendering; project context entries and available steps are unaffected
   - Cycle detection is mandatory — cycles in dependsOn must not cause infinite loops
   - Metadata-based content (fresh .specd-metadata.yaml) is always preferred; the metadataExtraction fallback is only used when metadata is absent or stale
 scenarios:
@@ -191,16 +178,16 @@ scenarios:
       - "contextIncludeSpecs: ['default:*'] and contextExcludeSpecs: ['default:drafts/*']"
       - AND default:drafts/old-spec was matched by the project-level include
     when:
-      - CompileContext.execute applies step 3 (project-level exclude)
+      - CompileContext.execute applies step 2 (project-level exclude)
     then:
       - default:drafts/old-spec is removed before workspace-level patterns are evaluated
   - requirement: Context spec collection
     name: Workspace-level exclude removes spec after workspace include
     given:
       - "default workspace declares contextIncludeSpecs: ['*'] and contextExcludeSpecs: ['internal/*']"
-      - AND default is active and default:internal/notes was added by the workspace include (step 4)
+      - AND default is active and default:internal/notes was added by the workspace include (step 3)
     when:
-      - CompileContext.execute applies step 5 (workspace-level exclude)
+      - CompileContext.execute applies step 4 (workspace-level exclude)
     then:
       - default:internal/notes is removed from the context set
   - requirement: Context spec collection
@@ -210,14 +197,14 @@ scenarios:
       - "AND auth/login/.specd-metadata.yaml declares dependsOn: ['auth/jwt']"
       - AND auth/jwt was not matched by any include pattern
     when:
-      - CompileContext.execute applies step 6
+      - 'CompileContext.execute applies step 5 with followDeps: true'
     then:
       - auth/jwt is added to the context set
   - requirement: Context spec collection
     name: dependsOn spec not removed by exclude
     given:
       - "contextExcludeSpecs: ['default:auth/*']"
-      - AND auth/jwt is added via dependsOn traversal (step 6)
+      - AND auth/jwt is added via dependsOn traversal (step 5)
     when:
       - CompileContext.execute is called
     then:
@@ -285,26 +272,24 @@ scenarios:
       - CompileContext.execute is called
     then:
       - the result is returned normally — no exception is thrown
-  - requirement: Assembled instruction block
-    name: instruction entry injected before schema instruction
+  - requirement: Assembled context block
+    name: instruction entry injected into context block
     given:
       - 'config.context: [{ instruction: "Always prefer editing existing files." }]'
     when:
       - CompileContext.execute is called
     then:
-      - result.instructionBlock begins with "Always prefer editing existing files."
-      - AND that text appears before the schema instruction
-  - requirement: Assembled instruction block
-    name: file entry read via FileReader and injected verbatim before schema instruction
+      - result.contextBlock contains "Always prefer editing existing files."
+  - requirement: Assembled context block
+    name: file entry read via FileReader and injected into context block
     given:
       - 'config.context: [{ file: "specd-bootstrap.md" }]'
       - AND FileReader.read("specd-bootstrap.md") returns "# specd Bootstrap"
     when:
       - CompileContext.execute is called
     then:
-      - result.instructionBlock begins with "# specd Bootstrap"
-      - AND that content appears before the schema instruction
-  - requirement: Assembled instruction block
+      - result.contextBlock contains "# specd Bootstrap"
+  - requirement: Assembled context block
     name: missing file entry emits a warning
     given:
       - 'config.context: [{ file: "does-not-exist.md" }]'
@@ -313,62 +298,39 @@ scenarios:
       - CompileContext.execute is called
     then:
       - a warning is emitted identifying the missing file, the entry is absent from the output, and no error is thrown
-  - requirement: Assembled instruction block
-    name: context absent — no effect on instruction block
+  - requirement: Assembled context block
+    name: context absent — no effect on context block
     given:
       - config.context is not declared
     when:
       - CompileContext.execute is called
     then:
-      - 'the instruction block is identical to one produced with context: []'
-  - requirement: Assembled instruction block
+      - 'the context block is identical to one produced with context: []'
+  - requirement: Assembled context block
     name: multiple context entries preserve declaration order
     given:
       - 'config.context: [{ file: AGENTS.md }, { instruction: "Inline note." }, { file: specd-bootstrap.md }]'
     when:
       - CompileContext.execute is called
     then:
-      - result.instructionBlock contains AGENTS.md content first, then "Inline note.", then specd-bootstrap.md content — in declaration order, before schema instruction
-  - requirement: Assembled instruction block
-    name: Schema instruction included for the active artifact only
+      - result.contextBlock contains AGENTS.md content first, then "Inline note.", then specd-bootstrap.md content — in declaration order
+  - requirement: Assembled context block
+    name: No artifact instructions in the context block
     given:
-      - "the schema declares artifacts[spec].instruction: 'Create specifications...' and artifacts[verify].instruction: 'Write scenarios...'"
-      - "AND CompileContext.execute is called with activeArtifact: 'spec'"
+      - "the schema declares artifacts[spec].instruction: 'Create specifications...'"
+    when:
+      - CompileContext.execute is called
     then:
-      - result.instructionBlock includes the instruction for spec
-      - AND does not include the instruction for verify
-  - requirement: Assembled instruction block
-    name: No artifact instruction for post-ready steps
+      - result.contextBlock does not include the artifact instruction — artifact instructions are retrieved via GetArtifactInstruction
+  - requirement: Assembled context block
+    name: No instruction hooks in the context block
     given:
-      - CompileContext.execute is called for a post-ready step (e.g. implementing, verifying, archiving)
-      - AND no activeArtifact is provided
+      - "workflow.archiving.hooks.pre contains { instruction: 'Review delta specs' } and { run: 'pnpm test' }"
+    when:
+      - "CompileContext.execute is called with step: 'archiving'"
     then:
-      - no artifact instructions are included in the instruction block — artifacts already exist at this point
-  - requirement: Assembled instruction block
-    name: rules.pre injected before the schema instruction for the active artifact
-    given:
-      - "the resolved schema declares artifacts.spec.rules.pre: [{ text: 'All requirements must use normative language.' }]"
-      - "AND CompileContext.execute is called with activeArtifact: 'spec'"
-    then:
-      - result.instructionBlock includes 'All requirements must use normative language.' before the schema instruction for spec
-      - AND no rules.pre content from other artifacts is injected
-  - requirement: Assembled instruction block
-    name: rules.post injected for the active artifact only
-    given:
-      - "the resolved schema declares artifacts.spec.rules.post: [{ text: 'All requirements must use SHALL/MUST' }] and artifacts.verify.rules.post: [{ text: 'Scenarios must use GIVEN/WHEN/THEN' }]"
-      - "AND CompileContext.execute is called with activeArtifact: 'spec'"
-    then:
-      - result.instructionBlock includes 'All requirements must use SHALL/MUST' after the schema instruction for spec
-      - AND does not include the verify rules.post content
-      - AND the schema instruction is not replaced
-  - requirement: Assembled instruction block
-    name: Step hooks fire once regardless of artifact iteration
-    given:
-      - "the designing step declares hooks.pre: [{ instruction: 'Plan your approach first.' }]"
-      - "AND CompileContext.execute is called twice — once with activeArtifact: 'spec' and once with activeArtifact: 'tasks'"
-    then:
-      - both calls include the designing pre-hook instruction — hooks are part of the step context, not scoped to a specific artifact
-  - requirement: Assembled instruction block
+      - result.contextBlock does not include Review delta specs or pnpm test — instruction hooks are retrieved via GetHookInstructions
+  - requirement: Assembled context block
     name: metadataExtraction used as fallback for stale/absent metadata
     given:
       - "the schema declares metadataExtraction.rules: [{ artifact: specs, extractor: { selector: { type: section, matches: '^Requirements$' }, groupBy: label, extract: content } }]"
@@ -376,8 +338,8 @@ scenarios:
     when:
       - CompileContext.execute is called with stale or absent metadata for auth/jwt
     then:
-      - result.instructionBlock includes extracted rules content from auth/jwt/spec.md
-  - requirement: Assembled instruction block
+      - result.contextBlock includes extracted rules content from auth/jwt/spec.md
+  - requirement: Assembled context block
     name: metadataExtraction extractor matching no nodes silently skipped
     given:
       - the schema declares a metadataExtraction extractor with a selector matching '^Examples$'
@@ -386,15 +348,6 @@ scenarios:
       - CompileContext.execute is called
     then:
       - no error is thrown and no content is produced for that field
-  - requirement: Assembled instruction block
-    name: instruction hooks included but run hooks excluded
-    given:
-      - "workflow.archiving.hooks.pre contains { instruction: 'Review delta specs' } and { run: 'pnpm test' }"
-    when:
-      - "CompileContext.execute is called with step: 'archiving'"
-    then:
-      - result.instructionBlock includes Review delta specs
-      - AND pnpm test is not included in the instruction block
   - requirement: Missing spec IDs emit a warning
     name: Non-existent spec ID emits a warning
     given:
@@ -443,6 +396,6 @@ scenarios:
       - result.warnings includes a warning about the unknown qualifier
       - AND no exception is thrown
 contentHashes:
-  spec.md: sha256:602e023f2cf9353a3858e8557d616fcbda2304b6c824f1a66679f31332d39c99
-  verify.md: sha256:f8e884232b5e21d8857d9a23f03d850c22bae65fb9e3011ead945db19687685e
+  spec.md: sha256:0585097f7c9c75f9c4777ff7baa527e450f3d6c2019c3790c8363b2810e2194e
+  verify.md: sha256:76cae78c5c8c567ab672f11c87e392e41df928cb3ef2458392d7be3a8657e595
 generatedBy: core

@@ -8,7 +8,7 @@ Once a change has completed its full lifecycle, its spec modifications need to b
 
 ### Requirement: Ports and constructor
 
-`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `HookRunner`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaRegistry`, `SaveSpecMetadata`, `YamlSerializer`, `schemaRef`, `workspaceSchemasPaths`, `projectRoot`, `changesPath`, and `projectHooks`.
+`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaRegistry`, `SaveSpecMetadata`, `YamlSerializer`, `schemaRef`, `workspaceSchemasPaths`, and `ActorResolver`.
 
 ```typescript
 class ArchiveChange {
@@ -16,24 +16,22 @@ class ArchiveChange {
     changes: ChangeRepository,
     specs: ReadonlyMap<string, SpecRepository>,
     archive: ArchiveRepository,
-    hooks: HookRunner,
-    git: VcsAdapter,
+    runStepHooks: RunStepHooks,
+    actor: ActorResolver,
     parsers: ArtifactParserRegistry,
     schemas: SchemaRegistry,
+    generateMetadata: GenerateSpecMetadata,
     saveMetadata: SaveSpecMetadata,
     yaml: YamlSerializer,
     schemaRef: string,
     workspaceSchemasPaths: ReadonlyMap<string, string>,
-    projectRoot: string,
-    changesPath: string,
-    projectHooks: ProjectHooks,
   )
 }
 ```
 
-`schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. `projectRoot` is the absolute path to the project root (the directory containing `specd.yaml`). `changesPath` is the absolute path to the changes directory. `projectHooks` contains the project-level workflow hook definitions from `specd.yaml`. All are injected at kernel composition time, not passed per invocation.
+Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not receive `HookRunner` or `projectWorkflowHooks` directly.
 
-`hookVariables` is built internally by `ArchiveChange` from `projectRoot` and `changesPath` — the caller does not provide it.
+`schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. All are injected at kernel composition time, not passed per invocation.
 
 `specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec ID's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.
 
@@ -44,6 +42,7 @@ class ArchiveChange {
 `ArchiveChange.execute` receives:
 
 - `name` — the change name to archive
+- `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
 
 ### Requirement: Schema name guard
 
@@ -55,11 +54,11 @@ The first step of `ArchiveChange.execute` after the schema name guard must call 
 
 ### Requirement: Pre-archive hooks
 
-After the archivable guard passes, `ArchiveChange` must run all `run:` hooks declared in the schema's `workflow[archiving].hooks.pre` followed by any project-level `workflow[archiving].hooks.pre` entries, in declaration order.
+After the archivable guard passes, when `skipHooks` is `false` (default), `ArchiveChange` must execute pre-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'pre' })`.
 
-`instruction:` hook entries in `pre` are not executed by `ArchiveChange` — they are AI context injected by `CompileContext` at skill compile time, not commands to run. Only `run:` entries are executed here.
+If any pre-archive `run:` hook fails, `ArchiveChange` must throw `HookFailedError` with the hook command, exit code, and stderr. No files are modified before a failed pre-archive hook.
 
-If any pre-archive `run:` hook exits with a non-zero code, `ArchiveChange` must abort immediately and throw `HookFailedError` with the hook command, exit code, and stderr. No files are modified before a failed pre-archive hook.
+When `skipHooks` is `true`, pre-archive hook execution is skipped entirely.
 
 ### Requirement: Delta merge and spec sync
 
@@ -102,11 +101,11 @@ The `FsArchiveRepository` implementation additionally moves the change directory
 
 ### Requirement: Post-archive hooks
 
-After `archiveRepository.archive()` succeeds, `ArchiveChange` must run all `run:` hooks declared in `workflow[archiving].hooks.post` — schema hooks first, then project-level hooks, in declaration order.
-
-`instruction:` post hooks are AI context injected by `CompileContext` and are not executed here.
+After `archiveRepository.archive()` succeeds, when `skipHooks` is `false`, `ArchiveChange` must execute post-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'post' })`.
 
 Post-archive hook failures do not roll back the archive — the change has already been moved and the index updated. Instead, `ArchiveChange` collects failures and returns them in the result so the CLI can present them to the user.
+
+When `skipHooks` is `true`, post-archive hook execution is skipped entirely.
 
 ### Requirement: Spec metadata generation
 
@@ -122,8 +121,6 @@ For each modified spec:
 6. Serialize the metadata as YAML and write via `SaveSpecMetadata`
 
 If metadata generation fails for a spec (e.g. extraction produces no required fields, or `SaveSpecMetadata` throws `MetadataValidationError`), the failure is collected but does not abort the archive — the spec was already synced successfully. Failures are included in `staleMetadataSpecPaths` so the caller can report them.
-
-`ArchiveChange` also needs `SchemaRegistry`, `YamlSerializer`, and `SaveSpecMetadata` (or equivalent ports) to perform the generation. These are injected at construction time alongside the existing dependencies.
 
 ### Requirement: Result shape
 
@@ -145,6 +142,7 @@ If metadata generation fails for a spec (e.g. extraction produces no required fi
 - `archivedName` must be derived from `change.createdAt` by the repository — never from wall-clock time at archive execution
 - `ArchiveChange` does not delete the change from `ChangeRepository` — `FsArchiveRepository.archive()` moves the directory as part of the archive operation
 - Metadata generation failures do not abort the archive — the spec was already synced successfully; failures are collected in `staleMetadataSpecPaths`
+- Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not call `HookRunner` directly
 
 ## Spec Dependencies
 
@@ -153,7 +151,9 @@ If metadata generation fails for a spec (e.g. extraction produces no required fi
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `apply()`, `DeltaApplicationError`, `ArtifactParserRegistry`
 - [`specs/core/validate-artifacts/spec.md`](../validate-artifacts/spec.md) — artifact validation gate before archive
 - [`specs/core/storage/spec.md`](../storage/spec.md) — archive directory naming, `index.jsonl`, `FsArchiveRepository.archive()`
-- [`specs/core/config/spec.md`](../config/spec.md) — workflow hook structure, `run:` vs `instruction:` entries, template variables
+- [`specs/core/run-step-hooks/spec.md`](../run-step-hooks/spec.md) — shared hook execution engine
+- [`specs/core/hook-execution-model/spec.md`](../hook-execution-model/spec.md) — hook types, execution semantics
+- [`specs/core/template-variables/spec.md`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — deterministic metadata generation at archive time; `SaveSpecMetadata` for writing
 - [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — `extractMetadata()` engine used to extract metadata fields from spec artifacts
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port-per-workspace pattern; manual DI at entry points

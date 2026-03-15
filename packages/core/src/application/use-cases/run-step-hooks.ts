@@ -1,0 +1,221 @@
+import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
+import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
+import { StepNotValidError } from '../../domain/errors/step-not-valid-error.js'
+import { HookNotFoundError } from '../../domain/errors/hook-not-found-error.js'
+import { type ChangeRepository } from '../ports/change-repository.js'
+import { type HookRunner, type TemplateVariables } from '../ports/hook-runner.js'
+import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
+import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
+import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
+
+/** Valid `ChangeState` values for step validation. */
+const CHANGE_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
+
+/** Progress event emitted during hook execution. */
+export type HookProgressEvent =
+  | { type: 'hook-start'; hookId: string; command: string }
+  | { type: 'hook-done'; hookId: string; success: boolean; exitCode: number }
+
+/** Callback for receiving hook execution progress events. */
+export type OnHookProgress = (event: HookProgressEvent) => void
+
+/** Input for the {@link RunStepHooks} use case. */
+export interface RunStepHooksInput {
+  readonly name: string
+  readonly step: string
+  readonly phase: 'pre' | 'post'
+  readonly only?: string | undefined
+}
+
+/** Per-hook execution result. */
+export interface RunStepHookEntry {
+  readonly id: string
+  readonly command: string
+  readonly exitCode: number
+  readonly stdout: string
+  readonly stderr: string
+  readonly success: boolean
+}
+
+/** Result returned by {@link RunStepHooks}. */
+export interface RunStepHooksResult {
+  readonly hooks: readonly RunStepHookEntry[]
+  readonly success: boolean
+  readonly failedHook: RunStepHookEntry | null
+}
+
+/**
+ * Executes `run:` hooks for a given workflow step and phase.
+ *
+ * Resolves hooks from the schema and project configuration, builds
+ * template variables from the active change, and executes them via
+ * `HookRunner` with fail-fast (pre) or fail-soft (post) semantics.
+ */
+export class RunStepHooks {
+  private readonly _changes: ChangeRepository
+  private readonly _hooks: HookRunner
+  private readonly _schemas: SchemaRegistry
+  private readonly _schemaRef: string
+  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
+  private readonly _projectWorkflowHooks: readonly {
+    readonly step: string
+    readonly hooks: {
+      readonly pre: readonly HookEntry[]
+      readonly post: readonly HookEntry[]
+    }
+  }[]
+
+  /**
+   * Creates a new `RunStepHooks` use case.
+   *
+   * @param changes - Repository for loading change entities
+   * @param hooks - Hook runner for executing shell commands
+   * @param schemas - Registry for resolving the active schema
+   * @param schemaRef - Schema reference string from config
+   * @param workspaceSchemasPaths - Map of workspace names to schema directory paths
+   * @param projectWorkflowHooks - Project-level workflow hook overrides
+   */
+  constructor(
+    changes: ChangeRepository,
+    hooks: HookRunner,
+    schemas: SchemaRegistry,
+    schemaRef: string,
+    workspaceSchemasPaths: ReadonlyMap<string, string>,
+    projectWorkflowHooks?: readonly {
+      readonly step: string
+      readonly hooks: {
+        readonly pre: readonly HookEntry[]
+        readonly post: readonly HookEntry[]
+      }
+    }[],
+  ) {
+    this._changes = changes
+    this._hooks = hooks
+    this._schemas = schemas
+    this._schemaRef = schemaRef
+    this._workspaceSchemasPaths = workspaceSchemasPaths
+    this._projectWorkflowHooks = projectWorkflowHooks ?? []
+  }
+
+  /**
+   * Executes `run:` hooks for the given step and phase.
+   *
+   * @param input - The step name, phase, and optional hook filter
+   * @param onProgress - Optional callback for hook execution progress events
+   * @returns Per-hook execution results with overall success status
+   */
+  async execute(
+    input: RunStepHooksInput,
+    onProgress?: OnHookProgress,
+  ): Promise<RunStepHooksResult> {
+    const change = await this._changes.get(input.name)
+    if (change === null) throw new ChangeNotFoundError(input.name)
+
+    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
+    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+
+    if (schema.name() !== change.schemaName) {
+      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
+    }
+
+    // Validate step is a valid ChangeState
+    if (!(CHANGE_STATES as string[]).includes(input.step)) {
+      throw new StepNotValidError(input.step)
+    }
+
+    const workflowStep = schema.workflowStep(input.step)
+    if (workflowStep === null) {
+      return { hooks: [], success: true, failedHook: null }
+    }
+
+    // Collect run: hooks (schema first, then project)
+    const allHooks = this._collectHooks(input.step, input.phase, workflowStep.hooks[input.phase])
+
+    // Filter for run: hooks only
+    let runHooks = allHooks.filter((h) => h.type === 'run')
+
+    // --only filter
+    if (input.only !== undefined) {
+      const match = runHooks.find((h) => h.id === input.only)
+      if (match === undefined) {
+        // Check if it's an instruction hook
+        const instrMatch = allHooks.find((h) => h.id === input.only && h.type === 'instruction')
+        if (instrMatch !== undefined) {
+          throw new HookNotFoundError(input.only, 'wrong-type')
+        }
+        throw new HookNotFoundError(input.only, 'not-found')
+      }
+      runHooks = [match]
+    }
+
+    if (runHooks.length === 0) {
+      return { hooks: [], success: true, failedHook: null }
+    }
+
+    // Build contextual variables
+    const workspace = change.workspaces[0] ?? 'default'
+    const variables: TemplateVariables = {
+      change: { name: change.name, workspace, path: this._changes.changePath(change) },
+    }
+
+    // Execute hooks
+    const results: RunStepHookEntry[] = []
+    let failedHook: RunStepHookEntry | null = null
+
+    for (const hook of runHooks) {
+      onProgress?.({ type: 'hook-start', hookId: hook.id, command: hook.command })
+      const result = await this._hooks.run(hook.command, variables)
+      const entry: RunStepHookEntry = {
+        id: hook.id,
+        command: hook.command,
+        exitCode: result.exitCode(),
+        stdout: result.stdout(),
+        stderr: result.stderr(),
+        success: result.isSuccess(),
+      }
+      results.push(entry)
+      onProgress?.({
+        type: 'hook-done',
+        hookId: hook.id,
+        success: result.isSuccess(),
+        exitCode: result.exitCode(),
+      })
+
+      if (!result.isSuccess()) {
+        if (input.phase === 'pre') {
+          // Fail-fast: stop on first failure
+          return { hooks: results, success: false, failedHook: entry }
+        }
+        if (failedHook === null) failedHook = entry
+      }
+    }
+
+    return {
+      hooks: results,
+      success: results.every((r) => r.success),
+      failedHook,
+    }
+  }
+
+  /**
+   * Collects hooks from schema and project configuration in declaration order.
+   *
+   * @param step - The workflow step name
+   * @param phase - The hook phase (pre or post)
+   * @param schemaHooks - Schema-level hooks for this step and phase
+   * @returns Combined list of hooks (schema first, then project)
+   */
+  private _collectHooks(
+    step: string,
+    phase: 'pre' | 'post',
+    schemaHooks: readonly HookEntry[],
+  ): readonly HookEntry[] {
+    const hooks: HookEntry[] = [...schemaHooks]
+    const projectStep = this._projectWorkflowHooks.find((s) => s.step === step)
+    if (projectStep !== undefined) {
+      hooks.push(...projectStep.hooks[phase])
+    }
+    return hooks
+  }
+}

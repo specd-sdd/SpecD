@@ -70,6 +70,6 @@ This may require extending `SchemaRegistry.resolve()` to return a richer result 
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `kind`, `extends`, schema structure
 - [`specs/core/schema-merge/spec.md`](../schema-merge/spec.md) — `mergeSchemaLayers`, `SchemaLayer`
 - [`specs/core/build-schema/spec.md`](../build-schema/spec.md) — `buildSchema`, `SchemaYamlData`
-- [`specs/core/port-schema-registry/spec.md`](../port-schema-registry/spec.md) — `SchemaRegistry` port
+- [`specs/core/schema-registry-port/spec.md`](../schema-registry-port/spec.md) — `SchemaRegistry` port
 - [`specs/core/config/spec.md`](../config/spec.md) — `schemaPlugins`, `schemaOverrides` fields
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — use case design

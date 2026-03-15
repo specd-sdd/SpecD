@@ -6,7 +6,9 @@ dependsOn:
   - core:core/delta-format
   - core:core/validate-artifacts
   - core:core/storage
-  - core:core/config
+  - core:core/run-step-hooks
+  - core:core/hook-execution-model
+  - core:core/template-variables
   - core:core/spec-metadata
   - core:core/content-extraction
   - default:_global/architecture
@@ -18,7 +20,7 @@ rules:
   - requirement: Ports and constructor
     rules:
       - |-
-        `ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `HookRunner`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaRegistry`, `SaveSpecMetadata`, `YamlSerializer`, `schemaRef`, `workspaceSchemasPaths`, `projectRoot`, `changesPath`, and `projectHooks`.
+        `ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaRegistry`, `SaveSpecMetadata`, `YamlSerializer`, `schemaRef`, `workspaceSchemasPaths`, and `ActorResolver`.
 
         ```typescript
         class ArchiveChange {
@@ -26,24 +28,22 @@ rules:
             changes: ChangeRepository,
             specs: ReadonlyMap<string, SpecRepository>,
             archive: ArchiveRepository,
-            hooks: HookRunner,
-            git: VcsAdapter,
+            runStepHooks: RunStepHooks,
+            actor: ActorResolver,
             parsers: ArtifactParserRegistry,
             schemas: SchemaRegistry,
+            generateMetadata: GenerateSpecMetadata,
             saveMetadata: SaveSpecMetadata,
             yaml: YamlSerializer,
             schemaRef: string,
             workspaceSchemasPaths: ReadonlyMap<string, string>,
-            projectRoot: string,
-            changesPath: string,
-            projectHooks: ProjectHooks,
           )
         }
         ```
 
-        `schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. `projectRoot` is the absolute path to the project root (the directory containing `specd.yaml`). `changesPath` is the absolute path to the changes directory. `projectHooks` contains the project-level workflow hook definitions from `specd.yaml`. All are injected at kernel composition time, not passed per invocation.
+        Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not receive `HookRunner` or `projectWorkflowHooks` directly.
 
-        `hookVariables` is built internally by `ArchiveChange` from `projectRoot` and `changesPath` — the caller does not provide it.
+        `schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. All are injected at kernel composition time, not passed per invocation.
 
         `specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec ID's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.
 
@@ -54,6 +54,7 @@ rules:
         `ArchiveChange.execute` receives:
 
         * `name` — the change name to archive
+        * `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
   - requirement: Schema name guard
     rules:
       - After resolving the schema from config, `ArchiveChange` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before the archivable guard, any hooks, or file modifications.
@@ -63,11 +64,11 @@ rules:
   - requirement: Pre-archive hooks
     rules:
       - |-
-        After the archivable guard passes, `ArchiveChange` must run all `run:` hooks declared in the schema's `workflow[archiving].hooks.pre` followed by any project-level `workflow[archiving].hooks.pre` entries, in declaration order.
+        After the archivable guard passes, when `skipHooks` is `false` (default), `ArchiveChange` must execute pre-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'pre' })`.
 
-        `instruction:` hook entries in `pre` are not executed by `ArchiveChange` — they are AI context injected by `CompileContext` at skill compile time, not commands to run. Only `run:` entries are executed here.
+        If any pre-archive `run:` hook fails, `ArchiveChange` must throw `HookFailedError` with the hook command, exit code, and stderr. No files are modified before a failed pre-archive hook.
 
-        If any pre-archive `run:` hook exits with a non-zero code, `ArchiveChange` must abort immediately and throw `HookFailedError` with the hook command, exit code, and stderr. No files are modified before a failed pre-archive hook.
+        When `skipHooks` is `true`, pre-archive hook execution is skipped entirely.
   - requirement: Delta merge and spec sync
     rules:
       - |-
@@ -110,11 +111,11 @@ rules:
   - requirement: Post-archive hooks
     rules:
       - |-
-        After `archiveRepository.archive()` succeeds, `ArchiveChange` must run all `run:` hooks declared in `workflow[archiving].hooks.post` — schema hooks first, then project-level hooks, in declaration order.
-
-        `instruction:` post hooks are AI context injected by `CompileContext` and are not executed here.
+        After `archiveRepository.archive()` succeeds, when `skipHooks` is `false`, `ArchiveChange` must execute post-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'post' })`.
 
         Post-archive hook failures do not roll back the archive — the change has already been moved and the index updated. Instead, `ArchiveChange` collects failures and returns them in the result so the CLI can present them to the user.
+
+        When `skipHooks` is `true`, post-archive hook execution is skipped entirely.
   - requirement: Spec metadata generation
     rules:
       - |-
@@ -130,8 +131,6 @@ rules:
         6. Serialize the metadata as YAML and write via `SaveSpecMetadata`
 
         If metadata generation fails for a spec (e.g. extraction produces no required fields, or `SaveSpecMetadata` throws `MetadataValidationError`), the failure is collected but does not abort the archive — the spec was already synced successfully. Failures are included in `staleMetadataSpecPaths` so the caller can report them.
-
-        `ArchiveChange` also needs `SchemaRegistry`, `YamlSerializer`, and `SaveSpecMetadata` (or equivalent ports) to perform the generation. These are injected at construction time alongside the existing dependencies.
   - requirement: Result shape
     rules:
       - |-
@@ -151,6 +150,7 @@ constraints:
   - archivedName must be derived from change.createdAt by the repository — never from wall-clock time at archive execution
   - ArchiveChange does not delete the change from ChangeRepository — FsArchiveRepository.archive() moves the directory as part of the archive operation
   - Metadata generation failures do not abort the archive — the spec was already synced successfully; failures are collected in staleMetadataSpecPaths
+  - Hook execution is delegated to RunStepHooks — ArchiveChange does not call HookRunner directly
 scenarios:
   - requirement: Archivable guard
     name: Change not in archivable state
@@ -314,6 +314,6 @@ scenarios:
     then:
       - ArchiveChange.execute throws and does not return a result
 contentHashes:
-  spec.md: sha256:f75c515e440fe186f230fecf3a82cb7d65698f54272d102fc91c81f1d1b1f8c6
+  spec.md: sha256:5650e0029f8f9c7ac5f3cf847baf2ccd82dd45eeb0b0f416e854a2bdc49efa17
   verify.md: sha256:6dc4100ae7cafad7ec3a7e4ed3ebfe1241f49296c6b3bb5d34fdce106315283e
 generatedBy: core

@@ -75,6 +75,17 @@ export class FsChangeRepository extends ChangeRepository {
   }
 
   /**
+   * Returns the absolute path to the active change directory.
+   *
+   * @param change - The change whose path is needed
+   * @returns Absolute path under `changes/`
+   */
+  override changePath(change: Change): string {
+    const dirName = changeDirName(change.name, change.createdAt)
+    return path.join(this._changesPath, dirName)
+  }
+
+  /**
    * Returns the change with the given name, searching `changes/` then `drafts/`
    * (excludes `discarded/`). Returns `null` if not found.
    *
