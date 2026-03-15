@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Agent-driven workflow steps declare `run:` hooks that need to be executed at step boundaries, but the agent cannot call `HookRunner` directly — it interacts with specd through CLI commands. `RunStepHooks` is the use case that bridges this gap: given a change name, step name, and phase, it resolves the relevant `run:` hooks from the schema and project configuration, executes them via `HookRunner` with the correct failure semantics, and returns per-hook results for the CLI to report.
+Agent-driven workflow steps declare `run:` hooks that need to be executed at step boundaries, but the agent cannot call `HookRunner` directly — it interacts with specd through CLI commands. `RunStepHooks` is the use case that bridges this gap: given a change name, step name, and phase, it resolves the relevant `run:` hooks from the schema and project configuration, executes them via `HookRunner` with the correct failure semantics, and returns per-hook results for the CLI to report. It also serves as a shared hook execution engine for other use cases (`TransitionChange`, `ArchiveChange`) that need to run workflow hooks.
 
 ## Requirements
 
@@ -35,6 +35,13 @@ class RunStepHooks {
 - `step` (string, required) — the workflow step name (e.g. `implementing`, `verifying`, `archiving`)
 - `phase` (`'pre'` | `'post'`, required) — which hook phase to execute
 - `only` (string, optional) — when provided, filters to a single hook by its `id`; all other hooks in the phase are skipped
+
+### Requirement: Progress callback
+
+`RunStepHooks.execute` SHALL accept an optional second parameter `onProgress?: OnHookProgress`. Progress events are:
+
+- `{ type: 'hook-start', hookId: string, command: string }` — emitted before each hook execution
+- `{ type: 'hook-done', hookId: string, success: boolean, exitCode: number }` — emitted after each hook execution
 
 ### Requirement: Change lookup
 
@@ -99,7 +106,7 @@ When no hooks match (empty `run:` hook list for the step+phase, or the step has 
 
 ### Requirement: Works for any step
 
-`RunStepHooks` MUST work for any workflow step, including `archiving`. While `ArchiveChange` handles hooks internally during the archive operation, `RunStepHooks` can also target the archiving step's hooks independently — for example, to run a pre-archive check without performing the full archive, or to retry a failed post-archive hook.
+`RunStepHooks` MUST work for any workflow step, including `archiving`. While `ArchiveChange` delegates hook execution to `RunStepHooks`, `RunStepHooks` can also be called independently — for example, to run a pre-archive check without performing the full archive, or to retry a failed post-archive hook.
 
 ## Constraints
 
