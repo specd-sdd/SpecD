@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Workflow steps declare hooks via `instruction:` and `run:` entries, but the schema format only defines their YAML structure — not who executes each type, when execution happens, or what failure means in each context. Without a unified execution model, hook behaviour is scattered across ArchiveChange, CompileContext, and undocumented agent conventions. This spec defines the complete hook execution model: the two hook types and their consumers, the two execution modes for `run:` hooks, failure semantics for each phase, hook ordering rules, and the boundary between compile-time and runtime concerns.
+Workflow steps declare hooks via `instruction:` and `run:` entries, but the schema format only defines their YAML structure — not who executes each type, when execution happens, or what failure means in each context. Without a unified execution model, hook behaviour is scattered across use cases and undocumented agent conventions. This spec defines the complete hook execution model: the two hook types and their consumers, hook execution for transitions and archives, failure semantics for each phase, hook ordering rules, the `--no-hooks` pattern for manual control, and the boundary between compile-time and runtime concerns.
 
 ## Requirements
 
@@ -10,43 +10,59 @@ Workflow steps declare hooks via `instruction:` and `run:` entries, but the sche
 
 Workflow hooks come in exactly two types, distinguished by their key:
 
-- **`instruction:`** — a text block consumed by `CompileContext` at compile time. It is injected into the agent's instruction block as contextual guidance. `instruction:` hooks are never executed at runtime — they have no process, exit code, or side effects.
+- **`instruction:`** — a text block consumed by `GetHookInstructions` at query time. It is returned as contextual guidance for the agent or external tool. `instruction:` hooks are never executed at runtime — they have no process, exit code, or side effects.
 - **`run:`** — a shell command executed by the `HookRunner` port. It produces an exit code, stdout, and stderr. `run:` hooks are never injected into agent context — they are operational commands.
 
 Every hook entry declares exactly one of these two keys alongside its `id`. An entry with both keys or neither key is a `SchemaValidationError` (enforced by schema validation, not by this model).
 
+All workflow steps can declare both `instruction:` and `run:` hooks — there are no restrictions by step type.
+
 ### Requirement: instruction hooks are passive text
 
-`instruction:` hooks are passive text blocks — they are never executed as processes. They have no exit code, stdout, stderr, or side effects. `ArchiveChange` and `RunStepHooks` MUST skip `instruction:` entries.
+`instruction:` hooks are passive text blocks — they are never executed as processes. They have no exit code, stdout, stderr, or side effects. `TransitionChange`, `ArchiveChange`, and `RunStepHooks` MUST skip `instruction:` entries.
 
 `instruction:` hooks are consumed exclusively by `GetHookInstructions`, which returns instruction text for a specific step+phase, optionally filtered by hook ID. This enables both native specd skills and external agent tools (e.g. Claude Code hooks) to retrieve instruction text independently from context compilation. `CompileContext` does NOT include instruction hooks — it assembles context (specs, metadata, artifact rules), not step instructions.
 
-### Requirement: Two execution modes for run hooks
+### Requirement: Default hook execution for transitions and archives
 
-`run:` hooks are executed in one of two modes depending on who owns the step:
+By default, `TransitionChange` and `ArchiveChange` auto-execute `run:` hooks at step boundaries:
 
-- **Deterministic mode** — the use case (`ArchiveChange`) calls `HookRunner.run()` directly as part of its atomic operation. The use case controls execution order, failure handling, and result collection internally. The agent does not participate in hook execution for deterministic steps.
-- **Agent-driven mode** — the agent calls `specd change run-hooks` via the CLI to execute `run:` hooks for a given step and phase. The CLI delegates to the `RunStepHooks` use case, which calls `HookRunner.run()`. The agent is responsible for invoking this command at the right time in its workflow.
+- **`TransitionChange`** — when transitioning to a state that has a workflow step with `run:` hooks, executes pre-hooks before the state change and post-hooks after. Pre-hook failure aborts the transition (fail-fast). Post-hook failures are collected but do not roll back (fail-soft). Hook execution is delegated to `RunStepHooks`.
+- **`ArchiveChange`** — executes pre-archive hooks before any file modifications and post-archive hooks after the archive completes. Pre-hook failure aborts the archive. Post-hook failures are collected. Hook execution is delegated to `RunStepHooks`.
 
-The execution mode is determined by which step is being executed, not by the hook itself. A `run:` hook in the `archiving` step executes in deterministic mode (via `ArchiveChange`); the same hook structure in `implementing` executes in agent-driven mode (via `specd change run-hooks`).
+Both use cases delegate hook execution to `RunStepHooks`, which handles hook collection, variable expansion, and execution semantics.
+
+### Requirement: Manual hook control with skipHooks
+
+When `skipHooks` is `true`, `TransitionChange` and `ArchiveChange` skip all `run:` hook execution. This gives the caller (typically an LLM agent) manual control over hook timing:
+
+1. Call `specd change hook-instruction <name> <step> --phase pre` to read `instruction:` hooks
+2. Call `specd change run-hooks <name> <step> --phase pre` to execute `run:` pre-hooks
+3. Call `specd change transition <name> <step> --no-hooks` to transition without auto-hooks
+4. Call `specd change run-hooks <name> <step> --phase post` to execute `run:` post-hooks
+5. Call `specd change hook-instruction <name> <step> --phase post` to read post-step instructions
+
+The `--no-hooks` CLI flag maps to `skipHooks: true` in the use case input. The agent is responsible for invoking hooks at the appropriate time.
 
 ### Requirement: Pre-hook failure semantics
 
 When a `run:` pre-hook exits with a non-zero code:
 
-- **Deterministic mode** — `ArchiveChange` aborts immediately and throws `HookFailedError` with the hook command, exit code, and stderr. No files are modified.
-- **Agent-driven mode** — `RunStepHooks` returns immediately with the failure result. The CLI exits with code 2 (per the entrypoint spec). The agent SHOULD NOT proceed with the step's work and SHOULD offer to fix the problem before retrying.
+- **`TransitionChange`** — throws `HookFailedError`. No state transition occurs.
+- **`ArchiveChange`** — throws `HookFailedError`. No files are modified.
+- **`RunStepHooks` (standalone)** — returns immediately with the failure result. The CLI exits with code 2. The agent SHOULD NOT proceed with the step's work and SHOULD offer to fix the problem before retrying.
 
-In both modes, pre-hooks use **fail-fast** semantics: execution stops at the first failure, and subsequent hooks in the list are not run.
+In all cases, pre-hooks use **fail-fast** semantics: execution stops at the first failure, and subsequent hooks in the list are not run.
 
 ### Requirement: Post-hook failure semantics
 
 When a `run:` post-hook exits with a non-zero code:
 
-- **Deterministic mode** — `ArchiveChange` collects the failure in `postHookFailures` but does not roll back the operation. All remaining post-hooks continue to execute. Failures are returned in the result for the CLI to report.
-- **Agent-driven mode** — `RunStepHooks` continues executing remaining post-hooks, collecting all failures. The CLI exits with code 2 if any post-hook failed. The agent reports failures but does not block the transition — the step's work is already done.
+- **`TransitionChange`** — collects the failure in `postHookFailures` but does not roll back the transition. All remaining post-hooks continue to execute.
+- **`ArchiveChange`** — collects the failure in `postHookFailures` but does not roll back the archive. All remaining post-hooks continue to execute.
+- **`RunStepHooks` (standalone)** — continues executing remaining post-hooks, collecting all failures. The CLI exits with code 2 if any post-hook failed.
 
-In both modes, post-hooks use **fail-soft** semantics: all hooks execute regardless of individual failures, and failures are collected rather than thrown.
+In all cases, post-hooks use **fail-soft** semantics: all hooks execute regardless of individual failures, and failures are collected rather than thrown.
 
 ### Requirement: Hook ordering
 
@@ -68,56 +84,70 @@ Before executing a `run:` hook command, `HookRunner` expands `{{key.path}}` temp
 
 Unknown variable paths are left unexpanded (the original `{{key.path}}` token is preserved). All substituted values are shell-escaped to prevent injection attacks.
 
-### Requirement: change transition does not execute hooks
-
-`TransitionChange` (and its CLI counterpart `specd change transition`) performs only a state transition on the Change entity. It MUST NOT execute any `run:` hooks. Hook execution is the responsibility of `ArchiveChange` (deterministic mode) or the agent via `specd change run-hooks` (agent-driven mode).
-
-This separation ensures that state transitions are fast, predictable, and side-effect-free.
-
 ## Constraints
 
 - `instruction:` hooks are never executed — they are passive text consumed exclusively by `GetHookInstructions`
 - `run:` hooks are never injected into agent context — they are commands executed by `HookRunner`
-- Pre-hooks use fail-fast semantics in both execution modes
-- Post-hooks use fail-soft semantics in both execution modes
+- All workflow steps can have both `instruction:` and `run:` hooks — no restrictions by step type
+- Pre-hooks use fail-fast semantics in all execution contexts
+- Post-hooks use fail-soft semantics in all execution contexts
 - Schema-level hooks always precede project-level hooks within the same phase
-- `TransitionChange` MUST NOT execute hooks — it only changes state
-- `ArchiveChange` is currently the only use case that executes hooks in deterministic mode
-- `RunStepHooks` is the use case for agent-driven hook execution
+- `TransitionChange` and `ArchiveChange` delegate hook execution to `RunStepHooks`
+- `RunStepHooks` is the single hook execution engine used by all use cases and the CLI
 - Template variable expansion and shell escaping are handled by `HookRunner`, not by callers
 
 ## Examples
 
-### Agent interaction flow for an agent-driven step
+### Default transition with hooks
 
 ```
-1. specd change context <name> implementing                        → get spec context
-2. specd change hook-instruction <name> implementing --phase pre   → get pre instructions
-3. specd change run-hooks <name> implementing --phase pre          → execute run: pre-hooks
-4. Agent does the implementation work
-5. specd change run-hooks <name> implementing --phase post         → execute run: post-hooks
-6. specd change hook-instruction <name> implementing --phase post  → get post instructions
-7. specd change transition <name> verifying                        → advance state
+1. specd change transition <name> implementing
+   → TransitionChange internally:
+     a. enforces workflow requires
+     b. runs pre-implementing run: hooks (fail-fast)
+     c. transitions state to implementing
+     d. runs post-implementing run: hooks (fail-soft)
+     e. returns result with change and any postHookFailures
 ```
 
-### Deterministic step (archiving)
+### Manual hook control (--no-hooks)
+
+```
+1. specd change hook-instruction <name> implementing --phase pre   → get pre instructions
+2. specd change run-hooks <name> implementing --phase pre          → execute run: pre-hooks
+3. specd change transition <name> implementing --no-hooks          → transition only
+4. specd change run-hooks <name> implementing --phase post         → execute run: post-hooks
+5. specd change hook-instruction <name> implementing --phase post  → get post instructions
+```
+
+### Deterministic step (archiving) with hooks
 
 ```
 1. specd change archive <name>
    → ArchiveChange internally:
-     a. runs pre-archive run: hooks (fail-fast)
+     a. runs pre-archive run: hooks (fail-fast) via RunStepHooks
      b. merges deltas, syncs specs
      c. archives the change
-     d. runs post-archive run: hooks (fail-soft)
+     d. runs post-archive run: hooks (fail-soft) via RunStepHooks
      e. generates metadata
+```
+
+### Archiving with --no-hooks
+
+```
+1. specd change run-hooks <name> archiving --phase pre   → execute pre-archive hooks
+2. specd change archive <name> --no-hooks                → archive without hooks
+3. specd change run-hooks <name> archiving --phase post   → execute post-archive hooks
 ```
 
 ## Spec Dependencies
 
-- [`specs/core/workflow-model/spec.md`](../workflow-model/spec.md) — step semantics, execution modes, step availability
+- [`specs/core/workflow-model/spec.md`](../workflow-model/spec.md) — step semantics, step availability
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `workflow[].hooks` structure, `instruction:` and `run:` entries
 - [`specs/core/hook-runner-port/spec.md`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`, template expansion
-- [`specs/core/archive-change/spec.md`](../archive-change/spec.md) — deterministic hook execution in archiving step
+- [`specs/core/transition-change/spec.md`](../transition-change/spec.md) — hook execution during transitions
+- [`specs/core/archive-change/spec.md`](../archive-change/spec.md) — hook execution during archiving
+- [`specs/core/run-step-hooks/spec.md`](../run-step-hooks/spec.md) — shared hook execution engine
 - [`specs/core/get-hook-instructions/spec.md`](../get-hook-instructions/spec.md) — `instruction:` hook query
 - [`specs/core/config/spec.md`](../config/spec.md) — project-level hooks via `schemaOverrides`
-- [`specs/cli/change-transition/spec.md`](../../cli/change-transition/spec.md) — transition does not execute hooks
+- [`specs/cli/change-transition/spec.md`](../../cli/change-transition/spec.md) — `--no-hooks` flag

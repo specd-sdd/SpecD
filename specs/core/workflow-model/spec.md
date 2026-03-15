@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The schema format defines the YAML structure of workflow step entries, but not what those steps mean semantically — when they are available, how they relate to change state, or which execution model governs each step. Without a dedicated semantic model, every consumer (CompileContext, GetStatus, CLI commands) would interpret step semantics independently, leading to inconsistent gating and unclear agent interaction contracts. This spec defines the semantic model of workflow steps: how step names relate to change states, how requires-based gating works, and what execution model each step implies.
+The schema format defines the YAML structure of workflow step entries, but not what those steps mean semantically — when they are available, how they relate to change state, or how hooks and requires are enforced. Without a dedicated semantic model, every consumer (CompileContext, GetStatus, TransitionChange, CLI commands) would interpret step semantics independently, leading to inconsistent gating and unclear agent interaction contracts. This spec defines the semantic model of workflow steps: how step names relate to change states, how requires-based gating works, and how hooks are executed at step boundaries.
 
 ## Requirements
 
@@ -23,9 +23,11 @@ Each workflow step has a defined semantic role in the change lifecycle:
 
 ### Requirement: Requires-based gating
 
-Each workflow step declares a `requires` array of artifact IDs. A step is **available** when every artifact ID in its `requires` list has effective status `complete` or `skipped` (via `change.effectiveStatus(artifactId)`). A skipped optional artifact satisfies the requirement identically to a completed one.
+Each workflow step declares a `requires` array of artifact IDs. `TransitionChange` enforces this at transition time: before allowing a transition to a state that has a workflow step, it checks `change.effectiveStatus(artifactId)` for each artifact ID in `requires`. If any required artifact has an effective status other than `complete` or `skipped`, the transition is rejected with `InvalidStateTransitionError`.
 
-An empty or omitted `requires` means the step is always available (no gating).
+An empty or omitted `requires` means the step has no gating — the transition proceeds without artifact checks.
+
+A skipped optional artifact satisfies the requirement identically to a completed one.
 
 ### Requirement: Step availability evaluation
 
@@ -46,14 +48,9 @@ The order of entries in the `workflow` array is the intended display order for t
 
 Entering a workflow step corresponds to transitioning the Change entity to the lifecycle state with the same name. The `step` value from the schema is used directly as the target state for `TransitionChange`. There is no indirection or mapping table — the step name IS the state name.
 
-### Requirement: Two execution modes
+### Requirement: Hook execution at step boundaries
 
-Workflow steps fall into two execution modes based on their intent:
-
-- **Agent-driven** — the step's work is performed interactively by an AI agent or human. The agent reads context via `CompileContext`, executes `run:` hooks via `specd change run-hooks`, does the work, and transitions to the next state. Steps like designing, implementing, and verifying are agent-driven.
-- **Deterministic** — the step's work is performed atomically by a use case. The use case executes hooks internally, performs the operation, and produces a result. The archiving step is deterministic, handled entirely by `ArchiveChange`.
-
-The execution mode is not declared in the schema — it is implied by which use case or command handles the step. The distinction matters for hook execution: deterministic steps execute hooks internally; agent-driven steps rely on the agent to invoke hooks via CLI.
+All workflow steps can declare `run:` and `instruction:` hooks in their `pre` and `post` phases. When transitioning to a state, `TransitionChange` executes `run:` hooks automatically by default (pre-hooks before the state change, post-hooks after). When `skipHooks` is true, the caller manages hook execution separately via `RunStepHooks`. The archiving step's hooks are executed by `ArchiveChange` via delegation to `RunStepHooks`.
 
 ### Requirement: Step requires reference artifact IDs
 
@@ -76,4 +73,6 @@ A workflow step's `requires` array contains **artifact IDs** (e.g. `specs`, `tas
 - [`specs/core/build-schema/spec.md`](../build-schema/spec.md) — artifact DAG cycle detection at schema build time
 - [`specs/core/compile-context/spec.md`](../compile-context/spec.md) — step availability evaluation, context compilation per step
 - [`specs/core/get-status/spec.md`](../get-status/spec.md) — reports current change state (= active workflow step)
+- [`specs/core/transition-change/spec.md`](../transition-change/spec.md) — requires enforcement and hook execution at transitions
 - [`specs/core/archive-change/spec.md`](../archive-change/spec.md) — deterministic execution of the archiving step
+- [`specs/core/hook-execution-model/spec.md`](../hook-execution-model/spec.md) — hook types, execution semantics
