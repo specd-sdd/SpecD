@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
@@ -100,6 +103,67 @@ describe('GoLanguageAdapter', () => {
       const code = 'package main\n\nimport "fmt"'
       const imports = adapter.extractImportedNames('main.go', code)
       expect(imports[0]!.isRelative).toBe(false)
+    })
+  })
+
+  describe('extensions', () => {
+    it('maps .go to go', () => {
+      expect(adapter.extensions()).toEqual({ '.go': 'go' })
+    })
+  })
+
+  describe('resolvePackageFromSpecifier', () => {
+    it('resolves by longest prefix match', () => {
+      const known = ['github.com/acme/auth', 'github.com/acme/billing']
+      expect(adapter.resolvePackageFromSpecifier('github.com/acme/auth/models', known)).toBe(
+        'github.com/acme/auth',
+      )
+    })
+
+    it('resolves exact match', () => {
+      const known = ['github.com/acme/auth']
+      expect(adapter.resolvePackageFromSpecifier('github.com/acme/auth', known)).toBe(
+        'github.com/acme/auth',
+      )
+    })
+
+    it('returns undefined for unknown module', () => {
+      const known = ['github.com/acme/auth']
+      expect(adapter.resolvePackageFromSpecifier('fmt', known)).toBeUndefined()
+    })
+
+    it('picks longest match when multiple prefixes overlap', () => {
+      const known = ['github.com/acme', 'github.com/acme/auth']
+      expect(adapter.resolvePackageFromSpecifier('github.com/acme/auth/models', known)).toBe(
+        'github.com/acme/auth',
+      )
+    })
+  })
+
+  describe('getPackageIdentity', () => {
+    let tempDir: string
+
+    afterEach(() => {
+      if (tempDir) rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    it('reads module from go.mod', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'go-pkg-'))
+      writeFileSync(join(tempDir, 'go.mod'), 'module github.com/acme/auth\n\ngo 1.21\n')
+      expect(adapter.getPackageIdentity(tempDir)).toBe('github.com/acme/auth')
+    })
+
+    it('returns undefined when no go.mod', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'go-pkg-'))
+      expect(adapter.getPackageIdentity(tempDir)).toBeUndefined()
+    })
+
+    it('walks up to find go.mod above codeRoot', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'go-pkg-'))
+      writeFileSync(join(tempDir, 'go.mod'), 'module github.com/acme/auth\n\ngo 1.21\n')
+      const subDir = join(tempDir, 'cmd', 'server')
+      mkdirSync(subDir, { recursive: true })
+      expect(adapter.getPackageIdentity(subDir, tempDir)).toBe('github.com/acme/auth')
     })
   })
 })

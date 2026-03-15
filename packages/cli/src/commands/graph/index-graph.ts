@@ -42,7 +42,7 @@ export function registerGraphIndex(parent: Command): void {
           process.stderr.write(`\r\x1b[K  ${bar} ${String(percent).padStart(3)}% ${phase}`)
         }
 
-        const workspaces = buildWorkspaceTargets(config, kernel, opts.workspace)
+        const workspaces = await buildWorkspaceTargets(config, kernel, opts.workspace)
 
         const indexOpts: IndexOptions = {
           workspaces,

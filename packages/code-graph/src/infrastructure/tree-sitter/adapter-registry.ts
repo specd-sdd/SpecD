@@ -1,31 +1,27 @@
 import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
 
-const EXTENSION_TO_LANGUAGE: Record<string, string> = {
-  '.ts': 'typescript',
-  '.tsx': 'tsx',
-  '.js': 'javascript',
-  '.jsx': 'jsx',
-  '.py': 'python',
-  '.pyi': 'python',
-  '.go': 'go',
-  '.php': 'php',
-}
-
 /**
  * Maps file extensions to language adapters. Implements {@link AdapterRegistryPort}
  * for use by application-layer use cases.
+ *
+ * The extension-to-language map is built dynamically from registered adapters
+ * via their `extensions()` method — no hardcoded language list.
  */
 export class AdapterRegistry implements AdapterRegistryPort {
   private adapters = new Map<string, LanguageAdapter>()
+  private extMap = new Map<string, string>()
 
   /**
-   * Registers a language adapter for all languages it supports.
+   * Registers a language adapter for all languages and extensions it supports.
    * @param adapter - The language adapter to register.
    */
   register(adapter: LanguageAdapter): void {
     for (const lang of adapter.languages()) {
       this.adapters.set(lang, adapter)
+    }
+    for (const [ext, lang] of Object.entries(adapter.extensions())) {
+      this.extMap.set(ext, lang)
     }
   }
 
@@ -45,10 +41,8 @@ export class AdapterRegistry implements AdapterRegistryPort {
    */
   getAdapterForFile(filePath: string): LanguageAdapter | undefined {
     const ext = filePath.slice(filePath.lastIndexOf('.'))
-    const lang = EXTENSION_TO_LANGUAGE[ext]
-    if (!lang) {
-      return undefined
-    }
+    const lang = this.extMap.get(ext)
+    if (!lang) return undefined
     return this.adapters.get(lang)
   }
 
@@ -59,6 +53,14 @@ export class AdapterRegistry implements AdapterRegistryPort {
    */
   getLanguageForFile(filePath: string): string | undefined {
     const ext = filePath.slice(filePath.lastIndexOf('.'))
-    return EXTENSION_TO_LANGUAGE[ext]
+    return this.extMap.get(ext)
+  }
+
+  /**
+   * Returns all unique registered adapters.
+   * @returns An array of unique adapter instances.
+   */
+  getAdapters(): LanguageAdapter[] {
+    return [...new Set(this.adapters.values())]
   }
 }

@@ -5,6 +5,7 @@ import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/sy
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
+import { findManifestField } from './find-manifest-field.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ensureLanguagesRegistered } from './register-languages.js'
 
@@ -41,6 +42,14 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    */
   languages(): string[] {
     return ['php']
+  }
+
+  /**
+   * Returns the file extension to language ID mapping for PHP.
+   * @returns Extension-to-language map.
+   */
+  extensions(): Record<string, string> {
+    return { '.php': 'php' }
   }
 
   /**
@@ -288,5 +297,34 @@ export class PhpLanguageAdapter implements LanguageAdapter {
         }
       }
     }
+  }
+
+  /**
+   * Builds a PHP qualified name from namespace and symbol name.
+   * @param namespace - The namespace (e.g. `App\Models`).
+   * @param symbolName - The symbol name (e.g. `User`).
+   * @returns The qualified name (e.g. `App\Models\User`).
+   */
+  buildQualifiedName(namespace: string, symbolName: string): string {
+    return `${namespace}\\${symbolName}`
+  }
+
+  /**
+   * Reads the package identity by searching for `composer.json` at or above
+   * the given directory, bounded by the repository root.
+   * @param codeRoot - Absolute path to the workspace's code root.
+   * @param repoRoot - Optional repository root to bound the search.
+   * @returns The `name` field from the nearest `composer.json`, or undefined.
+   */
+  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
+    return findManifestField(
+      codeRoot,
+      'composer.json',
+      (content) => {
+        const pkg = JSON.parse(content) as { name?: string }
+        return pkg.name
+      },
+      repoRoot,
+    )
   }
 }

@@ -155,17 +155,36 @@
 - **AND** phase strings describe the current activity (e.g. `"Parsing symbols"`, `"Resolving imports"`, `"Bulk loading"`)
 - **AND** detail strings are included for per-file phases (e.g. `"150/460"`)
 
-### Requirement: Monorepo package resolution
+### Requirement: Cross-workspace package resolution
 
-#### Scenario: Monorepo package imports resolved via pnpm-workspace.yaml
+#### Scenario: Package identity built from adapter
 
-- **GIVEN** a project with `pnpm-workspace.yaml` defining `packages: ['packages/*']`
-- **AND** `packages/core/package.json` has `name: '@specd/core'`
-- **AND** file B in workspace `cli` imports `createUser` from `@specd/core`
-- **AND** file A in workspace `core` defines `createUser`
+- **GIVEN** workspace `core` with `codeRoot` containing `package.json` with `name: '@specd/core'`
+- **AND** the TypeScript adapter implements `getPackageIdentity`
+- **WHEN** the indexer builds the `packageName → workspaceName` map
+- **THEN** `'@specd/core'` maps to workspace `'core'`
+
+#### Scenario: Cross-workspace import resolved via package identity
+
+- **GIVEN** workspace `core` with package identity `@specd/core` defining `createUser`
+- **AND** workspace `cli` has a file importing `createUser` from `@specd/core`
 - **WHEN** Pass 2 resolves imports
-- **THEN** an `IMPORTS` relation is created from file B to file A
+- **THEN** an `IMPORTS` relation is created from the cli file to the core file
 - **AND** a `CALLS` relation is created from the calling symbol to `createUser`
+
+#### Scenario: Multirepo cross-workspace resolution
+
+- **GIVEN** two workspaces from separate repos configured in `specd.yaml`
+- **AND** each has a `package.json` with distinct package names
+- **AND** workspace B imports a symbol from workspace A's package
+- **WHEN** Pass 2 resolves imports
+- **THEN** the import resolves across repos via the `packageName → workspaceName` map
+
+#### Scenario: Adapter without getPackageIdentity skips resolution
+
+- **GIVEN** an adapter that does not implement `getPackageIdentity`
+- **WHEN** the indexer queries it for a workspace's package identity
+- **THEN** non-relative imports for that language remain unresolved
 
 ### Requirement: Spec dependency indexing
 

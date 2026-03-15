@@ -5,6 +5,7 @@ import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/sy
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
+import { findManifestField } from './find-manifest-field.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ensureLanguagesRegistered } from './register-languages.js'
 
@@ -41,6 +42,14 @@ export class GoLanguageAdapter implements LanguageAdapter {
    */
   languages(): string[] {
     return ['go']
+  }
+
+  /**
+   * Returns the file extension to language ID mapping for Go.
+   * @returns Extension-to-language map.
+   */
+  extensions(): Record<string, string> {
+    return { '.go': 'go' }
   }
 
   /**
@@ -254,5 +263,42 @@ export class GoLanguageAdapter implements LanguageAdapter {
         if (name) addSymbol(name, kind, child, extractComment(node))
       }
     }
+  }
+
+  /**
+   * Resolves a Go import specifier to a known package by longest prefix match.
+   * @param specifier - The Go import path (e.g. `github.com/acme/auth/models`).
+   * @param knownPackages - Known module paths from `go.mod`.
+   * @returns The matching module path, or undefined.
+   */
+  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined {
+    let best: string | undefined
+    for (const pkg of knownPackages) {
+      if (specifier === pkg || specifier.startsWith(pkg + '/')) {
+        if (!best || pkg.length > best.length) {
+          best = pkg
+        }
+      }
+    }
+    return best
+  }
+
+  /**
+   * Reads the module identity by searching for `go.mod` at or above
+   * the given directory, bounded by the repository root.
+   * @param codeRoot - Absolute path to the workspace's code root.
+   * @param repoRoot - Optional repository root to bound the search.
+   * @returns The module path from the nearest `go.mod`, or undefined.
+   */
+  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
+    return findManifestField(
+      codeRoot,
+      'go.mod',
+      (content) => {
+        const match = content.match(/^module\s+(\S+)/m)
+        return match?.[1]
+      },
+      repoRoot,
+    )
   }
 }

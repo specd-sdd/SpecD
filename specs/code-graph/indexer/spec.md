@@ -52,8 +52,8 @@ The indexer SHALL discover files from each workspace's `codeRoot` independently.
 
 Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:
 
-- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). For PHP files with namespace declarations, build a qualified name map. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.
-- **Pass 2 (Resolve imports + CALLS, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). For relative imports, find the target file's symbols by path within the same workspace. For monorepo package imports, the monorepo map correlates package names with workspace prefixes, allowing cross-workspace resolution. For PHP qualified names, match against the namespace map globally. Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations. Accumulate all relations.
+- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter implements `extractNamespace` and `buildQualifiedName`, build a qualified name map for that language. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.
+- **Pass 2 (Resolve imports + CALLS, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations. Accumulate all relations.
 - **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.
 - **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.
 
@@ -79,11 +79,13 @@ The chunk budget is configurable via `IndexOptions.chunkBytes`.
 
 Progress updates include a detail string (e.g. `"150/460 files"`) for phases that process individual items.
 
-### Requirement: Monorepo package resolution
+### Requirement: Cross-workspace package resolution
 
-When the workspace root contains a `pnpm-workspace.yaml` file, the indexer discovers all monorepo packages by parsing the `packages` globs and reading each `package.json` name field. For non-relative import specifiers (e.g. `@specd/core`), the indexer checks this map and searches the in-memory `SymbolIndex` for symbols with the imported name within the matching package's file path prefix.
+Before Pass 2, the indexer builds a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over all registered adapters and the first one to return a non-`undefined` identity wins. This is language-agnostic — each adapter reads its own manifest format (`package.json`, `go.mod`, `pyproject.toml`, `composer.json`).
 
-The monorepo package map is computed lazily (once per indexing run).
+For non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the in-memory `SymbolIndex` for symbols with the imported name within the matching workspace's path prefix (`workspaceName + '/'`).
+
+This works for both monorepo (workspaces in the same repo) and multirepo (workspaces in separate repos configured in `specd.yaml`) because the resolution depends only on the adapter reading each workspace's manifest — not on `pnpm-workspace.yaml` or any monorepo-specific tooling.
 
 ### Requirement: Error isolation
 

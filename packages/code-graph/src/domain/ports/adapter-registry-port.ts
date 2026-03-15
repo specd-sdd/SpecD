@@ -9,4 +9,7 @@ export interface AdapterRegistryPort {
 
   /** Returns the language identifier for a file based on its extension, or `undefined`. */
   getLanguageForFile(filePath: string): string | undefined
+
+  /** Returns all unique registered adapters. */
+  getAdapters(): LanguageAdapter[]
 }

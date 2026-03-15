@@ -312,4 +312,39 @@ describe('Workspace indexing', () => {
     expect(cliSymbols).toHaveLength(1)
     expect(cliSymbols[0]!.filePath).toBe('cli/src/index.ts')
   })
+
+  it('resolves cross-workspace monorepo imports', async () => {
+    const coreRoot = createWorkspace(tempDir, 'core', {
+      'src/greet.ts': 'export function greet(name: string): string { return name }',
+      'package.json': JSON.stringify({ name: '@test/core' }),
+    })
+    const cliRoot = createWorkspace(tempDir, 'cli', {
+      'src/main.ts': [
+        "import { greet } from '@test/core'",
+        'export function run() { return greet("world") }',
+      ].join('\n'),
+      'package.json': JSON.stringify({ name: '@test/cli' }),
+    })
+
+    // Create pnpm-workspace.yaml so the indexer can discover packages
+    writeFileSync(join(tempDir, 'pnpm-workspace.yaml'), 'packages:\n  - core\n  - cli\n')
+
+    provider = createCodeGraphProvider({ storagePath: tempDir })
+    await provider.open()
+
+    const result = await provider.index({
+      workspaces: [
+        { name: 'core', codeRoot: coreRoot, specs: async () => [] },
+        { name: 'cli', codeRoot: cliRoot, specs: async () => [] },
+      ],
+      projectRoot: tempDir,
+    })
+
+    expect(result.errors).toHaveLength(0)
+
+    // The import from @test/core should resolve across workspaces
+    const impact = await provider.analyzeImpact('core/src/greet.ts:function:greet:1', 'upstream')
+    expect(impact.directDependents).toBeGreaterThanOrEqual(1)
+    expect(impact.affectedFiles).toContain('cli/src/main.ts')
+  })
 })

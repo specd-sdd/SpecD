@@ -11,6 +11,7 @@ rules:
         `LanguageAdapter` SHALL be an interface (not an abstract class, since adapters are stateless and have no shared state to inherit) with the following methods:
 
         * **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)
+        * **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.
         * **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found
         * **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution
         * **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS) from the file
@@ -19,9 +20,9 @@ rules:
   - requirement: Language detection
     rules:
       - |-
-        File-to-language mapping SHALL be determined by file extension. The adapter registry maintains a mapping from extensions to language identifiers. Files with unrecognized extensions SHALL be silently skipped — no error is thrown, no `FileNode` is created.
+        File-to-language mapping SHALL be determined by file extension. Each adapter declares its supported extensions via `extensions()`, and the adapter registry builds the mapping dynamically when adapters are registered. Files with unrecognized extensions SHALL be silently skipped — no error is thrown, no `FileNode` is created.
 
-        The following extensions are mapped for the built-in TypeScript adapter:
+        The following extensions are declared by the built-in TypeScript adapter:
 
         | Extension | Language ID  |
         | --------- | ------------ |
@@ -71,7 +72,7 @@ rules:
         | Go         | `import "pkg"`, `import alias "pkg"`    | always `false`  |
         | PHP        | `use Namespace\Class`                   | always `false`  |
 
-        The indexer is responsible for resolving specifiers to file paths and symbol ids — the adapter only parses syntax.
+        The adapter only parses syntax — specifier resolution is handled by the adapter's optional `resolveRelativeImportPath` and `resolvePackageFromSpecifier` methods, called by the indexer during Pass 2.
   - requirement: Call resolution
     rules:
       - |-
@@ -81,6 +82,57 @@ rules:
         * **Callee**: resolved via the import map passed to `extractRelations`. If the called identifier is in the import map, the callee is the resolved symbol. If the identifier matches a locally defined symbol, the callee is that local symbol.
 
         Calls to identifiers that cannot be resolved (e.g. global built-ins, member expressions like `obj.method()`, dynamic expressions) SHALL be silently dropped — no relation is created, no error is thrown.
+  - requirement: Package identity extraction
+    rules:
+      - |-
+        `LanguageAdapter` MAY provide an optional method:
+
+        * **`getPackageIdentity?(codeRoot: string, repoRoot?: string): string | undefined`** — searches at and above `codeRoot` (bounded by `repoRoot`) for the language's package manifest and returns the package name, or `undefined` if no manifest is found.
+
+        Each adapter reads its language's package manifest:
+
+        | Language   | Manifest file      | Identity field        |
+        | ---------- | ------------------ | --------------------- |
+        | TypeScript | `package.json`     | `name`                |
+        | Python     | `pyproject.toml`   | `[project].name`      |
+        | Go         | `go.mod`           | `module`              |
+        | PHP        | `composer.json`    | `name`                |
+
+        The `repoRoot` parameter is resolved by the CLI/MCP layer using the VCS adapter (`VcsAdapter.rootDir()`), making it VCS-agnostic (git, hg, svn). When not provided, the search walks up to the filesystem root.
+
+        The indexer calls this method for each workspace's `codeRoot` to build a `packageName → workspaceName` map. This enables cross-workspace import resolution without coupling the indexer to any language's package system.
+
+        Unlike extraction methods, `getPackageIdentity` performs I/O (reads a manifest file from disk). It is optional — adapters that do not implement it simply return `undefined`, and cross-workspace resolution for that language falls back to unresolved.
+  - requirement: Import specifier resolution
+    rules:
+      - |-
+        `LanguageAdapter` MAY provide optional methods for resolving import specifiers to file paths. This moves all language-specific resolution logic out of the indexer:
+
+        * **`resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined`** — given a non-relative import specifier and the list of known package names, returns which package the specifier refers to. Each language has its own rules:
+
+        | Language   | Specifier example                  | Package extraction rule                                |
+        | ---------- | ---------------------------------- | ------------------------------------------------------ |
+        | TypeScript | `@specd/core`                      | Scoped: first two segments. Bare: first segment.       |
+        | Go         | `github.com/acme/auth/models`      | Longest matching prefix from known packages.           |
+        | Python     | `acme_auth.models`                 | First segment, normalized (hyphens ↔ underscores).     |
+        | PHP        | (uses qualified names, not this)   | Not applicable — PHP resolves via `extractNamespace`.  |
+
+        * **`resolveRelativeImportPath?(fromFile: string, specifier: string): string`** — given the importing file path and a relative specifier, returns the resolved file path. Each language has its own rules for extension mapping and path resolution:
+
+        | Language   | Resolution rules                                              |
+        | ---------- | ------------------------------------------------------------- |
+        | TypeScript | `.js` → `.ts`, extensionless → `.ts`, `../` path traversal   |
+        | Python     | `.` = current package, `..` = parent, adds `.py` extension    |
+        | Go         | Not applicable — Go imports are never relative                |
+        | PHP        | Not applicable — PHP imports are never relative               |
+
+        * **`buildQualifiedName?(namespace: string, symbolName: string): string`** — builds a fully qualified name from a namespace and symbol name. Used by languages like PHP where imports are resolved via namespace-qualified names rather than package names.
+
+        | Language   | Example                                      |
+        | ---------- | -------------------------------------------- |
+        | PHP        | `App\Models` + `User` → `App\Models\User`   |
+
+        When these methods are not implemented, the indexer skips the corresponding resolution step for that language. The indexer MUST NOT contain any language-specific resolution logic — all specifier parsing, path resolution, and qualified name construction is delegated to adapters.
   - requirement: Tree-sitter query patterns
     rules:
       - The specific Tree-sitter / ast-grep query patterns used by each adapter are internal implementation details. They MUST NOT be part of the public API or exposed through the `LanguageAdapter` interface. Adapters are free to change their internal query patterns without breaking consumers.
@@ -89,14 +141,20 @@ rules:
       - |-
         An `AdapterRegistry` SHALL map language identifiers to `LanguageAdapter` instances. It provides:
 
-        * **`register(adapter: LanguageAdapter): void`** — registers an adapter for all languages it declares
+        * **`register(adapter: LanguageAdapter): void`** — registers an adapter for all languages it declares and all file extensions from `adapter.extensions()`
         * **`getAdapter(languageId: string): LanguageAdapter | undefined`** — returns the adapter for a language, or `undefined` if none registered
-        * **`getAdapterForFile(filePath: string): LanguageAdapter | undefined`** — resolves extension → language → adapter
+        * **`getAdapterForFile(filePath: string): LanguageAdapter | undefined`** — resolves extension → language → adapter using the dynamically built extension map
+        * **`getAdapters(): LanguageAdapter[]`** — returns all unique registered adapters
+
+        The extension-to-language map is built dynamically from registered adapters — there is no hardcoded extension list in the registry. Adding a new language requires only registering a new adapter.
 
         The TypeScript adapter MUST be registered by default when the registry is created. Additional adapters can be registered to extend language support.
 constraints:
   - LanguageAdapter is an interface, not an abstract class — adapters are stateless
   - Extraction methods are synchronous and pure — they receive content, not file handles
+  - getPackageIdentity is the only method that performs I/O — it is optional and searches for a manifest file upwards from codeRoot
+  - Resolution methods (resolvePackageFromSpecifier, resolveRelativeImportPath, buildQualifiedName) are synchronous and pure
+  - The indexer MUST NOT contain language-specific resolution logic — all of it is delegated to adapters
   - Unrecognized file extensions are silently skipped
   - Unresolvable call targets are silently dropped
   - Tree-sitter query patterns are internal — not part of the public API
@@ -277,12 +335,22 @@ scenarios:
   - requirement: Adapter registry
     name: Custom adapter extends registry
     given:
-      - "a custom adapter declaring languages(): ['python']"
+      - "a custom adapter declaring languages(): ['python'] and extensions(): { '.py': 'python' }"
     when:
       - register(adapter) is called
     then:
       - getAdapter('python') returns that adapter
+      - AND getAdapterForFile('main.py') returns that adapter
       - AND getAdapter('typescript') still returns the TypeScript adapter
+  - requirement: Adapter registry
+    name: Extension map built from adapters
+    given:
+      - a fresh AdapterRegistry with no adapters registered
+    when:
+      - "an adapter with extensions(): { '.rs': 'rust' } is registered"
+    then:
+      - getAdapterForFile('main.rs') returns that adapter
+      - AND getLanguageForFile('main.rs') returns 'rust'
   - requirement: Adapter registry
     name: Later registration overrides earlier
     given:
@@ -291,7 +359,128 @@ scenarios:
       - both are registered in sequence
     then:
       - getAdapter('typescript') returns the second adapter
+  - requirement: Package identity extraction
+    name: TypeScript adapter reads package.json
+    given:
+      - 'a directory containing package.json with {"name": "@specd/core"}'
+    when:
+      - getPackageIdentity(codeRoot) is called on the TypeScript adapter
+    then:
+      - it returns '@specd/core'
+  - requirement: Package identity extraction
+    name: No manifest returns undefined
+    given:
+      - a directory with no package.json
+    when:
+      - getPackageIdentity(codeRoot) is called on the TypeScript adapter
+    then:
+      - it returns undefined
+  - requirement: Package identity extraction
+    name: Go adapter reads go.mod
+    given:
+      - a directory containing go.mod with module github.com/acme/auth
+    when:
+      - getPackageIdentity(codeRoot) is called on the Go adapter
+    then:
+      - it returns 'github.com/acme/auth'
+  - requirement: Package identity extraction
+    name: Python adapter reads pyproject.toml
+    given:
+      - a directory containing pyproject.toml with [project] and name = "acme-auth"
+    when:
+      - getPackageIdentity(codeRoot) is called on the Python adapter
+    then:
+      - it returns 'acme-auth'
+  - requirement: Package identity extraction
+    name: PHP adapter reads composer.json
+    given:
+      - 'a directory containing composer.json with {"name": "acme/auth"}'
+    when:
+      - getPackageIdentity(codeRoot) is called on the PHP adapter
+    then:
+      - it returns 'acme/auth'
+  - requirement: Package identity extraction
+    name: Adapter without getPackageIdentity
+    given:
+      - an adapter that does not implement getPackageIdentity
+    when:
+      - the indexer queries it for a workspace's package identity
+    then:
+      - it returns undefined and cross-workspace resolution is skipped for that language
+  - requirement: Package identity extraction
+    name: Manifest found above codeRoot
+    given:
+      - a codeRoot at /project/packages/core/src with no package.json
+      - "AND /project/packages/core/package.json exists with name: '@specd/core'"
+    when:
+      - getPackageIdentity('/project/packages/core/src', '/project') is called
+    then:
+      - it returns '@specd/core'
+  - requirement: Package identity extraction
+    name: Search bounded by repoRoot
+    given:
+      - a codeRoot at /project/packages/core
+      - AND repoRoot is /project
+      - AND /package.json exists above the repo root
+    when:
+      - getPackageIdentity is called
+    then:
+      - it does not read /package.json — search stops at /project
+  - requirement: Import specifier resolution
+    name: TypeScript scoped package specifier
+    given:
+      - known packages ['@specd/core', '@specd/cli']
+    when:
+      - resolvePackageFromSpecifier('@specd/core', knownPackages) is called on the TS adapter
+    then:
+      - it returns '@specd/core'
+  - requirement: Import specifier resolution
+    name: TypeScript bare package specifier
+    given:
+      - known packages ['lodash']
+    when:
+      - resolvePackageFromSpecifier('lodash/fp', knownPackages) is called on the TS adapter
+    then:
+      - it returns 'lodash'
+  - requirement: Import specifier resolution
+    name: Go module specifier resolved by longest prefix
+    given:
+      - known packages ['github.com/acme/auth']
+    when:
+      - resolvePackageFromSpecifier('github.com/acme/auth/models', knownPackages) is called on the Go adapter
+    then:
+      - it returns 'github.com/acme/auth'
+  - requirement: Import specifier resolution
+    name: Python package specifier with hyphen normalization
+    given:
+      - known packages ['acme-auth']
+    when:
+      - resolvePackageFromSpecifier('acme_auth.models', knownPackages) is called on the Python adapter
+    then:
+      - it returns 'acme-auth'
+  - requirement: Import specifier resolution
+    name: Unknown specifier returns undefined
+    given:
+      - known packages ['@specd/core']
+    when:
+      - resolvePackageFromSpecifier('express', knownPackages) is called
+    then:
+      - it returns undefined
+  - requirement: Import specifier resolution
+    name: TypeScript relative import path resolution
+    given:
+      - a file at core/src/commands/create.ts
+    when:
+      - resolveRelativeImportPath('core/src/commands/create.ts', '../utils.js') is called
+    then:
+      - it returns 'core/src/utils.ts' (.js → .ts, path traversal applied)
+  - requirement: Import specifier resolution
+    name: PHP qualified name construction
+    when:
+      - buildQualifiedName('App\\Models', 'User') is called on the PHP adapter
+    then:
+      - it returns 'App\\Models\\User'
 contentHashes:
-  spec.md: sha256:5c4cd31c1c7cddce6b253843e034522a5cc6043c5b19d8a53fcdbe2f1b493be7
-  verify.md: sha256:97821bca2092fe3eab2806f3db646b1d682f85280ea4e8f43547cb64ed971cf6
+  spec.md: sha256:af603635e62758392d7dd8cf3fd8c6c831f0af74fdff7ff7066b9ea2a45c5e30
+  verify.md: sha256:eac94d0313162ba332ba778598a7e70b5ca8d380b529ad154566442d25f745f2
 generatedBy: core

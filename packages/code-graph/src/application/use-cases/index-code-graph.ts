@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import { type GraphStore } from '../../domain/ports/graph-store.js'
 import { type FileNode, createFileNode } from '../../domain/value-objects/file-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
@@ -14,6 +14,7 @@ import {
 } from '../../domain/value-objects/index-result.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
+import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
 import { discoverFiles } from './discover-files.js'
 import { discoverSpecs } from './discover-specs.js'
 import { computeContentHash } from './compute-content-hash.js'
@@ -262,19 +263,21 @@ export class IndexCodeGraph {
     let filesIndexed = 0
     const qualifiedNames = new Map<string, string>()
     const symbolIndex = new SymbolIndex()
-    const monorepoMap = this.discoverMonorepoPackages(options.projectRoot)
 
-    // Map monorepo package names to workspace prefixes
+    // Build package-name → workspace-name map for cross-workspace import resolution.
+    // Each adapter reads its language's manifest (package.json, go.mod, etc.) to
+    // extract the package identity. This is language-agnostic and works for both
+    // monorepo and multirepo setups.
+    const packageToWorkspace = new Map<string, string>()
+    const adapters = this.registry.getAdapters()
     for (const ws of options.workspaces) {
-      const pkgJsonPath = join(ws.codeRoot, 'package.json')
-      if (existsSync(pkgJsonPath)) {
-        try {
-          const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8')) as { name?: string }
-          if (pkg.name) {
-            monorepoMap.set(pkg.name, ws.codeRoot)
+      for (const adapter of adapters) {
+        if (adapter.getPackageIdentity) {
+          const identity = adapter.getPackageIdentity(ws.codeRoot, ws.repoRoot)
+          if (identity) {
+            packageToWorkspace.set(identity, ws.name)
+            break
           }
-        } catch {
-          /* skip */
         }
       }
     }
@@ -307,11 +310,11 @@ export class IndexCodeGraph {
           const symbols = adapter.extractSymbols(prefixedPath, content)
           const wsName = prefixedPath.substring(0, prefixedPath.indexOf('/'))
 
-          if (adapter.extractNamespace) {
+          if (adapter.extractNamespace && adapter.buildQualifiedName) {
             const ns = adapter.extractNamespace(content)
             if (ns) {
               for (const s of symbols) {
-                qualifiedNames.set(`${ns}\\${s.name}`, s.id)
+                qualifiedNames.set(adapter.buildQualifiedName(ns, s.name), s.id)
               }
             }
           }
@@ -360,10 +363,10 @@ export class IndexCodeGraph {
           const importMap = this.resolveImports(
             imports,
             prefixedPath,
-            options.projectRoot,
+            adapter,
             symbolIndex,
             qualifiedNames,
-            monorepoMap,
+            packageToWorkspace,
           )
           const relations = adapter.extractRelations(prefixedPath, content, symbols, importMap)
 
@@ -505,149 +508,59 @@ export class IndexCodeGraph {
 
   /**
    * Resolves import declarations to symbol ids using the in-memory symbol index.
-   * No store queries — purely in-memory lookup.
+   * All language-specific resolution is delegated to the adapter.
    * @param imports - Parsed import declarations.
    * @param filePath - The importing file path (workspace-prefixed).
-   * @param projectRoot - The project root for monorepo resolution.
+   * @param adapter - The language adapter for this file.
    * @param index - The in-memory symbol index.
-   * @param qualifiedNames - Map of PHP qualified names to symbol ids.
-   * @param monorepo - Map of package names to directory paths.
+   * @param qualifiedNames - Map of qualified names to symbol ids.
+   * @param packageToWorkspace - Map of package names to workspace name prefixes.
    * @returns A map of local import names to resolved symbol ids.
    */
   private resolveImports(
     imports: ImportDeclaration[],
     filePath: string,
-    projectRoot: string,
+    adapter: LanguageAdapter,
     index: SymbolIndex,
     qualifiedNames: Map<string, string>,
-    monorepo: Map<string, string>,
+    packageToWorkspace: Map<string, string>,
   ): Map<string, string> {
     const importMap = new Map<string, string>()
+    const knownPackages = [...packageToWorkspace.keys()]
 
     for (const imp of imports) {
       if (imp.isRelative) {
-        const resolvedPath = this.resolveImportPath(filePath, imp.specifier)
-        const target = index.findByFile(resolvedPath).find((s) => s.name === imp.originalName)
-        if (target) {
-          importMap.set(imp.localName, target.id)
+        // Delegate path resolution to the adapter
+        if (adapter.resolveRelativeImportPath) {
+          const resolvedPath = adapter.resolveRelativeImportPath(filePath, imp.specifier)
+          const target = index.findByFile(resolvedPath).find((s) => s.name === imp.originalName)
+          if (target) {
+            importMap.set(imp.localName, target.id)
+          }
         }
       } else {
-        // Qualified name (PHP namespaces)
+        // Qualified name resolution (e.g. PHP namespaces)
         const qualifiedId = qualifiedNames.get(imp.specifier)
         if (qualifiedId) {
           importMap.set(imp.localName, qualifiedId)
           continue
         }
 
-        // Monorepo package
-        const pkgName = imp.specifier.startsWith('@')
-          ? imp.specifier.split('/').slice(0, 2).join('/')
-          : imp.specifier.split('/')[0]!
-        const pkgDir = monorepo.get(pkgName)
-        if (!pkgDir) continue
-
-        const pkgPrefix = relative(projectRoot, pkgDir).replaceAll('\\', '/') + '/'
-        const candidates = index.findByName(imp.originalName, pkgPrefix)
-        if (candidates.length > 0) {
-          importMap.set(imp.localName, candidates[0]!.id)
+        // Package resolution — delegate specifier parsing to the adapter
+        if (adapter.resolvePackageFromSpecifier) {
+          const pkgName = adapter.resolvePackageFromSpecifier(imp.specifier, knownPackages)
+          if (pkgName) {
+            const wsPrefix = packageToWorkspace.get(pkgName)!
+            const candidates = index.findByName(imp.originalName, wsPrefix + '/')
+            if (candidates.length > 0) {
+              importMap.set(imp.localName, candidates[0]!.id)
+            }
+          }
         }
       }
     }
 
     return importMap
-  }
-
-  /**
-   * Discovers monorepo packages from pnpm-workspace.yaml.
-   * @param projectRoot - The project root path.
-   * @returns A map of package names to directory paths.
-   */
-  private discoverMonorepoPackages(projectRoot: string): Map<string, string> {
-    const packages = new Map<string, string>()
-    const wsFile = join(projectRoot, 'pnpm-workspace.yaml')
-    if (!existsSync(wsFile)) return packages
-
-    let wsContent: string
-    try {
-      wsContent = readFileSync(wsFile, 'utf-8')
-    } catch {
-      return packages
-    }
-
-    const globs: string[] = []
-    const lines = wsContent.split('\n')
-    let inPkgs = false
-    for (const line of lines) {
-      if (line.match(/^packages\s*:/)) {
-        inPkgs = true
-        continue
-      }
-      if (inPkgs) {
-        const m = line.match(/^\s+-\s+['"]?([^'"]+)['"]?/)
-        if (m?.[1]) globs.push(m[1])
-        else if (!line.match(/^\s/)) inPkgs = false
-      }
-    }
-
-    for (const glob of globs) {
-      if (glob.endsWith('/*')) {
-        const parentDir = join(projectRoot, glob.slice(0, -2))
-        if (!existsSync(parentDir)) continue
-        try {
-          for (const entry of readdirSync(parentDir)) {
-            this.tryRegisterPackage(join(parentDir, entry), packages)
-          }
-        } catch {
-          continue
-        }
-      } else {
-        this.tryRegisterPackage(join(projectRoot, glob), packages)
-      }
-    }
-
-    return packages
-  }
-
-  /**
-   * Tries to register a package from its directory.
-   * @param dir - Directory to check.
-   * @param packages - Map to register into.
-   */
-  private tryRegisterPackage(dir: string, packages: Map<string, string>): void {
-    const pkgJsonPath = join(dir, 'package.json')
-    if (!existsSync(pkgJsonPath)) return
-    try {
-      const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8')) as { name?: string }
-      if (pkg.name) packages.set(pkg.name, dir)
-    } catch {
-      /* skip */
-    }
-  }
-
-  /**
-   * Resolves a relative import specifier to a file path.
-   * Preserves the workspace prefix from the importing file.
-   * @param fromFile - The importing file (workspace-prefixed path).
-   * @param specifier - The relative specifier.
-   * @returns The resolved file path (workspace-prefixed).
-   */
-  private resolveImportPath(fromFile: string, specifier: string): string {
-    const fromDir = fromFile.substring(0, fromFile.lastIndexOf('/'))
-    const parts = specifier.split('/')
-    const segments = fromDir.split('/')
-
-    for (const part of parts) {
-      if (part === '.') continue
-      if (part === '..') {
-        // Don't pop the workspace name prefix (first segment)
-        if (segments.length > 1) segments.pop()
-      } else segments.push(part)
-    }
-
-    let resolved = segments.join('/')
-    resolved = resolved.replace(/\.js$/, '.ts')
-    if (!resolved.includes('.')) resolved += '.ts'
-    return resolved
   }
 }
 

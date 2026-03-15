@@ -25,6 +25,8 @@ export interface WorkspaceIndexTarget {
   readonly codeRoot: string
   /** Callback that returns discovered specs for this workspace. */
   readonly specs: () => Promise<DiscoveredSpec[]>
+  /** Optional repository root, used as boundary when searching for package manifests. */
+  readonly repoRoot?: string
 }
 
 /**

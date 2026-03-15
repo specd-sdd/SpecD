@@ -67,7 +67,7 @@ The `DiscoveredSpec` type is re-exported from `@specd/code-graph` for use by int
 During Pass 2 (import resolution), the indexer SHALL resolve imports across workspaces:
 
 - **Relative imports** — resolved within the same workspace (same path prefix)
-- **Monorepo package imports** — the monorepo map correlates package names with workspace names, allowing resolution across workspace boundaries
+- **Package imports** — the `packageName → workspaceName` map (built from `LanguageAdapter.getPackageIdentity`) correlates package names with workspace names, allowing resolution across workspace boundaries. This works for both monorepo and multirepo setups.
 - **PHP qualified names** — resolved globally across all workspaces
 
 The in-memory `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins, enabling cross-workspace resolution.
