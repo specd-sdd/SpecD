@@ -77,4 +77,35 @@ describe('PythonLanguageAdapter', () => {
       expect(imports).toHaveLength(0)
     })
   })
+
+  describe('extractImportedNames', () => {
+    it('parses absolute import', () => {
+      const imports = adapter.extractImportedNames('main.py', 'import os')
+      expect(imports).toHaveLength(1)
+      expect(imports[0]!.originalName).toBe('os')
+      expect(imports[0]!.isRelative).toBe(false)
+    })
+
+    it('parses from-import', () => {
+      const imports = adapter.extractImportedNames('main.py', 'from pathlib import Path')
+      expect(imports).toHaveLength(1)
+      expect(imports[0]!.originalName).toBe('Path')
+      expect(imports[0]!.specifier).toBe('pathlib')
+      expect(imports[0]!.isRelative).toBe(false)
+    })
+
+    it('parses relative from-import', () => {
+      const imports = adapter.extractImportedNames('src/main.py', 'from .utils import helper')
+      expect(imports).toHaveLength(1)
+      expect(imports[0]!.originalName).toBe('helper')
+      expect(imports[0]!.isRelative).toBe(true)
+    })
+
+    it('handles aliased imports', () => {
+      const imports = adapter.extractImportedNames('main.py', 'from os import path as p')
+      expect(imports).toHaveLength(1)
+      expect(imports[0]!.originalName).toBe('path')
+      expect(imports[0]!.localName).toBe('p')
+    })
+  })
 })

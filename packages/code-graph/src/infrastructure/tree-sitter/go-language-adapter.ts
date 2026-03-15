@@ -5,6 +5,7 @@ import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/sy
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
+import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ensureLanguagesRegistered } from './register-languages.js'
 
 /**
@@ -116,11 +117,11 @@ export class GoLanguageAdapter implements LanguageAdapter {
    * @param _importMap - Reserved for future use.
    * @returns An array of extracted relations.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   extractRelations(
     filePath: string,
     content: string,
     symbols: SymbolNode[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _importMap: Map<string, string>,
   ): Relation[] {
     const relations: Relation[] = []
@@ -136,6 +137,66 @@ export class GoLanguageAdapter implements LanguageAdapter {
     // which is deferred to a future version.
 
     return relations
+  }
+
+  /**
+   * Parses Go import declarations from source code.
+   * @param filePath - Path to the source file.
+   * @param content - The source file content.
+   * @returns An array of parsed import declarations.
+   */
+  extractImportedNames(filePath: string, content: string): ImportDeclaration[] {
+    ensureLanguagesRegistered()
+    const root = parse('go', content).root()
+    const results: ImportDeclaration[] = []
+
+    for (const child of root.children()) {
+      if (nodeKind(child) !== 'import_declaration') continue
+
+      for (const specListChild of child.children()) {
+        if (nodeKind(specListChild) === 'import_spec_list') {
+          for (const spec of specListChild.children()) {
+            if (nodeKind(spec) === 'import_spec') {
+              this.extractGoImportSpec(spec, results)
+            }
+          }
+        } else if (nodeKind(specListChild) === 'import_spec') {
+          // Single import without parentheses: import "fmt"
+          this.extractGoImportSpec(specListChild, results)
+        }
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * Extracts a single Go import spec into an ImportDeclaration.
+   * @param spec - The import_spec AST node.
+   * @param results - Array to push declarations into.
+   */
+  private extractGoImportSpec(spec: SgNode, results: ImportDeclaration[]): void {
+    let alias: string | undefined
+    let pathLiteral: string | undefined
+
+    for (const specChild of spec.children()) {
+      const specChildKind = nodeKind(specChild)
+      if (specChildKind === 'package_identifier') {
+        alias = specChild.text()
+      } else if (specChildKind === 'interpreted_string_literal') {
+        pathLiteral = specChild.text().replace(/"/g, '')
+      }
+    }
+
+    if (!pathLiteral) return
+
+    const lastSegment = pathLiteral.split('/').pop() ?? pathLiteral
+    results.push({
+      originalName: lastSegment,
+      localName: alias ?? lastSegment,
+      specifier: pathLiteral,
+      isRelative: false,
+    })
   }
 
   /**

@@ -7,6 +7,7 @@ describe('SpecNode', () => {
       specId: 'core:core/change',
       path: 'specs/core/change',
       title: 'Change',
+      contentHash: 'sha256:test',
       dependsOn: ['core:core/config'],
     })
     expect(node.specId).toBe('core:core/change')
@@ -20,6 +21,7 @@ describe('SpecNode', () => {
       specId: 'core:core/change',
       path: 'specs/core/change',
       title: 'Change',
+      contentHash: 'sha256:test',
     })
     expect(node.dependsOn).toEqual([])
   })
@@ -29,6 +31,7 @@ describe('SpecNode', () => {
       specId: 'core:core/change',
       path: 'specs\\core\\change',
       title: 'Change',
+      contentHash: 'sha256:test',
     })
     expect(node.path).toBe('specs/core/change')
   })

@@ -9,4 +9,6 @@ export interface SymbolQuery {
   readonly filePath?: string
   /** Substring to match within symbol comments. */
   readonly comment?: string
+  /** When true, name and comment matching is case sensitive. Defaults to false (case insensitive). */
+  readonly caseSensitive?: boolean
 }

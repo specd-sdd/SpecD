@@ -1,6 +1,7 @@
 import { parse, Lang } from '@ast-grep/napi'
 import { type SgNode } from '@ast-grep/napi'
 import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
+import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
@@ -262,19 +263,64 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts relations (defines, exports, imports) from a parsed source file.
+   * Parses TypeScript/JavaScript import declarations from source code.
+   * @param filePath - Path to the source file.
+   * @param content - The source file content.
+   * @returns An array of parsed import declarations.
+   */
+  extractImportedNames(filePath: string, content: string): ImportDeclaration[] {
+    const lang = langForFile(filePath)
+    const root = parse(lang, content).root()
+    const results: ImportDeclaration[] = []
+
+    for (const child of root.children()) {
+      if (nodeKind(child) !== 'import_statement') continue
+
+      const sourceNode = child.field('source')
+      if (!sourceNode) continue
+      const specifier = sourceNode.text().replace(/['"]/g, '')
+      const isRelative = specifier.startsWith('.')
+
+      for (const importChild of child.children()) {
+        if (nodeKind(importChild) === 'import_clause') {
+          for (const clauseChild of importChild.children()) {
+            if (nodeKind(clauseChild) === 'named_imports') {
+              for (const spec of clauseChild.children()) {
+                if (nodeKind(spec) === 'import_specifier') {
+                  const nameNode = spec.field('name')
+                  const aliasNode = spec.field('alias')
+                  if (nameNode) {
+                    results.push({
+                      originalName: nameNode.text(),
+                      localName: aliasNode ? aliasNode.text() : nameNode.text(),
+                      specifier,
+                      isRelative,
+                    })
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * Extracts relations (defines, exports, imports, calls) from a parsed source file.
    * @param filePath - Path to the source file.
    * @param content - The source file content.
    * @param symbols - Previously extracted symbols for this file.
-   * @param _importMap - Reserved for future use; currently unused.
+   * @param importMap - Map of imported names to their symbol ids for CALLS resolution.
    * @returns An array of extracted relations.
    */
   extractRelations(
     filePath: string,
     content: string,
     symbols: SymbolNode[],
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _importMap: Map<string, string>,
+    importMap: Map<string, string>,
   ): Relation[] {
     const lang = langForFile(filePath)
     const root = parse(lang, content).root()
@@ -292,6 +338,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
 
     this.extractExportRelations(root, filePath, symbols, relations)
     this.extractImportRelations(root, filePath, relations)
+    this.extractCallRelations(root, symbols, importMap, relations)
 
     return relations
   }
@@ -380,6 +427,98 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         }),
       )
     }
+  }
+
+  /**
+   * Extracts CALLS relations by walking call_expression nodes in the AST.
+   * Resolves callees via local symbols and the import map.
+   * @param root - The root AST node.
+   * @param symbols - Known symbols in this file.
+   * @param importMap - Map of imported names to their symbol ids.
+   * @param relations - Accumulator array for discovered relations.
+   */
+  private extractCallRelations(
+    root: SgNode,
+    symbols: SymbolNode[],
+    importMap: Map<string, string>,
+    relations: Relation[],
+  ): void {
+    const localSymbolsByName = new Map<string, string>()
+    for (const s of symbols) {
+      localSymbolsByName.set(s.name, s.id)
+    }
+
+    const seen = new Set<string>()
+
+    const walkCalls = (node: SgNode): void => {
+      if (nodeKind(node) === 'call_expression') {
+        const fnNode = node.field('function')
+        if (fnNode && nodeKind(fnNode) === 'identifier') {
+          const calleeName = fnNode.text()
+          const calleeId = importMap.get(calleeName) ?? localSymbolsByName.get(calleeName)
+
+          if (calleeId) {
+            const callerId = this.findEnclosingSymbolId(node, symbols)
+            if (callerId) {
+              const key = `${callerId}->${calleeId}`
+              if (!seen.has(key)) {
+                seen.add(key)
+                relations.push(
+                  createRelation({
+                    source: callerId,
+                    target: calleeId,
+                    type: RelationType.Calls,
+                  }),
+                )
+              }
+            }
+          }
+        }
+      }
+
+      for (const child of node.children()) {
+        walkCalls(child)
+      }
+    }
+
+    walkCalls(root)
+  }
+
+  /**
+   * Finds the id of the innermost enclosing function, method, or class for a node.
+   * @param node - The AST node to find the enclosing scope for.
+   * @param symbols - Known symbols in this file.
+   * @returns The symbol id of the enclosing scope, or undefined if at module level.
+   */
+  private findEnclosingSymbolId(node: SgNode, symbols: SymbolNode[]): string | undefined {
+    let current = node.parent()
+    while (current) {
+      const kind = nodeKind(current)
+      if (
+        kind === 'function_declaration' ||
+        kind === 'method_definition' ||
+        kind === 'arrow_function'
+      ) {
+        const name = getName(current)
+        if (name) {
+          const line = current.range().start.line + 1
+          return symbols.find((s) => s.name === name && s.line === line)?.id
+        }
+        // Arrow function assigned to variable — check parent variable_declarator
+        if (kind === 'arrow_function') {
+          const declarator = current.parent()
+          if (declarator && nodeKind(declarator) === 'variable_declarator') {
+            const varName = declarator.field('name')?.text()
+            if (varName) {
+              const line = declarator.range().start.line + 1
+              return symbols.find((s) => s.name === varName && s.line === line)?.id
+            }
+          }
+        }
+      }
+      current = current.parent()
+    }
+    return undefined
   }
 
   /**

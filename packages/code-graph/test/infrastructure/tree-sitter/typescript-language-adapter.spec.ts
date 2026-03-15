@@ -141,4 +141,76 @@ describe('TypeScriptLanguageAdapter', () => {
       expect(imports).toHaveLength(0)
     })
   })
+
+  describe('extractImportedNames', () => {
+    it('parses named imports from relative specifier', () => {
+      const code = `import { foo, bar } from './utils.js'`
+      const imports = adapter.extractImportedNames('src/main.ts', code)
+      expect(imports).toHaveLength(2)
+      expect(imports[0]!.originalName).toBe('foo')
+      expect(imports[0]!.localName).toBe('foo')
+      expect(imports[0]!.specifier).toBe('./utils.js')
+      expect(imports[0]!.isRelative).toBe(true)
+    })
+
+    it('parses aliased imports', () => {
+      const code = `import { foo as bar } from './mod.js'`
+      const imports = adapter.extractImportedNames('main.ts', code)
+      expect(imports).toHaveLength(1)
+      expect(imports[0]!.originalName).toBe('foo')
+      expect(imports[0]!.localName).toBe('bar')
+    })
+
+    it('marks package imports as non-relative', () => {
+      const code = `import { createKernel } from '@specd/core'`
+      const imports = adapter.extractImportedNames('main.ts', code)
+      expect(imports).toHaveLength(1)
+      expect(imports[0]!.specifier).toBe('@specd/core')
+      expect(imports[0]!.isRelative).toBe(false)
+    })
+
+    it('parses type imports alongside value imports', () => {
+      const code = `import { createUser, type Config } from '@specd/core'`
+      const imports = adapter.extractImportedNames('main.ts', code)
+      expect(imports).toHaveLength(2)
+      expect(imports.map((i) => i.originalName)).toContain('createUser')
+      expect(imports.map((i) => i.originalName)).toContain('Config')
+    })
+
+    it('skips import statements without named imports', () => {
+      const code = `import './side-effect.js'`
+      const imports = adapter.extractImportedNames('main.ts', code)
+      expect(imports).toHaveLength(0)
+    })
+  })
+
+  describe('CALLS extraction', () => {
+    it('creates CALLS relation for local function call', () => {
+      const code = `function caller() { callee() }\nfunction callee() { }`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
+      const calls = relations.filter((r) => r.type === RelationType.Calls)
+      expect(calls).toHaveLength(1)
+      expect(calls[0]!.source).toContain('caller')
+      expect(calls[0]!.target).toContain('callee')
+    })
+
+    it('creates CALLS relation via import map', () => {
+      const code = `import { helper } from './utils.js'\nfunction main() { helper() }`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const importMap = new Map([['helper', 'utils.ts:function:helper:1']])
+      const relations = adapter.extractRelations('main.ts', code, symbols, importMap)
+      const calls = relations.filter((r) => r.type === RelationType.Calls)
+      expect(calls).toHaveLength(1)
+      expect(calls[0]!.target).toBe('utils.ts:function:helper:1')
+    })
+
+    it('skips unresolvable calls', () => {
+      const code = `function main() { console.log('hi') }`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
+      const calls = relations.filter((r) => r.type === RelationType.Calls)
+      expect(calls).toHaveLength(0)
+    })
+  })
 })

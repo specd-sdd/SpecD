@@ -105,16 +105,6 @@ importers:
 
   packages/code-graph:
     dependencies:
-      '@ast-grep/napi':
-        specifier: ^0.41.1
-        version: 0.41.1
-      ignore:
-        specifier: ^7.0.0
-        version: 7.0.5
-      lbug:
-        specifier: ^0.14.0
-        version: 0.14.3
-    devDependencies:
       '@ast-grep/lang-go':
         specifier: ^0.0.5
         version: 0.0.5
@@ -124,6 +114,15 @@ importers:
       '@ast-grep/lang-python':
         specifier: ^0.0.5
         version: 0.0.5
+      '@ast-grep/napi':
+        specifier: ^0.41.1
+        version: 0.41.1
+      ignore:
+        specifier: ^7.0.0
+        version: 7.0.5
+      lbug:
+        specifier: ^0.14.0
+        version: 0.14.3
 
   packages/core:
     dependencies:
