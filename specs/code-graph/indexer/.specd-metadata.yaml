@@ -54,8 +54,8 @@ rules:
       - |-
         Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:
 
-        * **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). For PHP files with namespace declarations, build a qualified name map. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.
-        * **Pass 2 (Resolve imports + CALLS, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). For relative imports, find the target file's symbols by path within the same workspace. For monorepo package imports, the monorepo map correlates package names with workspace prefixes, allowing cross-workspace resolution. For PHP qualified names, match against the namespace map globally. Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations. Accumulate all relations.
+        * **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter implements `extractNamespace` and `buildQualifiedName`, build a qualified name map for that language. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.
+        * **Pass 2 (Resolve imports + CALLS, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations. Accumulate all relations.
         * **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.
         * **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.
 
@@ -80,12 +80,14 @@ rules:
         * 100%: Done
 
         Progress updates include a detail string (e.g. `"150/460 files"`) for phases that process individual items.
-  - requirement: Monorepo package resolution
+  - requirement: Cross-workspace package resolution
     rules:
       - |-
-        When the workspace root contains a `pnpm-workspace.yaml` file, the indexer discovers all monorepo packages by parsing the `packages` globs and reading each `package.json` name field. For non-relative import specifiers (e.g. `@specd/core`), the indexer checks this map and searches the in-memory `SymbolIndex` for symbols with the imported name within the matching package's file path prefix.
+        Before Pass 2, the indexer builds a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over all registered adapters and the first one to return a non-`undefined` identity wins. This is language-agnostic — each adapter reads its own manifest format (`package.json`, `go.mod`, `pyproject.toml`, `composer.json`).
 
-        The monorepo package map is computed lazily (once per indexing run).
+        For non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the in-memory `SymbolIndex` for symbols with the imported name within the matching workspace's path prefix (`workspaceName + '/'`).
+
+        This works for both monorepo (workspaces in the same repo) and multirepo (workspaces in separate repos configured in `specd.yaml`) because the resolution depends only on the adapter reading each workspace's manifest — not on `pnpm-workspace.yaml` or any monorepo-specific tooling.
   - requirement: Error isolation
     rules:
       - |-
@@ -316,18 +318,43 @@ scenarios:
       - the callback is called with increasing percent values from 0 to 100
       - AND phase strings describe the current activity (e.g. "Parsing symbols", "Resolving imports", "Bulk loading")
       - AND detail strings are included for per-file phases (e.g. "150/460")
-  - requirement: Monorepo package resolution
-    name: Monorepo package imports resolved via pnpm-workspace.yaml
+  - requirement: Cross-workspace package resolution
+    name: Package identity built from adapter
     given:
-      - "a project with pnpm-workspace.yaml defining packages: ['packages/*']"
-      - "AND packages/core/package.json has name: '@specd/core'"
-      - AND file B in workspace cli imports createUser from @specd/core
-      - AND file A in workspace core defines createUser
+      - "workspace core with codeRoot containing package.json with name: '@specd/core'"
+      - AND the TypeScript adapter implements getPackageIdentity
+    when:
+      - the indexer builds the packageName → workspaceName map
+    then:
+      - "'@specd/core' maps to workspace 'core'"
+  - requirement: Cross-workspace package resolution
+    name: Cross-workspace import resolved via package identity
+    given:
+      - workspace core with package identity @specd/core defining createUser
+      - AND workspace cli has a file importing createUser from @specd/core
     when:
       - Pass 2 resolves imports
     then:
-      - an IMPORTS relation is created from file B to file A
+      - an IMPORTS relation is created from the cli file to the core file
       - AND a CALLS relation is created from the calling symbol to createUser
+  - requirement: Cross-workspace package resolution
+    name: Multirepo cross-workspace resolution
+    given:
+      - two workspaces from separate repos configured in specd.yaml
+      - AND each has a package.json with distinct package names
+      - AND workspace B imports a symbol from workspace A's package
+    when:
+      - Pass 2 resolves imports
+    then:
+      - the import resolves across repos via the packageName → workspaceName map
+  - requirement: Cross-workspace package resolution
+    name: Adapter without getPackageIdentity skips resolution
+    given:
+      - an adapter that does not implement getPackageIdentity
+    when:
+      - the indexer queries it for a workspace's package identity
+    then:
+      - non-relative imports for that language remain unresolved
   - requirement: Spec dependency indexing
     name: Specs resolved via callback
     given:
@@ -433,6 +460,6 @@ scenarios:
       - AND each entry reports its own filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed
       - AND the aggregate filesDiscovered equals the sum of per-workspace filesDiscovered
 contentHashes:
-  spec.md: sha256:cfee4dd3483de51f988a99a6f78f9ef6c829ccf0a8eaad1984993a7932dd15a5
-  verify.md: sha256:61cbf9d8e9d8ed47c3e4aaf701c09a0754a175183eac8af713606579799da280
+  spec.md: sha256:57ca993d61826616feb43c5b608070fc4086d24a4f8aa7149d10bf8cdb32de82
+  verify.md: sha256:5232a75a9ae1cfd0e7ac643e01a7acf402c6ad876e21f0b48b3c2b036f677722
 generatedBy: core

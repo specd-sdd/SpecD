@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { PythonLanguageAdapter } from '../../../src/infrastructure/tree-sitter/python-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
@@ -106,6 +109,70 @@ describe('PythonLanguageAdapter', () => {
       expect(imports).toHaveLength(1)
       expect(imports[0]!.originalName).toBe('path')
       expect(imports[0]!.localName).toBe('p')
+    })
+  })
+
+  describe('extensions', () => {
+    it('maps .py and .pyi to python', () => {
+      const ext = adapter.extensions()
+      expect(ext['.py']).toBe('python')
+      expect(ext['.pyi']).toBe('python')
+    })
+  })
+
+  describe('resolvePackageFromSpecifier', () => {
+    it('normalizes hyphens and underscores', () => {
+      const result = adapter.resolvePackageFromSpecifier('acme_auth.models', ['acme-auth'])
+      expect(result).toBe('acme-auth')
+    })
+
+    it('matches exact top-level module', () => {
+      const result = adapter.resolvePackageFromSpecifier('requests', ['requests'])
+      expect(result).toBe('requests')
+    })
+
+    it('returns undefined for unknown module', () => {
+      const result = adapter.resolvePackageFromSpecifier('numpy', ['pandas'])
+      expect(result).toBeUndefined()
+    })
+  })
+
+  describe('resolveRelativeImportPath', () => {
+    it('resolves dot-prefixed relative import', () => {
+      const result = adapter.resolveRelativeImportPath('core/src/models/user.py', '.base')
+      expect(result).toBe('core/src/models/base.py')
+    })
+
+    it('resolves parent import with double dot', () => {
+      const result = adapter.resolveRelativeImportPath('core/src/models/user.py', '..utils')
+      expect(result).toBe('core/src/utils.py')
+    })
+  })
+
+  describe('getPackageIdentity', () => {
+    let tempDir: string
+
+    afterEach(() => {
+      if (tempDir) rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    it('reads name from pyproject.toml', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'py-pkg-'))
+      writeFileSync(join(tempDir, 'pyproject.toml'), '[project]\nname = "acme-auth"\n')
+      expect(adapter.getPackageIdentity(tempDir)).toBe('acme-auth')
+    })
+
+    it('returns undefined when no pyproject.toml', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'py-pkg-'))
+      expect(adapter.getPackageIdentity(tempDir)).toBeUndefined()
+    })
+
+    it('walks up to find pyproject.toml above codeRoot', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'py-pkg-'))
+      writeFileSync(join(tempDir, 'pyproject.toml'), '[project]\nname = "acme-auth"\n')
+      const subDir = join(tempDir, 'src')
+      mkdirSync(subDir)
+      expect(adapter.getPackageIdentity(subDir, tempDir)).toBe('acme-auth')
     })
   })
 })

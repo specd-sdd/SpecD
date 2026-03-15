@@ -5,6 +5,7 @@ import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/sy
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
+import { findManifestField } from './find-manifest-field.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ensureLanguagesRegistered } from './register-languages.js'
 
@@ -54,6 +55,14 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    */
   languages(): string[] {
     return ['python']
+  }
+
+  /**
+   * Returns the file extension to language ID mapping for Python.
+   * @returns Extension-to-language map.
+   */
+  extensions(): Record<string, string> {
+    return { '.py': 'python', '.pyi': 'python' }
   }
 
   /**
@@ -276,7 +285,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         const moduleName = moduleNode.text()
         if (!moduleName.startsWith('.')) continue
 
-        const resolved = this.resolveRelativeImport(filePath, moduleName)
+        const resolved = this.resolveRelativeImportPath(filePath, moduleName)
         if (resolved) {
           relations.push(
             createRelation({
@@ -294,22 +303,62 @@ export class PythonLanguageAdapter implements LanguageAdapter {
   /**
    * Resolves a relative Python import to a file path.
    * @param fromFile - The importing file path.
-   * @param moduleName - The dot-prefixed module name.
-   * @returns The resolved file path, or undefined.
+   * @param specifier - The dot-prefixed module name.
+   * @returns The resolved file path.
    */
-  private resolveRelativeImport(fromFile: string, moduleName: string): string | undefined {
+  resolveRelativeImportPath(fromFile: string, specifier: string): string {
     const fromDir = fromFile.substring(0, fromFile.lastIndexOf('/'))
-    const parts = moduleName.split('.')
     const segments = fromDir.split('/')
 
-    for (const part of parts) {
-      if (part === '') {
-        segments.pop()
-      } else {
+    // Count leading dots: first dot = current dir, each extra dot = go up
+    let dots = 0
+    while (dots < specifier.length && specifier[dots] === '.') dots++
+
+    // Go up (dots - 1) levels: first dot is the relative marker (current dir)
+    for (let i = 1; i < dots; i++) {
+      if (segments.length > 1) segments.pop()
+    }
+
+    // Remaining part after the dots is the module path
+    const modulePart = specifier.substring(dots)
+    if (modulePart) {
+      for (const part of modulePart.split('.')) {
         segments.push(part)
       }
     }
 
     return segments.join('/') + '.py'
+  }
+
+  /**
+   * Resolves a Python import specifier to a known package.
+   * Normalizes hyphens and underscores for matching.
+   * @param specifier - The import specifier (e.g. `acme_auth.models`).
+   * @param knownPackages - Known package names from `pyproject.toml`.
+   * @returns The matching package name, or undefined.
+   */
+  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined {
+    const topLevel = specifier.split('.')[0]!
+    const normalized = topLevel.replaceAll('_', '-')
+    return knownPackages.find((pkg) => pkg.replaceAll('_', '-') === normalized)
+  }
+
+  /**
+   * Reads the package identity by searching for `pyproject.toml` at or above
+   * the given directory, bounded by the repository root.
+   * @param codeRoot - Absolute path to the workspace's code root.
+   * @param repoRoot - Optional repository root to bound the search.
+   * @returns The project name from the nearest `pyproject.toml`, or undefined.
+   */
+  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
+    return findManifestField(
+      codeRoot,
+      'pyproject.toml',
+      (content) => {
+        const match = content.match(/^\s*name\s*=\s*"([^"]+)"/m)
+        return match?.[1]
+      },
+      repoRoot,
+    )
   }
 }

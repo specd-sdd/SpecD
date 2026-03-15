@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
@@ -123,6 +126,49 @@ describe('PhpLanguageAdapter', () => {
       // The qualified name ns + '\' + symbolName should match the import specifier
       const qualifiedName = `${ns}\\${userSymbol!.name}`
       expect(qualifiedName).toBe(imports[0]!.specifier)
+    })
+  })
+
+  describe('extensions', () => {
+    it('maps .php to php', () => {
+      expect(adapter.extensions()).toEqual({ '.php': 'php' })
+    })
+  })
+
+  describe('buildQualifiedName', () => {
+    it('builds qualified name from namespace and symbol', () => {
+      expect(adapter.buildQualifiedName('App\\Models', 'User')).toBe('App\\Models\\User')
+    })
+
+    it('works with single-level namespace', () => {
+      expect(adapter.buildQualifiedName('App', 'Config')).toBe('App\\Config')
+    })
+  })
+
+  describe('getPackageIdentity', () => {
+    let tempDir: string
+
+    afterEach(() => {
+      if (tempDir) rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    it('reads name from composer.json', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-pkg-'))
+      writeFileSync(join(tempDir, 'composer.json'), JSON.stringify({ name: 'acme/auth' }))
+      expect(adapter.getPackageIdentity(tempDir)).toBe('acme/auth')
+    })
+
+    it('returns undefined when no composer.json', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-pkg-'))
+      expect(adapter.getPackageIdentity(tempDir)).toBeUndefined()
+    })
+
+    it('walks up to find composer.json above codeRoot', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-pkg-'))
+      writeFileSync(join(tempDir, 'composer.json'), JSON.stringify({ name: 'acme/auth' }))
+      const subDir = join(tempDir, 'src')
+      mkdirSync(subDir)
+      expect(adapter.getPackageIdentity(subDir, tempDir)).toBe('acme/auth')
     })
   })
 })

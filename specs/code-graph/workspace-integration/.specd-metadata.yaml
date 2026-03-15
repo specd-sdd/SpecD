@@ -69,7 +69,7 @@ rules:
         During Pass 2 (import resolution), the indexer SHALL resolve imports across workspaces:
 
         * **Relative imports** — resolved within the same workspace (same path prefix)
-        * **Monorepo package imports** — the monorepo map correlates package names with workspace names, allowing resolution across workspace boundaries
+        * **Package imports** — the `packageName → workspaceName` map (built from `LanguageAdapter.getPackageIdentity`) correlates package names with workspace names, allowing resolution across workspace boundaries. This works for both monorepo and multirepo setups.
         * **PHP qualified names** — resolved globally across all workspaces
 
         The in-memory `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins, enabling cross-workspace resolution.
@@ -128,6 +128,6 @@ constraints:
   - The discoverSpecs filesystem function is kept as a fallback but the primary path uses SpecRepository
   - Existing .specd/code-graph.lbug files are incompatible with the new path format — --force re-index is required after upgrading
 contentHashes:
-  spec.md: sha256:879988c4273e98bfbf43fb97d691ab1ebb5912503e1e9793f99b8424ca35d660
+  spec.md: sha256:20455b30bf5959957e3e3bd689cc4e184f6df8438cba2a7d10698762de34aced
   verify.md: sha256:3df7a93457184cac0387b4b5d473517c7206a9c380b2c341afabf8d65be4061a
 generatedBy: core

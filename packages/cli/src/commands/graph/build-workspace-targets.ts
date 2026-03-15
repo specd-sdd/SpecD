@@ -1,6 +1,21 @@
 import { createHash } from 'node:crypto'
-import { type SpecdConfig, type Kernel, type SpecRepository } from '@specd/core'
+import { type SpecdConfig, type Kernel, type SpecRepository, createVcsAdapter } from '@specd/core'
 import { type WorkspaceIndexTarget, type DiscoveredSpec } from '@specd/code-graph'
+
+/**
+ * Resolves the repository root for a given directory using the VCS adapter.
+ * Returns undefined if the directory is not inside a repository.
+ * @param codeRoot - Absolute path to resolve.
+ * @returns The repository root, or undefined.
+ */
+async function resolveRepoRoot(codeRoot: string): Promise<string | undefined> {
+  try {
+    const vcs = await createVcsAdapter(codeRoot)
+    return await vcs.rootDir()
+  } catch {
+    return undefined
+  }
+}
 
 /**
  * Builds workspace index targets from specd config and kernel.
@@ -8,6 +23,7 @@ import { type WorkspaceIndexTarget, type DiscoveredSpec } from '@specd/code-grap
  * For each workspace, creates a target with:
  * - name: workspace name
  * - codeRoot: absolute path to code directory
+ * - repoRoot: repository root resolved via VCS adapter
  * - specs: callback that resolves specs via SpecRepository
  *
  * @param config - The specd configuration.
@@ -15,22 +31,28 @@ import { type WorkspaceIndexTarget, type DiscoveredSpec } from '@specd/code-grap
  * @param workspaceFilter - Optional workspace name to filter to a single workspace.
  * @returns Array of workspace index targets.
  */
-export function buildWorkspaceTargets(
+export async function buildWorkspaceTargets(
   config: SpecdConfig,
   kernel: Kernel,
   workspaceFilter?: string,
-): WorkspaceIndexTarget[] {
+): Promise<WorkspaceIndexTarget[]> {
   let workspaces = [...config.workspaces]
 
   if (workspaceFilter) {
     workspaces = workspaces.filter((ws) => ws.name === workspaceFilter)
   }
 
-  return workspaces.map((ws) => ({
-    name: ws.name,
-    codeRoot: ws.codeRoot,
-    specs: () => resolveSpecsFromRepo(kernel.specs.repos.get(ws.name), ws.name),
-  }))
+  const targets: WorkspaceIndexTarget[] = []
+  for (const ws of workspaces) {
+    const repoRoot = await resolveRepoRoot(ws.codeRoot)
+    targets.push({
+      name: ws.name,
+      codeRoot: ws.codeRoot,
+      ...(repoRoot !== undefined ? { repoRoot } : {}),
+      specs: () => resolveSpecsFromRepo(kernel.specs.repos.get(ws.name), ws.name),
+    })
+  }
+  return targets
 }
 
 /**

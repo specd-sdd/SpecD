@@ -6,6 +6,7 @@ import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/sy
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
+import { findManifestField } from './find-manifest-field.js'
 
 /**
  * Determines the tree-sitter language enum for a given file path based on its extension.
@@ -101,6 +102,14 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    */
   languages(): string[] {
     return ['typescript', 'tsx', 'javascript', 'jsx']
+  }
+
+  /**
+   * Returns the file extension to language ID mapping for TypeScript/JavaScript.
+   * @returns Extension-to-language map.
+   */
+  extensions(): Record<string, string> {
+    return { '.ts': 'typescript', '.tsx': 'tsx', '.js': 'javascript', '.jsx': 'jsx' }
   }
 
   /**
@@ -417,7 +426,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
 
       if (!specifier.startsWith('.')) continue
 
-      const resolvedPath = this.resolveImportPath(filePath, specifier)
+      const resolvedPath = this.resolveRelativeImportPath(filePath, specifier)
       relations.push(
         createRelation({
           source: filePath,
@@ -522,12 +531,13 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Resolves a relative import specifier to an absolute-style file path.
-   * @param fromFile - The file containing the import statement.
-   * @param specifier - The relative import specifier string.
+   * Resolves a relative import specifier to a file path.
+   * Maps `.js` → `.ts` and adds `.ts` for extensionless specifiers.
+   * @param fromFile - The importing file path.
+   * @param specifier - The relative import specifier.
    * @returns The resolved file path.
    */
-  private resolveImportPath(fromFile: string, specifier: string): string {
+  resolveRelativeImportPath(fromFile: string, specifier: string): string {
     const fromDir = fromFile.substring(0, fromFile.lastIndexOf('/'))
     const parts = specifier.split('/')
     const segments = fromDir.split('/')
@@ -535,7 +545,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     for (const part of parts) {
       if (part === '.') continue
       if (part === '..') {
-        segments.pop()
+        if (segments.length > 1) segments.pop()
       } else {
         segments.push(part)
       }
@@ -549,5 +559,39 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     }
 
     return resolved
+  }
+
+  /**
+   * Extracts the package name from a non-relative import specifier.
+   * Scoped packages: first two segments (`@scope/name`).
+   * Bare packages: first segment.
+   * @param specifier - The import specifier.
+   * @param knownPackages - Known package identities.
+   * @returns The matching package name, or undefined.
+   */
+  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined {
+    const pkgName = specifier.startsWith('@')
+      ? specifier.split('/').slice(0, 2).join('/')
+      : specifier.split('/')[0]!
+    return knownPackages.includes(pkgName) ? pkgName : undefined
+  }
+
+  /**
+   * Reads the package identity by searching for `package.json` at or above
+   * the given directory, bounded by the repository root.
+   * @param codeRoot - Absolute path to the workspace's code root.
+   * @param repoRoot - Optional repository root to bound the search.
+   * @returns The `name` field from the nearest `package.json`, or undefined.
+   */
+  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined {
+    return findManifestField(
+      codeRoot,
+      'package.json',
+      (content) => {
+        const pkg = JSON.parse(content) as { name?: string }
+        return pkg.name
+      },
+      repoRoot,
+    )
   }
 }

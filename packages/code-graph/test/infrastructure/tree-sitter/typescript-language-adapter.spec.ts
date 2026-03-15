@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
@@ -211,6 +214,91 @@ describe('TypeScriptLanguageAdapter', () => {
       const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
       const calls = relations.filter((r) => r.type === RelationType.Calls)
       expect(calls).toHaveLength(0)
+    })
+  })
+
+  describe('extensions', () => {
+    it('maps .ts, .tsx, .js, .jsx to language IDs', () => {
+      const ext = adapter.extensions()
+      expect(ext['.ts']).toBe('typescript')
+      expect(ext['.tsx']).toBe('tsx')
+      expect(ext['.js']).toBe('javascript')
+      expect(ext['.jsx']).toBe('jsx')
+    })
+  })
+
+  describe('resolvePackageFromSpecifier', () => {
+    it('resolves scoped package', () => {
+      const result = adapter.resolvePackageFromSpecifier('@specd/core', [
+        '@specd/core',
+        '@specd/cli',
+      ])
+      expect(result).toBe('@specd/core')
+    })
+
+    it('resolves bare package', () => {
+      const result = adapter.resolvePackageFromSpecifier('lodash/fp', ['lodash'])
+      expect(result).toBe('lodash')
+    })
+
+    it('returns undefined for unknown package', () => {
+      const result = adapter.resolvePackageFromSpecifier('express', ['@specd/core'])
+      expect(result).toBeUndefined()
+    })
+  })
+
+  describe('resolveRelativeImportPath', () => {
+    it('resolves .js to .ts', () => {
+      const result = adapter.resolveRelativeImportPath('core/src/commands/create.ts', '../utils.js')
+      expect(result).toBe('core/src/utils.ts')
+    })
+
+    it('adds .ts for extensionless specifier', () => {
+      const result = adapter.resolveRelativeImportPath('core/src/index.ts', './helpers/cli')
+      expect(result).toBe('core/src/helpers/cli.ts')
+    })
+
+    it('resolves ./ specifier', () => {
+      const result = adapter.resolveRelativeImportPath('core/src/index.ts', './utils.js')
+      expect(result).toBe('core/src/utils.ts')
+    })
+  })
+
+  describe('getPackageIdentity', () => {
+    let tempDir: string
+
+    afterEach(() => {
+      if (tempDir) rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    it('reads name from package.json', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'ts-pkg-'))
+      writeFileSync(join(tempDir, 'package.json'), JSON.stringify({ name: '@specd/core' }))
+      expect(adapter.getPackageIdentity(tempDir)).toBe('@specd/core')
+    })
+
+    it('returns undefined when no package.json', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'ts-pkg-'))
+      expect(adapter.getPackageIdentity(tempDir)).toBeUndefined()
+    })
+
+    it('walks up to find package.json above codeRoot', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'ts-pkg-'))
+      writeFileSync(join(tempDir, 'package.json'), JSON.stringify({ name: '@acme/lib' }))
+      const subDir = join(tempDir, 'src')
+      mkdirSync(subDir)
+      expect(adapter.getPackageIdentity(subDir, tempDir)).toBe('@acme/lib')
+    })
+
+    it('does not walk above repoRoot boundary', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'ts-pkg-'))
+      const repoRoot = join(tempDir, 'repo')
+      mkdirSync(repoRoot)
+      const innerDir = join(repoRoot, 'packages', 'core')
+      mkdirSync(innerDir, { recursive: true })
+      // package.json above repoRoot — should NOT be found
+      writeFileSync(join(tempDir, 'package.json'), JSON.stringify({ name: 'outside' }))
+      expect(adapter.getPackageIdentity(innerDir, repoRoot)).toBeUndefined()
     })
   })
 })

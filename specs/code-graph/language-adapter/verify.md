@@ -150,13 +150,117 @@
 
 #### Scenario: Custom adapter extends registry
 
-- **GIVEN** a custom adapter declaring `languages(): ['python']`
+- **GIVEN** a custom adapter declaring `languages(): ['python']` and `extensions(): { '.py': 'python' }`
 - **WHEN** `register(adapter)` is called
 - **THEN** `getAdapter('python')` returns that adapter
+- **AND** `getAdapterForFile('main.py')` returns that adapter
 - **AND** `getAdapter('typescript')` still returns the TypeScript adapter
+
+#### Scenario: Extension map built from adapters
+
+- **GIVEN** a fresh `AdapterRegistry` with no adapters registered
+- **WHEN** an adapter with `extensions(): { '.rs': 'rust' }` is registered
+- **THEN** `getAdapterForFile('main.rs')` returns that adapter
+- **AND** `getLanguageForFile('main.rs')` returns `'rust'`
 
 #### Scenario: Later registration overrides earlier
 
 - **GIVEN** two adapters both declaring `languages(): ['typescript']`
 - **WHEN** both are registered in sequence
 - **THEN** `getAdapter('typescript')` returns the second adapter
+
+### Requirement: Package identity extraction
+
+#### Scenario: TypeScript adapter reads package.json
+
+- **GIVEN** a directory containing `package.json` with `{"name": "@specd/core"}`
+- **WHEN** `getPackageIdentity(codeRoot)` is called on the TypeScript adapter
+- **THEN** it returns `'@specd/core'`
+
+#### Scenario: No manifest returns undefined
+
+- **GIVEN** a directory with no `package.json`
+- **WHEN** `getPackageIdentity(codeRoot)` is called on the TypeScript adapter
+- **THEN** it returns `undefined`
+
+#### Scenario: Go adapter reads go.mod
+
+- **GIVEN** a directory containing `go.mod` with `module github.com/acme/auth`
+- **WHEN** `getPackageIdentity(codeRoot)` is called on the Go adapter
+- **THEN** it returns `'github.com/acme/auth'`
+
+#### Scenario: Python adapter reads pyproject.toml
+
+- **GIVEN** a directory containing `pyproject.toml` with `[project]` and `name = "acme-auth"`
+- **WHEN** `getPackageIdentity(codeRoot)` is called on the Python adapter
+- **THEN** it returns `'acme-auth'`
+
+#### Scenario: PHP adapter reads composer.json
+
+- **GIVEN** a directory containing `composer.json` with `{"name": "acme/auth"}`
+- **WHEN** `getPackageIdentity(codeRoot)` is called on the PHP adapter
+- **THEN** it returns `'acme/auth'`
+
+#### Scenario: Adapter without getPackageIdentity
+
+- **GIVEN** an adapter that does not implement `getPackageIdentity`
+- **WHEN** the indexer queries it for a workspace's package identity
+- **THEN** it returns `undefined` and cross-workspace resolution is skipped for that language
+
+#### Scenario: Manifest found above codeRoot
+
+- **GIVEN** a codeRoot at `/project/packages/core/src` with no `package.json`
+- **AND** `/project/packages/core/package.json` exists with `name: '@specd/core'`
+- **WHEN** `getPackageIdentity('/project/packages/core/src', '/project')` is called
+- **THEN** it returns `'@specd/core'`
+
+#### Scenario: Search bounded by repoRoot
+
+- **GIVEN** a codeRoot at `/project/packages/core`
+- **AND** `repoRoot` is `/project`
+- **AND** `/package.json` exists above the repo root
+- **WHEN** `getPackageIdentity` is called
+- **THEN** it does not read `/package.json` — search stops at `/project`
+
+### Requirement: Import specifier resolution
+
+#### Scenario: TypeScript scoped package specifier
+
+- **GIVEN** known packages `['@specd/core', '@specd/cli']`
+- **WHEN** `resolvePackageFromSpecifier('@specd/core', knownPackages)` is called on the TS adapter
+- **THEN** it returns `'@specd/core'`
+
+#### Scenario: TypeScript bare package specifier
+
+- **GIVEN** known packages `['lodash']`
+- **WHEN** `resolvePackageFromSpecifier('lodash/fp', knownPackages)` is called on the TS adapter
+- **THEN** it returns `'lodash'`
+
+#### Scenario: Go module specifier resolved by longest prefix
+
+- **GIVEN** known packages `['github.com/acme/auth']`
+- **WHEN** `resolvePackageFromSpecifier('github.com/acme/auth/models', knownPackages)` is called on the Go adapter
+- **THEN** it returns `'github.com/acme/auth'`
+
+#### Scenario: Python package specifier with hyphen normalization
+
+- **GIVEN** known packages `['acme-auth']`
+- **WHEN** `resolvePackageFromSpecifier('acme_auth.models', knownPackages)` is called on the Python adapter
+- **THEN** it returns `'acme-auth'`
+
+#### Scenario: Unknown specifier returns undefined
+
+- **GIVEN** known packages `['@specd/core']`
+- **WHEN** `resolvePackageFromSpecifier('express', knownPackages)` is called
+- **THEN** it returns `undefined`
+
+#### Scenario: TypeScript relative import path resolution
+
+- **GIVEN** a file at `core/src/commands/create.ts`
+- **WHEN** `resolveRelativeImportPath('core/src/commands/create.ts', '../utils.js')` is called
+- **THEN** it returns `'core/src/utils.ts'` (`.js` → `.ts`, path traversal applied)
+
+#### Scenario: PHP qualified name construction
+
+- **WHEN** `buildQualifiedName('App\\Models', 'User')` is called on the PHP adapter
+- **THEN** it returns `'App\\Models\\User'`
