@@ -20,8 +20,14 @@ export { type LanguageAdapter } from './domain/value-objects/language-adapter.js
 export {
   type IndexOptions,
   type IndexProgressCallback,
+  type WorkspaceIndexTarget,
+  type DiscoveredSpec,
 } from './domain/value-objects/index-options.js'
-export { type IndexResult, type IndexError } from './domain/value-objects/index-result.js'
+export {
+  type IndexResult,
+  type IndexError,
+  type WorkspaceIndexBreakdown,
+} from './domain/value-objects/index-result.js'
 
 // Traversal types
 export { type TraversalOptions } from './domain/value-objects/traversal-options.js'
@@ -29,6 +35,9 @@ export { type TraversalResult } from './domain/value-objects/traversal-result.js
 export { type ImpactResult, type FileImpactResult } from './domain/value-objects/impact-result.js'
 export { type ChangeDetectionResult } from './domain/value-objects/change-detection-result.js'
 export { type RiskLevel } from './domain/value-objects/risk-level.js'
+
+// Spec discovery
+export { discoverSpecsFromDir } from './application/use-cases/discover-specs.js'
 
 // Errors
 export { CodeGraphError } from './domain/errors/code-graph-error.js'

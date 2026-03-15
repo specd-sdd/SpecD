@@ -11,7 +11,12 @@ export { type TraversalResult } from './traversal-result.js'
 export { type ImpactResult, type FileImpactResult } from './impact-result.js'
 export { type RiskLevel, computeRiskLevel } from './risk-level.js'
 export { type ChangeDetectionResult } from './change-detection-result.js'
-export { type IndexOptions, type IndexProgressCallback } from './index-options.js'
-export { type IndexResult, type IndexError } from './index-result.js'
+export {
+  type IndexOptions,
+  type IndexProgressCallback,
+  type WorkspaceIndexTarget,
+  type DiscoveredSpec,
+} from './index-options.js'
+export { type IndexResult, type IndexError, type WorkspaceIndexBreakdown } from './index-result.js'
 export { type LanguageAdapter } from './language-adapter.js'
 export { type ImportDeclaration } from './import-declaration.js'

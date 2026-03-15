@@ -4,17 +4,30 @@
 
 ### Requirement: File node
 
-#### Scenario: FileNode equality by path and workspace
+#### Scenario: FileNode equality by path
 
-- **GIVEN** two `FileNode` values with the same `path` and `workspace` but different `contentHash`
+- **GIVEN** two `FileNode` values with the same `path` but different `contentHash`
 - **WHEN** equality is checked
-- **THEN** they are considered equal
+- **THEN** they are considered equal (since path includes the workspace name prefix and is globally unique)
 
 #### Scenario: FileNode path normalization
 
 - **GIVEN** a file at OS path `src\domain\entities\change.ts`
 - **WHEN** a `FileNode` is created
 - **THEN** `path` is stored as `src/domain/entities/change.ts` (forward-slash-normalized)
+
+#### Scenario: FileNode workspace is a name string
+
+- **GIVEN** a file discovered in workspace `core`
+- **WHEN** a `FileNode` is created
+- **THEN** `workspace` is `'core'` (the workspace name, not an absolute path)
+
+#### Scenario: FileNode path includes workspace prefix
+
+- **GIVEN** a file `src/index.ts` discovered in workspace `core`
+- **WHEN** a `FileNode` is created by the indexer
+- **THEN** `path` is `'core/src/index.ts'`
+- **AND** `workspace` is `'core'`
 
 ### Requirement: Spec node
 
@@ -30,19 +43,38 @@
 - **WHEN** a `SpecNode` is created
 - **THEN** `dependsOn` is `['core:core/config', 'core:core/storage']`
 
+#### Scenario: SpecNode includes workspace field
+
+- **GIVEN** a spec discovered in workspace `core`
+- **WHEN** a `SpecNode` is created
+- **THEN** `workspace` is `'core'`
+
+#### Scenario: SpecNode dependsOn defaults to empty
+
+- **GIVEN** a spec with no dependencies
+- **WHEN** a `SpecNode` is created without `dependsOn`
+- **THEN** `dependsOn` defaults to `[]`
+
 ### Requirement: Symbol node
 
 #### Scenario: Deterministic id generation
 
-- **GIVEN** a symbol with `filePath: 'src/utils.ts'`, `kind: function`, `name: 'hash'`, `line: 10`
+- **GIVEN** a symbol with `filePath: 'core/src/utils.ts'`, `kind: function`, `name: 'hash'`, `line: 10`
 - **WHEN** the id is computed
-- **THEN** it produces the same value every time for these inputs
+- **THEN** it produces `'core/src/utils.ts:function:hash:10'` every time for these inputs
 
 #### Scenario: Different line produces different id
 
 - **GIVEN** two symbols with the same `filePath`, `kind`, and `name` but different `line` values
 - **WHEN** their ids are computed
 - **THEN** the ids are different
+
+#### Scenario: Id includes workspace-prefixed path
+
+- **GIVEN** a symbol in file `core/src/index.ts` (workspace-prefixed path)
+- **WHEN** the id is computed
+- **THEN** the id starts with `core/src/index.ts:`
+- **AND** the id is globally unique across workspaces
 
 #### Scenario: Comment extracted from JSDoc
 
@@ -100,7 +132,7 @@
 
 - **WHEN** `CodeGraphError` is instantiated
 - **THEN** it extends `Error` directly, not `SpecdError`
-- **AND** no import from `@specd/core` is required
+- **AND** error types do not import from `@specd/core`
 
 #### Scenario: Duplicate symbol id detected
 

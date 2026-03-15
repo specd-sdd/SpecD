@@ -1,5 +1,6 @@
 import { Command } from 'commander'
 import { output, parseFormat } from '../../formatter.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { withProvider } from './with-provider.js'
 
 /**
@@ -16,7 +17,6 @@ export function registerGraphFind(parent: Command): void {
     .option('--file <path>', 'filter by file path (supports * wildcards)')
     .option('--comment <text>', 'search in symbol comments (substring match)')
     .option('--case-sensitive', 'use case-sensitive matching for name and comment')
-    .option('--path <path>', 'workspace root path', process.cwd())
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .action(
       async (opts: {
@@ -25,12 +25,12 @@ export function registerGraphFind(parent: Command): void {
         file?: string
         comment?: string
         caseSensitive?: boolean
-        path: string
         format: string
       }) => {
         const fmt = parseFormat(opts.format)
+        const { config } = await resolveCliContext()
 
-        await withProvider(opts.path, opts.format, async (provider) => {
+        await withProvider(config, opts.format, async (provider) => {
           const query: Record<string, unknown> = {}
           if (opts.name) query['name'] = opts.name
           if (opts.kind) query['kind'] = opts.kind

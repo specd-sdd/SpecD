@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 export const SCHEMA_DDL = `
 CREATE NODE TABLE IF NOT EXISTS File(
@@ -23,6 +23,7 @@ CREATE NODE TABLE IF NOT EXISTS Spec(
   path STRING,
   title STRING,
   contentHash STRING,
+  workspace STRING,
   PRIMARY KEY (specId)
 );
 CREATE NODE TABLE IF NOT EXISTS Meta(

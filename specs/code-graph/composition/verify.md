@@ -13,8 +13,8 @@
 #### Scenario: Index delegates to IndexCodeGraph
 
 - **GIVEN** an opened `CodeGraphProvider`
-- **WHEN** `index({ workspacePath: '/project' })` is called
-- **THEN** `IndexCodeGraph.execute()` is invoked with the workspace path and the result is returned
+- **WHEN** `index({ workspaces: [...], projectRoot: '/project' })` is called
+- **THEN** `IndexCodeGraph.execute()` is invoked with the workspace targets and the result is returned
 
 #### Scenario: Clear removes all data for full re-index
 
@@ -24,12 +24,28 @@
 
 ### Requirement: Factory function
 
-#### Scenario: Factory creates fully wired provider
+#### Scenario: Primary factory with SpecdConfig
+
+- **WHEN** `createCodeGraphProvider(config)` is called with a `SpecdConfig`
+- **THEN** the storage path is derived from `config.projectRoot`
+- **AND** the returned provider can be opened, used for indexing and queries, and closed without error
+
+#### Scenario: Legacy factory with CodeGraphOptions
 
 - **WHEN** `createCodeGraphProvider({ storagePath: '/project' })` is called
 - **THEN** the returned provider can be opened, used for indexing and queries, and closed without error
 
-#### Scenario: Custom adapters registered
+#### Scenario: Factory detects overload by property
+
+- **GIVEN** an object with `projectRoot` property
+- **WHEN** passed to `createCodeGraphProvider`
+- **THEN** it is treated as `SpecdConfig`
+
+- **GIVEN** an object with `storagePath` property
+- **WHEN** passed to `createCodeGraphProvider`
+- **THEN** it is treated as `CodeGraphOptions`
+
+#### Scenario: Custom adapters registered (legacy)
 
 - **GIVEN** a custom adapter for Python
 - **WHEN** `createCodeGraphProvider({ storagePath: '/project', adapters: [pythonAdapter] })` is called
@@ -56,7 +72,12 @@
 #### Scenario: Model types are exported
 
 - **WHEN** a consumer needs to type-annotate results
-- **THEN** `FileNode`, `SymbolNode`, `Relation`, `SymbolKind`, and `RelationType` are available as imports
+- **THEN** `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, and `RelationType` are available as imports
+
+#### Scenario: Workspace integration types are exported
+
+- **WHEN** a consumer needs to build workspace targets
+- **THEN** `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, and `DiscoveredSpec` are available as imports
 
 ### Requirement: Lifecycle management
 
@@ -78,10 +99,10 @@
 - **WHEN** `close()` is called twice
 - **THEN** the second call completes without error
 
-### Requirement: No dependency on @specd/core
+### Requirement: Dependency on @specd/core
 
-#### Scenario: No core imports in package
+#### Scenario: Package depends on @specd/core for types
 
 - **WHEN** the `@specd/code-graph` package is inspected
-- **THEN** its `package.json` has no dependency on `@specd/core` or any `@specd/*` package
-- **AND** no source file imports from `@specd/core`
+- **THEN** its `package.json` has a dependency on `@specd/core`
+- **AND** the primary factory accepts `SpecdConfig` from `@specd/core`

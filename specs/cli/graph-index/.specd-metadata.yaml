@@ -1,0 +1,155 @@
+title: Graph Index
+description: Without an up-to-date code graph, all graph-based queries return stale or empty results. The `specd graph index` command indexes the current workspace into the code graph, reporting what was discovered, indexed, skipped, and removed so users and agents can verify completeness.
+dependsOn:
+  - cli:cli/entrypoint
+  - code-graph:code-graph/composition
+context:
+  - Without an up-to-date code graph, all graph-based queries return stale or empty results. The `specd graph index` command indexes the current workspace into the code graph, reporting what was discovered, indexed, skipped, and removed so users and agents can verify completeness.
+rules:
+  - requirement: Command signature
+    rules:
+      - |-
+        ```
+        specd graph index [--workspace <name>] [--force] [--format text|json|toon]
+        ```
+
+        * `--workspace` — optional; index only the named workspace instead of all workspaces
+        * `--force` — optional flag; when present, all existing graph data is cleared before indexing
+        * `--format text|json|toon` — optional; output format, defaults to `text`
+
+        The `--path` option is removed — the workspace root is derived from `SpecdConfig` via `resolveCliContext()`.
+  - requirement: Indexing behaviour
+    rules:
+      - |-
+        The command uses `resolveCliContext()` to load config and kernel, then uses `withProvider` which manages the `CodeGraphProvider` lifecycle and registers `SIGINT`/`SIGTERM` signal handlers for graceful shutdown.
+
+        The command:
+
+        1. Resolves CLI context via `resolveCliContext()` to get `SpecdConfig` and `Kernel`
+        2. Creates a `CodeGraphProvider` from the config via `withProvider`
+        3. If `--force` is passed, deletes the `.lbug`, `.lbug.wal`, and `.lbug.lock` files before opening (rather than calling `clear()`)
+        4. Builds `WorkspaceIndexTarget[]` from `config.workspaces`, using `kernel.specs.repos` to provide spec sources
+        5. If `--workspace` is specified, filters to only that workspace
+        6. Calls `index({ workspaces, projectRoot })` to perform the indexing
+        7. Outputs the `IndexResult` with per-workspace breakdown
+        8. Closes the provider
+        9. Exits with `process.exit(0)` — this explicit exit is required because the LadybugDB native threads keep the Node process alive
+
+        When output is a TTY and format is `text`, progress is displayed on stderr using `\r\x1b[K` for in-place updates (overwriting the current line).
+  - requirement: Output format
+    rules:
+      - |-
+        In `text` mode (default), the output is a summary block:
+
+        ```
+        Indexed 387 file(s) in 1234ms
+          discovered: 459
+          skipped:    72
+          removed:    0
+          specs:      122
+          errors:     3
+            path/to/file.ts: error message
+        ```
+
+        The first line shows `filesIndexed` and `duration`. The indented lines show `filesDiscovered`, `filesSkipped`, `filesRemoved`, `specsIndexed`, and error count. When errors are present, each error is listed below with its file path and message, indented further.
+
+        In `json` or `toon` mode, the full `IndexResult` object is output as-is.
+  - requirement: Error cases
+    rules:
+      - |-
+        If the provider cannot be opened or indexing fails due to an infrastructure error (I/O, database), the command exits with code 3.
+
+        Per-file indexing errors (parse failures, unsupported syntax) do not cause a non-zero exit — they are reported in the `errors` array of `IndexResult` and the command exits with code 0.
+constraints:
+  - The CLI does not contain indexing logic — it delegates entirely to @specd/code-graph
+  - process.exit(0) is called explicitly after closing the provider to prevent LadybugDB native threads from keeping the process alive
+  - --force deletes the database files (.lbug, .lbug.wal, .lbug.lock) before opening; without it, indexing is incremental
+  - The withProvider helper manages lifecycle and registers SIGINT/SIGTERM signal handlers
+  - Workspace targets and spec sources are derived from SpecdConfig and Kernel, not from CLI arguments
+scenarios:
+  - requirement: Indexing behaviour
+    name: Successful indexing with defaults
+    given:
+      - the current working directory is a valid workspace with TypeScript files
+    when:
+      - specd graph index is run
+    then:
+      - stdout shows Indexed N file(s) in Xms followed by the summary lines
+      - AND the process exits with code 0
+  - requirement: Indexing behaviour
+    name: Force flag clears existing data
+    given:
+      - the workspace has been previously indexed
+    when:
+      - specd graph index --force is run
+    then:
+      - clear() is called on the provider before indexing
+      - AND filesRemoved in the output reflects the previously indexed files
+  - requirement: Indexing behaviour
+    name: Custom path
+    given:
+      - /tmp/my-project is a valid workspace
+    when:
+      - specd graph index --path /tmp/my-project is run
+    then:
+      - the provider is created with /tmp/my-project as the workspace path
+      - AND indexing operates on files within that directory
+  - requirement: Indexing behaviour
+    name: Process exits explicitly
+    given:
+      - indexing completes successfully
+    when:
+      - the provider is closed
+    then:
+      - process.exit(0) is called to prevent the LadybugDB addon from keeping the process alive
+  - requirement: Output format
+    name: Text output shows summary
+    given:
+      - indexing discovers 459 files, indexes 387, skips 72, removes 0, indexes 122 specs, and has 0 errors in 1234ms
+    when:
+      - specd graph index is run
+    then:
+      - stdout contains Indexed 387 file(s) in 1234ms
+      - 'AND stdout contains discovered: 459'
+      - 'AND stdout contains skipped:    72'
+      - 'AND stdout contains errors:     0'
+  - requirement: Output format
+    name: Text output with errors
+    given:
+      - indexing completes with 2 per-file errors
+    when:
+      - specd graph index is run
+    then:
+      - 'stdout shows errors:     2'
+      - AND each error is listed below with its file path and message
+      - AND the process exits with code 0
+  - requirement: Output format
+    name: JSON output
+    given:
+      - indexing completes successfully
+    when:
+      - specd graph index --format json is run
+    then:
+      - stdout is valid JSON containing filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsIndexed, errors, and duration
+  - requirement: Error cases
+    name: Infrastructure error exits with code 3
+    given:
+      - the provider cannot be opened (e.g. database I/O error)
+    when:
+      - specd graph index is run
+    then:
+      - 'stderr contains a fatal: prefixed error message'
+      - AND the process exits with code 3
+  - requirement: Error cases
+    name: Per-file errors do not cause non-zero exit
+    given:
+      - indexing encounters parse failures in some files
+    when:
+      - specd graph index is run
+    then:
+      - the errors are included in the errors array of the output
+      - AND the process exits with code 0
+contentHashes:
+  spec.md: sha256:ba80dda3d32ab7f958da35d8ac15ff6325eba92bad9b6111a4216e2906f00f12
+  verify.md: sha256:1b97f3a2dbbe003f59a58467cbe7c36661420bb1c40251758e30cd5c103025d9
+generatedBy: core

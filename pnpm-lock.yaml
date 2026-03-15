@@ -117,6 +117,9 @@ importers:
       '@ast-grep/napi':
         specifier: ^0.41.1
         version: 0.41.1
+      '@specd/core':
+        specifier: workspace:*
+        version: link:../core
       ignore:
         specifier: ^7.0.0
         version: 7.0.5

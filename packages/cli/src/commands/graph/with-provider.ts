@@ -1,3 +1,4 @@
+import { type SpecdConfig } from '@specd/core'
 import { createCodeGraphProvider } from '@specd/code-graph'
 import { handleError } from '../../handle-error.js'
 
@@ -10,16 +11,16 @@ type Provider = ReturnType<typeof createCodeGraphProvider>
  * LadybugDB native threads from keeping the process alive.
  * On SIGINT/SIGTERM, exits immediately without waiting for close() since
  * LadybugDB native calls can block indefinitely.
- * @param storagePath - The workspace root path.
+ * @param config - The specd configuration.
  * @param format - The output format string (for error reporting).
  * @param fn - The async callback receiving the opened provider.
  */
 export async function withProvider(
-  storagePath: string,
+  config: SpecdConfig,
   format: string,
   fn: (provider: Provider) => Promise<void>,
 ): Promise<void> {
-  const provider = createCodeGraphProvider({ storagePath })
+  const provider = createCodeGraphProvider(config)
 
   // Force exit on signals — don't wait for LadybugDB close which can block
   const forceExit = (): void => {

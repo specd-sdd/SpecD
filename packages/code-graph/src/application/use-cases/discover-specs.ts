@@ -4,7 +4,7 @@ import { createSpecNode, type SpecNode } from '../../domain/value-objects/spec-n
 import { computeContentHash } from './compute-content-hash.js'
 
 /** Represents a discovered spec with its parsed node and content hash. */
-interface DiscoveredSpec {
+export interface DiscoveredSpec {
   spec: SpecNode
   contentHash: string
 }
@@ -93,12 +93,15 @@ function buildSpecId(specsDir: string, specDirPath: string): string {
  * Discovers all spec.md files under the workspace's specs/ directory and parses them into spec nodes.
  * @param workspacePath - Absolute path to the workspace root.
  * @param onProgress - Optional callback invoked with the number of specs found so far.
+ * @param workspace - Optional workspace name for the discovered specs. Defaults to empty string.
  * @returns An array of discovered specs with their parsed nodes and content hashes.
  */
 export function discoverSpecs(
   workspacePath: string,
   onProgress?: (found: number) => void,
+  workspace?: string,
 ): DiscoveredSpec[] {
+  const wsName = workspace ?? ''
   const specsDir = join(workspacePath, 'specs')
   if (!existsSync(specsDir)) return []
 
@@ -147,7 +150,104 @@ export function discoverSpecs(
 
       const hash = computeContentHash(hashSource)
       results.push({
-        spec: createSpecNode({ specId, path: relPath, title, contentHash: hash, dependsOn }),
+        spec: createSpecNode({
+          specId,
+          path: relPath,
+          title,
+          contentHash: hash,
+          dependsOn,
+          workspace: wsName,
+        }),
+        contentHash: hash,
+      })
+      if (onProgress) onProgress(results.length)
+    }
+
+    for (const entry of entries) {
+      const fullPath = join(dir, entry)
+      try {
+        const stat = statSync(fullPath, { throwIfNoEntry: false })
+        if (stat?.isDirectory()) {
+          walk(fullPath)
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  walk(specsDir)
+  return results
+}
+
+/**
+ * Discovers all spec.md files under a given specs directory and parses them into spec nodes.
+ * Unlike `discoverSpecs`, this accepts the specs directory path directly.
+ * @param specsDir - Absolute path to the specs directory.
+ * @param workspace - Workspace name for the discovered specs.
+ * @param onProgress - Optional callback invoked with the number of specs found so far.
+ * @returns An array of discovered specs with their parsed nodes and content hashes.
+ */
+export function discoverSpecsFromDir(
+  specsDir: string,
+  workspace: string,
+  onProgress?: (found: number) => void,
+): DiscoveredSpec[] {
+  if (!existsSync(specsDir)) return []
+
+  const results: DiscoveredSpec[] = []
+
+  /**
+   * Recursively walks directories looking for spec.md files.
+   * @param dir - Absolute path to the directory to walk.
+   */
+  function walk(dir: string): void {
+    let entries: string[]
+    try {
+      entries = readdirSync(dir)
+    } catch {
+      return
+    }
+
+    const specMdPath = join(dir, 'spec.md')
+    if (existsSync(specMdPath)) {
+      let specContent: string
+      try {
+        specContent = readFileSync(specMdPath, 'utf-8')
+      } catch {
+        return
+      }
+
+      const title = extractTitle(specContent)
+      let hashSource = specContent
+
+      let dependsOn: string[] = []
+      const metadataPath = join(dir, '.specd-metadata.yaml')
+      if (existsSync(metadataPath)) {
+        try {
+          const metadataContent = readFileSync(metadataPath, 'utf-8')
+          dependsOn = extractDependsOnFromMetadata(metadataContent)
+          hashSource += metadataContent
+        } catch {
+          // skip metadata
+        }
+      } else {
+        dependsOn = extractDependsOnFromSpec(specContent)
+      }
+
+      const relPath = relative(specsDir, dir).replaceAll('\\', '/')
+      const specId = `${workspace}:${workspace}/${relPath}`
+
+      const hash = computeContentHash(hashSource)
+      results.push({
+        spec: createSpecNode({
+          specId,
+          path: relPath,
+          title,
+          contentHash: hash,
+          dependsOn,
+          workspace,
+        }),
         contentHash: hash,
       })
       if (onProgress) onProgress(results.length)

@@ -1,0 +1,283 @@
+title: Symbol Model
+description: A code graph needs a unified, language-agnostic representation of source code structure before any persistence, traversal, or impact analysis can operate on it. The symbol model defines the domain entities and value objects that represent files, symbols, and the relationships between them — the foundational vocabulary for the entire `@specd/code-graph` package.
+dependsOn:
+  - default:_global/conventions
+context:
+  - A code graph needs a unified, language-agnostic representation of source code structure before any persistence, traversal, or impact analysis can operate on it. The symbol model defines the domain entities and value objects that represent files, symbols, and the relationships between them — the foundational vocabulary for the entire `@specd/code-graph` package.
+rules:
+  - requirement: File node
+    rules:
+      - |-
+        A `FileNode` SHALL represent a single source file in the workspace. It contains:
+
+        * **`path`** (`string`) — globally unique path in format `{workspaceName}/{relativeToCodeRoot}` (e.g. `core/src/index.ts`). Forward-slash-normalized. This is the node's identity.
+        * **`language`** (`string`) — language identifier (e.g. `typescript`, `python`). Determined by the language adapter at index time.
+        * **`contentHash`** (`string`) — hash of the file's content at last index. Used for incremental diffing.
+        * **`workspace`** (`string`) — the workspace name this file belongs to (e.g. `core`, `cli`, `default`).
+        * **`embedding`** (`Float32Array | undefined`) — optional vector embedding for semantic search. Deferred to v2+.
+
+        Two `FileNode` values are equal if and only if their `path` fields match (since path includes the workspace name prefix).
+  - requirement: Spec node
+    rules:
+      - |-
+        A `SpecNode` SHALL represent a spec directory in the workspace. It contains:
+
+        * **`specId`** (`string`) — the spec identifier in `workspace:package/topic` format (e.g. `core:core/change`, `_global:_global/architecture`). This is the node's identity.
+        * **`path`** (`string`) — workspace-relative path to the spec directory (e.g. `specs/core/change`).
+        * **`title`** (`string`) — the spec title extracted from the `# Title` heading in `spec.md`.
+        * **`contentHash`** (`string`) — hash of the spec's content at last index. Computed from `spec.md` + `.specd-metadata.yaml`. Used for incremental diffing.
+        * **`dependsOn`** (`string[]`) — ordered list of spec IDs this spec depends on, extracted from `.specd-metadata.yaml` or the `## Spec Dependencies` section in `spec.md`.
+        * **`workspace`** (`string`) — the workspace name this spec belongs to (e.g. `core`, `_global`).
+
+        Two `SpecNode` values are equal if their `specId` fields match.
+  - requirement: Symbol node
+    rules:
+      - |-
+        A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:
+
+        * **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line` (e.g. `core/src/index.ts:function:main:1`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.
+        * **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).
+        * **`kind`** (`SymbolKind`) — the category of this symbol.
+        * **`filePath`** (`string`) — workspace-relative path of the file containing this symbol.
+        * **`line`** (`number`) — 1-based line number of the symbol's declaration.
+        * **`column`** (`number`) — 0-based column offset of the symbol's declaration.
+        * **`comment`** (`string | undefined`) — the raw comment or JSDoc text immediately preceding the symbol's declaration. Stored verbatim (no parsing) to enable full-text search. Language adapters extract this from the AST; symbols without a preceding comment have `undefined`.
+
+        The `id` field is the symbol's identity for graph operations. Two `SymbolNode` values with the same `id` are considered the same symbol.
+  - requirement: SymbolKind enum
+    rules:
+      - |-
+        `SymbolKind` SHALL be a closed string enum with the following members:
+
+        * `function`
+        * `class`
+        * `method`
+        * `variable`
+        * `type`
+        * `interface`
+        * `enum`
+
+        No other values are permitted. Language adapters MUST map language-specific constructs to one of these kinds or skip the construct entirely.
+  - requirement: Relation types
+    rules:
+      - |-
+        Relations between nodes SHALL be represented as typed edges. Each relation has a `source`, `target`, and `type`. The following relation types are defined:
+
+        | Type         | Source | Target | Meaning                                | Phase |
+        | ------------ | ------ | ------ | -------------------------------------- | ----- |
+        | `IMPORTS`    | File   | File   | Source file imports from target file   | v1.5  |
+        | `DEFINES`    | File   | Symbol | File contains the symbol's declaration | v2    |
+        | `CALLS`      | Symbol | Symbol | Source symbol invokes target symbol    | v2    |
+        | `EXPORTS`    | File   | Symbol | File exports the symbol as public API  | v2    |
+        | `DEPENDS_ON` | Spec   | Spec   | Spec depends on target spec            | v1.5  |
+        | `COVERS`     | Spec   | File   | Spec covers the target file            | v2+   |
+
+        Relations are directional. `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`, and `DEPENDS_ON` are populated by the indexer. `COVERS` is populated by spec-to-code mapping (deferred to v2+).
+  - requirement: Relation value object
+    rules:
+      - |-
+        A `Relation` SHALL be a value object containing:
+
+        * **`source`** (`string`) — the id or path of the source node.
+        * **`target`** (`string`) — the id or path of the target node.
+        * **`type`** (`RelationType`) — one of the relation types defined above.
+        * **`metadata`** (`Record<string, unknown> | undefined`) — optional adapter-specific metadata (e.g. import specifier, call site line number).
+
+        Two `Relation` values are equal if `source`, `target`, and `type` all match.
+  - requirement: Import declaration
+    rules:
+      - |-
+        An `ImportDeclaration` SHALL represent a parsed import statement extracted from source code. It contains:
+
+        * **`localName`** (`string`) — the identifier used locally in the importing file
+        * **`originalName`** (`string`) — the identifier as declared in the source module
+        * **`specifier`** (`string`) — the raw import specifier string
+        * **`isRelative`** (`boolean`) — true if the specifier is a relative path
+
+        `ImportDeclaration` is a pure syntactic representation — it contains no resolution information. The indexer resolves specifiers to files and symbol ids using the adapter registry and monorepo package map.
+  - requirement: Immutability
+    rules:
+      - All model types — `FileNode`, `SymbolNode`, `Relation`, and any aggregate containing them — SHALL be immutable value objects. Properties MUST be `readonly`. Mutations to the graph happen exclusively through the `GraphStore` port's atomic upsert operations, which replace entire file-scoped slices. There is no in-place mutation API.
+  - requirement: Error types
+    rules:
+      - |-
+        `@specd/code-graph` SHALL define its own `CodeGraphError` base class extending `Error`. All package-specific errors MUST extend `CodeGraphError`. This package has no dependency on `@specd/core` and MUST NOT use `SpecdError` or any core error type.
+
+        Specific error subclasses include:
+
+        * `InvalidSymbolKindError` — when a symbol kind value is not in the `SymbolKind` enum
+        * `InvalidRelationTypeError` — when a relation type value is not in the defined set
+        * `DuplicateSymbolIdError` — when two symbols in the same file produce the same deterministic id
+constraints:
+  - All model types are value objects — no identity beyond structural equality (except SymbolNode.id which is deterministic)
+  - SymbolKind is a closed enum — adding a new kind requires a spec change
+  - RelationType is a closed set — adding a new type requires a spec change
+  - Depends on @specd/core for SpecdConfig type imports
+  - embedding on FileNode is deferred to v2+ — adapters MUST NOT populate it until the embedding pipeline is implemented
+  - COVERS relations are deferred to v2+ — the type exists in the model but is not populated by any v1.5/v2 process
+  - DEPENDS_ON relations are populated by the indexer in v1.5, reading from .specd-metadata.yaml or spec.md
+scenarios:
+  - requirement: File node
+    name: FileNode equality by path
+    given:
+      - two FileNode values with the same path but different contentHash
+    when:
+      - equality is checked
+    then:
+      - they are considered equal (since path includes the workspace name prefix and is globally unique)
+  - requirement: File node
+    name: FileNode path normalization
+    given:
+      - a file at OS path src\domain\entities\change.ts
+    when:
+      - a FileNode is created
+    then:
+      - path is stored as src/domain/entities/change.ts (forward-slash-normalized)
+  - requirement: File node
+    name: FileNode workspace is a name string
+    given:
+      - a file discovered in workspace core
+    when:
+      - a FileNode is created
+    then:
+      - workspace is 'core' (the workspace name, not an absolute path)
+  - requirement: File node
+    name: FileNode path includes workspace prefix
+    given:
+      - a file src/index.ts discovered in workspace core
+    when:
+      - a FileNode is created by the indexer
+    then:
+      - path is 'core/src/index.ts'
+      - AND workspace is 'core'
+  - requirement: Spec node
+    name: SpecNode equality by specId
+    given:
+      - two SpecNode values with the same specId but different title
+    when:
+      - equality is checked
+    then:
+      - they are considered equal
+  - requirement: Spec node
+    name: dependsOn extracted from metadata
+    given:
+      - 'a spec directory with .specd-metadata.yaml containing dependsOn: [core:core/config, core:core/storage]'
+    when:
+      - a SpecNode is created
+    then:
+      - dependsOn is ['core:core/config', 'core:core/storage']
+  - requirement: Spec node
+    name: SpecNode includes workspace field
+    given:
+      - a spec discovered in workspace core
+    when:
+      - a SpecNode is created
+    then:
+      - workspace is 'core'
+  - requirement: Spec node
+    name: SpecNode dependsOn defaults to empty
+    given:
+      - a spec with no dependencies
+    when:
+      - a SpecNode is created without dependsOn
+    then:
+      - dependsOn defaults to []
+  - requirement: Symbol node
+    name: Deterministic id generation
+    given:
+      - "a symbol with filePath: 'core/src/utils.ts', kind: function, name: 'hash', line: 10"
+    when:
+      - the id is computed
+    then:
+      - it produces 'core/src/utils.ts:function:hash:10' every time for these inputs
+  - requirement: Symbol node
+    name: Different line produces different id
+    given:
+      - two symbols with the same filePath, kind, and name but different line values
+    when:
+      - their ids are computed
+    then:
+      - the ids are different
+  - requirement: Symbol node
+    name: Id includes workspace-prefixed path
+    given:
+      - a symbol in file core/src/index.ts (workspace-prefixed path)
+    when:
+      - the id is computed
+    then:
+      - 'the id starts with core/src/index.ts:'
+      - AND the id is globally unique across workspaces
+  - requirement: Symbol node
+    name: Comment extracted from JSDoc
+    given:
+      - a TypeScript file with /** Computes the hash. */ immediately before function computeHash()
+    when:
+      - the symbol is extracted
+    then:
+      - comment is '/** Computes the hash. */'
+  - requirement: Symbol node
+    name: Symbol without comment
+    given:
+      - a function declaration with no preceding comment
+    when:
+      - the symbol is extracted
+    then:
+      - comment is undefined
+  - requirement: SymbolKind enum
+    name: Invalid kind rejected
+    when:
+      - "a SymbolNode is created with kind: 'module' (not in the enum)"
+    then:
+      - InvalidSymbolKindError is thrown
+  - requirement: Relation types
+    name: Relation direction matters
+    given:
+      - a CALLS relation from symbol A to symbol B
+    when:
+      - callers of symbol B are queried
+    then:
+      - symbol A appears in the results
+      - AND querying callers of symbol A does not return symbol B
+  - requirement: Relation types
+    name: DEPENDS_ON relation connects specs
+    given:
+      - "spec A has dependsOn: ['core:core/config']"
+    when:
+      - relations are built from the SpecNode
+    then:
+      - a DEPENDS_ON relation exists from spec A's specId to core:core/config
+  - requirement: Relation value object
+    name: Relation equality by source, target, and type
+    given:
+      - two Relation values with the same source, target, and type but different metadata
+    when:
+      - equality is checked
+    then:
+      - they are considered equal
+  - requirement: Immutability
+    name: FileNode properties are readonly
+    given:
+      - a FileNode instance
+    when:
+      - an attempt is made to reassign contentHash
+    then:
+      - the TypeScript compiler rejects the assignment (compile-time enforcement)
+  - requirement: Error types
+    name: CodeGraphError is independent of SpecdError
+    when:
+      - CodeGraphError is instantiated
+    then:
+      - it extends Error directly, not SpecdError
+      - AND error types do not import from @specd/core
+  - requirement: Error types
+    name: Duplicate symbol id detected
+    given:
+      - two symbols in the same file that produce the same deterministic id
+    when:
+      - they are validated
+    then:
+      - DuplicateSymbolIdError is thrown with both symbols' details
+contentHashes:
+  spec.md: sha256:edbbd850d299fc941a844cf6e356fb2308d7d13493bc1fcf7d7859bf8dd847cb
+  verify.md: sha256:478e00f2daf6e6528d609fb71ba094aee98b8473b7b41f8f0159f52096f80070
+generatedBy: core
