@@ -36,7 +36,10 @@ export function registerGraphIndex(parent: Command): void {
 
       await withProvider(config, opts.format, async (provider) => {
         const progressFn = (percent: number, phase: string): void => {
-          process.stderr.write(`\r\x1b[K  ${String(percent).padStart(3)}% ${phase}`)
+          const width = 20
+          const filled = Math.round((percent / 100) * width)
+          const bar = '█'.repeat(filled) + '░'.repeat(width - filled)
+          process.stderr.write(`\r\x1b[K  ${bar} ${String(percent).padStart(3)}% ${phase}`)
         }
 
         const workspaces = buildWorkspaceTargets(config, kernel, opts.workspace)
