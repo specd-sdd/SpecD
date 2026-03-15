@@ -1,7 +1,6 @@
 import { Command } from 'commander'
-import { createCodeGraphProvider } from '@specd/code-graph'
-import { handleError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
+import { withProvider } from './with-provider.js'
 
 /**
  * Registers the `graph find` command.
@@ -16,6 +15,7 @@ export function registerGraphFind(parent: Command): void {
     .option('--kind <kind>', 'symbol kind: function|class|method|variable|type|interface|enum')
     .option('--file <path>', 'filter by file path (supports * wildcards)')
     .option('--comment <text>', 'search in symbol comments (substring match)')
+    .option('--case-sensitive', 'use case-sensitive matching for name and comment')
     .option('--path <path>', 'workspace root path', process.cwd())
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .action(
@@ -24,43 +24,36 @@ export function registerGraphFind(parent: Command): void {
         kind?: string
         file?: string
         comment?: string
+        caseSensitive?: boolean
         path: string
         format: string
       }) => {
-        try {
-          const fmt = parseFormat(opts.format)
-          const provider = createCodeGraphProvider({ storagePath: opts.path })
+        const fmt = parseFormat(opts.format)
 
-          await provider.open()
-          try {
-            const query: Record<string, unknown> = {}
-            if (opts.name) query['name'] = opts.name
-            if (opts.kind) query['kind'] = opts.kind
-            if (opts.file) query['filePath'] = opts.file
-            if (opts.comment) query['comment'] = opts.comment
-            const symbols = await provider.findSymbols(query)
+        await withProvider(opts.path, opts.format, async (provider) => {
+          const query: Record<string, unknown> = {}
+          if (opts.name) query['name'] = opts.name
+          if (opts.kind) query['kind'] = opts.kind
+          if (opts.file) query['filePath'] = opts.file
+          if (opts.comment) query['comment'] = opts.comment
+          if (opts.caseSensitive) query['caseSensitive'] = true
+          const symbols = await provider.findSymbols(query)
 
-            if (fmt === 'text') {
-              if (symbols.length === 0) {
-                output('No symbols found.', 'text')
-              } else {
-                const lines = [`${String(symbols.length)} symbol(s) found:\n`]
-                for (const s of symbols) {
-                  const comment = s.comment ? ` — ${s.comment.substring(0, 60)}` : ''
-                  lines.push(`  ${s.kind} ${s.name}  ${s.filePath}:${String(s.line)}${comment}`)
-                }
-                output(lines.join('\n'), 'text')
-              }
+          if (fmt === 'text') {
+            if (symbols.length === 0) {
+              output('No symbols found.', 'text')
             } else {
-              output(symbols, fmt)
+              const lines = [`${String(symbols.length)} symbol(s) found:\n`]
+              for (const s of symbols) {
+                const comment = s.comment ? ` — ${s.comment.substring(0, 60)}` : ''
+                lines.push(`  ${s.kind} ${s.name}  ${s.filePath}:${String(s.line)}${comment}`)
+              }
+              output(lines.join('\n'), 'text')
             }
-          } finally {
-            await provider.close()
+          } else {
+            output(symbols, fmt)
           }
-          process.exit(0)
-        } catch (err) {
-          handleError(err, opts.format)
-        }
+        })
       },
     )
 }
