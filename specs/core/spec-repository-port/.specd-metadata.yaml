@@ -1,6 +1,7 @@
 title: SpecRepository Port
 description: Use cases need to read and write specs without knowing how or where they are stored on disk, so a port boundary is essential for testability and storage-strategy independence. `SpecRepository` is the application-layer port for reading and writing specs within a single workspace, extending the shared `Repository` base class with immutable `workspace()`, `ownership()`, and `isExternal()` accessors set at construction time. Use cases that need multiple workspaces receive a separate `SpecRepository` instance per workspace.
 dependsOn:
+  - core:core/repository-port
   - default:_global/architecture
   - core:core/change
   - core:core/storage
@@ -171,6 +172,6 @@ scenarios:
     then:
       - null is returned
 contentHashes:
-  spec.md: sha256:fa5c60ae41367fc4057c8bd0840c02d0a0cf15f2a3057ddbab90368573b6093c
+  spec.md: sha256:984d0f9c975300f210b406c860b10a15e2943747b5f2c2c7fec6c50d55c286f9
   verify.md: sha256:34f0a78d9f68ab75cc66d679bc518e35452dd85283684073e4eb49b927cb16a2
 generatedBy: core

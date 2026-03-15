@@ -76,6 +76,6 @@ scenarios:
     then:
       - the command exits with code 1
 contentHashes:
-  spec.md: sha256:965982e4979bcb5f8f68f2aa4947085215007d1b8201a1ea5bd26dc400a0827a
+  spec.md: sha256:6fff226587eec055af02ed2fde3ef9e7a0f43351343eb2ccc45c1374bf46d783
   verify.md: sha256:0dd80d0e6899df4e42e91c45bc2a9755c9937be2a820c1ba7122485722764853
 generatedBy: core

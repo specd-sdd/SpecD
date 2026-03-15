@@ -20,6 +20,9 @@ dependsOn:
   - core:core/update-spec-deps
   - core:core/list-archived
   - core:core/get-archived-change
+  - core:core/run-step-hooks
+  - core:core/get-hook-instructions
+  - core:core/get-artifact-instruction
   - core:core/approve-spec
   - core:core/approve-signoff
   - core:core/list-specs
@@ -73,26 +76,29 @@ rules:
 
         #### kernel.changes
 
-        | Kernel path              | Use case class      | Spec                                                  | Description                                          |
-        | ------------------------ | ------------------- | ----------------------------------------------------- | ---------------------------------------------------- |
-        | `changes.repo`           | `ChangeRepository`  | —                                                     | Underlying repository for adapter-level queries      |
-        | `changes.create`         | `CreateChange`      | [create-change](../create-change/spec.md)             | Creates a new change                                 |
-        | `changes.status`         | `GetStatus`         | [get-status](../get-status/spec.md)                   | Reports lifecycle state and artifact statuses        |
-        | `changes.transition`     | `TransitionChange`  | [transition-change](../transition-change/spec.md)     | Performs a lifecycle state transition                |
-        | `changes.draft`          | `DraftChange`       | [draft-change](../draft-change/spec.md)               | Shelves a change to drafts                           |
-        | `changes.restore`        | `RestoreChange`     | [restore-change](../restore-change/spec.md)           | Recovers a drafted change                            |
-        | `changes.discard`        | `DiscardChange`     | [discard-change](../discard-change/spec.md)           | Permanently abandons a change                        |
-        | `changes.archive`        | `ArchiveChange`     | [archive-change](../archive-change/spec.md)           | Finalises a change: merges deltas, moves to archive  |
-        | `changes.validate`       | `ValidateArtifacts` | [validate-artifacts](../validate-artifacts/spec.md)   | Validates artifact files against the active schema   |
-        | `changes.compile`        | `CompileContext`    | [compile-context](../compile-context/spec.md)         | Assembles the instruction block for a lifecycle step |
-        | `changes.list`           | `ListChanges`       | [list-changes](../list-changes/spec.md)               | Lists all active changes                             |
-        | `changes.listDrafts`     | `ListDrafts`        | [list-drafts](../list-drafts/spec.md)                 | Lists all drafted changes                            |
-        | `changes.listDiscarded`  | `ListDiscarded`     | [list-discarded](../list-discarded/spec.md)           | Lists all discarded changes                          |
-        | `changes.edit`           | `EditChange`        | [edit-change](../edit-change/spec.md)                 | Edits the spec scope of a change                     |
-        | `changes.skipArtifact`   | `SkipArtifact`      | [skip-artifact](../skip-artifact/spec.md)             | Explicitly skips an optional artifact                |
-        | `changes.updateSpecDeps` | `UpdateSpecDeps`    | [update-spec-deps](../update-spec-deps/spec.md)       | Updates declared dependencies for a spec             |
-        | `changes.listArchived`   | `ListArchived`      | [list-archived](../list-archived/spec.md)             | Lists all archived changes                           |
-        | `changes.getArchived`    | `GetArchivedChange` | [get-archived-change](../get-archived-change/spec.md) | Retrieves a single archived change by name           |
+        | Kernel path                      | Use case class           | Spec                                                            | Description                                             |
+        | -------------------------------- | ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------- |
+        | `changes.repo`                   | `ChangeRepository`       | —                                                               | Underlying repository for adapter-level queries         |
+        | `changes.create`                 | `CreateChange`           | [create-change](../create-change/spec.md)                       | Creates a new change                                    |
+        | `changes.status`                 | `GetStatus`              | [get-status](../get-status/spec.md)                             | Reports lifecycle state and artifact statuses           |
+        | `changes.transition`             | `TransitionChange`       | [transition-change](../transition-change/spec.md)               | Performs a lifecycle state transition                   |
+        | `changes.draft`                  | `DraftChange`            | [draft-change](../draft-change/spec.md)                         | Shelves a change to drafts                              |
+        | `changes.restore`                | `RestoreChange`          | [restore-change](../restore-change/spec.md)                     | Recovers a drafted change                               |
+        | `changes.discard`                | `DiscardChange`          | [discard-change](../discard-change/spec.md)                     | Permanently abandons a change                           |
+        | `changes.archive`                | `ArchiveChange`          | [archive-change](../archive-change/spec.md)                     | Finalises a change: merges deltas, moves to archive     |
+        | `changes.validate`               | `ValidateArtifacts`      | [validate-artifacts](../validate-artifacts/spec.md)             | Validates artifact files against the active schema      |
+        | `changes.compile`                | `CompileContext`         | [compile-context](../compile-context/spec.md)                   | Assembles the context block for a lifecycle step        |
+        | `changes.list`                   | `ListChanges`            | [list-changes](../list-changes/spec.md)                         | Lists all active changes                                |
+        | `changes.listDrafts`             | `ListDrafts`             | [list-drafts](../list-drafts/spec.md)                           | Lists all drafted changes                               |
+        | `changes.listDiscarded`          | `ListDiscarded`          | [list-discarded](../list-discarded/spec.md)                     | Lists all discarded changes                             |
+        | `changes.edit`                   | `EditChange`             | [edit-change](../edit-change/spec.md)                           | Edits the spec scope of a change                        |
+        | `changes.skipArtifact`           | `SkipArtifact`           | [skip-artifact](../skip-artifact/spec.md)                       | Explicitly skips an optional artifact                   |
+        | `changes.updateSpecDeps`         | `UpdateSpecDeps`         | [update-spec-deps](../update-spec-deps/spec.md)                 | Updates declared dependencies for a spec                |
+        | `changes.listArchived`           | `ListArchived`           | [list-archived](../list-archived/spec.md)                       | Lists all archived changes                              |
+        | `changes.getArchived`            | `GetArchivedChange`      | [get-archived-change](../get-archived-change/spec.md)           | Retrieves a single archived change by name              |
+        | `changes.runStepHooks`           | `RunStepHooks`           | [run-step-hooks](../run-step-hooks/spec.md)                     | Executes run: hooks for a step and phase                |
+        | `changes.getHookInstructions`    | `GetHookInstructions`    | [get-hook-instructions](../get-hook-instructions/spec.md)       | Returns instruction: hook text for a step and phase     |
+        | `changes.getArtifactInstruction` | `GetArtifactInstruction` | [get-artifact-instruction](../get-artifact-instruction/spec.md) | Returns artifact instruction block with rules and delta |
 
         #### kernel.specs
 
@@ -252,6 +258,6 @@ scenarios:
     then:
       - the kernel object and its nested groups are not expected to change — there is no addUseCase() or removeUseCase() mechanism
 contentHashes:
-  spec.md: sha256:cdf0eeefae7176d00ab18f32dc7a383130c8593097fc3a6199f40d7b1b3ce759
+  spec.md: sha256:586a07148b9d2f6c4a487f7d8ddf30f0c5ec1b7e3f614649dfeaad6b3704b73f
   verify.md: sha256:557d6d97d8856cc560a5f2053f0b71916836b377d8e4c5bb0b34fa9a73ebe958
 generatedBy: core
