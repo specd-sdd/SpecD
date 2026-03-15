@@ -75,6 +75,29 @@ export abstract class GraphStore {
    * @param path - The file path to look up.
    * @returns The matching file node, or undefined if not found.
    */
+  /**
+   * Adds relations to the store without removing existing data.
+   * Used for cross-file relations (e.g. CALLS) that must survive file re-upserts.
+   * @param relations - The relations to add.
+   * @returns A promise that resolves when all relations are added.
+   */
+  abstract addRelations(relations: Relation[]): Promise<void>
+
+  /**
+   * Bulk loads files, symbols, specs, and relations into the store.
+   * Much faster than individual upserts for large datasets.
+   * Implementations should use native bulk import mechanisms when available.
+   * @param data - The data to load.
+   * @returns A promise that resolves when loading is complete.
+   */
+  abstract bulkLoad(data: {
+    files: FileNode[]
+    symbols: SymbolNode[]
+    specs: SpecNode[]
+    relations: Relation[]
+    onProgress?: (step: string) => void
+  }): Promise<void>
+
   abstract getFile(path: string): Promise<FileNode | undefined>
 
   /**

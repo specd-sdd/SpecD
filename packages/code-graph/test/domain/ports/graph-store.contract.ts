@@ -234,11 +234,13 @@ export function graphStoreContractTests(
         specId: 'core:core/config',
         path: 'specs/core/config',
         title: 'Config',
+        contentHash: 'sha256:a',
       })
       const spec2 = createSpecNode({
         specId: 'core:core/change',
         path: 'specs/core/change',
         title: 'Change',
+        contentHash: 'sha256:b',
         dependsOn: ['core:core/config'],
       })
       await store.upsertSpec(spec1, [])

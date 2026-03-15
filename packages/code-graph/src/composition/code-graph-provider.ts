@@ -165,6 +165,14 @@ export class CodeGraphProvider {
   }
 
   /**
+   * Removes all data from the graph store.
+   * @returns A promise that resolves when the store is cleared.
+   */
+  async clear(): Promise<void> {
+    return this.store.clear()
+  }
+
+  /**
    * Detects the scope of changes given a set of modified files.
    * @param changedFiles - Array of file paths that have changed.
    * @returns The change detection result with affected symbols and flows.
