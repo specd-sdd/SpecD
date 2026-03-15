@@ -229,6 +229,42 @@ export class InMemoryGraphStore extends GraphStore {
     return [...this.specs.values()]
   }
 
+  async searchSymbols(
+    query: string,
+    limit?: number,
+  ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
+    this.ensureOpen()
+    const terms = query.toLowerCase().split(/\s+/)
+    const results: Array<{ symbol: SymbolNode; score: number }> = []
+    for (const sym of this.symbols.values()) {
+      const text = `${sym.name} ${sym.comment ?? ''}`.toLowerCase()
+      if (terms.some((t) => text.includes(t))) {
+        results.push({ symbol: sym, score: 1 })
+      }
+    }
+    return results.slice(0, limit ?? 20)
+  }
+
+  async searchSpecs(
+    query: string,
+    limit?: number,
+  ): Promise<Array<{ spec: SpecNode; score: number }>> {
+    this.ensureOpen()
+    const terms = query.toLowerCase().split(/\s+/)
+    const results: Array<{ spec: SpecNode; score: number }> = []
+    for (const spec of this.specs.values()) {
+      const text = `${spec.title} ${spec.description} ${spec.content}`.toLowerCase()
+      if (terms.some((t) => text.includes(t))) {
+        results.push({ spec, score: 1 })
+      }
+    }
+    return results.slice(0, limit ?? 20)
+  }
+
+  async rebuildFtsIndexes(): Promise<void> {
+    // No-op for in-memory store — search is always live
+  }
+
   async clear(): Promise<void> {
     this.ensureOpen()
     this.files.clear()

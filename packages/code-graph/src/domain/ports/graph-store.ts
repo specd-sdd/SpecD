@@ -182,6 +182,35 @@ export abstract class GraphStore {
   abstract getAllSpecs(): Promise<SpecNode[]>
 
   /**
+   * Full-text search across symbols (name and comment).
+   * @param query - The search query string.
+   * @param limit - Maximum results to return.
+   * @returns Matching symbols with BM25 scores, ordered by relevance.
+   */
+  abstract searchSymbols(
+    query: string,
+    limit?: number,
+  ): Promise<Array<{ symbol: SymbolNode; score: number }>>
+
+  /**
+   * Full-text search across specs (title, description, and content).
+   * @param query - The search query string.
+   * @param limit - Maximum results to return.
+   * @returns Matching specs with BM25 scores, ordered by relevance.
+   */
+  abstract searchSpecs(
+    query: string,
+    limit?: number,
+  ): Promise<Array<{ spec: SpecNode; score: number }>>
+
+  /**
+   * Rebuilds full-text search indexes after data changes.
+   * Must be called after bulk load or significant data mutations.
+   * @returns A promise that resolves when indexes are rebuilt.
+   */
+  abstract rebuildFtsIndexes(): Promise<void>
+
+  /**
    * Removes all data from the store.
    * @returns A promise that resolves when the store is cleared.
    */

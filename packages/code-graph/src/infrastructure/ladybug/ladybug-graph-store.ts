@@ -93,6 +93,12 @@ export class LadybugGraphStore extends GraphStore {
       }
     }
 
+    // Load FTS extension and create indexes (idempotent — skip if already exists)
+    await this.conn.query('INSTALL fts')
+    await this.conn.query('LOAD fts')
+    await this.createFtsIndex('Symbol', 'symbol_fts', ['name', 'comment'])
+    await this.createFtsIndex('Spec', 'spec_fts', ['title', 'description', 'content'])
+
     this._isOpen = true
 
     const metaRows = await exec(
@@ -102,6 +108,48 @@ export class LadybugGraphStore extends GraphStore {
     if (metaRows.length > 0 && metaRows[0]) {
       this._lastIndexedAt = metaRows[0]['v'] as string
     }
+  }
+
+  /**
+   * Creates an FTS index on a table, skipping if it already exists.
+   * @param table - The node table name.
+   * @param indexName - The index name.
+   * @param columns - The columns to index.
+   */
+  private async createFtsIndex(table: string, indexName: string, columns: string[]): Promise<void> {
+    try {
+      const colList = columns.map((c) => `'${c}'`).join(', ')
+      await this.conn!.query(
+        `CALL CREATE_FTS_INDEX('${table}', '${indexName}', [${colList}], stemmer := 'porter')`,
+      )
+    } catch {
+      // Index already exists — skip
+    }
+  }
+
+  /**
+   * Drops and recreates all FTS indexes. Must be called after bulk data changes
+   * because LadybugDB FTS indexes are not automatically updated on insert.
+   */
+  async rebuildFtsIndexes(): Promise<void> {
+    this.ensureOpen()
+    const conn = this.conn!
+
+    // Drop existing indexes
+    for (const [table, name] of [
+      ['Symbol', 'symbol_fts'],
+      ['Spec', 'spec_fts'],
+    ] as const) {
+      try {
+        await conn.query(`CALL DROP_FTS_INDEX('${table}', '${name}')`)
+      } catch {
+        // Index may not exist yet
+      }
+    }
+
+    // Recreate
+    await this.createFtsIndex('Symbol', 'symbol_fts', ['name', 'comment'])
+    await this.createFtsIndex('Spec', 'spec_fts', ['title', 'description', 'content'])
   }
 
   /**
@@ -295,10 +343,10 @@ export class LadybugGraphStore extends GraphStore {
       if (data.specs.length > 0) {
         const specCsv = prefix + 'specs.csv'
         csvFiles.push(specCsv)
-        const specRows = ['specId,path,title,contentHash,workspace']
+        const specRows = ['specId,path,title,description,contentHash,content,workspace']
         for (const sp of data.specs) {
           specRows.push(
-            `${csvEscape(sp.specId)},${csvEscape(sp.path)},${csvEscape(sp.title)},${csvEscape(sp.contentHash)},${csvEscape(sp.workspace)}`,
+            `${csvEscape(sp.specId)},${csvEscape(sp.path)},${csvEscape(sp.title)},${csvEscape(sp.description)},${csvEscape(sp.contentHash)},${csvEscape(sp.content)},${csvEscape(sp.workspace)}`,
           )
         }
         writeFileSync(specCsv, specRows.join('\n') + '\n')
@@ -360,7 +408,7 @@ export class LadybugGraphStore extends GraphStore {
     await this.removeSpec(spec.specId)
 
     await conn.query(
-      `CREATE (s:Spec {specId: '${this.escape(spec.specId)}', path: '${this.escape(spec.path)}', title: '${this.escape(spec.title)}', contentHash: '${this.escape(spec.contentHash)}', workspace: '${this.escape(spec.workspace)}'})`,
+      `CREATE (s:Spec {specId: '${this.escape(spec.specId)}', path: '${this.escape(spec.path)}', title: '${this.escape(spec.title)}', description: '${this.escape(spec.description)}', contentHash: '${this.escape(spec.contentHash)}', content: '${this.escape(spec.content)}', workspace: '${this.escape(spec.workspace)}'})`,
     )
 
     for (const rel of relations) {
@@ -428,7 +476,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      `MATCH (s:Spec {specId: '${this.escape(specId)}'}) RETURN s.specId AS specId, s.path AS path, s.title AS title, s.contentHash AS contentHash, s.workspace AS workspace`,
+      `MATCH (s:Spec {specId: '${this.escape(specId)}'}) RETURN s.specId AS specId, s.path AS path, s.title AS title, s.description AS description, s.contentHash AS contentHash, s.content AS content, s.workspace AS workspace`,
     )
     if (rows.length === 0 || !rows[0]) return undefined
     const row = rows[0]
@@ -442,7 +490,9 @@ export class LadybugGraphStore extends GraphStore {
       specId: row['specId'] as string,
       path: row['path'] as string,
       title: row['title'] as string,
+      description: (row['description'] as string) ?? '',
       contentHash: row['contentHash'] as string,
+      content: (row['content'] as string) ?? '',
       dependsOn: depRows.map((r) => r['specId'] as string),
       workspace: (row['workspace'] as string) ?? '',
     }
@@ -680,7 +730,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      'MATCH (s:Spec) RETURN s.specId AS specId, s.path AS path, s.title AS title, s.contentHash AS contentHash, s.workspace AS workspace',
+      'MATCH (s:Spec) RETURN s.specId AS specId, s.path AS path, s.title AS title, s.description AS description, s.contentHash AS contentHash, s.content AS content, s.workspace AS workspace',
     )
 
     const specs: SpecNode[] = []
@@ -694,13 +744,78 @@ export class LadybugGraphStore extends GraphStore {
         specId,
         path: row['path'] as string,
         title: row['title'] as string,
+        description: (row['description'] as string) ?? '',
         contentHash: row['contentHash'] as string,
+        content: (row['content'] as string) ?? '',
         dependsOn: depRows.map((r) => r['target'] as string),
         workspace: (row['workspace'] as string) ?? '',
       })
     }
 
     return specs
+  }
+
+  /**
+   * Full-text search across symbols using the `symbol_fts` index.
+   * @param query - The search query string.
+   * @param limit - Maximum results to return (default 20).
+   * @returns Matching symbols with BM25 scores, ordered by relevance.
+   */
+  async searchSymbols(
+    query: string,
+    limit?: number,
+  ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
+    this.ensureOpen()
+    const top = limit ?? 20
+    const rows = await exec(
+      this.conn!,
+      `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', '${this.escape(query)}', k := 1000) RETURN node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.line AS line, node.col AS col, node.comment AS comment, score ORDER BY score DESC LIMIT ${String(top)}`,
+    )
+    return rows.map((r) => ({
+      symbol: this.rowToSymbol(r),
+      score: r['score'] as number,
+    }))
+  }
+
+  /**
+   * Full-text search across specs using the `spec_fts` index.
+   * @param query - The search query string.
+   * @param limit - Maximum results to return (default 20).
+   * @returns Matching specs with BM25 scores, ordered by relevance.
+   */
+  async searchSpecs(
+    query: string,
+    limit?: number,
+  ): Promise<Array<{ spec: SpecNode; score: number }>> {
+    this.ensureOpen()
+    const top = limit ?? 20
+    const rows = await exec(
+      this.conn!,
+      `CALL QUERY_FTS_INDEX('Spec', 'spec_fts', '${this.escape(query)}', k := 1000) RETURN node.specId AS specId, node.path AS path, node.title AS title, node.description AS description, node.contentHash AS contentHash, node.content AS content, node.workspace AS workspace, score ORDER BY score DESC LIMIT ${String(top)}`,
+    )
+
+    const results: Array<{ spec: SpecNode; score: number }> = []
+    for (const row of rows) {
+      const specId = row['specId'] as string
+      const depRows = await exec(
+        this.conn!,
+        `MATCH (s:Spec {specId: '${this.escape(specId)}'})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS target`,
+      )
+      results.push({
+        spec: {
+          specId,
+          path: row['path'] as string,
+          title: row['title'] as string,
+          description: (row['description'] as string) ?? '',
+          contentHash: row['contentHash'] as string,
+          content: (row['content'] as string) ?? '',
+          dependsOn: depRows.map((r) => r['target'] as string),
+          workspace: (row['workspace'] as string) ?? '',
+        },
+        score: row['score'] as number,
+      })
+    }
+    return results
   }
 
   /**

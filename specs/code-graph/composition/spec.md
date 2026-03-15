@@ -12,6 +12,7 @@ Consumers of `@specd/code-graph` should not need to know how the store, indexer,
 
 - **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`
 - **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getStatistics()` — delegates to `GraphStore`
+- **Search**: `searchSymbols(query, limit?)`, `searchSpecs(query, limit?)` — full-text search with BM25 ranking, delegates to `GraphStore`
 - **Maintenance**: `clear(): Promise<void>` — removes all data from the store (for full re-index)
 - **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
 - **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `detectChanges(changedFiles)` — delegates to impact functions
@@ -51,7 +52,8 @@ The `@specd/code-graph` package SHALL export only:
 - `createCodeGraphProvider` — factory function
 - `CodeGraphProvider` — type only (for type annotations, not construction)
 - `CodeGraphOptions` — options type for the factory
-- `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).
+- `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, `DiscoveredSpec` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).
+- `discoverSpecsFromDir` — utility for discovering specs from a directory (used by CLI/MCP integration layers)
 - `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult` — traversal/impact types
 - `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType` — model types
 - `SymbolQuery`, `GraphStatistics` — query types

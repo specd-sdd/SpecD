@@ -86,7 +86,20 @@ The Spec node table includes:
 - `specId STRING` — primary key
 - `path STRING`
 - `title STRING`
-- `contentHash STRING` — hash of spec content for incremental diffing
+- `description STRING` — from `.specd-metadata.yaml`
+- `contentHash STRING` — hash of concatenated artifacts (excluding `.specd-metadata.yaml`)
+- `content STRING` — concatenated artifact text for full-text search
+- `workspace STRING`
+
+### Requirement: Full-text search
+
+`GraphStore` SHALL provide:
+
+- **`searchSymbols(query: string, limit?: number): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.name` and `Symbol.comment`. Returns results ranked by BM25 score descending.
+- **`searchSpecs(query: string, limit?: number): Promise<Array<{ spec: SpecNode; score: number }>>`** — full-text search across `Spec.title`, `Spec.description`, and `Spec.content`. Returns results ranked by BM25 score descending.
+- **`rebuildFtsIndexes(): Promise<void>`** — drops and recreates FTS indexes. Must be called after bulk data changes because LadybugDB FTS indexes are not automatically updated on insert.
+
+Default limit is 20. The `LadybugGraphStore` implementation uses `QUERY_FTS_INDEX` with `k := 1000` internally and applies `ORDER BY score DESC LIMIT n` to get the true top-k results.
 
 ### Requirement: Bulk operations
 

@@ -64,8 +64,8 @@ import { registerSchemaExtend } from './commands/schema/extend.js'
 // graph
 import { registerGraphIndex } from './commands/graph/index-graph.js'
 import { registerGraphStats } from './commands/graph/stats.js'
-import { registerGraphFind } from './commands/graph/find.js'
 import { registerGraphImpact } from './commands/graph/impact.js'
+import { registerGraphSearch } from './commands/graph/search.js'
 
 // skills
 import { registerSkillsList } from './commands/skills/list.js'
@@ -168,7 +168,7 @@ registerSkillsUpdate(skillsCmd)
 const graphCmd = program.command('graph').description('Code graph intelligence')
 registerGraphIndex(graphCmd)
 registerGraphStats(graphCmd)
-registerGraphFind(graphCmd)
 registerGraphImpact(graphCmd)
+registerGraphSearch(graphCmd)
 
 program.parseAsync(process.argv).catch(handleError)

@@ -24,8 +24,10 @@ A `SpecNode` SHALL represent a spec directory in the workspace. It contains:
 
 - **`specId`** (`string`) — the spec identifier in `workspace:package/topic` format (e.g. `core:core/change`, `_global:_global/architecture`). This is the node's identity.
 - **`path`** (`string`) — workspace-relative path to the spec directory (e.g. `specs/core/change`).
-- **`title`** (`string`) — the spec title extracted from the `# Title` heading in `spec.md`.
-- **`contentHash`** (`string`) — hash of the spec's content at last index. Computed from `spec.md` + `.specd-metadata.yaml`. Used for incremental diffing.
+- **`title`** (`string`) — from `.specd-metadata.yaml` `title` field. Falls back to the first `# Heading` in `spec.md` if metadata is absent.
+- **`description`** (`string`) — from `.specd-metadata.yaml` `description` field. Empty string if absent.
+- **`contentHash`** (`string`) — hash of concatenated spec artifacts, excluding `.specd-metadata.yaml`. `spec.md` first if present, then remaining artifacts in alphabetical order. Used for incremental diffing.
+- **`content`** (`string`) — concatenated artifact text for full-text search. Same ordering as `contentHash`: `spec.md` first if present, then remaining artifacts alphabetically. Excludes `.specd-metadata.yaml`.
 - **`dependsOn`** (`string[]`) — ordered list of spec IDs this spec depends on, extracted from `.specd-metadata.yaml` or the `## Spec Dependencies` section in `spec.md`.
 - **`workspace`** (`string`) — the workspace name this spec belongs to (e.g. `core`, `_global`).
 
@@ -143,12 +145,14 @@ const symbol: SymbolNode = {
   comment: '/** Creates a new Change entity from the given parameters. */',
 }
 
-// SpecNode — includes workspace field
+// SpecNode — includes description, content, workspace
 const spec: SpecNode = {
   specId: 'core:core/change',
   path: 'specs/core/change',
   title: 'Change',
+  description: 'Without a single entity that owns spec work...',
   contentHash: 'sha256:def456...',
+  content: '# Change\n\n## Purpose\n...',
   dependsOn: ['core:core/config', 'core:core/storage'],
   workspace: 'core',
 }
