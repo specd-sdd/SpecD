@@ -9,8 +9,9 @@ import { createArchiveRepository } from '../archive-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
-import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
 import { TemplateExpander } from '../../application/template-expander.js'
+import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
+import { RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { NodeYamlSerializer } from '../../infrastructure/node/yaml-serializer.js'
 import { GenerateSpecMetadata } from '../../application/use-cases/generate-spec-metadata.js'
@@ -188,11 +189,19 @@ export function createArchiveChange(
     opts.workspaceSchemasPaths,
   )
   const saveMetadata = new SaveSpecMetadata(opts.specRepositories, yaml)
+  const runStepHooks = new RunStepHooks(
+    changeRepo,
+    hooks,
+    schemas,
+    opts.schemaRef,
+    opts.workspaceSchemasPaths,
+    opts.projectWorkflowHooks,
+  )
   return new ArchiveChange(
     changeRepo,
     opts.specRepositories,
     archiveRepo,
-    hooks,
+    runStepHooks,
     actor,
     parsers,
     schemas,
@@ -201,6 +210,5 @@ export function createArchiveChange(
     yaml,
     opts.schemaRef,
     opts.workspaceSchemasPaths,
-    opts.projectWorkflowHooks,
   )
 }
