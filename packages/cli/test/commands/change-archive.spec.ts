@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
@@ -132,5 +132,46 @@ describe('change archive', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
+  })
+
+  it('passes skipHooks: true when --no-hooks is set', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.archive.execute.mockResolvedValue({
+      archivedChange: {
+        name: 'feat',
+        archivedName: '2026-01-15-feat',
+        archivedAt: new Date('2026-01-15T10:00:00Z'),
+      },
+      archiveDirPath: '/project/.specd/archive/2026-01/feat',
+      postHookFailures: [],
+    })
+
+    const program = makeProgram()
+    registerChangeArchive(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat', '--no-hooks'])
+
+    const call = kernel.changes.archive.execute.mock.calls[0]![0] as { skipHooks?: boolean }
+    expect(call.skipHooks).toBe(true)
+    expect(stdout()).toContain('archived change feat')
+  })
+
+  it('passes skipHooks: false by default (no --no-hooks flag)', async () => {
+    const { kernel } = setup()
+    kernel.changes.archive.execute.mockResolvedValue({
+      archivedChange: {
+        name: 'feat',
+        archivedName: '2026-01-15-feat',
+        archivedAt: new Date('2026-01-15T10:00:00Z'),
+      },
+      archiveDirPath: '/project/.specd/archive/2026-01/feat',
+      postHookFailures: [],
+    })
+
+    const program = makeProgram()
+    registerChangeArchive(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat'])
+
+    const call = kernel.changes.archive.execute.mock.calls[0]![0] as { skipHooks?: boolean }
+    expect(call.skipHooks).toBe(false)
   })
 })
