@@ -16,6 +16,12 @@
 - **WHEN** `index({ workspacePath: '/project' })` is called
 - **THEN** `IndexCodeGraph.execute()` is invoked with the workspace path and the result is returned
 
+#### Scenario: Clear removes all data for full re-index
+
+- **GIVEN** an opened `CodeGraphProvider` with indexed data
+- **WHEN** `clear()` is called followed by `index()`
+- **THEN** all files and symbols are re-processed (none skipped)
+
 ### Requirement: Factory function
 
 #### Scenario: Factory creates fully wired provider

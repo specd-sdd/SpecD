@@ -12,6 +12,7 @@ Different programming languages have fundamentally different syntax for function
 
 - **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)
 - **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found
+- **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution
 - **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS) from the file
 
 Both extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects.
@@ -50,14 +51,36 @@ The adapter maps TypeScript/JavaScript constructs to `SymbolKind` values:
 | Interface declaration              | `interface` |
 | Enum declaration                   | `enum`      |
 
+### Requirement: Import declaration extraction
+
+`LanguageAdapter` SHALL provide `extractImportedNames(filePath: string, content: string): ImportDeclaration[]` — a synchronous, pure method that parses the file's import statements and returns structured declarations without any resolution.
+
+`ImportDeclaration` is a value object with:
+
+- **`localName`** (`string`) — the name used locally in the importing file (may differ from original via aliasing)
+- **`originalName`** (`string`) — the name as declared in the source module
+- **`specifier`** (`string`) — the raw import specifier string (e.g. `'./utils.js'`, `'@specd/core'`, `'os'`)
+- **`isRelative`** (`boolean`) — true if the specifier starts with `.` or `/`
+
+Each adapter parses imports using its language's syntax:
+
+| Language   | Import syntax                           | isRelative      |
+| ---------- | --------------------------------------- | --------------- |
+| TypeScript | `import { X } from 'specifier'`         | starts with `.` |
+| Python     | `from module import X`, `import module` | starts with `.` |
+| Go         | `import "pkg"`, `import alias "pkg"`    | always `false`  |
+| PHP        | `use Namespace\Class`                   | always `false`  |
+
+The indexer is responsible for resolving specifiers to file paths and symbol ids — the adapter only parses syntax.
+
 ### Requirement: Call resolution
 
-For `CALLS` relations, the adapter MUST resolve:
+For `CALLS` relations, the adapter MUST extract call expressions from the AST and resolve them:
 
-- **Caller**: the innermost enclosing function, method, or class scope containing the call expression. If the call is at module top level, the caller is the file itself (represented as a `DEFINES` context).
-- **Callee**: resolved via the import map. If the called identifier was imported, the callee is the symbol from the imported file. If the identifier is locally defined, the callee is the local symbol.
+- **Caller**: the innermost enclosing function, method, or arrow function containing the call expression. Calls at module top level are silently dropped.
+- **Callee**: resolved via the import map passed to `extractRelations`. If the called identifier is in the import map, the callee is the resolved symbol. If the identifier matches a locally defined symbol, the callee is that local symbol.
 
-Calls to identifiers that cannot be resolved (e.g. global built-ins, dynamic expressions, computed property access) SHALL be silently dropped — no relation is created, no error is thrown.
+Calls to identifiers that cannot be resolved (e.g. global built-ins, member expressions like `obj.method()`, dynamic expressions) SHALL be silently dropped — no relation is created, no error is thrown.
 
 ### Requirement: Tree-sitter query patterns
 
