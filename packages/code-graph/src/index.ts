@@ -17,7 +17,10 @@ export { type GraphStatistics } from './domain/value-objects/graph-statistics.js
 export { type LanguageAdapter } from './domain/value-objects/language-adapter.js'
 
 // Indexer types
-export { type IndexOptions } from './domain/value-objects/index-options.js'
+export {
+  type IndexOptions,
+  type IndexProgressCallback,
+} from './domain/value-objects/index-options.js'
 export { type IndexResult, type IndexError } from './domain/value-objects/index-result.js'
 
 // Traversal types

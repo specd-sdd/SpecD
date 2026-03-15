@@ -5,6 +5,7 @@ import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/sy
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
+import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ensureLanguagesRegistered } from './register-languages.js'
 
 /**
@@ -40,6 +41,39 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    */
   languages(): string[] {
     return ['php']
+  }
+
+  /**
+   * Extracts the namespace declaration from PHP source code.
+   * @param content - The PHP source file content.
+   * @returns The namespace string (e.g. 'App\Models'), or undefined if no namespace is declared.
+   */
+  extractNamespace(content: string): string | undefined {
+    ensureLanguagesRegistered()
+    const root = parse('php', content).root()
+    return this.findNamespace(root)
+  }
+
+  /**
+   * Recursively finds the namespace_definition node and returns the namespace string.
+   * @param node - The AST node to search.
+   * @returns The namespace string, or undefined.
+   */
+  private findNamespace(node: SgNode): string | undefined {
+    for (const child of node.children()) {
+      const kind = nodeKind(child)
+      if (kind === 'namespace_definition') {
+        for (const part of child.children()) {
+          if (nodeKind(part) === 'namespace_name') {
+            return part.text()
+          }
+        }
+      } else if (kind === 'program') {
+        const result = this.findNamespace(child)
+        if (result) return result
+      }
+    }
+    return undefined
   }
 
   /**
@@ -83,16 +117,16 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   /**
    * Extracts relations from PHP source code.
    * @param filePath - The file path.
-   * @param content - The source content.
+   * @param _content - The source content (unused — relations derived from symbols).
    * @param symbols - Previously extracted symbols.
    * @param _importMap - Reserved for future use.
    * @returns An array of extracted relations.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   extractRelations(
     filePath: string,
-    content: string,
+    _content: string,
     symbols: SymbolNode[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _importMap: Map<string, string>,
   ): Relation[] {
     const relations: Relation[] = []
@@ -108,6 +142,74 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     // which is deferred to a future version.
 
     return relations
+  }
+
+  /**
+   * Parses PHP use declarations from source code.
+   * @param _filePath - Path to the source file (unused — PHP uses namespaces, not paths).
+   * @param content - The source file content.
+   * @returns An array of parsed import declarations.
+   */
+  extractImportedNames(_filePath: string, content: string): ImportDeclaration[] {
+    ensureLanguagesRegistered()
+    const root = parse('php', content).root()
+    const results: ImportDeclaration[] = []
+
+    this.walkForUseDeclarations(root, results)
+
+    return results
+  }
+
+  /**
+   * Recursively walks the AST to find namespace_use_declaration nodes.
+   * @param node - The current AST node.
+   * @param results - Array to push declarations into.
+   */
+  private walkForUseDeclarations(node: SgNode, results: ImportDeclaration[]): void {
+    for (const child of node.children()) {
+      const kind = nodeKind(child)
+
+      if (kind === 'namespace_use_declaration') {
+        for (const clauseChild of child.children()) {
+          if (nodeKind(clauseChild) === 'namespace_use_clause') {
+            let qualifiedName: string | undefined
+            let alias: string | undefined
+
+            let seenAs = false
+            for (const part of clauseChild.children()) {
+              const partKind = nodeKind(part)
+              if (partKind === 'qualified_name') {
+                qualifiedName = part.text()
+              } else if (!part.isNamed() && part.text() === 'as') {
+                seenAs = true
+              } else if (seenAs && partKind === 'name') {
+                alias = part.text()
+              } else if (partKind === 'namespace_aliasing_clause') {
+                for (const aliasChild of part.children()) {
+                  if (nodeKind(aliasChild) === 'name') {
+                    alias = aliasChild.text()
+                  }
+                }
+              }
+            }
+
+            if (qualifiedName) {
+              const segments = qualifiedName.split('\\')
+              const originalName = segments[segments.length - 1] ?? qualifiedName
+              results.push({
+                originalName,
+                localName: alias ?? originalName,
+                specifier: qualifiedName,
+                isRelative: false,
+              })
+            }
+          }
+        }
+      } else if (kind === 'program') {
+        // PHP AST wraps content in a program node; recurse into it
+        this.walkForUseDeclarations(child, results)
+      }
+    }
   }
 
   /**

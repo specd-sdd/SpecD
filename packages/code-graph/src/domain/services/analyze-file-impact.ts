@@ -1,6 +1,6 @@
 import { type GraphStore } from '../ports/graph-store.js'
-import { type FileImpactResult } from '../value-objects/impact-result.js'
-import { type RiskLevel } from '../value-objects/risk-level.js'
+import { type FileImpactResult, type ImpactResult } from '../value-objects/impact-result.js'
+import { type RiskLevel, computeRiskLevel } from '../value-objects/risk-level.js'
 import { analyzeImpact } from './analyze-impact.js'
 
 const RISK_ORDER: Record<RiskLevel, number> = {
@@ -22,6 +22,7 @@ function maxRisk(a: RiskLevel, b: RiskLevel): RiskLevel {
 
 /**
  * Analyzes the combined impact of all symbols within a file.
+ * Uses both CALLS (symbol-level) and IMPORTS (file-level) to compute impact.
  * @param store - The graph store to query.
  * @param filePath - The path of the file to analyze.
  * @param direction - The traversal direction: upstream, downstream, or both.
@@ -32,33 +33,121 @@ export async function analyzeFileImpact(
   filePath: string,
   direction: 'upstream' | 'downstream' | 'both',
 ): Promise<FileImpactResult> {
+  // Symbol-level impact via CALLS
   const symbols = await store.findSymbols({ filePath })
   const symbolResults = await Promise.all(symbols.map((s) => analyzeImpact(store, s.id, direction)))
 
-  const affectedFileSet = new Set<string>()
-  let totalDirect = 0
-  let totalIndirect = 0
-  let totalTransitive = 0
-  let overallRisk: RiskLevel = 'LOW'
+  // File-level impact via IMPORTS (BFS)
+  const fileImpact = await analyzeFileImportImpact(store, filePath, direction)
 
+  // Merge: take the max of symbol-level and file-level
+  const affectedFileSet = new Set<string>()
+  for (const f of fileImpact.affectedFiles) {
+    affectedFileSet.add(f)
+  }
   for (const result of symbolResults) {
-    totalDirect += result.directDependents
-    totalIndirect += result.indirectDependents
-    totalTransitive += result.transitiveDependents
-    overallRisk = maxRisk(overallRisk, result.riskLevel)
     for (const f of result.affectedFiles) {
       affectedFileSet.add(f)
     }
   }
 
+  const directDependents = Math.max(
+    fileImpact.directDependents,
+    symbolResults.reduce((sum, r) => sum + r.directDependents, 0),
+  )
+  const indirectDependents = Math.max(
+    fileImpact.indirectDependents,
+    symbolResults.reduce((sum, r) => sum + r.indirectDependents, 0),
+  )
+  const transitiveDependents = Math.max(
+    fileImpact.transitiveDependents,
+    symbolResults.reduce((sum, r) => sum + r.transitiveDependents, 0),
+  )
+
+  let overallRisk = fileImpact.riskLevel
+  for (const result of symbolResults) {
+    overallRisk = maxRisk(overallRisk, result.riskLevel)
+  }
+
   return {
     target: filePath,
-    directDependents: totalDirect,
-    indirectDependents: totalIndirect,
-    transitiveDependents: totalTransitive,
+    directDependents,
+    indirectDependents,
+    transitiveDependents,
     riskLevel: overallRisk,
     affectedFiles: [...affectedFileSet],
     affectedProcesses: [],
     symbols: symbolResults,
+  }
+}
+
+/**
+ * BFS over IMPORTS relations to find files that depend on the given file.
+ * @param store - The graph store to query.
+ * @param filePath - The file to analyze.
+ * @param direction - upstream (importers), downstream (importees), or both.
+ * @returns An impact result based on file-level import relationships.
+ */
+async function analyzeFileImportImpact(
+  store: GraphStore,
+  filePath: string,
+  direction: 'upstream' | 'downstream' | 'both',
+): Promise<ImpactResult> {
+  const maxDepth = 3
+  const visited = new Set<string>([filePath])
+  const depthFiles = new Map<number, string[]>()
+
+  let currentFiles = [filePath]
+
+  for (let depth = 1; depth <= maxDepth; depth++) {
+    const nextFiles: string[] = []
+
+    for (const fp of currentFiles) {
+      const relations = []
+      if (direction === 'upstream' || direction === 'both') {
+        relations.push(...(await store.getImporters(fp)))
+      }
+      if (direction === 'downstream' || direction === 'both') {
+        relations.push(...(await store.getImportees(fp)))
+      }
+
+      for (const rel of relations) {
+        const target = direction === 'downstream' ? rel.target : rel.source
+        if (!visited.has(target)) {
+          visited.add(target)
+          nextFiles.push(target)
+        }
+      }
+    }
+
+    if (nextFiles.length > 0) {
+      depthFiles.set(depth, nextFiles)
+    }
+
+    if (nextFiles.length === 0) break
+    currentFiles = nextFiles
+  }
+
+  const directDependents = depthFiles.get(1)?.length ?? 0
+  const indirectDependents = depthFiles.get(2)?.length ?? 0
+  let transitiveDependents = 0
+  for (const [depth, files] of depthFiles) {
+    if (depth >= 3) transitiveDependents += files.length
+  }
+
+  const totalDependents = directDependents + indirectDependents + transitiveDependents
+  const affectedFiles: string[] = []
+  for (const files of depthFiles.values()) {
+    affectedFiles.push(...files)
+  }
+
+  return {
+    target: filePath,
+    directDependents,
+    indirectDependents,
+    transitiveDependents,
+    riskLevel: computeRiskLevel(directDependents, totalDependents, 0),
+    affectedFiles,
+    affectedProcesses: [],
   }
 }

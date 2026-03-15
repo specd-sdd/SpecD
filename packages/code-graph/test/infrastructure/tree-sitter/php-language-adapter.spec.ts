@@ -73,4 +73,56 @@ describe('PhpLanguageAdapter', () => {
       expect(defines).toHaveLength(symbols.length)
     })
   })
+
+  describe('extractImportedNames', () => {
+    it('parses use statement', () => {
+      const code = '<?php\nuse App\\Models\\User;'
+      const imports = adapter.extractImportedNames('main.php', code)
+      expect(imports).toHaveLength(1)
+      expect(imports[0]!.originalName).toBe('User')
+      expect(imports[0]!.specifier).toContain('User')
+      expect(imports[0]!.isRelative).toBe(false)
+    })
+
+    it('parses aliased use statement', () => {
+      const code = '<?php\nuse App\\Models\\User as U;'
+      const imports = adapter.extractImportedNames('main.php', code)
+      expect(imports).toHaveLength(1)
+      expect(imports[0]!.originalName).toBe('User')
+      expect(imports[0]!.localName).toBe('U')
+    })
+
+    it('all use statements are non-relative', () => {
+      const code = '<?php\nuse App\\Models\\User;'
+      const imports = adapter.extractImportedNames('main.php', code)
+      expect(imports[0]!.isRelative).toBe(false)
+    })
+  })
+
+  describe('extractNamespace', () => {
+    it('extracts namespace from PHP file', () => {
+      const code = '<?php\nnamespace App\\Models;\n\nclass User {}'
+      const ns = adapter.extractNamespace('<?php\nnamespace App\\Models;\n\nclass User {}')
+      expect(ns).toBe('App\\Models')
+    })
+
+    it('returns undefined when no namespace declared', () => {
+      const ns = adapter.extractNamespace('<?php\nclass User {}')
+      expect(ns).toBeUndefined()
+    })
+
+    it('qualified name matches use statement specifier', () => {
+      const fileContent = '<?php\nnamespace App\\Models;\n\nclass User {}'
+      const ns = adapter.extractNamespace(fileContent)
+      const symbols = adapter.extractSymbols('src/Models/User.php', fileContent)
+      const userSymbol = symbols.find((s) => s.name === 'User')
+
+      const importContent = '<?php\nuse App\\Models\\User;'
+      const imports = adapter.extractImportedNames('main.php', importContent)
+
+      // The qualified name ns + '\' + symbolName should match the import specifier
+      const qualifiedName = `${ns}\\${userSymbol!.name}`
+      expect(qualifiedName).toBe(imports[0]!.specifier)
+    })
+  })
 })

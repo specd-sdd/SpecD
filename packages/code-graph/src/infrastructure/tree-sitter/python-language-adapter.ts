@@ -5,6 +5,7 @@ import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/sy
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
+import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ensureLanguagesRegistered } from './register-languages.js'
 
 /**
@@ -101,11 +102,11 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param _importMap - Reserved for future use.
    * @returns An array of extracted relations.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   extractRelations(
     filePath: string,
     content: string,
     symbols: SymbolNode[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _importMap: Map<string, string>,
   ): Relation[] {
     ensureLanguagesRegistered()
@@ -120,6 +121,89 @@ export class PythonLanguageAdapter implements LanguageAdapter {
 
     this.extractImportRelations(root, filePath, relations)
     return relations
+  }
+
+  /**
+   * Parses Python import declarations from source code.
+   * @param _filePath - Path to the source file (unused — Python imports are not path-relative).
+   * @param content - The source file content.
+   * @returns An array of parsed import declarations.
+   */
+  extractImportedNames(_filePath: string, content: string): ImportDeclaration[] {
+    ensureLanguagesRegistered()
+    const root = parse('python', content).root()
+    const results: ImportDeclaration[] = []
+
+    for (const child of root.children()) {
+      const kind = nodeKind(child)
+
+      if (kind === 'import_statement') {
+        // import os / import os.path
+        for (const nameChild of child.children()) {
+          if (nodeKind(nameChild) === 'dotted_name') {
+            const name = nameChild.text()
+            results.push({
+              originalName: name,
+              localName: name,
+              specifier: name,
+              isRelative: false,
+            })
+          } else if (nodeKind(nameChild) === 'aliased_import') {
+            const dottedName = nameChild.child(0)
+            const alias = nameChild.field('alias')
+            if (dottedName) {
+              const name = dottedName.text()
+              results.push({
+                originalName: name,
+                localName: alias ? alias.text() : name,
+                specifier: name,
+                isRelative: false,
+              })
+            }
+          }
+        }
+      } else if (kind === 'import_from_statement') {
+        // from pathlib import Path / from .utils import helper
+        const moduleNode = child.field('module_name')
+        const specifier = moduleNode ? moduleNode.text() : ''
+        const isRelative = specifier.startsWith('.')
+        const moduleNodeId = moduleNode?.id()
+
+        let seenImportKeyword = false
+        for (const nameChild of child.children()) {
+          // Track the 'import' keyword to distinguish module name from imported names
+          if (!nameChild.isNamed() && nameChild.text() === 'import') {
+            seenImportKeyword = true
+            continue
+          }
+          if (nodeKind(nameChild) === 'dotted_name') {
+            // Skip the module name (before 'import' keyword)
+            if (!seenImportKeyword || nameChild.id() === moduleNodeId) continue
+            const name = nameChild.text()
+            results.push({
+              originalName: name,
+              localName: name,
+              specifier,
+              isRelative,
+            })
+          } else if (nodeKind(nameChild) === 'aliased_import') {
+            const dottedName = nameChild.child(0)
+            const alias = nameChild.field('alias')
+            if (dottedName) {
+              const name = dottedName.text()
+              results.push({
+                originalName: name,
+                localName: alias ? alias.text() : name,
+                specifier,
+                isRelative,
+              })
+            }
+          }
+        }
+      }
+    }
+
+    return results
   }
 
   /**

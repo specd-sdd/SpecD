@@ -72,4 +72,34 @@ describe('GoLanguageAdapter', () => {
       expect(defines).toHaveLength(symbols.length)
     })
   })
+
+  describe('extractImportedNames', () => {
+    it('parses single import', () => {
+      const code = 'package main\n\nimport "fmt"'
+      const imports = adapter.extractImportedNames('main.go', code)
+      expect(imports).toHaveLength(1)
+      expect(imports[0]!.originalName).toBe('fmt')
+      expect(imports[0]!.specifier).toBe('fmt')
+      expect(imports[0]!.isRelative).toBe(false)
+    })
+
+    it('parses grouped imports', () => {
+      const code = 'package main\n\nimport (\n  "fmt"\n  "os"\n)'
+      const imports = adapter.extractImportedNames('main.go', code)
+      expect(imports).toHaveLength(2)
+    })
+
+    it('uses last path segment as name', () => {
+      const code = 'package main\n\nimport "path/filepath"'
+      const imports = adapter.extractImportedNames('main.go', code)
+      expect(imports[0]!.originalName).toBe('filepath')
+      expect(imports[0]!.localName).toBe('filepath')
+    })
+
+    it('all imports are non-relative', () => {
+      const code = 'package main\n\nimport "fmt"'
+      const imports = adapter.extractImportedNames('main.go', code)
+      expect(imports[0]!.isRelative).toBe(false)
+    })
+  })
 })
