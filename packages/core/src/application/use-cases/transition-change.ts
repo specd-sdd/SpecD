@@ -2,9 +2,12 @@ import { type Change } from '../../domain/entities/change.js'
 import { type ChangeState } from '../../domain/value-objects/change-state.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
+import { type SchemaRegistry } from '../ports/schema-registry.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
+import { HookFailedError } from '../../domain/errors/hook-failed-error.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
+import { type RunStepHooks, type OnHookProgress } from './run-step-hooks.js'
 
 /** A single task completion check for the `implementing → verifying` transition. */
 export interface TaskCompletionCheck {
@@ -76,10 +79,36 @@ export interface TransitionChangeInput {
    * Ignored on all other transitions.
    */
   readonly implementingTaskChecks?: ReadonlyArray<TaskCompletionCheck>
+  /**
+   * When `true`, skips all `run:` hook execution. The caller is responsible
+   * for invoking hooks separately via `RunStepHooks`.
+   *
+   * Defaults to `false`.
+   */
+  readonly skipHooks?: boolean
+}
+
+/** Progress event emitted during a transition. */
+export type TransitionProgressEvent =
+  | { type: 'requires-check'; artifactId: string; satisfied: boolean }
+  | { type: 'hook-start'; phase: 'pre' | 'post'; hookId: string; command: string }
+  | { type: 'hook-done'; phase: 'pre' | 'post'; hookId: string; success: boolean; exitCode: number }
+  | { type: 'transitioned'; from: ChangeState; to: ChangeState }
+
+/** Callback for receiving transition progress events. */
+export type OnTransitionProgress = (event: TransitionProgressEvent) => void
+
+/** Result returned by {@link TransitionChange}. */
+export interface TransitionChangeResult {
+  /** The updated change after the transition. */
+  readonly change: Change
+  /** Commands of post-hooks that failed; empty on full success or when skipHooks is true. */
+  readonly postHookFailures: readonly string[]
 }
 
 /**
- * Performs a lifecycle state transition on a change with approval-gate routing.
+ * Performs a lifecycle state transition on a change with approval-gate routing,
+ * workflow requires enforcement, and hook execution.
  *
  * Handles the two smart-routing decision points:
  * - `ready → implementing` is redirected to `ready → pending-spec-approval`
@@ -91,51 +120,159 @@ export interface TransitionChangeInput {
  * in `implementingTaskChecks` for incomplete task items. Throws
  * `InvalidStateTransitionError` if any incomplete item is found.
  *
+ * Enforces workflow `requires` for the target step and executes `run:` hooks
+ * at step boundaries (unless `skipHooks` is true).
  */
 export class TransitionChange {
   private readonly _changes: ChangeRepository
   private readonly _actor: ActorResolver
+  private readonly _schemas: SchemaRegistry
+  private readonly _runStepHooks: RunStepHooks
+  private readonly _schemaRef: string
+  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new `TransitionChange` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
    * @param actor - Resolver for the actor identity
+   * @param schemas - Registry for resolving the active schema
+   * @param runStepHooks - Use case for executing workflow hooks
+   * @param schemaRef - Schema reference string from config
+   * @param workspaceSchemasPaths - Map of workspace names to schema directory paths
    */
-  constructor(changes: ChangeRepository, actor: ActorResolver) {
+  constructor(
+    changes: ChangeRepository,
+    actor: ActorResolver,
+    schemas: SchemaRegistry,
+    runStepHooks: RunStepHooks,
+    schemaRef: string,
+    workspaceSchemasPaths: ReadonlyMap<string, string>,
+  ) {
     this._changes = changes
     this._actor = actor
+    this._schemas = schemas
+    this._runStepHooks = runStepHooks
+    this._schemaRef = schemaRef
+    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
    * Executes the use case.
    *
    * @param input - Transition parameters
-   * @returns The updated change after the transition
+   * @param onProgress - Optional callback for progress events
+   * @returns The transition result with the updated change and any post-hook failures
    * @throws {ChangeNotFoundError} If no change with the given name exists
-   * @throws {InvalidStateTransitionError} If the transition is not permitted or incomplete tasks remain
+   * @throws {InvalidStateTransitionError} If the transition is not permitted, requires are unsatisfied, or incomplete tasks remain
+   * @throws {HookFailedError} If a pre-hook exits with a non-zero code
    */
-  async execute(input: TransitionChangeInput): Promise<Change> {
+  async execute(
+    input: TransitionChangeInput,
+    onProgress?: OnTransitionProgress,
+  ): Promise<TransitionChangeResult> {
     const change = await this._changes.get(input.name)
     if (change === null) {
       throw new ChangeNotFoundError(input.name)
     }
 
     const actor = await this._actor.identity()
-
+    const fromState = change.state
     const effectiveTarget = this._resolveTarget(change.state, input)
 
+    // --- Resolve schema and workflow step (best-effort) ---
+    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
+    const workflowStep = schema?.workflowStep(effectiveTarget) ?? null
+
+    // --- Enforce workflow requires ---
+    if (workflowStep !== null && workflowStep.requires.length > 0) {
+      for (const artifactId of workflowStep.requires) {
+        const status = change.effectiveStatus(artifactId)
+        const satisfied = status === 'complete' || status === 'skipped'
+        onProgress?.({ type: 'requires-check', artifactId, satisfied })
+        if (!satisfied) {
+          throw new InvalidStateTransitionError(change.state, effectiveTarget)
+        }
+      }
+    }
+
+    // --- Task completion check (implementing → verifying) ---
     if (change.state === 'implementing' && effectiveTarget === 'verifying') {
       await this._checkTaskCompletion(change, input.implementingTaskChecks ?? [])
     }
 
+    // --- Artifact validation clearing (verifying → implementing) ---
     if (change.state === 'verifying' && effectiveTarget === 'implementing') {
       change.clearArtifactValidations(input.implementingRequires ?? [])
     }
 
+    // --- Pre-hooks (only when schema resolved a workflow step with hooks) ---
+    const skipHooks = input.skipHooks ?? false
+    const hasWorkflowStep = workflowStep !== null
+    if (!skipHooks && hasWorkflowStep) {
+      await this._executeHooks(input.name, effectiveTarget, 'pre', onProgress)
+    }
+
+    // --- State transition ---
     change.transition(effectiveTarget, actor)
     await this._changes.save(change)
-    return change
+    onProgress?.({ type: 'transitioned', from: fromState, to: effectiveTarget })
+
+    // --- Post-hooks (only when schema resolved a workflow step with hooks) ---
+    const postHookFailures: string[] = []
+    if (!skipHooks && hasWorkflowStep) {
+      const failures = await this._executePostHooks(input.name, effectiveTarget, onProgress)
+      postHookFailures.push(...failures)
+    }
+
+    return { change, postHookFailures }
+  }
+
+  /**
+   * Executes pre-hooks for the target step. Throws on failure (fail-fast).
+   *
+   * @param name - The change name
+   * @param step - The target workflow step
+   * @param phase - The hook phase (always 'pre')
+   * @param onProgress - Optional progress callback
+   */
+  private async _executeHooks(
+    name: string,
+    step: ChangeState,
+    phase: 'pre',
+    onProgress?: OnTransitionProgress,
+  ): Promise<void> {
+    const hookProgress: OnHookProgress = (evt) => {
+      onProgress?.({ ...evt, phase } as TransitionProgressEvent)
+    }
+    const result = await this._runStepHooks.execute({ name, step, phase }, hookProgress)
+    if (!result.success && result.failedHook !== null) {
+      throw new HookFailedError(
+        result.failedHook.command,
+        result.failedHook.exitCode,
+        result.failedHook.stderr,
+      )
+    }
+  }
+
+  /**
+   * Executes post-hooks for the target step. Collects failures (fail-soft).
+   *
+   * @param name - The change name
+   * @param step - The target workflow step
+   * @param onProgress - Optional progress callback
+   * @returns Array of failed hook commands
+   */
+  private async _executePostHooks(
+    name: string,
+    step: ChangeState,
+    onProgress?: OnTransitionProgress,
+  ): Promise<string[]> {
+    const hookProgress: OnHookProgress = (evt) => {
+      onProgress?.({ ...evt, phase: 'post' } as TransitionProgressEvent)
+    }
+    const result = await this._runStepHooks.execute({ name, step, phase: 'post' }, hookProgress)
+    return result.hooks.filter((h) => !h.success).map((h) => h.command)
   }
 
   /**

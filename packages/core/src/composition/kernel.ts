@@ -156,15 +156,32 @@ export interface KernelOptions {
 export function createKernel(config: SpecdConfig, options?: KernelOptions): Kernel {
   const i = createKernelInternals(config, options)
 
-  // Project-level workflow hooks from config (used by ArchiveChange and future use cases)
+  // Project-level workflow hooks from config
   const projectWorkflowHooks = config.workflow
+
+  // Shared RunStepHooks instance — used by TransitionChange, ArchiveChange, and exposed directly
+  const runStepHooks = new RunStepHooks(
+    i.changes,
+    i.hooks,
+    i.schemas,
+    i.schemaRef,
+    i.workspaceSchemasPaths,
+    projectWorkflowHooks,
+  )
 
   return {
     changes: {
       repo: i.changes,
       create: new CreateChange(i.changes, i.actor),
       status: new GetStatus(i.changes),
-      transition: new TransitionChange(i.changes, i.actor),
+      transition: new TransitionChange(
+        i.changes,
+        i.actor,
+        i.schemas,
+        runStepHooks,
+        i.schemaRef,
+        i.workspaceSchemasPaths,
+      ),
       draft: new DraftChange(i.changes, i.actor),
       restore: new RestoreChange(i.changes, i.actor),
       discard: new DiscardChange(i.changes, i.actor),
@@ -172,7 +189,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
         i.changes,
         i.specs,
         i.archive,
-        i.hooks,
+        runStepHooks,
         i.actor,
         i.parsers,
         i.schemas,
@@ -188,7 +205,6 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
         i.yaml,
         i.schemaRef,
         i.workspaceSchemasPaths,
-        projectWorkflowHooks,
       ),
       validate: new ValidateArtifacts(
         i.changes,
@@ -218,14 +234,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       updateSpecDeps: new UpdateSpecDeps(i.changes),
       listArchived: new ListArchived(i.archive),
       getArchived: new GetArchivedChange(i.archive),
-      runStepHooks: new RunStepHooks(
-        i.changes,
-        i.hooks,
-        i.schemas,
-        i.schemaRef,
-        i.workspaceSchemasPaths,
-        projectWorkflowHooks,
-      ),
+      runStepHooks,
       getHookInstructions: new GetHookInstructions(
         i.changes,
         i.schemas,

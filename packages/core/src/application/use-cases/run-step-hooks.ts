@@ -12,6 +12,14 @@ import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 /** Valid `ChangeState` values for step validation. */
 const CHANGE_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
 
+/** Progress event emitted during hook execution. */
+export type HookProgressEvent =
+  | { type: 'hook-start'; hookId: string; command: string }
+  | { type: 'hook-done'; hookId: string; success: boolean; exitCode: number }
+
+/** Callback for receiving hook execution progress events. */
+export type OnHookProgress = (event: HookProgressEvent) => void
+
 /** Input for the {@link RunStepHooks} use case. */
 export interface RunStepHooksInput {
   readonly name: string
@@ -94,9 +102,13 @@ export class RunStepHooks {
    * Executes `run:` hooks for the given step and phase.
    *
    * @param input - The step name, phase, and optional hook filter
+   * @param onProgress - Optional callback for hook execution progress events
    * @returns Per-hook execution results with overall success status
    */
-  async execute(input: RunStepHooksInput): Promise<RunStepHooksResult> {
+  async execute(
+    input: RunStepHooksInput,
+    onProgress?: OnHookProgress,
+  ): Promise<RunStepHooksResult> {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
@@ -152,6 +164,7 @@ export class RunStepHooks {
     let failedHook: RunStepHookEntry | null = null
 
     for (const hook of runHooks) {
+      onProgress?.({ type: 'hook-start', hookId: hook.id, command: hook.command })
       const result = await this._hooks.run(hook.command, variables)
       const entry: RunStepHookEntry = {
         id: hook.id,
@@ -162,6 +175,12 @@ export class RunStepHooks {
         success: result.isSuccess(),
       }
       results.push(entry)
+      onProgress?.({
+        type: 'hook-done',
+        hookId: hook.id,
+        success: result.isSuccess(),
+        exitCode: result.exitCode(),
+      })
 
       if (!result.isSuccess()) {
         if (input.phase === 'pre') {
