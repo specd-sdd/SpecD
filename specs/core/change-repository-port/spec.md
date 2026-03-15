@@ -50,9 +50,13 @@ Without an abstraction over change storage, use cases would couple directly to f
 
 `deltaExists(change, specId, filename)` MUST return `true` if the specified delta file exists for the given change and spec ID, `false` otherwise. Delta files are located within a subdirectory of the change directory identified by the spec ID.
 
+### Requirement: changePath returns the absolute path to a change directory
+
+`changePath(change)` MUST accept a `Change` and return the absolute filesystem path to that change's directory. This is used by use cases that need the change path for template variable construction (e.g. `change.path` in `TemplateVariables`). The implementation resolves the path from its internal storage layout.
+
 ### Requirement: Abstract class with abstract methods
 
-`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
 
 ## Constraints
 
@@ -66,6 +70,7 @@ Without an abstraction over change storage, use cases would couple directly to f
 
 ## Spec Dependencies
 
+- [`specs/core/repository-port/spec.md`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, artifact status derivation, history events
 - [`specs/core/storage/spec.md`](../storage/spec.md) — change directory naming, manifest format, atomic writes

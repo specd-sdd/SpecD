@@ -22,14 +22,14 @@
 
 - **GIVEN** `contextIncludeSpecs: ['default:*']` and `contextExcludeSpecs: ['default:drafts/*']`
 - **AND** `default:drafts/old-spec` was matched by the project-level include
-- **WHEN** `CompileContext.execute` applies step 3 (project-level exclude)
+- **WHEN** `CompileContext.execute` applies step 2 (project-level exclude)
 - **THEN** `default:drafts/old-spec` is removed before workspace-level patterns are evaluated
 
 #### Scenario: Workspace-level exclude removes spec after workspace include
 
 - **GIVEN** `default` workspace declares `contextIncludeSpecs: ['*']` and `contextExcludeSpecs: ['internal/*']`
-- **AND** `default` is active and `default:internal/notes` was added by the workspace include (step 4)
-- **WHEN** `CompileContext.execute` applies step 5 (workspace-level exclude)
+- **AND** `default` is active and `default:internal/notes` was added by the workspace include (step 3)
+- **WHEN** `CompileContext.execute` applies step 4 (workspace-level exclude)
 - **THEN** `default:internal/notes` is removed from the context set
 
 #### Scenario: dependsOn traversal adds specs beyond include set
@@ -37,13 +37,13 @@
 - **GIVEN** `change.specIds: ['default:auth/login']`
 - **AND** `auth/login/.specd-metadata.yaml` declares `dependsOn: ['auth/jwt']`
 - **AND** `auth/jwt` was not matched by any include pattern
-- **WHEN** `CompileContext.execute` applies step 6
+- **WHEN** `CompileContext.execute` applies step 5 with `followDeps: true`
 - **THEN** `auth/jwt` is added to the context set
 
 #### Scenario: dependsOn spec not removed by exclude
 
 - **GIVEN** `contextExcludeSpecs: ['default:auth/*']`
-- **AND** `auth/jwt` is added via `dependsOn` traversal (step 6)
+- **AND** `auth/jwt` is added via `dependsOn` traversal (step 5)
 - **WHEN** `CompileContext.execute` is called
 - **THEN** `auth/jwt` is not excluded — `dependsOn` traversal specs are immune to exclude rules
 
@@ -102,22 +102,20 @@
 - **WHEN** `CompileContext.execute` is called
 - **THEN** the result is returned normally — no exception is thrown
 
-### Requirement: Assembled instruction block
+### Requirement: Assembled context block
 
-#### Scenario: instruction entry injected before schema instruction
+#### Scenario: instruction entry injected into context block
 
 - **GIVEN** `config.context: [{ instruction: "Always prefer editing existing files." }]`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `result.instructionBlock` begins with `"Always prefer editing existing files."`
-- **AND** that text appears before the schema instruction
+- **THEN** `result.contextBlock` contains `"Always prefer editing existing files."`
 
-#### Scenario: file entry read via FileReader and injected verbatim before schema instruction
+#### Scenario: file entry read via FileReader and injected into context block
 
 - **GIVEN** `config.context: [{ file: "specd-bootstrap.md" }]`
 - **AND** `FileReader.read("specd-bootstrap.md")` returns `"# specd Bootstrap"`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `result.instructionBlock` begins with `"# specd Bootstrap"`
-- **AND** that content appears before the schema instruction
+- **THEN** `result.contextBlock` contains `"# specd Bootstrap"`
 
 #### Scenario: missing file entry emits a warning
 
@@ -126,58 +124,36 @@
 - **WHEN** `CompileContext.execute` is called
 - **THEN** a warning is emitted identifying the missing file, the entry is absent from the output, and no error is thrown
 
-#### Scenario: context absent — no effect on instruction block
+#### Scenario: context absent — no effect on context block
 
 - **GIVEN** `config.context` is not declared
 - **WHEN** `CompileContext.execute` is called
-- **THEN** the instruction block is identical to one produced with `context: []`
+- **THEN** the context block is identical to one produced with `context: []`
 
 #### Scenario: multiple context entries preserve declaration order
 
 - **GIVEN** `config.context: [{ file: AGENTS.md }, { instruction: "Inline note." }, { file: specd-bootstrap.md }]`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `result.instructionBlock` contains `AGENTS.md` content first, then `"Inline note."`, then `specd-bootstrap.md` content — in declaration order, before schema instruction
+- **THEN** `result.contextBlock` contains `AGENTS.md` content first, then `"Inline note."`, then `specd-bootstrap.md` content — in declaration order
 
-#### Scenario: Schema instruction included for the active artifact only
+#### Scenario: No artifact instructions in the context block
 
-- **GIVEN** the schema declares `artifacts[spec].instruction: 'Create specifications...'` and `artifacts[verify].instruction: 'Write scenarios...'`
-- **AND** `CompileContext.execute` is called with `activeArtifact: 'spec'`
-- **THEN** `result.instructionBlock` includes the instruction for `spec`
-- **AND** does not include the instruction for `verify`
+- **GIVEN** the schema declares `artifacts[spec].instruction: 'Create specifications...'`
+- **WHEN** `CompileContext.execute` is called
+- **THEN** `result.contextBlock` does not include the artifact instruction — artifact instructions are retrieved via `GetArtifactInstruction`
 
-#### Scenario: No artifact instruction for post-ready steps
+#### Scenario: No instruction hooks in the context block
 
-- **GIVEN** `CompileContext.execute` is called for a post-`ready` step (e.g. `implementing`, `verifying`, `archiving`)
-- **AND** no `activeArtifact` is provided
-- **THEN** no artifact instructions are included in the instruction block — artifacts already exist at this point
-
-#### Scenario: rules.pre injected before the schema instruction for the active artifact
-
-- **GIVEN** the resolved schema declares `artifacts.spec.rules.pre: [{ text: 'All requirements must use normative language.' }]`
-- **AND** `CompileContext.execute` is called with `activeArtifact: 'spec'`
-- **THEN** `result.instructionBlock` includes `'All requirements must use normative language.'` before the schema instruction for `spec`
-- **AND** no `rules.pre` content from other artifacts is injected
-
-#### Scenario: rules.post injected for the active artifact only
-
-- **GIVEN** the resolved schema declares `artifacts.spec.rules.post: [{ text: 'All requirements must use SHALL/MUST' }]` and `artifacts.verify.rules.post: [{ text: 'Scenarios must use GIVEN/WHEN/THEN' }]`
-- **AND** `CompileContext.execute` is called with `activeArtifact: 'spec'`
-- **THEN** `result.instructionBlock` includes `'All requirements must use SHALL/MUST'` after the schema instruction for `spec`
-- **AND** does not include the `verify` rules.post content
-- **AND** the schema instruction is not replaced
-
-#### Scenario: Step hooks fire once regardless of artifact iteration
-
-- **GIVEN** the `designing` step declares `hooks.pre: [{ instruction: 'Plan your approach first.' }]`
-- **AND** `CompileContext.execute` is called twice — once with `activeArtifact: 'spec'` and once with `activeArtifact: 'tasks'`
-- **THEN** both calls include the `designing` pre-hook instruction — hooks are part of the step context, not scoped to a specific artifact
+- **GIVEN** `workflow.archiving.hooks.pre` contains `{ instruction: 'Review delta specs' }` and `{ run: 'pnpm test' }`
+- **WHEN** `CompileContext.execute` is called with `step: 'archiving'`
+- **THEN** `result.contextBlock` does not include `Review delta specs` or `pnpm test` — instruction hooks are retrieved via `GetHookInstructions`
 
 #### Scenario: metadataExtraction used as fallback for stale/absent metadata
 
 - **GIVEN** the schema declares `metadataExtraction.rules: [{ artifact: specs, extractor: { selector: { type: section, matches: '^Requirements$' }, groupBy: label, extract: content } }]`
 - **AND** `auth/jwt/spec.md` is in the context set and has a `## Requirements` section
 - **WHEN** `CompileContext.execute` is called with stale or absent metadata for `auth/jwt`
-- **THEN** `result.instructionBlock` includes extracted rules content from `auth/jwt/spec.md`
+- **THEN** `result.contextBlock` includes extracted rules content from `auth/jwt/spec.md`
 
 #### Scenario: metadataExtraction extractor matching no nodes silently skipped
 
@@ -185,13 +161,6 @@
 - **AND** a context spec has no section matching `Examples`
 - **WHEN** `CompileContext.execute` is called
 - **THEN** no error is thrown and no content is produced for that field
-
-#### Scenario: instruction hooks included but run hooks excluded
-
-- **GIVEN** `workflow.archiving.hooks.pre` contains `{ instruction: 'Review delta specs' }` and `{ run: 'pnpm test' }`
-- **WHEN** `CompileContext.execute` is called with `step: 'archiving'`
-- **THEN** `result.instructionBlock` includes `Review delta specs`
-- **AND** `pnpm test` is not included in the instruction block
 
 ### Requirement: Missing spec IDs emit a warning
 

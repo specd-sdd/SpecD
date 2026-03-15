@@ -59,6 +59,7 @@ Relative resolution MUST be pure computation (no I/O). Absolute resolution MAY r
 
 ## Spec Dependencies
 
+- [`specs/core/repository-port/spec.md`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity references specIds that resolve to specs managed by this port
 - [`specs/core/storage/spec.md`](../storage/spec.md) — storage layer design, filesystem adapter constraints

@@ -61,4 +61,4 @@ Created specd/schemas/my-workflow/schema.yaml
 
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`specs/core/schema-format/spec.md`](../../core/schema-format/spec.md) — schema structure, `kind`, `extends`
-- [`specs/core/port-schema-registry/spec.md`](../../core/port-schema-registry/spec.md) — schema resolution
+- [`specs/core/schema-registry-port/spec.md`](../../core/schema-registry-port/spec.md) — schema resolution

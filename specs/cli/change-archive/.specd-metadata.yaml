@@ -3,6 +3,8 @@ description: Once a change is fully approved, its spec deltas need to be promote
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
+  - core:core/archive-change
+  - core:core/hook-execution-model
 context:
   - Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd change archive <name>` finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.
 rules:
@@ -10,10 +12,11 @@ rules:
     rules:
       - |-
         ```
-        specd change archive <name> [--format text|json|toon]
+        specd change archive <name> [--no-hooks] [--format text|json|toon]
         ```
 
         * `<name>` — required positional; the name of the change to archive
+        * `--no-hooks` — optional flag; skips `run:` hook execution, allowing the caller to manage hooks separately via `specd change run-hooks`
         * `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Prerequisites
     rules:
@@ -26,9 +29,12 @@ rules:
         1. Merges all spec delta artifacts into the permanent spec directories
         2. Moves the change directory to the archive location determined by `storage.archivePattern`
         3. Records the archive operation in the change history
+  - requirement: Hook execution
+    rules:
+      - By default, the `ArchiveChange` use case executes `run:` hooks for the `archiving` workflow step (pre-hooks before file modifications, post-hooks after the archive). When `--no-hooks` is passed, hook execution is skipped — the caller is responsible for invoking hooks via `specd change run-hooks`.
   - requirement: Post-archive hooks
     rules:
-      - After a successful archive, any `post:` hooks declared on the schema's `archivable` step or the project-level workflow are run. If a hook fails, the CLI exits with code 2.
+      - After a successful archive, if any post-archive hooks failed, the CLI exits with code 2 and reports the failures.
   - requirement: Output on success
     rules:
       - |-
@@ -103,6 +109,6 @@ scenarios:
       - stdout is valid JSON with result equal to "ok", name equal to "my-change", and archivePath containing the archive path
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:fdbb6e177d2c55da276ce8a037707e8aa852f55defd14ffa1881dd01d2496e1f
+  spec.md: sha256:279c254a38306169d3ca40226be83c2cc65741375fce9398548c93b4f3e22ff3
   verify.md: sha256:9bdfc08eee69a987836597dc57debc5d5bfc26e5e9d227d50ce59b6cef863acb
 generatedBy: core

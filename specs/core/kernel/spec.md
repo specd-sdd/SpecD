@@ -44,26 +44,29 @@ The following table is the exhaustive mapping between kernel paths and use case 
 
 #### `kernel.changes`
 
-| Kernel path              | Use case class      | Spec                                                  | Description                                          |
-| ------------------------ | ------------------- | ----------------------------------------------------- | ---------------------------------------------------- |
-| `changes.repo`           | `ChangeRepository`  | —                                                     | Underlying repository for adapter-level queries      |
-| `changes.create`         | `CreateChange`      | [create-change](../create-change/spec.md)             | Creates a new change                                 |
-| `changes.status`         | `GetStatus`         | [get-status](../get-status/spec.md)                   | Reports lifecycle state and artifact statuses        |
-| `changes.transition`     | `TransitionChange`  | [transition-change](../transition-change/spec.md)     | Performs a lifecycle state transition                |
-| `changes.draft`          | `DraftChange`       | [draft-change](../draft-change/spec.md)               | Shelves a change to drafts                           |
-| `changes.restore`        | `RestoreChange`     | [restore-change](../restore-change/spec.md)           | Recovers a drafted change                            |
-| `changes.discard`        | `DiscardChange`     | [discard-change](../discard-change/spec.md)           | Permanently abandons a change                        |
-| `changes.archive`        | `ArchiveChange`     | [archive-change](../archive-change/spec.md)           | Finalises a change: merges deltas, moves to archive  |
-| `changes.validate`       | `ValidateArtifacts` | [validate-artifacts](../validate-artifacts/spec.md)   | Validates artifact files against the active schema   |
-| `changes.compile`        | `CompileContext`    | [compile-context](../compile-context/spec.md)         | Assembles the instruction block for a lifecycle step |
-| `changes.list`           | `ListChanges`       | [list-changes](../list-changes/spec.md)               | Lists all active changes                             |
-| `changes.listDrafts`     | `ListDrafts`        | [list-drafts](../list-drafts/spec.md)                 | Lists all drafted changes                            |
-| `changes.listDiscarded`  | `ListDiscarded`     | [list-discarded](../list-discarded/spec.md)           | Lists all discarded changes                          |
-| `changes.edit`           | `EditChange`        | [edit-change](../edit-change/spec.md)                 | Edits the spec scope of a change                     |
-| `changes.skipArtifact`   | `SkipArtifact`      | [skip-artifact](../skip-artifact/spec.md)             | Explicitly skips an optional artifact                |
-| `changes.updateSpecDeps` | `UpdateSpecDeps`    | [update-spec-deps](../update-spec-deps/spec.md)       | Updates declared dependencies for a spec             |
-| `changes.listArchived`   | `ListArchived`      | [list-archived](../list-archived/spec.md)             | Lists all archived changes                           |
-| `changes.getArchived`    | `GetArchivedChange` | [get-archived-change](../get-archived-change/spec.md) | Retrieves a single archived change by name           |
+| Kernel path                      | Use case class           | Spec                                                            | Description                                             |
+| -------------------------------- | ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------- |
+| `changes.repo`                   | `ChangeRepository`       | —                                                               | Underlying repository for adapter-level queries         |
+| `changes.create`                 | `CreateChange`           | [create-change](../create-change/spec.md)                       | Creates a new change                                    |
+| `changes.status`                 | `GetStatus`              | [get-status](../get-status/spec.md)                             | Reports lifecycle state and artifact statuses           |
+| `changes.transition`             | `TransitionChange`       | [transition-change](../transition-change/spec.md)               | Performs a lifecycle state transition                   |
+| `changes.draft`                  | `DraftChange`            | [draft-change](../draft-change/spec.md)                         | Shelves a change to drafts                              |
+| `changes.restore`                | `RestoreChange`          | [restore-change](../restore-change/spec.md)                     | Recovers a drafted change                               |
+| `changes.discard`                | `DiscardChange`          | [discard-change](../discard-change/spec.md)                     | Permanently abandons a change                           |
+| `changes.archive`                | `ArchiveChange`          | [archive-change](../archive-change/spec.md)                     | Finalises a change: merges deltas, moves to archive     |
+| `changes.validate`               | `ValidateArtifacts`      | [validate-artifacts](../validate-artifacts/spec.md)             | Validates artifact files against the active schema      |
+| `changes.compile`                | `CompileContext`         | [compile-context](../compile-context/spec.md)                   | Assembles the context block for a lifecycle step        |
+| `changes.list`                   | `ListChanges`            | [list-changes](../list-changes/spec.md)                         | Lists all active changes                                |
+| `changes.listDrafts`             | `ListDrafts`             | [list-drafts](../list-drafts/spec.md)                           | Lists all drafted changes                               |
+| `changes.listDiscarded`          | `ListDiscarded`          | [list-discarded](../list-discarded/spec.md)                     | Lists all discarded changes                             |
+| `changes.edit`                   | `EditChange`             | [edit-change](../edit-change/spec.md)                           | Edits the spec scope of a change                        |
+| `changes.skipArtifact`           | `SkipArtifact`           | [skip-artifact](../skip-artifact/spec.md)                       | Explicitly skips an optional artifact                   |
+| `changes.updateSpecDeps`         | `UpdateSpecDeps`         | [update-spec-deps](../update-spec-deps/spec.md)                 | Updates declared dependencies for a spec                |
+| `changes.listArchived`           | `ListArchived`           | [list-archived](../list-archived/spec.md)                       | Lists all archived changes                              |
+| `changes.getArchived`            | `GetArchivedChange`      | [get-archived-change](../get-archived-change/spec.md)           | Retrieves a single archived change by name              |
+| `changes.runStepHooks`           | `RunStepHooks`           | [run-step-hooks](../run-step-hooks/spec.md)                     | Executes run: hooks for a step and phase                |
+| `changes.getHookInstructions`    | `GetHookInstructions`    | [get-hook-instructions](../get-hook-instructions/spec.md)       | Returns instruction: hook text for a step and phase     |
+| `changes.getArtifactInstruction` | `GetArtifactInstruction` | [get-artifact-instruction](../get-artifact-instruction/spec.md) | Returns artifact instruction block with rules and delta |
 
 #### `kernel.specs`
 
@@ -166,6 +169,9 @@ await kernel.project.init.execute({
 - [`specs/core/update-spec-deps/spec.md`](../update-spec-deps/spec.md)
 - [`specs/core/list-archived/spec.md`](../list-archived/spec.md)
 - [`specs/core/get-archived-change/spec.md`](../get-archived-change/spec.md)
+- [`specs/core/run-step-hooks/spec.md`](../run-step-hooks/spec.md)
+- [`specs/core/get-hook-instructions/spec.md`](../get-hook-instructions/spec.md)
+- [`specs/core/get-artifact-instruction/spec.md`](../get-artifact-instruction/spec.md)
 - [`specs/core/approve-spec/spec.md`](../approve-spec/spec.md)
 - [`specs/core/approve-signoff/spec.md`](../approve-signoff/spec.md)
 - [`specs/core/list-specs/spec.md`](../list-specs/spec.md)

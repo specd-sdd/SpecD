@@ -14,13 +14,14 @@ export function registerChangeArchive(parent: Command): void {
     .command('archive <name>')
     .allowExcessArguments(false)
     .description('Archive a completed change')
+    .option('--no-hooks', 'skip run: hook execution')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
-    .action(async (name: string, opts: { format: string; config?: string }) => {
+    .action(async (name: string, opts: { format: string; config?: string; hooks: boolean }) => {
       try {
         const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
-        const result = await kernel.changes.archive.execute({ name })
+        const result = await kernel.changes.archive.execute({ name, skipHooks: !opts.hooks })
 
         const archivePath = path.relative(config.projectRoot, result.archiveDirPath)
 

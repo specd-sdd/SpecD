@@ -9,7 +9,9 @@ import { createArchiveRepository } from '../archive-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
+import { TemplateExpander } from '../../application/template-expander.js'
 import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
+import { RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { NodeYamlSerializer } from '../../infrastructure/node/yaml-serializer.js'
 import { GenerateSpecMetadata } from '../../application/use-cases/generate-spec-metadata.js'
@@ -58,11 +60,14 @@ export interface FsArchiveChangeOptions {
   readonly workspaceSchemasPaths: ReadonlyMap<string, string>
   /** Absolute path to the project root. */
   readonly projectRoot: string
-  /** Project-level hooks for the `archiving` workflow step. */
-  readonly projectHooks?: {
-    readonly pre: readonly HookEntry[]
-    readonly post: readonly HookEntry[]
-  }
+  /** Project-level workflow hook definitions from `specd.yaml`. */
+  readonly projectWorkflowHooks?: readonly {
+    readonly step: string
+    readonly hooks: {
+      readonly pre: readonly HookEntry[]
+      readonly post: readonly HookEntry[]
+    }
+  }[]
 }
 
 /**
@@ -126,7 +131,6 @@ export function createArchiveChange(
         workspaceSchemasPaths.set(ws.name, ws.schemasPath)
       }
     }
-    const archivingStep = config.workflow?.find((s) => s.step === 'archiving')
     return createArchiveChange(
       {
         workspace: defaultWs.name,
@@ -150,7 +154,7 @@ export function createArchiveChange(
         schemaRef: config.schemaRef,
         workspaceSchemasPaths,
         projectRoot: config.projectRoot,
-        ...(archivingStep?.hooks !== undefined ? { projectHooks: archivingStep.hooks } : {}),
+        ...(config.workflow !== undefined ? { projectWorkflowHooks: config.workflow } : {}),
       },
     )
   }
@@ -171,7 +175,8 @@ export function createArchiveChange(
     configDir: opts.configDir,
   })
   const parsers = createArtifactParserRegistry()
-  const hooks = new NodeHookRunner()
+  const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
+  const hooks = new NodeHookRunner(expander)
   const actor = new GitActorResolver()
   const hasher = new NodeContentHasher()
   const yaml = new NodeYamlSerializer()
@@ -184,11 +189,19 @@ export function createArchiveChange(
     opts.workspaceSchemasPaths,
   )
   const saveMetadata = new SaveSpecMetadata(opts.specRepositories, yaml)
+  const runStepHooks = new RunStepHooks(
+    changeRepo,
+    hooks,
+    schemas,
+    opts.schemaRef,
+    opts.workspaceSchemasPaths,
+    opts.projectWorkflowHooks,
+  )
   return new ArchiveChange(
     changeRepo,
     opts.specRepositories,
     archiveRepo,
-    hooks,
+    runStepHooks,
     actor,
     parsers,
     schemas,
@@ -197,8 +210,5 @@ export function createArchiveChange(
     yaml,
     opts.schemaRef,
     opts.workspaceSchemasPaths,
-    opts.projectRoot,
-    opts.changesPath,
-    opts.projectHooks,
   )
 }

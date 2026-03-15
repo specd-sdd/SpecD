@@ -10,16 +10,19 @@ import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
-import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
 import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { type GenerateSpecMetadata } from '../../../src/application/use-cases/generate-spec-metadata.js'
 import { type SaveSpecMetadata } from '../../../src/application/use-cases/save-spec-metadata.js'
 import { YamlSerializer } from '../../../src/application/ports/yaml-serializer.js'
 import {
+  type RunStepHooksInput,
+  type RunStepHooksResult,
+} from '../../../src/application/use-cases/run-step-hooks.js'
+import {
   makeChangeRepository,
   makeActorResolver,
-  makeHookRunner,
+  makeRunStepHooks,
   makeSchemaRegistry,
   makeSpecRepository,
   makeArtifactType,
@@ -143,7 +146,7 @@ describe('ArchiveChange', () => {
         makeChangeRepository([]),
         new Map(),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
@@ -152,8 +155,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await expect(uc.execute({ name: 'missing' })).rejects.toThrow(ChangeNotFoundError)
     })
@@ -166,7 +167,7 @@ describe('ArchiveChange', () => {
         makeChangeRepository([change]),
         new Map(),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(null),
@@ -175,8 +176,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaNotFoundError)
     })
@@ -227,7 +226,7 @@ describe('ArchiveChange', () => {
         makeChangeRepository([change]),
         new Map(),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
@@ -236,8 +235,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(InvalidStateTransitionError)
     })
@@ -250,7 +247,7 @@ describe('ArchiveChange', () => {
         makeChangeRepository([change]),
         new Map(),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema({ name: 'schema-b' })),
@@ -259,8 +256,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaMismatchError)
     })
@@ -273,7 +268,7 @@ describe('ArchiveChange', () => {
         makeChangeRepository([change]),
         new Map(),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
@@ -282,8 +277,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       const result = await uc.execute({ name: 'my-change' })
       expect(result.archivedChange).toBeDefined()
@@ -298,7 +291,7 @@ describe('ArchiveChange', () => {
         makeChangeRepository([change]),
         new Map(),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
@@ -307,8 +300,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       const result = await uc.execute({ name: 'add-auth-flow' })
 
@@ -320,7 +311,7 @@ describe('ArchiveChange', () => {
         makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
@@ -329,8 +320,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -362,7 +351,7 @@ describe('ArchiveChange', () => {
         changeRepo,
         new Map([['default', specRepo]]),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
@@ -371,8 +360,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -392,24 +379,8 @@ describe('ArchiveChange', () => {
         return origSave(...args)
       }
 
-      const hooks = {
-        async run(command: string, _variables: unknown): Promise<HookResult> {
-          callOrder.push(command)
-          return new HookResult(0, '', '')
-        },
-      }
-
       const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
-      const schema = makeSchema(
-        [artifactType],
-        [
-          {
-            step: 'archiving',
-            requires: [],
-            hooks: { pre: [{ id: 'run-tests', type: 'run', command: 'pnpm test' }], post: [] },
-          },
-        ],
-      )
+      const schema = makeSchema([artifactType])
 
       const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       change.setArtifact(
@@ -426,11 +397,20 @@ describe('ArchiveChange', () => {
         },
       })
 
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'pre') {
+            callOrder.push('pnpm test')
+          }
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
+
       const uc = new ArchiveChange(
         changeRepo,
         new Map([['default', specRepo]]),
         makeArchiveRepository(),
-        hooks,
+        runStepHooks,
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
@@ -439,8 +419,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -451,38 +429,48 @@ describe('ArchiveChange', () => {
     it('throws HookFailedError and does not write spec files when the hook fails', async () => {
       const specRepo = makeSpecRepository()
 
-      const hooks = {
-        async run(_command: string, _variables: unknown): Promise<HookResult> {
-          return new HookResult(1, '', 'test failed')
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'pre') {
+            return {
+              hooks: [
+                {
+                  id: 'run-tests',
+                  command: 'pnpm test',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'test failed',
+                  success: false,
+                },
+              ],
+              success: false,
+              failedHook: {
+                id: 'run-tests',
+                command: 'pnpm test',
+                exitCode: 1,
+                stdout: '',
+                stderr: 'test failed',
+                success: false,
+              },
+            }
+          }
+          return { hooks: [], success: true, failedHook: null }
         },
-      }
-
-      const schema = makeSchema(
-        [makeArtifactType('spec')],
-        [
-          {
-            step: 'archiving',
-            requires: [],
-            hooks: { pre: [{ id: 'run-tests', type: 'run', command: 'pnpm test' }], post: [] },
-          },
-        ],
-      )
+      })
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         new Map([['default', specRepo]]),
         makeArchiveRepository(),
-        hooks,
+        runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaRegistry(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -491,32 +479,48 @@ describe('ArchiveChange', () => {
     })
 
     it('throws HookFailedError and does not return a result', async () => {
-      const schema = makeSchema(
-        [],
-        [
-          {
-            step: 'archiving',
-            requires: [],
-            hooks: { pre: [{ id: 'fail-hook', type: 'run', command: 'fail' }], post: [] },
-          },
-        ],
-      )
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'pre') {
+            return {
+              hooks: [
+                {
+                  id: 'fail-hook',
+                  command: 'fail',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'error',
+                  success: false,
+                },
+              ],
+              success: false,
+              failedHook: {
+                id: 'fail-hook',
+                command: 'fail',
+                exitCode: 1,
+                stdout: '',
+                stderr: 'error',
+                success: false,
+              },
+            }
+          }
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
-        makeHookRunner(1, 'error'),
+        runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaRegistry(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -526,43 +530,29 @@ describe('ArchiveChange', () => {
   describe('given project-level hooks are configured', () => {
     it('runs project-level pre hooks after schema pre hooks', async () => {
       const callOrder: string[] = []
-      const hooks = {
-        async run(command: string, _variables: unknown): Promise<HookResult> {
-          callOrder.push(command)
-          return new HookResult(0, '', '')
-        },
-      }
 
-      const schema = makeSchema(
-        [],
-        [
-          {
-            step: 'archiving',
-            requires: [],
-            hooks: { pre: [{ id: 'schema-pre', type: 'run', command: 'schema-pre' }], post: [] },
-          },
-        ],
-      )
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'pre') {
+            callOrder.push('schema-pre', 'project-pre')
+          }
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
-        hooks,
+        runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaRegistry(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
-        {
-          pre: [{ id: 'project-pre', type: 'run', command: 'project-pre' }],
-          post: [],
-        },
       )
       await uc.execute({ name: 'my-change' })
 
@@ -571,43 +561,29 @@ describe('ArchiveChange', () => {
 
     it('runs project-level post hooks after schema post hooks', async () => {
       const callOrder: string[] = []
-      const hooks = {
-        async run(command: string, _variables: unknown): Promise<HookResult> {
-          callOrder.push(command)
-          return new HookResult(0, '', '')
-        },
-      }
 
-      const schema = makeSchema(
-        [],
-        [
-          {
-            step: 'archiving',
-            requires: [],
-            hooks: { pre: [], post: [{ id: 'schema-post', type: 'run', command: 'schema-post' }] },
-          },
-        ],
-      )
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'post') {
+            callOrder.push('schema-post', 'project-post')
+          }
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
-        hooks,
+        runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaRegistry(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
-        {
-          pre: [],
-          post: [{ id: 'project-post', type: 'run', command: 'project-post' }],
-        },
       )
       await uc.execute({ name: 'my-change' })
 
@@ -615,18 +591,40 @@ describe('ArchiveChange', () => {
     })
 
     it('throws HookFailedError when project-level pre hook fails', async () => {
-      const hooks = {
-        async run(command: string, _variables: unknown): Promise<HookResult> {
-          if (command === 'project-pre') return new HookResult(1, '', 'fail')
-          return new HookResult(0, '', '')
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'pre') {
+            return {
+              hooks: [
+                {
+                  id: 'project-pre',
+                  command: 'project-pre',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'fail',
+                  success: false,
+                },
+              ],
+              success: false,
+              failedHook: {
+                id: 'project-pre',
+                command: 'project-pre',
+                exitCode: 1,
+                stdout: '',
+                stderr: 'fail',
+                success: false,
+              },
+            }
+          }
+          return { hooks: [], success: true, failedHook: null }
         },
-      }
+      })
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
-        hooks,
+        runStepHooks,
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
@@ -635,30 +633,46 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
-        {
-          pre: [{ id: 'project-pre', type: 'run', command: 'project-pre' }],
-          post: [],
-        },
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
     })
 
     it('collects project-level post hook failures without rollback', async () => {
-      const hooks = {
-        async run(command: string, _variables: unknown): Promise<HookResult> {
-          if (command === 'project-post') return new HookResult(1, '', 'fail')
-          return new HookResult(0, '', '')
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'post') {
+            return {
+              hooks: [
+                {
+                  id: 'project-post',
+                  command: 'project-post',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'fail',
+                  success: false,
+                },
+              ],
+              success: false,
+              failedHook: {
+                id: 'project-post',
+                command: 'project-post',
+                exitCode: 1,
+                stdout: '',
+                stderr: 'fail',
+                success: false,
+              },
+            }
+          }
+          return { hooks: [], success: true, failedHook: null }
         },
-      }
+      })
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
-        hooks,
+        runStepHooks,
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(makeSchema()),
@@ -667,12 +681,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
-        {
-          pre: [],
-          post: [{ id: 'project-post', type: 'run', command: 'project-post' }],
-        },
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -682,28 +690,55 @@ describe('ArchiveChange', () => {
 
   describe('given an instruction-type pre hook entry is configured', () => {
     it('does not invoke the hook runner', async () => {
-      const runSpy = vi.fn().mockResolvedValue(new HookResult(0, '', ''))
-      const hooks = { run: runSpy }
-
-      const schema = makeSchema(
-        [],
-        [
-          {
-            step: 'archiving',
-            requires: [],
-            hooks: {
-              pre: [{ id: 'review-instruction', type: 'instruction', text: 'Review delta specs' }],
-              post: [],
-            },
-          },
-        ],
-      )
-
+      // RunStepHooks internally skips instruction hooks, so the default
+      // stub (which returns success with no hooks executed) is correct.
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         makeArchiveRepository(),
-        hooks,
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+      const result = await uc.execute({ name: 'my-change' })
+
+      expect(result.archivedChange).toBeDefined()
+      expect(result.postHookFailures).toEqual([])
+    })
+  })
+
+  describe('given skipHooks is true', () => {
+    it('still performs delta merge and spec sync', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const schema = makeSchema([artifactType])
+      const specRepo = makeSpecRepository()
+
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          filename: 'spec.md',
+          status: 'complete',
+          validatedHash: 'abc123',
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact(_change: Change, _filename: string) {
+          return new SpecArtifact('spec.md', '# Synced content')
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
@@ -712,12 +747,131 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
-      await uc.execute({ name: 'my-change' })
+      const result = await uc.execute({ name: 'my-change', skipHooks: true })
 
-      expect(runSpy).not.toHaveBeenCalled()
+      expect(specRepo.saved.get('spec.md')).toBe('# Synced content')
+      expect(result.archivedChange).toBeDefined()
+    })
+
+    it('still generates metadata', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const schema = makeSchema([artifactType])
+      const specRepo = makeSpecRepository()
+
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          filename: 'spec.md',
+          status: 'complete',
+          validatedHash: 'abc123',
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact(_change: Change, _filename: string) {
+          return new SpecArtifact('spec.md', '# Content')
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+      const result = await uc.execute({ name: 'my-change', skipHooks: true })
+
+      expect(result.archiveDirPath).toBeDefined()
+      expect(typeof result.archiveDirPath).toBe('string')
+    })
+
+    it('returns empty postHookFailures', async () => {
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'post') {
+            return {
+              hooks: [
+                {
+                  id: 'post-fail',
+                  command: 'post-fail',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'fail',
+                  success: false,
+                },
+              ],
+              success: false,
+              failedHook: {
+                id: 'post-fail',
+                command: 'post-fail',
+                exitCode: 1,
+                stdout: '',
+                stderr: 'fail',
+                success: false,
+              },
+            }
+          }
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([makeArchivableChange('my-change')]),
+        new Map(),
+        makeArchiveRepository(),
+        runStepHooks,
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+      const result = await uc.execute({ name: 'my-change', skipHooks: true })
+
+      expect(result.postHookFailures).toEqual([])
+    })
+
+    it('does not execute hooks', async () => {
+      const executeSpy = vi.fn()
+
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          executeSpy(input)
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([makeArchivableChange('my-change')]),
+        new Map(),
+        makeArchiveRepository(),
+        runStepHooks,
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+      const result = await uc.execute({ name: 'my-change', skipHooks: true })
+
+      expect(executeSpy).not.toHaveBeenCalled()
+      expect(result.archivedChange).toBeDefined()
+      expect(result.postHookFailures).toEqual([])
     })
   })
 
@@ -759,7 +913,7 @@ describe('ArchiveChange', () => {
         changeRepo,
         new Map([['default', specRepo]]),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
         makeSchemaRegistry(schema),
@@ -768,8 +922,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -813,7 +965,7 @@ describe('ArchiveChange', () => {
         changeRepo,
         new Map([['default', makeSpecRepository()]]),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
         makeSchemaRegistry(schema),
@@ -822,8 +974,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(DeltaApplicationError)
@@ -858,7 +1008,7 @@ describe('ArchiveChange', () => {
         changeRepo,
         new Map([['default', specRepo]]),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
@@ -867,8 +1017,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -889,7 +1037,7 @@ describe('ArchiveChange', () => {
         ]),
         new Map([['default', specRepo]]),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
@@ -898,8 +1046,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -922,7 +1068,7 @@ describe('ArchiveChange', () => {
         makeChangeRepository([change]),
         new Map([['default', specRepo]]),
         makeArchiveRepository(),
-        makeHookRunner(),
+        makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
         makeSchemaRegistry(schema),
@@ -931,8 +1077,6 @@ describe('ArchiveChange', () => {
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -951,42 +1095,28 @@ describe('ArchiveChange', () => {
         return origArchive(change)
       }
 
-      const hooks = {
-        async run(command: string, _variables: unknown): Promise<HookResult> {
-          callOrder.push(command)
-          return new HookResult(0, '', '')
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'post') {
+            callOrder.push('git commit -m archive')
+          }
+          return { hooks: [], success: true, failedHook: null }
         },
-      }
-
-      const schema = makeSchema(
-        [],
-        [
-          {
-            step: 'archiving',
-            requires: [],
-            hooks: {
-              pre: [],
-              post: [{ id: 'git-commit', type: 'run', command: 'git commit -m archive' }],
-            },
-          },
-        ],
-      )
+      })
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         archiveRepo,
-        hooks,
+        runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaRegistry(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1003,43 +1133,230 @@ describe('ArchiveChange', () => {
         return origArchive(change)
       }
 
-      const hooks = {
-        async run(_command: string, _variables: unknown): Promise<HookResult> {
-          return new HookResult(1, '', 'post hook failed')
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'post') {
+            return {
+              hooks: [
+                {
+                  id: 'git-push',
+                  command: 'git push',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'post hook failed',
+                  success: false,
+                },
+              ],
+              success: false,
+              failedHook: {
+                id: 'git-push',
+                command: 'git push',
+                exitCode: 1,
+                stdout: '',
+                stderr: 'post hook failed',
+                success: false,
+              },
+            }
+          }
+          return { hooks: [], success: true, failedHook: null }
         },
-      }
-
-      const schema = makeSchema(
-        [],
-        [
-          {
-            step: 'archiving',
-            requires: [],
-            hooks: { pre: [], post: [{ id: 'git-push', type: 'run', command: 'git push' }] },
-          },
-        ],
-      )
+      })
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
         new Map(),
         archiveRepo,
-        hooks,
+        runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaRegistry(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
         'std',
         new Map(),
-        '/repo',
-        '/changes',
       )
       const result = await uc.execute({ name: 'my-change' })
 
       expect(archiveCalled).toBe(true)
       expect(result.postHookFailures).toEqual(['git push'])
+    })
+  })
+
+  describe('RunStepHooks delegation parameters', () => {
+    it('passes name, step:"archiving", phase:"pre" for pre-hooks', async () => {
+      const calls: Array<{ name: string; step: string; phase: string }> = []
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          calls.push({ name: input.name, step: input.step, phase: input.phase })
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([makeArchivableChange('my-change')]),
+        new Map(),
+        makeArchiveRepository(),
+        runStepHooks,
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+      await uc.execute({ name: 'my-change' })
+
+      expect(calls).toContainEqual({ name: 'my-change', step: 'archiving', phase: 'pre' })
+    })
+
+    it('passes name, step:"archiving", phase:"post" for post-hooks', async () => {
+      const calls: Array<{ name: string; step: string; phase: string }> = []
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          calls.push({ name: input.name, step: input.step, phase: input.phase })
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([makeArchivableChange('my-change')]),
+        new Map(),
+        makeArchiveRepository(),
+        runStepHooks,
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+      await uc.execute({ name: 'my-change' })
+
+      expect(calls).toContainEqual({ name: 'my-change', step: 'archiving', phase: 'post' })
+    })
+  })
+
+  describe('multiple post-hook failures', () => {
+    it('collects all failed hook commands', async () => {
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'post') {
+            return {
+              hooks: [
+                {
+                  id: 'hook-a',
+                  command: 'npm run lint',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'lint failed',
+                  success: false,
+                },
+                {
+                  id: 'hook-b',
+                  command: 'npm run deploy',
+                  exitCode: 2,
+                  stdout: '',
+                  stderr: 'deploy failed',
+                  success: false,
+                },
+              ],
+              success: false,
+              failedHook: {
+                id: 'hook-a',
+                command: 'npm run lint',
+                exitCode: 1,
+                stdout: '',
+                stderr: 'lint failed',
+                success: false,
+              },
+            }
+          }
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([makeArchivableChange('my-change')]),
+        new Map(),
+        makeArchiveRepository(),
+        runStepHooks,
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+      const result = await uc.execute({ name: 'my-change' })
+
+      expect(result.postHookFailures).toEqual(['npm run lint', 'npm run deploy'])
+    })
+  })
+
+  describe('pre-hook failure prevents archive', () => {
+    it('does not call archive repository when pre-hook fails', async () => {
+      let archiveCalled = false
+
+      const archiveRepo = makeArchiveRepository()
+      const origArchive = archiveRepo.archive.bind(archiveRepo)
+      archiveRepo.archive = async (change: Change) => {
+        archiveCalled = true
+        return origArchive(change)
+      }
+
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          if (input.phase === 'pre') {
+            return {
+              hooks: [
+                {
+                  id: 'block-hook',
+                  command: 'pnpm test',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'tests failed',
+                  success: false,
+                },
+              ],
+              success: false,
+              failedHook: {
+                id: 'block-hook',
+                command: 'pnpm test',
+                exitCode: 1,
+                stdout: '',
+                stderr: 'tests failed',
+                success: false,
+              },
+            }
+          }
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([makeArchivableChange('my-change')]),
+        new Map(),
+        archiveRepo,
+        runStepHooks,
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
+      expect(archiveCalled).toBe(false)
     })
   })
 })

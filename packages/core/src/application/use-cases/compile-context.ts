@@ -7,10 +7,9 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaRegistry } from '../ports/schema-registry.js'
 import { type FileReader } from '../ports/file-reader.js'
-import { type ArtifactParserRegistry, type OutlineEntry } from '../ports/artifact-parser.js'
+import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
-import { type WorkflowStep } from '../../domain/value-objects/workflow-step.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
@@ -43,13 +42,6 @@ export interface CompileContextConfig {
   readonly contextIncludeSpecs?: string[]
   /** Project-level exclude patterns; always applied regardless of active workspace. */
   readonly contextExcludeSpecs?: string[]
-  /**
-   * Per-artifact additional constraint strings injected below the schema instruction.
-   * Keyed by artifact ID.
-   */
-  readonly artifactRules?: Record<string, string[]>
-  /** Project-level workflow hook overrides; merged after schema hooks. */
-  readonly workflow?: readonly WorkflowStep[]
   /** Per-workspace context include/exclude patterns. */
   readonly workspaces?: Record<string, WorkspaceContextConfig>
 }
@@ -63,12 +55,6 @@ export interface CompileContextInput {
   readonly name: string
   /** The lifecycle step being entered (e.g. `'designing'`, `'implementing'`). */
   readonly step: string
-  /**
-   * The artifact ID currently being generated. Only applicable to the `designing` step.
-   * When present, only this artifact's instruction and rules are injected.
-   * When absent, no artifact instructions are injected.
-   */
-  readonly activeArtifact?: string
   /** Resolved project configuration. */
   readonly config: CompileContextConfig
   /**
@@ -84,7 +70,7 @@ export interface CompileContextInput {
   /**
    * When present, restricts the metadata sections rendered per spec to the listed values.
    * When absent, all sections are rendered (description + rules + constraints + scenarios).
-   * Does not affect schema instructions, delta context, artifact rules, hooks, or available steps.
+   * Does not affect available steps.
    */
   readonly sections?: ReadonlyArray<SpecSection>
 }
@@ -95,18 +81,20 @@ export interface CompileContextResult {
   readonly stepAvailable: boolean
   /** Artifact IDs blocking the step; empty when `stepAvailable` is `true`. */
   readonly blockingArtifacts: string[]
-  /** The fully assembled instruction text to inject into the AI context. */
-  readonly instructionBlock: string
+  /** The fully assembled context text (project context + spec content + available steps). */
+  readonly contextBlock: string
   /** Stale metadata warnings and other advisory conditions. */
   readonly warnings: ContextWarning[]
 }
 
 /**
- * Assembles the instruction block an AI agent receives when entering a lifecycle step.
+ * Assembles the context block an AI agent receives when entering a lifecycle step.
  *
  * Collects context specs via five-step include/exclude/dependsOn resolution,
- * evaluates step availability, and combines schema instructions, artifact rules,
- * spec content, and step hooks into a single structured output.
+ * evaluates step availability, and combines project context entries, spec content,
+ * and available steps into a single structured output. Artifact instructions and
+ * step hook instructions are separate concerns handled by `GetArtifactInstruction`
+ * and `GetHookInstructions` respectively.
  */
 export class CompileContext {
   private readonly _changes: ChangeRepository
@@ -151,10 +139,10 @@ export class CompileContext {
   }
 
   /**
-   * Compiles the instruction block for the given lifecycle step.
+   * Compiles the context block for the given lifecycle step.
    *
    * @param input - Context compilation parameters
-   * @returns Assembled context result with instruction block and warnings
+   * @returns Assembled context result with context block and warnings
    * @throws {ChangeNotFoundError} If no change with the given name exists
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    */
@@ -341,110 +329,7 @@ export class CompileContext {
       }
     }
 
-    // Part 2: Artifact rules.pre + schema instruction + delta + rules.post
-    const activeArtifactType =
-      input.activeArtifact !== undefined ? schema.artifact(input.activeArtifact) : null
-
-    // Part 2a: rules.pre (before instruction)
-    if (activeArtifactType !== null) {
-      const preRules = activeArtifactType.rules?.pre
-      if (preRules !== undefined && preRules.length > 0) {
-        const ruleLines = preRules.map((r) => `- ${r.text}`).join('\n')
-        parts.push(`## Pre-instruction rules: ${activeArtifactType.id}\n\n${ruleLines}`)
-      }
-    }
-
-    // Part 2b: Schema instruction
-    if (activeArtifactType !== null) {
-      const instruction = activeArtifactType.instruction
-      if (instruction !== undefined) {
-        parts.push(`## Artifact instruction: ${activeArtifactType.id}\n\n${instruction}`)
-      }
-    }
-
-    // Part 3: Delta context (only when activeArtifact has delta: true)
-    if (activeArtifactType !== null && activeArtifactType.delta) {
-      const format =
-        activeArtifactType.format ?? inferFormat(activeArtifactType.output) ?? 'plaintext'
-      const parser = this._parsers.get(format)
-      if (parser === undefined) {
-        warnings.push({
-          type: 'missing-parser',
-          path: format,
-          message: `No parser registered for format '${format}' — delta context skipped`,
-        })
-      } else {
-        const deltaContextParts: string[] = []
-
-        // Format instructions
-        deltaContextParts.push(`### Format instructions\n\n${parser.deltaInstructions()}`)
-
-        // Domain instructions
-        const domainInstr = activeArtifactType.deltaInstruction
-        if (domainInstr !== undefined) {
-          deltaContextParts.push(`### Domain instructions\n\n${domainInstr}`)
-        }
-
-        // Existing artifact outlines
-        const outlineParts: string[] = []
-        for (const specId of change.specIds) {
-          const { workspace, capPath } = parseSpecId(specId)
-          if (!capPath) continue
-
-          const specRepo = this._specs.get(workspace)
-          if (specRepo === undefined) continue
-
-          let specPathObj: SpecPath
-          try {
-            specPathObj = SpecPath.parse(capPath)
-          } catch {
-            continue
-          }
-
-          const spec = new Spec(workspace, specPathObj, [])
-          const deltaOutputFilename = activeArtifactType.output.split('/').pop()!
-          const artifactFile = await specRepo.artifact(spec, deltaOutputFilename)
-          if (artifactFile === null) continue
-
-          const ast = parser.parse(artifactFile.content)
-          const outlineEntries = parser.outline(ast)
-          if (outlineEntries.length > 0) {
-            const outlineText = this._renderOutline(outlineEntries)
-            outlineParts.push(
-              `**${workspace}:${capPath}/${activeArtifactType.output}**\n${outlineText}`,
-            )
-          }
-        }
-
-        if (outlineParts.length > 0) {
-          deltaContextParts.push(`### Existing artifact outlines\n\n${outlineParts.join('\n\n')}`)
-        }
-
-        parts.push(
-          `## Delta context: ${activeArtifactType.id}\n\n${deltaContextParts.join('\n\n')}`,
-        )
-      }
-    }
-
-    // Part 4: rules.post (after delta context)
-    if (activeArtifactType !== null) {
-      const postRules = activeArtifactType.rules?.post
-      if (postRules !== undefined && postRules.length > 0) {
-        const ruleLines = postRules.map((r) => `- ${r.text}`).join('\n')
-        parts.push(`## Post-instruction rules: ${activeArtifactType.id}\n\n${ruleLines}`)
-      }
-    }
-
-    // Legacy: Project artifact rules for active artifact (deprecated, use schema rules instead)
-    if (activeArtifactType !== null) {
-      const rules = input.config.artifactRules?.[activeArtifactType.id]
-      if (rules !== undefined && rules.length > 0) {
-        const ruleLines = rules.map((r) => `- ${r}`).join('\n')
-        parts.push(`## Artifact rules: ${activeArtifactType.id}\n\n${ruleLines}`)
-      }
-    }
-
-    // Part 5: Spec content
+    // Part 2: Spec content
     const specContentParts: string[] = []
     for (const { workspace, capPath } of allSpecs) {
       const specRepo = this._specs.get(workspace)
@@ -548,29 +433,7 @@ export class CompileContext {
       parts.push(`## Spec content\n\n${specContentParts.join('\n\n---\n\n')}`)
     }
 
-    // Part 6: Step hooks (instruction: entries only, pre then post)
-    const hookParts: string[] = []
-
-    const collectInstructionHooks = (step: WorkflowStep | null | undefined): void => {
-      if (step === null || step === undefined) return
-      for (const hook of step.hooks.pre) {
-        if (hook.type === 'instruction') hookParts.push(`[pre] ${hook.text}`)
-      }
-      for (const hook of step.hooks.post) {
-        if (hook.type === 'instruction') hookParts.push(`[post] ${hook.text}`)
-      }
-    }
-
-    // Schema hooks first, then project-level hooks
-    collectInstructionHooks(schemaWorkflowStep)
-    const configWorkflowStep = input.config.workflow?.find((w) => w.step === input.step)
-    collectInstructionHooks(configWorkflowStep)
-
-    if (hookParts.length > 0) {
-      parts.push(`## Step hooks: ${input.step}\n\n${hookParts.join('\n')}`)
-    }
-
-    // Part 7: Available steps
+    // Part 3: Available steps
     const stepLines: string[] = []
     for (const workflowStep of schema.workflow()) {
       const blocking: string[] = []
@@ -594,7 +457,7 @@ export class CompileContext {
     return {
       stepAvailable,
       blockingArtifacts,
-      instructionBlock: parts.join('\n\n---\n\n'),
+      contextBlock: parts.join('\n\n---\n\n'),
       warnings,
     }
   }
@@ -732,23 +595,5 @@ export class CompileContext {
       (c) => this._hasher.hash(c),
     )
     return result.allFresh
-  }
-
-  /**
-   * Renders an outline entry list as an indented text summary.
-   *
-   * @param entries - Outline entries from `ArtifactParser.outline()`
-   * @returns Indented text representation
-   */
-  private _renderOutline(entries: readonly OutlineEntry[]): string {
-    const lines: string[] = []
-    const render = (items: readonly OutlineEntry[], indent: number): void => {
-      for (const item of items) {
-        lines.push(`${'  '.repeat(indent)}- ${item.label} (${item.type})`)
-        if (item.children) render(item.children, indent + 1)
-      }
-    }
-    render(entries, 0)
-    return lines.join('\n')
   }
 }

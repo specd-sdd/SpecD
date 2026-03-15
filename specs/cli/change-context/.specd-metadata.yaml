@@ -1,17 +1,18 @@
 title: Change Context
-description: AI agents need a single command to retrieve all relevant instructions — schema rules, spec content, delta context, and step hooks — so they can operate on a change without manual assembly. `specd change context <name> <step> [--artifact <id>]` compiles and prints the full instruction block an agent receives when entering a lifecycle step for a named change.
+description: AI agents need a single command to retrieve all relevant context — spec content, project context entries, and step availability — so they can operate on a change without manual assembly. `specd change context <name> <step>` compiles and prints the context block an agent receives when entering a lifecycle step for a named change. Artifact instructions and step hook instructions are separate concerns retrieved via `specd change artifact-instruction` and `specd change hook-instruction` respectively.
 dependsOn:
   - cli:cli/entrypoint
-  - core:core/change
+  - core:core/compile-context
+  - core:core/get-artifact-instruction
+  - core:core/get-hook-instructions
 context:
-  - AI agents need a single command to retrieve all relevant instructions — schema rules, spec content, delta context, and step hooks — so they can operate on a change without manual assembly. `specd change context <name> <step> [--artifact <id>]` compiles and prints the full instruction block an agent receives when entering a lifecycle step for a named change.
+  - AI agents need a single command to retrieve all relevant context — spec content, project context entries, and step availability — so they can operate on a change without manual assembly. `specd change context <name> <step>` compiles and prints the context block an agent receives when entering a lifecycle step for a named change. Artifact instructions and step hook instructions are separate concerns retrieved via `specd change artifact-instruction` and `specd change hook-instruction` respectively.
 rules:
   - requirement: Command signature
     rules:
       - |-
         ```
         specd change context <name> <step>
-          [--artifact <id>]
           [--rules] [--constraints] [--scenarios]
           [--follow-deps [--depth <n>]]
           [--format text|json|toon]
@@ -19,7 +20,6 @@ rules:
 
         * `<name>` — required positional; the name of the change to compile context for
         * `<step>` — required positional; the lifecycle step being entered (e.g. `designing`, `implementing`, `verifying`)
-        * `--artifact <id>` — optional; the artifact ID currently being generated. When present, only that artifact's instruction and rules are injected.
         * `--rules` — when present, includes only the rules sections of spec content in the output
         * `--constraints` — when present, includes only the constraints sections of spec content in the output
         * `--scenarios` — when present, includes only the scenarios sections of spec content in the output
@@ -34,32 +34,32 @@ rules:
   - requirement: Output
     rules:
       - |-
-        In `text` or `toon` mode (default `text`), the compiled instruction block is printed to stdout verbatim. No framing or additional headers are added by the CLI.
+        In `text` or `toon` mode (default `text`), the compiled context block is printed to stdout verbatim. No framing or additional headers are added by the CLI.
 
         In `json` mode, the output is:
 
         ```json
-        { "instructionBlock": "...", "stepAvailable": true, "blockingArtifacts": [], "warnings": [] }
+        { "contextBlock": "...", "stepAvailable": true, "blockingArtifacts": [], "warnings": [] }
         ```
 
-        where `instructionBlock` contains the full compiled instruction text, `stepAvailable` reflects whether the requested step is currently available, `blockingArtifacts` lists any blocking artifact IDs, and `warnings` lists any warning strings from the use case.
+        where `contextBlock` contains the full compiled context text, `stepAvailable` reflects whether the requested step is currently available, `blockingArtifacts` lists any blocking artifact IDs, and `warnings` lists any warning strings from the use case.
   - requirement: Step availability warning
     rules:
-      - 'If the requested step is not currently available (i.e. `stepAvailable: false`), the command prints a warning to stderr listing the blocking artifacts and still prints the instruction block to stdout. The process exits with code 0.'
+      - 'If the requested step is not currently available (i.e. `stepAvailable: false`), the command prints a warning to stderr listing the blocking artifacts and still prints the context block to stdout. The process exits with code 0.'
   - requirement: Context warnings
     rules:
-      - Any warnings from the `CompileContext` use case (stale metadata, missing specs, unknown workspaces, cycles) are printed to stderr as `warning:` lines. The instruction block is still printed to stdout and the process exits with code 0.
+      - Any warnings from the `CompileContext` use case (stale metadata, missing specs, unknown workspaces, cycles) are printed to stderr as `warning:` lines. The context block is still printed to stdout and the process exits with code 0.
   - requirement: Error cases
     rules:
       - |-
         * If the change does not exist, exits with code 1.
         * If the schema cannot be resolved, exits with code 3.
 constraints:
-  - The raw instruction block is the sole stdout output — no wrapping, no summary header
-  - All warnings go to stderr; the instruction block goes to stdout
+  - The raw context block is the sole stdout output — no wrapping, no summary header
+  - All warnings go to stderr; the context block goes to stdout
   - dependsOn traversal is opt-in via --follow-deps; without the flag, deps are not followed
   - --depth without --follow-deps is a CLI usage error (exit code 1)
-  - Section flags (--rules, --constraints, --scenarios) only filter spec content; schema instructions, delta context, artifact rules, step hooks, and available steps are unaffected
+  - Section flags (--rules, --constraints, --scenarios) only filter spec content; available steps are unaffected
 scenarios:
   - requirement: Command signature
     name: Missing step argument
@@ -74,19 +74,13 @@ scenarios:
     then:
       - the command exits with code 1 and prints a usage error to stderr
   - requirement: Output
-    name: Instruction block printed verbatim
+    name: Context block printed verbatim
     when:
       - specd change context my-change designing is run
     then:
-      - stdout contains the compiled instruction block exactly as returned by CompileContext
+      - stdout contains the compiled context block exactly as returned by CompileContext
       - AND no framing headers are added
       - AND the process exits with code 0
-  - requirement: Output
-    name: With artifact flag
-    when:
-      - specd change context my-change designing --artifact spec is run
-    then:
-      - stdout includes only the spec artifact instruction (not all artifact instructions)
   - requirement: Output
     name: dependsOn not followed by default
     given:
@@ -102,7 +96,7 @@ scenarios:
     when:
       - specd change context my-change implementing --follow-deps is run
     then:
-      - the instruction block includes content from the dependent specs as well
+      - the context block includes content from the dependent specs as well
   - requirement: Output
     name: --depth limits traversal
     given:
@@ -118,7 +112,7 @@ scenarios:
     when:
       - specd change context my-change implementing --rules --constraints is run
     then:
-      - the instruction block contains rules and constraints sections from each spec
+      - the context block contains rules and constraints sections from each spec
       - AND description and scenarios sections are not present
   - requirement: Output
     name: No section flags includes all sections
@@ -127,7 +121,7 @@ scenarios:
     when:
       - specd change context my-change implementing is run without section flags
     then:
-      - the instruction block contains description, rules, constraints, and scenarios from each spec
+      - the context block contains description, rules, constraints, and scenarios from each spec
   - requirement: Step availability warning
     name: Step not yet available
     given:
@@ -136,7 +130,7 @@ scenarios:
       - specd change context my-change implementing is run
     then:
       - 'stderr contains a warning: line listing the blocking artifacts'
-      - AND stdout still contains the instruction block
+      - AND stdout still contains the context block
       - AND the process exits with code 0
   - requirement: Context warnings
     name: Stale metadata warning
@@ -146,7 +140,7 @@ scenarios:
       - specd change context my-change designing is run
     then:
       - 'stderr contains a warning: line for the stale spec'
-      - AND the instruction block is still printed to stdout
+      - AND the context block is still printed to stdout
       - AND the process exits with code 0
   - requirement: Error cases
     name: Change not found
@@ -156,14 +150,14 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
   - requirement: Output
-    name: JSON output contains instructionBlock and warnings
+    name: JSON output contains contextBlock and warnings
     when:
       - specd change context my-change designing --format json is run
     then:
-      - stdout is valid JSON with instructionBlock, stepAvailable, blockingArtifacts, and warnings
-      - AND instructionBlock contains the compiled instruction text
+      - stdout is valid JSON with contextBlock, stepAvailable, blockingArtifacts, and warnings
+      - AND contextBlock contains the compiled context text
       - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:6581b2fc50921a231784c6978ee6da347d081c0257ae4b06f028ade39fd38603
-  verify.md: sha256:5416bd02524183c7e4a75902ee3f7640dcca4c52d72fc4277d240cf5a8757f7d
+  spec.md: sha256:27a3ffab035af8617baabf143b92be914baaf2e2836d655ff934d71aa481072c
+  verify.md: sha256:9b5b2cd0d3a378855a76700476d728ab22428b5d1a02c088b7339b68574f6b0e
 generatedBy: core
