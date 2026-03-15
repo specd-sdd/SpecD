@@ -153,6 +153,6 @@ scenarios:
     then:
       - both calls produce an equivalent Schema object
 contentHashes:
-  spec.md: sha256:7ecfaa64c3e6e420efdd6510dd13781db51e50d145abba312f5210febc2957ca
+  spec.md: sha256:17754e5a08888f152ff881355e622271f25f8224e4916ce911431db5b6b008a3
   verify.md: sha256:1a3400b68d528c85d78c8f810a3589b1db9572838ded339ca834eb20b8e04d1a
 generatedBy: core

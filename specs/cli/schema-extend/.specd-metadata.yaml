@@ -83,6 +83,6 @@ scenarios:
     then:
       - the command exits with code 1 with a message explaining only schemas can be extended
 contentHashes:
-  spec.md: sha256:4518a0c63d362e19967b4d9da9fb1e6819fa362345c3297ef8f2fe42778cd0ae
+  spec.md: sha256:4e4ec236d49bda25727172b5321f66b7d80cdf2bc76385d526b67531a95fa93c
   verify.md: sha256:8a399f7761206f4be3f86bf3ecc6bb090f54890d0adcfa996849019a241bdfc8
 generatedBy: core
