@@ -479,9 +479,10 @@ describe('change transition', () => {
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
     })
-    kernel.changes.transition.execute.mockResolvedValue(
-      makeMockChange({ name: 'feat', state: 'implementing' }),
-    )
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'feat', state: 'implementing' }),
+      postHookFailures: [],
+    })
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
@@ -500,9 +501,10 @@ describe('change transition', () => {
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
     })
-    kernel.changes.transition.execute.mockResolvedValue(
-      makeMockChange({ name: 'feat', state: 'implementing' }),
-    )
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'feat', state: 'implementing' }),
+      postHookFailures: [],
+    })
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
@@ -528,9 +530,10 @@ describe('change transition', () => {
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       artifactStatuses: [],
     })
-    kernel.changes.transition.execute.mockResolvedValue(
-      makeMockChange({ name: 'my-change', state: 'designing' }),
-    )
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      postHookFailures: [],
+    })
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
@@ -565,7 +568,10 @@ describe('change transition', () => {
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [],
     })
-    kernel.changes.transition.execute.mockResolvedValue(makeMockChange())
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange(),
+      postHookFailures: [],
+    })
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))

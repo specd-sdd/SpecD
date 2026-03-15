@@ -53,9 +53,10 @@ describe('Approval-gate routing', () => {
       change: makeMockChange({ name: 'my-change', state: 'ready' }),
       artifactStatuses: [],
     })
-    kernel.changes.transition.execute.mockResolvedValue(
-      makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
-    )
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
+      postHookFailures: [],
+    })
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
@@ -74,9 +75,10 @@ describe('Approval-gate routing', () => {
       change: makeMockChange({ name: 'my-change', state: 'done' }),
       artifactStatuses: [],
     })
-    kernel.changes.transition.execute.mockResolvedValue(
-      makeMockChange({ name: 'my-change', state: 'pending-signoff' }),
-    )
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'pending-signoff' }),
+      postHookFailures: [],
+    })
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
@@ -116,9 +118,10 @@ describe('Output on success', () => {
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       artifactStatuses: [],
     })
-    kernel.changes.transition.execute.mockResolvedValue(
-      makeMockChange({ name: 'my-change', state: 'designing' }),
-    )
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      postHookFailures: [],
+    })
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
@@ -135,9 +138,10 @@ describe('Output on success', () => {
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       artifactStatuses: [],
     })
-    kernel.changes.transition.execute.mockResolvedValue(
-      makeMockChange({ name: 'my-change', state: 'designing' }),
-    )
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      postHookFailures: [],
+    })
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
@@ -179,6 +183,108 @@ describe('Invalid transition error', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
+  })
+})
+
+describe('--no-hooks flag', () => {
+  it('passes skipHooks: true to the use case when --no-hooks is set', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      artifactStatuses: [],
+    })
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      postHookFailures: [],
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'transition',
+      'my-change',
+      'designing',
+      '--no-hooks',
+    ])
+
+    const call = kernel.changes.transition.execute.mock.calls[0]![0]
+    expect(call.skipHooks).toBe(true)
+    expect(stdout()).toContain('transitioned')
+  })
+
+  it('passes skipHooks: false by default (no --no-hooks flag)', async () => {
+    const { kernel } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      artifactStatuses: [],
+    })
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      postHookFailures: [],
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'designing'])
+
+    const call = kernel.changes.transition.execute.mock.calls[0]![0]
+    expect(call.skipHooks).toBe(false)
+  })
+})
+
+describe('Post-hook failure warning', () => {
+  it('exits with code 2 when post-hooks fail', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      artifactStatuses: [],
+    })
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      postHookFailures: ['git push', 'notify'],
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'designing'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(2)
+    const err = stderr()
+    expect(err).toContain('post-hook')
+    expect(err).toContain('git push')
+  })
+
+  it('JSON output includes postHookFailures on success', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      artifactStatuses: [],
+    })
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      postHookFailures: [],
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'transition',
+      'my-change',
+      'designing',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.postHookFailures).toEqual([])
   })
 })
 
