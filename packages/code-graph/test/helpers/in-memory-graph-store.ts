@@ -66,6 +66,26 @@ export class InMemoryGraphStore extends GraphStore {
     )
   }
 
+  async addRelations(relations: Relation[]): Promise<void> {
+    this.ensureOpen()
+    this.relations.push(...relations)
+  }
+
+  async bulkLoad(data: {
+    files: FileNode[]
+    symbols: SymbolNode[]
+    specs: SpecNode[]
+    relations: Relation[]
+    onProgress?: (step: string) => void
+  }): Promise<void> {
+    this.ensureOpen()
+    for (const f of data.files) this.files.set(f.path, f)
+    for (const s of data.symbols) this.symbols.set(s.id, s)
+    for (const sp of data.specs) this.specs.set(sp.specId, sp)
+    this.relations.push(...data.relations)
+    this._lastIndexedAt = new Date().toISOString()
+  }
+
   async upsertSpec(spec: SpecNode, relations: Relation[]): Promise<void> {
     this.ensureOpen()
     await this.removeSpec(spec.specId)
@@ -133,6 +153,7 @@ export class InMemoryGraphStore extends GraphStore {
   async findSymbols(query: SymbolQuery): Promise<SymbolNode[]> {
     this.ensureOpen()
     let results = [...this.symbols.values()]
+    const ci = query.caseSensitive !== true
 
     if (query.kind !== undefined) {
       results = results.filter((s) => s.kind === query.kind)
@@ -149,15 +170,28 @@ export class InMemoryGraphStore extends GraphStore {
 
     if (query.name !== undefined) {
       if (query.name.includes('*')) {
-        const pattern = new RegExp('^' + query.name.replaceAll('*', '.*') + '$')
+        const flags = ci ? 'i' : ''
+        const pattern = new RegExp('^' + query.name.replaceAll('*', '.*') + '$', flags)
         results = results.filter((s) => pattern.test(s.name))
+      } else if (ci) {
+        const lower = query.name.toLowerCase()
+        results = results.filter((s) => s.name.toLowerCase() === lower)
       } else {
         results = results.filter((s) => s.name === query.name)
       }
     }
 
     if (query.comment !== undefined) {
-      results = results.filter((s) => s.comment !== undefined && s.comment.includes(query.comment!))
+      if (ci) {
+        const lower = query.comment.toLowerCase()
+        results = results.filter(
+          (s) => s.comment !== undefined && s.comment.toLowerCase().includes(lower),
+        )
+      } else {
+        results = results.filter(
+          (s) => s.comment !== undefined && s.comment.includes(query.comment!),
+        )
+      }
     }
 
     return results

@@ -92,9 +92,13 @@ function buildSpecId(specsDir: string, specDirPath: string): string {
 /**
  * Discovers all spec.md files under the workspace's specs/ directory and parses them into spec nodes.
  * @param workspacePath - Absolute path to the workspace root.
+ * @param onProgress - Optional callback invoked with the number of specs found so far.
  * @returns An array of discovered specs with their parsed nodes and content hashes.
  */
-export function discoverSpecs(workspacePath: string): DiscoveredSpec[] {
+export function discoverSpecs(
+  workspacePath: string,
+  onProgress?: (found: number) => void,
+): DiscoveredSpec[] {
   const specsDir = join(workspacePath, 'specs')
   if (!existsSync(specsDir)) return []
 
@@ -141,10 +145,12 @@ export function discoverSpecs(workspacePath: string): DiscoveredSpec[] {
       const specId = buildSpecId(specsDir, dir)
       const relPath = relative(workspacePath, dir).replaceAll('\\', '/')
 
+      const hash = computeContentHash(hashSource)
       results.push({
-        spec: createSpecNode({ specId, path: relPath, title, dependsOn }),
-        contentHash: computeContentHash(hashSource),
+        spec: createSpecNode({ specId, path: relPath, title, contentHash: hash, dependsOn }),
+        contentHash: hash,
       })
+      if (onProgress) onProgress(results.length)
     }
 
     for (const entry of entries) {

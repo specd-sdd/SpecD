@@ -22,6 +22,7 @@ CREATE NODE TABLE IF NOT EXISTS Spec(
   specId STRING,
   path STRING,
   title STRING,
+  contentHash STRING,
   PRIMARY KEY (specId)
 );
 CREATE NODE TABLE IF NOT EXISTS Meta(

@@ -9,8 +9,9 @@ import { type GraphStatistics } from '../../domain/value-objects/graph-statistic
 import { type RelationType, RelationType as RT } from '../../domain/value-objects/relation-type.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { SCHEMA_DDL } from './schema.js'
-import { mkdirSync, existsSync } from 'node:fs'
+import { mkdirSync, existsSync, writeFileSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
+import { tmpdir } from 'node:os'
 
 /**
  * Unwraps a query result (or array of results) into an array of row records.
@@ -34,6 +35,16 @@ async function getAll(result: QueryResult | QueryResult[]): Promise<Record<strin
 async function exec(conn: Connection, query: string): Promise<Record<string, LbugValue>[]> {
   const result = await conn.query(query)
   return getAll(result)
+}
+
+/**
+ * Escapes a value for CSV output (RFC 4180).
+ * Wraps in double quotes and doubles any internal double quotes.
+ * @param value - The string value to escape.
+ * @returns The CSV-safe escaped string.
+ */
+function csvEscape(value: string): string {
+  return '"' + value.replaceAll('"', '""') + '"'
 }
 
 /**
@@ -170,6 +181,174 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Adds relations to the store without removing existing data.
+   * Uses CSV bulk import when more than 50 relations, falls back to individual inserts for small batches.
+   * @param relations - The relations to add.
+   */
+  async addRelations(relations: Relation[]): Promise<void> {
+    this.ensureOpen()
+    const conn = this.conn!
+
+    if (relations.length <= 50) {
+      for (const rel of relations) {
+        await this.createRelation(conn, rel)
+      }
+      return
+    }
+
+    // Bulk: group by type, write CSV, COPY
+    const byType = new Map<string, Relation[]>()
+    for (const rel of relations) {
+      const existing = byType.get(rel.type) ?? []
+      existing.push(rel)
+      byType.set(rel.type, existing)
+    }
+
+    const prefix = join(tmpdir(), `codegraph-rel-${Date.now()}-`)
+    const csvFiles: string[] = []
+
+    try {
+      const batchSize = 500
+      for (const [type, rels] of byType) {
+        for (let i = 0; i < rels.length; i += batchSize) {
+          const batch = rels.slice(i, i + batchSize)
+          const csvPath = prefix + `${type.toLowerCase()}-${i}.csv`
+          csvFiles.push(csvPath)
+          const rows = ['from,to']
+          for (const r of batch) {
+            rows.push(`${csvEscape(r.source)},${csvEscape(r.target)}`)
+          }
+          writeFileSync(csvPath, rows.join('\n') + '\n')
+          await conn.query(
+            `COPY ${type} FROM "${csvPath}" (HEADER=true, PARALLEL=false, IGNORE_ERRORS=true)`,
+          )
+        }
+      }
+    } finally {
+      for (const f of csvFiles) {
+        try {
+          unlinkSync(f)
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
+  /**
+   * Bulk loads files, symbols, specs, and relations using CSV import.
+   * Orders of magnitude faster than individual upserts for large datasets.
+   * @param data - The data to load.
+   * @param data.files - File nodes to load.
+   * @param data.symbols - Symbol nodes to load.
+   * @param data.specs - Spec nodes to load.
+   * @param data.relations - Relations to load.
+   * @param data.onProgress - Optional progress callback.
+   */
+  async bulkLoad(data: {
+    files: FileNode[]
+    symbols: SymbolNode[]
+    specs: SpecNode[]
+    relations: Relation[]
+    onProgress?: (step: string) => void
+  }): Promise<void> {
+    this.ensureOpen()
+    const conn = this.conn!
+
+    const report = data.onProgress ?? ((): void => {})
+    const prefix = join(tmpdir(), `codegraph-${Date.now()}-`)
+    const csvFiles: string[] = []
+
+    try {
+      // Write File nodes CSV
+      report(`Loading ${data.files.length} files`)
+      if (data.files.length > 0) {
+        const fileCsv = prefix + 'files.csv'
+        csvFiles.push(fileCsv)
+        const fileRows = ['path,language,contentHash,workspace']
+        for (const f of data.files) {
+          fileRows.push(
+            `${csvEscape(f.path)},${csvEscape(f.language)},${csvEscape(f.contentHash)},${csvEscape(f.workspace)}`,
+          )
+        }
+        writeFileSync(fileCsv, fileRows.join('\n') + '\n')
+        await conn.query(`COPY File FROM "${fileCsv}" (HEADER=true, PARALLEL=false)`)
+      }
+
+      // Write Symbol nodes CSV
+      report(`Loading ${data.symbols.length} symbols`)
+      if (data.symbols.length > 0) {
+        const symCsv = prefix + 'symbols.csv'
+        csvFiles.push(symCsv)
+        const symRows = ['id,name,kind,filePath,line,col,comment']
+        for (const s of data.symbols) {
+          symRows.push(
+            `${csvEscape(s.id)},${csvEscape(s.name)},${csvEscape(s.kind)},${csvEscape(s.filePath)},${s.line},${s.column},${csvEscape(s.comment ?? '')}`,
+          )
+        }
+        writeFileSync(symCsv, symRows.join('\n') + '\n')
+        await conn.query(`COPY Symbol FROM "${symCsv}" (HEADER=true, PARALLEL=false)`)
+      }
+
+      // Write Spec nodes CSV
+      report(`Loading ${data.specs.length} specs`)
+      if (data.specs.length > 0) {
+        const specCsv = prefix + 'specs.csv'
+        csvFiles.push(specCsv)
+        const specRows = ['specId,path,title,contentHash']
+        for (const sp of data.specs) {
+          specRows.push(
+            `${csvEscape(sp.specId)},${csvEscape(sp.path)},${csvEscape(sp.title)},${csvEscape(sp.contentHash)}`,
+          )
+        }
+        writeFileSync(specCsv, specRows.join('\n') + '\n')
+        await conn.query(`COPY Spec FROM "${specCsv}" (HEADER=true, PARALLEL=false)`)
+      }
+
+      // Write relations CSVs — one per type
+      // IGNORE_ERRORS skips rows referencing non-existent nodes (dangling imports to external files)
+      const relsByType = new Map<string, Relation[]>()
+      for (const rel of data.relations) {
+        const existing = relsByType.get(rel.type) ?? []
+        existing.push(rel)
+        relsByType.set(rel.type, existing)
+      }
+
+      for (const [type, rels] of relsByType) {
+        if (rels.length === 0) continue
+        // Process in batches to avoid LadybugDB blocking on large COPY operations
+        const batchSize = 500
+        for (let i = 0; i < rels.length; i += batchSize) {
+          const batch = rels.slice(i, i + batchSize)
+          const relCsv = prefix + `rel-${type.toLowerCase()}-${i}.csv`
+          csvFiles.push(relCsv)
+          const relRows = ['from,to']
+          for (const r of batch) {
+            relRows.push(`${csvEscape(r.source)},${csvEscape(r.target)}`)
+          }
+          writeFileSync(relCsv, relRows.join('\n') + '\n')
+          report(`Loading ${type} ${i + batch.length}/${rels.length}`)
+          await conn.query(
+            `COPY ${type} FROM "${relCsv}" (HEADER=true, PARALLEL=false, IGNORE_ERRORS=true)`,
+          )
+        }
+      }
+
+      this._lastIndexedAt = new Date().toISOString()
+      await this.updateMeta(conn, 'lastIndexedAt', this._lastIndexedAt)
+    } finally {
+      // Clean up temp files
+      for (const f of csvFiles) {
+        try {
+          unlinkSync(f)
+        } catch {
+          // ignore cleanup errors
+        }
+      }
+    }
+  }
+
+  /**
    * Inserts or replaces a spec node along with its dependency relations.
    * @param spec - The spec node to upsert.
    * @param relations - Dependency relations for this spec.
@@ -181,7 +360,7 @@ export class LadybugGraphStore extends GraphStore {
     await this.removeSpec(spec.specId)
 
     await conn.query(
-      `CREATE (s:Spec {specId: '${this.escape(spec.specId)}', path: '${this.escape(spec.path)}', title: '${this.escape(spec.title)}'})`,
+      `CREATE (s:Spec {specId: '${this.escape(spec.specId)}', path: '${this.escape(spec.path)}', title: '${this.escape(spec.title)}', contentHash: '${this.escape(spec.contentHash)}'})`,
     )
 
     for (const rel of relations) {
@@ -249,7 +428,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      `MATCH (s:Spec {specId: '${this.escape(specId)}'}) RETURN s.specId AS specId, s.path AS path, s.title AS title`,
+      `MATCH (s:Spec {specId: '${this.escape(specId)}'}) RETURN s.specId AS specId, s.path AS path, s.title AS title, s.contentHash AS contentHash`,
     )
     if (rows.length === 0 || !rows[0]) return undefined
     const row = rows[0]
@@ -263,6 +442,7 @@ export class LadybugGraphStore extends GraphStore {
       specId: row['specId'] as string,
       path: row['path'] as string,
       title: row['title'] as string,
+      contentHash: row['contentHash'] as string,
       dependsOn: depRows.map((r) => r['specId'] as string),
     }
   }
@@ -402,15 +582,27 @@ export class LadybugGraphStore extends GraphStore {
       }
     }
     if (query.name !== undefined) {
+      const ci = query.caseSensitive !== true
       if (query.name.includes('*')) {
         const regex = query.name.replaceAll('.', '\\.').replaceAll('*', '.*')
-        conditions.push(`s.name =~ '${this.escape(regex)}'`)
+        if (ci) {
+          conditions.push(`lower(s.name) =~ '${this.escape(regex.toLowerCase())}'`)
+        } else {
+          conditions.push(`s.name =~ '${this.escape(regex)}'`)
+        }
+      } else if (ci) {
+        conditions.push(`lower(s.name) = '${this.escape(query.name.toLowerCase())}'`)
       } else {
         conditions.push(`s.name = '${this.escape(query.name)}'`)
       }
     }
     if (query.comment !== undefined) {
-      conditions.push(`s.comment CONTAINS '${this.escape(query.comment)}'`)
+      const ci = query.caseSensitive !== true
+      if (ci) {
+        conditions.push(`lower(s.comment) CONTAINS '${this.escape(query.comment.toLowerCase())}'`)
+      } else {
+        conditions.push(`s.comment CONTAINS '${this.escape(query.comment)}'`)
+      }
     }
 
     const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
@@ -487,7 +679,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      'MATCH (s:Spec) RETURN s.specId AS specId, s.path AS path, s.title AS title',
+      'MATCH (s:Spec) RETURN s.specId AS specId, s.path AS path, s.title AS title, s.contentHash AS contentHash',
     )
 
     const specs: SpecNode[] = []
@@ -501,6 +693,7 @@ export class LadybugGraphStore extends GraphStore {
         specId,
         path: row['path'] as string,
         title: row['title'] as string,
+        contentHash: row['contentHash'] as string,
         dependsOn: depRows.map((r) => r['target'] as string),
       })
     }
