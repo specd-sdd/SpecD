@@ -7,6 +7,7 @@ export interface SpecNode {
   readonly title: string
   readonly contentHash: string
   readonly dependsOn: readonly string[]
+  readonly workspace: string
 }
 
 /**
@@ -17,6 +18,7 @@ export interface SpecNode {
  * @param params.title - The spec title.
  * @param params.contentHash - Content hash for incremental diffing.
  * @param params.dependsOn - Optional dependency spec identifiers.
+ * @param params.workspace - Workspace name this spec belongs to.
  * @returns A SpecNode value object.
  */
 export function createSpecNode(params: {
@@ -25,6 +27,7 @@ export function createSpecNode(params: {
   title: string
   contentHash: string
   dependsOn?: readonly string[]
+  workspace: string
 }): SpecNode {
   return {
     specId: params.specId,
@@ -32,5 +35,6 @@ export function createSpecNode(params: {
     title: params.title,
     contentHash: params.contentHash,
     dependsOn: params.dependsOn ?? [],
+    workspace: params.workspace,
   }
 }

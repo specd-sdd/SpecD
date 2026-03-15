@@ -1,0 +1,236 @@
+title: Traversal
+description: Once a code graph is built, developers need to answer questions like "what breaks if I change this function?" and "what does this function depend on?" Traversal operations walk the graph to compute blast radius, find callers and callees at arbitrary depth, and assess the risk of proposed changes. These are pure, stateless functions that read from the graph store — the query side of the code graph.
+dependsOn:
+  - code-graph:code-graph/symbol-model
+  - code-graph:code-graph/graph-store
+context:
+  - Once a code graph is built, developers need to answer questions like "what breaks if I change this function?" and "what does this function depend on?" Traversal operations walk the graph to compute blast radius, find callers and callees at arbitrary depth, and assess the risk of proposed changes. These are pure, stateless functions that read from the graph store — the query side of the code graph.
+rules:
+  - requirement: Upstream traversal
+    rules:
+      - |-
+        `getUpstream(store: GraphStore, symbolId: string, options?: TraversalOptions): Promise<TraversalResult>` SHALL return all callers of the given symbol, transitively up to `maxDepth` (default: 3). Results MUST be grouped by depth level:
+
+        * **Depth 1** — direct callers (symbols that call the target)
+        * **Depth 2** — callers of the direct callers
+        * **Depth N** — callers at N steps removed
+
+        The traversal follows `CALLS` relations in reverse (target → source). Cycles are detected and broken — a symbol already visited at a shallower depth is not revisited.
+  - requirement: Downstream traversal
+    rules:
+      - '`getDownstream(store: GraphStore, symbolId: string, options?: TraversalOptions): Promise<TraversalResult>` SHALL return all callees of the given symbol, transitively up to `maxDepth` (default: 3). Results are grouped by depth level following `CALLS` relations forward (source → target). Cycle detection applies as with upstream.'
+  - requirement: TraversalOptions and TraversalResult
+    rules:
+      - |-
+        `TraversalOptions` is a value object with:
+
+        * **`maxDepth`** (`number`, default: 3) — maximum traversal depth
+        * **`includeFiles`** (`boolean`, default: true) — whether to include `IMPORTS` relations in addition to `CALLS`
+
+        `TraversalResult` is a value object with:
+
+        * **`root`** (`string`) — the starting symbol id
+        * **`levels`** — `Map<number, SymbolNode[]>` — symbols grouped by depth (1-indexed)
+        * **`totalCount`** — total number of unique symbols found across all levels
+        * **`truncated`** (`boolean`) — true if traversal hit `maxDepth` and there are potentially more results
+  - requirement: Impact analysis
+    rules:
+      - |-
+        `analyzeImpact(store: GraphStore, target: string, direction: 'upstream' | 'downstream' | 'both'): Promise<ImpactResult>` SHALL compute the blast radius of modifying the target symbol. It runs traversal in the specified direction and produces:
+
+        * **`target`** — the symbol being analyzed
+        * **`directDependents`** — count of depth-1 results (WILL BREAK)
+        * **`indirectDependents`** — count of depth-2 results (LIKELY AFFECTED)
+        * **`transitiveDependents`** — count of depth-3+ results (MAY NEED TESTING)
+        * **`riskLevel`** — computed from dependent counts: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`
+        * **`affectedFiles`** — unique file paths containing any affected symbol
+        * **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)
+
+        Risk level thresholds:
+
+        | Level      | Condition                                                |
+        | ---------- | -------------------------------------------------------- |
+        | `LOW`      | 0–2 direct dependents, no indirect                       |
+        | `MEDIUM`   | 3–5 direct dependents, or any indirect                   |
+        | `HIGH`     | 6+ direct dependents, or 10+ total dependents            |
+        | `CRITICAL` | 20+ total dependents, or target is in 3+ execution flows |
+  - requirement: File impact
+    rules:
+      - |-
+        `analyzeFileImpact(store: GraphStore, filePath: string, direction: 'upstream' | 'downstream' | 'both'): Promise<FileImpactResult>` SHALL compute aggregate impact for all symbols defined in the given file. It:
+
+        1. Retrieves all symbols in the file via `findSymbols({ filePath })`
+        2. Runs `analyzeImpact` for each symbol
+        3. Merges results: deduplicates affected symbols, takes the maximum risk level, unions affected files
+
+        `FileImpactResult` extends `ImpactResult` with:
+
+        * **`symbols`** — array of per-symbol `ImpactResult` entries
+        * **`riskLevel`** — the maximum risk level across all symbols in the file
+  - requirement: Change detection
+    rules:
+      - |-
+        `detectChanges(store: GraphStore, changedFiles: string[]): Promise<ChangeDetectionResult>` SHALL identify the impact of a set of changed files on the code graph. It:
+
+        1. For each changed file, finds all symbols defined in it
+        2. Runs upstream traversal on each symbol
+        3. Aggregates affected symbols, files, and execution flows
+        4. Computes an overall risk level
+
+        `ChangeDetectionResult` contains:
+
+        * **`changedFiles`** — the input file paths
+        * **`changedSymbols`** — symbols defined in the changed files
+        * **`affectedSymbols`** — symbols affected by the changes (upstream dependents)
+        * **`affectedFiles`** — files containing affected symbols
+        * **`riskLevel`** — maximum risk level across all changed symbols
+        * **`summary`** — human-readable summary string
+  - requirement: Pure functions
+    rules:
+      - All traversal operations SHALL be stateless pure functions defined in `domain/services/`. They receive a `GraphStore` instance (for reads only) and return value objects. They MUST NOT mutate the store, manage lifecycle, or hold state between calls.
+constraints:
+  - Traversal depth defaults to 3 — callers may override via TraversalOptions
+  - Cycles are broken by tracking visited symbols — a symbol is only reported at its shallowest depth
+  - Risk level thresholds are fixed in this spec — they are not configurable
+  - All traversal functions are in domain/services/, not in use cases or infrastructure
+  - Traversal functions never mutate the store
+  - No dependency on @specd/core
+scenarios:
+  - requirement: Upstream traversal
+    name: Direct callers returned at depth 1
+    given:
+      - symbol C is called by symbols A and B
+    when:
+      - getUpstream(store, C.id) is called
+    then:
+      - levels.get(1) contains A and B
+  - requirement: Upstream traversal
+    name: Transitive callers at correct depth
+    given:
+      - D calls C, C calls B, B calls A
+    when:
+      - 'getUpstream(store, A.id, { maxDepth: 3 }) is called'
+    then:
+      - B is at depth 1, C is at depth 2, D is at depth 3
+  - requirement: Upstream traversal
+    name: Cycle broken at shallowest depth
+    given:
+      - A calls B, B calls C, C calls A (cycle)
+    when:
+      - getUpstream(store, A.id) is called
+    then:
+      - A is not revisited and the traversal terminates
+  - requirement: Upstream traversal
+    name: maxDepth limits traversal
+    given:
+      - a call chain of depth 5
+    when:
+      - 'getUpstream(store, target.id, { maxDepth: 2 }) is called'
+    then:
+      - only depths 1 and 2 are returned and truncated is true
+  - requirement: Downstream traversal
+    name: Direct callees at depth 1
+    given:
+      - symbol A calls B and C
+    when:
+      - getDownstream(store, A.id) is called
+    then:
+      - levels.get(1) contains B and C
+  - requirement: Downstream traversal
+    name: Downstream with includeFiles
+    given:
+      - file X imports file Y and symbol A in X calls symbol B in Y
+    when:
+      - 'getDownstream(store, A.id, { includeFiles: true }) is called'
+    then:
+      - both the CALLS relation to B and the IMPORTS relation to Y are reflected in the result
+  - requirement: Impact analysis
+    name: LOW risk — no dependents
+    given:
+      - a symbol with 0 callers
+    when:
+      - analyzeImpact(store, symbol.id, 'upstream') is called
+    then:
+      - riskLevel is LOW and directDependents is 0
+  - requirement: Impact analysis
+    name: MEDIUM risk — few direct dependents
+    given:
+      - a symbol with 4 direct callers and 0 indirect
+    when:
+      - analyzeImpact(store, symbol.id, 'upstream') is called
+    then:
+      - riskLevel is MEDIUM
+  - requirement: Impact analysis
+    name: HIGH risk — many direct dependents
+    given:
+      - a symbol with 8 direct callers
+    when:
+      - analyzeImpact(store, symbol.id, 'upstream') is called
+    then:
+      - riskLevel is HIGH
+  - requirement: Impact analysis
+    name: CRITICAL risk — widely used symbol
+    given:
+      - a symbol with 25 total dependents across all depths
+    when:
+      - analyzeImpact(store, symbol.id, 'upstream') is called
+    then:
+      - riskLevel is CRITICAL
+  - requirement: Impact analysis
+    name: affectedFiles deduplication
+    given:
+      - symbols A and B are both in src/utils.ts and both are callers of target
+    when:
+      - analyzeImpact is called
+    then:
+      - affectedFiles contains src/utils.ts only once
+  - requirement: File impact
+    name: Aggregate risk is maximum across symbols
+    given:
+      - file src/auth.ts contains symbols X (LOW risk) and Y (HIGH risk)
+    when:
+      - analyzeFileImpact(store, 'src/auth.ts', 'upstream') is called
+    then:
+      - riskLevel is HIGH (the maximum)
+  - requirement: File impact
+    name: Affected symbols deduplicated across file symbols
+    given:
+      - symbols X and Y in the file share a common upstream dependent Z
+    when:
+      - analyzeFileImpact is called
+    then:
+      - Z appears once in the aggregate result, not twice
+  - requirement: Change detection
+    name: Single changed file impact
+    given:
+      - src/utils.ts was modified and contains symbol hash with 3 callers
+    when:
+      - detectChanges(store, ['src/utils.ts']) is called
+    then:
+      - changedSymbols includes hash and affectedSymbols includes its 3 callers
+  - requirement: Change detection
+    name: Multiple changed files aggregated
+    given:
+      - two files were modified, each with different sets of upstream dependents
+    when:
+      - detectChanges(store, [file1, file2]) is called
+    then:
+      - affectedSymbols is the union of both files' upstream dependents
+  - requirement: Change detection
+    name: Summary is human-readable
+    when:
+      - detectChanges completes
+    then:
+      - summary contains the number of changed files, affected symbols, and risk level in readable form
+  - requirement: Pure functions
+    name: Traversal does not mutate store
+    given:
+      - a store with known state
+    when:
+      - getUpstream, getDownstream, or analyzeImpact is called
+    then:
+      - getStatistics() returns the same counts before and after the call
+contentHashes:
+  spec.md: sha256:f4baeff25b0abe515940abcea3bf062c743c8cb4c9291b3652f25d7920930792
+  verify.md: sha256:7ef97ed9ede89b1c299cae5b0189943aa4d5bfc9f28e93dbbc85f0e31fc8c80b
+generatedBy: core

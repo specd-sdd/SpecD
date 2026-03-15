@@ -2,6 +2,7 @@ import { Command } from 'commander'
 import { createCodeGraphProvider } from '@specd/code-graph'
 import { cliError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { withProvider } from './with-provider.js'
 
 /**
@@ -58,7 +59,6 @@ export function registerGraphImpact(parent: Command): void {
     .option('--symbol <name>', 'analyze impact of a symbol by name')
     .option('--changes <files...>', 'detect impact of changes to multiple files')
     .option('--direction <dir>', 'traversal direction: upstream|downstream|both', 'upstream')
-    .option('--path <path>', 'workspace root path', process.cwd())
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .action(
       async (opts: {
@@ -66,13 +66,13 @@ export function registerGraphImpact(parent: Command): void {
         symbol?: string
         changes?: string[]
         direction: string
-        path: string
         format: string
       }) => {
         const fmt = parseFormat(opts.format)
         const direction = opts.direction as 'upstream' | 'downstream' | 'both'
+        const { config } = await resolveCliContext()
 
-        await withProvider(opts.path, opts.format, async (provider) => {
+        await withProvider(config, opts.format, async (provider) => {
           if (opts.symbol) {
             await handleSymbolImpact(provider, opts.symbol, direction, fmt)
           } else if (opts.changes) {

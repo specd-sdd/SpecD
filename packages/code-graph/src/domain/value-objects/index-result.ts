@@ -7,6 +7,19 @@ export interface IndexError {
 }
 
 /**
+ * Per-workspace breakdown of indexing results.
+ */
+export interface WorkspaceIndexBreakdown {
+  readonly name: string
+  readonly filesDiscovered: number
+  readonly filesIndexed: number
+  readonly filesSkipped: number
+  readonly filesRemoved: number
+  readonly specsDiscovered: number
+  readonly specsIndexed: number
+}
+
+/**
  * Summary of an indexing operation including counts and errors.
  */
 export interface IndexResult {
@@ -18,4 +31,5 @@ export interface IndexResult {
   readonly specsIndexed: number
   readonly errors: readonly IndexError[]
   readonly duration: number
+  readonly workspaces: readonly WorkspaceIndexBreakdown[]
 }

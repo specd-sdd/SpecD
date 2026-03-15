@@ -1,0 +1,185 @@
+import { createHash } from 'node:crypto'
+import { type SpecdConfig, type Kernel, type SpecRepository } from '@specd/core'
+import { type WorkspaceIndexTarget, type DiscoveredSpec } from '@specd/code-graph'
+
+/**
+ * Builds workspace index targets from specd config and kernel.
+ *
+ * For each workspace, creates a target with:
+ * - name: workspace name
+ * - codeRoot: absolute path to code directory
+ * - specs: callback that resolves specs via SpecRepository
+ *
+ * @param config - The specd configuration.
+ * @param kernel - The wired kernel instance.
+ * @param workspaceFilter - Optional workspace name to filter to a single workspace.
+ * @returns Array of workspace index targets.
+ */
+export function buildWorkspaceTargets(
+  config: SpecdConfig,
+  kernel: Kernel,
+  workspaceFilter?: string,
+): WorkspaceIndexTarget[] {
+  let workspaces = [...config.workspaces]
+
+  if (workspaceFilter) {
+    workspaces = workspaces.filter((ws) => ws.name === workspaceFilter)
+  }
+
+  return workspaces.map((ws) => ({
+    name: ws.name,
+    codeRoot: ws.codeRoot,
+    specs: () => resolveSpecsFromRepo(kernel.specs.repos.get(ws.name), ws.name),
+  }))
+}
+
+/**
+ * Resolves specs from a SpecRepository into DiscoveredSpec objects.
+ *
+ * For each spec in the repository:
+ * 1. Lists all specs
+ * 2. Loads spec.md content for title extraction and hashing
+ * 3. Loads .specd-metadata.yaml for dependency extraction
+ * 4. Builds DiscoveredSpec with specId, title, contentHash, dependsOn
+ *
+ * @param repo - The spec repository for this workspace, or undefined if not found.
+ * @param workspace - The workspace name.
+ * @returns Array of discovered specs.
+ */
+async function resolveSpecsFromRepo(
+  repo: SpecRepository | undefined,
+  workspace: string,
+): Promise<DiscoveredSpec[]> {
+  if (!repo) return []
+
+  const specs = await repo.list()
+  const results: DiscoveredSpec[] = []
+
+  for (const spec of specs) {
+    // Load all artifacts, ordered: spec.md first (if present), then rest alphabetically
+    const filenames = [...spec.filenames]
+    const ordered: string[] = []
+    const specMdIdx = filenames.indexOf('spec.md')
+    if (specMdIdx !== -1) {
+      ordered.push('spec.md')
+      filenames.splice(specMdIdx, 1)
+    }
+    ordered.push(...filenames.sort())
+
+    // Concatenate all artifact contents for hashing
+    let hashSource = ''
+    let title = 'Untitled'
+    let specMdContent: string | undefined
+
+    for (const filename of ordered) {
+      const artifact = await repo.artifact(spec, filename)
+      if (artifact) {
+        hashSource += artifact.content
+        if (filename === 'spec.md') {
+          specMdContent = artifact.content
+          title = extractTitle(artifact.content)
+        }
+      }
+    }
+
+    if (hashSource === '') continue
+
+    // Extract dependsOn from metadata or spec.md
+    let dependsOn: string[] = []
+    if (ordered.includes('.specd-metadata.yaml')) {
+      const metadata = await repo.artifact(spec, '.specd-metadata.yaml')
+      if (metadata) {
+        dependsOn = extractDependsOnFromMetadata(metadata.content)
+      }
+    } else if (specMdContent) {
+      dependsOn = extractDependsOnFromSpec(specMdContent)
+    }
+
+    const specId = `${spec.workspace}:${spec.name.toString()}`
+    const contentHash = computeHash(hashSource)
+
+    results.push({
+      spec: {
+        specId,
+        path: spec.name.toString(),
+        title,
+        contentHash,
+        dependsOn,
+        workspace,
+      },
+      contentHash,
+    })
+  }
+
+  return results
+}
+
+/**
+ * Extracts the first heading from a spec markdown file as the title.
+ * @param content - The raw markdown content.
+ * @returns The extracted title, or 'Untitled' if no heading is found.
+ */
+function extractTitle(content: string): string {
+  const match = content.match(/^#\s+(.+)$/m)
+  return match?.[1]?.trim() ?? 'Untitled'
+}
+
+/**
+ * Computes a SHA-256 content hash.
+ * @param content - The content to hash.
+ * @returns The hex hash string.
+ */
+function computeHash(content: string): string {
+  return createHash('sha256').update(content).digest('hex')
+}
+
+/**
+ * Parses the dependsOn list from a .specd-metadata.yaml file.
+ * @param metadataContent - The raw YAML metadata content.
+ * @returns An array of dependency spec identifiers.
+ */
+function extractDependsOnFromMetadata(metadataContent: string): string[] {
+  const deps: string[] = []
+  const lines = metadataContent.split('\n')
+  let inDependsOn = false
+
+  for (const line of lines) {
+    if (line.match(/^dependsOn\s*:/)) {
+      inDependsOn = true
+      continue
+    }
+    if (inDependsOn) {
+      const match = line.match(/^\s+-\s+(.+)/)
+      if (match?.[1]) {
+        deps.push(match[1].trim())
+      } else if (!line.match(/^\s/)) {
+        inDependsOn = false
+      }
+    }
+  }
+  return deps
+}
+
+/**
+ * Extracts dependency spec paths from the "Spec Dependencies" section of a spec markdown file.
+ * @param specContent - The raw markdown content.
+ * @returns An array of dependency spec path strings.
+ */
+function extractDependsOnFromSpec(specContent: string): string[] {
+  const deps: string[] = []
+  const depSection = specContent.match(/## Spec Dependencies\n([\s\S]*?)(?=\n## |\n$|$)/)
+  if (!depSection?.[1]) return deps
+
+  const links = depSection[1].matchAll(/\[.*?\]\(([^)]+)\)/g)
+  for (const match of links) {
+    const href = match[1]
+    if (href && href.endsWith('spec.md')) {
+      const specPath = href
+        .replace(/\/spec\.md$/, '')
+        .replace(/^\.\.\//, '')
+        .replace(/^\.\.\//, '')
+      deps.push(specPath)
+    }
+  }
+  return deps
+}

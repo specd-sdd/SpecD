@@ -1,3 +1,4 @@
+import { type SpecdConfig } from '@specd/core'
 import { type LanguageAdapter } from '../domain/value-objects/language-adapter.js'
 import { LadybugGraphStore } from '../infrastructure/ladybug/ladybug-graph-store.js'
 import { AdapterRegistry } from '../infrastructure/tree-sitter/adapter-registry.js'
@@ -8,7 +9,7 @@ import { PhpLanguageAdapter } from '../infrastructure/tree-sitter/php-language-a
 import { IndexCodeGraph } from '../application/use-cases/index-code-graph.js'
 import { CodeGraphProvider } from './code-graph-provider.js'
 
-/** Configuration options for creating a {@link CodeGraphProvider}. */
+/** Configuration options for creating a {@link CodeGraphProvider} (legacy). */
 export interface CodeGraphOptions {
   readonly storagePath: string
   readonly adapters?: LanguageAdapter[]
@@ -16,11 +17,20 @@ export interface CodeGraphOptions {
 
 /**
  * Factory function that wires up the code graph subsystem with default adapters.
- * @param options - Configuration options including storage path and optional custom adapters.
+ *
+ * Accepts either a `SpecdConfig` (primary, workspace-aware) or a `CodeGraphOptions`
+ * (legacy, standalone). When given `SpecdConfig`, derives the storage path from
+ * `config.projectRoot`.
+ *
+ * @param options - SpecdConfig or CodeGraphOptions.
  * @returns A fully configured {@link CodeGraphProvider} instance.
  */
-export function createCodeGraphProvider(options: CodeGraphOptions): CodeGraphProvider {
-  const store = new LadybugGraphStore(options.storagePath)
+export function createCodeGraphProvider(
+  options: SpecdConfig | CodeGraphOptions,
+): CodeGraphProvider {
+  const storagePath = isSpecdConfig(options) ? options.projectRoot : options.storagePath
+
+  const store = new LadybugGraphStore(storagePath)
 
   const registry = new AdapterRegistry()
   registry.register(new TypeScriptLanguageAdapter())
@@ -28,7 +38,7 @@ export function createCodeGraphProvider(options: CodeGraphOptions): CodeGraphPro
   registry.register(new GoLanguageAdapter())
   registry.register(new PhpLanguageAdapter())
 
-  if (options.adapters) {
+  if (!isSpecdConfig(options) && options.adapters) {
     for (const adapter of options.adapters) {
       registry.register(adapter)
     }
@@ -37,4 +47,13 @@ export function createCodeGraphProvider(options: CodeGraphOptions): CodeGraphPro
   const indexer = new IndexCodeGraph(store, registry)
 
   return new CodeGraphProvider(store, indexer)
+}
+
+/**
+ * Type guard to distinguish SpecdConfig from CodeGraphOptions.
+ * @param options - The options object to check.
+ * @returns True if the options object is a SpecdConfig.
+ */
+function isSpecdConfig(options: SpecdConfig | CodeGraphOptions): options is SpecdConfig {
+  return 'projectRoot' in options
 }

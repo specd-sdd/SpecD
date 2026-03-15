@@ -295,10 +295,10 @@ export class LadybugGraphStore extends GraphStore {
       if (data.specs.length > 0) {
         const specCsv = prefix + 'specs.csv'
         csvFiles.push(specCsv)
-        const specRows = ['specId,path,title,contentHash']
+        const specRows = ['specId,path,title,contentHash,workspace']
         for (const sp of data.specs) {
           specRows.push(
-            `${csvEscape(sp.specId)},${csvEscape(sp.path)},${csvEscape(sp.title)},${csvEscape(sp.contentHash)}`,
+            `${csvEscape(sp.specId)},${csvEscape(sp.path)},${csvEscape(sp.title)},${csvEscape(sp.contentHash)},${csvEscape(sp.workspace)}`,
           )
         }
         writeFileSync(specCsv, specRows.join('\n') + '\n')
@@ -360,7 +360,7 @@ export class LadybugGraphStore extends GraphStore {
     await this.removeSpec(spec.specId)
 
     await conn.query(
-      `CREATE (s:Spec {specId: '${this.escape(spec.specId)}', path: '${this.escape(spec.path)}', title: '${this.escape(spec.title)}', contentHash: '${this.escape(spec.contentHash)}'})`,
+      `CREATE (s:Spec {specId: '${this.escape(spec.specId)}', path: '${this.escape(spec.path)}', title: '${this.escape(spec.title)}', contentHash: '${this.escape(spec.contentHash)}', workspace: '${this.escape(spec.workspace)}'})`,
     )
 
     for (const rel of relations) {
@@ -428,7 +428,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      `MATCH (s:Spec {specId: '${this.escape(specId)}'}) RETURN s.specId AS specId, s.path AS path, s.title AS title, s.contentHash AS contentHash`,
+      `MATCH (s:Spec {specId: '${this.escape(specId)}'}) RETURN s.specId AS specId, s.path AS path, s.title AS title, s.contentHash AS contentHash, s.workspace AS workspace`,
     )
     if (rows.length === 0 || !rows[0]) return undefined
     const row = rows[0]
@@ -444,6 +444,7 @@ export class LadybugGraphStore extends GraphStore {
       title: row['title'] as string,
       contentHash: row['contentHash'] as string,
       dependsOn: depRows.map((r) => r['specId'] as string),
+      workspace: (row['workspace'] as string) ?? '',
     }
   }
 
@@ -679,7 +680,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      'MATCH (s:Spec) RETURN s.specId AS specId, s.path AS path, s.title AS title, s.contentHash AS contentHash',
+      'MATCH (s:Spec) RETURN s.specId AS specId, s.path AS path, s.title AS title, s.contentHash AS contentHash, s.workspace AS workspace',
     )
 
     const specs: SpecNode[] = []
@@ -695,6 +696,7 @@ export class LadybugGraphStore extends GraphStore {
         title: row['title'] as string,
         contentHash: row['contentHash'] as string,
         dependsOn: depRows.map((r) => r['target'] as string),
+        workspace: (row['workspace'] as string) ?? '',
       })
     }
 

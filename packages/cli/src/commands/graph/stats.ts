@@ -1,5 +1,6 @@
 import { Command } from 'commander'
 import { output, parseFormat } from '../../formatter.js'
+import { resolveCliContext } from '../../helpers/cli-context.js'
 import { withProvider } from './with-provider.js'
 
 /**
@@ -11,12 +12,12 @@ export function registerGraphStats(parent: Command): void {
     .command('stats')
     .allowExcessArguments(false)
     .description('Show code graph statistics')
-    .option('--path <path>', 'workspace root path', process.cwd())
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
-    .action(async (opts: { path: string; format: string }) => {
+    .action(async (opts: { format: string }) => {
       const fmt = parseFormat(opts.format)
+      const { config } = await resolveCliContext()
 
-      await withProvider(opts.path, opts.format, async (provider) => {
+      await withProvider(config, opts.format, async (provider) => {
         const stats = await provider.getStatistics()
 
         if (fmt === 'text') {

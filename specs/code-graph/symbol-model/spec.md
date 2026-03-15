@@ -10,13 +10,13 @@ A code graph needs a unified, language-agnostic representation of source code st
 
 A `FileNode` SHALL represent a single source file in the workspace. It contains:
 
-- **`path`** (`string`) — workspace-relative, forward-slash-normalized, unique per workspace. This is the node's identity.
+- **`path`** (`string`) — globally unique path in format `{workspaceName}/{relativeToCodeRoot}` (e.g. `core/src/index.ts`). Forward-slash-normalized. This is the node's identity.
 - **`language`** (`string`) — language identifier (e.g. `typescript`, `python`). Determined by the language adapter at index time.
 - **`contentHash`** (`string`) — hash of the file's content at last index. Used for incremental diffing.
-- **`workspace`** (`string`) — the workspace root this file belongs to.
+- **`workspace`** (`string`) — the workspace name this file belongs to (e.g. `core`, `cli`, `default`).
 - **`embedding`** (`Float32Array | undefined`) — optional vector embedding for semantic search. Deferred to v2+.
 
-Two `FileNode` values are equal if and only if their `path` and `workspace` fields match.
+Two `FileNode` values are equal if and only if their `path` fields match (since path includes the workspace name prefix).
 
 ### Requirement: Spec node
 
@@ -27,6 +27,7 @@ A `SpecNode` SHALL represent a spec directory in the workspace. It contains:
 - **`title`** (`string`) — the spec title extracted from the `# Title` heading in `spec.md`.
 - **`contentHash`** (`string`) — hash of the spec's content at last index. Computed from `spec.md` + `.specd-metadata.yaml`. Used for incremental diffing.
 - **`dependsOn`** (`string[]`) — ordered list of spec IDs this spec depends on, extracted from `.specd-metadata.yaml` or the `## Spec Dependencies` section in `spec.md`.
+- **`workspace`** (`string`) — the workspace name this spec belongs to (e.g. `core`, `_global`).
 
 Two `SpecNode` values are equal if their `specId` fields match.
 
@@ -34,7 +35,7 @@ Two `SpecNode` values are equal if their `specId` fields match.
 
 A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:
 
-- **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line`. The same symbol at the same location always produces the same id.
+- **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line` (e.g. `core/src/index.ts:function:main:1`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.
 - **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).
 - **`kind`** (`SymbolKind`) — the category of this symbol.
 - **`filePath`** (`string`) — workspace-relative path of the file containing this symbol.
@@ -114,7 +115,7 @@ Specific error subclasses include:
 - All model types are value objects — no identity beyond structural equality (except `SymbolNode.id` which is deterministic)
 - `SymbolKind` is a closed enum — adding a new kind requires a spec change
 - `RelationType` is a closed set — adding a new type requires a spec change
-- No dependency on `@specd/core` — this is a standalone package
+- Depends on `@specd/core` for `SpecdConfig` type imports
 - `embedding` on `FileNode` is deferred to v2+ — adapters MUST NOT populate it until the embedding pipeline is implemented
 - `COVERS` relations are deferred to v2+ — the type exists in the model but is not populated by any v1.5/v2 process
 - `DEPENDS_ON` relations are populated by the indexer in v1.5, reading from `.specd-metadata.yaml` or `spec.md`
@@ -122,33 +123,34 @@ Specific error subclasses include:
 ## Examples
 
 ```typescript
-// FileNode
+// FileNode — path includes workspace prefix
 const file: FileNode = {
-  path: 'src/domain/entities/change.ts',
+  path: 'core/src/domain/entities/change.ts',
   language: 'typescript',
   contentHash: 'sha256:abc123...',
-  workspace: '/Users/dev/project',
+  workspace: 'core',
   embedding: undefined,
 }
 
-// SymbolNode
+// SymbolNode — id and filePath include workspace prefix
 const symbol: SymbolNode = {
-  id: 'src/domain/entities/change.ts:function:createChange:42',
+  id: 'core/src/domain/entities/change.ts:function:createChange:42',
   name: 'createChange',
   kind: SymbolKind.Function,
-  filePath: 'src/domain/entities/change.ts',
+  filePath: 'core/src/domain/entities/change.ts',
   line: 42,
   column: 0,
   comment: '/** Creates a new Change entity from the given parameters. */',
 }
 
-// SpecNode
+// SpecNode — includes workspace field
 const spec: SpecNode = {
   specId: 'core:core/change',
   path: 'specs/core/change',
   title: 'Change',
   contentHash: 'sha256:def456...',
   dependsOn: ['core:core/config', 'core:core/storage'],
+  workspace: 'core',
 }
 
 // Relation

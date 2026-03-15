@@ -24,7 +24,7 @@ The indexer SHALL compute a content hash for each discovered file and compare it
 
 - **New** — file exists on disk but not in the store → extract and upsert
 - **Changed** — file exists in both but hashes differ → extract and upsert (replaces previous data)
-- **Deleted** — file exists in the store but not on disk → remove from store
+- **Deleted** — file exists in the store but not on disk → remove from store. Only files belonging to workspaces being indexed are considered for deletion — files from other workspaces are left untouched. This allows `--workspace <name>` to index a single workspace without destroying data from others.
 
 Files whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison.
 
@@ -32,24 +32,30 @@ Changed files are removed from the store before bulk load, because CSV `COPY FRO
 
 To force a full re-index, callers MUST call `GraphStore.clear()` before `execute()`. This removes all stored data, causing every file to be treated as new.
 
-### Requirement: File discovery
+### Requirement: Multi-workspace file discovery
 
-The indexer SHALL walk the workspace directory recursively to discover source files. It MUST:
+The indexer SHALL discover files from each workspace's `codeRoot` independently. For each `WorkspaceIndexTarget`:
 
-- Respect `.gitignore` rules (using the same algorithm as git)
-- Exclude the following directories regardless of `.gitignore`: `node_modules`, `.git`, `.specd`, `dist`, `build`, `coverage`, `.next`, `.nuxt`
-- Skip symbolic links — only regular files are indexed
-- Skip files with no registered language adapter (determined by extension)
+1. Call `discoverFiles(codeRoot, hasAdapter)` to get paths relative to `codeRoot`
+2. Prefix each path with `{workspaceName}/` to form the globally unique `FileNode.path`
+3. Diff against the store (filtered by workspace prefix)
 
-The discovery phase produces a list of workspace-relative file paths with forward-slash normalization.
+`discoverFiles` itself has no workspace knowledge — it accepts a root directory and:
+
+- Respects `.gitignore` rules hierarchically (finds git root by walking up from root)
+- Excludes the following directories regardless of `.gitignore`: `node_modules`, `.git`, `.specd`, `dist`, `build`, `coverage`, `.next`, `.nuxt`
+- Skips symbolic links — only regular files are indexed
+- Skips files with no registered language adapter (determined by extension)
+- Returns root-relative file paths with forward-slash normalization
 
 ### Requirement: Single-pass extraction with in-memory index
 
 Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:
 
-- **Pass 1 (Extract symbols)** — For each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). For PHP files with namespace declarations, build a qualified name map. No store queries are needed.
-- **Pass 2 (Resolve imports + CALLS)** — For each file: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). For relative imports, find the target file's symbols by path. For monorepo package imports, find by name within the package prefix. For PHP qualified names, match against the namespace map. Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations. Accumulate all relations.
-- **Bulk load** — After both passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.
+- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). For PHP files with namespace declarations, build a qualified name map. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.
+- **Pass 2 (Resolve imports + CALLS, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). For relative imports, find the target file's symbols by path within the same workspace. For monorepo package imports, the monorepo map correlates package names with workspace prefixes, allowing cross-workspace resolution. For PHP qualified names, match against the namespace map globally. Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations. Accumulate all relations.
+- **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.
+- **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.
 
 This two-pass approach ensures all symbols exist in the index before import/call resolution, while avoiding any store queries during extraction.
 
@@ -94,7 +100,7 @@ Only infrastructure-level errors (e.g. store connection lost, disk full) may abo
 
 `IndexCodeGraph` SHALL return an `IndexResult` value object containing:
 
-- **`filesDiscovered`** — total files found during discovery
+- **`filesDiscovered`** — total files found during discovery (across all workspaces)
 - **`filesIndexed`** — files that were new or changed and successfully processed
 - **`filesRemoved`** — files removed from the store (deleted from disk)
 - **`filesSkipped`** — files skipped because their hash matched
@@ -102,6 +108,7 @@ Only infrastructure-level errors (e.g. store connection lost, disk full) may abo
 - **`specsIndexed`** — specs that were new or changed and successfully processed
 - **`errors`** — array of `{ filePath: string; message: string }` for files or specs that failed
 - **`duration`** — elapsed time in milliseconds
+- **`workspaces`** — per-workspace breakdown array of `{ name, filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }`
 
 ### Requirement: Spec dependency indexing
 
@@ -125,8 +132,8 @@ Spec indexing runs as an additional phase after source file indexing (Phase 1 an
 - Hardcoded exclusion directories cannot be overridden (they are always excluded)
 - Pass 2 depends on Pass 1 completing for all files — they are not interleaved per file
 - Per-file errors are collected, not thrown — only infrastructure errors abort the run
-- Spec indexing uses `.specd-metadata.yaml` as the primary source for `dependsOn`; falls back to parsing `spec.md` links
-- No dependency on `@specd/core`
+- Spec indexing uses the workspace's `specs()` callback as the primary source; `discoverSpecs` is kept as a fallback
+- Pass 2 depends on Pass 1 completing for ALL workspaces — they are not interleaved per workspace
 
 ## Examples
 
@@ -134,17 +141,29 @@ Spec indexing runs as an additional phase after source file indexing (Phase 1 an
 const store = new LadybugGraphStore({ storagePath: '/project' })
 await store.open()
 
-const registry = new AdapterRegistry() // TypeScript adapter registered by default
+const registry = new AdapterRegistry()
 const indexer = new IndexCodeGraph(store, registry)
 
-const result = await indexer.execute({ workspacePath: '/project' })
+const result = await indexer.execute({
+  workspaces: [
+    { name: 'core', codeRoot: '/project/packages/core', specs: async () => [...] },
+    { name: 'cli', codeRoot: '/project/packages/cli', specs: async () => [...] },
+  ],
+  projectRoot: '/project',
+})
 // result: {
 //   filesDiscovered: 150,
 //   filesIndexed: 12,
 //   filesRemoved: 2,
 //   filesSkipped: 136,
-//   errors: [{ filePath: 'src/broken.ts', message: 'Parse error at line 42' }],
+//   specsDiscovered: 20,
+//   specsIndexed: 5,
+//   errors: [],
 //   duration: 340,
+//   workspaces: [
+//     { name: 'core', filesDiscovered: 100, filesIndexed: 8, filesSkipped: 90, filesRemoved: 2 },
+//     { name: 'cli', filesDiscovered: 50, filesIndexed: 4, filesSkipped: 46, filesRemoved: 0 },
+//   ],
 // }
 
 await store.close()

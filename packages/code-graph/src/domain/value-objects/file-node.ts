@@ -24,7 +24,7 @@ function normalizePath(filePath: string): string {
  * @param params.path - Workspace-relative file path.
  * @param params.language - Language identifier.
  * @param params.contentHash - Content hash for incremental diffing.
- * @param params.workspace - Workspace root path.
+ * @param params.workspace - Workspace name (e.g. 'core', 'cli').
  * @param params.embedding - Optional vector embedding.
  * @returns A frozen FileNode value object.
  */

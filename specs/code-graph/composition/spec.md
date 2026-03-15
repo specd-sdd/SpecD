@@ -21,17 +21,26 @@ Consumers of `@specd/code-graph` should not need to know how the store, indexer,
 
 ### Requirement: Factory function
 
-`createCodeGraphProvider(options: CodeGraphOptions): CodeGraphProvider` SHALL be the sole construction path for `CodeGraphProvider`. It accepts:
+Two factory signatures are provided:
+
+**Primary (workspace-aware):**
+
+`createCodeGraphProvider(config: SpecdConfig): CodeGraphProvider` accepts a `SpecdConfig` from `@specd/core` and:
+
+1. Derives `storagePath` from `config.projectRoot` (locates `.specd/code-graph.lbug`)
+2. Creates `LadybugGraphStore` with the storage path
+3. Creates `AdapterRegistry` and registers the built-in adapters (TypeScript, Python, Go, PHP)
+4. Creates `IndexCodeGraph` with the store and registry
+5. Returns a `CodeGraphProvider` wired to all components
+
+**Legacy (standalone):**
+
+`createCodeGraphProvider(options: CodeGraphOptions): CodeGraphProvider` accepts:
 
 - **`storagePath`** (`string`, required) — workspace root path, used to locate the `.specd/code-graph.lbug` file
-- **`adapters`** (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the 4 built-in adapters (TypeScript, Python, Go, PHP)
+- **`adapters`** (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the 4 built-in adapters
 
-The factory constructs all internal components:
-
-1. Creates `LadybugGraphStore` with the storage path
-2. Creates `AdapterRegistry` and registers the built-in adapters (TypeScript, Python, Go, PHP) plus any additional adapters
-3. Creates `IndexCodeGraph` with the store and registry
-4. Returns a `CodeGraphProvider` wired to all components
+The factory detects which overload is being used by checking for the `projectRoot` property (present on `SpecdConfig`) vs the `storagePath` property (present on `CodeGraphOptions`).
 
 Callers MUST NOT construct `CodeGraphProvider` directly — the constructor is not part of the public API.
 
@@ -42,7 +51,7 @@ The `@specd/code-graph` package SHALL export only:
 - `createCodeGraphProvider` — factory function
 - `CodeGraphProvider` — type only (for type annotations, not construction)
 - `CodeGraphOptions` — options type for the factory
-- `IndexOptions`, `IndexResult` — indexer types. `IndexOptions` includes `workspacePath` (required), `onProgress` (optional `(percent: number, phase: string) => void` callback), and `chunkBytes` (optional chunk size budget, default 20 MB).
+- `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).
 - `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult` — traversal/impact types
 - `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType` — model types
 - `SymbolQuery`, `GraphStatistics` — query types
@@ -57,9 +66,9 @@ Callers MUST call `open()` before using any query, traversal, or indexing method
 
 The provider does not auto-open or auto-close — callers manage the lifecycle explicitly. This follows the same pattern as database connections and avoids hidden state transitions.
 
-### Requirement: No dependency on @specd/core
+### Requirement: Dependency on @specd/core
 
-`@specd/code-graph` SHALL have zero workspace dependencies. It does not import from `@specd/core`, `@specd/cli`, or any other `@specd/*` package. All types, errors, and utilities are self-contained. Integration with specd happens at the CLI and MCP layers, which depend on both `@specd/core` and `@specd/code-graph`.
+`@specd/code-graph` depends on `@specd/core` for type imports (`SpecdConfig`, `SpecdWorkspaceConfig`). The primary factory function accepts `SpecdConfig` to derive workspace targets, storage path, and spec sources. The legacy `CodeGraphOptions`-based factory remains for standalone usage.
 
 ## Constraints
 
@@ -68,38 +77,33 @@ The provider does not auto-open or auto-close — callers manage the lifecycle e
 - The `LanguageAdapter` interface is exported so consumers can write custom adapters
 - `CodeGraphProvider` holds no domain logic — it only delegates
 - Lifecycle is explicit — no auto-open, no auto-close
-- Zero workspace dependencies — standalone package
+- Depends on `@specd/core` for `SpecdConfig` type
 
 ## Examples
 
 ```typescript
-import { createCodeGraphProvider, SymbolKind, type LanguageAdapter } from '@specd/code-graph'
+import { createCodeGraphProvider, SymbolKind } from '@specd/code-graph'
 
-// Basic usage
-const provider = createCodeGraphProvider({ storagePath: '/my/project' })
+// Primary usage — with SpecdConfig
+const provider = createCodeGraphProvider(config)
 await provider.open()
 
-// Index the workspace
-const result = await provider.index({ workspacePath: '/my/project' })
+// Index all workspaces
+const result = await provider.index({
+  workspaces: [
+    { name: 'core', codeRoot: '/project/packages/core', specs: async () => [...] },
+    { name: 'cli', codeRoot: '/project/packages/cli', specs: async () => [...] },
+  ],
+  projectRoot: '/project',
+})
 console.log(`Indexed ${result.filesIndexed} files in ${result.duration}ms`)
 
-// Query symbols
+// Legacy usage — with CodeGraphOptions
+const legacyProvider = createCodeGraphProvider({ storagePath: '/my/project' })
+
+// Query symbols (workspace-qualified paths)
 const symbols = await provider.findSymbols({ kind: SymbolKind.Function, name: 'create*' })
-
-// Impact analysis
-const impact = await provider.analyzeImpact(symbols[0].id, 'upstream')
-console.log(`Risk: ${impact.riskLevel}, ${impact.directDependents} direct dependents`)
-
-// Full-text search in symbol comments
-const hashSymbols = await provider.findSymbols({ comment: 'content hash' })
-
-// Change detection
-const changes = await provider.detectChanges(['src/auth.ts', 'src/user.ts'])
-console.log(changes.summary)
-
-// Force full re-index (clear + index)
-await provider.clear()
-const freshResult = await provider.index({ workspacePath: '/my/project' })
+// symbols[0].filePath === 'core/src/domain/entities/change.ts'
 
 await provider.close()
 ```

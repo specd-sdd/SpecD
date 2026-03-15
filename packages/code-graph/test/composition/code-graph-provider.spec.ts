@@ -32,7 +32,10 @@ describe('CodeGraphProvider', () => {
     const provider = createCodeGraphProvider({ storagePath: tempDir })
     await provider.open()
 
-    const result = await provider.index({ workspacePath: tempDir })
+    const result = await provider.index({
+      workspaces: [{ name: 'test', codeRoot: tempDir, specs: async () => [] }],
+      projectRoot: tempDir,
+    })
     expect(result.filesIndexed).toBeGreaterThanOrEqual(2)
     expect(result.errors).toHaveLength(0)
 

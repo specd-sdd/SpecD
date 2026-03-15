@@ -7,12 +7,12 @@ describe('FileNode', () => {
       path: 'src\\domain\\file.ts',
       language: 'typescript',
       contentHash: 'sha256:abc',
-      workspace: '/project',
+      workspace: 'core',
     })
     expect(node.path).toBe('src/domain/file.ts')
     expect(node.language).toBe('typescript')
     expect(node.contentHash).toBe('sha256:abc')
-    expect(node.workspace).toBe('/project')
+    expect(node.workspace).toBe('core')
     expect(node.embedding).toBeUndefined()
   })
 
@@ -21,7 +21,7 @@ describe('FileNode', () => {
       path: 'src/domain/file.ts',
       language: 'typescript',
       contentHash: 'sha256:abc',
-      workspace: '/project',
+      workspace: 'core',
     })
     expect(node.path).toBe('src/domain/file.ts')
   })
@@ -32,9 +32,20 @@ describe('FileNode', () => {
       path: 'file.ts',
       language: 'typescript',
       contentHash: 'sha256:abc',
-      workspace: '/project',
+      workspace: 'core',
       embedding,
     })
     expect(node.embedding).toBe(embedding)
+  })
+
+  it('workspace is a name string, not a path', () => {
+    const node = createFileNode({
+      path: 'core/src/index.ts',
+      language: 'typescript',
+      contentHash: 'sha256:abc',
+      workspace: 'core',
+    })
+    expect(node.workspace).toBe('core')
+    expect(node.workspace).not.toContain('/')
   })
 })
