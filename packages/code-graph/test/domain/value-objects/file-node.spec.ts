@@ -40,12 +40,11 @@ describe('FileNode', () => {
 
   it('workspace value is passed through as-is', () => {
     const node = createFileNode({
-      path: 'core/src/index.ts',
+      path: 'org/core/src/index.ts',
       language: 'typescript',
       contentHash: 'sha256:abc',
-      workspace: 'core',
+      workspace: 'org/core',
     })
-    expect(node.workspace).toBe('core')
-    expect(node.workspace).not.toContain('/')
+    expect(node.workspace).toBe('org/core')
   })
 })

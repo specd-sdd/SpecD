@@ -12,7 +12,7 @@ describe('SymbolNode', () => {
       line: 42,
       column: 0,
     })
-    expect(node.id).toBe('src/domain/user.ts:function:createUser:42')
+    expect(node.id).toBe('src/domain/user.ts:function:createUser:42:0')
     expect(node.name).toBe('createUser')
     expect(node.kind).toBe('function')
     expect(node.filePath).toBe('src/domain/user.ts')
@@ -91,7 +91,7 @@ describe('SymbolNode', () => {
     expect(node.comment).toBeUndefined()
   })
 
-  it('same name/kind/file/line with different column produces same id', () => {
+  it('same name/kind/file/line with different column produces different id', () => {
     const a = createSymbolNode({
       name: 'fn',
       kind: 'function',
@@ -106,8 +106,7 @@ describe('SymbolNode', () => {
       line: 1,
       column: 10,
     })
-    // Current id scheme does not include column — document the collision
-    expect(a.id).toBe(b.id)
+    expect(a.id).not.toBe(b.id)
   })
 
   it('throws InvalidSymbolKindError for invalid kind', () => {
