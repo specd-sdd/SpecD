@@ -63,7 +63,7 @@ export async function analyzeImpact(
         }
 
         for (const rel of relations) {
-          const file = direction === 'downstream' ? rel.target : rel.source
+          const file = rel.source === fp ? rel.target : rel.source
           if (!visited.has(file)) {
             visited.add(file)
             nextFiles.push(file)

@@ -26,7 +26,7 @@ function normalizePath(filePath: string): string {
  * @param params.contentHash - Content hash for incremental diffing.
  * @param params.workspace - Workspace name (e.g. 'core', 'cli').
  * @param params.embedding - Optional vector embedding.
- * @returns A frozen FileNode value object.
+ * @returns A FileNode value object.
  */
 export function createFileNode(params: {
   path: string

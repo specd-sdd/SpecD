@@ -4,7 +4,7 @@
  * @returns A case-insensitive RegExp matching the pattern.
  */
 function globToRegExp(pattern: string): RegExp {
-  const escaped = pattern.replaceAll('.', '\\.').replaceAll('*', '.*')
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replaceAll('*', '.*')
   return new RegExp(escaped, 'i')
 }
 
