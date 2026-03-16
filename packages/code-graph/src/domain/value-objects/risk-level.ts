@@ -3,6 +3,24 @@
  */
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 
+/** Numeric ordering of risk levels for comparison. */
+export const RISK_ORDER: Record<RiskLevel, number> = {
+  LOW: 0,
+  MEDIUM: 1,
+  HIGH: 2,
+  CRITICAL: 3,
+}
+
+/**
+ * Returns the higher of two risk levels.
+ * @param a - First risk level.
+ * @param b - Second risk level.
+ * @returns The more severe risk level.
+ */
+export function maxRisk(a: RiskLevel, b: RiskLevel): RiskLevel {
+  return RISK_ORDER[a] >= RISK_ORDER[b] ? a : b
+}
+
 /**
  * Computes the risk level based on dependent counts and process participation.
  * @param directDependents - Number of direct (depth-1) dependents.
