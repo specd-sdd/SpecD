@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 export const SCHEMA_DDL = `
 CREATE NODE TABLE IF NOT EXISTS File(
@@ -11,6 +11,7 @@ CREATE NODE TABLE IF NOT EXISTS File(
 CREATE NODE TABLE IF NOT EXISTS Symbol(
   id STRING,
   name STRING,
+  searchName STRING,
   kind STRING,
   filePath STRING,
   line INT64,

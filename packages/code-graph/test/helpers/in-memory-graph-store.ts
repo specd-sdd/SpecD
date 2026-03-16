@@ -7,6 +7,7 @@ import { type SymbolQuery } from '../../src/domain/value-objects/symbol-query.js
 import { type GraphStatistics } from '../../src/domain/value-objects/graph-statistics.js'
 import { RelationType } from '../../src/domain/value-objects/relation-type.js'
 import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.js'
+import { expandSymbolName } from '../../src/domain/services/expand-symbol-name.js'
 
 export class InMemoryGraphStore extends GraphStore {
   private _isOpen = false
@@ -237,7 +238,7 @@ export class InMemoryGraphStore extends GraphStore {
     const terms = query.toLowerCase().split(/\s+/)
     const results: Array<{ symbol: SymbolNode; score: number }> = []
     for (const sym of this.symbols.values()) {
-      const text = `${sym.name} ${sym.comment ?? ''}`.toLowerCase()
+      const text = `${expandSymbolName(sym.name)} ${sym.comment ?? ''}`.toLowerCase()
       if (terms.some((t) => text.includes(t))) {
         results.push({ symbol: sym, score: 1 })
       }

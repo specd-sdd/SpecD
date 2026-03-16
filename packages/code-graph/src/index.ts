@@ -41,6 +41,9 @@ export {
   type HotspotResult,
 } from './domain/value-objects/hotspot-result.js'
 
+// Domain services
+export { expandSymbolName } from './domain/services/expand-symbol-name.js'
+
 // Spec discovery
 export { discoverSpecsFromDir } from './application/use-cases/discover-specs.js'
 
