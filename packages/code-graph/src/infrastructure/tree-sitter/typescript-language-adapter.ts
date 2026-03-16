@@ -506,15 +506,16 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       if (
         kind === 'function_declaration' ||
         kind === 'method_definition' ||
-        kind === 'arrow_function'
+        kind === 'arrow_function' ||
+        kind === 'function'
       ) {
         const name = getName(current)
         if (name) {
           const line = current.range().start.line + 1
           return symbols.find((s) => s.name === name && s.line === line)?.id
         }
-        // Arrow function assigned to variable — check parent variable_declarator
-        if (kind === 'arrow_function') {
+        // Arrow/function expression assigned to variable — check parent variable_declarator
+        if (kind === 'arrow_function' || kind === 'function') {
           const declarator = current.parent()
           if (declarator && nodeKind(declarator) === 'variable_declarator') {
             const varName = declarator.field('name')?.text()
