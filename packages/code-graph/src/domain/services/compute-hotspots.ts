@@ -89,9 +89,20 @@ export async function computeHotspots(
     })
   }
 
+  // When a scope filter is explicitly provided, drop the restrictive defaults
+  // so scoped queries (e.g. { workspace: 'core' }) don't silently lose results.
+  // Threshold overrides (minScore, minRisk, limit) don't trigger this — they
+  // are explicit choices about the thresholds themselves.
+  const hasScopeFilter =
+    options?.workspace !== undefined ||
+    options?.kind !== undefined ||
+    options?.filePath !== undefined ||
+    (options?.excludePaths?.length ?? 0) > 0 ||
+    (options?.excludeWorkspaces?.length ?? 0) > 0
+
   // Also include symbols that have no callers but may have file importers,
   // or all symbols when minScore is 0
-  const minScore = options?.minScore ?? 1
+  const minScore = options?.minScore ?? (hasScopeFilter ? 0 : 1)
   const needAllSymbols = minScore === 0 || importerCounts.size > 0
   if (needAllSymbols) {
     const allSymbols = await store.findSymbols({})
@@ -115,8 +126,8 @@ export async function computeHotspots(
   }
 
   // Apply filters
-  const minRisk = options?.minRisk ?? 'MEDIUM'
-  const limit = options?.limit ?? 20
+  const minRisk = options?.minRisk ?? (hasScopeFilter ? 'LOW' : 'MEDIUM')
+  const limit = options?.limit ?? (hasScopeFilter ? Infinity : 20)
   const minRiskOrder = RISK_ORDER[minRisk]
 
   let filtered = entries.filter((e) => {
