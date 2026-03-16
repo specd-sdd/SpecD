@@ -108,15 +108,14 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param filePath - The file path.
    * @param content - The source content.
    * @param symbols - Previously extracted symbols.
-   * @param _importMap - Reserved for future use.
+   * @param importMap - Map of imported name to resolved symbol id.
    * @returns An array of extracted relations.
    */
   extractRelations(
     filePath: string,
     content: string,
     symbols: SymbolNode[],
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _importMap: Map<string, string>,
+    importMap: Map<string, string>,
   ): Relation[] {
     ensureLanguagesRegistered()
     const root = parse('python', content).root()
@@ -129,6 +128,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     }
 
     this.extractImportRelations(root, filePath, relations)
+    this.extractCallRelations(root, filePath, symbols, importMap, relations)
     return relations
   }
 
@@ -271,6 +271,96 @@ export class PythonLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Finds the enclosing function/method/class symbol for a given AST node.
+   * @param node - The AST node to find the enclosing symbol for.
+   * @param symbols - The extracted symbols for this file.
+   * @param filePath - The current file path.
+   * @returns The symbol id of the enclosing scope, or undefined if at module level.
+   */
+  private findEnclosingSymbolId(
+    node: SgNode,
+    symbols: SymbolNode[],
+    filePath: string,
+  ): string | undefined {
+    let current = node.parent()
+    while (current) {
+      const kind = nodeKind(current)
+      if (kind === 'function_definition' || kind === 'class_definition') {
+        const name = current.field('name')?.text()
+        if (name) {
+          const line = current.range().start.line + 1
+          return symbols.find((s) => s.name === name && s.line === line && s.filePath === filePath)
+            ?.id
+        }
+      }
+      current = current.parent()
+    }
+    return undefined
+  }
+
+  /**
+   * Extracts CALLS relations from Python function/method call expressions.
+   * @param root - The root AST node.
+   * @param filePath - The current file path.
+   * @param symbols - The extracted symbols for this file.
+   * @param importMap - Map of imported name to resolved symbol id.
+   * @param relations - Array to push relations into.
+   */
+  private extractCallRelations(
+    root: SgNode,
+    filePath: string,
+    symbols: SymbolNode[],
+    importMap: Map<string, string>,
+    relations: Relation[],
+  ): void {
+    const localSymbolsByName = new Map<string, string>()
+    for (const s of symbols) {
+      localSymbolsByName.set(s.name, s.id)
+    }
+
+    const seen = new Set<string>()
+
+    const walkCalls = (node: SgNode): void => {
+      for (const child of node.children()) {
+        if (nodeKind(child) === 'call') {
+          const funcNode = child.field('function')
+          if (funcNode) {
+            const calleeName =
+              nodeKind(funcNode) === 'identifier'
+                ? funcNode.text()
+                : nodeKind(funcNode) === 'attribute'
+                  ? funcNode.field('attribute')?.text()
+                  : undefined
+
+            if (calleeName) {
+              const calleeId = importMap.get(calleeName) ?? localSymbolsByName.get(calleeName)
+              if (calleeId) {
+                const callerId = this.findEnclosingSymbolId(child, symbols, filePath)
+                if (callerId) {
+                  const key = `${callerId}->${calleeId}`
+                  if (!seen.has(key)) {
+                    seen.add(key)
+                    relations.push(
+                      createRelation({
+                        source: callerId,
+                        target: calleeId,
+                        type: RelationType.Calls,
+                      }),
+                    )
+                  }
+                }
+              }
+            }
+          }
+        }
+        walkCalls(child)
+      }
+    }
+
+    walkCalls(root)
+  }
+
+  /**
    * Extracts import relations from Python import statements.
    * @param root - The root AST node.
    * @param filePath - The current file path.
@@ -327,6 +417,11 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       }
     }
 
+    // If there's no module part after dots, this is a package-level import (e.g. `from . import X`)
+    // which refers to the __init__.py in the resolved directory
+    if (!modulePart) {
+      return segments.join('/') + '/__init__.py'
+    }
     return segments.join('/') + '.py'
   }
 
