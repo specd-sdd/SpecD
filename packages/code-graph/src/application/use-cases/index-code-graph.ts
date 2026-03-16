@@ -405,46 +405,44 @@ export class IndexCodeGraph {
       totalSpecsDiscovered += discoveredSpecs.length
       progress(80, 'Discovering specs', `${String(totalSpecsDiscovered)} found`)
 
-      if (discoveredSpecs.length > 0) {
-        const discoveredSpecIds = new Set(discoveredSpecs.map((s) => s.spec.specId))
+      const discoveredSpecIds = new Set(discoveredSpecs.map((s) => s.spec.specId))
 
-        // Remove deleted specs for this workspace
-        for (const existing of existingSpecs) {
-          if (existing.workspace === ws.name && !discoveredSpecIds.has(existing.specId)) {
-            try {
-              await this.store.removeSpec(existing.specId)
-            } catch (err) {
-              errors.push({ filePath: existing.path, message: String(err) })
-            }
+      // Remove deleted specs for this workspace (always runs, even when no specs discovered)
+      for (const existing of existingSpecs) {
+        if (existing.workspace === ws.name && !discoveredSpecIds.has(existing.specId)) {
+          try {
+            await this.store.removeSpec(existing.specId)
+          } catch (err) {
+            errors.push({ filePath: existing.path, message: String(err) })
           }
         }
+      }
 
-        for (const { spec } of discoveredSpecs) {
-          try {
-            const existing = existingSpecMap.get(spec.specId)
-            if (existing && existing.contentHash === spec.contentHash) continue
+      for (const { spec } of discoveredSpecs) {
+        try {
+          const existing = existingSpecMap.get(spec.specId)
+          if (existing && existing.contentHash === spec.contentHash) continue
 
-            if (existing) {
-              await this.store.removeSpec(spec.specId)
-            }
-
-            for (const depId of spec.dependsOn) {
-              if (discoveredSpecIds.has(depId)) {
-                allRelations.push(
-                  createRelation({
-                    source: spec.specId,
-                    target: depId,
-                    type: RelationType.DependsOn,
-                  }),
-                )
-              }
-            }
-            allSpecs.push(spec)
-            specsIndexed++
-            wsBreakdown.specsIndexed++
-          } catch (err) {
-            errors.push({ filePath: spec.path, message: String(err) })
+          if (existing) {
+            await this.store.removeSpec(spec.specId)
           }
+
+          for (const depId of spec.dependsOn) {
+            if (discoveredSpecIds.has(depId)) {
+              allRelations.push(
+                createRelation({
+                  source: spec.specId,
+                  target: depId,
+                  type: RelationType.DependsOn,
+                }),
+              )
+            }
+          }
+          allSpecs.push(spec)
+          specsIndexed++
+          wsBreakdown.specsIndexed++
+        } catch (err) {
+          errors.push({ filePath: spec.path, message: String(err) })
         }
       }
     }
