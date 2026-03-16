@@ -81,6 +81,19 @@ export function registerProjectInit(parent: Command): void {
     .option('--agent <id>', 'agent to install skills for (repeatable)', collect, [])
     .option('--force', 'overwrite existing specd.yaml')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    result: "ok"
+    configPath: string
+    schema: string
+    workspaces: string[]
+    skillsInstalled: Record<string, string[]>
+  }
+`,
+    )
     .action(
       async (opts: {
         schema?: string

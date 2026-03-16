@@ -13,6 +13,20 @@ export function registerGraphStats(parent: Command): void {
     .allowExcessArguments(false)
     .description('Show code graph statistics')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    fileCount: number
+    symbolCount: number
+    specCount: number
+    relationCounts: Record<RelationType, number>
+    languages: string[]
+    lastIndexedAt?: string
+  }
+`,
+    )
     .action(async (opts: { format: string }) => {
       const fmt = parseFormat(opts.format)
       const { config } = await resolveCliContext()

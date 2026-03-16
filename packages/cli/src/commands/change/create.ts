@@ -19,6 +19,13 @@ export function registerChangeCreate(parent: Command): void {
     .option('--description <text>', 'change description (informational)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  { result: "ok", name: string, state: string }
+`,
+    )
     .action(
       async (
         name: string,

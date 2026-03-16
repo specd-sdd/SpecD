@@ -16,6 +16,13 @@ export function registerChangeDraft(parent: Command): void {
     .option('--reason <text>', 'reason for shelving')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  { result: "ok", name: string }
+`,
+    )
     .action(async (name: string, opts: { reason?: string; format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })

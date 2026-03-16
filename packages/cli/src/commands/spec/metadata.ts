@@ -19,6 +19,25 @@ export function registerSpecMetadata(parent: Command): void {
     .description('Show the metadata for a spec')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    spec: string
+    fresh: boolean
+    title?: string
+    description?: string
+    generatedBy?: string
+    contentHashes: Array<{ filename: string, recorded: string, current: string, fresh: boolean }>
+    dependsOn?: string[]
+    keywords?: string[]
+    rules: Array<{ requirement: string, rules: string[] }>
+    constraints: string[]
+    scenarios: Array<{ name: string, requirement: string, given?: string[], when?: string[], then?: string[] }>
+  }
+`,
+    )
     .action(async (specPath: string, opts: { format: string; config?: string }) => {
       try {
         const { config, kernel } = await resolveCliContext({ configPath: opts.config })

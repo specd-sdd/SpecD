@@ -15,6 +15,17 @@ export function registerSchemaShow(parent: Command): void {
     .description('Show the active schema')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    schema: { name: string, version: string }
+    artifacts: Array<{ id: string, scope: string, optional: boolean, requires: string[], format: string, delta: boolean }>
+    workflow: Array<{ step: string, requires: string[] }>
+  }
+`,
+    )
     .action(async (opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })

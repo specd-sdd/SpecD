@@ -67,6 +67,32 @@ Structured error output is only emitted for known error types — subtypes of `S
 
 When `--format` is `text` (the default), errors go to stderr only and stdout remains empty — no change from the existing behaviour for human users.
 
+### Requirement: JSON/TOON output schema in help
+
+Every command that supports `--format json|toon` MUST include a human-readable description of its JSON output schema in the command help text, appended after the options list using Commander's `addHelpText('after', ...)`. The schema block MUST:
+
+- Start with a header line: `\nJSON/TOON output schema:`
+- Show the output shape as a TypeScript-style type annotation with one property per line
+- Use `// comment` for brief field descriptions only when the field name is not self-explanatory
+- Use `?` suffix for optional/conditional fields
+- Show array element types inline (e.g. `Array<{ name: string, score: number }>`)
+
+Example:
+
+```
+JSON/TOON output schema:
+  {
+    totalSymbols: number
+    entries: Array<{
+      symbol: { id, name, kind, filePath, line, col, comment }
+      score: number
+      riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+    }>
+  }
+```
+
+This ensures programmatic consumers (agents, scripts, CI pipelines) can discover the output shape without reading source code or running the command.
+
 ### Requirement: Excess arguments rejected
 
 Every leaf command rejects unexpected positional arguments. If a user passes more positional arguments than the command declares, the command exits with code 1 and prints a usage error to stderr. This prevents silent typos and misremembered syntax from being ignored.

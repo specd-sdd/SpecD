@@ -19,6 +19,24 @@ export function registerGraphIndex(parent: Command): void {
     .option('--workspace <name>', 'index only the named workspace')
     .option('--force', 'full re-index, ignoring cached hashes')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    filesDiscovered: number
+    filesIndexed: number
+    filesRemoved: number
+    filesSkipped: number
+    specsDiscovered: number
+    specsIndexed: number
+    errors: Array<{ filePath: string, message: string }>
+    duration: number
+    workspaces: Array<{ name, filesDiscovered, filesIndexed, filesSkipped,
+      filesRemoved, specsDiscovered, specsIndexed }>
+  }
+`,
+    )
     .action(async (opts: { workspace?: string; force?: boolean; format: string }) => {
       const fmt = parseFormat(opts.format)
       const isTTY = process.stderr.isTTY === true && fmt === 'text'

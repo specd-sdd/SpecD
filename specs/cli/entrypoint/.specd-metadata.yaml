@@ -62,6 +62,32 @@ rules:
         Structured error output is only emitted for known error types — subtypes of `SpecdError` that carry a machine-readable `code`. Generic or unexpected errors (exit code 3 from unhandled exceptions) are written to stderr only; stdout remains empty.
 
         When `--format` is `text` (the default), errors go to stderr only and stdout remains empty — no change from the existing behaviour for human users.
+  - requirement: JSON/TOON output schema in help
+    rules:
+      - |-
+        Every command that supports `--format json|toon` MUST include a human-readable description of its JSON output schema in the command help text, appended after the options list using Commander's `addHelpText('after', ...)`. The schema block MUST:
+
+        * Start with a header line: `\nJSON/TOON output schema:`
+        * Show the output shape as a TypeScript-style type annotation with one property per line
+        * Use `// comment` for brief field descriptions only when the field name is not self-explanatory
+        * Use `?` suffix for optional/conditional fields
+        * Show array element types inline (e.g. `Array<{ name: string, score: number }>`)
+
+        Example:
+
+        ```
+        JSON/TOON output schema:
+          {
+            totalSymbols: number
+            entries: Array<{
+              symbol: { id, name, kind, filePath, line, col, comment }
+              score: number
+              riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+            }>
+          }
+        ```
+
+        This ensures programmatic consumers (agents, scripts, CI pipelines) can discover the output shape without reading source code or running the command.
   - requirement: Excess arguments rejected
     rules:
       - Every leaf command rejects unexpected positional arguments. If a user passes more positional arguments than the command declares, the command exits with code 1 and prints a usage error to stderr. This prevents silent typos and misremembered syntax from being ignored.
@@ -255,6 +281,6 @@ scenarios:
       - stdout is empty
       - 'AND stderr contains the error: line in plain text'
 contentHashes:
-  spec.md: sha256:ed9c11d3a126ec29a58d00c04336f8b43cdbf9ea14a7bbfaad4ece622e00fb24
+  spec.md: sha256:7a7a3e68e4675c01ec71e6526527002d298351e818813a7f0ba7b2fed5017b0a
   verify.md: sha256:249cca51e3d5d5052752d223b8caaf4500862b08e6a8946d5d4bfe67cd64d9b7
 generatedBy: core

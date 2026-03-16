@@ -27,6 +27,24 @@ export function registerGraphHotspots(parent: Command): void {
     .option('--min-risk <level>', 'minimum risk level: LOW|MEDIUM|HIGH|CRITICAL (default MEDIUM)')
     .option('--all', 'remove all default filters (score, risk, limit)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    totalSymbols: number
+    entries: Array<{
+      symbol: { id, name, kind, filePath, line, column, comment }
+      score: number
+      directCallers: number
+      crossWorkspaceCallers: number
+      fileImporters: number
+      riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+      workspace: string
+    }>
+  }
+`,
+    )
     .action(
       async (opts: {
         workspace?: string

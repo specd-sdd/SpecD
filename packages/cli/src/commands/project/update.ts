@@ -19,6 +19,15 @@ export function registerProjectUpdate(parent: Command): void {
     .description('Update the project after upgrading specd')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    skills: Array<{ name: string, path: string, status: "updated" | "skipped", warning?: string }>
+  }
+`,
+    )
     .action(async (opts: { format: string; config?: string }) => {
       try {
         const { config, kernel } = await resolveCliContext({ configPath: opts.config })

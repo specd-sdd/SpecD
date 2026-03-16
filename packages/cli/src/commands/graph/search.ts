@@ -24,6 +24,28 @@ export function registerGraphSearch(parent: Command): void {
     .option('--limit <n>', 'max results per category', '10')
     .option('--spec-content', 'include full spec content (only with --format json|toon)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    symbols: Array<{
+      workspace: string
+      symbol: { id, name, kind, filePath, line, column, comment }
+      score: number
+    }>
+    specs: Array<{
+      workspace: string
+      specId: string
+      path: string
+      title: string
+      description: string
+      content?: string
+      score: number
+    }>
+  }
+`,
+    )
     .action(
       async (
         query: string,

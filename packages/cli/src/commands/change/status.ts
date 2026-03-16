@@ -15,6 +15,20 @@ export function registerChangeStatus(parent: Command): void {
     .description('Show the status of a change')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    name: string
+    state: string
+    specIds: string[]
+    schema: { name: string, version: number }
+    description?: string
+    artifacts: Array<{ type: string, effectiveStatus: string }>
+  }
+`,
+    )
     .action(async (name: string, opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })

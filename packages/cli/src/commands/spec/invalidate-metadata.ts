@@ -17,6 +17,13 @@ export function registerSpecInvalidateMetadata(parent: Command): void {
     .description('Invalidate .specd-metadata.yaml by removing contentHashes (marks as stale)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  { result: "ok", spec: string }
+`,
+    )
     .action(async (specPath: string, opts: { format: string; config?: string }) => {
       try {
         const { config, kernel } = await resolveCliContext({ configPath: opts.config })

@@ -20,6 +20,13 @@ export function registerChangeApprove(parent: Command): void {
     .requiredOption('--reason <text>', 'rationale for approval')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  { result: "ok", gate: "spec", name: string }
+`,
+    )
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
         const { config, kernel } = await resolveCliContext({
@@ -50,6 +57,13 @@ export function registerChangeApprove(parent: Command): void {
     .requiredOption('--reason <text>', 'rationale for sign-off')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  { result: "ok", gate: "signoff", name: string }
+`,
+    )
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
         const { config, kernel } = await resolveCliContext({

@@ -60,6 +60,27 @@ export function registerGraphImpact(parent: Command): void {
     .option('--changes <files...>', 'detect impact of changes to multiple files')
     .option('--direction <dir>', 'traversal direction: upstream|downstream|both', 'upstream')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  --symbol (single match):
+    { symbol: { id, name, kind, filePath, line, column, comment }, impact: ImpactResult }
+  --symbol (multiple matches):
+    Array<{ symbol: { id, name, kind, filePath, line, column, comment }, impact: ImpactResult }>
+  --file:
+    FileImpactResult (ImpactResult + symbols: ImpactResult[])
+  --changes:
+    { changedFiles: string[], changedSymbols: SymbolNode[], affectedSymbols: SymbolNode[],
+      affectedFiles: string[], riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", summary: string }
+
+  ImpactResult: { target, directDependents, indirectDependents, transitiveDependents,
+    riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", affectedFiles: string[], affectedProcesses: string[] }
+
+  --symbol (no match):
+    { error: "not_found", symbol: string }
+`,
+    )
     .action(
       async (opts: {
         file?: string

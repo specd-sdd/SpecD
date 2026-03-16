@@ -15,6 +15,19 @@ export function registerConfigShow(parent: Command): void {
     .description('Show the resolved project configuration')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    projectRoot: string
+    schemaRef: string
+    workspaces: Array<{ name: string, specsPath: string, ownership: string, isExternal: boolean }>
+    storage: { changesPath: string, draftsPath: string, discardedPath: string, archivePath: string }
+    approvals: { spec: boolean, signoff: boolean }
+  }
+`,
+    )
     .action(async (opts: { format: string; config?: string }) => {
       try {
         const config = await loadConfig({ configPath: opts.config })

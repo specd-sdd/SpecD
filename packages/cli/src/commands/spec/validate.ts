@@ -18,6 +18,23 @@ export function registerSpecValidate(parent: Command): void {
     .option('--workspace <name>', 'validate all specs in a workspace')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    entries: Array<{
+      spec: string
+      passed: boolean
+      failures: Array<{ artifactId: string, description: string }>
+      warnings: Array<{ artifactId: string, description: string }>
+    }>
+    totalSpecs: number
+    passed: number
+    failed: number
+  }
+`,
+    )
     .action(
       async (
         specPath: string | undefined,

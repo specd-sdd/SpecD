@@ -16,6 +16,21 @@ export function registerChangeArtifacts(parent: Command): void {
     .description('Show artifact files for a change')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    name: string
+    artifacts: Array<{
+      id: string
+      filename: string
+      effectiveStatus: string
+      exists: boolean
+    }>
+  }
+`,
+    )
     .action(async (name: string, opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })

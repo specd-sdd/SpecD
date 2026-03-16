@@ -16,6 +16,13 @@ export function registerSpecResolvePath(parent: Command): void {
     .description('Resolve a filesystem path to a spec identifier')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  { workspace: string, specPath: string, specId: string }
+`,
+    )
     .action(async (fsPath: string, opts: { format: string; config?: string }) => {
       try {
         const { config, kernel } = await resolveCliContext({ configPath: opts.config })
