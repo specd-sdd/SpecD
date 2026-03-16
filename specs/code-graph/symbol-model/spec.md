@@ -40,7 +40,7 @@ A `SymbolNode` SHALL represent a named code construct extracted from a file. It 
 - **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line` (e.g. `core/src/index.ts:function:main:1`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.
 - **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).
 - **`kind`** (`SymbolKind`) — the category of this symbol.
-- **`filePath`** (`string`) — workspace-relative path of the file containing this symbol.
+- **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol (e.g. `core/src/index.ts`).
 - **`line`** (`number`) — 1-based line number of the symbol's declaration.
 - **`column`** (`number`) — 0-based column offset of the symbol's declaration.
 - **`comment`** (`string | undefined`) — the raw comment or JSDoc text immediately preceding the symbol's declaration. Stored verbatim (no parsing) to enable full-text search. Language adapters extract this from the AST; symbols without a preceding comment have `undefined`.
@@ -104,7 +104,7 @@ All model types — `FileNode`, `SymbolNode`, `Relation`, and any aggregate cont
 
 ### Requirement: Error types
 
-`@specd/code-graph` SHALL define its own `CodeGraphError` base class extending `Error`. All package-specific errors MUST extend `CodeGraphError`. This package has no dependency on `@specd/core` and MUST NOT use `SpecdError` or any core error type.
+`@specd/code-graph` SHALL define its own `CodeGraphError` base class extending `Error`. All package-specific errors MUST extend `CodeGraphError`. Error types MUST NOT depend on `@specd/core` and MUST NOT use `SpecdError` or any core error type.
 
 Specific error subclasses include:
 

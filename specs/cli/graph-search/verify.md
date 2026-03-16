@@ -84,7 +84,7 @@
 - **WHEN** results are displayed in text mode
 - **THEN** each line shows `[workspace]` before the symbol or spec identity
 
-### Requirement: Command signature
+### Requirement: Command signature (filters)
 
 #### Scenario: Filter by symbol kind
 

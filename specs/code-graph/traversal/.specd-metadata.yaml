@@ -25,7 +25,7 @@ rules:
         `TraversalOptions` is a value object with:
 
         * **`maxDepth`** (`number`, default: 3) — maximum traversal depth
-        * **`includeFiles`** (`boolean`, default: true) — whether to include `IMPORTS` relations in addition to `CALLS`
+        * **`includeFiles`** (`boolean`, default: false) — reserved for future use. When true, traversal would also follow `IMPORTS` relations in addition to `CALLS`. Currently not implemented — traversal follows `CALLS` only.
 
         `TraversalResult` is a value object with:
 

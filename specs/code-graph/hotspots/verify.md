@@ -44,7 +44,7 @@ THEN only symbols with kind "function" are returned
 
 WHEN symbol X in workspace A is called by 2 symbols in workspace A and 1 symbol in workspace B
 AND X's file has 3 importers
-THEN X's score = (2 _ 3) + (1 _ 5) + 3 = 14
+THEN X's score = (2 \* 3) + (1 \* 5) + 3 = 14
 AND X's crossWorkspaceCallers = 1
 AND X's directCallers = 2
 

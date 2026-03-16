@@ -57,10 +57,12 @@
 #### Scenario: JSDoc comment extracted with symbol
 
 - **GIVEN** content containing:
+
   ```typescript
   /** Creates a user in the system. */
   export function createUser(name: string) {}
   ```
+
 - **WHEN** `extractSymbols()` is called
 - **THEN** the `createUser` symbol has `comment: '/** Creates a user in the system. */'`
 

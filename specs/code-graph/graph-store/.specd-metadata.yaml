@@ -21,9 +21,9 @@ rules:
   - requirement: Additive relation insertion
     rules:
       - |-
-        `GraphStore` SHALL provide `addRelations(relations: Relation[]): Promise<void>`. This operation adds relations to the store without removing any existing data. It is used for cross-file relations (e.g. `CALLS` between symbols in different files) that must not be deleted when either file is re-upserted.
+        `GraphStore` SHALL provide `addRelations(relations: Relation[]): Promise<void>`. This operation adds relations to the store without removing any existing data. It is used for cross-file relations (e.g. `CALLS` between symbols in different files) that are added separately from the per-file upsert.
 
-        Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely additive.
+        Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely additive. Note: cross-file relations ARE removed when either endpoint's file is removed or re-upserted — the indexer re-adds them during bulk load.
   - requirement: File removal
     rules:
       - '`GraphStore` SHALL provide `removeFile(filePath: string): Promise<void>`. This operation MUST atomically remove the `FileNode`, all `SymbolNode` entries with that `filePath`, and all `Relation` entries where the file or any of its symbols appear as `source` or `target`.'

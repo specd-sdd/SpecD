@@ -15,7 +15,7 @@ Identify which symbols in the code graph have the highest impact — the most ca
 
 The score formula is:
 
-```
+```text
 score = (sameWorkspaceCallers * 3) + (crossWorkspaceCallers * 5) + fileImporters
 ```
 

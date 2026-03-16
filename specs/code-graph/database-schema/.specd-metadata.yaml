@@ -167,17 +167,17 @@ scenarios:
     then:
       - no error occurs — FTS index creation is skipped if already exists
   - requirement: Schema versioning
-    name: Schema version 3
+    name: Schema version 4
     when:
       - a fresh database is opened
     then:
-      - the schema version stored in the Meta table is 3
+      - the schema version stored in the Meta table is 4
   - requirement: Schema versioning
     name: Old schema requires force re-index
     given:
-      - a database created with schema version 2
+      - a database created with schema version 3
     when:
-      - the application opens it expecting version 3
+      - the application opens it expecting version 4
     then:
       - a --force re-index is required to rebuild
   - requirement: Relationship tables

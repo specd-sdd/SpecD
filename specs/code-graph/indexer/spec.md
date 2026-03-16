@@ -164,8 +164,8 @@ const result = await indexer.execute({
 //   errors: [],
 //   duration: 340,
 //   workspaces: [
-//     { name: 'core', filesDiscovered: 100, filesIndexed: 8, filesSkipped: 90, filesRemoved: 2 },
-//     { name: 'cli', filesDiscovered: 50, filesIndexed: 4, filesSkipped: 46, filesRemoved: 0 },
+//     { name: 'core', filesDiscovered: 100, filesIndexed: 8, filesSkipped: 90, filesRemoved: 2, specsDiscovered: 15, specsIndexed: 3 },
+//     { name: 'cli', filesDiscovered: 50, filesIndexed: 4, filesSkipped: 46, filesRemoved: 0, specsDiscovered: 5, specsIndexed: 2 },
 //   ],
 // }
 

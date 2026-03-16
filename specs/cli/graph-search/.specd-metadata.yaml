@@ -65,7 +65,10 @@ rules:
         In `json` or `toon` mode, outputs `{ symbols: [...], specs: [...] }`. Each entry includes a `workspace` field and a `score` field. Spec entries include `specId`, `path`, `title`, and `description`. Full spec `content` is omitted by default — pass `--spec-content` to include it.
   - requirement: Error cases
     rules:
-      - If the provider cannot be opened, the command exits with code 3 (same as other graph commands). The `process.exit(0)` pattern applies — LadybugDB native threads require explicit exit.
+      - |-
+        If the provider cannot be opened, the command exits with code 3 (same as other graph commands).
+
+        On success, `process.exit(0)` is called explicitly after closing the provider — LadybugDB native threads require explicit exit to avoid hanging.
 constraints:
   - The CLI does not contain search logic — it delegates to CodeGraphProvider.searchSymbols and CodeGraphProvider.searchSpecs
   - FTS indexes must be built during indexing — search on an empty graph returns no results

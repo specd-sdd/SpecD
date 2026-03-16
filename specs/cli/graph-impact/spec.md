@@ -8,7 +8,7 @@ Before modifying code, developers and agents need to understand the blast radius
 
 ### Requirement: Command signature
 
-```
+```text
 specd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction upstream|downstream|both] [--path <path>] [--format text|json|toon]
 ```
 
@@ -54,7 +54,7 @@ When `--changes` is provided:
 
 **File impact** in `text` mode:
 
-```
+```text
 Impact analysis for src/auth.ts
   Risk level:       HIGH
   Direct deps:      6
@@ -73,7 +73,7 @@ Per-symbol breakdown:
 
 **Symbol impact** in `text` mode:
 
-```
+```text
 Impact analysis for function createKernel (packages/core/src/composition/kernel.ts:147)
   Risk level:       CRITICAL
   Direct deps:      1
