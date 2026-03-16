@@ -217,6 +217,13 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       } else if (kind === 'program') {
         // PHP AST wraps content in a program node; recurse into it
         this.walkForUseDeclarations(child, results)
+      } else if (kind === 'namespace_definition') {
+        // Block-style namespace: namespace Foo\Bar { ... }
+        for (const nsChild of child.children()) {
+          if (nodeKind(nsChild) === 'compound_statement') {
+            this.walkForUseDeclarations(nsChild, results)
+          }
+        }
       }
     }
   }
@@ -269,6 +276,15 @@ export class PhpLanguageAdapter implements LanguageAdapter {
               if (nameNode && nodeKind(nameNode) === 'name') {
                 addSymbol(nameNode.text(), SymbolKind.Variable, constChild, extractComment(child))
               }
+            }
+          }
+          break
+        }
+        case 'namespace_definition': {
+          // Block-style namespace: namespace Foo\Bar { ... }
+          for (const nsChild of child.children()) {
+            if (nodeKind(nsChild) === 'compound_statement') {
+              this.walk(nsChild, addSymbol)
             }
           }
           break
