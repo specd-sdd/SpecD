@@ -91,6 +91,25 @@ describe('SymbolNode', () => {
     expect(node.comment).toBeUndefined()
   })
 
+  it('same name/kind/file/line with different column produces same id', () => {
+    const a = createSymbolNode({
+      name: 'fn',
+      kind: 'function',
+      filePath: 'a.ts',
+      line: 1,
+      column: 0,
+    })
+    const b = createSymbolNode({
+      name: 'fn',
+      kind: 'function',
+      filePath: 'a.ts',
+      line: 1,
+      column: 10,
+    })
+    // Current id scheme does not include column — document the collision
+    expect(a.id).toBe(b.id)
+  })
+
   it('throws InvalidSymbolKindError for invalid kind', () => {
     expect(() =>
       createSymbolNode({ name: 'fn', kind: 'bogus', filePath: 'a.ts', line: 1, column: 0 }),

@@ -16,6 +16,10 @@ describe('SymbolKind', () => {
     expect(isSymbolKind('function')).toBe(true)
     expect(isSymbolKind('class')).toBe(true)
     expect(isSymbolKind('method')).toBe(true)
+    expect(isSymbolKind('variable')).toBe(true)
+    expect(isSymbolKind('type')).toBe(true)
+    expect(isSymbolKind('interface')).toBe(true)
+    expect(isSymbolKind('enum')).toBe(true)
   })
 
   it('isSymbolKind returns false for invalid kinds', () => {
