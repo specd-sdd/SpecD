@@ -272,6 +272,7 @@ export class InMemoryGraphStore extends GraphStore {
   }
 
   async rebuildFtsIndexes(): Promise<void> {
+    this.ensureOpen()
     // No-op for in-memory store — search is always live
   }
 

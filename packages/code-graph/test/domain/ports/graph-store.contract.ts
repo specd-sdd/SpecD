@@ -7,6 +7,7 @@ import { createRelation } from '../../../src/domain/value-objects/relation.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { StoreNotOpenError } from '../../../src/domain/errors/store-not-open-error.js'
+import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 
 export function graphStoreContractTests(
   name: string,
@@ -268,7 +269,5 @@ export function graphStoreContractTests(
     })
   })
 }
-
-import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 
 graphStoreContractTests('InMemoryGraphStore', () => new InMemoryGraphStore())
