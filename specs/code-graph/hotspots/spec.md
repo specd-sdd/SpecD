@@ -31,19 +31,22 @@ Workspace is extracted as the first path segment of filePath (everything before 
 
 Each entry's `riskLevel` SHALL be computed using the existing `computeRiskLevel(directCallers, totalCallers + fileImporters, 0)` where `directCallers` = `sameWorkspaceCallers + crossWorkspaceCallers` and the second argument is the total callers plus file importers.
 
-### Requirement: Smart defaults with override
+### Requirement: Smart defaults with automatic removal
 
-By default the command applies these filters:
+When invoked with **no filter flags**, the command applies safe defaults:
 
 - **score > 0** — symbols with no callers and no importers are excluded
 - **risk >= MEDIUM** — LOW-risk symbols are filtered out
 - **limit 20** — only the top 20 results are returned
 
-These defaults can be removed entirely with the `--all` flag, or overridden individually:
+When **any** filter flag is provided (`--workspace`, `--kind`, `--file`, `--exclude-path`, `--exclude-workspace`, `--limit`, `--min-score`, `--min-risk`), **all** defaults are removed (minScore → 0, minRisk → LOW, limit → unlimited). Only explicitly provided constraints apply. This prevents defaults from silently hiding results that the user's filter was intended to surface.
 
-- `--min-score 0` overrides the score > 0 default
-- `--min-risk LOW` overrides the risk >= MEDIUM default
-- `--limit N` overrides the 20 result limit
+Examples:
+
+- `specd graph hotspots` → defaults apply (score > 0, risk >= MEDIUM, limit 20)
+- `specd graph hotspots --min-risk HIGH` → only risk >= HIGH, no score or limit constraint
+- `specd graph hotspots --workspace core` → all symbols in core, no score/risk/limit constraint
+- `specd graph hotspots --min-risk HIGH --limit 5` → risk >= HIGH, limit 5, no score constraint
 
 ### Requirement: Filtering
 
