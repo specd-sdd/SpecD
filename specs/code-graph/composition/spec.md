@@ -12,7 +12,7 @@ Consumers of `@specd/code-graph` should not need to know how the store, indexer,
 
 - **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`
 - **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getStatistics()` — delegates to `GraphStore`
-- **Search**: `searchSymbols(query, limit?)`, `searchSpecs(query, limit?)` — full-text search with BM25 ranking, delegates to `GraphStore`
+- **Search**: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)` — full-text search with BM25 ranking and store-level filtering, delegates to `GraphStore`
 - **Maintenance**: `clear(): Promise<void>` — removes all data from the store (for full re-index)
 - **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
 - **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `detectChanges(changedFiles)` — delegates to impact functions

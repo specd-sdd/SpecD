@@ -208,6 +208,47 @@ describe('computeHotspots', () => {
     expect(result.entries).toHaveLength(3)
   })
 
+  it('excludes symbols by workspace', async () => {
+    const a = sym('inA', 'ws-a/a.ts', 1)
+    const b = sym('inB', 'ws-b/b.ts', 1)
+    const caller = sym('caller', 'ws-a/c.ts', 1)
+
+    await store.upsertFile(file('ws-a/a.ts'), [a], [])
+    await store.upsertFile(file('ws-b/b.ts', 'ws-b'), [b], [])
+    await store.upsertFile(
+      file('ws-a/c.ts'),
+      [caller],
+      [
+        createRelation({ source: caller.id, target: a.id, type: RelationType.Calls }),
+        createRelation({ source: caller.id, target: b.id, type: RelationType.Calls }),
+      ],
+    )
+
+    const result = await computeHotspots(store, { excludeWorkspaces: ['ws-b'], minRisk: 'LOW' })
+    expect(result.entries.every((e) => !e.symbol.filePath.startsWith('ws-b/'))).toBe(true)
+  })
+
+  it('excludes symbols by path pattern', async () => {
+    const src = sym('srcFn', 'ws-a/src/main.ts', 1)
+    const test = sym('testFn', 'ws-a/test/main.spec.ts', 1)
+    const caller = sym('caller', 'ws-a/src/caller.ts', 1)
+
+    await store.upsertFile(file('ws-a/src/main.ts'), [src], [])
+    await store.upsertFile(file('ws-a/test/main.spec.ts'), [test], [])
+    await store.upsertFile(
+      file('ws-a/src/caller.ts'),
+      [caller],
+      [
+        createRelation({ source: caller.id, target: src.id, type: RelationType.Calls }),
+        createRelation({ source: caller.id, target: test.id, type: RelationType.Calls }),
+      ],
+    )
+
+    const result = await computeHotspots(store, { excludePaths: ['*/test/*'], minRisk: 'LOW' })
+    expect(result.entries.every((e) => !e.symbol.filePath.includes('/test/'))).toBe(true)
+    expect(result.entries.some((e) => e.symbol.name === 'srcFn')).toBe(true)
+  })
+
   it('totalSymbols reflects the full graph regardless of filters', async () => {
     const symbols = Array.from({ length: 5 }, (_, i) => sym(`s${i}`, 'ws-a/a.ts', i + 1))
     await store.upsertFile(file('ws-a/a.ts'), symbols, [])

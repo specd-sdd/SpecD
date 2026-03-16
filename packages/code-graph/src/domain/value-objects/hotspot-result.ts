@@ -24,6 +24,8 @@ export interface HotspotOptions {
   readonly limit?: number
   readonly minScore?: number
   readonly minRisk?: RiskLevel
+  readonly excludePaths?: readonly string[]
+  readonly excludeWorkspaces?: readonly string[]
 }
 
 /**

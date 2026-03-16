@@ -6,6 +6,7 @@ import {
 } from '../value-objects/hotspot-result.js'
 import { type RiskLevel, computeRiskLevel } from '../value-objects/risk-level.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
+import { matchesExclude } from './matches-exclude.js'
 
 const RISK_ORDER: Record<RiskLevel, number> = {
   LOW: 0,
@@ -122,6 +123,8 @@ export async function computeHotspots(
     if (options?.workspace && !e.symbol.filePath.startsWith(options.workspace + '/')) return false
     if (options?.kind && e.symbol.kind !== options.kind) return false
     if (options?.filePath && e.symbol.filePath !== options.filePath) return false
+    if (matchesExclude(e.symbol.filePath, options?.excludePaths, options?.excludeWorkspaces))
+      return false
     return true
   })
 

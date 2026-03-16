@@ -7,6 +7,7 @@ import { type Relation } from '../../domain/value-objects/relation.js'
 import { type SymbolQuery } from '../../domain/value-objects/symbol-query.js'
 import { type GraphStatistics } from '../../domain/value-objects/graph-statistics.js'
 import { type RelationType, RelationType as RT } from '../../domain/value-objects/relation-type.js'
+import { type SearchOptions } from '../../domain/value-objects/search-options.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { SCHEMA_DDL } from './schema.js'
 import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
@@ -758,19 +759,44 @@ export class LadybugGraphStore extends GraphStore {
 
   /**
    * Full-text search across symbols using the `symbol_fts` index.
-   * @param query - The search query string.
-   * @param limit - Maximum results to return (default 20).
+   * Filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied
+   * as WHERE clauses between the FTS CALL and RETURN — before LIMIT.
+   * @param options - Search options including query, limit, and filters.
    * @returns Matching symbols with BM25 scores, ordered by relevance.
    */
   async searchSymbols(
-    query: string,
-    limit?: number,
+    options: SearchOptions,
   ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
     this.ensureOpen()
-    const top = limit ?? 20
+    const top = options.limit ?? 20
+
+    const conditions: string[] = []
+    if (options.kind) {
+      conditions.push(`node.kind = '${this.escape(options.kind)}'`)
+    }
+    if (options.filePattern) {
+      const regex = options.filePattern.replaceAll('.', '\\.').replaceAll('*', '.*')
+      conditions.push(`node.filePath =~ '(?i)${this.escape(regex)}'`)
+    }
+    if (options.workspace) {
+      conditions.push(`starts_with(node.filePath, '${this.escape(options.workspace + '/')}')`)
+    }
+    if (options.excludePaths && options.excludePaths.length > 0) {
+      for (const pattern of options.excludePaths) {
+        const regex = pattern.replaceAll('.', '\\.').replaceAll('*', '.*')
+        conditions.push(`NOT node.filePath =~ '(?i)${this.escape(regex)}'`)
+      }
+    }
+    if (options.excludeWorkspaces && options.excludeWorkspaces.length > 0) {
+      for (const ws of options.excludeWorkspaces) {
+        conditions.push(`NOT starts_with(node.filePath, '${this.escape(ws + '/')}')`)
+      }
+    }
+
+    const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
     const rows = await exec(
       this.conn!,
-      `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', '${this.escape(query)}', k := 1000) RETURN node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.line AS line, node.col AS col, node.comment AS comment, score ORDER BY score DESC LIMIT ${String(top)}`,
+      `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', '${this.escape(options.query)}', k := 1000)${where} RETURN node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.line AS line, node.col AS col, node.comment AS comment, score ORDER BY score DESC LIMIT ${String(top)}`,
     )
     return rows.map((r) => ({
       symbol: this.rowToSymbol(r),
@@ -780,19 +806,34 @@ export class LadybugGraphStore extends GraphStore {
 
   /**
    * Full-text search across specs using the `spec_fts` index.
-   * @param query - The search query string.
-   * @param limit - Maximum results to return (default 20).
+   * Filters (workspace, excludeWorkspaces) are applied as WHERE clauses before LIMIT.
+   * @param options - Search options including query, limit, and filters.
    * @returns Matching specs with BM25 scores, ordered by relevance.
    */
-  async searchSpecs(
-    query: string,
-    limit?: number,
-  ): Promise<Array<{ spec: SpecNode; score: number }>> {
+  async searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>> {
     this.ensureOpen()
-    const top = limit ?? 20
+    const top = options.limit ?? 20
+
+    const conditions: string[] = []
+    if (options.workspace) {
+      conditions.push(`node.workspace = '${this.escape(options.workspace)}'`)
+    }
+    if (options.excludeWorkspaces && options.excludeWorkspaces.length > 0) {
+      for (const ws of options.excludeWorkspaces) {
+        conditions.push(`node.workspace <> '${this.escape(ws)}'`)
+      }
+    }
+    if (options.excludePaths && options.excludePaths.length > 0) {
+      for (const pattern of options.excludePaths) {
+        const regex = pattern.replaceAll('.', '\\.').replaceAll('*', '.*')
+        conditions.push(`NOT node.path =~ '(?i)${this.escape(regex)}'`)
+      }
+    }
+
+    const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
     const rows = await exec(
       this.conn!,
-      `CALL QUERY_FTS_INDEX('Spec', 'spec_fts', '${this.escape(query)}', k := 1000) RETURN node.specId AS specId, node.path AS path, node.title AS title, node.description AS description, node.contentHash AS contentHash, node.content AS content, node.workspace AS workspace, score ORDER BY score DESC LIMIT ${String(top)}`,
+      `CALL QUERY_FTS_INDEX('Spec', 'spec_fts', '${this.escape(options.query)}', k := 1000)${where} RETURN node.specId AS specId, node.path AS path, node.title AS title, node.description AS description, node.contentHash AS contentHash, node.content AS content, node.workspace AS workspace, score ORDER BY score DESC LIMIT ${String(top)}`,
     )
 
     const results: Array<{ spec: SpecNode; score: number }> = []

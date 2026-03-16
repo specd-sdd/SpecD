@@ -4,6 +4,7 @@ import { type SpecNode } from '../value-objects/spec-node.js'
 import { type Relation } from '../value-objects/relation.js'
 import { type SymbolQuery } from '../value-objects/symbol-query.js'
 import { type GraphStatistics } from '../value-objects/graph-statistics.js'
+import { type SearchOptions } from '../value-objects/search-options.js'
 
 /**
  * Abstract base class defining the contract for graph storage backends.
@@ -183,25 +184,23 @@ export abstract class GraphStore {
 
   /**
    * Full-text search across symbols (name and comment).
-   * @param query - The search query string.
-   * @param limit - Maximum results to return.
+   * Filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied
+   * before LIMIT in the query — no post-query filtering needed.
+   * @param options - Search options including query, limit, and filters.
    * @returns Matching symbols with BM25 scores, ordered by relevance.
    */
   abstract searchSymbols(
-    query: string,
-    limit?: number,
+    options: SearchOptions,
   ): Promise<Array<{ symbol: SymbolNode; score: number }>>
 
   /**
    * Full-text search across specs (title, description, and content).
-   * @param query - The search query string.
-   * @param limit - Maximum results to return.
+   * Filters (workspace, excludePaths, excludeWorkspaces) are applied
+   * before LIMIT in the query — no post-query filtering needed.
+   * @param options - Search options including query, limit, and filters.
    * @returns Matching specs with BM25 scores, ordered by relevance.
    */
-  abstract searchSpecs(
-    query: string,
-    limit?: number,
-  ): Promise<Array<{ spec: SpecNode; score: number }>>
+  abstract searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>
 
   /**
    * Rebuilds full-text search indexes after data changes.

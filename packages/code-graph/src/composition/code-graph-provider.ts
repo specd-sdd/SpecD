@@ -13,6 +13,7 @@ import { type ImpactResult, type FileImpactResult } from '../domain/value-object
 import { type ChangeDetectionResult } from '../domain/value-objects/change-detection-result.js'
 import { type HotspotOptions, type HotspotResult } from '../domain/value-objects/hotspot-result.js'
 import { type Relation } from '../domain/value-objects/relation.js'
+import { type SearchOptions } from '../domain/value-objects/search-options.js'
 import { getUpstream } from '../domain/services/get-upstream.js'
 import { getDownstream } from '../domain/services/get-downstream.js'
 import { analyzeImpact } from '../domain/services/analyze-impact.js'
@@ -195,27 +196,23 @@ export class CodeGraphProvider {
 
   /**
    * Full-text search across symbols (name and comment).
-   * @param query - The search query string.
-   * @param limit - Maximum results to return.
+   * Filters are applied at the store level before LIMIT.
+   * @param options - Search options including query, limit, and filters.
    * @returns Matching symbols with BM25 scores, ordered by relevance.
    */
   async searchSymbols(
-    query: string,
-    limit?: number,
+    options: SearchOptions,
   ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
-    return this.store.searchSymbols(query, limit)
+    return this.store.searchSymbols(options)
   }
 
   /**
    * Full-text search across specs (title, description, and content).
-   * @param query - The search query string.
-   * @param limit - Maximum results to return.
+   * Filters are applied at the store level before LIMIT.
+   * @param options - Search options including query, limit, and filters.
    * @returns Matching specs with BM25 scores, ordered by relevance.
    */
-  async searchSpecs(
-    query: string,
-    limit?: number,
-  ): Promise<Array<{ spec: SpecNode; score: number }>> {
-    return this.store.searchSpecs(query, limit)
+  async searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>> {
+    return this.store.searchSpecs(options)
   }
 }

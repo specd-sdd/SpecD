@@ -95,11 +95,21 @@ The Spec node table includes:
 
 `GraphStore` SHALL provide:
 
-- **`searchSymbols(query: string, limit?: number): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.searchName` and `Symbol.comment`. The `searchName` column contains the original symbol name plus camelCase/snake_case/kebab-case tokenized parts (e.g. `handleError` is indexed as `"handleError handle error"`), so searches for individual words within compound names match correctly. Returns results ranked by BM25 score descending.
-- **`searchSpecs(query: string, limit?: number): Promise<Array<{ spec: SpecNode; score: number }>>`** — full-text search across `Spec.title`, `Spec.description`, and `Spec.content`. Returns results ranked by BM25 score descending.
+- **`searchSymbols(options: SearchOptions): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.searchName` and `Symbol.comment`. The `searchName` column contains the original symbol name plus camelCase/snake_case/kebab-case tokenized parts (e.g. `handleError` is indexed as `"handleError handle error"`), so searches for individual words within compound names match correctly. Returns results ranked by BM25 score descending.
+- **`searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>`** — full-text search across `Spec.title`, `Spec.description`, and `Spec.content`. Returns results ranked by BM25 score descending.
 - **`rebuildFtsIndexes(): Promise<void>`** — drops and recreates FTS indexes. Must be called after bulk data changes because LadybugDB FTS indexes are not automatically updated on insert.
 
-Default limit is 20. The `LadybugGraphStore` implementation uses `QUERY_FTS_INDEX` with `k := 1000` internally and applies `ORDER BY score DESC LIMIT n` to get the true top-k results.
+`SearchOptions` is a value object with:
+
+- **query** — the search query string (required)
+- **limit** — maximum results to return (default 20)
+- **kind** — filter symbols by `SymbolKind` (symbols only)
+- **filePattern** — filter symbols by file path glob (supports `*` wildcards, case-insensitive; symbols only)
+- **workspace** — filter results to a single workspace
+- **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)
+- **excludeWorkspaces** — array of workspace names to exclude
+
+All filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied **before** LIMIT in the query — not as post-query filters. The `LadybugGraphStore` implementation adds WHERE clauses between the FTS CALL and RETURN. The `InMemoryGraphStore` test helper applies filters before slicing to limit.
 
 ### Requirement: Bulk operations
 

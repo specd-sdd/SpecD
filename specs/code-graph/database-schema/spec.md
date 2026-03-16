@@ -76,6 +76,8 @@ The database SHALL create FTS indexes after schema initialization:
 
 Both indexes use the `porter` stemmer for English-language stemming. Indexes are created using `CREATE_FTS_INDEX` and queried using `QUERY_FTS_INDEX`, which returns results ranked by BM25 score.
 
+FTS queries apply WHERE clauses between the `QUERY_FTS_INDEX` CALL and the RETURN for filtering by kind, file path pattern, workspace inclusion/exclusion, and path exclusion patterns. This ensures filters are applied before `ORDER BY score DESC LIMIT n`, avoiding lossy post-query filtering.
+
 FTS indexes are created once during `open()` after schema DDL. If the index already exists, creation is skipped (idempotent).
 
 ### Requirement: Schema versioning

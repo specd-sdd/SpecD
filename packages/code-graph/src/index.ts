@@ -41,6 +41,9 @@ export {
   type HotspotResult,
 } from './domain/value-objects/hotspot-result.js'
 
+// Search
+export { type SearchOptions } from './domain/value-objects/search-options.js'
+
 // Domain services
 export { expandSymbolName } from './domain/services/expand-symbol-name.js'
 

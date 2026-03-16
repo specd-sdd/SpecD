@@ -6,8 +6,10 @@ import { type Relation } from '../../src/domain/value-objects/relation.js'
 import { type SymbolQuery } from '../../src/domain/value-objects/symbol-query.js'
 import { type GraphStatistics } from '../../src/domain/value-objects/graph-statistics.js'
 import { RelationType } from '../../src/domain/value-objects/relation-type.js'
+import { type SearchOptions } from '../../src/domain/value-objects/search-options.js'
 import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.js'
 import { expandSymbolName } from '../../src/domain/services/expand-symbol-name.js'
+import { matchesExclude } from '../../src/domain/services/matches-exclude.js'
 
 export class InMemoryGraphStore extends GraphStore {
   private _isOpen = false
@@ -231,35 +233,42 @@ export class InMemoryGraphStore extends GraphStore {
   }
 
   async searchSymbols(
-    query: string,
-    limit?: number,
+    options: SearchOptions,
   ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
     this.ensureOpen()
-    const terms = query.toLowerCase().split(/\s+/)
+    const terms = options.query.toLowerCase().split(/\s+/)
     const results: Array<{ symbol: SymbolNode; score: number }> = []
     for (const sym of this.symbols.values()) {
       const text = `${expandSymbolName(sym.name)} ${sym.comment ?? ''}`.toLowerCase()
-      if (terms.some((t) => text.includes(t))) {
-        results.push({ symbol: sym, score: 1 })
+      if (!terms.some((t) => text.includes(t))) continue
+      if (options.kind && sym.kind !== options.kind) continue
+      if (options.filePattern) {
+        const regex = new RegExp(
+          options.filePattern.replaceAll('.', '\\.').replaceAll('*', '.*'),
+          'i',
+        )
+        if (!regex.test(sym.filePath)) continue
       }
+      if (options.workspace && !sym.filePath.startsWith(options.workspace + '/')) continue
+      if (matchesExclude(sym.filePath, options.excludePaths, options.excludeWorkspaces)) continue
+      results.push({ symbol: sym, score: 1 })
     }
-    return results.slice(0, limit ?? 20)
+    return results.slice(0, options.limit ?? 20)
   }
 
-  async searchSpecs(
-    query: string,
-    limit?: number,
-  ): Promise<Array<{ spec: SpecNode; score: number }>> {
+  async searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>> {
     this.ensureOpen()
-    const terms = query.toLowerCase().split(/\s+/)
+    const terms = options.query.toLowerCase().split(/\s+/)
     const results: Array<{ spec: SpecNode; score: number }> = []
     for (const spec of this.specs.values()) {
       const text = `${spec.title} ${spec.description} ${spec.content}`.toLowerCase()
-      if (terms.some((t) => text.includes(t))) {
-        results.push({ spec, score: 1 })
-      }
+      if (!terms.some((t) => text.includes(t))) continue
+      if (options.workspace && spec.workspace !== options.workspace) continue
+      if (matchesExclude(spec.path, options.excludePaths, options.excludeWorkspaces)) continue
+      if (options.excludeWorkspaces && options.excludeWorkspaces.includes(spec.workspace)) continue
+      results.push({ spec, score: 1 })
     }
-    return results.slice(0, limit ?? 20)
+    return results.slice(0, options.limit ?? 20)
   }
 
   async rebuildFtsIndexes(): Promise<void> {

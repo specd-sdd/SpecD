@@ -52,9 +52,13 @@ These defaults can be removed entirely with the `--all` flag, or overridden indi
 - **workspace** — only include symbols whose filePath starts with this workspace prefix
 - **kind** — only include symbols of this SymbolKind
 - **filePath** — only include symbols in this file
+- **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive). Uses `matchesExclude` from `domain/services/matches-exclude.ts`
+- **excludeWorkspaces** — array of workspace names to exclude. Uses `matchesExclude` from `domain/services/matches-exclude.ts`
 - **limit** — maximum results to return (default 20)
 - **minScore** — minimum score threshold (default 1, i.e. > 0)
 - **minRisk** — minimum risk level threshold (default MEDIUM)
+
+Excludes are applied alongside the existing include filters before the limit is applied.
 
 ### Requirement: Output
 
