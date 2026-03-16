@@ -60,10 +60,7 @@ function extractDependsOnFromSpec(specContent: string): string[] {
   for (const match of links) {
     const href = match[1]
     if (href && href.endsWith('spec.md')) {
-      const specPath = href
-        .replace(/\/spec\.md$/, '')
-        .replace(/^\.\.\//, '')
-        .replace(/^\.\.\//, '')
+      const specPath = href.replace(/\/spec\.md$/, '').replace(/^(\.\.\/)+/, '')
       deps.push(specPath)
     }
   }
