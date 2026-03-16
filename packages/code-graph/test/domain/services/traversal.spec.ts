@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 import { getUpstream } from '../../../src/domain/services/get-upstream.js'
 import { getDownstream } from '../../../src/domain/services/get-downstream.js'
@@ -25,6 +25,10 @@ describe('Traversal services', () => {
   beforeEach(async () => {
     store = new InMemoryGraphStore()
     await store.open()
+  })
+
+  afterEach(async () => {
+    await store.close()
   })
 
   describe('getUpstream', () => {
