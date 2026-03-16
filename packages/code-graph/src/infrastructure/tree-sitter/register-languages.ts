@@ -27,7 +27,6 @@ function loadLang(moduleName: string): DynamicLangRegistrations[string] | undefi
  */
 export function ensureLanguagesRegistered(): void {
   if (registered) return
-  registered = true
 
   const langs: DynamicLangRegistrations = {}
   const python = loadLang('@ast-grep/lang-python')
@@ -40,4 +39,5 @@ export function ensureLanguagesRegistered(): void {
   if (Object.keys(langs).length > 0) {
     registerDynamicLanguage(langs)
   }
+  registered = true
 }
