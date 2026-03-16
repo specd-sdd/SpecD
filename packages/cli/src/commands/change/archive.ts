@@ -17,6 +17,13 @@ export function registerChangeArchive(parent: Command): void {
     .option('--no-hooks', 'skip run: hook execution')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  { result: "ok", name: string, archivePath: string }
+`,
+    )
     .action(async (name: string, opts: { format: string; config?: string; hooks: boolean }) => {
       try {
         const { config, kernel } = await resolveCliContext({ configPath: opts.config })

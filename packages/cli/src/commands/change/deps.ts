@@ -24,6 +24,18 @@ export function registerChangeDeps(parent: Command): void {
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    result: "ok"
+    name: string
+    specId: string
+    dependsOn: string[]
+  }
+`,
+    )
     .action(
       async (
         name: string,

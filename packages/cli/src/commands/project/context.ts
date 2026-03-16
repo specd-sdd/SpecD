@@ -25,6 +25,17 @@ export function registerProjectContext(parent: Command): void {
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    contextEntries: string[]
+    specs: Array<{ workspace: string, path: string, content: string }>
+    warnings: string[]
+  }
+`,
+    )
     .action(
       async (opts: {
         rules?: boolean

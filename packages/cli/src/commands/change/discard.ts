@@ -16,6 +16,13 @@ export function registerChangeDiscard(parent: Command): void {
     .requiredOption('--reason <text>', 'mandatory explanation for discarding')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  { result: "ok", name: string }
+`,
+    )
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
         if (opts.reason.trim().length === 0) {

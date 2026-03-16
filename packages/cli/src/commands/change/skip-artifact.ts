@@ -16,6 +16,13 @@ export function registerChangeSkipArtifact(parent: Command): void {
     .option('--reason <text>', 'reason for skipping')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  { result: "ok", name: string, artifactId: string }
+`,
+    )
     .action(
       async (
         name: string,

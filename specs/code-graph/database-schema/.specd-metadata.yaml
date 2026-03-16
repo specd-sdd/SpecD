@@ -23,16 +23,16 @@ rules:
 
         **Symbol** — code symbols extracted from files.
 
-        | Column     | Type   | Notes                                                                  |
-        | ---------- | ------ | ---------------------------------------------------------------------- |
-        | id         | STRING | Primary key. `{filePath}:{kind}:{name}:{line}`.                        |
-        | name       | STRING | Symbol's declared name.                                                |
+        | Column     | Type   | Notes                                                                    |
+        | ---------- | ------ | ------------------------------------------------------------------------ |
+        | id         | STRING | Primary key. `{filePath}:{kind}:{name}:{line}`.                          |
+        | name       | STRING | Symbol's declared name.                                                  |
         | searchName | STRING | Expanded name for FTS. camelCase/snake\_case/kebab-case split + original. |
-        | kind       | STRING | `SymbolKind` value.                                                    |
-        | filePath   | STRING | References `File.path`.                                                |
-        | line       | INT64  | 1-based line number.                                                   |
-        | col        | INT64  | 0-based column offset.                                                 |
-        | comment    | STRING | Raw preceding comment text, or empty string.                           |
+        | kind       | STRING | `SymbolKind` value.                                                      |
+        | filePath   | STRING | References `File.path`.                                                  |
+        | line       | INT64  | 1-based line number.                                                     |
+        | col        | INT64  | 0-based column offset.                                                   |
+        | comment    | STRING | Raw preceding comment text, or empty string.                             |
 
         **Spec** — specification documents from workspace spec directories.
 
@@ -194,6 +194,6 @@ scenarios:
       - the COVERS relationship table exists
       - AND it contains no rows (v2+ feature)
 contentHashes:
-  spec.md: sha256:9f7f0183cf34c79d93d3be9d7b7b2100d42ecab45761917629471c1786e32471
+  spec.md: sha256:fb5dc6db045a62cacb92dfb83372f550e6b47747701e11133c4532255d472780
   verify.md: sha256:d6bf57f61d431be882ef293682b8be54d54bf6281bc7dbc2e1b9db47f3696463
 generatedBy: core

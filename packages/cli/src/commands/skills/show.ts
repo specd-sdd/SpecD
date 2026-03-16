@@ -14,6 +14,17 @@ export function registerSkillsShow(parent: Command): void {
     .allowExcessArguments(false)
     .description('Show the content of a skill')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    name: string
+    description: string
+    content: string
+  }
+`,
+    )
     .action((name: string, opts: { format: string }) => {
       try {
         const skill = getSkill(name)

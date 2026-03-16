@@ -15,6 +15,24 @@ export function registerChangeArtifactInstruction(parent: Command): void {
     .description('Get artifact-specific instructions, rules, and delta guidance')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    result: "ok"
+    artifactId: string
+    rulesPre: string[]
+    instruction: string | null
+    delta: {
+      formatInstructions: string
+      domainInstructions: string | null
+      outlines: Array<{ specId: string, outline: object }>
+    } | null
+    rulesPost: string[]
+  }
+`,
+    )
     .action(
       async (
         name: string,

@@ -123,6 +123,23 @@ export function registerSpecList(parent: Command): void {
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    workspaces: Array<{
+      name: string
+      specs: Array<{
+        path: string
+        title: string
+        metadataStatus?: "fresh" | "stale" | "missing" | "invalid"
+        summary?: string
+      }>
+    }>
+  }
+`,
+    )
     .action(
       async (opts: {
         summary?: boolean

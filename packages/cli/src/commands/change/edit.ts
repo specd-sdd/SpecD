@@ -20,6 +20,20 @@ export function registerChangeEdit(parent: Command): void {
     .option('--description <text>', 'set or replace the change description (informational)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    result: "ok"
+    name: string
+    specIds: string[]
+    workspaces: string[]
+    invalidated: boolean
+    state: string
+  }
+`,
+    )
     .action(
       async (
         name: string,

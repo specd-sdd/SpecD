@@ -22,6 +22,13 @@ export function registerSkillsInstall(parent: Command): void {
     .option('--global', 'install globally to the user-level commands directory')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  Array<{ name: string, path: string }>
+`,
+    )
     .action(
       async (
         skillName: string,

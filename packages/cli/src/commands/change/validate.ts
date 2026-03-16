@@ -16,6 +16,17 @@ export function registerChangeValidate(parent: Command): void {
     .description('Validate artifact files against the active schema')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    passed: boolean
+    failures: Array<{ artifactId: string, description: string }>
+    warnings: Array<{ artifactId: string, description: string }>
+  }
+`,
+    )
     .action(async (name: string, specPath: string, opts: { format: string; config?: string }) => {
       try {
         const { config, kernel } = await resolveCliContext({

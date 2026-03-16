@@ -16,6 +16,20 @@ export function registerArchiveList(parent: Command): void {
     .description('List all archived changes')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  Array<{
+    name: string
+    archivedName: string
+    workspace: string
+    archivedAt: string
+    archivedBy?: { name: string, email: string }
+    artifacts: string[]
+  }>
+`,
+    )
     .action(async (opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })

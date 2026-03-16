@@ -82,6 +82,19 @@ export function registerChangeTransition(parent: Command): void {
     .option('--no-hooks', 'skip run: hook execution')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    result: "ok"
+    name: string
+    from: string
+    to: string
+    postHookFailures: string[]
+  }
+`,
+    )
     .action(
       async (
         name: string,

@@ -15,6 +15,16 @@ export function registerDraftsRestore(parent: Command): void {
     .description('Restore a drafted change back to active changes')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    result: "ok"
+    name: string
+  }
+`,
+    )
     .action(async (name: string, opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })

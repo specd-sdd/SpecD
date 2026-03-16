@@ -20,6 +20,13 @@ export function registerSkillsUpdate(parent: Command): void {
     .option('--agent <id>', 'restrict update to one agent')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  Array<{ name: string, path: string, status: "updated" | "skipped", warning?: string }>
+`,
+    )
     .action(async (opts: { agent?: string; format: string; config?: string }) => {
       try {
         if (opts.agent !== undefined && !(opts.agent in KNOWN_AGENTS)) {

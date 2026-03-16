@@ -60,6 +60,24 @@ export function registerSpecContext(parent: Command): void {
     .option('--depth <n>', 'limit dependency traversal depth (requires --follow-deps)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    specs: Array<{
+      spec: string
+      title?: string
+      description?: string
+      rules?: Array<{ requirement: string, rules: string[] }>
+      constraints?: string[]
+      scenarios?: Array<{ name: string, requirement: string, given?: string[], when?: string[], then?: string[] }>
+      stale: boolean
+    }>
+    warnings: string[]
+  }
+`,
+    )
     .action(
       async (
         specPath: string,

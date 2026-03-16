@@ -15,6 +15,18 @@ export function registerArchiveShow(parent: Command): void {
     .description('Show details of an archived change')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    name: string
+    state: "archivable"
+    specIds: string[]
+    schema: { name: string, version: string }
+  }
+`,
+    )
     .action(async (name: string, opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })

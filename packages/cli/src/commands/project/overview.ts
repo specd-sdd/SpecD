@@ -71,6 +71,19 @@ export function registerProjectOverview(parent: Command): void {
     .description('Show a visual dashboard of the project status')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    projectRoot: string
+    schemaRef: string
+    workspaces: string[]
+    specs: { total: number, byWorkspace: Record<string, number> }
+    changes: { active: number, drafts: number, discarded: number }
+  }
+`,
+    )
     .action(async (opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)

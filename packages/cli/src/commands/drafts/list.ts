@@ -17,6 +17,19 @@ export function registerDraftsList(parent: Command): void {
     .description('List all drafted (shelved) changes')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  Array<{
+    name: string
+    state: string
+    draftedAt: string | null
+    draftedBy?: { name: string, email: string }
+    reason?: string
+  }>
+`,
+    )
     .action(async (opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })

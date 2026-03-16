@@ -15,6 +15,18 @@ export function registerDiscardedShow(parent: Command): void {
     .description('Show details of a discarded change')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    name: string
+    specIds: string[]
+    schema: { name: string, version: string }
+    reason: string
+  }
+`,
+    )
     .action(async (name: string, opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })

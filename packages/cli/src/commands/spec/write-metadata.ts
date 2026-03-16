@@ -21,6 +21,13 @@ export function registerSpecWriteMetadata(parent: Command): void {
     .option('--force', 'skip conflict detection and overwrite unconditionally')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  { result: "ok", spec: string }
+`,
+    )
     .action(
       async (
         specPath: string,

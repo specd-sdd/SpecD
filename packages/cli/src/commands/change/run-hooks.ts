@@ -17,6 +17,24 @@ export function registerChangeRunHooks(parent: Command): void {
     .option('--only <hook-id>', 'execute only the hook with this ID')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  Success:
+    {
+      result: "ok"
+      hooks: Array<{ id: string, command: string, exitCode: number, success: true }>
+    }
+  Failure (exit code 2):
+    {
+      result: "error"
+      code: "HOOK_FAILED"
+      hooks: Array<{ id: string, command: string, exitCode: number, success: boolean, stderr?: string }>
+      failedHook?: { id: string, exitCode: number }
+    }
+`,
+    )
     .action(
       async (
         name: string,

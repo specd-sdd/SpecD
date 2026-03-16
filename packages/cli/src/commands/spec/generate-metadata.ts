@@ -20,6 +20,14 @@ export function registerSpecGenerateMetadata(parent: Command): void {
     .option('--force', 'overwrite existing metadata without conflict detection (requires --write)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  Without --write: { spec: string, metadata: object }
+  With --write:    { result: "ok", spec: string, written: true }
+`,
+    )
     .action(
       async (
         specPath: string,

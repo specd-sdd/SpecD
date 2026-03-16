@@ -25,6 +25,18 @@ export function registerChangeContext(parent: Command): void {
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    contextBlock: string
+    stepAvailable: boolean
+    blockingArtifacts: string[]
+    warnings: string[]
+  }
+`,
+    )
     .action(
       async (
         name: string,

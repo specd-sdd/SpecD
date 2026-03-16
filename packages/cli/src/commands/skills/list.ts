@@ -41,6 +41,13 @@ export function registerSkillsList(parent: Command): void {
     .description('List all available skills')
     .option('--agent <id>', 'check installation status for this agent (e.g. claude)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  Array<{ name: string, description: string, installed?: boolean }>
+`,
+    )
     .action(async (opts: { agent?: string; format: string }) => {
       try {
         if (opts.agent !== undefined && !(opts.agent in KNOWN_AGENTS)) {
