@@ -383,6 +383,9 @@ export class IndexCodeGraph {
     let specsIndexed = 0
     const allSpecs: SpecNode[] = []
 
+    const existingSpecs = await this.store.getAllSpecs()
+    const existingSpecMap = new Map(existingSpecs.map((s) => [s.specId, s]))
+
     for (const ws of options.workspaces) {
       let discoveredSpecs: DiscoveredSpec[]
       try {
@@ -404,8 +407,6 @@ export class IndexCodeGraph {
 
       if (discoveredSpecs.length > 0) {
         const discoveredSpecIds = new Set(discoveredSpecs.map((s) => s.spec.specId))
-        const existingSpecs = await this.store.getAllSpecs()
-        const existingSpecMap = new Map(existingSpecs.map((s) => [s.specId, s]))
 
         // Remove deleted specs for this workspace
         for (const existing of existingSpecs) {
