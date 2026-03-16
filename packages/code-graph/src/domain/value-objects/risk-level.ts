@@ -15,13 +15,16 @@ export function computeRiskLevel(
   totalDependents: number,
   processCount: number,
 ): RiskLevel {
-  if (totalDependents >= 20 || processCount >= 3) {
+  const direct = Math.max(0, directDependents)
+  const total = Math.max(0, totalDependents)
+  const processes = Math.max(0, processCount)
+  if (total >= 20 || processes >= 3) {
     return 'CRITICAL'
   }
-  if (directDependents >= 6 || totalDependents >= 10) {
+  if (direct >= 6 || total >= 10) {
     return 'HIGH'
   }
-  if (directDependents >= 3 || totalDependents > directDependents) {
+  if (direct >= 3 || total > direct) {
     return 'MEDIUM'
   }
   return 'LOW'

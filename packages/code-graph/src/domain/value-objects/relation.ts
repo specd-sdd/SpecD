@@ -35,6 +35,6 @@ export function createRelation(params: {
     source: params.source,
     target: params.target,
     type: params.type,
-    metadata: params.metadata,
+    metadata: params.metadata ? Object.freeze({ ...params.metadata }) : undefined,
   }
 }

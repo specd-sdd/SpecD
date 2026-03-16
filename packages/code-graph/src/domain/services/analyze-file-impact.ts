@@ -40,7 +40,7 @@ export async function analyzeFileImpact(
   // File-level impact via IMPORTS (BFS)
   const fileImpact = await analyzeFileImportImpact(store, filePath, direction)
 
-  // Merge: take the max of symbol-level and file-level
+  // Merge file-level and symbol-level affected files into a deduped set
   const affectedFileSet = new Set<string>()
   for (const f of fileImpact.affectedFiles) {
     affectedFileSet.add(f)
@@ -51,17 +51,21 @@ export async function analyzeFileImpact(
     }
   }
 
+  // Use the larger of file-level or symbol-level counts per depth
+  // File-level counts are already deduped (from BFS); symbol-level
+  // sums may overcount shared dependents, so we take the file-level
+  // count as the floor and only escalate if symbols reveal more
   const directDependents = Math.max(
     fileImpact.directDependents,
-    symbolResults.reduce((sum, r) => sum + r.directDependents, 0),
+    ...symbolResults.map((r) => r.directDependents),
   )
   const indirectDependents = Math.max(
     fileImpact.indirectDependents,
-    symbolResults.reduce((sum, r) => sum + r.indirectDependents, 0),
+    ...symbolResults.map((r) => r.indirectDependents),
   )
   const transitiveDependents = Math.max(
     fileImpact.transitiveDependents,
-    symbolResults.reduce((sum, r) => sum + r.transitiveDependents, 0),
+    ...symbolResults.map((r) => r.transitiveDependents),
   )
 
   let overallRisk = fileImpact.riskLevel
@@ -112,10 +116,13 @@ async function analyzeFileImportImpact(
       }
 
       for (const rel of relations) {
-        const target = direction === 'downstream' ? rel.target : rel.source
-        if (!visited.has(target)) {
-          visited.add(target)
-          nextFiles.push(target)
+        // For upstream (importers): the dependent is rel.source (the file that imports us)
+        // For downstream (importees): the dependency is rel.target (the file we import)
+        // For both: pick the end that isn't the current file
+        const candidate = rel.source === fp ? rel.target : rel.source
+        if (!visited.has(candidate)) {
+          visited.add(candidate)
+          nextFiles.push(candidate)
         }
       }
     }
