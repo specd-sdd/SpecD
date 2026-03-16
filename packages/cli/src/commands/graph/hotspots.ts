@@ -145,10 +145,12 @@ Exclude examples:
             lines.push('─'.repeat(90))
 
             for (const entry of result.entries) {
-              const ws = entry.symbol.filePath.substring(0, entry.symbol.filePath.indexOf('/'))
-              const relPath = entry.symbol.filePath.substring(
-                entry.symbol.filePath.indexOf('/') + 1,
-              )
+              const sepIndex = entry.symbol.filePath.indexOf('/')
+              const ws = sepIndex !== -1 ? entry.symbol.filePath.substring(0, sepIndex) : ''
+              const relPath =
+                sepIndex !== -1
+                  ? entry.symbol.filePath.substring(sepIndex + 1)
+                  : entry.symbol.filePath
               lines.push(
                 `${String(entry.score).padStart(6)}  ${entry.riskLevel.padEnd(8)}  ${String(entry.crossWorkspaceCallers).padStart(3)}  ${entry.symbol.kind.padEnd(9)}  ${entry.symbol.name.padEnd(30)}  [${ws}] ${relPath}:${String(entry.symbol.line)}`,
               )
@@ -166,7 +168,10 @@ Exclude examples:
                   crossWorkspaceCallers: e.crossWorkspaceCallers,
                   fileImporters: e.fileImporters,
                   riskLevel: e.riskLevel,
-                  workspace: e.symbol.filePath.substring(0, e.symbol.filePath.indexOf('/')),
+                  workspace:
+                    e.symbol.filePath.indexOf('/') !== -1
+                      ? e.symbol.filePath.substring(0, e.symbol.filePath.indexOf('/'))
+                      : '',
                 })),
               },
               fmt,
