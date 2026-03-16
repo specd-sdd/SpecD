@@ -313,6 +313,9 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     importMap: Map<string, string>,
     relations: Relation[],
   ): void {
+    // Maps symbol name → id. When multiple symbols share a name (e.g. a module-level
+    // function and a method), the last definition wins — matching Python's shadowing
+    // semantics. TODO: disambiguate by enclosing scope for more accurate edges.
     const localSymbolsByName = new Map<string, string>()
     for (const s of symbols) {
       localSymbolsByName.set(s.name, s.id)
