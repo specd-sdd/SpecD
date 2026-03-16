@@ -1,8 +1,19 @@
 import { Command } from 'commander'
+import { type SearchOptions, type SymbolKind } from '@specd/code-graph'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { withProvider } from './with-provider.js'
+
+/**
+ * Collects repeatable option values into an array.
+ * @param value - The new value.
+ * @param previous - The accumulated array.
+ * @returns The updated array.
+ */
+function collect(value: string, previous: string[]): string[] {
+  return [...previous, value]
+}
 
 /**
  * Registers the `graph search` command.
@@ -21,6 +32,18 @@ export function registerGraphSearch(parent: Command): void {
     )
     .option('--file <path>', 'filter symbols by file path (supports * wildcards)')
     .option('--workspace <name>', 'filter results by workspace')
+    .option(
+      '--exclude-path <pattern>',
+      'exclude symbols/specs whose file path matches glob pattern (supports * wildcards, case-insensitive, repeatable)',
+      collect,
+      [],
+    )
+    .option(
+      '--exclude-workspace <name>',
+      'exclude results from workspace (repeatable)',
+      collect,
+      [],
+    )
     .option('--limit <n>', 'max results per category', '10')
     .option('--spec-content', 'include full spec content (only with --format json|toon)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
@@ -44,6 +67,11 @@ JSON/TOON output schema:
       score: number
     }>
   }
+
+Exclude examples:
+  specd graph search "handle" --exclude-path "test/*"
+  specd graph search "config" --exclude-workspace cli --exclude-workspace mcp
+  specd graph search "create" --exclude-path "*.spec.ts" --exclude-path "test/*"
 `,
     )
     .action(
@@ -55,6 +83,8 @@ JSON/TOON output schema:
           kind?: string
           file?: string
           workspace?: string
+          excludePath: string[]
+          excludeWorkspace: string[]
           specContent?: boolean
           limit: string
           format: string
@@ -69,33 +99,22 @@ JSON/TOON output schema:
         const { config } = await resolveCliContext()
 
         await withProvider(config, opts.format, async (provider) => {
-          // Fetch more results than needed so we can filter, then trim to limit
-          const fetchLimit = limit * 5
-
-          let symbolResults =
-            searchBoth || opts.symbols ? await provider.searchSymbols(query, fetchLimit) : []
-          let specResults =
-            searchBoth || opts.specs ? await provider.searchSpecs(query, fetchLimit) : []
-
-          // Apply post-FTS filters
-          if (opts.kind) {
-            symbolResults = symbolResults.filter((r) => r.symbol.kind === opts.kind)
-          }
-          if (opts.file) {
-            const pattern = opts.file.replaceAll('.', '\\.').replaceAll('*', '.*')
-            const re = new RegExp(pattern, 'i')
-            symbolResults = symbolResults.filter((r) => re.test(r.symbol.filePath))
-          }
-          if (opts.workspace) {
-            symbolResults = symbolResults.filter((r) =>
-              r.symbol.filePath.startsWith(opts.workspace + '/'),
-            )
-            specResults = specResults.filter((r) => r.spec.workspace === opts.workspace)
+          const searchOptions: SearchOptions = {
+            query,
+            limit,
+            ...(opts.kind ? { kind: opts.kind as SymbolKind } : undefined),
+            ...(opts.file ? { filePattern: opts.file } : undefined),
+            ...(opts.workspace ? { workspace: opts.workspace } : undefined),
+            ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),
+            ...(opts.excludeWorkspace.length > 0
+              ? { excludeWorkspaces: opts.excludeWorkspace }
+              : undefined),
           }
 
-          // Trim to limit after filtering
-          symbolResults = symbolResults.slice(0, limit)
-          specResults = specResults.slice(0, limit)
+          const symbolResults =
+            searchBoth || opts.symbols ? await provider.searchSymbols(searchOptions) : []
+          const specResults =
+            searchBoth || opts.specs ? await provider.searchSpecs(searchOptions) : []
 
           if (fmt === 'text') {
             const lines: string[] = []

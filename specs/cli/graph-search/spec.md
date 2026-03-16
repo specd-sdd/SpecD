@@ -9,7 +9,7 @@ The code graph contains symbols with names and comments, and specs with titles, 
 ### Requirement: Command signature
 
 ```
-specd graph search <query> [--symbols] [--specs] [--kind <kind>] [--file <path>] [--workspace <name>] [--limit <n>] [--spec-content] [--format text|json|toon]
+specd graph search <query> [--symbols] [--specs] [--kind <kind>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--format text|json|toon]
 ```
 
 - `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)
@@ -18,20 +18,22 @@ specd graph search <query> [--symbols] [--specs] [--kind <kind>] [--file <path>]
 - `--kind <kind>` — optional; filter symbols by kind (`function|class|method|variable|type|interface|enum`)
 - `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)
 - `--workspace <name>` — optional; filter both symbols and specs to a single workspace
+- `--exclude-path <pattern>` — optional, repeatable; exclude symbols/specs whose file path matches glob pattern (supports `*` wildcards, case-insensitive)
+- `--exclude-workspace <name>` — optional, repeatable; exclude results from the given workspace
 - `--limit <n>` — optional; maximum results per category, defaults to `10`
 - `--spec-content` — optional; include full spec content in output. Only valid with `--format json` or `--format toon` — exits with code 1 if used with text format
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 When neither `--symbols` nor `--specs` is provided, both categories are searched.
 
-`--kind`, `--file`, and `--workspace` are post-FTS filters — the FTS query runs first, then results are filtered by the specified criteria before trimming to `--limit`.
+All filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-workspace`) are applied at the store level before LIMIT — not as post-query filters. The CLI passes them via `SearchOptions` to `CodeGraphProvider.searchSymbols` / `CodeGraphProvider.searchSpecs`.
 
 ### Requirement: Search behaviour
 
 The command uses `resolveCliContext()` to load config and creates a `CodeGraphProvider` via `withProvider`. It delegates to:
 
-- `provider.searchSymbols(query, limit)` — full-text search on `Symbol.name` and `Symbol.comment`
-- `provider.searchSpecs(query, limit)` — full-text search on `Spec.title`, `Spec.description`, and `Spec.content`
+- `provider.searchSymbols(options)` — full-text search on `Symbol.name` and `Symbol.comment`, with filters applied at the store level
+- `provider.searchSpecs(options)` — full-text search on `Spec.title`, `Spec.description`, and `Spec.content`, with filters applied at the store level
 
 Both use LadybugDB's FTS extension with BM25 scoring. Results are returned ordered by score descending — highest relevance first.
 
@@ -123,6 +125,21 @@ Symbols (1):
 
 $ specd graph search "hook" --specs --limit 1 --format json --spec-content
 {"symbols":[],"specs":[{"workspace":"core","specId":"core:core/hook-execution-model",...,"content":"# Hook Execution Model\n\n## Purpose\n...","score":61.0}]}
+
+$ specd graph search "handle" --exclude-path "test/*" --symbols --limit 5
+Symbols (5):
+    5.7  [core] function handleError  src/handle-error.ts:10 — /** Handles CLI errors...
+    ...
+
+$ specd graph search "config" --exclude-workspace cli --exclude-workspace mcp
+Symbols (10):
+    ...
+Specs (10):
+    ...
+
+$ specd graph search "create" --exclude-path "*.spec.ts" --exclude-path "test/*" --symbols
+Symbols (10):
+    ...
 ```
 
 ## Spec Dependencies

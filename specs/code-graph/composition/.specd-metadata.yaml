@@ -17,7 +17,7 @@ rules:
 
         * **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`
         * **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getStatistics()` — delegates to `GraphStore`
-        * **Search**: `searchSymbols(query, limit?)`, `searchSpecs(query, limit?)` — full-text search with BM25 ranking, delegates to `GraphStore`
+        * **Search**: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)` — full-text search with BM25 ranking and store-level filtering, delegates to `GraphStore`
         * **Maintenance**: `clear(): Promise<void>` — removes all data from the store (for full re-index)
         * **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
         * **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `detectChanges(changedFiles)` — delegates to impact functions
@@ -202,6 +202,6 @@ scenarios:
       - its package.json has a dependency on @specd/core
       - AND the primary factory accepts SpecdConfig from @specd/core
 contentHashes:
-  spec.md: sha256:758812c6d212400879b7ce48e741320dc56a55de087e590a583ddcc4453bfb24
+  spec.md: sha256:89b57540595875c1a171b57b1cf97e8c1ff41da3521e37a69347bb2b7489b613
   verify.md: sha256:60a27521edc9df6b0533098b8315c2a387098392d09ecdc38c9a6eeff95fd82c
 generatedBy: core

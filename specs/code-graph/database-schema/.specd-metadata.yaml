@@ -78,6 +78,8 @@ rules:
 
         Both indexes use the `porter` stemmer for English-language stemming. Indexes are created using `CREATE_FTS_INDEX` and queried using `QUERY_FTS_INDEX`, which returns results ranked by BM25 score.
 
+        FTS queries apply WHERE clauses between the `QUERY_FTS_INDEX` CALL and the RETURN for filtering by kind, file path pattern, workspace inclusion/exclusion, and path exclusion patterns. This ensures filters are applied before `ORDER BY score DESC LIMIT n`, avoiding lossy post-query filtering.
+
         FTS indexes are created once during `open()` after schema DDL. If the index already exists, creation is skipped (idempotent).
   - requirement: Schema versioning
     rules:
@@ -194,6 +196,6 @@ scenarios:
       - the COVERS relationship table exists
       - AND it contains no rows (v2+ feature)
 contentHashes:
-  spec.md: sha256:fb5dc6db045a62cacb92dfb83372f550e6b47747701e11133c4532255d472780
+  spec.md: sha256:a02ea9cda79c7a3dbd2ce18ab63f1c0c41165528a7f5076c9ed9e7cb619fc8e7
   verify.md: sha256:d6bf57f61d431be882ef293682b8be54d54bf6281bc7dbc2e1b9db47f3696463
 generatedBy: core

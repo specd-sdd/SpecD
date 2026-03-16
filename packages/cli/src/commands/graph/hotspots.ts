@@ -5,6 +5,16 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { withProvider } from './with-provider.js'
 
 /**
+ * Collects repeatable option values into an array.
+ * @param value - The new value.
+ * @param previous - The accumulated array.
+ * @returns The updated array.
+ */
+function collect(value: string, previous: string[]): string[] {
+  return [...previous, value]
+}
+
+/**
  * Registers the `graph hotspots` command.
  * @param parent - The parent commander command.
  */
@@ -22,6 +32,18 @@ export function registerGraphHotspots(parent: Command): void {
       'filter by symbol kind (function|class|method|variable|type|interface|enum)',
     )
     .option('--file <path>', 'filter by file path')
+    .option(
+      '--exclude-path <pattern>',
+      'exclude symbols whose file path matches glob pattern (supports * wildcards, case-insensitive, repeatable)',
+      collect,
+      [],
+    )
+    .option(
+      '--exclude-workspace <name>',
+      'exclude results from workspace (repeatable)',
+      collect,
+      [],
+    )
     .option('--limit <n>', 'max results (default 20)')
     .option('--min-score <n>', 'minimum score threshold (default 1)')
     .option('--min-risk <level>', 'minimum risk level: LOW|MEDIUM|HIGH|CRITICAL (default MEDIUM)')
@@ -43,6 +65,11 @@ JSON/TOON output schema:
       workspace: string
     }>
   }
+
+Exclude examples:
+  specd graph hotspots --exclude-path "test/*"
+  specd graph hotspots --exclude-workspace cli --exclude-workspace mcp
+  specd graph hotspots --exclude-path "*.spec.ts" --min-risk HIGH
 `,
     )
     .action(
@@ -50,6 +77,8 @@ JSON/TOON output schema:
         workspace?: string
         kind?: string
         file?: string
+        excludePath: string[]
+        excludeWorkspace: string[]
         limit?: string
         minScore?: string
         minRisk?: string
@@ -70,6 +99,10 @@ JSON/TOON output schema:
             ...(opts.workspace ? { workspace: opts.workspace } : undefined),
             ...(opts.kind ? { kind: opts.kind as SymbolKind } : undefined),
             ...(opts.file ? { filePath: opts.file } : undefined),
+            ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),
+            ...(opts.excludeWorkspace.length > 0
+              ? { excludeWorkspaces: opts.excludeWorkspace }
+              : undefined),
             ...(opts.limit !== undefined ? { limit: parseInt(opts.limit, 10) } : undefined),
             ...(opts.minScore !== undefined
               ? { minScore: parseInt(opts.minScore, 10) }
