@@ -43,7 +43,13 @@ export async function withProvider(
     handleError(err, format)
   }
 
-  await provider.close()
+  try {
+    await provider.close()
+  } catch (err) {
+    process.removeListener('SIGINT', forceExit)
+    process.removeListener('SIGTERM', forceExit)
+    handleError(err, format)
+  }
   process.removeListener('SIGINT', forceExit)
   process.removeListener('SIGTERM', forceExit)
   process.exit(0)

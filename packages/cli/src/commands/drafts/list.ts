@@ -112,7 +112,7 @@ JSON/TOON output schema:
               return {
                 name: c.name,
                 state: c.state,
-                draftedAt: evt?.at.toISOString(),
+                draftedAt: evt?.at.toISOString() ?? null,
                 ...(evt ? { draftedBy: { name: evt.by.name, email: evt.by.email } } : {}),
                 ...(evt?.reason !== undefined ? { reason: evt.reason } : {}),
               }

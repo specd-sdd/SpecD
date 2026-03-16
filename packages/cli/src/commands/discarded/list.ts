@@ -117,7 +117,7 @@ JSON/TOON output schema:
           output(
             withEvents.map(({ change: c, evt }) => ({
               name: c.name,
-              discardedAt: evt?.at.toISOString(),
+              discardedAt: evt?.at.toISOString() ?? null,
               ...(evt ? { discardedBy: { name: evt.by.name, email: evt.by.email } } : {}),
               ...(evt?.reason !== undefined ? { reason: evt.reason } : {}),
               ...(evt?.supersededBy && evt.supersededBy.length > 0
