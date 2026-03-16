@@ -9,7 +9,10 @@ import { PhpLanguageAdapter } from '../infrastructure/tree-sitter/php-language-a
 import { IndexCodeGraph } from '../application/use-cases/index-code-graph.js'
 import { CodeGraphProvider } from './code-graph-provider.js'
 
-/** Configuration options for creating a {@link CodeGraphProvider} (legacy). */
+/**
+ * Configuration options for creating a {@link CodeGraphProvider} (legacy).
+ * @deprecated Use `SpecdConfig` instead.
+ */
 export interface CodeGraphOptions {
   readonly storagePath: string
   readonly adapters?: LanguageAdapter[]
