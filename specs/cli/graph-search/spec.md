@@ -8,7 +8,7 @@ The code graph contains symbols with names and comments, and specs with titles, 
 
 ### Requirement: Command signature
 
-```
+```text
 specd graph search <query> [--symbols] [--specs] [--kind <kind>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--format text|json|toon]
 ```
 
@@ -41,7 +41,7 @@ Both use LadybugDB's FTS extension with BM25 scoring. Results are returned order
 
 In `text` mode, results are grouped by category:
 
-```
+```text
 Symbols (5):
    8.0  [core] method execute  src/use-cases/run-hooks.ts:108 — /** Executes run hooks... */
    5.5  [core] type OnHookProgress  src/use-cases/run-hooks.ts:21 — /** Callback for hook... */

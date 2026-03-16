@@ -12,7 +12,7 @@ rules:
       - |-
         `FileNode.path` SHALL be globally unique by prefixing the workspace name to the code-root-relative path:
 
-        * **`path`** = `{workspaceName}/{relativeToCodeRoot}` (e.g. `core/src/index.ts`)
+        * **`path`** = `{workspaceName}/{relativeToCodeRoot}` (e.g. `core/src/index.ts`). Paths are forward-slash-normalized (backslashes replaced with `/`).
         * **`workspace`** = workspace name string (e.g. `core`, `cli`, `default`)
 
         This ensures that two workspaces with identical relative paths (e.g. both having `src/index.ts`) produce distinct `FileNode.path` values. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.

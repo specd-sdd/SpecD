@@ -56,15 +56,15 @@
 
 ### Requirement: Schema versioning
 
-#### Scenario: Schema version 3
+#### Scenario: Schema version 4
 
 - **WHEN** a fresh database is opened
-- **THEN** the schema version stored in the Meta table is `3`
+- **THEN** the schema version stored in the Meta table is `4`
 
 #### Scenario: Old schema requires force re-index
 
-- **GIVEN** a database created with schema version 2
-- **WHEN** the application opens it expecting version 3
+- **GIVEN** a database created with schema version 3
+- **WHEN** the application opens it expecting version 4
 - **THEN** a `--force` re-index is required to rebuild
 
 ### Requirement: Relationship tables
