@@ -554,10 +554,12 @@ export class IndexCodeGraph {
         if (adapter.resolvePackageFromSpecifier) {
           const pkgName = adapter.resolvePackageFromSpecifier(imp.specifier, knownPackages)
           if (pkgName) {
-            const wsPrefix = packageToWorkspace.get(pkgName)!
-            const candidates = index.findByName(imp.originalName, wsPrefix + '/')
-            if (candidates.length > 0) {
-              importMap.set(imp.localName, candidates[0]!.id)
+            const wsPrefix = packageToWorkspace.get(pkgName)
+            if (wsPrefix !== undefined) {
+              const candidates = index.findByName(imp.originalName, wsPrefix + '/')
+              if (candidates.length > 0) {
+                importMap.set(imp.localName, candidates[0]!.id)
+              }
             }
           }
         }

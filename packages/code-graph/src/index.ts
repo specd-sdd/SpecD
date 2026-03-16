@@ -3,7 +3,7 @@ export {
   createCodeGraphProvider,
   type CodeGraphOptions,
 } from './composition/create-code-graph-provider.js'
-export { type CodeGraphProvider } from './composition/code-graph-provider.js'
+export { CodeGraphProvider } from './composition/code-graph-provider.js'
 
 // Value objects
 export { type FileNode } from './domain/value-objects/file-node.js'
