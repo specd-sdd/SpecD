@@ -84,7 +84,7 @@ JSON/TOON output schema:
   {
     totalSymbols: number
     entries: Array<{
-      symbol: { id, name, kind, filePath, line, col, comment }
+      symbol: { id: string, name: string, kind: string, filePath: string, line: number, col: number, comment?: string }
       score: number
       riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
     }>

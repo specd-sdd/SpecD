@@ -83,17 +83,8 @@ scenarios:
     when:
       - specd graph index --force is run
     then:
-      - clear() is called on the provider before indexing
-      - AND filesRemoved in the output reflects the previously indexed files
-  - requirement: Indexing behaviour
-    name: Custom path
-    given:
-      - /tmp/my-project is a valid workspace
-    when:
-      - specd graph index --path /tmp/my-project is run
-    then:
-      - the provider is created with /tmp/my-project as the workspace path
-      - AND indexing operates on files within that directory
+      - the .lbug, .lbug.wal, and .lbug.lock files are deleted before opening the provider
+      - AND indexing re-processes all files (none skipped)
   - requirement: Indexing behaviour
     name: Process exits explicitly
     given:
