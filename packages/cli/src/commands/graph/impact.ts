@@ -194,11 +194,12 @@ async function handleSymbolImpact(
 
     output(allLines.join('\n'), 'text')
   } else {
-    const results = []
-    for (const sym of symbols) {
-      const result = await provider.analyzeImpact(sym.id, direction)
-      results.push({ symbol: sym, impact: result })
-    }
+    const results = await Promise.all(
+      symbols.map(async (sym) => ({
+        symbol: sym,
+        impact: await provider.analyzeImpact(sym.id, direction),
+      })),
+    )
     output(results, fmt)
   }
 }
