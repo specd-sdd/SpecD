@@ -102,6 +102,7 @@ export async function analyzeImpact(
   const indirectDependents = Math.max(symbolIndirect, fileIndirect)
   const transitiveDependents = Math.max(symbolTransitive, fileTransitive)
   const totalDependents = directDependents + indirectDependents + transitiveDependents
+  // TODO: wire affectedProcesses count once execution flow tracking is implemented
   const riskLevel = computeRiskLevel(directDependents, totalDependents, 0)
 
   return {
