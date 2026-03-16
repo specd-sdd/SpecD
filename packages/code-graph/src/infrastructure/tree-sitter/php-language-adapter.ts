@@ -296,7 +296,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Walks a class/interface/trait body to extract methods.
+   * Walks a class/interface/trait body to extract methods and properties.
    * @param classNode - The class/interface/trait AST node.
    * @param addSymbol - Callback to register a discovered symbol.
    */
@@ -307,9 +307,21 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     for (const child of classNode.children()) {
       if (nodeKind(child) !== 'declaration_list') continue
       for (const member of child.children()) {
-        if (nodeKind(member) === 'method_declaration') {
+        const memberKind = nodeKind(member)
+        if (memberKind === 'method_declaration') {
           const name = member.field('name')?.text()
           if (name) addSymbol(name, SymbolKind.Method, member, extractComment(member))
+        } else if (memberKind === 'property_declaration') {
+          for (const propChild of member.children()) {
+            if (nodeKind(propChild) === 'property_element') {
+              const varName = propChild.field('name')
+              if (varName) {
+                // Strip the leading $ from PHP variable names
+                const name = varName.text().replace(/^\$/, '')
+                if (name) addSymbol(name, SymbolKind.Variable, member, extractComment(member))
+              }
+            }
+          }
         }
       }
     }
