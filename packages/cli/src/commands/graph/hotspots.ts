@@ -24,7 +24,8 @@ export function registerGraphHotspots(parent: Command): void {
     .allowExcessArguments(false)
     .description(
       'Rank symbols by impact score (callers, importers, cross-workspace deps).\n' +
-        'Defaults: score > 0, risk >= MEDIUM, limit 20. Use --all to remove all defaults.',
+        'Defaults (no flags): score > 0, risk >= MEDIUM, limit 20.\n' +
+        'Any filter flag removes all defaults — only explicit constraints apply.',
     )
     .option('--workspace <name>', 'filter by workspace')
     .option(
@@ -44,10 +45,12 @@ export function registerGraphHotspots(parent: Command): void {
       collect,
       [],
     )
-    .option('--limit <n>', 'max results (default 20)')
-    .option('--min-score <n>', 'minimum score threshold (default 1)')
-    .option('--min-risk <level>', 'minimum risk level: LOW|MEDIUM|HIGH|CRITICAL (default MEDIUM)')
-    .option('--all', 'remove all default filters (score, risk, limit)')
+    .option('--limit <n>', 'max results (default 20 when no filters)')
+    .option('--min-score <n>', 'minimum score threshold (default 1 when no filters)')
+    .option(
+      '--min-risk <level>',
+      'minimum risk level: LOW|MEDIUM|HIGH|CRITICAL (default MEDIUM when no filters)',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .addHelpText(
       'after',
@@ -82,20 +85,31 @@ Exclude examples:
         limit?: string
         minScore?: string
         minRisk?: string
-        all?: boolean
         format: string
       }) => {
         const fmt = parseFormat(opts.format)
         const { config } = await resolveCliContext()
 
         await withProvider(config, opts.format, async (provider) => {
-          const allDefaults: HotspotOptions = opts.all
+          const hasAnyFilter = !!(
+            opts.workspace ||
+            opts.kind ||
+            opts.file ||
+            opts.excludePath.length > 0 ||
+            opts.excludeWorkspace.length > 0 ||
+            opts.limit !== undefined ||
+            opts.minScore !== undefined ||
+            opts.minRisk !== undefined
+          )
+
+          // When no filters are provided, apply safe defaults.
+          // Any filter removes all defaults — only explicit constraints apply.
+          const base: HotspotOptions = hasAnyFilter
             ? { minScore: 0, minRisk: 'LOW', limit: Infinity }
             : {}
 
           const options: HotspotOptions = {
-            ...allDefaults,
-            // Individual overrides take precedence over --all
+            ...base,
             ...(opts.workspace ? { workspace: opts.workspace } : undefined),
             ...(opts.kind ? { kind: opts.kind as SymbolKind } : undefined),
             ...(opts.file ? { filePath: opts.file } : undefined),
