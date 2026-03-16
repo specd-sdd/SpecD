@@ -353,7 +353,7 @@ workflow:
             (cross-cutting concern, new dependency, significant architectural decision).
 
   - step: ready
-    requires: [proposal, specs, design, tasks]
+    requires: [proposal, specs, verify, design, tasks]
     hooks:
       pre:
         - id: ready-guidance
