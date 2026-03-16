@@ -40,6 +40,6 @@ export function createFileNode(params: {
     language: params.language,
     contentHash: params.contentHash,
     workspace: params.workspace,
-    embedding: params.embedding,
+    embedding: params.embedding ? new Float32Array(params.embedding) : undefined,
   }
 }

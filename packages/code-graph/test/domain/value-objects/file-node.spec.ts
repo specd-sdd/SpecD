@@ -35,7 +35,7 @@ describe('FileNode', () => {
       workspace: 'core',
       embedding,
     })
-    expect(node.embedding).toBe(embedding)
+    expect(node.embedding).toEqual(embedding)
   })
 
   it('workspace value is passed through as-is', () => {
