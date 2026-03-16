@@ -293,7 +293,8 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       for (const importChild of child.children()) {
         if (nodeKind(importChild) === 'import_clause') {
           for (const clauseChild of importChild.children()) {
-            if (nodeKind(clauseChild) === 'named_imports') {
+            const clauseKind = nodeKind(clauseChild)
+            if (clauseKind === 'named_imports') {
               for (const spec of clauseChild.children()) {
                 if (nodeKind(spec) === 'import_specifier') {
                   const nameNode = spec.field('name')
@@ -306,6 +307,27 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
                       isRelative,
                     })
                   }
+                }
+              }
+            } else if (clauseKind === 'identifier') {
+              // Default import: import Foo from '...'
+              results.push({
+                originalName: 'default',
+                localName: clauseChild.text(),
+                specifier,
+                isRelative,
+              })
+            } else if (clauseKind === 'namespace_import') {
+              // Namespace import: import * as Foo from '...'
+              for (const nsChild of clauseChild.children()) {
+                if (nodeKind(nsChild) === 'identifier') {
+                  results.push({
+                    originalName: '*',
+                    localName: nsChild.text(),
+                    specifier,
+                    isRelative,
+                  })
+                  break
                 }
               }
             }
