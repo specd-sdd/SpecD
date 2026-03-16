@@ -1,24 +1,7 @@
 import { type GraphStore } from '../ports/graph-store.js'
 import { type FileImpactResult, type ImpactResult } from '../value-objects/impact-result.js'
-import { type RiskLevel, computeRiskLevel } from '../value-objects/risk-level.js'
+import { computeRiskLevel, maxRisk } from '../value-objects/risk-level.js'
 import { analyzeImpact } from './analyze-impact.js'
-
-const RISK_ORDER: Record<RiskLevel, number> = {
-  LOW: 0,
-  MEDIUM: 1,
-  HIGH: 2,
-  CRITICAL: 3,
-}
-
-/**
- * Returns the higher of two risk levels.
- * @param a - First risk level.
- * @param b - Second risk level.
- * @returns The more severe risk level.
- */
-function maxRisk(a: RiskLevel, b: RiskLevel): RiskLevel {
-  return RISK_ORDER[a] >= RISK_ORDER[b] ? a : b
-}
 
 /**
  * Analyzes the combined impact of all symbols within a file.

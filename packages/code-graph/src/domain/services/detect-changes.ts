@@ -1,25 +1,8 @@
 import { type GraphStore } from '../ports/graph-store.js'
 import { type ChangeDetectionResult } from '../value-objects/change-detection-result.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
-import { type RiskLevel } from '../value-objects/risk-level.js'
+import { type RiskLevel, maxRisk } from '../value-objects/risk-level.js'
 import { getUpstream } from './get-upstream.js'
-
-const RISK_ORDER: Record<RiskLevel, number> = {
-  LOW: 0,
-  MEDIUM: 1,
-  HIGH: 2,
-  CRITICAL: 3,
-}
-
-/**
- * Returns the higher of two risk levels.
- * @param a - First risk level.
- * @param b - Second risk level.
- * @returns The more severe risk level.
- */
-function maxRisk(a: RiskLevel, b: RiskLevel): RiskLevel {
-  return RISK_ORDER[a] >= RISK_ORDER[b] ? a : b
-}
 
 /**
  * Detects which symbols and files are affected by changes to a set of files.

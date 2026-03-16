@@ -4,16 +4,9 @@ import {
   type HotspotOptions,
   type HotspotResult,
 } from '../value-objects/hotspot-result.js'
-import { type RiskLevel, computeRiskLevel } from '../value-objects/risk-level.js'
+import { computeRiskLevel, RISK_ORDER } from '../value-objects/risk-level.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { matchesExclude } from './matches-exclude.js'
-
-const RISK_ORDER: Record<RiskLevel, number> = {
-  LOW: 0,
-  MEDIUM: 1,
-  HIGH: 2,
-  CRITICAL: 3,
-}
 
 /**
  * Extracts the workspace prefix (first path segment) from a file path.
