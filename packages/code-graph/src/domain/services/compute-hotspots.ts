@@ -77,6 +77,8 @@ export async function computeHotspots(
     const score = sameWs * 3 + crossWs * 5 + fileImporters
     const riskLevel = computeRiskLevel(totalCallers, totalCallers + fileImporters, 0)
 
+    // directCallers tracks same-workspace callers; crossWorkspaceCallers tracks
+    // callers from other workspaces (weighted higher in the score formula above).
     entries.push({
       symbol,
       score,

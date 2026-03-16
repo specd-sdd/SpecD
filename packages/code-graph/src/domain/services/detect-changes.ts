@@ -45,6 +45,10 @@ export async function detectChanges(
       const totalDependents = result.totalCount
       const directDependents = result.levels.get(1)?.length ?? 0
 
+      // Evaluate risk per symbol using the same thresholds as computeRiskLevel:
+      // CRITICAL: 20+ total dependents
+      // HIGH: 6+ direct or 10+ total
+      // MEDIUM: 3+ direct or any indirect
       if (totalDependents >= 20) {
         overallRisk = maxRisk(overallRisk, 'CRITICAL')
       } else if (directDependents >= 6 || totalDependents >= 10) {
