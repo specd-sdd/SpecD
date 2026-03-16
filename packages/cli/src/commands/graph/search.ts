@@ -95,6 +95,20 @@ Exclude examples:
           cliError('--spec-content requires --format json or --format toon', opts.format, 1)
         }
         const limit = parseInt(opts.limit, 10)
+        if (Number.isNaN(limit) || limit <= 0) {
+          cliError('--limit must be a positive integer', opts.format)
+        }
+        if (
+          opts.kind &&
+          !['function', 'class', 'method', 'variable', 'type', 'interface', 'enum'].includes(
+            opts.kind,
+          )
+        ) {
+          cliError(
+            `--kind must be one of: function, class, method, variable, type, interface, enum (got '${opts.kind}')`,
+            opts.format,
+          )
+        }
         const searchBoth = !opts.symbols && !opts.specs
         const { config } = await resolveCliContext()
 

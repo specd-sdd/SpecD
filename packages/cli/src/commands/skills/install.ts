@@ -56,7 +56,11 @@ JSON/TOON output schema:
                 })()
 
           if (skillsToInstall.length === 0) {
-            output('no skills to install', 'text')
+            if (fmt === 'text') {
+              output('no skills to install', 'text')
+            } else {
+              output([], fmt)
+            }
             return
           }
 

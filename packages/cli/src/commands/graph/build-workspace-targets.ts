@@ -192,7 +192,18 @@ function extractDependsOnFromMetadata(metadataContent: string): string[] {
   let inDependsOn = false
 
   for (const line of lines) {
-    if (line.match(/^dependsOn\s*:/)) {
+    const headerMatch = line.match(/^dependsOn\s*:\s*(.*)/)
+    if (headerMatch) {
+      // Check for inline list syntax: dependsOn: [a, b, c]
+      const inlineValue = headerMatch[1]?.trim()
+      if (inlineValue && inlineValue.startsWith('[') && inlineValue.endsWith(']')) {
+        const items = inlineValue.slice(1, -1).split(',')
+        for (const item of items) {
+          const trimmed = item.trim()
+          if (trimmed) deps.push(trimmed)
+        }
+        return deps
+      }
       inDependsOn = true
       continue
     }
