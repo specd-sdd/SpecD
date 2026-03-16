@@ -105,7 +105,12 @@ export async function computeHotspots(
   const minScore = options?.minScore ?? (hasScopeFilter ? 0 : 1)
   const needAllSymbols = minScore === 0 || importerCounts.size > 0
   if (needAllSymbols) {
-    const allSymbols = await store.findSymbols({})
+    // Scope the query to the requested workspace/kind when possible
+    // to avoid a full symbol table scan
+    const allSymbols = await store.findSymbols({
+      ...(options?.workspace ? { filePath: `${options.workspace}/*` } : undefined),
+      ...(options?.kind ? { kind: options.kind } : undefined),
+    })
     for (const symbol of allSymbols) {
       if (symbolMap.has(symbol.id)) continue // already processed
       const fileImporters = importerCounts.get(symbol.filePath) ?? 0
