@@ -197,5 +197,5 @@ scenarios:
       - AND it contains no rows (v2+ feature)
 contentHashes:
   spec.md: sha256:a02ea9cda79c7a3dbd2ce18ab63f1c0c41165528a7f5076c9ed9e7cb619fc8e7
-  verify.md: sha256:d6bf57f61d431be882ef293682b8be54d54bf6281bc7dbc2e1b9db47f3696463
+  verify.md: sha256:89a709a548ce8f90458f9171fee7ac7949f42f7102c2857b91db07b67fe158a2
 generatedBy: core

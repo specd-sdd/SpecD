@@ -280,6 +280,6 @@ scenarios:
     then:
       - DuplicateSymbolIdError is thrown with both symbols' details
 contentHashes:
-  spec.md: sha256:b2d0b50522282ac8d251b54e8a5c1700459d819348ea2fce930ac23cc5a8b595
+  spec.md: sha256:8b6fc5dc345f7a9926b2dd05e332c99b2c4e85cd49a950db8bf09f1e4e10ec3d
   verify.md: sha256:478e00f2daf6e6528d609fb71ba094aee98b8473b7b41f8f0159f52096f80070
 generatedBy: core

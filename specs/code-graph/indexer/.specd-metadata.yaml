@@ -461,6 +461,6 @@ scenarios:
       - AND each entry reports its own filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed
       - AND the aggregate filesDiscovered equals the sum of per-workspace filesDiscovered
 contentHashes:
-  spec.md: sha256:66106e9b539e0ac4d22aba886d9755479988cb37fdf8467d3a19ebb4b606d0d8
+  spec.md: sha256:60eced1b501115df70593b2dcdae9af81c01e3881214df443db8b3fe00f87bd0
   verify.md: sha256:5232a75a9ae1cfd0e7ac643e01a7acf402c6ad876e21f0b48b3c2b036f677722
 generatedBy: core
