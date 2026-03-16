@@ -28,13 +28,14 @@ JSON/TOON output schema:
     fresh: boolean
     title?: string
     description?: string
-    generatedBy?: string
+    generatedBy?: 'core' | 'agent'
     contentHashes: Array<{ filename: string, recorded: string, current: string, fresh: boolean }>
     dependsOn?: string[]
     keywords?: string[]
+    context?: string[]
     rules: Array<{ requirement: string, rules: string[] }>
     constraints: string[]
-    scenarios: Array<{ name: string, requirement: string, given?: string[], when?: string[], then?: string[] }>
+    scenarios: Array<{ requirement: string, name: string, given?: string[], when?: string[], then?: string[] }>
   }
 `,
     )
