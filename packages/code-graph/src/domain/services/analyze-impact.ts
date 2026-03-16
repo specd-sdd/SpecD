@@ -43,8 +43,9 @@ export async function analyzeImpact(
     }
   }
 
-  // IMPORTS-based traversal (file-level fallback)
-  // Find the file this symbol belongs to, then follow IMPORTS
+  // IMPORTS-based traversal (file-level) — tracked separately to avoid
+  // conflating file-level and symbol-level dependent counts.
+  const filesByDepth = new Map<number, Set<string>>()
   const symbol = await store.getSymbol(target)
   if (symbol) {
     const visited = new Set<string>([symbol.filePath])
@@ -69,11 +70,10 @@ export async function analyzeImpact(
             nextFiles.push(file)
             affectedFileSet.add(file)
 
-            // Count importing files as dependents at this depth
-            if (!allSymbolsByDepth.has(depth)) {
-              allSymbolsByDepth.set(depth, new Set())
+            if (!filesByDepth.has(depth)) {
+              filesByDepth.set(depth, new Set())
             }
-            allSymbolsByDepth.get(depth)!.add(`file:${file}`)
+            filesByDepth.get(depth)!.add(file)
           }
         }
       }
@@ -83,16 +83,24 @@ export async function analyzeImpact(
     }
   }
 
-  const directDependents = allSymbolsByDepth.get(1)?.size ?? 0
-  const indirectDependents = allSymbolsByDepth.get(2)?.size ?? 0
-
-  let transitiveDependents = 0
+  // Take the larger of symbol-level or file-level counts per depth
+  const symbolDirect = allSymbolsByDepth.get(1)?.size ?? 0
+  const symbolIndirect = allSymbolsByDepth.get(2)?.size ?? 0
+  let symbolTransitive = 0
   for (const [depth, ids] of allSymbolsByDepth) {
-    if (depth >= 3) {
-      transitiveDependents += ids.size
-    }
+    if (depth >= 3) symbolTransitive += ids.size
   }
 
+  const fileDirect = filesByDepth.get(1)?.size ?? 0
+  const fileIndirect = filesByDepth.get(2)?.size ?? 0
+  let fileTransitive = 0
+  for (const [depth, ids] of filesByDepth) {
+    if (depth >= 3) fileTransitive += ids.size
+  }
+
+  const directDependents = Math.max(symbolDirect, fileDirect)
+  const indirectDependents = Math.max(symbolIndirect, fileIndirect)
+  const transitiveDependents = Math.max(symbolTransitive, fileTransitive)
   const totalDependents = directDependents + indirectDependents + transitiveDependents
   const riskLevel = computeRiskLevel(directDependents, totalDependents, 0)
 
