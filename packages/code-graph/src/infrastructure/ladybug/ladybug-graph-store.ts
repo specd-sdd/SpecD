@@ -179,29 +179,36 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const conn = this.conn!
 
-    await this.removeFile(file.path)
+    await conn.query('BEGIN TRANSACTION')
+    try {
+      await this.removeFile(file.path)
 
-    const escapedPath = this.escape(file.path)
-    const escapedLang = this.escape(file.language)
-    const escapedHash = this.escape(file.contentHash)
-    const escapedWorkspace = this.escape(file.workspace)
+      const escapedPath = this.escape(file.path)
+      const escapedLang = this.escape(file.language)
+      const escapedHash = this.escape(file.contentHash)
+      const escapedWorkspace = this.escape(file.workspace)
 
-    await conn.query(
-      `CREATE (f:File {path: '${escapedPath}', language: '${escapedLang}', contentHash: '${escapedHash}', workspace: '${escapedWorkspace}'})`,
-    )
-
-    for (const symbol of symbols) {
       await conn.query(
-        `CREATE (s:Symbol {id: '${this.escape(symbol.id)}', name: '${this.escape(symbol.name)}', searchName: '${this.escape(expandSymbolName(symbol.name))}', kind: '${this.escape(symbol.kind)}', filePath: '${escapedPath}', line: ${symbol.line}, col: ${symbol.column}, comment: '${this.escape(symbol.comment ?? '')}'})`,
+        `CREATE (f:File {path: '${escapedPath}', language: '${escapedLang}', contentHash: '${escapedHash}', workspace: '${escapedWorkspace}'})`,
       )
-    }
 
-    for (const rel of relations) {
-      await this.createRelation(conn, rel)
-    }
+      for (const symbol of symbols) {
+        await conn.query(
+          `CREATE (s:Symbol {id: '${this.escape(symbol.id)}', name: '${this.escape(symbol.name)}', searchName: '${this.escape(expandSymbolName(symbol.name))}', kind: '${this.escape(symbol.kind)}', filePath: '${escapedPath}', line: ${symbol.line}, col: ${symbol.column}, comment: '${this.escape(symbol.comment ?? '')}'})`,
+        )
+      }
 
-    this._lastIndexedAt = new Date().toISOString()
-    await this.updateMeta(conn, 'lastIndexedAt', this._lastIndexedAt)
+      for (const rel of relations) {
+        await this.createRelation(conn, rel)
+      }
+
+      this._lastIndexedAt = new Date().toISOString()
+      await this.updateMeta(conn, 'lastIndexedAt', this._lastIndexedAt)
+      await conn.query('COMMIT')
+    } catch (err) {
+      await conn.query('ROLLBACK').catch(() => {})
+      throw err
+    }
   }
 
   /**
