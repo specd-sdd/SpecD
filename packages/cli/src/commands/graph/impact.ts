@@ -91,6 +91,12 @@ JSON/TOON output schema:
       }) => {
         const fmt = parseFormat(opts.format)
         const direction = opts.direction as 'upstream' | 'downstream' | 'both'
+
+        const selectorCount = (opts.symbol ? 1 : 0) + (opts.changes ? 1 : 0) + (opts.file ? 1 : 0)
+        if (selectorCount !== 1) {
+          cliError('provide exactly one of --file, --symbol, or --changes', opts.format, 1)
+        }
+
         const { config } = await resolveCliContext()
 
         await withProvider(config, opts.format, async (provider) => {
@@ -100,8 +106,6 @@ JSON/TOON output schema:
             await handleChangesImpact(provider, opts.changes, fmt)
           } else if (opts.file) {
             await handleFileImpact(provider, opts.file, direction, fmt)
-          } else {
-            cliError('provide --file, --symbol, or --changes', opts.format, 1)
           }
         })
       },
