@@ -136,8 +136,10 @@ Exclude examples:
             if (symbolResults.length > 0) {
               lines.push(`Symbols (${String(symbolResults.length)}):`)
               for (const { symbol, score } of symbolResults) {
-                const ws = symbol.filePath.substring(0, symbol.filePath.indexOf('/'))
-                const relPath = symbol.filePath.substring(symbol.filePath.indexOf('/') + 1)
+                const sepIndex = symbol.filePath.indexOf('/')
+                const ws = sepIndex !== -1 ? symbol.filePath.substring(0, sepIndex) : ''
+                const relPath =
+                  sepIndex !== -1 ? symbol.filePath.substring(sepIndex + 1) : symbol.filePath
                 const comment = symbol.comment ? ` — ${symbol.comment.substring(0, 50)}` : ''
                 lines.push(
                   `  ${score.toFixed(1).padStart(5)}  [${ws}] ${symbol.kind} ${symbol.name}  ${relPath}:${String(symbol.line)}${comment}`,
@@ -165,7 +167,9 @@ Exclude examples:
             output(
               {
                 symbols: symbolResults.map(({ symbol, score }) => ({
-                  workspace: symbol.filePath.substring(0, symbol.filePath.indexOf('/')),
+                  workspace: symbol.filePath.includes('/')
+                    ? symbol.filePath.substring(0, symbol.filePath.indexOf('/'))
+                    : '',
                   symbol,
                   score,
                 })),
