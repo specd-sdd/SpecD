@@ -265,6 +265,32 @@ export class InMemoryGraphStore extends GraphStore {
     // No-op for in-memory store — search is always live
   }
 
+  async getSymbolCallers(): Promise<Array<{ symbol: SymbolNode; callerFilePath: string }>> {
+    this.ensureOpen()
+    const results: Array<{ symbol: SymbolNode; callerFilePath: string }> = []
+    for (const rel of this.relations) {
+      if (rel.type === RelationType.Calls) {
+        const targetSymbol = this.symbols.get(rel.target)
+        const callerSymbol = this.symbols.get(rel.source)
+        if (targetSymbol && callerSymbol) {
+          results.push({ symbol: targetSymbol, callerFilePath: callerSymbol.filePath })
+        }
+      }
+    }
+    return results
+  }
+
+  async getFileImporterCounts(): Promise<Map<string, number>> {
+    this.ensureOpen()
+    const counts = new Map<string, number>()
+    for (const rel of this.relations) {
+      if (rel.type === RelationType.Imports) {
+        counts.set(rel.target, (counts.get(rel.target) ?? 0) + 1)
+      }
+    }
+    return counts
+  }
+
   async clear(): Promise<void> {
     this.ensureOpen()
     this.files.clear()

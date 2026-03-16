@@ -211,6 +211,20 @@ export abstract class GraphStore {
   abstract rebuildFtsIndexes(): Promise<void>
 
   /**
+   * Returns all (symbol, caller) pairs in the graph, one row per caller.
+   * Used for batch hotspot computation — avoids N+1 per-symbol queries.
+   * @returns An array of objects containing the target symbol and its caller's file path.
+   */
+  abstract getSymbolCallers(): Promise<Array<{ symbol: SymbolNode; callerFilePath: string }>>
+
+  /**
+   * Returns the number of files that import each file in the graph.
+   * Used for batch hotspot computation.
+   * @returns A map from file path to importer count.
+   */
+  abstract getFileImporterCounts(): Promise<Map<string, number>>
+
+  /**
    * Removes all data from the store.
    * @returns A promise that resolves when the store is cleared.
    */

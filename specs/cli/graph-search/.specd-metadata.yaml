@@ -182,6 +182,6 @@ scenarios:
       - only symbols from workspace core are returned
       - AND only specs from workspace core are returned
 contentHashes:
-  spec.md: sha256:a06721ea840d35feb58e43cf6ed6c2137139302ed94abd4277fe3da639515630
+  spec.md: sha256:a75f66d716fc076fdf8964aefe58d132fee0fdf1ffc2d1b0cf9d60330d883553
   verify.md: sha256:4afc0bb07880f4c71c54330ff2f1bf0f92f9b9b82e2962f195894db02fa0b5d9
 generatedBy: core

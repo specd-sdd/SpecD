@@ -35,6 +35,11 @@ export { type TraversalResult } from './domain/value-objects/traversal-result.js
 export { type ImpactResult, type FileImpactResult } from './domain/value-objects/impact-result.js'
 export { type ChangeDetectionResult } from './domain/value-objects/change-detection-result.js'
 export { type RiskLevel } from './domain/value-objects/risk-level.js'
+export {
+  type HotspotEntry,
+  type HotspotOptions,
+  type HotspotResult,
+} from './domain/value-objects/hotspot-result.js'
 
 // Spec discovery
 export { discoverSpecsFromDir } from './application/use-cases/discover-specs.js'
