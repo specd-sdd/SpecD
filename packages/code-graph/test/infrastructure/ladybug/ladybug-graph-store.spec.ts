@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { LadybugGraphStore } from '../../../src/infrastructure/ladybug/ladybug-graph-store.js'
 import { graphStoreContractTests } from '../../domain/ports/graph-store.contract.js'
 
-let tempDir: string
+let tempDir: string | undefined
 
 graphStoreContractTests(
   'LadybugGraphStore',
@@ -14,6 +14,9 @@ graphStoreContractTests(
     return new LadybugGraphStore(tempDir)
   },
   async () => {
-    rmSync(tempDir, { recursive: true, force: true })
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true })
+      tempDir = undefined
+    }
   },
 )

@@ -38,7 +38,7 @@ describe('FileNode', () => {
     expect(node.embedding).toBe(embedding)
   })
 
-  it('workspace is a name string, not a path', () => {
+  it('workspace value is passed through as-is', () => {
     const node = createFileNode({
       path: 'core/src/index.ts',
       language: 'typescript',
