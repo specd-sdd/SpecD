@@ -422,6 +422,9 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     if (!modulePart) {
       return segments.join('/') + '/__init__.py'
     }
+    // Note: without filesystem access we cannot distinguish module files from package
+    // directories (e.g. `from .sub import bar` could be `sub.py` or `sub/__init__.py`).
+    // We default to `.py`; the caller/indexer resolves ambiguity at index time.
     return segments.join('/') + '.py'
   }
 
@@ -433,7 +436,9 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @returns The matching package name, or undefined.
    */
   resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined {
-    const topLevel = specifier.split('.')[0]!
+    if (!specifier) return undefined
+    const topLevel = specifier.split('.')[0]
+    if (!topLevel) return undefined
     const normalized = topLevel.replaceAll('_', '-')
     return knownPackages.find((pkg) => pkg.replaceAll('_', '-') === normalized)
   }

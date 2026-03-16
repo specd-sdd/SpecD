@@ -20,10 +20,17 @@ export interface SymbolNode {
  * @param kind - The symbol kind.
  * @param name - The symbol name.
  * @param line - The 1-based line number.
+ * @param column - The 0-based column offset.
  * @returns The computed symbol id string.
  */
-function computeSymbolId(filePath: string, kind: SymbolKind, name: string, line: number): string {
-  return `${filePath}:${kind}:${name}:${line}`
+function computeSymbolId(
+  filePath: string,
+  kind: SymbolKind,
+  name: string,
+  line: number,
+  column: number,
+): string {
+  return `${filePath}:${kind}:${name}:${line}:${column}`
 }
 
 /**
@@ -53,7 +60,7 @@ export function createSymbolNode(params: {
   const filePath = params.filePath.replaceAll('\\', '/')
 
   return {
-    id: computeSymbolId(filePath, params.kind, params.name, params.line),
+    id: computeSymbolId(filePath, params.kind, params.name, params.line, params.column),
     name: params.name,
     kind: params.kind,
     filePath,
