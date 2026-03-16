@@ -555,7 +555,8 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
 
   /**
    * Resolves a relative import specifier to a file path.
-   * Maps `.js` → `.ts` and adds `.ts` for extensionless specifiers.
+   * Maps JS extensions to their TS equivalents (`.js` → `.ts`, `.jsx` → `.tsx`)
+   * and appends `.ts` for extensionless specifiers.
    * @param fromFile - The importing file path.
    * @param specifier - The relative import specifier.
    * @returns The resolved file path.
@@ -575,9 +576,16 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     }
 
     let resolved = segments.join('/')
-    resolved = resolved.replace(/\.js$/, '.ts')
 
-    if (!resolved.includes('.')) {
+    // Map JS extensions to TS equivalents (ESM convention)
+    if (resolved.endsWith('.js')) {
+      resolved = resolved.slice(0, -3) + '.ts'
+    } else if (resolved.endsWith('.jsx')) {
+      resolved = resolved.slice(0, -4) + '.tsx'
+    } else if (resolved.endsWith('.ts') || resolved.endsWith('.tsx')) {
+      // Already a TS extension — keep as-is
+    } else if (!resolved.includes('.', resolved.lastIndexOf('/') + 1)) {
+      // Extensionless — default to .ts
       resolved += '.ts'
     }
 
