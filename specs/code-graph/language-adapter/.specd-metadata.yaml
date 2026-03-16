@@ -482,5 +482,5 @@ scenarios:
       - it returns 'App\\Models\\User'
 contentHashes:
   spec.md: sha256:d85e0e838da8ab68a47575ebe329b88109ff9ca727f1f5e23054f88006e21bf4
-  verify.md: sha256:eac94d0313162ba332ba778598a7e70b5ca8d380b529ad154566442d25f745f2
+  verify.md: sha256:0cd4bf89790b18a869b03b21325c490dff51128dd2dc6df6ef413febedb6fc01
 generatedBy: core

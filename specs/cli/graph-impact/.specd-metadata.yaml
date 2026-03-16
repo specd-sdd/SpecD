@@ -9,7 +9,7 @@ rules:
   - requirement: Command signature
     rules:
       - |-
-        ```
+        ```text
         specd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction upstream|downstream|both] [--path <path>] [--format text|json|toon]
         ```
 
@@ -55,7 +55,7 @@ rules:
       - |-
         **File impact** in `text` mode:
 
-        ```
+        ```text
         Impact analysis for src/auth.ts
           Risk level:       HIGH
           Direct deps:      6
@@ -74,7 +74,7 @@ rules:
 
         **Symbol impact** in `text` mode:
 
-        ```
+        ```text
         Impact analysis for function createKernel (packages/core/src/composition/kernel.ts:147)
           Risk level:       CRITICAL
           Direct deps:      1
@@ -224,6 +224,6 @@ scenarios:
     then:
       - process.exit(0) is called to prevent the LadybugDB addon from keeping the process alive
 contentHashes:
-  spec.md: sha256:155d7e610dd33875e7165d0bbbdecec4d699cea71bba7064d9f8449f2fed4a15
+  spec.md: sha256:3b87ca30e7a2df73902c4daa777edc505c7b2c6308589bb82512e78e24c72148
   verify.md: sha256:bc4647261929fdd1171f7fbac7d5aa36baf678d7a5592f899ca2564553b53430
 generatedBy: core

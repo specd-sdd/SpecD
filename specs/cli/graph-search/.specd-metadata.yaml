@@ -10,7 +10,7 @@ rules:
   - requirement: Command signature
     rules:
       - |-
-        ```
+        ```text
         specd graph search <query> [--symbols] [--specs] [--kind <kind>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--format text|json|toon]
         ```
 
@@ -43,7 +43,7 @@ rules:
       - |-
         In `text` mode, results are grouped by category:
 
-        ```
+        ```text
         Symbols (5):
            8.0  [core] method execute  src/use-cases/run-hooks.ts:108 — /** Executes run hooks... */
            5.5  [core] type OnHookProgress  src/use-cases/run-hooks.ts:21 — /** Callback for hook... */
@@ -65,10 +65,7 @@ rules:
         In `json` or `toon` mode, outputs `{ symbols: [...], specs: [...] }`. Each entry includes a `workspace` field and a `score` field. Spec entries include `specId`, `path`, `title`, and `description`. Full spec `content` is omitted by default — pass `--spec-content` to include it.
   - requirement: Error cases
     rules:
-      - |-
-        If the provider cannot be opened, the command exits with code 3 (same as other graph commands).
-
-        On success, `process.exit(0)` is called explicitly after closing the provider — LadybugDB native threads require explicit exit to avoid hanging.
+      - If the provider cannot be opened, the command exits with code 3 (same as other graph commands). The `process.exit(0)` pattern applies — LadybugDB native threads require explicit exit.
 constraints:
   - The CLI does not contain search logic — it delegates to CodeGraphProvider.searchSymbols and CodeGraphProvider.searchSpecs
   - FTS indexes must be built during indexing — search on an empty graph returns no results
@@ -166,20 +163,20 @@ scenarios:
       - results are displayed in text mode
     then:
       - each line shows [workspace] before the symbol or spec identity
-  - requirement: Command signature
+  - requirement: Command signature (filters)
     name: Filter by symbol kind
     when:
       - specd graph search "transition" --kind method is run
     then:
       - only symbols with kind method are returned
       - AND symbols of other kinds are excluded
-  - requirement: Command signature
+  - requirement: Command signature (filters)
     name: Filter by file path wildcard
     when:
       - specd graph search "create" --file "*/composition/*" is run
     then:
       - only symbols in files matching the pattern are returned
-  - requirement: Command signature
+  - requirement: Command signature (filters)
     name: Filter by workspace
     when:
       - specd graph search "kernel" --workspace core is run
@@ -187,6 +184,6 @@ scenarios:
       - only symbols from workspace core are returned
       - AND only specs from workspace core are returned
 contentHashes:
-  spec.md: sha256:886f372ca177baceff3a80f2d4426596b73922840554793df3c2df9ed235a3f4
-  verify.md: sha256:4afc0bb07880f4c71c54330ff2f1bf0f92f9b9b82e2962f195894db02fa0b5d9
+  spec.md: sha256:8b5a07e6a29af6522be0d22e14c43fe25d715d994a888e8f8de17c34907d8546
+  verify.md: sha256:61fcd84a1d03d186f468bd409c16945a5d1689085dae8645b287399b836d1828
 generatedBy: core
