@@ -62,6 +62,16 @@ JSON/TOON output schema:
 
         const workspaces = await buildWorkspaceTargets(config, kernel, opts.workspace)
 
+        if (workspaces.length === 0) {
+          output(
+            opts.workspace
+              ? `No workspace found matching "${opts.workspace}".`
+              : 'No workspaces configured.',
+            'text',
+          )
+          return
+        }
+
         const indexOpts: IndexOptions = {
           workspaces,
           projectRoot: config.projectRoot,
