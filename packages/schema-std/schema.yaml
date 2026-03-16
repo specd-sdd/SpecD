@@ -352,6 +352,9 @@ workflow:
             rewriting the existing files. Write design.md only if the change warrants it
             (cross-cutting concern, new dependency, significant architectural decision).
 
+  - step: ready
+    requires: [proposal, specs, design, tasks]
+
   - step: implementing
     requires: [tasks]
     hooks:
