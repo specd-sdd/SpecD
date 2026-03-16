@@ -43,7 +43,7 @@ rules:
 
         `createCodeGraphProvider(options: CodeGraphOptions): CodeGraphProvider` accepts:
 
-        * **`storagePath`** (`string`, required) — workspace root path, used to locate the `.specd/code-graph.lbug` file
+        * **`storagePath`** (`string`, required) — project root path (equivalent to `projectRoot` in `SpecdConfig`); the database is stored at `<storagePath>/.specd/code-graph.lbug`
         * **`adapters`** (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the 4 built-in adapters
 
         The factory detects which overload is being used by checking for the `projectRoot` property (present on `SpecdConfig`) vs the `storagePath` property (present on `CodeGraphOptions`).
@@ -58,6 +58,7 @@ rules:
         * `CodeGraphProvider` — type only (for type annotations, not construction)
         * `CodeGraphOptions` — options type for the factory
         * `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, `DiscoveredSpec` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).
+        * `SearchOptions` — search options type used by `searchSymbols()` and `searchSpecs()`
         * `discoverSpecsFromDir` — utility for discovering specs from a directory (used by CLI/MCP integration layers)
         * `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult` — traversal/impact types
         * `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType` — model types
@@ -69,7 +70,7 @@ rules:
   - requirement: Lifecycle management
     rules:
       - |-
-        Callers MUST call `open()` before using any query, traversal, or indexing method, and `close()` when done. The `CodeGraphProvider` delegates these calls to the underlying `GraphStore`. Methods called before `open()` or after `close()` throw `StoreNotOpenError`.
+        Callers MUST call `open()` before using any query, search, traversal, indexing, or maintenance (`clear()`) method, and `close()` when done. The `CodeGraphProvider` delegates these calls to the underlying `GraphStore`. Methods called before `open()` or after `close()` throw `StoreNotOpenError`.
 
         The provider does not auto-open or auto-close — callers manage the lifecycle explicitly. This follows the same pattern as database connections and avoids hidden state transitions.
   - requirement: Dependency on @specd/core

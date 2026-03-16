@@ -80,7 +80,7 @@ rules:
           {
             totalSymbols: number
             entries: Array<{
-              symbol: { id, name, kind, filePath, line, col, comment }
+              symbol: { id: string, name: string, kind: string, filePath: string, line: number, col: number, comment?: string }
               score: number
               riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
             }>
@@ -281,6 +281,6 @@ scenarios:
       - stdout is empty
       - 'AND stderr contains the error: line in plain text'
 contentHashes:
-  spec.md: sha256:7a7a3e68e4675c01ec71e6526527002d298351e818813a7f0ba7b2fed5017b0a
+  spec.md: sha256:04edef4eb44b65d63272225ecb98b4748b78624a50c3dedcda1e23c59c7ceabb
   verify.md: sha256:249cca51e3d5d5052752d223b8caaf4500862b08e6a8946d5d4bfe67cd64d9b7
 generatedBy: core
