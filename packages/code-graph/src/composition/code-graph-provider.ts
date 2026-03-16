@@ -11,12 +11,14 @@ import { type TraversalOptions } from '../domain/value-objects/traversal-options
 import { type TraversalResult } from '../domain/value-objects/traversal-result.js'
 import { type ImpactResult, type FileImpactResult } from '../domain/value-objects/impact-result.js'
 import { type ChangeDetectionResult } from '../domain/value-objects/change-detection-result.js'
+import { type HotspotOptions, type HotspotResult } from '../domain/value-objects/hotspot-result.js'
 import { type Relation } from '../domain/value-objects/relation.js'
 import { getUpstream } from '../domain/services/get-upstream.js'
 import { getDownstream } from '../domain/services/get-downstream.js'
 import { analyzeImpact } from '../domain/services/analyze-impact.js'
 import { analyzeFileImpact } from '../domain/services/analyze-file-impact.js'
 import { detectChanges } from '../domain/services/detect-changes.js'
+import { computeHotspots } from '../domain/services/compute-hotspots.js'
 
 /**
  * High-level facade for the code graph subsystem.
@@ -179,6 +181,16 @@ export class CodeGraphProvider {
    */
   async detectChanges(changedFiles: string[]): Promise<ChangeDetectionResult> {
     return detectChanges(this.store, changedFiles)
+  }
+
+  /**
+   * Computes hotspot scores for all symbols in the graph.
+   * Ranks symbols by how much would break if they changed.
+   * @param options - Optional filtering and limiting options.
+   * @returns The hotspot result with ranked entries.
+   */
+  async getHotspots(options?: HotspotOptions): Promise<HotspotResult> {
+    return computeHotspots(this.store, options)
   }
 
   /**

@@ -66,6 +66,7 @@ import { registerGraphIndex } from './commands/graph/index-graph.js'
 import { registerGraphStats } from './commands/graph/stats.js'
 import { registerGraphImpact } from './commands/graph/impact.js'
 import { registerGraphSearch } from './commands/graph/search.js'
+import { registerGraphHotspots } from './commands/graph/hotspots.js'
 
 // skills
 import { registerSkillsList } from './commands/skills/list.js'
@@ -170,5 +171,6 @@ registerGraphIndex(graphCmd)
 registerGraphStats(graphCmd)
 registerGraphImpact(graphCmd)
 registerGraphSearch(graphCmd)
+registerGraphHotspots(graphCmd)
 
 program.parseAsync(process.argv).catch(handleError)

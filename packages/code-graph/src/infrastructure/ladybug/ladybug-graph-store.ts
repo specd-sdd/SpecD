@@ -819,6 +819,39 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Returns all (symbol, caller) pairs in the graph for batch hotspot scoring.
+   * @returns An array of objects containing the target symbol and the caller's file path.
+   */
+  async getSymbolCallers(): Promise<Array<{ symbol: SymbolNode; callerFilePath: string }>> {
+    this.ensureOpen()
+    const rows = await exec(
+      this.conn!,
+      `MATCH (caller:Symbol)-[:CALLS]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment, caller.filePath AS callerFilePath`,
+    )
+    return rows.map((r) => ({
+      symbol: this.rowToSymbol(r),
+      callerFilePath: r['callerFilePath'] as string,
+    }))
+  }
+
+  /**
+   * Returns the number of files that import each file in the graph.
+   * @returns A map from file path to importer count.
+   */
+  async getFileImporterCounts(): Promise<Map<string, number>> {
+    this.ensureOpen()
+    const rows = await exec(
+      this.conn!,
+      `MATCH (imp:File)-[:IMPORTS]->(f:File) RETURN f.path AS path, count(imp) AS importerCount`,
+    )
+    const result = new Map<string, number>()
+    for (const row of rows) {
+      result.set(row['path'] as string, Number(row['importerCount']))
+    }
+    return result
+  }
+
+  /**
    * Deletes all nodes and relations from the graph.
    */
   async clear(): Promise<void> {

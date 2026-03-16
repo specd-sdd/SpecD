@@ -14,56 +14,56 @@ rules:
 
         **File** — source files indexed from workspace code roots.
 
-        | Column      | Type   | Notes                                        |
-        | ----------- | ------ | -------------------------------------------- |
-        | path        | STRING | Primary key. `{workspace}/{relativePath}`.   |
-        | language    | STRING | Language identifier (e.g. `typescript`).      |
-        | contentHash | STRING | SHA-256 hash of file content.                |
-        | workspace   | STRING | Workspace name (e.g. `core`, `cli`).         |
+        | Column      | Type   | Notes                                      |
+        | ----------- | ------ | ------------------------------------------ |
+        | path        | STRING | Primary key. `{workspace}/{relativePath}`. |
+        | language    | STRING | Language identifier (e.g. `typescript`).   |
+        | contentHash | STRING | SHA-256 hash of file content.              |
+        | workspace   | STRING | Workspace name (e.g. `core`, `cli`).       |
 
         **Symbol** — code symbols extracted from files.
 
-        | Column   | Type   | Notes                                              |
-        | -------- | ------ | -------------------------------------------------- |
-        | id       | STRING | Primary key. `{filePath}:{kind}:{name}:{line}`.    |
-        | name     | STRING | Symbol's declared name.                            |
-        | kind     | STRING | `SymbolKind` value.                                |
-        | filePath | STRING | References `File.path`.                            |
-        | line     | INT64  | 1-based line number.                               |
-        | col      | INT64  | 0-based column offset.                             |
-        | comment  | STRING | Raw preceding comment text, or empty string.       |
+        | Column   | Type   | Notes                                           |
+        | -------- | ------ | ----------------------------------------------- |
+        | id       | STRING | Primary key. `{filePath}:{kind}:{name}:{line}`. |
+        | name     | STRING | Symbol's declared name.                         |
+        | kind     | STRING | `SymbolKind` value.                             |
+        | filePath | STRING | References `File.path`.                         |
+        | line     | INT64  | 1-based line number.                            |
+        | col      | INT64  | 0-based column offset.                          |
+        | comment  | STRING | Raw preceding comment text, or empty string.    |
 
         **Spec** — specification documents from workspace spec directories.
 
-        | Column      | Type   | Notes                                              |
-        | ----------- | ------ | -------------------------------------------------- |
-        | specId      | STRING | Primary key. `{workspace}:{specPath}`.             |
-        | path        | STRING | Spec path within the workspace.                    |
-        | title       | STRING | From `.specd-metadata.yaml` `title` field.         |
-        | description | STRING | From `.specd-metadata.yaml` `description` field.   |
-        | contentHash | STRING | SHA-256 hash of concatenated artifacts (excluding `.specd-metadata.yaml`). |
+        | Column      | Type   | Notes                                                                                                                                                         |
+        | ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+        | specId      | STRING | Primary key. `{workspace}:{specPath}`.                                                                                                                        |
+        | path        | STRING | Spec path within the workspace.                                                                                                                               |
+        | title       | STRING | From `.specd-metadata.yaml` `title` field.                                                                                                                    |
+        | description | STRING | From `.specd-metadata.yaml` `description` field.                                                                                                              |
+        | contentHash | STRING | SHA-256 hash of concatenated artifacts (excluding `.specd-metadata.yaml`).                                                                                    |
         | content     | STRING | Concatenated artifact text for full-text search. `spec.md` first if present, then remaining artifacts in alphabetical order. Excludes `.specd-metadata.yaml`. |
-        | workspace   | STRING | Workspace name.                                    |
+        | workspace   | STRING | Workspace name.                                                                                                                                               |
 
         **Meta** — key-value metadata for the database itself.
 
-        | Column | Type   | Notes                            |
-        | ------ | ------ | -------------------------------- |
-        | key    | STRING | Primary key (e.g. `lastIndexed`).|
-        | value  | STRING | Metadata value.                  |
+        | Column | Type   | Notes                             |
+        | ------ | ------ | --------------------------------- |
+        | key    | STRING | Primary key (e.g. `lastIndexed`). |
+        | value  | STRING | Metadata value.                   |
   - requirement: Relationship tables
     rules:
       - |-
         The database SHALL define the following relationship tables:
 
-        | Relationship | From   | To     | Populated by          |
-        | ------------ | ------ | ------ | --------------------- |
-        | IMPORTS      | File   | File   | Indexer Pass 2        |
-        | DEFINES      | File   | Symbol | Indexer Pass 1        |
-        | CALLS        | Symbol | Symbol | Indexer Pass 2        |
-        | EXPORTS      | File   | Symbol | Indexer Pass 1        |
-        | DEPENDS\_ON   | Spec   | Spec   | Spec indexing phase   |
-        | COVERS       | Spec   | File   | Deferred to v2+       |
+        | Relationship | From   | To     | Populated by        |
+        | ------------ | ------ | ------ | ------------------- |
+        | IMPORTS      | File   | File   | Indexer Pass 2      |
+        | DEFINES      | File   | Symbol | Indexer Pass 1      |
+        | CALLS        | Symbol | Symbol | Indexer Pass 2      |
+        | EXPORTS      | File   | Symbol | Indexer Pass 1      |
+        | DEPENDS\_ON   | Spec   | Spec   | Spec indexing phase |
+        | COVERS       | Spec   | File   | Deferred to v2+     |
 
         Relationships have no properties — they are pure edges.
   - requirement: Full-text search indexes
@@ -192,6 +192,6 @@ scenarios:
       - the COVERS relationship table exists
       - AND it contains no rows (v2+ feature)
 contentHashes:
-  spec.md: sha256:54d5c5232ac5e61b9caa5228fe97e7af55c7d66c001fa93eb56388cc66baab4b
+  spec.md: sha256:e28a84c1501bfcf1b084b06c5249b075fb18018762372b6a42618250f23fe7fe
   verify.md: sha256:d6bf57f61d431be882ef293682b8be54d54bf6281bc7dbc2e1b9db47f3696463
 generatedBy: core
