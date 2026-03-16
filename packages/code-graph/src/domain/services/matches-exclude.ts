@@ -5,7 +5,7 @@
  */
 function globToRegExp(pattern: string): RegExp {
   const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replaceAll('*', '.*')
-  return new RegExp(escaped, 'i')
+  return new RegExp(`^${escaped}$`, 'i')
 }
 
 /**
