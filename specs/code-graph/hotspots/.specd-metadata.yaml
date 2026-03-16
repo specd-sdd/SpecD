@@ -83,5 +83,5 @@ constraints:
   - No spec coverage logic — deferred to issue 19
 contentHashes:
   spec.md: sha256:b169996a94f5b232e270fcdda74cb0ac882a6e57a64724c4c6ca2d1bee3dacfe
-  verify.md: sha256:e878320012b00e063abf1d4b6e765a982e57da88671e89793ddfed79b0f3c02c
+  verify.md: sha256:0afd1717c1f6a0e2bd0fd5f2e055161fabc91af7cd26e322629aa316b016778b
 generatedBy: core

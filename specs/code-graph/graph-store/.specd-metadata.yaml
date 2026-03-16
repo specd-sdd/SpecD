@@ -63,7 +63,7 @@ rules:
         The adapter MUST:
 
         * Create the `.specd/` directory and database file on first `open()` if they do not exist
-        * Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text.
+        * Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text and a `searchName STRING` column for FTS-optimized name search (computed from the symbol name using `expandSymbolName`).
         * Use parameterized Cypher queries for all operations (no string interpolation of user data)
         * Support schema migration: if the database schema version does not match the expected version, migrate on `open()`
 
@@ -92,7 +92,7 @@ rules:
       - |-
         `GraphStore` SHALL provide:
 
-        * **`searchSymbols(query: string, limit?: number): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.name` and `Symbol.comment`. Returns results ranked by BM25 score descending.
+        * **`searchSymbols(query: string, limit?: number): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.searchName` and `Symbol.comment`. The `searchName` column contains the original symbol name plus camelCase/snake\_case/kebab-case tokenized parts (e.g. `handleError` is indexed as `"handleError handle error"`), so searches for individual words within compound names match correctly. Returns results ranked by BM25 score descending.
         * **`searchSpecs(query: string, limit?: number): Promise<Array<{ spec: SpecNode; score: number }>>`** — full-text search across `Spec.title`, `Spec.description`, and `Spec.content`. Returns results ranked by BM25 score descending.
         * **`rebuildFtsIndexes(): Promise<void>`** — drops and recreates FTS indexes. Must be called after bulk data changes because LadybugDB FTS indexes are not automatically updated on insert.
 
@@ -301,6 +301,6 @@ scenarios:
     then:
       - 12 SpecNode entries are returned
 contentHashes:
-  spec.md: sha256:1336b749c365314a278261b45d476273adf07344b08e2806037500d58dd872fd
+  spec.md: sha256:72cd5052db5ba98db9e757498978b5d196faaaa766d7855dced35d83dd302483
   verify.md: sha256:a54044aaef872c72e836bbbf8eb60f2b4b6bb74e16b8ed0be4f8b6a05b783746
 generatedBy: core

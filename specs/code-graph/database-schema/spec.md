@@ -21,15 +21,16 @@ The database SHALL define the following node tables:
 
 **Symbol** — code symbols extracted from files.
 
-| Column   | Type   | Notes                                           |
-| -------- | ------ | ----------------------------------------------- |
-| id       | STRING | Primary key. `{filePath}:{kind}:{name}:{line}`. |
-| name     | STRING | Symbol's declared name.                         |
-| kind     | STRING | `SymbolKind` value.                             |
-| filePath | STRING | References `File.path`.                         |
-| line     | INT64  | 1-based line number.                            |
-| col      | INT64  | 0-based column offset.                          |
-| comment  | STRING | Raw preceding comment text, or empty string.    |
+| Column     | Type   | Notes                                                                    |
+| ---------- | ------ | ------------------------------------------------------------------------ |
+| id         | STRING | Primary key. `{filePath}:{kind}:{name}:{line}`.                          |
+| name       | STRING | Symbol's declared name.                                                  |
+| searchName | STRING | Expanded name for FTS. camelCase/snake_case/kebab-case split + original. |
+| kind       | STRING | `SymbolKind` value.                                                      |
+| filePath   | STRING | References `File.path`.                                                  |
+| line       | INT64  | 1-based line number.                                                     |
+| col        | INT64  | 0-based column offset.                                                   |
+| comment    | STRING | Raw preceding comment text, or empty string.                             |
 
 **Spec** — specification documents from workspace spec directories.
 
@@ -69,7 +70,7 @@ Relationships have no properties — they are pure edges.
 
 The database SHALL create FTS indexes after schema initialization:
 
-**`symbol_fts`** — on the `Symbol` table, covering `name` and `comment` columns. Enables keyword search across symbol names and their documentation comments.
+**`symbol_fts`** — on the `Symbol` table, covering `searchName` and `comment` columns. Enables keyword search across symbol names (with camelCase/snake_case/kebab-case tokenization) and their documentation comments.
 
 **`spec_fts`** — on the `Spec` table, covering `title`, `description`, and `content` columns. Enables keyword search across spec documentation.
 
@@ -79,7 +80,7 @@ FTS indexes are created once during `open()` after schema DDL. If the index alre
 
 ### Requirement: Schema versioning
 
-The schema SHALL be versioned with an integer `SCHEMA_VERSION` constant. The current version is **3**. When the database is opened:
+The schema SHALL be versioned with an integer `SCHEMA_VERSION` constant. The current version is **4**. When the database is opened:
 
 1. Execute the DDL statements (all use `IF NOT EXISTS` — safe to re-run)
 2. Create FTS indexes if they do not exist
@@ -95,6 +96,7 @@ The database file SHALL be stored at `{storagePath}/.specd/code-graph.lbug`. The
 
 - All node table primary keys are STRING — no auto-increment
 - `comment` on Symbol is stored as empty string (not NULL) when no comment exists, to enable FTS indexing
+- `searchName` on Symbol is computed at insert time by `expandSymbolName(name)` — it is a derived column, never set directly by callers
 - `content` on Spec may be large (full spec text) — no size limit enforced
 - FTS indexes are rebuilt on `--force` re-index (dropped with the database)
 - Relationship tables have no properties — metadata is not persisted on edges

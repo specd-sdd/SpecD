@@ -65,7 +65,7 @@ The concrete `LadybugGraphStore` adapter SHALL use LadybugDB as the storage engi
 The adapter MUST:
 
 - Create the `.specd/` directory and database file on first `open()` if they do not exist
-- Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text.
+- Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text and a `searchName STRING` column for FTS-optimized name search (computed from the symbol name using `expandSymbolName`).
 
 - Use parameterized Cypher queries for all operations (no string interpolation of user data)
 - Support schema migration: if the database schema version does not match the expected version, migrate on `open()`
@@ -95,7 +95,7 @@ The Spec node table includes:
 
 `GraphStore` SHALL provide:
 
-- **`searchSymbols(query: string, limit?: number): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.name` and `Symbol.comment`. Returns results ranked by BM25 score descending.
+- **`searchSymbols(query: string, limit?: number): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.searchName` and `Symbol.comment`. The `searchName` column contains the original symbol name plus camelCase/snake_case/kebab-case tokenized parts (e.g. `handleError` is indexed as `"handleError handle error"`), so searches for individual words within compound names match correctly. Returns results ranked by BM25 score descending.
 - **`searchSpecs(query: string, limit?: number): Promise<Array<{ spec: SpecNode; score: number }>>`** — full-text search across `Spec.title`, `Spec.description`, and `Spec.content`. Returns results ranked by BM25 score descending.
 - **`rebuildFtsIndexes(): Promise<void>`** — drops and recreates FTS indexes. Must be called after bulk data changes because LadybugDB FTS indexes are not automatically updated on insert.
 

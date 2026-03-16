@@ -9,6 +9,7 @@ import { type GraphStatistics } from '../../domain/value-objects/graph-statistic
 import { type RelationType, RelationType as RT } from '../../domain/value-objects/relation-type.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { SCHEMA_DDL } from './schema.js'
+import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
 import { mkdirSync, existsSync, writeFileSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -96,7 +97,7 @@ export class LadybugGraphStore extends GraphStore {
     // Load FTS extension and create indexes (idempotent — skip if already exists)
     await this.conn.query('INSTALL fts')
     await this.conn.query('LOAD fts')
-    await this.createFtsIndex('Symbol', 'symbol_fts', ['name', 'comment'])
+    await this.createFtsIndex('Symbol', 'symbol_fts', ['searchName', 'comment'])
     await this.createFtsIndex('Spec', 'spec_fts', ['title', 'description', 'content'])
 
     this._isOpen = true
@@ -148,7 +149,7 @@ export class LadybugGraphStore extends GraphStore {
     }
 
     // Recreate
-    await this.createFtsIndex('Symbol', 'symbol_fts', ['name', 'comment'])
+    await this.createFtsIndex('Symbol', 'symbol_fts', ['searchName', 'comment'])
     await this.createFtsIndex('Spec', 'spec_fts', ['title', 'description', 'content'])
   }
 
@@ -190,7 +191,7 @@ export class LadybugGraphStore extends GraphStore {
 
     for (const symbol of symbols) {
       await conn.query(
-        `CREATE (s:Symbol {id: '${this.escape(symbol.id)}', name: '${this.escape(symbol.name)}', kind: '${this.escape(symbol.kind)}', filePath: '${escapedPath}', line: ${symbol.line}, col: ${symbol.column}, comment: '${this.escape(symbol.comment ?? '')}'})`,
+        `CREATE (s:Symbol {id: '${this.escape(symbol.id)}', name: '${this.escape(symbol.name)}', searchName: '${this.escape(expandSymbolName(symbol.name))}', kind: '${this.escape(symbol.kind)}', filePath: '${escapedPath}', line: ${symbol.line}, col: ${symbol.column}, comment: '${this.escape(symbol.comment ?? '')}'})`,
       )
     }
 
@@ -328,10 +329,10 @@ export class LadybugGraphStore extends GraphStore {
       if (data.symbols.length > 0) {
         const symCsv = prefix + 'symbols.csv'
         csvFiles.push(symCsv)
-        const symRows = ['id,name,kind,filePath,line,col,comment']
+        const symRows = ['id,name,searchName,kind,filePath,line,col,comment']
         for (const s of data.symbols) {
           symRows.push(
-            `${csvEscape(s.id)},${csvEscape(s.name)},${csvEscape(s.kind)},${csvEscape(s.filePath)},${s.line},${s.column},${csvEscape(s.comment ?? '')}`,
+            `${csvEscape(s.id)},${csvEscape(s.name)},${csvEscape(expandSymbolName(s.name))},${csvEscape(s.kind)},${csvEscape(s.filePath)},${s.line},${s.column},${csvEscape(s.comment ?? '')}`,
           )
         }
         writeFileSync(symCsv, symRows.join('\n') + '\n')
