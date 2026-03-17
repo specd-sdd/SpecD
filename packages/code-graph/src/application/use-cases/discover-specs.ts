@@ -10,13 +10,22 @@ export interface DiscoveredSpec {
 }
 
 /**
- * Extracts the first heading from a spec markdown file as the title.
- * @param specContent - The raw markdown content.
- * @returns The extracted title, or 'Untitled' if no heading is found.
+ * Extracts a top-level scalar field from a YAML metadata file.
+ * @param content - The raw YAML content.
+ * @param field - The field name to extract (e.g. `title`, `description`).
+ * @returns The field value, or undefined if not found.
  */
-function extractTitle(specContent: string): string {
-  const match = specContent.match(/^#\s+(.+)$/m)
-  return match?.[1]?.trim() ?? 'Untitled'
+function extractMetadataField(content: string, field: string): string | undefined {
+  const match = content.match(new RegExp(`^${field}:\\s*(.+)$`, 'm'))
+  if (!match?.[1]) return undefined
+  let value = match[1].trim()
+  if (
+    (value.startsWith("'") && value.endsWith("'")) ||
+    (value.startsWith('"') && value.endsWith('"'))
+  ) {
+    value = value.slice(1, -1)
+  }
+  return value
 }
 
 /**
@@ -41,27 +50,6 @@ function extractDependsOnFromMetadata(metadataContent: string): string[] {
       } else if (!line.match(/^\s/)) {
         inDependsOn = false
       }
-    }
-  }
-  return deps
-}
-
-/**
- * Extracts dependency spec paths from the "Spec Dependencies" section of a spec markdown file.
- * @param specContent - The raw markdown content.
- * @returns An array of dependency spec path strings.
- */
-function extractDependsOnFromSpec(specContent: string): string[] {
-  const deps: string[] = []
-  const depSection = specContent.match(/## Spec Dependencies\n([\s\S]*?)(?=\n## |\n$|$)/)
-  if (!depSection?.[1]) return deps
-
-  const links = depSection[1].matchAll(/\[.*?\]\(([^)]+)\)/g)
-  for (const match of links) {
-    const href = match[1]
-    if (href && href.endsWith('spec.md')) {
-      const specPath = href.replace(/\/spec\.md$/, '').replace(/^(\.\.\/)+/, '')
-      deps.push(specPath)
     }
   }
   return deps
@@ -125,27 +113,24 @@ export function discoverSpecs(
         return
       }
 
-      const title = extractTitle(specContent)
-      let hashSource = specContent
+      const specId = buildSpecId(specsDir, dir)
+      const relPath = relative(workspacePath, dir).replaceAll('\\', '/')
 
+      // Title and dependsOn come from metadata only — no fallback parsing
+      let title = specId
       let dependsOn: string[] = []
       const metadataPath = join(dir, '.specd-metadata.yaml')
       if (existsSync(metadataPath)) {
         try {
           const metadataContent = readFileSync(metadataPath, 'utf-8')
+          title = extractMetadataField(metadataContent, 'title') ?? specId
           dependsOn = extractDependsOnFromMetadata(metadataContent)
-          hashSource += metadataContent
         } catch {
           // skip metadata
         }
-      } else {
-        dependsOn = extractDependsOnFromSpec(specContent)
       }
 
-      const specId = buildSpecId(specsDir, dir)
-      const relPath = relative(workspacePath, dir).replaceAll('\\', '/')
-
-      const hash = computeContentHash(hashSource)
+      const hash = computeContentHash(specContent)
       results.push({
         spec: createSpecNode({
           specId,
@@ -215,27 +200,24 @@ export function discoverSpecsFromDir(
         return
       }
 
-      const title = extractTitle(specContent)
-      let hashSource = specContent
+      const relPath = relative(specsDir, dir).replaceAll('\\', '/')
+      const specId = `${workspace}:${workspace}/${relPath}`
 
+      // Title and dependsOn come from metadata only — no fallback parsing
+      let title = specId
       let dependsOn: string[] = []
       const metadataPath = join(dir, '.specd-metadata.yaml')
       if (existsSync(metadataPath)) {
         try {
           const metadataContent = readFileSync(metadataPath, 'utf-8')
+          title = extractMetadataField(metadataContent, 'title') ?? specId
           dependsOn = extractDependsOnFromMetadata(metadataContent)
-          hashSource += metadataContent
         } catch {
           // skip metadata
         }
-      } else {
-        dependsOn = extractDependsOnFromSpec(specContent)
       }
 
-      const relPath = relative(specsDir, dir).replaceAll('\\', '/')
-      const specId = `${workspace}:${workspace}/${relPath}`
-
-      const hash = computeContentHash(hashSource)
+      const hash = computeContentHash(specContent)
       results.push({
         spec: createSpecNode({
           specId,

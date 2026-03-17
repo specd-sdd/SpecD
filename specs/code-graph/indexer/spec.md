@@ -117,8 +117,8 @@ Only infrastructure-level errors (e.g. store connection lost, disk full) may abo
 
 The indexer SHALL build `SpecNode` entries with `DEPENDS_ON` relations. Specs are resolved via the workspace's `specs()` callback (backed by `SpecRepository`), NOT by reading the filesystem directly. For each spec provided by the repository:
 
-1. Read `.specd-metadata.yaml` via `SpecRepository.artifact()` — extract `title`, `description`, and `dependsOn` as the primary source
-2. If no `.specd-metadata.yaml` exists, fall back to parsing `spec.md` content: extract the title from the `# Title` heading and `dependsOn` from the `## Spec Dependencies` section
+1. Read `.specd-metadata.yaml` via `SpecRepository.artifact()` — extract `title`, `description`, and `dependsOn`
+2. If no `.specd-metadata.yaml` exists, use defaults: `title` = specId, `description` = `''`, `dependsOn` = `[]`. There is no fallback parsing of `spec.md` — metadata should be regenerated via `spec generate-metadata` before indexing.
 3. Compute a `contentHash` (SHA-256 of all artifacts EXCEPT `.specd-metadata.yaml`) — this includes `spec.md`, `verify.md`, and any other spec artifacts
 4. Create a `SpecNode` and upsert it into the store
 5. Create a `DEPENDS_ON` relation for each entry in `dependsOn`
