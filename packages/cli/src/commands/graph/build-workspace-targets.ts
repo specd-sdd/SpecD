@@ -1,6 +1,14 @@
-import { createHash } from 'node:crypto'
-import { type SpecdConfig, type Kernel, type SpecRepository, createVcsAdapter } from '@specd/core'
+import {
+  type SpecdConfig,
+  type Kernel,
+  type SpecRepository,
+  createVcsAdapter,
+  parseMetadata,
+  NodeContentHasher,
+} from '@specd/core'
 import { type WorkspaceIndexTarget, type DiscoveredSpec } from '@specd/code-graph'
+
+const hasher = new NodeContentHasher()
 
 /**
  * Resolves the repository root for a given directory using the VCS adapter.
@@ -86,9 +94,10 @@ async function resolveSpecsFromRepo(
     let dependsOn: string[] = []
     const metadata = await repo.artifact(spec, '.specd-metadata.yaml')
     if (metadata) {
-      title = extractMetadataField(metadata.content, 'title') ?? specId
-      description = extractMetadataField(metadata.content, 'description') ?? ''
-      dependsOn = extractDependsOnFromMetadata(metadata.content)
+      const parsed = parseMetadata(metadata.content)
+      title = parsed.title ?? specId
+      description = parsed.description ?? ''
+      dependsOn = parsed.dependsOn ?? []
     }
 
     // Build content: all artifacts EXCEPT .specd-metadata.yaml
@@ -111,7 +120,7 @@ async function resolveSpecsFromRepo(
 
     if (content === '' && !metadata) continue
 
-    const contentHash = computeHash(content)
+    const contentHash = hasher.hash(content)
 
     results.push({
       spec: {
@@ -129,71 +138,4 @@ async function resolveSpecsFromRepo(
   }
 
   return results
-}
-
-/**
- * Extracts a top-level scalar field from a YAML metadata file.
- * @param content - The raw YAML content.
- * @param field - The field name to extract (e.g. `title`, `description`).
- * @returns The field value, or undefined if not found.
- */
-function extractMetadataField(content: string, field: string): string | undefined {
-  const match = content.match(new RegExp(`^${field}:\\s*(.+)$`, 'm'))
-  if (!match?.[1]) return undefined
-  let value = match[1].trim()
-  // Strip surrounding quotes (YAML scalar quoting)
-  if (
-    (value.startsWith("'") && value.endsWith("'")) ||
-    (value.startsWith('"') && value.endsWith('"'))
-  ) {
-    value = value.slice(1, -1)
-  }
-  return value
-}
-
-/**
- * Computes a SHA-256 content hash.
- * @param content - The content to hash.
- * @returns The hex hash string.
- */
-function computeHash(content: string): string {
-  return createHash('sha256').update(content).digest('hex')
-}
-
-/**
- * Parses the dependsOn list from a .specd-metadata.yaml file.
- * @param metadataContent - The raw YAML metadata content.
- * @returns An array of dependency spec identifiers.
- */
-function extractDependsOnFromMetadata(metadataContent: string): string[] {
-  const deps: string[] = []
-  const lines = metadataContent.split('\n')
-  let inDependsOn = false
-
-  for (const line of lines) {
-    const headerMatch = line.match(/^dependsOn\s*:\s*(.*)/)
-    if (headerMatch) {
-      // Check for inline list syntax: dependsOn: [a, b, c]
-      const inlineValue = headerMatch[1]?.trim()
-      if (inlineValue && inlineValue.startsWith('[') && inlineValue.endsWith(']')) {
-        const items = inlineValue.slice(1, -1).split(',')
-        for (const item of items) {
-          const trimmed = item.trim()
-          if (trimmed) deps.push(trimmed)
-        }
-        return deps
-      }
-      inDependsOn = true
-      continue
-    }
-    if (inDependsOn) {
-      const match = line.match(/^\s+-\s+(.+)/)
-      if (match?.[1]) {
-        deps.push(match[1].trim())
-      } else if (!line.match(/^\s/)) {
-        inDependsOn = false
-      }
-    }
-  }
-  return deps
 }
