@@ -63,9 +63,16 @@ artifacts:
       open question affects the spec you are writing, ask the user to resolve it before
       proceeding — do not make assumptions about unresolved decisions.
 
+      If the spec depends on other specs (uses their types, calls their APIs, or
+      builds on their requirements), add a `## Spec Dependencies` section listing
+      each dependency as `- <workspace>:<capability-path>` with a brief reason.
+      This section is used by tooling to discover transitive context.
+
       Common pitfalls:
       - Using the wrong heading level. Requirements are `###`, never `##` or `####`.
       - Mixing requirement content into the Purpose section.
+      - Omitting spec dependencies — if the spec references another spec's concepts,
+        list it.
     delta: true
     deltaInstruction: |
       For every modified spec listed in the proposal's "Specs affected" section,
@@ -89,10 +96,16 @@ artifacts:
 
       Every `### Requirement:` heading in `content` must use exactly three hashtags.
 
+      If the change introduces new dependencies on other specs, add or update the
+      `## Spec Dependencies` section using an `added` or `modified` operation targeting
+      that section. List each dependency as `- <workspace>:<capability-path>` with a
+      brief reason.
+
       Common pitfalls:
       - Forgetting to read the existing spec before writing a MODIFIED delta — the
         selector must match the exact heading text.
       - Writing a full spec file instead of a delta — never rewrite an existing spec.
+      - Omitting spec dependency updates when the change adds cross-spec references.
     validations:
       - id: has-purpose
         type: section
@@ -189,34 +202,53 @@ artifacts:
   # ── design ─────────────────────────────────────────────────────────────────
   - id: design
     scope: change
-    optional: true
+    optional: false
     output: design.md
-    description: Technical design with implementation decisions
+    description: Implementation analysis — what needs to change and how
     template: templates/design.md
     requires:
       - proposal
     instruction: |
-      Create the design document explaining HOW to implement the change.
+      Create the design document that analyses HOW to implement the change.
 
-      Write design.md only when at least one of these applies:
-      - The change spans multiple modules, services, or packages.
-      - A new external dependency or significant data model change is introduced.
-      - There are non-obvious security, performance, or migration concerns.
-      - Key technical decisions need to be recorded before coding begins.
+      This artifact is the bridge between specs and tasks. Its purpose is to study the
+      codebase, identify every file, symbol, and module affected, and document the
+      implementation approach so that the tasks artifact can be derived from it.
 
-      If none of these apply, skip design.md — the agent must explicitly mark it as
-      skipped rather than leaving it absent.
+      **Always write design.md.** The scope and depth should match the nature of the
+      change — a code change needs codebase analysis, a docs change needs content
+      analysis — but the artifact is never skipped.
 
       Sections to include:
-      - **Approach**: The chosen technical strategy and why.
-      - **Key decisions**: Each significant choice with its rationale. For each decision,
-        note what alternatives were considered and why they were rejected.
-      - **Trade-offs**: Known limitations or things that could go wrong, with mitigations.
-      - **Migration plan**: Steps to deploy and roll back (if applicable).
-      - **Open questions**: Outstanding technical unknowns to resolve during implementation.
 
-      Reference the spec requirements — do not repeat them. Focus on architecture and
-      approach, not line-by-line implementation.
+      - **Affected areas**: List every file, module, symbol, document, or resource that
+        will be created, modified, or removed. Use the codebase and tooling to discover
+        these — do not guess. For each area, briefly explain what changes.
+      - **Approach**: The chosen strategy and why. How do the pieces fit together? What
+        is the order of operations?
+      - **Key decisions**: Each significant choice with its rationale. Note what
+        alternatives were considered and why they were rejected.
+      - **Trade-offs**: Known limitations or things that could go wrong, with mitigations.
+      - **Open questions**: Outstanding unknowns to resolve during implementation.
+
+      The implementation approach must satisfy every requirement and scenario defined
+      in the specs and verify artifacts of this change. Reference them to ensure full
+      coverage — any requirement without a clear path to implementation should be flagged.
+
+      Review the project's existing test infrastructure and documentation to determine
+      how the implementation will be validated. Note which test suites, linting rules,
+      or documentation sources apply, and flag any gaps where new tests or docs updates
+      are needed to verify correctness.
+
+      Adapt the depth to the change:
+      - **Code changes**: analyse the codebase — identify affected symbols, layers, and
+        modules. Reference spec requirements; do not repeat them.
+      - **Non-code changes** (documentation, configuration): focus on
+        which files are affected, what content changes, and how it relates to existing
+        material.
+
+      Omit sections that genuinely do not apply (e.g. Trade-offs for a typo fix), but
+      Affected areas and Approach are always required.
 
   # ── tasks ──────────────────────────────────────────────────────────────────
   - id: tasks
@@ -226,19 +258,25 @@ artifacts:
     template: templates/tasks.md
     requires:
       - specs
+      - design
     instruction: |
       Create the task list that breaks down the implementation into discrete,
-      trackable steps.
+      trackable steps. The tasks artifact is derived from design.md — every task
+      must reference the concrete files, symbols, and approach documented there.
 
       Format requirements:
       - Group related tasks under `## <n>. <Group name>` headings.
-      - Each task must be a checkbox: `- [ ] <n>.<m> <description>`.
-        Tasks not using this format will not be tracked by SpecD.
+      - Each task is a checkbox line followed by indented context lines:
+        ```
+        - [ ] <n>.<m> <short description>
+              <file>: <symbol> — <what to change and why>
+        ```
+        The checkbox line is tracked by SpecD. The indented lines below it provide
+        the actionable context from design.md: which file, which symbol or function,
+        and what the change does. A developer reading a single task should know exactly
+        where to go and what to do.
       - Order tasks by dependency — what must be done first?
       - Tasks should be small enough to complete in a single session.
-
-      If design.md exists, use it to inform the breakdown. If it does not exist,
-      derive tasks from the specs alone.
 
       Reference each spec requirement at least once — every requirement must map
       to at least one task, otherwise it may never be implemented.
@@ -247,14 +285,20 @@ artifacts:
       ```
       ## 1. Domain model
 
-      - [ ] 1.1 Define value objects and entity interfaces
-      - [ ] 1.2 Implement state transition logic
+      - [ ] 1.1 Add optional `artifactId` field to input interface
+            `packages/core/src/application/use-cases/validate-artifacts.ts`:
+            `ValidateArtifactsInput` — add `artifactId?: string` property
+            (Req: Input)
+      - [ ] 1.2 Guard unknown artifact IDs with failure result
+            `packages/core/src/application/use-cases/validate-artifacts.ts`:
+            `execute()` — return failure when `artifactId` not in schema, do not throw
+            (Req: Input, scenario: unknown artifact ID)
 
-      ## 2. Infrastructure
+      ## 2. Tests
 
-      - [ ] 2.1 Add filesystem adapter for persistence
-      - [ ] 2.2 Write integration tests against real storage
-      - [ ] 2.3 Wire adapter into composition factory
+      - [ ] 2.1 Add test for single-artifact validation
+            `packages/core/test/application/use-cases/validate-artifacts.spec.ts`:
+            new describe block — verify only specified artifact is validated
       ```
 
       Each task should be verifiable — you know unambiguously when it is done.
@@ -349,8 +393,9 @@ workflow:
             `specs/<workspace>/<capability-path>/spec.md` and the paired `verify.md` for
             each new spec. For modified specs, produce delta files at
             `deltas/<workspace>/<capability-path>/<filename>.delta.yaml` instead of
-            rewriting the existing files. Write design.md only if the change warrants it
-            (cross-cutting concern, new dependency, significant architectural decision).
+            rewriting the existing files. Then write design.md — analyse the codebase to
+            identify affected files and symbols, and document the implementation approach.
+            If the change has no code implementation, state that explicitly in design.md.
 
   - step: implementing
     requires: [tasks]
