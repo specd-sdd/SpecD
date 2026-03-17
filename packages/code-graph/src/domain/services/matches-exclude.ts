@@ -9,12 +9,12 @@ function globToRegExp(pattern: string): RegExp {
 }
 
 /**
- * Extracts the workspace prefix (first path segment) from a file path.
- * @param filePath - A forward-slash separated file path.
- * @returns The first path segment, or the entire path if no slash is present.
+ * Extracts the workspace prefix from a colon-separated file path (workspace:relative-path).
+ * @param filePath - A workspace-prefixed file path (e.g. "core:src/foo.ts").
+ * @returns The workspace name, or the entire path if no colon is present.
  */
 function extractWorkspace(filePath: string): string {
-  const idx = filePath.indexOf('/')
+  const idx = filePath.indexOf(':')
   return idx === -1 ? filePath : filePath.substring(0, idx)
 }
 
