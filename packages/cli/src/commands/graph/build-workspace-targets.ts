@@ -78,13 +78,15 @@ async function resolveSpecsFromRepo(
   const results: DiscoveredSpec[] = []
 
   for (const spec of specs) {
-    // Read metadata for title, description, dependsOn
-    let title = 'Untitled'
+    const specId = `${spec.workspace}:${spec.name.toString()}`
+
+    // Read metadata for title, description, dependsOn — no fallback parsing
+    let title = specId
     let description = ''
     let dependsOn: string[] = []
     const metadata = await repo.artifact(spec, '.specd-metadata.yaml')
     if (metadata) {
-      title = extractMetadataField(metadata.content, 'title') ?? 'Untitled'
+      title = extractMetadataField(metadata.content, 'title') ?? specId
       description = extractMetadataField(metadata.content, 'description') ?? ''
       dependsOn = extractDependsOnFromMetadata(metadata.content)
     }
@@ -100,28 +102,15 @@ async function resolveSpecsFromRepo(
     ordered.push(...contentFilenames.filter((f) => f !== 'spec.md').sort())
 
     let content = ''
-    let specMdContent: string | undefined
     for (const filename of ordered) {
       const artifact = await repo.artifact(spec, filename)
       if (artifact) {
         content += artifact.content
-        if (filename === 'spec.md') {
-          specMdContent = artifact.content
-        }
       }
     }
 
     if (content === '' && !metadata) continue
 
-    // Fallback: if no metadata, extract title from spec.md and dependsOn from links
-    if (!metadata) {
-      if (specMdContent) {
-        title = extractTitle(specMdContent)
-        dependsOn = extractDependsOnFromSpec(specMdContent)
-      }
-    }
-
-    const specId = `${spec.workspace}:${spec.name.toString()}`
     const contentHash = computeHash(content)
 
     results.push({
@@ -160,16 +149,6 @@ function extractMetadataField(content: string, field: string): string | undefine
     value = value.slice(1, -1)
   }
   return value
-}
-
-/**
- * Extracts the first heading from a spec markdown file as the title.
- * @param content - The raw markdown content.
- * @returns The extracted title, or 'Untitled' if no heading is found.
- */
-function extractTitle(content: string): string {
-  const match = content.match(/^#\s+(.+)$/m)
-  return match?.[1]?.trim() ?? 'Untitled'
 }
 
 /**
@@ -214,27 +193,6 @@ function extractDependsOnFromMetadata(metadataContent: string): string[] {
       } else if (!line.match(/^\s/)) {
         inDependsOn = false
       }
-    }
-  }
-  return deps
-}
-
-/**
- * Extracts dependency spec paths from the "Spec Dependencies" section of a spec markdown file.
- * @param specContent - The raw markdown content.
- * @returns An array of dependency spec path strings.
- */
-function extractDependsOnFromSpec(specContent: string): string[] {
-  const deps: string[] = []
-  const depSection = specContent.match(/## Spec Dependencies\n([\s\S]*?)(?=\n## |\n$|$)/)
-  if (!depSection?.[1]) return deps
-
-  const links = depSection[1].matchAll(/\[.*?\]\(([^)]+)\)/g)
-  for (const match of links) {
-    const href = match[1]
-    if (href && href.endsWith('spec.md')) {
-      const specPath = href.replace(/\/spec\.md$/, '').replace(/^(\.\.\/)+/, '')
-      deps.push(specPath)
     }
   }
   return deps
