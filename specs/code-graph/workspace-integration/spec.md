@@ -54,9 +54,8 @@ The `specs` callback is implemented by the CLI/MCP integration layer using `Spec
 1. Call `repo.list()` to get all `Spec` entities in the workspace
 2. For each spec, load all artifacts via `repo.artifact(spec, filename)`
 3. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order
-4. Extract the title from the first `# Heading` in `spec.md` (or `'Untitled'` if absent)
-5. Extract `dependsOn` from `.specd-metadata.yaml` if present, otherwise from the `## Spec Dependencies` section of `spec.md`
-6. Build the `specId` as `{workspace}:{specPath}` (e.g. `core:core/change`), matching the format produced by `SpecRepository.resolveFromPath`
+4. Load `.specd-metadata.yaml` via `repo.artifact(spec, '.specd-metadata.yaml')` and parse it with `parseMetadata` to extract `title`, `description`, and `dependsOn`. If metadata is absent, `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.
+5. Build the `specId` as `{workspace}:{specPath}` (e.g. `core:core/change`), matching the format produced by `SpecRepository.resolveFromPath`
 
 This decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`.
 
@@ -166,7 +165,9 @@ const spec: SpecNode = {
   specId: 'core:core/change',
   path: 'specs/core/change',
   title: 'Change',
+  description: 'Defines the Change entity and its lifecycle transitions',
   contentHash: 'sha256:def456...',
+  content: '# Change\n\n## Purpose\n...',
   dependsOn: [],
   workspace: 'core',
 }
