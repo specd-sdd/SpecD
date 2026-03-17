@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { parseMetadata } from '@specd/core'
 import { createSpecNode, type SpecNode } from '../../domain/value-objects/spec-node.js'
 import { computeContentHash } from './compute-content-hash.js'
 
@@ -7,52 +8,6 @@ import { computeContentHash } from './compute-content-hash.js'
 export interface DiscoveredSpec {
   spec: SpecNode
   contentHash: string
-}
-
-/**
- * Extracts a top-level scalar field from a YAML metadata file.
- * @param content - The raw YAML content.
- * @param field - The field name to extract (e.g. `title`, `description`).
- * @returns The field value, or undefined if not found.
- */
-function extractMetadataField(content: string, field: string): string | undefined {
-  const match = content.match(new RegExp(`^${field}:\\s*(.+)$`, 'm'))
-  if (!match?.[1]) return undefined
-  let value = match[1].trim()
-  if (
-    (value.startsWith("'") && value.endsWith("'")) ||
-    (value.startsWith('"') && value.endsWith('"'))
-  ) {
-    value = value.slice(1, -1)
-  }
-  return value
-}
-
-/**
- * Parses the dependsOn list from a .specd-metadata.yaml file.
- * @param metadataContent - The raw YAML metadata content.
- * @returns An array of dependency spec identifiers.
- */
-function extractDependsOnFromMetadata(metadataContent: string): string[] {
-  const deps: string[] = []
-  const lines = metadataContent.split('\n')
-  let inDependsOn = false
-
-  for (const line of lines) {
-    if (line.match(/^dependsOn\s*:/)) {
-      inDependsOn = true
-      continue
-    }
-    if (inDependsOn) {
-      const match = line.match(/^\s+-\s+(.+)/)
-      if (match?.[1]) {
-        deps.push(match[1].trim())
-      } else if (!line.match(/^\s/)) {
-        inDependsOn = false
-      }
-    }
-  }
-  return deps
 }
 
 /**
@@ -123,8 +78,9 @@ export function discoverSpecs(
       if (existsSync(metadataPath)) {
         try {
           const metadataContent = readFileSync(metadataPath, 'utf-8')
-          title = extractMetadataField(metadataContent, 'title') ?? specId
-          dependsOn = extractDependsOnFromMetadata(metadataContent)
+          const parsed = parseMetadata(metadataContent)
+          title = parsed.title ?? specId
+          dependsOn = parsed.dependsOn ?? []
         } catch {
           // skip metadata
         }
@@ -210,8 +166,9 @@ export function discoverSpecsFromDir(
       if (existsSync(metadataPath)) {
         try {
           const metadataContent = readFileSync(metadataPath, 'utf-8')
-          title = extractMetadataField(metadataContent, 'title') ?? specId
-          dependsOn = extractDependsOnFromMetadata(metadataContent)
+          const parsed = parseMetadata(metadataContent)
+          title = parsed.title ?? specId
+          dependsOn = parsed.dependsOn ?? []
         } catch {
           // skip metadata
         }
