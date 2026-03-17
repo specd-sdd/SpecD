@@ -16,15 +16,16 @@ The use case MUST load the change by name from the `ChangeRepository`. If no cha
 
 ### Requirement: Artifact hash computation
 
-Before recording the signoff, the use case MUST compute a content hash for every artifact in the change. For each artifact:
+Before recording the signoff, the use case MUST compute a content hash for every file across all artifacts in the change. For each artifact, it iterates over the artifact's `files` map. For each file:
 
-1. Load the artifact content from the repository via `ChangeRepository.artifact()`.
-2. If the artifact cannot be loaded (returns `null`), skip it silently.
-3. Resolve the active schema from the `SchemaRegistry` using the configured schema reference and workspace schema paths.
-4. If the schema resolves, build a cleanup map of artifact-type to pre-hash cleanup rules; if it does not resolve, use an empty cleanup map.
-5. Apply the matching cleanup rules (by artifact type) to the content, then hash the cleaned content via the `ContentHasher`.
+1. Skip files with status `missing` or `skipped`.
+2. Load the file content from the repository via `ChangeRepository.artifact(change, file.filename)`.
+3. If the file cannot be loaded (returns `null`), skip it silently.
+4. Resolve the active schema from the `SchemaRegistry` using the configured schema reference and workspace schema paths.
+5. If the schema resolves, build a cleanup map of artifact-type to pre-hash cleanup rules; if it does not resolve, use an empty cleanup map.
+6. Apply the matching cleanup rules (by artifact type) to the content, then hash the cleaned content via the `ContentHasher`.
 
-The result is a `Record<string, string>` mapping artifact filename to hash string.
+The result is a `Record<string, string>` mapping `type:key` hash keys to hash strings (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within the artifact.
 
 ### Requirement: Signoff recording and state transition
 

@@ -43,7 +43,7 @@ After resolving the schema from config, `ValidateArtifacts` must compare `schema
 
 ### Requirement: Required artifacts check
 
-Before validating structure, `ValidateArtifacts` must verify that all non-optional artifact IDs are present in the change (status not `missing`). Optional artifacts with status `skipped` (`validatedHash === "__skipped__"`) are considered resolved and do not cause a failure. If any non-optional artifact is absent, `ValidateArtifacts` must return a failure result listing the missing artifact IDs. It must not throw — missing required artifacts are a validation failure, not an error.
+Before validating structure, `ValidateArtifacts` must verify that all non-optional artifact IDs are present in the change (aggregated status not `missing`). Optional artifacts with aggregated status `skipped` are considered resolved and do not cause a failure. If any non-optional artifact is absent, `ValidateArtifacts` must return a failure result listing the missing artifact IDs. It must not throw — missing required artifacts are a validation failure, not an error.
 
 ### Requirement: Dependency order check
 
@@ -53,9 +53,17 @@ Before validating an artifact, `ValidateArtifacts` must check that all artifact 
 
 If the change has an active spec approval (`change.activeSpecApproval` is defined) and any artifact file's current content hash (after `preHashCleanup`) differs from the hash recorded in that approval's `artifactHashes`, `ValidateArtifacts` must call `change.invalidate('artifact-change', actor)` before proceeding with validation. This rolls the change back to `designing` and records the invalidation in history.
 
+Approval hash keys use the `type:key` format (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within that artifact.
+
 The same check applies to active signoff (`change.activeSignoff`): if any artifact's current hash differs from what was recorded in `activeSignoff.artifactHashes`, `change.invalidate('artifact-change', actor)` must be called.
 
 A single invalidation call is made per `execute` invocation even if multiple artifacts have changed — the first hash mismatch triggers invalidation and the remaining artifacts are checked against the now-cleared approval state.
+
+### Requirement: Per-file validation
+
+Validation operates per-file within each artifact type. For `scope: change` artifacts, the single file is keyed by the artifact type id. For `scope: spec` artifacts, validation targets the file keyed by the `specPath` input parameter. If the tracked file's filename ends with `.delta.yaml`, the file is read as a delta directly (no separate delta lookup). Otherwise, standard delta detection applies.
+
+The raw file content (not merged) is hashed for `markComplete` — this is the content that was actually written by the user/agent.
 
 ### Requirement: Delta validation
 
@@ -101,12 +109,12 @@ After a successful delta application preview (or for non-delta artifacts), `Vali
 
 ### Requirement: Hash computation and markComplete
 
-If all delta validations, conflict detection, and structural validations pass for an artifact, `ValidateArtifacts` must:
+If all delta validations, conflict detection, and structural validations pass for a file within an artifact, `ValidateArtifacts` must:
 
-1. Compute the cleaned hash: apply each `preHashCleanup` substitution in declaration order to the artifact file content, then compute SHA-256 of the result.
-2. Call `change.getArtifact(type).markComplete(cleanedHash)` on the corresponding `ChangeArtifact`.
+1. Compute the cleaned hash: apply each `preHashCleanup` substitution in declaration order to the raw file content (not the merged content), then compute SHA-256 of the result.
+2. Call `change.getArtifact(type).markComplete(key, cleanedHash)` on the corresponding `ChangeArtifact`, where `key` is the file key (artifact type id for `scope: change`, spec ID for `scope: spec`).
 
-If any validation step fails, `markComplete` must not be called for that artifact.
+If any validation step fails, `markComplete` must not be called for that file.
 
 ### Requirement: Result shape
 

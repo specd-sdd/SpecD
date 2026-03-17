@@ -21,6 +21,13 @@ Each `ArtifactStatusEntry` MUST contain:
 
 - `type` -- the artifact type identifier (e.g. `'proposal'`, `'spec'`)
 - `effectiveStatus` -- the effective `ArtifactStatus` after cascading through required dependencies via `Change.effectiveStatus(type)`
+- `files` -- an array of `ArtifactFileStatus` objects, one per file in the artifact
+
+Each `ArtifactFileStatus` MUST contain:
+
+- `key` -- the file key (artifact type id for `scope: change`, spec ID for `scope: spec`)
+- `filename` -- the relative filename within the change directory
+- `status` -- the `ArtifactStatus` of that individual file
 
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
