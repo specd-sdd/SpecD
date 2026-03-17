@@ -115,14 +115,15 @@ Only infrastructure-level errors (e.g. store connection lost, disk full) may abo
 
 ### Requirement: Spec dependency indexing
 
-The indexer SHALL discover spec directories under `specs/` and build `SpecNode` entries with `DEPENDS_ON` relations. For each spec directory found:
+The indexer SHALL build `SpecNode` entries with `DEPENDS_ON` relations. Specs are resolved via the workspace's `specs()` callback (backed by `SpecRepository`), NOT by reading the filesystem directly. For each spec provided by the repository:
 
-1. Read `.specd-metadata.yaml` if it exists — extract `dependsOn` as the primary source
-2. If no `.specd-metadata.yaml` exists, parse the `## Spec Dependencies` section in `spec.md` — extract linked spec paths and convert them to spec IDs
-3. Extract the spec title from the `# Title` heading in `spec.md`
-4. Compute a `contentHash` (SHA-256 of `spec.md` + `.specd-metadata.yaml` content) and include it in the `SpecNode`
-5. Create a `SpecNode` and upsert it into the store
-6. Create a `DEPENDS_ON` relation for each entry in `dependsOn`
+1. Read `.specd-metadata.yaml` via `SpecRepository.artifact()` — extract `title`, `description`, and `dependsOn` as the primary source
+2. If no `.specd-metadata.yaml` exists, fall back to parsing `spec.md` content: extract the title from the `# Title` heading and `dependsOn` from the `## Spec Dependencies` section
+3. Compute a `contentHash` (SHA-256 of all artifacts EXCEPT `.specd-metadata.yaml`) — this includes `spec.md`, `verify.md`, and any other spec artifacts
+4. Create a `SpecNode` and upsert it into the store
+5. Create a `DEPENDS_ON` relation for each entry in `dependsOn`
+
+Metadata changes alone do NOT trigger re-indexing — only changes to spec content artifacts (`spec.md`, `verify.md`, etc.) affect the `contentHash`. Metadata freshness is tracked independently by `@specd/core`.
 
 Spec discovery follows the same incremental model as source files: the `contentHash` is compared against the stored hash, and only specs with changed hashes are re-processed. Unchanged specs are skipped entirely.
 
