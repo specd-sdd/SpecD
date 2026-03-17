@@ -14,6 +14,7 @@ import { withProvider } from './with-provider.js'
  * @param result.indirectDependents - Count of indirect dependents.
  * @param result.transitiveDependents - Count of transitive dependents.
  * @param result.affectedFiles - List of affected file paths.
+ * @param result.affectedSymbols - Optional list of affected symbols with name and file path.
  * @returns An array of formatted lines.
  */
 function formatImpact(
@@ -24,6 +25,7 @@ function formatImpact(
     indirectDependents: number
     transitiveDependents: number
     affectedFiles: readonly string[]
+    affectedSymbols?: readonly { name: string; filePath: string }[]
   },
 ): string[] {
   const lines = [
@@ -35,7 +37,25 @@ function formatImpact(
     `  Affected files:   ${String(result.affectedFiles.length)}`,
   ]
 
-  if (result.affectedFiles.length > 0) {
+  if (result.affectedSymbols && result.affectedSymbols.length > 0) {
+    // Group symbols by file
+    const byFile = new Map<string, string[]>()
+    for (const s of result.affectedSymbols) {
+      const existing = byFile.get(s.filePath)
+      if (existing) {
+        existing.push(s.name)
+      } else {
+        byFile.set(s.filePath, [s.name])
+      }
+    }
+
+    lines.push('')
+    lines.push('Affected files:')
+    for (const f of result.affectedFiles) {
+      const syms = byFile.get(f)
+      lines.push(syms ? `  ${f}: ${syms.join(', ')}` : `  ${f}`)
+    }
+  } else if (result.affectedFiles.length > 0) {
     lines.push('')
     lines.push('Affected files:')
     for (const f of result.affectedFiles) {

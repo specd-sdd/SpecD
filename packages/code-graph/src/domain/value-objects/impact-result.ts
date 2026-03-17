@@ -3,6 +3,15 @@ import { type RiskLevel } from './risk-level.js'
 /**
  * Result of analyzing the impact of modifying a single symbol.
  */
+export interface AffectedSymbol {
+  readonly id: string
+  readonly name: string
+  readonly filePath: string
+}
+
+/**
+ * Result of analyzing the impact of modifying a single symbol.
+ */
 export interface ImpactResult {
   readonly target: string
   readonly directDependents: number
@@ -10,6 +19,7 @@ export interface ImpactResult {
   readonly transitiveDependents: number
   readonly riskLevel: RiskLevel
   readonly affectedFiles: readonly string[]
+  readonly affectedSymbols: readonly AffectedSymbol[]
   readonly affectedProcesses: readonly string[]
 }
 

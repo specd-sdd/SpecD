@@ -1,5 +1,5 @@
 import { type GraphStore } from '../ports/graph-store.js'
-import { type ImpactResult } from '../value-objects/impact-result.js'
+import { type ImpactResult, type AffectedSymbol } from '../value-objects/impact-result.js'
 import { computeRiskLevel } from '../value-objects/risk-level.js'
 import { getUpstream } from './get-upstream.js'
 import { getDownstream } from './get-downstream.js'
@@ -29,6 +29,7 @@ export async function analyzeImpact(
 
   const affectedFileSet = new Set<string>()
   const allSymbolsByDepth = new Map<number, Set<string>>()
+  const affectedSymbolMap = new Map<string, AffectedSymbol>()
 
   for (const result of results) {
     for (const [depth, symbols] of result.levels) {
@@ -39,6 +40,13 @@ export async function analyzeImpact(
       for (const symbol of symbols) {
         depthSet.add(symbol.id)
         affectedFileSet.add(symbol.filePath)
+        if (!affectedSymbolMap.has(symbol.id)) {
+          affectedSymbolMap.set(symbol.id, {
+            id: symbol.id,
+            name: symbol.name,
+            filePath: symbol.filePath,
+          })
+        }
       }
     }
   }
@@ -112,6 +120,7 @@ export async function analyzeImpact(
     transitiveDependents,
     riskLevel,
     affectedFiles: [...affectedFileSet],
+    affectedSymbols: [...affectedSymbolMap.values()],
     affectedProcesses: [],
   }
 }

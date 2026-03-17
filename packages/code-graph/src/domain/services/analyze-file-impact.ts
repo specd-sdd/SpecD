@@ -63,6 +63,7 @@ export async function analyzeFileImpact(
     transitiveDependents,
     riskLevel: overallRisk,
     affectedFiles: [...affectedFileSet],
+    affectedSymbols: symbolResults.flatMap((r) => r.affectedSymbols),
     affectedProcesses: [],
     symbols: symbolResults,
   }
@@ -138,6 +139,7 @@ async function analyzeFileImportImpact(
     transitiveDependents,
     riskLevel: computeRiskLevel(directDependents, totalDependents, 0),
     affectedFiles,
+    affectedSymbols: [],
     affectedProcesses: [],
   }
 }
