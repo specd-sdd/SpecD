@@ -40,29 +40,56 @@ function findGitRoot(startDir: string): string | undefined {
  * @returns An array of root-relative file paths.
  */
 export function discoverFiles(root: string, hasAdapter: (filePath: string) => boolean): string[] {
-  const ig = ignore()
+  // Each entry scopes an ignore instance to the directory containing the .gitignore.
+  // `base` is the root-relative path of that directory (empty string = root level).
+  const scopedIgnores: Array<{ ig: ReturnType<typeof ignore>; base: string }> = []
 
-  // Load .gitignore from git root if root is inside a git repo
-  const gitRoot = findGitRoot(root)
-  if (gitRoot) {
-    const gitRootIgnore = join(gitRoot, '.gitignore')
+  /**
+   * Loads a `.gitignore` file from a directory and registers it scoped to that directory.
+   * @param absoluteDir - Absolute path to the directory containing the `.gitignore`.
+   */
+  function loadIgnoreFile(absoluteDir: string): void {
     try {
-      const content = readFileSync(gitRootIgnore, 'utf-8')
+      const content = readFileSync(join(absoluteDir, '.gitignore'), 'utf-8')
+      const base = absoluteDir === root ? '' : relative(root, absoluteDir).replaceAll('\\', '/')
+      const ig = ignore()
       ig.add(content)
+      scopedIgnores.push({ ig, base })
     } catch {
-      // no .gitignore at git root
+      // no .gitignore in this directory
     }
   }
 
-  // Also load .gitignore at root itself (may be same as git root)
+  // Load .gitignore from git root (patterns apply relative to root)
+  const gitRoot = findGitRoot(root)
+  if (gitRoot) {
+    loadIgnoreFile(gitRoot)
+  }
+
+  // Load .gitignore at codeRoot itself (if different from git root)
   if (gitRoot !== root) {
-    const rootIgnore = join(root, '.gitignore')
-    try {
-      const content = readFileSync(rootIgnore, 'utf-8')
-      ig.add(content)
-    } catch {
-      // no .gitignore at root
+    loadIgnoreFile(root)
+  }
+
+  /**
+   * Checks whether a root-relative path is ignored by any scoped `.gitignore` rule.
+   * @param relPath - Root-relative path to check.
+   * @param isDir - Whether the path is a directory.
+   * @returns True if any scoped ignore rule matches the path.
+   */
+  function isIgnored(relPath: string, isDir: boolean): boolean {
+    for (const { ig, base } of scopedIgnores) {
+      if (base === '') {
+        if (ig.ignores(isDir ? relPath + '/' : relPath)) return true
+      } else {
+        const prefix = base + '/'
+        if (relPath.startsWith(prefix)) {
+          const sub = relPath.slice(prefix.length)
+          if (sub && ig.ignores(isDir ? sub + '/' : sub)) return true
+        }
+      }
     }
+    return false
   }
 
   const results: string[] = []
@@ -79,15 +106,9 @@ export function discoverFiles(root: string, hasAdapter: (filePath: string) => bo
       return
     }
 
-    // Load .gitignore in this subdirectory if present
+    // Load scoped .gitignore for this subdirectory
     if (dir !== root && dir !== gitRoot) {
-      const subIgnore = join(dir, '.gitignore')
-      try {
-        const content = readFileSync(subIgnore, 'utf-8')
-        ig.add(content)
-      } catch {
-        // no .gitignore in this subdir
-      }
+      loadIgnoreFile(dir)
     }
 
     for (const entry of entries) {
@@ -106,11 +127,11 @@ export function discoverFiles(root: string, hasAdapter: (filePath: string) => bo
       if (!stat || stat.isSymbolicLink()) continue
 
       if (stat.isDirectory()) {
-        if (!ig.ignores(relPath + '/')) {
+        if (!isIgnored(relPath, true)) {
           walk(fullPath)
         }
       } else if (stat.isFile()) {
-        if (!ig.ignores(relPath) && hasAdapter(relPath)) {
+        if (!isIgnored(relPath, false) && hasAdapter(relPath)) {
           results.push(relPath)
         }
       }
