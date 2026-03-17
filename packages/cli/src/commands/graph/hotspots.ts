@@ -1,4 +1,4 @@
-import { Command } from 'commander'
+import { Command, Option } from 'commander'
 import { type HotspotOptions, type RiskLevel, SymbolKind } from '@specd/code-graph'
 import { output, parseFormat } from '../../formatter.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
@@ -28,9 +28,8 @@ export function registerGraphHotspots(parent: Command): void {
         'Any filter flag removes all defaults — only explicit constraints apply.',
     )
     .option('--workspace <name>', 'filter by workspace')
-    .option(
-      '--kind <kind>',
-      'filter by symbol kind (function|class|method|variable|type|interface|enum)',
+    .addOption(
+      new Option('--kind <kind>', 'filter by symbol kind').choices(Object.values(SymbolKind)),
     )
     .option('--file <path>', 'filter by file path')
     .option(
@@ -47,9 +46,11 @@ export function registerGraphHotspots(parent: Command): void {
     )
     .option('--limit <n>', 'max results (default 20 when no filters)')
     .option('--min-score <n>', 'minimum score threshold (default 1 when no filters)')
-    .option(
-      '--min-risk <level>',
-      'minimum risk level: LOW|MEDIUM|HIGH|CRITICAL (default MEDIUM when no filters)',
+    .addOption(
+      new Option(
+        '--min-risk <level>',
+        'minimum risk level (default MEDIUM when no filters)',
+      ).choices(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .addHelpText(

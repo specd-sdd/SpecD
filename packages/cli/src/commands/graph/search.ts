@@ -1,5 +1,5 @@
-import { Command } from 'commander'
-import { type SearchOptions, type SymbolKind } from '@specd/code-graph'
+import { Command, Option } from 'commander'
+import { type SearchOptions, SymbolKind } from '@specd/code-graph'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
@@ -26,9 +26,8 @@ export function registerGraphSearch(parent: Command): void {
     .description('Full-text search across symbols and specs')
     .option('--symbols', 'search only symbols')
     .option('--specs', 'search only specs')
-    .option(
-      '--kind <kind>',
-      'filter symbols by kind (function|class|method|variable|type|interface|enum)',
+    .addOption(
+      new Option('--kind <kind>', 'filter symbols by kind').choices(Object.values(SymbolKind)),
     )
     .option('--file <path>', 'filter symbols by file path (supports * wildcards)')
     .option('--workspace <name>', 'filter results by workspace')
