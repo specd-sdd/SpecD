@@ -12,6 +12,8 @@ export {
   type RestoredEvent,
   type DiscardedEvent,
   type ArtifactSkippedEvent,
+  type ArtifactsSyncedEvent,
+  SYSTEM_ACTOR,
 } from './change.js'
 export { Spec } from './spec.js'
 export { ChangeArtifact, SKIPPED_SENTINEL, type ChangeArtifactProps } from './change-artifact.js'

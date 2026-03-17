@@ -12,6 +12,7 @@ import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { type GenerateSpecMetadata } from '../../../src/application/use-cases/generate-spec-metadata.js'
 import { type SaveSpecMetadata } from '../../../src/application/use-cases/save-spec-metadata.js'
 import { YamlSerializer } from '../../../src/application/ports/yaml-serializer.js'
@@ -336,9 +337,17 @@ describe('ArchiveChange', () => {
       successChange.setArtifact(
         new ChangeArtifact({
           type: 'spec',
-          filename: 'spec.md',
-          status: 'complete',
-          validatedHash: 'abc123',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
         }),
       )
       const changeRepo = Object.assign(makeChangeRepository([successChange]), {
@@ -386,9 +395,17 @@ describe('ArchiveChange', () => {
       change.setArtifact(
         new ChangeArtifact({
           type: 'spec',
-          filename: 'spec.md',
-          status: 'complete',
-          validatedHash: 'abc123',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
         }),
       )
       const changeRepo = Object.assign(makeChangeRepository([change]), {
@@ -723,9 +740,17 @@ describe('ArchiveChange', () => {
       change.setArtifact(
         new ChangeArtifact({
           type: 'spec',
-          filename: 'spec.md',
-          status: 'complete',
-          validatedHash: 'abc123',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
         }),
       )
       const changeRepo = Object.assign(makeChangeRepository([change]), {
@@ -763,9 +788,17 @@ describe('ArchiveChange', () => {
       change.setArtifact(
         new ChangeArtifact({
           type: 'spec',
-          filename: 'spec.md',
-          status: 'complete',
-          validatedHash: 'abc123',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
         }),
       )
       const changeRepo = Object.assign(makeChangeRepository([change]), {
@@ -896,9 +929,17 @@ describe('ArchiveChange', () => {
       change.setArtifact(
         new ChangeArtifact({
           type: 'spec',
-          filename: 'spec.md',
-          status: 'complete',
-          validatedHash: 'abc123',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
         }),
       )
       const changeRepo = Object.assign(makeChangeRepository([change]), {
@@ -948,9 +989,17 @@ describe('ArchiveChange', () => {
       conflictChange.setArtifact(
         new ChangeArtifact({
           type: 'spec',
-          filename: 'spec.md',
-          status: 'complete',
-          validatedHash: 'abc123',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
         }),
       )
       const changeRepo = Object.assign(makeChangeRepository([conflictChange]), {
@@ -991,9 +1040,17 @@ describe('ArchiveChange', () => {
       change.setArtifact(
         new ChangeArtifact({
           type: 'spec',
-          filename: 'spec.md',
-          status: 'complete',
-          validatedHash: 'abc123',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
         }),
       )
       const changeRepo = Object.assign(makeChangeRepository([change]), {
@@ -1061,7 +1118,21 @@ describe('ArchiveChange', () => {
 
       const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       change.setArtifact(
-        new ChangeArtifact({ type: 'spec', filename: 'spec.md', validatedHash: '__skipped__' }),
+        new ChangeArtifact({
+          type: 'spec',
+          optional: true,
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'spec.md',
+                status: 'skipped',
+                validatedHash: '__skipped__',
+              }),
+            ],
+          ]),
+        }),
       )
 
       const uc = new ArchiveChange(
