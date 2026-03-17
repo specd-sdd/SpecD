@@ -48,21 +48,35 @@ export function registerChangeArtifacts(parent: Command): void {
         const artifactRows: ArtifactRow[] = []
 
         for (const a of artifactStatuses) {
-          const artifact = change.artifacts.get(a.type)
           const schemaArtifact = schemaArtifacts.get(a.type)
-          const filename = artifact?.filename ?? schemaArtifact?.output ?? `${a.type}.md`
-          const exists = await kernel.changes.repo.artifactExists(change, filename)
-          artifactRows.push({
-            id: a.type,
-            filename,
-            effectiveStatus: a.effectiveStatus,
-            exists,
-          })
+
+          // Show per-file rows from the new multi-file model
+          for (const file of a.files) {
+            const exists = await kernel.changes.repo.artifactExists(change, file.filename)
+            artifactRows.push({
+              id: a.files.length > 1 ? `${a.type} [${file.key}]` : a.type,
+              filename: file.filename,
+              effectiveStatus: file.status,
+              exists,
+            })
+          }
+
+          // If no files exist yet, show a summary row
+          if (a.files.length === 0) {
+            const filename = schemaArtifact?.output ?? `${a.type}.md`
+            artifactRows.push({
+              id: a.type,
+              filename,
+              effectiveStatus: a.effectiveStatus,
+              exists: false,
+            })
+          }
 
           // Add delta entries when schema declares delta: true
           if (schemaArtifact?.delta) {
+            const baseFilename = a.files[0]?.filename ?? schemaArtifact.output
             for (const specId of change.specIds) {
-              const deltaFilename = `${filename.replace(/\.[^.]+$/, '')}.delta.yaml`
+              const deltaFilename = `${baseFilename.replace(/\.[^.]+$/, '')}.delta.yaml`
               const deltaExists = await kernel.changes.repo.deltaExists(
                 change,
                 specId,

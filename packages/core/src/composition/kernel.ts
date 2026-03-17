@@ -172,7 +172,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
   return {
     changes: {
       repo: i.changes,
-      create: new CreateChange(i.changes, i.actor),
+      create: new CreateChange(i.changes, i.specs, i.actor),
       status: new GetStatus(i.changes),
       transition: new TransitionChange(
         i.changes,
@@ -229,7 +229,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       list: new ListChanges(i.changes),
       listDrafts: new ListDrafts(i.changes),
       listDiscarded: new ListDiscarded(i.changes),
-      edit: new EditChange(i.changes, i.actor),
+      edit: new EditChange(i.changes, i.specs, i.actor),
       skipArtifact: new SkipArtifact(i.changes, i.actor),
       updateSpecDeps: new UpdateSpecDeps(i.changes),
       listArchived: new ListArchived(i.archive),

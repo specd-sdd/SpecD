@@ -101,14 +101,14 @@ export class ApproveSpec {
 
     const result: Record<string, string> = {}
     for (const [type, artifact] of change.artifacts) {
-      const loaded = await this._changes.artifact(change, artifact.filename)
-      if (loaded === null) continue
       const cleanups = cleanupMap.get(type) ?? []
-      result[artifact.filename] = computeArtifactHash(
-        loaded.content,
-        (c) => this._hasher.hash(c),
-        cleanups,
-      )
+      for (const [fileKey, file] of artifact.files) {
+        if (file.status === 'missing' || file.status === 'skipped') continue
+        const loaded = await this._changes.artifact(change, file.filename)
+        if (loaded === null) continue
+        const hashKey = `${type}:${fileKey}`
+        result[hashKey] = computeArtifactHash(loaded.content, (c) => this._hasher.hash(c), cleanups)
+      }
     }
     return result
   }

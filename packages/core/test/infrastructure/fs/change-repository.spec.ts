@@ -4,6 +4,7 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { type ActorIdentity } from '../../../src/domain/entities/change.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../../src/domain/errors/artifact-conflict-error.js'
@@ -238,13 +239,17 @@ describe('FsChangeRepository', () => {
   describe('artifact status derivation', () => {
     function makeChangeWithArtifact(name: string, validatedHash: string | null): Change {
       const change = makeChange(name)
+      const fileProps: { key: string; filename: string; validatedHash?: string } = {
+        key: 'proposal',
+        filename: 'proposal.md',
+      }
+      if (validatedHash !== null) fileProps.validatedHash = validatedHash
       change.setArtifact(
         new ChangeArtifact({
           type: 'proposal',
-          filename: 'proposal.md',
           optional: false,
           requires: [],
-          ...(validatedHash !== null ? { validatedHash } : {}),
+          files: new Map([['proposal', new ArtifactFile(fileProps)]]),
         }),
       )
       return change
@@ -296,10 +301,18 @@ describe('FsChangeRepository', () => {
       change.setArtifact(
         new ChangeArtifact({
           type: 'proposal',
-          filename: 'proposal.md',
           optional: true,
           requires: [],
-          validatedHash: '__skipped__',
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                validatedHash: '__skipped__',
+              }),
+            ],
+          ]),
         }),
       )
       await ctx.repo.save(change)
@@ -575,7 +588,11 @@ describe('FsChangeRepository', () => {
     it('given a change with artifact-skipped event, when saved and loaded, then artifact-skipped event is preserved', async () => {
       const change = makeChange('add-auth')
       change.setArtifact(
-        new ChangeArtifact({ type: 'design', filename: 'design.md', optional: true }),
+        new ChangeArtifact({
+          type: 'design',
+          optional: true,
+          files: new Map([['design', new ArtifactFile({ key: 'design', filename: 'design.md' })]]),
+        }),
       )
       change.recordArtifactSkipped('design', actor, 'not needed')
       await ctx.repo.save(change)

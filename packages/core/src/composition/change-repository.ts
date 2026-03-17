@@ -1,4 +1,5 @@
 import { type ChangeRepository } from '../application/ports/change-repository.js'
+import { type ArtifactType } from '../domain/value-objects/artifact-type.js'
 import { FsChangeRepository } from '../infrastructure/fs/change-repository.js'
 
 /**
@@ -31,6 +32,16 @@ export interface FsChangeRepositoryOptions {
    * records a different schema. Advisory only.
    */
   readonly activeSchema?: { name: string; version: number }
+  /**
+   * Resolved artifact types from the active schema. Passed to the repository
+   * to enable artifact sync on every get/save.
+   */
+  readonly artifactTypes?: readonly ArtifactType[]
+  /**
+   * Async resolver for artifact types. Used when artifact types aren't known
+   * at construction time (e.g. kernel-level repo created before schema is resolved).
+   */
+  readonly resolveArtifactTypes?: () => Promise<readonly ArtifactType[]>
 }
 
 /**
@@ -59,6 +70,10 @@ export function createChangeRepository(
         draftsPath: options.draftsPath,
         discardedPath: options.discardedPath,
         ...(options.activeSchema !== undefined ? { activeSchema: options.activeSchema } : {}),
+        ...(options.artifactTypes !== undefined ? { artifactTypes: options.artifactTypes } : {}),
+        ...(options.resolveArtifactTypes !== undefined
+          ? { resolveArtifactTypes: options.resolveArtifactTypes }
+          : {}),
       })
   }
 }

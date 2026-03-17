@@ -7,6 +7,7 @@ import { SchemaMismatchError } from '../../../src/application/errors/schema-mism
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -189,10 +190,18 @@ describe('ValidateArtifacts', () => {
       const schema = makeSchema([designType])
       const designArtifact = new ChangeArtifact({
         type: 'design',
-        filename: 'design.md',
         optional: true,
-        status: 'skipped',
-        validatedHash: '__skipped__',
+        files: new Map([
+          [
+            'design',
+            new ArtifactFile({
+              key: 'design',
+              filename: 'design.md',
+              status: 'skipped',
+              validatedHash: '__skipped__',
+            }),
+          ],
+        ]),
       })
       const change = makeChangeWithArtifacts('c', [designArtifact])
       const repo = makeChangeRepository([change])
@@ -248,13 +257,18 @@ describe('ValidateArtifacts', () => {
 
       const proposalArtifact = new ChangeArtifact({
         type: 'proposal',
-        filename: 'proposal.md',
-        status: 'in-progress',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({ key: 'proposal', filename: 'proposal.md', status: 'in-progress' }),
+          ],
+        ]),
       })
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
-        filename: 'spec.md',
-        status: 'in-progress',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
       })
       const change = makeChangeWithArtifacts('c', [proposalArtifact, specsArtifact])
 
@@ -298,14 +312,23 @@ describe('ValidateArtifacts', () => {
       const content = 'content'
       const proposalArtifact = new ChangeArtifact({
         type: 'proposal',
-        filename: 'proposal.md',
-        status: 'complete',
-        validatedHash: sha256(content),
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'complete',
+              validatedHash: sha256(content),
+            }),
+          ],
+        ]),
       })
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
-        filename: 'spec.md',
-        status: 'in-progress',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
       })
       const change = makeChangeWithArtifacts('c', [proposalArtifact, specsArtifact])
 
@@ -349,16 +372,28 @@ describe('ValidateArtifacts', () => {
 
       const designArtifact = new ChangeArtifact({
         type: 'design',
-        filename: 'design.md',
         optional: true,
-        status: 'skipped',
-        validatedHash: '__skipped__',
+        files: new Map([
+          [
+            'design',
+            new ArtifactFile({
+              key: 'design',
+              filename: 'design.md',
+              status: 'skipped',
+              validatedHash: '__skipped__',
+            }),
+          ],
+        ]),
       })
       const tasksContent = 'tasks content'
       const tasksArtifact = new ChangeArtifact({
         type: 'tasks',
-        filename: 'tasks.md',
-        status: 'in-progress',
+        files: new Map([
+          [
+            'tasks',
+            new ArtifactFile({ key: 'tasks', filename: 'tasks.md', status: 'in-progress' }),
+          ],
+        ]),
       })
       const change = makeChangeWithArtifacts('c', [designArtifact, tasksArtifact])
 
@@ -401,8 +436,9 @@ describe('ValidateArtifacts', () => {
       const content = 'current content'
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
-        filename: 'spec.md',
-        status: 'in-progress',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
       })
       const history: import('../../../src/domain/entities/change.js').ChangeEvent[] = [
         {
@@ -410,7 +446,7 @@ describe('ValidateArtifacts', () => {
           at: new Date(),
           by: testActor,
           reason: 'approved',
-          artifactHashes: { specs: 'sha256:oldHash' },
+          artifactHashes: { 'specs:specs': 'sha256:oldHash' },
         },
       ]
       const change = makeChangeWithArtifacts('c', [specsArtifact], { history })
@@ -452,17 +488,26 @@ describe('ValidateArtifacts', () => {
 
       const art1 = new ChangeArtifact({
         type: 'proposal',
-        filename: 'proposal.md',
-        status: 'in-progress',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({ key: 'proposal', filename: 'proposal.md', status: 'in-progress' }),
+          ],
+        ]),
       })
-      const art2 = new ChangeArtifact({ type: 'specs', filename: 'spec.md', status: 'in-progress' })
+      const art2 = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
+      })
       const history: import('../../../src/domain/entities/change.js').ChangeEvent[] = [
         {
           type: 'spec-approved',
           at: new Date(),
           by: testActor,
           reason: 'approved',
-          artifactHashes: { proposal: 'sha256:old1', specs: 'sha256:old2' },
+          artifactHashes: { 'proposal:proposal': 'sha256:old1', 'specs:specs': 'sha256:old2' },
         },
       ]
       const change = makeChangeWithArtifacts('c', [art1, art2], { history })
@@ -508,8 +553,9 @@ describe('ValidateArtifacts', () => {
       const currentHash = sha256(content)
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
-        filename: 'spec.md',
-        status: 'in-progress',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
       })
       const history: import('../../../src/domain/entities/change.js').ChangeEvent[] = [
         {
@@ -517,7 +563,7 @@ describe('ValidateArtifacts', () => {
           at: new Date(),
           by: testActor,
           reason: 'approved',
-          artifactHashes: { specs: currentHash },
+          artifactHashes: { 'specs:specs': currentHash },
         },
       ]
       const change = makeChangeWithArtifacts('c', [specsArtifact], { history })
@@ -560,8 +606,9 @@ describe('ValidateArtifacts', () => {
       const content = 'spec content'
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
-        filename: 'spec.md',
-        status: 'in-progress',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
       })
       const change = makeChangeWithArtifacts('c', [specsArtifact])
 
@@ -593,7 +640,7 @@ describe('ValidateArtifacts', () => {
       const saved = repo.store.get('c')
       const artifact = saved?.getArtifact('specs')
       expect(artifact?.status).toBe('complete')
-      expect(artifact?.validatedHash).toBe(sha256(content))
+      expect(artifact?.getFile('specs')?.validatedHash).toBe(sha256(content))
     })
 
     it('applies preHashCleanup before computing hash', async () => {
@@ -607,8 +654,9 @@ describe('ValidateArtifacts', () => {
       const cleanedContent = '- [ ] done task'
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
-        filename: 'spec.md',
-        status: 'in-progress',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
       })
       const change = makeChangeWithArtifacts('c', [specsArtifact])
 
@@ -639,7 +687,7 @@ describe('ValidateArtifacts', () => {
 
       const saved = repo.store.get('c')
       const artifact = saved?.getArtifact('specs')
-      expect(artifact?.validatedHash).toBe(sha256(cleanedContent))
+      expect(artifact?.getFile('specs')?.validatedHash).toBe(sha256(cleanedContent))
     })
 
     it('does not call markComplete when a required validation fails', async () => {
@@ -658,8 +706,9 @@ describe('ValidateArtifacts', () => {
       const content = 'spec content'
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
-        filename: 'spec.md',
-        status: 'in-progress',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
       })
       const change = makeChangeWithArtifacts('c', [specsArtifact])
 
@@ -712,8 +761,9 @@ describe('ValidateArtifacts', () => {
       const content = 'spec content'
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
-        filename: 'spec.md',
-        status: 'in-progress',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
       })
       const change = makeChangeWithArtifacts('c', [specsArtifact])
 
@@ -759,8 +809,9 @@ describe('ValidateArtifacts', () => {
       const content = 'spec content'
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
-        filename: 'spec.md',
-        status: 'in-progress',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
       })
       const change = makeChangeWithArtifacts('c', [specsArtifact])
 
@@ -811,8 +862,9 @@ describe('ValidateArtifacts', () => {
       const content = 'content'
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
-        filename: 'spec.md',
-        status: 'in-progress',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
       })
       const change = makeChangeWithArtifacts('c', [specsArtifact])
 
@@ -866,8 +918,9 @@ describe('ValidateArtifacts', () => {
       const content = 'content'
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
-        filename: 'spec.md',
-        status: 'in-progress',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
       })
       const change = makeChangeWithArtifacts('c', [specsArtifact])
 
@@ -911,10 +964,19 @@ describe('ValidateArtifacts', () => {
       const content = 'content'
       const art1 = new ChangeArtifact({
         type: 'proposal',
-        filename: 'proposal.md',
-        status: 'in-progress',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({ key: 'proposal', filename: 'proposal.md', status: 'in-progress' }),
+          ],
+        ]),
       })
-      const art2 = new ChangeArtifact({ type: 'specs', filename: 'spec.md', status: 'in-progress' })
+      const art2 = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
+      })
       const change = makeChangeWithArtifacts('c', [art1, art2])
 
       // proposal has file, specs does not → specs fails (missing effect from no file)
@@ -959,8 +1021,9 @@ describe('ValidateArtifacts', () => {
       const content = 'content'
       const specsArtifact = new ChangeArtifact({
         type: 'specs',
-        filename: 'spec.md',
-        status: 'in-progress',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
       })
       const change = makeChangeWithArtifacts('c', [specsArtifact])
 
