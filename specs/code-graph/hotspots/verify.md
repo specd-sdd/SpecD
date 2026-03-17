@@ -32,8 +32,8 @@ THEN only symbols with risk HIGH or CRITICAL are returned
 
 ## Workspace filter
 
-WHEN `workspace` is set to "packages/core"
-THEN only symbols whose filePath starts with "packages/core/" are returned
+WHEN `workspace` is set to "core"
+THEN only symbols whose filePath starts with "core/" are returned
 
 ## Kind filter
 
