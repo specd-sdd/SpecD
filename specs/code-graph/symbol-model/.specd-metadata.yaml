@@ -114,7 +114,7 @@ constraints:
   - All model types are value objects — no identity beyond structural equality (except SymbolNode.id which is deterministic)
   - SymbolKind is a closed enum — adding a new kind requires a spec change
   - RelationType is a closed set — adding a new type requires a spec change
-  - Depends on @specd/core for SpecdConfig type imports
+  - Depends on @specd/core as a runtime dependency
   - embedding on FileNode is deferred to v2+ — adapters MUST NOT populate it until the embedding pipeline is implemented
   - COVERS relations are deferred to v2+ — the type exists in the model but is not populated by any v1.5/v2 process
   - DEPENDS_ON relations are populated by the indexer in v1.5, reading from .specd-metadata.yaml or spec.md

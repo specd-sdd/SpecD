@@ -75,7 +75,7 @@ rules:
         The provider does not auto-open or auto-close — callers manage the lifecycle explicitly. This follows the same pattern as database connections and avoids hidden state transitions.
   - requirement: Dependency on @specd/core
     rules:
-      - '`@specd/code-graph` depends on `@specd/core` for type imports (`SpecdConfig`, `SpecdWorkspaceConfig`). The primary factory function accepts `SpecdConfig` to derive workspace targets, storage path, and spec sources. The legacy `CodeGraphOptions`-based factory remains for standalone usage.'
+      - '`@specd/code-graph` depends on `@specd/core` as a runtime dependency. It uses types (`SpecdConfig`, `SpecdWorkspaceConfig`) and may use domain services (e.g. `parseMetadata`, `SpecRepository`) for spec resolution. The primary factory function accepts `SpecdConfig` to derive workspace targets, storage path, and spec sources.'
 constraints:
   - createCodeGraphProvider is the only construction path — CodeGraphProvider constructor is not exported
   - Internal components are not re-exported from the package
@@ -196,7 +196,7 @@ scenarios:
     then:
       - the second call completes without error
   - requirement: Dependency on @specd/core
-    name: Package depends on @specd/core for types
+    name: Package depends on @specd/core
     when:
       - the @specd/code-graph package is inspected
     then:
