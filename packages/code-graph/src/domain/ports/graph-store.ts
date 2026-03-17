@@ -158,6 +158,13 @@ export abstract class GraphStore {
   abstract getSpecDependents(specId: string): Promise<Relation[]>
 
   /**
+   * Returns all symbols exported by the given file.
+   * @param filePath - The file path to find exports for.
+   * @returns An array of exported symbol nodes.
+   */
+  abstract getExportedSymbols(filePath: string): Promise<SymbolNode[]>
+
+  /**
    * Finds symbols matching the given query criteria.
    * @param query - The symbol query with optional name, kind, and filePath filters.
    * @returns An array of matching symbol nodes.

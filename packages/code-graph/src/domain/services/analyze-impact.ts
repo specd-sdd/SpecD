@@ -83,6 +83,44 @@ export async function analyzeImpact(
               filesByDepth.set(depth, new Set())
             }
             filesByDepth.get(depth)!.add(file)
+
+            // Resolve which symbols in this file are actually affected.
+            // First try: symbols with CALLS edges to/from already-affected symbols.
+            const fileSymbols = await store.findSymbols({ filePath: file })
+            let foundViaCall = false
+            for (const fs of fileSymbols) {
+              const callerRels = await store.getCallers(fs.id)
+              const calleeRels = await store.getCallees(fs.id)
+              const isAffected =
+                callerRels.some((r) => affectedSymbolMap.has(r.source)) ||
+                calleeRels.some((r) => affectedSymbolMap.has(r.target))
+              if (isAffected && !affectedSymbolMap.has(fs.id)) {
+                affectedSymbolMap.set(fs.id, {
+                  id: fs.id,
+                  name: fs.name,
+                  filePath: fs.filePath,
+                  line: fs.line,
+                })
+                foundViaCall = true
+              }
+            }
+
+            // Fallback: if no CALLS edges found, use exported symbols.
+            // The file imports an affected file, so its exports that re-expose
+            // or delegate to the imported code are the affected surface.
+            if (!foundViaCall) {
+              const exported = await store.getExportedSymbols(file)
+              for (const es of exported) {
+                if (!affectedSymbolMap.has(es.id)) {
+                  affectedSymbolMap.set(es.id, {
+                    id: es.id,
+                    name: es.name,
+                    filePath: es.filePath,
+                    line: es.line,
+                  })
+                }
+              }
+            }
           }
         }
       }
