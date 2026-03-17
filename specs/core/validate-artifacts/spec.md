@@ -142,6 +142,20 @@ After all artifacts have been evaluated, `ValidateArtifacts` must call `changeRe
 - A missing `validations[]` is not an error — the step is skipped
 - A missing delta file for a `delta: true` artifact is not itself a validation error — the artifact may be new (no existing base spec to delta against); in that case, validate the artifact file directly against `validations[]`
 
+### Requirement: Automatic dependsOn extraction
+
+After successfully validating a `scope: spec` artifact, the use case extracts `dependsOn` from the validated content using the schema's `metadataExtraction` declarations. For delta artifacts, the extraction runs against the **merged** content (base + delta), ensuring dependencies added via deltas are captured.
+
+The extraction uses `extractMetadata` with the artifact's AST, then resolves raw paths to full spec IDs via `SpecRepository.resolveFromPath`. If dependencies are found, they are registered on the change via `change.setSpecDependsOn(specId, deps)`.
+
+This removes the need for agents or users to manually call `change deps --add` — the system extracts dependencies from the artifact content that was already written.
+
+Extraction only runs when:
+
+- The artifact is `scope: spec`
+- The schema declares `metadataExtraction.dependsOn` targeting this artifact type
+- The artifact passed validation (no failures)
+
 ## Spec Dependencies
 
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, artifact model, approval invalidation, `effectiveStatus`
