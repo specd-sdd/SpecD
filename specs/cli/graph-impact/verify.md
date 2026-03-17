@@ -8,7 +8,7 @@
 
 - **GIVEN** `src/auth.ts` is indexed in the graph with upstream dependents
 - **WHEN** `specd graph impact --file src/auth.ts` is run
-- **THEN** stdout shows `Impact analysis for src/auth.ts` with risk level, dependency counts, affected files, and per-symbol breakdown
+- **THEN** stdout shows `Impact analysis for src/auth.ts` with risk level, dependency counts, affected files with their affected symbols, and per-symbol breakdown
 - **AND** the analysis direction is `upstream`
 - **AND** the process exits with code 0
 
@@ -72,7 +72,7 @@
 #### Scenario: JSON output for file impact
 
 - **WHEN** `specd graph impact --file src/auth.ts --format json` is run
-- **THEN** stdout is valid JSON containing `target`, `riskLevel`, `directDependents`, `affectedFiles`, and `symbols`
+- **THEN** stdout is valid JSON containing `target`, `riskLevel`, `directDependents`, `affectedFiles`, `affectedSymbols`, and `symbols`
 
 #### Scenario: JSON output for symbol impact
 
@@ -86,10 +86,10 @@
 
 ### Requirement: Error cases
 
-#### Scenario: No mode provided
+#### Scenario: No selector or multiple selectors provided
 
-- **WHEN** `specd graph impact` is run without `--file`, `--symbol`, or `--changes`
-- **THEN** stderr contains `error: provide --file, --symbol, or --changes`
+- **WHEN** `specd graph impact` is run without any of `--file`, `--symbol`, or `--changes`
+- **THEN** stderr contains `error: provide exactly one of --file, --symbol, or --changes`
 - **AND** the process exits with code 1
 
 #### Scenario: Infrastructure error exits with code 3

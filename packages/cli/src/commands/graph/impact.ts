@@ -25,7 +25,7 @@ function formatImpact(
     indirectDependents: number
     transitiveDependents: number
     affectedFiles: readonly string[]
-    affectedSymbols?: readonly { name: string; filePath: string }[]
+    affectedSymbols?: readonly { name: string; filePath: string; line: number }[]
   },
 ): string[] {
   const lines = [
@@ -38,14 +38,14 @@ function formatImpact(
   ]
 
   if (result.affectedSymbols && result.affectedSymbols.length > 0) {
-    // Group symbols by file
-    const byFile = new Map<string, string[]>()
+    // Group symbols by file, preserving line info for display
+    const byFile = new Map<string, Array<{ name: string; line: number }>>()
     for (const s of result.affectedSymbols) {
       const existing = byFile.get(s.filePath)
       if (existing) {
-        existing.push(s.name)
+        existing.push({ name: s.name, line: s.line })
       } else {
-        byFile.set(s.filePath, [s.name])
+        byFile.set(s.filePath, [{ name: s.name, line: s.line }])
       }
     }
 
@@ -53,7 +53,12 @@ function formatImpact(
     lines.push('Affected files:')
     for (const f of result.affectedFiles) {
       const syms = byFile.get(f)
-      lines.push(syms ? `  ${f}: ${syms.join(', ')}` : `  ${f}`)
+      if (syms) {
+        const symList = syms.map((s) => `${s.name}:${String(s.line)}`).join(', ')
+        lines.push(`  ${f}: ${symList}`)
+      } else {
+        lines.push(`  ${f}`)
+      }
     }
   } else if (result.affectedFiles.length > 0) {
     lines.push('')
@@ -95,7 +100,8 @@ JSON/TOON output schema:
       affectedFiles: string[], riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", summary: string }
 
   ImpactResult: { target, directDependents, indirectDependents, transitiveDependents,
-    riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", affectedFiles: string[], affectedProcesses: string[] }
+    riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", affectedFiles: string[],
+    affectedSymbols: Array<{ id, name, filePath }>, affectedProcesses: string[] }
 
   --symbol (no match):
     { error: "not_found", symbol: string }
