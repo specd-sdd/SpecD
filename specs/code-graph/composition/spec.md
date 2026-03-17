@@ -104,7 +104,7 @@ const legacyProvider = createCodeGraphProvider({ storagePath: '/my/project' })
 
 // Query symbols (workspace-qualified paths)
 const symbols = await provider.findSymbols({ kind: SymbolKind.Function, name: 'create*' })
-// symbols[0].filePath === 'core/src/domain/entities/change.ts'
+// symbols[0].filePath === 'core:src/domain/entities/change.ts'
 
 await provider.close()
 ```

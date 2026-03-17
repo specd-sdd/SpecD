@@ -39,7 +39,7 @@ rules:
         The indexer SHALL discover files from each workspace's `codeRoot` independently. For each `WorkspaceIndexTarget`:
 
         1. Call `discoverFiles(codeRoot, hasAdapter)` to get paths relative to `codeRoot`
-        2. Prefix each path with `{workspaceName}/` to form the globally unique `FileNode.path`
+        2. Prefix each path with `{workspaceName}:` to form the globally unique `FileNode.path`
         3. Diff against the store (filtered by workspace prefix)
 
         `discoverFiles` itself has no workspace knowledge — it accepts a root directory and:
@@ -86,7 +86,7 @@ rules:
       - |-
         Before Pass 2, the indexer builds a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over all registered adapters and the first one to return a non-`undefined` identity wins. This is language-agnostic — each adapter reads its own manifest format (`package.json`, `go.mod`, `pyproject.toml`, `composer.json`).
 
-        For non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the in-memory `SymbolIndex` for symbols with the imported name within the matching workspace's path prefix (`workspaceName + '/'`).
+        For non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the in-memory `SymbolIndex` for symbols with the imported name within the matching workspace's path prefix (`workspaceName + ':'`).
 
         This works for both monorepo (workspaces in the same repo) and multirepo (workspaces in separate repos configured in `specd.yaml`) because the resolution depends only on the adapter reading each workspace's manifest — not on `pnpm-workspace.yaml` or any monorepo-specific tooling.
   - requirement: Error isolation
@@ -161,7 +161,7 @@ scenarios:
   - requirement: Incremental indexing
     name: Changed file re-indexed
     given:
-      - a store containing core/src/utils.ts with hash abc
+      - a store containing core:src/utils.ts with hash abc
       - AND src/utils.ts on disk in workspace core now has hash def
     when:
       - IndexCodeGraph.execute() is called
@@ -171,12 +171,12 @@ scenarios:
   - requirement: Incremental indexing
     name: Deleted file removed from store
     given:
-      - a store containing core/src/old.ts
+      - a store containing core:src/old.ts
       - AND src/old.ts no longer exists on disk in workspace core
     when:
       - IndexCodeGraph.execute() is called
     then:
-      - removeFile('core/src/old.ts') is called on the store
+      - removeFile('core:src/old.ts') is called on the store
       - AND filesRemoved is 1
   - requirement: Incremental indexing
     name: Deletion scoped to indexed workspaces
@@ -190,21 +190,21 @@ scenarios:
   - requirement: Incremental indexing
     name: New file added to store
     given:
-      - a store with no entry for core/src/new.ts
+      - a store with no entry for core:src/new.ts
       - AND src/new.ts exists on disk in workspace core
     when:
       - IndexCodeGraph.execute() is called
     then:
-      - the file is extracted and upserted with path core/src/new.ts
+      - the file is extracted and upserted with path core:src/new.ts
   - requirement: Incremental indexing
     name: Changed files removed from store before bulk load
     given:
-      - a store containing core/src/utils.ts with hash abc
+      - a store containing core:src/utils.ts with hash abc
       - AND src/utils.ts on disk now has hash def
     when:
       - IndexCodeGraph.execute() is called
     then:
-      - core/src/utils.ts is removed from the store before bulk load
+      - core:src/utils.ts is removed from the store before bulk load
       - AND the re-extracted data is inserted via bulkLoad()
   - requirement: Multi-workspace file discovery
     name: node_modules excluded
@@ -256,7 +256,7 @@ scenarios:
     when:
       - the indexer processes this workspace
     then:
-      - FileNode.path is core/src/index.ts
+      - FileNode.path is core:src/index.ts
       - AND FileNode.workspace is core
   - requirement: Single-pass extraction with in-memory index
     name: Pass 2 can resolve cross-file calls
@@ -462,6 +462,6 @@ scenarios:
       - AND each entry reports its own filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed
       - AND the aggregate filesDiscovered equals the sum of per-workspace filesDiscovered
 contentHashes:
-  spec.md: sha256:c74b9d4572f8f3f522d8159bd9adaaeb5bda23f68f1a64d36f5660ef6729005f
-  verify.md: sha256:5232a75a9ae1cfd0e7ac643e01a7acf402c6ad876e21f0b48b3c2b036f677722
+  spec.md: sha256:4772bf57028c2a26e9bebf5a6b2fd9fa0e319ef6fcabfafa519a5d798fbfe8b6
+  verify.md: sha256:6e3bdb03cfa30949187534fa7ee466382f7875083111b2075729da839c26f977
 generatedBy: core

@@ -6,7 +6,7 @@
 
 #### Scenario: File node stored and retrieved
 
-- **GIVEN** a `FileNode` with path `core/src/index.ts` and workspace `core`
+- **GIVEN** a `FileNode` with path `core:src/index.ts` and workspace `core`
 - **WHEN** it is upserted and then retrieved by path
 - **THEN** all fields (path, language, contentHash, workspace) are preserved
 
@@ -56,15 +56,15 @@
 
 ### Requirement: Schema versioning
 
-#### Scenario: Schema version 4
+#### Scenario: Schema version 5
 
 - **WHEN** a fresh database is opened
-- **THEN** the schema version stored in the Meta table is `4`
+- **THEN** the schema version stored in the Meta table is `5`
 
 #### Scenario: Old schema requires force re-index
 
-- **GIVEN** a database created with schema version 3
-- **WHEN** the application opens it expecting version 4
+- **GIVEN** a database created with schema version 4
+- **WHEN** the application opens it expecting version 5
 - **THEN** a `--force` re-index is required to rebuild
 
 ### Requirement: Relationship tables

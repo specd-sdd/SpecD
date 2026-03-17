@@ -64,13 +64,15 @@ rules:
           Affected files:   8
 
         Affected files:
-          src/login.ts
-          src/session.ts
+          src/login.ts: handleLogin:12, validateSession:45
+          src/session.ts: createSession:8
 
         Per-symbol breakdown:
-          src/auth.ts:function:validate:10  risk=HIGH direct=4
-          src/auth.ts:class:AuthService:20  risk=MEDIUM direct=2
+          src/auth.ts:function:validate:10:0  risk=HIGH direct=4
+          src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2
         ```
+
+        When affected symbols are available, each file line shows the symbols grouped after a colon: `path: name:line, name:line`. Files reached only via IMPORTS (file-level) are listed without symbols.
 
         **Symbol impact** in `text` mode:
 
@@ -83,7 +85,7 @@ rules:
           Affected files:   40
 
         Affected files:
-          packages/cli/src/kernel.ts
+          packages/cli/src/kernel.ts: wireKernel:5
           ...
         ```
 
@@ -95,7 +97,7 @@ rules:
   - requirement: Error cases
     rules:
       - |-
-        If none of `--file`, `--symbol`, or `--changes` is provided, the command exits with code 1 and prints `error: provide --file, --symbol, or --changes`.
+        Exactly one of `--file`, `--symbol`, or `--changes` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file, --symbol, or --changes`.
 
         If the provider cannot be opened, the command exits with code 3.
 constraints:
@@ -111,7 +113,7 @@ scenarios:
     when:
       - specd graph impact --file src/auth.ts is run
     then:
-      - stdout shows Impact analysis for src/auth.ts with risk level, dependency counts, affected files, and per-symbol breakdown
+      - stdout shows Impact analysis for src/auth.ts with risk level, dependency counts, affected files with their affected symbols, and per-symbol breakdown
       - AND the analysis direction is upstream
       - AND the process exits with code 0
   - requirement: File impact analysis
@@ -186,7 +188,7 @@ scenarios:
     when:
       - specd graph impact --file src/auth.ts --format json is run
     then:
-      - stdout is valid JSON containing target, riskLevel, directDependents, affectedFiles, and symbols
+      - stdout is valid JSON containing target, riskLevel, directDependents, affectedFiles, affectedSymbols, and symbols
   - requirement: Output format
     name: JSON output for symbol impact
     when:
@@ -200,11 +202,11 @@ scenarios:
     then:
       - stdout is valid JSON containing changedFiles, changedSymbols, affectedSymbols, riskLevel, and summary
   - requirement: Error cases
-    name: No mode provided
+    name: No selector or multiple selectors provided
     when:
-      - specd graph impact is run without --file, --symbol, or --changes
+      - specd graph impact is run without any of --file, --symbol, or --changes
     then:
-      - 'stderr contains error: provide --file, --symbol, or --changes'
+      - 'stderr contains error: provide exactly one of --file, --symbol, or --changes'
       - AND the process exits with code 1
   - requirement: Error cases
     name: Infrastructure error exits with code 3
@@ -224,6 +226,6 @@ scenarios:
     then:
       - process.exit(0) is called to prevent the LadybugDB addon from keeping the process alive
 contentHashes:
-  spec.md: sha256:3b87ca30e7a2df73902c4daa777edc505c7b2c6308589bb82512e78e24c72148
-  verify.md: sha256:bc4647261929fdd1171f7fbac7d5aa36baf678d7a5592f899ca2564553b53430
+  spec.md: sha256:69eed84656ccb0d25b359f7dd760c28065bc93644a534478b4fcf4aad266a8f8
+  verify.md: sha256:ea6a480ded85f8e51f0b9e7009c11ac5841da5d57fb5eb3f71023bcaf10baec0
 generatedBy: core

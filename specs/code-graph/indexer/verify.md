@@ -23,7 +23,7 @@
 
 #### Scenario: Changed file re-indexed
 
-- **GIVEN** a store containing `core/src/utils.ts` with hash `abc`
+- **GIVEN** a store containing `core:src/utils.ts` with hash `abc`
 - **AND** `src/utils.ts` on disk in workspace `core` now has hash `def`
 - **WHEN** `IndexCodeGraph.execute()` is called
 - **THEN** the file is re-extracted and upserted with the new data
@@ -31,10 +31,10 @@
 
 #### Scenario: Deleted file removed from store
 
-- **GIVEN** a store containing `core/src/old.ts`
+- **GIVEN** a store containing `core:src/old.ts`
 - **AND** `src/old.ts` no longer exists on disk in workspace `core`
 - **WHEN** `IndexCodeGraph.execute()` is called
-- **THEN** `removeFile('core/src/old.ts')` is called on the store
+- **THEN** `removeFile('core:src/old.ts')` is called on the store
 - **AND** `filesRemoved` is 1
 
 #### Scenario: Deletion scoped to indexed workspaces
@@ -46,17 +46,17 @@
 
 #### Scenario: New file added to store
 
-- **GIVEN** a store with no entry for `core/src/new.ts`
+- **GIVEN** a store with no entry for `core:src/new.ts`
 - **AND** `src/new.ts` exists on disk in workspace `core`
 - **WHEN** `IndexCodeGraph.execute()` is called
-- **THEN** the file is extracted and upserted with path `core/src/new.ts`
+- **THEN** the file is extracted and upserted with path `core:src/new.ts`
 
 #### Scenario: Changed files removed from store before bulk load
 
-- **GIVEN** a store containing `core/src/utils.ts` with hash `abc`
+- **GIVEN** a store containing `core:src/utils.ts` with hash `abc`
 - **AND** `src/utils.ts` on disk now has hash `def`
 - **WHEN** `IndexCodeGraph.execute()` is called
-- **THEN** `core/src/utils.ts` is removed from the store before bulk load
+- **THEN** `core:src/utils.ts` is removed from the store before bulk load
 - **AND** the re-extracted data is inserted via `bulkLoad()`
 
 ### Requirement: Multi-workspace file discovery
@@ -98,7 +98,7 @@
 - **GIVEN** a workspace named `core` with codeRoot `/project/packages/core`
 - **AND** a file at `/project/packages/core/src/index.ts`
 - **WHEN** the indexer processes this workspace
-- **THEN** `FileNode.path` is `core/src/index.ts`
+- **THEN** `FileNode.path` is `core:src/index.ts`
 - **AND** `FileNode.workspace` is `core`
 
 ### Requirement: Single-pass extraction with in-memory index

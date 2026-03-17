@@ -25,7 +25,7 @@ Where:
 - **crossWorkspaceCallers** — callers whose filePath has a different workspace prefix (weighted higher because cross-workspace calls are implicit contracts with wider blast radius)
 - **fileImporters** — number of files that IMPORT the file containing this symbol
 
-Workspace is extracted as the first path segment of filePath (everything before the first `/`).
+Workspace is extracted from filePath as the prefix before the first `:` (e.g. `core` from `core:src/index.ts`).
 
 ### Requirement: Risk level
 
@@ -88,7 +88,7 @@ Each `HotspotEntry` contains:
 - Exactly 2 graph queries — no N+1 per-symbol queries
 - Score formula weights are fixed: same-ws = 3, cross-ws = 5, importers = 1
 - Risk level thresholds reuse the existing `computeRiskLevel` function
-- Workspace is the first path segment of filePath
+- Workspace is the prefix before the first `:` in filePath
 - No spec coverage logic — deferred to issue 19
 
 ## Spec Dependencies

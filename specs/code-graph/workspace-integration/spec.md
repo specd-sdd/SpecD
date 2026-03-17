@@ -10,7 +10,7 @@
 
 `FileNode.path` SHALL be globally unique by prefixing the workspace name to the code-root-relative path:
 
-- **`path`** = `{workspaceName}/{relativeToCodeRoot}` (e.g. `core/src/index.ts`)
+- **`path`** = `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`)
 - **`workspace`** = workspace name string (e.g. `core`, `cli`, `default`)
 
 This ensures that two workspaces with identical relative paths (e.g. both having `src/index.ts`) produce distinct `FileNode.path` values. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.
@@ -19,7 +19,7 @@ This ensures that two workspaces with identical relative paths (e.g. both having
 
 `SymbolNode.id` SHALL include the workspace-prefixed path:
 
-- **`id`** = `{workspace}/{relativePath}:{kind}:{name}:{line}` (e.g. `core/src/index.ts:function:main:1`)
+- **`id`** = `{workspace}:{relativePath}:{kind}:{name}:{line}` (e.g. `core:src/index.ts:function:main:1`)
 
 This follows naturally from `SymbolNode.filePath` being the `FileNode.path`.
 
@@ -142,7 +142,7 @@ const coreTarget: WorkspaceIndexTarget = {
 
 // FileNode with workspace-qualified path
 const file: FileNode = {
-  path: 'core/src/domain/entities/change.ts',
+  path: 'core:src/domain/entities/change.ts',
   language: 'typescript',
   contentHash: 'sha256:abc123...',
   workspace: 'core',
@@ -151,10 +151,10 @@ const file: FileNode = {
 
 // SymbolNode with workspace in ID
 const symbol: SymbolNode = {
-  id: 'core/src/domain/entities/change.ts:function:createChange:42',
+  id: 'core:src/domain/entities/change.ts:function:createChange:42',
   name: 'createChange',
   kind: 'function',
-  filePath: 'core/src/domain/entities/change.ts',
+  filePath: 'core:src/domain/entities/change.ts',
   line: 42,
   column: 0,
   comment: undefined,

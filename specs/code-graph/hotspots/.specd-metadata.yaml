@@ -27,7 +27,7 @@ rules:
         * **crossWorkspaceCallers** — callers whose filePath has a different workspace prefix (weighted higher because cross-workspace calls are implicit contracts with wider blast radius)
         * **fileImporters** — number of files that IMPORT the file containing this symbol
 
-        Workspace is extracted as the first path segment of filePath (everything before the first `/`).
+        Workspace is extracted from filePath as the prefix before the first `:` (e.g. `core` from `core:src/index.ts`).
   - requirement: Risk level
     rules:
       - Each entry's `riskLevel` SHALL be computed using the existing `computeRiskLevel(directCallers, totalCallers + fileImporters, 0)` where `directCallers` = `sameWorkspaceCallers + crossWorkspaceCallers` and the second argument is the total callers plus file importers.
@@ -86,9 +86,9 @@ constraints:
   - Exactly 2 graph queries — no N+1 per-symbol queries
   - 'Score formula weights are fixed: same-ws = 3, cross-ws = 5, importers = 1'
   - Risk level thresholds reuse the existing computeRiskLevel function
-  - Workspace is the first path segment of filePath
+  - 'Workspace is the prefix before the first : in filePath'
   - No spec coverage logic — deferred to issue 19
 contentHashes:
-  spec.md: sha256:c800d3c915a9caef0e2d91d3b0672a55294fb3dc0ced738771a3f493a80ca83a
-  verify.md: sha256:ccd298d16ace99037cc6b9048b89cb6856cda39c1e57f934bf19fef2dbb0a52d
+  spec.md: sha256:76c89d2ab25d8e0209af2d8886d1cb85d654cd87499852e02e5cc13f8d46ae47
+  verify.md: sha256:e1404c28281f30af6cc806f058a36414ebb7d77a48ed39bbc5b39f3109d90198
 generatedBy: core
