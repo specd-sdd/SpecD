@@ -12,7 +12,7 @@ rules:
       - |-
         `FileNode.path` SHALL be globally unique by prefixing the workspace name to the code-root-relative path:
 
-        * **`path`** = `{workspaceName}/{relativeToCodeRoot}` (e.g. `core/src/index.ts`). Paths are forward-slash-normalized (backslashes replaced with `/`).
+        * **`path`** = `{workspaceName}/{relativeToCodeRoot}` (e.g. `core/src/index.ts`)
         * **`workspace`** = workspace name string (e.g. `core`, `cli`, `default`)
 
         This ensures that two workspaces with identical relative paths (e.g. both having `src/index.ts`) produce distinct `FileNode.path` values. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.
@@ -128,6 +128,6 @@ constraints:
   - The discoverSpecs filesystem function is kept as a fallback but the primary path uses SpecRepository
   - Existing .specd/code-graph.lbug files are incompatible with the new path format — --force re-index is required after upgrading
 contentHashes:
-  spec.md: sha256:20455b30bf5959957e3e3bd689cc4e184f6df8438cba2a7d10698762de34aced
+  spec.md: sha256:192d5b22ea8c33d22f1c3bce96abad685c9191ec151beee466e913c08221e86f
   verify.md: sha256:3df7a93457184cac0387b4b5d473517c7206a9c380b2c341afabf8d65be4061a
 generatedBy: core
