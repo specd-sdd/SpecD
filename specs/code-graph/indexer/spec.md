@@ -48,7 +48,7 @@ The indexer SHALL discover files from each workspace's `codeRoot` independently.
 - Skips files with no registered language adapter (determined by extension)
 - Returns root-relative file paths with forward-slash normalization
 
-### Requirement: Single-pass extraction with in-memory index
+### Requirement: Two-pass extraction with in-memory index
 
 Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:
 

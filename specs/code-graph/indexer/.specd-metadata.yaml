@@ -49,7 +49,7 @@ rules:
         * Skips symbolic links — only regular files are indexed
         * Skips files with no registered language adapter (determined by extension)
         * Returns root-relative file paths with forward-slash normalization
-  - requirement: Single-pass extraction with in-memory index
+  - requirement: Two-pass extraction with in-memory index
     rules:
       - |-
         Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:
@@ -462,6 +462,6 @@ scenarios:
       - AND each entry reports its own filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed
       - AND the aggregate filesDiscovered equals the sum of per-workspace filesDiscovered
 contentHashes:
-  spec.md: sha256:10788c2c37472cfbe44222ae73addaa95c9e85ab193934ef51f9651eb746a04d
+  spec.md: sha256:c74b9d4572f8f3f522d8159bd9adaaeb5bda23f68f1a64d36f5660ef6729005f
   verify.md: sha256:5232a75a9ae1cfd0e7ac643e01a7acf402c6ad876e21f0b48b3c2b036f677722
 generatedBy: core
