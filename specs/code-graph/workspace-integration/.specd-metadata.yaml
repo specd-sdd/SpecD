@@ -128,6 +128,6 @@ constraints:
   - Spec resolution uses SpecRepository exclusively — no filesystem fallback
   - Existing .specd/code-graph.lbug files are incompatible with the new path format — --force re-index is required after upgrading
 contentHashes:
-  spec.md: sha256:192d5b22ea8c33d22f1c3bce96abad685c9191ec151beee466e913c08221e86f
+  spec.md: sha256:c7bd74e819c9784c8b3c4b783a9414bbb7fc6a7004ffcbc31bd9f109d04c7fd1
   verify.md: sha256:3df7a93457184cac0387b4b5d473517c7206a9c380b2c341afabf8d65be4061a
 generatedBy: core

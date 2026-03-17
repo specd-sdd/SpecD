@@ -201,6 +201,6 @@ scenarios:
       - its package.json has a dependency on @specd/core
       - AND the primary factory accepts SpecdConfig from @specd/core
 contentHashes:
-  spec.md: sha256:cfe6424a9a34c4e391690bc38324b4b87a6cd98965a6e5882c46f2a9ee6de02c
+  spec.md: sha256:fb4a20c271e21ca1513937c2b3dc6f1e4466bab18a7622329b420ef864fff449
   verify.md: sha256:231ddedff29ba7b306d23cf054327cceb1facca60fb419f0c48d71fdee0e760f
 generatedBy: core
