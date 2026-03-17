@@ -53,7 +53,6 @@ The `@specd/code-graph` package SHALL export only:
 - `CodeGraphProvider` — type only (for type annotations, not construction)
 - `CodeGraphOptions` — options type for the factory
 - `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, `DiscoveredSpec` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).
-- `discoverSpecsFromDir` — utility for discovering specs from a directory (used by CLI/MCP integration layers)
 - `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult` — traversal/impact types
 - `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType` — model types
 - `SymbolQuery`, `GraphStatistics` — query types

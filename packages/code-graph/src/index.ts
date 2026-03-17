@@ -47,9 +47,6 @@ export { type SearchOptions } from './domain/value-objects/search-options.js'
 // Domain services
 export { expandSymbolName } from './domain/services/expand-symbol-name.js'
 
-// Spec discovery
-export { discoverSpecsFromDir } from './application/use-cases/discover-specs.js'
-
 // Errors
 export { CodeGraphError } from './domain/errors/code-graph-error.js'
 export { InvalidSymbolKindError } from './domain/errors/invalid-symbol-kind-error.js'

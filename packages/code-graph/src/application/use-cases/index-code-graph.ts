@@ -6,7 +6,7 @@ import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type SpecNode } from '../../domain/value-objects/spec-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
-import { type IndexOptions, type DiscoveredSpec } from '../../domain/value-objects/index-options.js'
+import { type IndexOptions } from '../../domain/value-objects/index-options.js'
 import {
   type IndexResult,
   type IndexError,
@@ -16,7 +16,6 @@ import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-po
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
 import { discoverFiles } from './discover-files.js'
-import { discoverSpecs } from './discover-specs.js'
 import { computeContentHash } from './compute-content-hash.js'
 
 const DEFAULT_CHUNK_BYTES = 20 * 1024 * 1024
@@ -387,18 +386,7 @@ export class IndexCodeGraph {
     const existingSpecMap = new Map(existingSpecs.map((s) => [s.specId, s]))
 
     for (const ws of options.workspaces) {
-      let discoveredSpecs: DiscoveredSpec[]
-      try {
-        discoveredSpecs = await ws.specs()
-      } catch {
-        // Fallback to filesystem discovery
-        discoveredSpecs = discoverSpecs(ws.codeRoot, (found) => {
-          progress(80, 'Discovering specs', `${String(found)} found in ${ws.name}`)
-        }).map((d) => ({
-          spec: { ...d.spec, workspace: ws.name },
-          contentHash: d.contentHash,
-        }))
-      }
+      const discoveredSpecs = await ws.specs()
 
       const wsBreakdown = wsBreakdowns.get(ws.name)!
       wsBreakdown.specsDiscovered = discoveredSpecs.length

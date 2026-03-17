@@ -136,7 +136,7 @@ Spec indexing runs as an additional phase after source file indexing (Phase 1 an
 - Hardcoded exclusion directories cannot be overridden (they are always excluded)
 - Pass 2 depends on Pass 1 completing for all files — they are not interleaved per file
 - Per-file errors are collected, not thrown — only infrastructure errors abort the run
-- Spec indexing uses the workspace's `specs()` callback as the primary source; `discoverSpecs` is kept as a fallback
+- Spec indexing uses the workspace's `specs()` callback exclusively — no filesystem fallback
 - Pass 2 depends on Pass 1 completing for ALL workspaces — they are not interleaved per workspace
 
 ## Examples

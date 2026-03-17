@@ -125,7 +125,7 @@ This handles the case where `codeRoot` is a subdirectory of a git repo (e.g. `pa
 - `@specd/code-graph` depends on `@specd/core` as a runtime dependency (types, domain services)
 - Single `.specd/code-graph.lbug` file for the whole project
 - The `discoverFiles` function remains workspace-agnostic — workspace prefixing happens in the indexer
-- The `discoverSpecs` filesystem function is kept as a fallback but the primary path uses `SpecRepository`
+- Spec resolution uses `SpecRepository` exclusively — no filesystem fallback
 - Existing `.specd/code-graph.lbug` files are incompatible with the new path format — `--force` re-index is required after upgrading
 
 ## Examples

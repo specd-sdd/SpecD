@@ -125,7 +125,7 @@ constraints:
   - '@specd/code-graph depends on @specd/core as a runtime dependency (types, domain services)'
   - Single .specd/code-graph.lbug file for the whole project
   - The discoverFiles function remains workspace-agnostic — workspace prefixing happens in the indexer
-  - The discoverSpecs filesystem function is kept as a fallback but the primary path uses SpecRepository
+  - Spec resolution uses SpecRepository exclusively — no filesystem fallback
   - Existing .specd/code-graph.lbug files are incompatible with the new path format — --force re-index is required after upgrading
 contentHashes:
   spec.md: sha256:192d5b22ea8c33d22f1c3bce96abad685c9191ec151beee466e913c08221e86f
