@@ -143,6 +143,15 @@ export class InMemoryGraphStore extends GraphStore {
     return this.relations.filter((r) => r.type === RelationType.Imports && r.source === filePath)
   }
 
+  async getExportedSymbols(filePath: string): Promise<SymbolNode[]> {
+    this.ensureOpen()
+    const exportRels = this.relations.filter(
+      (r) => r.type === RelationType.Exports && r.source === filePath,
+    )
+    const exportedIds = new Set(exportRels.map((r) => r.target))
+    return [...this.symbols.values()].filter((s) => exportedIds.has(s.id))
+  }
+
   async getSpecDependencies(specId: string): Promise<Relation[]> {
     this.ensureOpen()
     return this.relations.filter((r) => r.type === RelationType.DependsOn && r.source === specId)

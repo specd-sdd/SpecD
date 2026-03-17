@@ -584,6 +584,28 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Returns all symbols exported by the given file.
+   * @param filePath - The file path to find exports for.
+   * @returns An array of exported symbol nodes.
+   */
+  async getExportedSymbols(filePath: string): Promise<SymbolNode[]> {
+    this.ensureOpen()
+    const rows = await exec(
+      this.conn!,
+      `MATCH (f:File {path: '${this.escape(filePath)}'})-[:EXPORTS]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment`,
+    )
+    return rows.map((r) => ({
+      id: r['id'] as string,
+      name: r['name'] as string,
+      kind: r['kind'] as string as import('../../domain/value-objects/symbol-kind.js').SymbolKind,
+      filePath: r['filePath'] as string,
+      line: Number(r['line']),
+      column: Number(r['col']),
+      comment: (r['comment'] as string) || undefined,
+    }))
+  }
+
+  /**
    * Returns all specs that the given spec depends on.
    * @param specId - The spec identifier.
    * @returns An array of DEPENDS_ON relations.
