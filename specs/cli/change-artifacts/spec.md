@@ -17,33 +17,45 @@ specd change artifacts <name> [--format text|json|toon]
 
 ### Requirement: Output format
 
-In `text` mode (default), each artifact is listed on one line:
+Artifacts are listed per-file. Multi-file artifacts (e.g. `scope: spec` with multiple
+specIds) produce one row per file. Single-file artifacts produce one row.
+
+In `text` mode (default), each file is listed on one line:
 
 ```
-<artifact-id>  <effectiveStatus>  <exists>  <absolute-path>
+<id>  <effectiveStatus>  <exists>
 ```
 
-where `<exists>` is `yes` or `no`, and `<absolute-path>` is the full filesystem path to the artifact file within the change directory (whether or not the file currently exists on disk).
+For multi-file artifacts, `<id>` includes the file key: `<artifact-id> [<file-key>]`.
+For single-file artifacts, `<id>` is just the artifact type id.
+
+When an artifact has no files yet (not synced), a summary row is shown with the
+artifact-level `effectiveStatus`.
 
 In `json` or `toon` mode, the output is (encoded in the respective format):
 
 ```json
 {
   "name": "<change-name>",
-  "changeDir": "<absolute-path-to-change-directory>",
   "artifacts": [
     {
-      "id": "...",
-      "filename": "...",
-      "path": "<absolute-path>",
-      "effectiveStatus": "missing|in-progress|complete|skipped",
+      "id": "proposal",
+      "filename": "proposal.md",
+      "effectiveStatus": "complete",
+      "exists": true
+    },
+    {
+      "id": "specs [default:auth/login]",
+      "filename": "specs/default/auth/login/spec.md",
+      "effectiveStatus": "in-progress",
       "exists": true
     }
   ]
 }
 ```
 
-Artifacts are listed in schema-declared order. `changeDir` is the absolute path to the root of the change directory.
+Artifacts are listed in schema-declared order, with per-file entries within each
+artifact.
 
 ### Requirement: Error cases
 
@@ -59,20 +71,10 @@ Artifacts are listed in schema-declared order. `changeDir` is the absolute path 
 
 ```
 $ specd change artifacts add-oauth-login
-proposal   complete     yes  /home/user/project/.specd/changes/2026-01-add-oauth-login/proposal.md
-spec       in-progress  yes  /home/user/project/.specd/changes/2026-01-add-oauth-login/spec.md
-tasks      missing      no   /home/user/project/.specd/changes/2026-01-add-oauth-login/tasks.md
-
-$ specd change artifacts add-oauth-login --format json
-{
-  "name": "add-oauth-login",
-  "changeDir": "/home/user/project/.specd/changes/2026-01-add-oauth-login",
-  "artifacts": [
-    {"id": "proposal", "filename": "proposal.md", "path": "...proposal.md", "effectiveStatus": "complete", "exists": true},
-    {"id": "spec", "filename": "spec.md", "path": "...spec.md", "effectiveStatus": "in-progress", "exists": true},
-    {"id": "tasks", "filename": "tasks.md", "path": "...tasks.md", "effectiveStatus": "missing", "exists": false}
-  ]
-}
+proposal                      complete      yes
+specs [default:auth/login]    in-progress   yes
+specs [default:auth/signup]   missing       no
+tasks                         missing       no
 ```
 
 ## Spec Dependencies

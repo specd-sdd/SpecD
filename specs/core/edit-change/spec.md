@@ -45,7 +45,8 @@ When the resulting `specIds` differ from the current set, the use case MUST:
 1. Resolve the current actor via `ActorResolver.identity()`
 2. Call `change.updateSpecIds(newSpecIds, actor)` — this records an `invalidated` event with cause `spec-change` and a `transitioned` event
 3. Persist the change via `ChangeRepository.save`
-4. Return `{ change, invalidated: true }`
+4. Call `ChangeRepository.scaffold(change, specExists)` to create directories for any newly added spec-scoped artifacts, using the `specs` map for the `specExists` check
+5. Return `{ change, invalidated: true }`
 
 ### Requirement: Output contract
 
@@ -53,6 +54,14 @@ When the resulting `specIds` differ from the current set, the use case MUST:
 
 - `change` — the `Change` entity (updated or unchanged)
 - `invalidated` — `true` if approvals were invalidated, `false` otherwise
+
+### Requirement: Dependencies
+
+`EditChange` depends on the following ports injected via constructor:
+
+- `ChangeRepository` — for loading, persisting, and scaffolding changes
+- `ActorResolver` — for resolving the current actor identity
+- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding
 
 ## Constraints
 

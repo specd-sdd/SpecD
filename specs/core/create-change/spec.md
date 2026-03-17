@@ -39,21 +39,22 @@ The newly constructed `Change` MUST have a history containing exactly one event 
 
 The `Change` entity MUST be constructed with `name`, `createdAt`, `specIds`, and `history` from the input and the created event. The `description` field MUST be included only when provided in the input.
 
-### Requirement: Persistence
+### Requirement: Persistence and scaffolding
 
-After construction, the use case MUST persist the change via `ChangeRepository.save` and return the newly created `Change` instance.
+After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks the `SpecRepository` map for each spec ID's workspace. Finally, the use case returns the newly created `Change` instance.
 
 ### Requirement: Dependencies
 
-`CreateChange` depends on two ports injected via constructor:
+`CreateChange` depends on the following ports injected via constructor:
 
-- `ChangeRepository` — for existence checks and persistence
+- `ChangeRepository` — for existence checks, persistence, and scaffolding
 - `ActorResolver` — for resolving the current actor identity
+- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding
 
 ## Constraints
 
 - The use case MUST NOT perform any state transitions — the change starts in `drafting` state (the default when no `transitioned` event exists)
-- The use case MUST NOT modify or read any artifact files
+- The use case MUST NOT modify or read any artifact files (scaffolding only creates directories)
 - The `created` event timestamp and the `Change.createdAt` field MUST use the same `Date` instance
 
 ## Spec Dependencies

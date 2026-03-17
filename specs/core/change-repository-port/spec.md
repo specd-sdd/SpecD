@@ -14,6 +14,17 @@ Without an abstraction over change storage, use cases would couple directly to f
 
 `get(name)` MUST accept a change name string and return the `Change` with that name, or `null` if no change with that name exists. The returned `Change` MUST have its artifact statuses derived at load time by comparing the current file hash against the stored `validatedHash` (see `specs/core/change/spec.md` — Requirement: Artifacts). A hash mismatch MUST reset the artifact status to `in-progress`.
 
+### Requirement: Auto-invalidation on get when artifact files drift
+
+The `FsChangeRepository` implementation of `get()` MUST detect artifact file drift and auto-invalidate the change when appropriate. After loading a change and deriving artifact statuses, the repository checks whether any previously-validated artifact file has drifted — that is, the file's `validatedHash` was set (indicating a prior validation) but the derived status is now `missing` or `in-progress` (indicating the file was deleted or modified on disk).
+
+If drift is detected AND either of the following conditions is true, the repository MUST call `change.invalidate('artifact-change', SYSTEM_ACTOR)` and persist the updated manifest before returning:
+
+1. The change is beyond `designing` state (i.e. has progressed past the initial design phase), OR
+2. The change has an active approval (spec approval or signoff) that has not been superseded by a subsequent `invalidated` event.
+
+This ensures that approval drift and state-inconsistent artifact changes are detected eagerly on any change load, not only during explicit validation. The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@specd.dev' }`) is used as the actor for these automated invalidations.
+
 ### Requirement: list returns active changes in creation order
 
 `list()` MUST return all active (non-drafted, non-discarded) changes sorted by creation order, oldest first. Each returned `Change` MUST include artifact state (derived statuses) but MUST NOT include artifact content. Content is loaded on demand via `artifact()`.
@@ -54,13 +65,18 @@ Without an abstraction over change storage, use cases would couple directly to f
 
 `changePath(change)` MUST accept a `Change` and return the absolute filesystem path to that change's directory. This is used by use cases that need the change path for template variable construction (e.g. `change.path` in `TemplateVariables`). The implementation resolves the path from its internal storage layout.
 
+### Requirement: scaffold creates artifact directories
+
+`scaffold(change, specExists)` MUST create the directory structure needed for the change's artifacts. For `scope: spec` artifacts, it creates `specs/<ws>/<capPath>/` or `deltas/<ws>/<capPath>/` directories under the change directory. For `scope: change` artifacts, the root directory already exists. The `specExists` callback is an async function that returns whether a spec already exists in the repository, used to determine whether to create spec-scoped or delta-scoped directories.
+
 ### Requirement: Abstract class with abstract methods
 
-`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `scaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
 
 ## Constraints
 
 - Changes are stored globally, not per-workspace — the inherited workspace context is unused
+- `get()` in `FsChangeRepository` may auto-invalidate and persist the change before returning, if artifact drift is detected and the change is beyond `designing` or has active approvals
 - All list methods return `Change` objects with derived artifact state but without artifact content
 - `save()` writes the manifest only; `saveArtifact()` writes file content only — these are separate operations
 - `ArtifactConflictError` is the sole error type for concurrent modification detection
