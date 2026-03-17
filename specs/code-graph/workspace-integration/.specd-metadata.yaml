@@ -56,9 +56,8 @@ rules:
         1. Call `repo.list()` to get all `Spec` entities in the workspace
         2. For each spec, load all artifacts via `repo.artifact(spec, filename)`
         3. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order
-        4. Extract the title from the first `# Heading` in `spec.md` (or `'Untitled'` if absent)
-        5. Extract `dependsOn` from `.specd-metadata.yaml` if present, otherwise from the `## Spec Dependencies` section of `spec.md`
-        6. Build the `specId` as `{workspace}:{specPath}` (e.g. `core:core/change`), matching the format produced by `SpecRepository.resolveFromPath`
+        4. Load `.specd-metadata.yaml` via `repo.artifact(spec, '.specd-metadata.yaml')` and parse it with `parseMetadata` to extract `title`, `description`, and `dependsOn`. If metadata is absent, `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.
+        5. Build the `specId` as `{workspace}:{specPath}` (e.g. `core:core/change`), matching the format produced by `SpecRepository.resolveFromPath`
 
         This decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`.
 
@@ -128,6 +127,6 @@ constraints:
   - Spec resolution uses SpecRepository exclusively — no filesystem fallback
   - Existing .specd/code-graph.lbug files are incompatible with the new path format — --force re-index is required after upgrading
 contentHashes:
-  spec.md: sha256:c7bd74e819c9784c8b3c4b783a9414bbb7fc6a7004ffcbc31bd9f109d04c7fd1
+  spec.md: sha256:b1d8a1baba887b4b8298ac82600b2b432b35fa5092709837a682852f4999a672
   verify.md: sha256:3df7a93457184cac0387b4b5d473517c7206a9c380b2c341afabf8d65be4061a
 generatedBy: core
