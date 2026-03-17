@@ -180,7 +180,7 @@ export class IndexCodeGraph {
       breakdown.filesDiscovered = relFiles.length
 
       for (const relPath of relFiles) {
-        const prefixedPath = `${ws.name}/${relPath}`
+        const prefixedPath = `${ws.name}:${relPath}`
         allDiscoveredPaths.push(prefixedPath)
         absolutePaths.set(prefixedPath, join(ws.codeRoot, relPath))
       }
@@ -232,7 +232,7 @@ export class IndexCodeGraph {
 
     // Track per-workspace removals
     for (const filePath of deletedFiles) {
-      const wsName = filePath.substring(0, filePath.indexOf('/'))
+      const wsName = filePath.substring(0, filePath.indexOf(':'))
       const breakdown = wsBreakdowns.get(wsName)
       if (breakdown) breakdown.filesRemoved++
     }
@@ -299,7 +299,7 @@ export class IndexCodeGraph {
         try {
           const content = readFileSync(absPath, 'utf-8')
           // Use the relative-to-codeRoot path for adapter matching (extension-based)
-          const relPath = prefixedPath.substring(prefixedPath.indexOf('/') + 1)
+          const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
           const adapter = this.registry.getAdapterForFile(relPath)
           if (!adapter) continue
 
@@ -307,7 +307,7 @@ export class IndexCodeGraph {
           const hash = fileHashes.get(prefixedPath) ?? computeContentHash(content)
           // Extract symbols with workspace-prefixed path
           const symbols = adapter.extractSymbols(prefixedPath, content)
-          const wsName = prefixedPath.substring(0, prefixedPath.indexOf('/'))
+          const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
 
           if (adapter.extractNamespace && adapter.buildQualifiedName) {
             const ns = adapter.extractNamespace(content)
@@ -353,7 +353,7 @@ export class IndexCodeGraph {
         }
         try {
           const content = readFileSync(absPath, 'utf-8')
-          const relPath = prefixedPath.substring(prefixedPath.indexOf('/') + 1)
+          const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
           const adapter = this.registry.getAdapterForFile(relPath)
           if (!adapter) continue
 
@@ -543,7 +543,7 @@ export class IndexCodeGraph {
           if (pkgName) {
             const wsPrefix = packageToWorkspace.get(pkgName)
             if (wsPrefix !== undefined) {
-              const candidates = index.findByName(imp.originalName, wsPrefix + '/')
+              const candidates = index.findByName(imp.originalName, wsPrefix + ':')
               if (candidates.length > 0) {
                 importMap.set(imp.localName, candidates[0]!.id)
               }

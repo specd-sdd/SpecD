@@ -249,18 +249,18 @@ describe('TypeScriptLanguageAdapter', () => {
 
   describe('resolveRelativeImportPath', () => {
     it('resolves .js to .ts', () => {
-      const result = adapter.resolveRelativeImportPath('core/src/commands/create.ts', '../utils.js')
-      expect(result).toBe('core/src/utils.ts')
+      const result = adapter.resolveRelativeImportPath('core:src/commands/create.ts', '../utils.js')
+      expect(result).toBe('core:src/utils.ts')
     })
 
     it('adds .ts for extensionless specifier', () => {
-      const result = adapter.resolveRelativeImportPath('core/src/index.ts', './helpers/cli')
-      expect(result).toBe('core/src/helpers/cli.ts')
+      const result = adapter.resolveRelativeImportPath('core:src/index.ts', './helpers/cli')
+      expect(result).toBe('core:src/helpers/cli.ts')
     })
 
     it('resolves ./ specifier', () => {
-      const result = adapter.resolveRelativeImportPath('core/src/index.ts', './utils.js')
-      expect(result).toBe('core/src/utils.ts')
+      const result = adapter.resolveRelativeImportPath('core:src/index.ts', './utils.js')
+      expect(result).toBe('core:src/utils.ts')
     })
   })
 

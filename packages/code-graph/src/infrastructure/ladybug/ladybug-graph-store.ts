@@ -808,7 +808,7 @@ export class LadybugGraphStore extends GraphStore {
       conditions.push(`node.filePath =~ '(?i)${this.escape(regex)}'`)
     }
     if (options.workspace) {
-      conditions.push(`starts_with(node.filePath, '${this.escape(options.workspace + '/')}')`)
+      conditions.push(`starts_with(node.filePath, '${this.escape(options.workspace + ':')}')`)
     }
     if (options.excludePaths && options.excludePaths.length > 0) {
       for (const pattern of options.excludePaths) {
@@ -818,7 +818,7 @@ export class LadybugGraphStore extends GraphStore {
     }
     if (options.excludeWorkspaces && options.excludeWorkspaces.length > 0) {
       for (const ws of options.excludeWorkspaces) {
-        conditions.push(`NOT starts_with(node.filePath, '${this.escape(ws + '/')}')`)
+        conditions.push(`NOT starts_with(node.filePath, '${this.escape(ws + ':')}')`)
       }
     }
 

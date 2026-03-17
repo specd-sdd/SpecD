@@ -9,12 +9,12 @@ import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { matchesExclude } from './matches-exclude.js'
 
 /**
- * Extracts the workspace prefix (first path segment) from a file path.
- * @param filePath - A forward-slash separated file path.
- * @returns The first path segment, or the entire path if no slash is present.
+ * Extracts the workspace prefix from a colon-separated file path (workspace:relative-path).
+ * @param filePath - A workspace-prefixed file path (e.g. "core:src/foo.ts").
+ * @returns The workspace name, or the entire path if no colon is present.
  */
 function extractWorkspace(filePath: string): string {
-  const idx = filePath.indexOf('/')
+  const idx = filePath.indexOf(':')
   return idx === -1 ? filePath : filePath.substring(0, idx)
 }
 
@@ -101,7 +101,7 @@ export async function computeHotspots(
     // Scope the query to the requested workspace/kind when possible
     // to avoid a full symbol table scan
     const allSymbols = await store.findSymbols({
-      ...(options?.workspace ? { filePath: `${options.workspace}/*` } : undefined),
+      ...(options?.workspace ? { filePath: `${options.workspace}:*` } : undefined),
       ...(options?.kind ? { kind: options.kind } : undefined),
     })
     for (const symbol of allSymbols) {
@@ -131,7 +131,7 @@ export async function computeHotspots(
   let filtered = entries.filter((e) => {
     if (e.score < minScore) return false
     if (RISK_ORDER[e.riskLevel] < minRiskOrder) return false
-    if (options?.workspace && !e.symbol.filePath.startsWith(options.workspace + '/')) return false
+    if (options?.workspace && !e.symbol.filePath.startsWith(options.workspace + ':')) return false
     if (options?.kind && e.symbol.kind !== options.kind) return false
     if (options?.filePath && e.symbol.filePath !== options.filePath) return false
     if (matchesExclude(e.symbol.filePath, options?.excludePaths, options?.excludeWorkspaces))

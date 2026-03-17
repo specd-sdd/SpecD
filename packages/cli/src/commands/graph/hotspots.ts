@@ -71,7 +71,7 @@ JSON/TOON output schema:
   }
 
 Exclude examples:
-  specd graph hotspots --exclude-path "test/*"
+  specd graph hotspots --exclude-path "*:test/*"
   specd graph hotspots --exclude-workspace cli --exclude-workspace mcp
   specd graph hotspots --exclude-path "*.spec.ts" --min-risk HIGH
 `,
@@ -146,7 +146,7 @@ Exclude examples:
             lines.push('─'.repeat(90))
 
             for (const entry of result.entries) {
-              const sepIndex = entry.symbol.filePath.indexOf('/')
+              const sepIndex = entry.symbol.filePath.indexOf(':')
               const ws = sepIndex !== -1 ? entry.symbol.filePath.substring(0, sepIndex) : ''
               const relPath =
                 sepIndex !== -1
@@ -170,8 +170,8 @@ Exclude examples:
                   fileImporters: e.fileImporters,
                   riskLevel: e.riskLevel,
                   workspace:
-                    e.symbol.filePath.indexOf('/') !== -1
-                      ? e.symbol.filePath.substring(0, e.symbol.filePath.indexOf('/'))
+                    e.symbol.filePath.indexOf(':') !== -1
+                      ? e.symbol.filePath.substring(0, e.symbol.filePath.indexOf(':'))
                       : '',
                 })),
               },

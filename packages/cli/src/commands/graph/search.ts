@@ -68,9 +68,9 @@ JSON/TOON output schema:
   }
 
 Exclude examples:
-  specd graph search "handle" --exclude-path "test/*"
+  specd graph search "handle" --exclude-path "*:test/*"
   specd graph search "config" --exclude-workspace cli --exclude-workspace mcp
-  specd graph search "create" --exclude-path "*.spec.ts" --exclude-path "test/*"
+  specd graph search "create" --exclude-path "*.spec.ts" --exclude-path "*:test/*"
 `,
     )
     .action(
@@ -135,7 +135,7 @@ Exclude examples:
             if (symbolResults.length > 0) {
               lines.push(`Symbols (${String(symbolResults.length)}):`)
               for (const { symbol, score } of symbolResults) {
-                const sepIndex = symbol.filePath.indexOf('/')
+                const sepIndex = symbol.filePath.indexOf(':')
                 const ws = sepIndex !== -1 ? symbol.filePath.substring(0, sepIndex) : ''
                 const relPath =
                   sepIndex !== -1 ? symbol.filePath.substring(sepIndex + 1) : symbol.filePath
@@ -166,8 +166,8 @@ Exclude examples:
             output(
               {
                 symbols: symbolResults.map(({ symbol, score }) => ({
-                  workspace: symbol.filePath.includes('/')
-                    ? symbol.filePath.substring(0, symbol.filePath.indexOf('/'))
+                  workspace: symbol.filePath.includes(':')
+                    ? symbol.filePath.substring(0, symbol.filePath.indexOf(':'))
                     : '',
                   symbol,
                   score,

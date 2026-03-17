@@ -67,8 +67,8 @@ describe('Workspace indexing', () => {
     expect(result.errors).toHaveLength(0)
 
     // Both files discoverable by path with workspace prefix
-    const coreFile = await provider.getFile('core/src/index.ts')
-    const cliFile = await provider.getFile('cli/src/index.ts')
+    const coreFile = await provider.getFile('core:src/index.ts')
+    const cliFile = await provider.getFile('cli:src/index.ts')
     expect(coreFile).toBeDefined()
     expect(coreFile!.workspace).toBe('core')
     expect(cliFile).toBeDefined()
@@ -90,8 +90,8 @@ describe('Workspace indexing', () => {
 
     const symbols = await provider.findSymbols({ name: 'hash' })
     expect(symbols).toHaveLength(1)
-    expect(symbols[0]!.id).toBe('core/src/utils.ts:function:hash:1')
-    expect(symbols[0]!.filePath).toBe('core/src/utils.ts')
+    expect(symbols[0]!.id).toBe('core:src/utils.ts:function:hash:1')
+    expect(symbols[0]!.filePath).toBe('core:src/utils.ts')
   })
 
   it('produces per-workspace result breakdown', async () => {
@@ -186,7 +186,7 @@ describe('Workspace indexing', () => {
     expect(statsAfter.fileCount).toBe(2)
 
     // cli file still exists
-    const cliFile = await provider.getFile('cli/src/cli.ts')
+    const cliFile = await provider.getFile('cli:src/cli.ts')
     expect(cliFile).toBeDefined()
   })
 
@@ -299,8 +299,8 @@ describe('Workspace indexing', () => {
       projectRoot: tempDir,
     })
 
-    const coreFile = await provider.getFile('core/src/index.ts')
-    const cliFile = await provider.getFile('cli/src/index.ts')
+    const coreFile = await provider.getFile('core:src/index.ts')
+    const cliFile = await provider.getFile('cli:src/index.ts')
     expect(coreFile).toBeDefined()
     expect(cliFile).toBeDefined()
 
@@ -308,9 +308,9 @@ describe('Workspace indexing', () => {
     const coreSymbols = await provider.findSymbols({ name: 'coreFunc' })
     const cliSymbols = await provider.findSymbols({ name: 'cliFunc' })
     expect(coreSymbols).toHaveLength(1)
-    expect(coreSymbols[0]!.filePath).toBe('core/src/index.ts')
+    expect(coreSymbols[0]!.filePath).toBe('core:src/index.ts')
     expect(cliSymbols).toHaveLength(1)
-    expect(cliSymbols[0]!.filePath).toBe('cli/src/index.ts')
+    expect(cliSymbols[0]!.filePath).toBe('cli:src/index.ts')
   })
 
   it('resolves cross-workspace monorepo imports', async () => {
@@ -343,8 +343,8 @@ describe('Workspace indexing', () => {
     expect(result.errors).toHaveLength(0)
 
     // The import from @test/core should resolve across workspaces
-    const impact = await provider.analyzeImpact('core/src/greet.ts:function:greet:1', 'upstream')
+    const impact = await provider.analyzeImpact('core:src/greet.ts:function:greet:1', 'upstream')
     expect(impact.directDependents).toBeGreaterThanOrEqual(1)
-    expect(impact.affectedFiles).toContain('cli/src/main.ts')
+    expect(impact.affectedFiles).toContain('cli:src/main.ts')
   })
 })
