@@ -7,6 +7,7 @@ export interface AffectedSymbol {
   readonly id: string
   readonly name: string
   readonly filePath: string
+  readonly line: number
 }
 
 /**

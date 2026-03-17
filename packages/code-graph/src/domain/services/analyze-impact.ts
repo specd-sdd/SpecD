@@ -45,6 +45,7 @@ export async function analyzeImpact(
             id: symbol.id,
             name: symbol.name,
             filePath: symbol.filePath,
+            line: symbol.line,
           })
         }
       }

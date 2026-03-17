@@ -63,13 +63,15 @@ Impact analysis for src/auth.ts
   Affected files:   8
 
 Affected files:
-  src/login.ts
-  src/session.ts
+  src/login.ts: handleLogin:12, validateSession:45
+  src/session.ts: createSession:8
 
 Per-symbol breakdown:
-  src/auth.ts:function:validate:10  risk=HIGH direct=4
-  src/auth.ts:class:AuthService:20  risk=MEDIUM direct=2
+  src/auth.ts:function:validate:10:0  risk=HIGH direct=4
+  src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2
 ```
+
+When affected symbols are available, each file line shows the symbols grouped after a colon: `path: name:line, name:line`. Files reached only via IMPORTS (file-level) are listed without symbols.
 
 **Symbol impact** in `text` mode:
 
@@ -82,7 +84,7 @@ Impact analysis for function createKernel (packages/core/src/composition/kernel.
   Affected files:   40
 
 Affected files:
-  packages/cli/src/kernel.ts
+  packages/cli/src/kernel.ts: wireKernel:5
   ...
 ```
 
@@ -94,7 +96,7 @@ In `json` or `toon` mode, the full result object is output as-is.
 
 ### Requirement: Error cases
 
-If none of `--file`, `--symbol`, or `--changes` is provided, the command exits with code 1 and prints `error: provide --file, --symbol, or --changes`.
+Exactly one of `--file`, `--symbol`, or `--changes` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file, --symbol, or --changes`.
 
 If the provider cannot be opened, the command exits with code 3.
 
