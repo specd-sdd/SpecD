@@ -8,7 +8,7 @@ export { type SymbolQuery } from './symbol-query.js'
 export { type GraphStatistics } from './graph-statistics.js'
 export { type TraversalOptions } from './traversal-options.js'
 export { type TraversalResult } from './traversal-result.js'
-export { type ImpactResult, type FileImpactResult } from './impact-result.js'
+export { type ImpactResult, type FileImpactResult, type AffectedSymbol } from './impact-result.js'
 export { type RiskLevel, computeRiskLevel } from './risk-level.js'
 export { type ChangeDetectionResult } from './change-detection-result.js'
 export {
