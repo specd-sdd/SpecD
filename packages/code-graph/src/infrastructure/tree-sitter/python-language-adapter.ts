@@ -313,12 +313,15 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     importMap: Map<string, string>,
     relations: Relation[],
   ): void {
-    // Maps symbol name → id. When multiple symbols share a name (e.g. a module-level
-    // function and a method), the last definition wins — matching Python's shadowing
-    // semantics. TODO: disambiguate by enclosing scope for more accurate edges.
-    const localSymbolsByName = new Map<string, string>()
+    // Maps symbol name → all candidate ids, grouped for scope-based disambiguation.
+    const localSymbolsByName = new Map<string, SymbolNode[]>()
     for (const s of symbols) {
-      localSymbolsByName.set(s.name, s.id)
+      const existing = localSymbolsByName.get(s.name)
+      if (existing) {
+        existing.push(s)
+      } else {
+        localSymbolsByName.set(s.name, [s])
+      }
     }
 
     const seen = new Set<string>()
@@ -336,7 +339,9 @@ export class PythonLanguageAdapter implements LanguageAdapter {
                   : undefined
 
             if (calleeName) {
-              const calleeId = importMap.get(calleeName) ?? localSymbolsByName.get(calleeName)
+              const importedId = importMap.get(calleeName)
+              const calleeId =
+                importedId ?? this.resolveLocalCallee(child, calleeName, localSymbolsByName)
               if (calleeId) {
                 const callerId = this.findEnclosingSymbolId(child, symbols, filePath)
                 if (callerId) {
@@ -361,6 +366,54 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     }
 
     walkCalls(root)
+  }
+
+  /**
+   * Resolves a local callee name to the best-matching symbol id by scope proximity.
+   * When multiple symbols share a name (e.g. module-level function and a method),
+   * prefers the one whose line is closest to and before the call site.
+   * @param callNode - The call expression AST node.
+   * @param name - The callee name to resolve.
+   * @param candidates - Map of name → candidate symbols.
+   * @returns The best-matching symbol id, or undefined.
+   */
+  private resolveLocalCallee(
+    callNode: SgNode,
+    name: string,
+    candidates: Map<string, SymbolNode[]>,
+  ): string | undefined {
+    const syms = candidates.get(name)
+    if (!syms || syms.length === 0) return undefined
+    if (syms.length === 1) return syms[0]!.id
+
+    // Find the enclosing scope to prefer same-scope symbols
+    const callLine = callNode.range().start.line + 1
+    let enclosingClass: string | undefined
+    let current = callNode.parent()
+    while (current) {
+      if (nodeKind(current) === 'class_definition') {
+        enclosingClass = current.field('name')?.text()
+        break
+      }
+      current = current.parent()
+    }
+
+    // Prefer method in same class over module-level function
+    if (enclosingClass) {
+      const method = syms.find((s) => s.kind === 'method' && s.line <= callLine)
+      if (method) return method.id
+    }
+
+    // Fall back to the symbol defined closest before the call site
+    let best: SymbolNode | undefined
+    for (const s of syms) {
+      if (s.line <= callLine) {
+        if (!best || s.line > best.line) {
+          best = s
+        }
+      }
+    }
+    return best?.id ?? syms[0]!.id
   }
 
   /**
