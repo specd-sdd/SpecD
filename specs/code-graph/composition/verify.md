@@ -101,7 +101,7 @@
 
 ### Requirement: Dependency on @specd/core
 
-#### Scenario: Package depends on @specd/core for types
+#### Scenario: Package depends on @specd/core
 
 - **WHEN** the `@specd/code-graph` package is inspected
 - **THEN** its `package.json` has a dependency on `@specd/core`

@@ -122,7 +122,7 @@ This handles the case where `codeRoot` is a subdirectory of a git repo (e.g. `pa
 
 ## Constraints
 
-- `@specd/code-graph` depends on `@specd/core` for type imports only (`SpecdConfig`, `SpecdWorkspaceConfig`)
+- `@specd/code-graph` depends on `@specd/core` as a runtime dependency (types, domain services)
 - Single `.specd/code-graph.lbug` file for the whole project
 - The `discoverFiles` function remains workspace-agnostic — workspace prefixing happens in the indexer
 - The `discoverSpecs` filesystem function is kept as a fallback but the primary path uses `SpecRepository`

@@ -70,7 +70,7 @@ The provider does not auto-open or auto-close — callers manage the lifecycle e
 
 ### Requirement: Dependency on @specd/core
 
-`@specd/code-graph` depends on `@specd/core` for type imports (`SpecdConfig`, `SpecdWorkspaceConfig`). The primary factory function accepts `SpecdConfig` to derive workspace targets, storage path, and spec sources. The legacy `CodeGraphOptions`-based factory remains for standalone usage.
+`@specd/code-graph` depends on `@specd/core` as a runtime dependency. It uses types (`SpecdConfig`, `SpecdWorkspaceConfig`) and may use domain services (e.g. `parseMetadata`, `SpecRepository`) for spec resolution. The primary factory function accepts `SpecdConfig` to derive workspace targets, storage path, and spec sources.
 
 ## Constraints
 
