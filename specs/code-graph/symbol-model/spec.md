@@ -10,7 +10,7 @@ A code graph needs a unified, language-agnostic representation of source code st
 
 A `FileNode` SHALL represent a single source file in the workspace. It contains:
 
-- **`path`** (`string`) — globally unique path in format `{workspaceName}/{relativeToCodeRoot}` (e.g. `core/src/index.ts`). Forward-slash-normalized. This is the node's identity.
+- **`path`** (`string`) — globally unique path in format `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`). Forward-slash-normalized. This is the node's identity.
 - **`language`** (`string`) — language identifier (e.g. `typescript`, `python`). Determined by the language adapter at index time.
 - **`contentHash`** (`string`) — hash of the file's content at last index. Used for incremental diffing.
 - **`workspace`** (`string`) — the workspace name this file belongs to (e.g. `core`, `cli`, `default`).
@@ -37,10 +37,10 @@ Two `SpecNode` values are equal if their `specId` fields match.
 
 A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:
 
-- **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line` (e.g. `core/src/index.ts:function:main:1`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.
+- **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line` (e.g. `core:src/index.ts:function:main:1`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.
 - **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).
 - **`kind`** (`SymbolKind`) — the category of this symbol.
-- **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol (e.g. `core/src/index.ts`).
+- **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol (e.g. `core:src/index.ts`).
 - **`line`** (`number`) — 1-based line number of the symbol's declaration.
 - **`column`** (`number`) — 0-based column offset of the symbol's declaration.
 - **`comment`** (`string | undefined`) — the raw comment or JSDoc text immediately preceding the symbol's declaration. Stored verbatim (no parsing) to enable full-text search. Language adapters extract this from the AST; symbols without a preceding comment have `undefined`.
@@ -127,7 +127,7 @@ Specific error subclasses include:
 ```typescript
 // FileNode — path includes workspace prefix
 const file: FileNode = {
-  path: 'core/src/domain/entities/change.ts',
+  path: 'core:src/domain/entities/change.ts',
   language: 'typescript',
   contentHash: 'sha256:abc123...',
   workspace: 'core',
@@ -136,10 +136,10 @@ const file: FileNode = {
 
 // SymbolNode — id and filePath include workspace prefix
 const symbol: SymbolNode = {
-  id: 'core/src/domain/entities/change.ts:function:createChange:42',
+  id: 'core:src/domain/entities/change.ts:function:createChange:42',
   name: 'createChange',
   kind: SymbolKind.Function,
-  filePath: 'core/src/domain/entities/change.ts',
+  filePath: 'core:src/domain/entities/change.ts',
   line: 42,
   column: 0,
   comment: '/** Creates a new Change entity from the given parameters. */',

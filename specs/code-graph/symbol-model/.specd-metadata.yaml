@@ -10,7 +10,7 @@ rules:
       - |-
         A `FileNode` SHALL represent a single source file in the workspace. It contains:
 
-        * **`path`** (`string`) — globally unique path in format `{workspaceName}/{relativeToCodeRoot}` (e.g. `core/src/index.ts`). Forward-slash-normalized. This is the node's identity.
+        * **`path`** (`string`) — globally unique path in format `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`). Forward-slash-normalized. This is the node's identity.
         * **`language`** (`string`) — language identifier (e.g. `typescript`, `python`). Determined by the language adapter at index time.
         * **`contentHash`** (`string`) — hash of the file's content at last index. Used for incremental diffing.
         * **`workspace`** (`string`) — the workspace name this file belongs to (e.g. `core`, `cli`, `default`).
@@ -37,10 +37,10 @@ rules:
       - |-
         A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:
 
-        * **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line` (e.g. `core/src/index.ts:function:main:1`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.
+        * **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line` (e.g. `core:src/index.ts:function:main:1`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.
         * **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).
         * **`kind`** (`SymbolKind`) — the category of this symbol.
-        * **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol (e.g. `core/src/index.ts`).
+        * **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol (e.g. `core:src/index.ts`).
         * **`line`** (`number`) — 1-based line number of the symbol's declaration.
         * **`column`** (`number`) — 0-based column offset of the symbol's declaration.
         * **`comment`** (`string | undefined`) — the raw comment or JSDoc text immediately preceding the symbol's declaration. Stored verbatim (no parsing) to enable full-text search. Language adapters extract this from the AST; symbols without a preceding comment have `undefined`.
@@ -280,6 +280,6 @@ scenarios:
     then:
       - DuplicateSymbolIdError is thrown with both symbols' details
 contentHashes:
-  spec.md: sha256:8fee7f573c013d0dd50a22b1c6616ae02a3127e9770e688fad8e86b2a90cdb64
+  spec.md: sha256:17bed2518dc1e55810cbfba81d432d2ce5925877ad0f78ff9d2506d929f4ee7a
   verify.md: sha256:478e00f2daf6e6528d609fb71ba094aee98b8473b7b41f8f0159f52096f80070
 generatedBy: core

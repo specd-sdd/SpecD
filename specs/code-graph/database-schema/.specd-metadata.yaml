@@ -16,7 +16,7 @@ rules:
 
         | Column      | Type   | Notes                                      |
         | ----------- | ------ | ------------------------------------------ |
-        | path        | STRING | Primary key. `{workspace}/{relativePath}`. |
+        | path        | STRING | Primary key. `{workspace}:{relativePath}`. |
         | language    | STRING | Language identifier (e.g. `typescript`).   |
         | contentHash | STRING | SHA-256 hash of file content.              |
         | workspace   | STRING | Workspace name (e.g. `core`, `cli`).       |
@@ -84,7 +84,7 @@ rules:
   - requirement: Schema versioning
     rules:
       - |-
-        The schema SHALL be versioned with an integer `SCHEMA_VERSION` constant. The current version is **4**. When the database is opened:
+        The schema SHALL be versioned with an integer `SCHEMA_VERSION` constant. The current version is **5**. When the database is opened:
 
         1. Execute the DDL statements (all use `IF NOT EXISTS` — safe to re-run)
         2. Create FTS indexes if they do not exist
@@ -106,7 +106,7 @@ scenarios:
   - requirement: Node tables
     name: File node stored and retrieved
     given:
-      - a FileNode with path core/src/index.ts and workspace core
+      - a FileNode with path core:src/index.ts and workspace core
     when:
       - it is upserted and then retrieved by path
     then:
@@ -167,17 +167,17 @@ scenarios:
     then:
       - no error occurs — FTS index creation is skipped if already exists
   - requirement: Schema versioning
-    name: Schema version 4
+    name: Schema version 5
     when:
       - a fresh database is opened
     then:
-      - the schema version stored in the Meta table is 4
+      - the schema version stored in the Meta table is 5
   - requirement: Schema versioning
     name: Old schema requires force re-index
     given:
-      - a database created with schema version 3
+      - a database created with schema version 4
     when:
-      - the application opens it expecting version 4
+      - the application opens it expecting version 5
     then:
       - a --force re-index is required to rebuild
   - requirement: Relationship tables
@@ -196,6 +196,6 @@ scenarios:
       - the COVERS relationship table exists
       - AND it contains no rows (v2+ feature)
 contentHashes:
-  spec.md: sha256:a02ea9cda79c7a3dbd2ce18ab63f1c0c41165528a7f5076c9ed9e7cb619fc8e7
-  verify.md: sha256:89a709a548ce8f90458f9171fee7ac7949f42f7102c2857b91db07b67fe158a2
+  spec.md: sha256:941cf2e5e5fee2edb29a6c1d2685c5eda701ba13ad2fcfec98399fb96dba1af4
+  verify.md: sha256:7aacc9d30c8eee224a1f67b8a4c1696331bb54d6e708cb05495ab0a866917aec
 generatedBy: core

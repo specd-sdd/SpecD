@@ -37,7 +37,7 @@ To force a full re-index, callers MUST call `GraphStore.clear()` before `execute
 The indexer SHALL discover files from each workspace's `codeRoot` independently. For each `WorkspaceIndexTarget`:
 
 1. Call `discoverFiles(codeRoot, hasAdapter)` to get paths relative to `codeRoot`
-2. Prefix each path with `{workspaceName}/` to form the globally unique `FileNode.path`
+2. Prefix each path with `{workspaceName}:` to form the globally unique `FileNode.path`
 3. Diff against the store (filtered by workspace prefix)
 
 `discoverFiles` itself has no workspace knowledge — it accepts a root directory and:
@@ -84,7 +84,7 @@ Progress updates include a detail string (e.g. `"150/460 files"`) for phases tha
 
 Before Pass 2, the indexer builds a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over all registered adapters and the first one to return a non-`undefined` identity wins. This is language-agnostic — each adapter reads its own manifest format (`package.json`, `go.mod`, `pyproject.toml`, `composer.json`).
 
-For non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the in-memory `SymbolIndex` for symbols with the imported name within the matching workspace's path prefix (`workspaceName + '/'`).
+For non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the in-memory `SymbolIndex` for symbols with the imported name within the matching workspace's path prefix (`workspaceName + ':'`).
 
 This works for both monorepo (workspaces in the same repo) and multirepo (workspaces in separate repos configured in `specd.yaml`) because the resolution depends only on the adapter reading each workspace's manifest — not on `pnpm-workspace.yaml` or any monorepo-specific tooling.
 

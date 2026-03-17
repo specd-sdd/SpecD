@@ -14,7 +14,7 @@ The database SHALL define the following node tables:
 
 | Column      | Type   | Notes                                      |
 | ----------- | ------ | ------------------------------------------ |
-| path        | STRING | Primary key. `{workspace}/{relativePath}`. |
+| path        | STRING | Primary key. `{workspace}:{relativePath}`. |
 | language    | STRING | Language identifier (e.g. `typescript`).   |
 | contentHash | STRING | SHA-256 hash of file content.              |
 | workspace   | STRING | Workspace name (e.g. `core`, `cli`).       |
@@ -82,7 +82,7 @@ FTS indexes are created once during `open()` after schema DDL. If the index alre
 
 ### Requirement: Schema versioning
 
-The schema SHALL be versioned with an integer `SCHEMA_VERSION` constant. The current version is **4**. When the database is opened:
+The schema SHALL be versioned with an integer `SCHEMA_VERSION` constant. The current version is **5**. When the database is opened:
 
 1. Execute the DDL statements (all use `IF NOT EXISTS` — safe to re-run)
 2. Create FTS indexes if they do not exist

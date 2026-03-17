@@ -12,7 +12,7 @@ rules:
       - |-
         `FileNode.path` SHALL be globally unique by prefixing the workspace name to the code-root-relative path:
 
-        * **`path`** = `{workspaceName}/{relativeToCodeRoot}` (e.g. `core/src/index.ts`)
+        * **`path`** = `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`)
         * **`workspace`** = workspace name string (e.g. `core`, `cli`, `default`)
 
         This ensures that two workspaces with identical relative paths (e.g. both having `src/index.ts`) produce distinct `FileNode.path` values. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.
@@ -21,7 +21,7 @@ rules:
       - |-
         `SymbolNode.id` SHALL include the workspace-prefixed path:
 
-        * **`id`** = `{workspace}/{relativePath}:{kind}:{name}:{line}` (e.g. `core/src/index.ts:function:main:1`)
+        * **`id`** = `{workspace}:{relativePath}:{kind}:{name}:{line}` (e.g. `core:src/index.ts:function:main:1`)
 
         This follows naturally from `SymbolNode.filePath` being the `FileNode.path`.
   - requirement: SpecNode workspace field
@@ -127,6 +127,6 @@ constraints:
   - Spec resolution uses SpecRepository exclusively — no filesystem fallback
   - Existing .specd/code-graph.lbug files are incompatible with the new path format — --force re-index is required after upgrading
 contentHashes:
-  spec.md: sha256:b1d8a1baba887b4b8298ac82600b2b432b35fa5092709837a682852f4999a672
+  spec.md: sha256:729fd2848eaeef935ee855ebb4c16e18e755484b358141546d37447555308904
   verify.md: sha256:3df7a93457184cac0387b4b5d473517c7206a9c380b2c341afabf8d65be4061a
 generatedBy: core
