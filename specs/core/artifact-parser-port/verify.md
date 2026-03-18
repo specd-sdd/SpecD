@@ -53,6 +53,25 @@
 - **WHEN** `parse` is called followed by `serialize`
 - **THEN** parsing the serialized output produces an AST equivalent to the original
 
+#### Scenario: Markdown serialize preserves untouched inline formatting
+
+- **GIVEN** a markdown AST containing inline code, emphasis, and strong in one paragraph
+- **AND** delta application modifies a different node in the same document
+- **WHEN** the markdown adapter serializes the resulting AST
+- **THEN** the untouched paragraph preserves inline formatting intent (inline code/emphasis/strong)
+
+#### Scenario: Markdown serializer uses source style when unambiguous
+
+- **GIVEN** a markdown source that consistently uses `-` bullets and `_` emphasis
+- **WHEN** the markdown adapter parses, applies delta, and serializes
+- **THEN** output keeps `-` as bullet marker and `_` as emphasis marker where representable
+
+#### Scenario: Markdown serializer resolves mixed style deterministically
+
+- **GIVEN** a markdown source that mixes both supported markers for bullets or emphasis
+- **WHEN** the markdown adapter serializes the AST
+- **THEN** output uses deterministic project markdown conventions for the ambiguous construct
+
 ### Requirement: RenderSubtree contract
 
 #### Scenario: Single node renders to native format

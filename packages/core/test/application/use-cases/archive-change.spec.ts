@@ -16,6 +16,7 @@ import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js
 import { type GenerateSpecMetadata } from '../../../src/application/use-cases/generate-spec-metadata.js'
 import { type SaveSpecMetadata } from '../../../src/application/use-cases/save-spec-metadata.js'
 import { YamlSerializer } from '../../../src/application/ports/yaml-serializer.js'
+import { MarkdownParser } from '../../../src/infrastructure/artifact-parser/markdown-parser.js'
 import {
   type RunStepHooksInput,
   type RunStepHooksResult,
@@ -1026,6 +1027,350 @@ describe('ArchiveChange', () => {
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(DeltaApplicationError)
+    })
+
+    it('preserves untouched inline formatting in markdown merge output', async () => {
+      const baseContent =
+        '## Requirement: Unchanged\n\nUse `specd change validate <name>`.\n\n## Requirement: Target\n\nOld text.\n'
+      const mdParser = new MarkdownParser()
+      const yamlParser = makeParser({
+        parseDelta: () => [
+          {
+            op: 'modified' as const,
+            selector: { type: 'section', matches: '^Requirement: Target$' },
+            content: 'New text.\n',
+          },
+        ],
+      })
+
+      const specRepo = makeSpecRepository({ artifacts: { 'auth/oauth/spec.md': baseContent } })
+      const artifactType = makeArtifactType('spec', {
+        delta: true,
+        format: 'markdown',
+        scope: 'spec',
+      })
+      const schema = makeSchema([artifactType])
+
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact(_change: Change, filename: string) {
+          if (filename === 'deltas/default/auth/oauth/spec.md.delta.yaml')
+            return new SpecArtifact(filename, 'delta-content')
+          return null
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(mdParser, yamlParser),
+        makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+      await uc.execute({ name: 'my-change' })
+
+      const merged = specRepo.saved.get('spec.md') ?? ''
+      expect(merged).toContain('`specd change validate <name>`')
+      expect(merged).not.toContain('\\<name\\>')
+    })
+
+    it('serializes mixed markdown styles deterministically after merge', async () => {
+      const baseContent =
+        '## Requirement: Unchanged\n\n- item a\n* item b\n\nUse _one_ and *two*.\nUse __three__ and **four**.\n\n## Requirement: Target\n\nOld text.\n'
+      const mdParser = new MarkdownParser()
+      const yamlParser = makeParser({
+        parseDelta: () => [
+          {
+            op: 'modified' as const,
+            selector: { type: 'section', matches: '^Requirement: Target$' },
+            content: 'New text.\n',
+          },
+        ],
+      })
+
+      const specRepo = makeSpecRepository({ artifacts: { 'auth/oauth/spec.md': baseContent } })
+      const artifactType = makeArtifactType('spec', {
+        delta: true,
+        format: 'markdown',
+        scope: 'spec',
+      })
+      const schema = makeSchema([artifactType])
+
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact(_change: Change, filename: string) {
+          if (filename === 'deltas/default/auth/oauth/spec.md.delta.yaml')
+            return new SpecArtifact(filename, 'delta-content')
+          return null
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(mdParser, yamlParser),
+        makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+      await uc.execute({ name: 'my-change' })
+
+      const merged = specRepo.saved.get('spec.md') ?? ''
+      expect(merged).toContain('- item a')
+      expect(merged).toContain('- item b')
+      expect(merged).not.toContain('* item b')
+      expect(merged).toContain('*one*')
+      expect(merged).toContain('**three**')
+    })
+
+    it('preserves untouched thematic breaks when merging markdown deltas', async () => {
+      const baseContent =
+        '## Requirement: Unchanged\n\nBefore\n\n---\n\nAfter\n\n## Requirement: Target\n\nOld text.\n'
+      const mdParser = new MarkdownParser()
+      const yamlParser = makeParser({
+        parseDelta: () => [
+          {
+            op: 'modified' as const,
+            selector: { type: 'section', matches: '^Requirement: Target$' },
+            content: 'New text.\n',
+          },
+        ],
+      })
+
+      const specRepo = makeSpecRepository({ artifacts: { 'auth/oauth/spec.md': baseContent } })
+      const artifactType = makeArtifactType('spec', {
+        delta: true,
+        format: 'markdown',
+        scope: 'spec',
+      })
+      const schema = makeSchema([artifactType])
+
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact(_change: Change, filename: string) {
+          if (filename === 'deltas/default/auth/oauth/spec.md.delta.yaml')
+            return new SpecArtifact(filename, 'delta-content')
+          return null
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(mdParser, yamlParser),
+        makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+      await uc.execute({ name: 'my-change' })
+
+      const merged = specRepo.saved.get('spec.md') ?? ''
+      expect(merged).toContain('\n---\n')
+      expect(merged).not.toContain('\n***\n')
+    })
+
+    it('preserves untouched blockquotes when merging markdown deltas', async () => {
+      const baseContent =
+        '## Requirement: Unchanged\n\n> Warning line\n\n## Requirement: Target\n\nOld text.\n'
+      const mdParser = new MarkdownParser()
+      const yamlParser = makeParser({
+        parseDelta: () => [
+          {
+            op: 'modified' as const,
+            selector: { type: 'section', matches: '^Requirement: Target$' },
+            content: 'New text.\n',
+          },
+        ],
+      })
+
+      const specRepo = makeSpecRepository({ artifacts: { 'auth/oauth/spec.md': baseContent } })
+      const artifactType = makeArtifactType('spec', {
+        delta: true,
+        format: 'markdown',
+        scope: 'spec',
+      })
+      const schema = makeSchema([artifactType])
+
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact(_change: Change, filename: string) {
+          if (filename === 'deltas/default/auth/oauth/spec.md.delta.yaml')
+            return new SpecArtifact(filename, 'delta-content')
+          return null
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(mdParser, yamlParser),
+        makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+      await uc.execute({ name: 'my-change' })
+
+      const merged = specRepo.saved.get('spec.md') ?? ''
+      expect(merged).toContain('> Warning line')
+      expect(merged).not.toContain('\\> Warning line')
+    })
+
+    it('preserves untouched ordered list numbering when merging markdown deltas', async () => {
+      const baseContent =
+        '## Requirement: Unchanged\n\n3. Keep as three\n4. Keep as four\n\n## Requirement: Target\n\nOld text.\n'
+      const mdParser = new MarkdownParser()
+      const yamlParser = makeParser({
+        parseDelta: () => [
+          {
+            op: 'modified' as const,
+            selector: { type: 'section', matches: '^Requirement: Target$' },
+            content: 'New text.\n',
+          },
+        ],
+      })
+
+      const specRepo = makeSpecRepository({ artifacts: { 'auth/oauth/spec.md': baseContent } })
+      const artifactType = makeArtifactType('spec', {
+        delta: true,
+        format: 'markdown',
+        scope: 'spec',
+      })
+      const schema = makeSchema([artifactType])
+
+      const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact(_change: Change, filename: string) {
+          if (filename === 'deltas/default/auth/oauth/spec.md.delta.yaml')
+            return new SpecArtifact(filename, 'delta-content')
+          return null
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(mdParser, yamlParser),
+        makeSchemaRegistry(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+      await uc.execute({ name: 'my-change' })
+
+      const merged = specRepo.saved.get('spec.md') ?? ''
+      expect(merged).toContain('3. Keep as three')
+      expect(merged).toContain('4. Keep as four')
+      expect(merged).not.toContain('1. Keep as three')
     })
   })
 

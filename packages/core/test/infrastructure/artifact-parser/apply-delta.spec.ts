@@ -201,6 +201,25 @@ describe('applyDelta', () => {
       // parseContent returns a document with one child labeled 'new-child'
       expect(block.children![0]!.label).toBe('new-child')
     })
+
+    it('preserves adapter metadata for untouched nodes', () => {
+      const untouchedParagraph: ArtifactNode = {
+        type: 'paragraph',
+        value: 'Use `code`',
+        _inlines: [{ type: 'inlineCode', value: 'code' }],
+      }
+      const ast = makeAST([untouchedParagraph, pair('name', 'old-value')])
+      const delta: DeltaEntry[] = [
+        {
+          op: 'modified',
+          selector: { type: 'pair', matches: '^name$' },
+          value: 'new-value',
+        },
+      ]
+
+      const result = applyDelta(ast, delta, parseContent, valueToNode)
+      expect(result.root.children![0]!._inlines).toEqual([{ type: 'inlineCode', value: 'code' }])
+    })
   })
 
   describe('removed operation', () => {

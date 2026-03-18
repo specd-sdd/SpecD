@@ -147,6 +147,8 @@ Each adapter must be able to serialize a normalized AST back to the artifact's n
 
 - All `label`, `value`, and `children` content is preserved exactly
 - For markdown: heading levels, list types (`ordered`), code block languages, and nesting structure are preserved
+- For markdown: inline formatting intent represented in AST node metadata (such as inline code, emphasis, strong, and link structure) is preserved across parse/apply/serialize for nodes not explicitly modified by delta entries
+- For markdown: serializer style markers (`bullet`, `emphasis`, `strong`) should follow the source document when unambiguous; when ambiguous, output follows deterministic project markdown conventions
 - For YAML: key order within mappings is preserved; comments are preserved where the underlying library supports it (CST-level round-trip)
 - For JSON: key order is preserved; formatting is normalized to two-space indentation
 - Content not representable in the normalized format (e.g. inline markdown formatting such as bold or italic) is preserved as-is within `value` strings — the adapter does not decompose inline nodes

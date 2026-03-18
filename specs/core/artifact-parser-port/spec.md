@@ -36,6 +36,12 @@ The `apply` method MUST resolve all selectors before applying any operation. If 
 
 Calling `serialize(parse(content))` MUST produce output that, when parsed again, yields an equivalent AST. Implementations SHOULD preserve formatting where practical, but semantic equivalence is the binding constraint.
 
+For the markdown adapter, serialize/apply behavior MUST preserve inline formatting intent represented in the AST (for example inline code, emphasis, and strong markers) for nodes not targeted by delta operations.
+
+The markdown adapter MUST support serializer style options derived from source content (at minimum unordered list marker, emphasis marker, and strong marker) so merged output can preserve original style where unambiguous.
+
+If source style is ambiguous (mixed markers for the same construct), the markdown adapter MUST serialize deterministically using project markdown conventions so output is stable across runs.
+
 ### Requirement: RenderSubtree contract
 
 The `renderSubtree` method MUST accept a single `ArtifactNode` and return the native format string for that node and all its descendants. This is used by `ValidateArtifacts` for `contentMatches` evaluation and by the metadata extraction engine.

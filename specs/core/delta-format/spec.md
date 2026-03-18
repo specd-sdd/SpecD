@@ -183,15 +183,17 @@ Example with `parent` and `where`:
 
 ### Requirement: Delta application
 
-`ArtifactParser.apply(ast, delta)` applies a delta array to an artifact AST and returns a new AST. The algorithm:
+Delta entries are applied in declaration order after all selectors are validated. For each entry:
 
-1. **Validate** — resolve every `selector` in `modified` and `removed` entries against the AST. If any fails to resolve (no match, or ambiguous match), reject the entire delta with `DeltaApplicationError` without applying any operation. For `modified` entries with `rename`, also verify that no sibling node already carries the target name — if one exists, reject with `DeltaApplicationError`. `position.after`/`position.before` selectors in `added` entries are **not** validated at this stage — their failure is a recoverable warning, not an error. `position.parent` selectors are validated — if a `parent` is declared and resolves to no node, reject with `DeltaApplicationError`.
-2. **Apply** — process entries in declaration order:
-   - `removed` — detach the matched node from its parent
-   - `modified` — if `rename` is present, update the node's identifying property to the new value; if `content` is present, call `ArtifactParser.parse(content)` to obtain an AST fragment and replace the node's body (everything except the identifying line/key); if `value` is present, replace the node's value directly; for array targets, apply the declared `strategy`; `rename` and `content`/`value` are independent and can be combined
-   - `added` — if `content` is present, call `ArtifactParser.parse(content)` to obtain the new AST node (the identifying property is derived from the first line of content for text-based formats, or from the `value` structure for structured formats); resolve `position`: if `position.parent` is declared, scope the insertion to that node's children; then apply the placement hint: `first` → prepend to the scope; `last` → append to the scope (this is also the default when no hint is given); `after`/`before` → attempt to resolve within the scope; if resolved, insert immediately after/before the matched sibling; if not resolved, emit a warning and append at the end of the scope; if no `position` is declared at all, append at the end of the document
+- `modified`: replace the targeted node body (`content`) and/or rename the identifying field (`rename`)
+- `removed`: remove the targeted node
+- `added`: insert new node(s) according to `position` semantics
 
-Declaration order is the authoritative execution order. No fixed operation ordering is imposed — the LLM is responsible for declaring operations in a valid, non-conflicting sequence.
+`apply` first resolves selectors against the original AST to guarantee atomicity. If any selector is invalid or ambiguous, `apply` fails with `DeltaApplicationError` and applies nothing.
+
+During `modified` operations on markdown artifacts, replacing node body content must not destroy inline formatting metadata for unaffected sibling/ancestor nodes. Implementations must preserve representable inline structure so serialization does not strip backticks or rewrite emphasis/strong markers in untouched nodes.
+
+For markdown serialization after delta apply, list/emphasis/strong marker output should track source style when unambiguous. If the source is mixed/ambiguous for a construct, the serializer must choose deterministic project markdown conventions.
 
 ### Requirement: Delta conflict detection
 
