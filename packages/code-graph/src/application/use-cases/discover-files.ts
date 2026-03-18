@@ -72,24 +72,35 @@ export function discoverFiles(root: string, hasAdapter: (filePath: string) => bo
   }
 
   /**
-   * Checks whether a root-relative path is ignored by any scoped `.gitignore` rule.
+   * Checks whether a root-relative path is ignored by scoped `.gitignore` rules.
+   * Evaluates from general to specific scope so child negations can override
+   * parent ignores (e.g. root `*.gen.ts` overridden by `src/!keep.gen.ts`).
    * @param relPath - Root-relative path to check.
    * @param isDir - Whether the path is a directory.
-   * @returns True if any scoped ignore rule matches the path.
+   * @returns True if the path is ignored after all scoped rules are evaluated.
    */
   function isIgnored(relPath: string, isDir: boolean): boolean {
+    let ignored = false
     for (const { ig, base } of scopedIgnores) {
+      const target = isDir ? relPath + '/' : relPath
       if (base === '') {
-        if (ig.ignores(isDir ? relPath + '/' : relPath)) return true
+        const result = ig.test(target)
+        if (result.ignored) ignored = true
+        if (result.unignored) ignored = false
       } else {
         const prefix = base + '/'
         if (relPath.startsWith(prefix)) {
           const sub = relPath.slice(prefix.length)
-          if (sub && ig.ignores(isDir ? sub + '/' : sub)) return true
+          if (sub) {
+            const subTarget = isDir ? sub + '/' : sub
+            const result = ig.test(subTarget)
+            if (result.ignored) ignored = true
+            if (result.unignored) ignored = false
+          }
         }
       }
     }
-    return false
+    return ignored
   }
 
   const results: string[] = []
