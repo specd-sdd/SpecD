@@ -449,21 +449,17 @@ export class IndexCodeGraph {
       `${String(allFiles.length)} files, ${String(allSymbols.length)} symbols, ${String(allRelations.length)} relations`,
     )
     if (allFiles.length > 0 || allSpecs.length > 0) {
-      try {
-        let bulkStep = 0
-        await this.store.bulkLoad({
-          files: allFiles,
-          symbols: allSymbols,
-          specs: allSpecs,
-          relations: allRelations,
-          onProgress: (step) => {
-            bulkStep++
-            progress(83 + Math.min(Math.round(bulkStep * 2), 12), 'Bulk loading', step)
-          },
-        })
-      } catch (err) {
-        errors.push({ filePath: '<bulk-load>', message: String(err) })
-      }
+      let bulkStep = 0
+      await this.store.bulkLoad({
+        files: allFiles,
+        symbols: allSymbols,
+        specs: allSpecs,
+        relations: allRelations,
+        onProgress: (step) => {
+          bulkStep++
+          progress(83 + Math.min(Math.round(bulkStep * 2), 12), 'Bulk loading', step)
+        },
+      })
     }
 
     // Rebuild FTS indexes after data changes
