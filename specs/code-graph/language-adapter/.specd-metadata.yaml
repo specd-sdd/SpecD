@@ -14,7 +14,7 @@ rules:
         - **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.
         - **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found
         - **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution
-        - **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS) from the file
+        - **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS) from the file. The `importMap` maps local import names to resolved symbol IDs (e.g. `"validateUser"` → `"auth:src/auth.ts:function:validateUser:10"`), built by the indexer during Pass 2
 
         Both extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects.
   - requirement: Language detection
@@ -119,12 +119,12 @@ rules:
 
         - **`resolveRelativeImportPath?(fromFile: string, specifier: string): string | string[]`** — given the importing file path and a relative specifier, returns one or more candidate file paths. Returns multiple candidates when the specifier is ambiguous (e.g. could be a file or a directory with an index file). The indexer tries each candidate in order against the symbol index. Each language has its own rules for extension mapping and path resolution:
 
-        | Language   | Resolution rules                                                                    |
-        | ---------- | ----------------------------------------------------------------------------------- |
-        | TypeScript | `.js` → `.ts`, extensionless → `[.ts, /index.ts]`, `.jsx` → `.tsx`, `../` traversal |
-        | Python     | `.` = current package, `..` = parent, adds `.py` extension                          |
-        | Go         | Not applicable — Go imports are never relative                                      |
-        | PHP        | Not applicable — PHP imports are never relative                                     |
+        | Language   | Resolution rules                                                                               |
+        | ---------- | ---------------------------------------------------------------------------------------------- |
+        | TypeScript | `.js` → `.ts`, extensionless → `[.ts, /index.ts]`, `.jsx` → `.tsx`, `../` traversal            |
+        | Python     | `.` = current package, `..` = parent, module → `[.py, /__init__.py]`, bare dot → `__init__.py` |
+        | Go         | Not applicable — Go imports are never relative                                                 |
+        | PHP        | Not applicable — PHP imports are never relative                                                |
 
         - **`buildQualifiedName?(namespace: string, symbolName: string): string`** — builds a fully qualified name from a namespace and symbol name. Used by languages like PHP where imports are resolved via namespace-qualified names rather than package names.
 
@@ -481,6 +481,6 @@ scenarios:
     then:
       - it returns 'App\\Models\\User'
 contentHashes:
-  spec.md: sha256:0748b31ec86c5ef4843b63d4187616963968521fc57597fc12947a4ed9cea666
+  spec.md: sha256:c4dfb330800129c9ca98a9ad43eef679224eb5d92432fb7fc2c9abca38389866
   verify.md: sha256:0cd4bf89790b18a869b03b21325c490dff51128dd2dc6df6ef413febedb6fc01
 generatedBy: core

@@ -14,7 +14,7 @@ Different programming languages have fundamentally different syntax for function
 - **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.
 - **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found
 - **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution
-- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS) from the file
+- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS) from the file. The `importMap` maps local import names to resolved symbol IDs (e.g. `"validateUser"` → `"auth:src/auth.ts:function:validateUser:10"`), built by the indexer during Pass 2
 
 Both extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects.
 
