@@ -230,13 +230,6 @@ export class IndexCodeGraph {
       }
     }
 
-    // Track per-workspace removals
-    for (const filePath of deletedFiles) {
-      const wsName = filePath.substring(0, filePath.indexOf(':'))
-      const breakdown = wsBreakdowns.get(wsName)
-      if (breakdown) breakdown.filesRemoved++
-    }
-
     const filesToProcess = [...newFiles, ...changedFiles]
 
     // ── Cleanup (6%) ──
@@ -247,7 +240,12 @@ export class IndexCodeGraph {
     for (const filePath of toRemove) {
       try {
         await this.store.removeFile(filePath)
-        if (deletedSet.has(filePath)) filesRemoved++
+        if (deletedSet.has(filePath)) {
+          filesRemoved++
+          const wsName = filePath.substring(0, filePath.indexOf(':'))
+          const breakdown = wsBreakdowns.get(wsName)
+          if (breakdown) breakdown.filesRemoved++
+        }
       } catch (err) {
         errors.push({ filePath, message: String(err) })
       }
