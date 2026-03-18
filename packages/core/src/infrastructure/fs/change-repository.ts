@@ -17,6 +17,8 @@ import {
   type ChangeRepositoryConfig,
 } from '../../application/ports/change-repository.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
+import { safeRegex } from '../../domain/services/safe-regex.js'
 import { changeDirName } from './dir-name.js'
 import { sha256 } from './hash.js'
 import { isEnoent } from './is-enoent.js'
@@ -534,7 +536,8 @@ export class FsChangeRepository extends ChangeRepository {
       const artType = artifactTypeMap.get(raw.type)
       const filesMap = new Map<string, ArtifactFile>()
       for (const rawFile of raw.files) {
-        let status = await this._deriveFileStatus(rawFile, dir, raw.optional)
+        const cleanup = artType?.preHashCleanup ?? []
+        let status = await this._deriveFileStatus(rawFile, dir, raw.optional, cleanup)
         let resolvedFilename = rawFile.filename
 
         // For delta-capable spec-scoped artifacts, check the delta file if the primary is missing
@@ -549,6 +552,7 @@ export class FsChangeRepository extends ChangeRepository {
             { key: rawFile.key, filename: deltaPath, validatedHash: rawFile.validatedHash },
             dir,
             raw.optional,
+            cleanup,
           )
           if (deltaStatus !== 'missing') {
             status = deltaStatus
@@ -607,6 +611,7 @@ export class FsChangeRepository extends ChangeRepository {
 
       for (const [typeId, artifact] of change.artifacts) {
         const artType = artifactTypeMap.get(typeId)
+        const syncCleanup = artType?.preHashCleanup ?? []
 
         for (const [, file] of artifact.files) {
           if (file.status === 'missing' && file.validatedHash === undefined) {
@@ -615,6 +620,7 @@ export class FsChangeRepository extends ChangeRepository {
               { key: file.key, filename: file.filename, validatedHash: null },
               dir,
               artifact.optional,
+              syncCleanup,
             )
 
             // For delta-capable spec-scoped artifacts, also check the delta file path
@@ -629,6 +635,7 @@ export class FsChangeRepository extends ChangeRepository {
                 { key: file.key, filename: deltaPath, validatedHash: null },
                 dir,
                 artifact.optional,
+                syncCleanup,
               )
               if (derivedStatus !== 'missing') {
                 // Delta file exists — update filename to the delta path
@@ -701,12 +708,14 @@ export class FsChangeRepository extends ChangeRepository {
    * @param file - The manifest file descriptor
    * @param dir - Absolute path to the change directory
    * @param optional - Whether the parent artifact is optional (affects skipped sentinel handling)
+   * @param preHashCleanup - Cleanup transforms to apply before hashing
    * @returns The derived `ArtifactStatus`
    */
   private async _deriveFileStatus(
     file: ManifestArtifactFile,
     dir: string,
     optional: boolean = true,
+    preHashCleanup: readonly PreHashCleanup[] = [],
   ): Promise<ArtifactStatus> {
     if (file.validatedHash === SKIPPED_SENTINEL && optional) return 'skipped'
     if (file.validatedHash === SKIPPED_SENTINEL) return 'in-progress'
@@ -722,7 +731,14 @@ export class FsChangeRepository extends ChangeRepository {
 
     if (file.validatedHash === null) return 'in-progress'
 
-    const currentHash = sha256(content)
+    let cleaned = content
+    for (const rule of preHashCleanup) {
+      const re = safeRegex(rule.pattern, 'g')
+      if (re !== null) {
+        cleaned = cleaned.replace(re, rule.replacement)
+      }
+    }
+    const currentHash = sha256(cleaned)
     return currentHash === file.validatedHash ? 'complete' : 'in-progress'
   }
 }
