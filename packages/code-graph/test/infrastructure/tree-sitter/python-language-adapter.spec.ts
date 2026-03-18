@@ -138,14 +138,14 @@ describe('PythonLanguageAdapter', () => {
   })
 
   describe('resolveRelativeImportPath', () => {
-    it('resolves dot-prefixed relative import', () => {
+    it('returns candidates for dot-prefixed relative import', () => {
       const result = adapter.resolveRelativeImportPath('core:src/models/user.py', '.base')
-      expect(result).toBe('core:src/models/base.py')
+      expect(result).toEqual(['core:src/models/base.py', 'core:src/models/base/__init__.py'])
     })
 
-    it('resolves parent import with double dot', () => {
+    it('returns candidates for parent import with double dot', () => {
       const result = adapter.resolveRelativeImportPath('core:src/models/user.py', '..utils')
-      expect(result).toBe('core:src/utils.py')
+      expect(result).toEqual(['core:src/utils.py', 'core:src/utils/__init__.py'])
     })
   })
 

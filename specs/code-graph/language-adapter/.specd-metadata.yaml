@@ -10,11 +10,11 @@ rules:
       - |-
         `LanguageAdapter` SHALL be an interface (not an abstract class, since adapters are stateless and have no shared state to inherit) with the following methods:
 
-        * **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)
-        * **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.
-        * **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found
-        * **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution
-        * **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS) from the file
+        - **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)
+        - **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.
+        - **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found
+        - **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution
+        - **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS) from the file
 
         Both extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects.
   - requirement: Language detection
@@ -35,9 +35,9 @@ rules:
       - |-
         A built-in `TypeScriptLanguageAdapter` SHALL handle `typescript`, `tsx`, `javascript`, and `jsx` files using `@ast-grep/napi` for Tree-sitter parsing. It MUST extract:
 
-        * **Symbols**: functions (named + arrow assigned to const), classes, methods, exported variables, type aliases, interfaces, enums
-        * **Comments**: For each extracted symbol, the adapter extracts the raw text of the immediately preceding comment block (JSDoc `/** ... */`, block `/* ... */`, or contiguous line comments `// ...`). The comment is stored verbatim in `SymbolNode.comment`. If no comment precedes the declaration, `comment` is `undefined`.
-        * **Relations**: `DEFINES` (file → symbol), `EXPORTS` (file → exported symbol), `IMPORTS` (file → file via import specifier resolution), `CALLS` (symbol → symbol via call expressions)
+        - **Symbols**: functions (named + arrow assigned to const), classes, methods, exported variables, type aliases, interfaces, enums
+        - **Comments**: For each extracted symbol, the adapter extracts the raw text of the immediately preceding comment block (JSDoc `/** ... */`, block `/* ... */`, or contiguous line comments `// ...`). The comment is stored verbatim in `SymbolNode.comment`. If no comment precedes the declaration, `comment` is `undefined`.
+        - **Relations**: `DEFINES` (file → symbol), `EXPORTS` (file → exported symbol), `IMPORTS` (file → file via import specifier resolution), `CALLS` (symbol → symbol via call expressions)
 
         The adapter maps TypeScript/JavaScript constructs to `SymbolKind` values:
 
@@ -58,10 +58,10 @@ rules:
 
         `ImportDeclaration` is a value object with:
 
-        * **`localName`** (`string`) — the name used locally in the importing file (may differ from original via aliasing)
-        * **`originalName`** (`string`) — the name as declared in the source module
-        * **`specifier`** (`string`) — the raw import specifier string (e.g. `'./utils.js'`, `'@specd/core'`, `'os'`)
-        * **`isRelative`** (`boolean`) — true if the specifier starts with `.` or `/`
+        - **`localName`** (`string`) — the name used locally in the importing file (may differ from original via aliasing)
+        - **`originalName`** (`string`) — the name as declared in the source module
+        - **`specifier`** (`string`) — the raw import specifier string (e.g. `'./utils.js'`, `'@specd/core'`, `'os'`)
+        - **`isRelative`** (`boolean`) — true if the specifier starts with `.` or `/`
 
         Each adapter parses imports using its language's syntax:
 
@@ -78,8 +78,8 @@ rules:
       - |-
         For `CALLS` relations, the adapter MUST extract call expressions from the AST and resolve them:
 
-        * **Caller**: the innermost enclosing function, method, or arrow function containing the call expression. Calls at module top level are silently dropped.
-        * **Callee**: resolved via the import map passed to `extractRelations`. If the called identifier is in the import map, the callee is the resolved symbol. If the identifier matches a locally defined symbol, the callee is that local symbol.
+        - **Caller**: the innermost enclosing function, method, or arrow function containing the call expression. Calls at module top level are silently dropped.
+        - **Callee**: resolved via the import map passed to `extractRelations`. If the called identifier is in the import map, the callee is the resolved symbol. If the identifier matches a locally defined symbol, the callee is that local symbol.
 
         Calls to identifiers that cannot be resolved (e.g. global built-ins, member expressions like `obj.method()`, dynamic expressions) SHALL be silently dropped — no relation is created, no error is thrown.
   - requirement: Package identity extraction
@@ -87,7 +87,7 @@ rules:
       - |-
         `LanguageAdapter` MAY provide an optional method:
 
-        * **`getPackageIdentity?(codeRoot: string, repoRoot?: string): string | undefined`** — searches at and above `codeRoot` (bounded by `repoRoot`) for the language's package manifest and returns the package name, or `undefined` if no manifest is found.
+        - **`getPackageIdentity?(codeRoot: string, repoRoot?: string): string | undefined`** — searches at and above `codeRoot` (bounded by `repoRoot`) for the language's package manifest and returns the package name, or `undefined` if no manifest is found.
 
         Each adapter reads its language's package manifest:
 
@@ -108,7 +108,7 @@ rules:
       - |-
         `LanguageAdapter` MAY provide optional methods for resolving import specifiers to file paths. This moves all language-specific resolution logic out of the indexer:
 
-        * **`resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined`** — given a non-relative import specifier and the list of known package names, returns which package the specifier refers to. Each language has its own rules:
+        - **`resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined`** — given a non-relative import specifier and the list of known package names, returns which package the specifier refers to. Each language has its own rules:
 
         | Language   | Specifier example                | Package extraction rule                               |
         | ---------- | -------------------------------- | ----------------------------------------------------- |
@@ -117,16 +117,16 @@ rules:
         | Python     | `acme_auth.models`               | First segment, normalized (hyphens ↔ underscores).    |
         | PHP        | (uses qualified names, not this) | Not applicable — PHP resolves via `extractNamespace`. |
 
-        * **`resolveRelativeImportPath?(fromFile: string, specifier: string): string`** — given the importing file path and a relative specifier, returns the resolved file path. Each language has its own rules for extension mapping and path resolution:
+        - **`resolveRelativeImportPath?(fromFile: string, specifier: string): string | string[]`** — given the importing file path and a relative specifier, returns one or more candidate file paths. Returns multiple candidates when the specifier is ambiguous (e.g. could be a file or a directory with an index file). The indexer tries each candidate in order against the symbol index. Each language has its own rules for extension mapping and path resolution:
 
-        | Language   | Resolution rules                                           |
-        | ---------- | ---------------------------------------------------------- |
-        | TypeScript | `.js` → `.ts`, extensionless → `.ts`, `../` path traversal |
-        | Python     | `.` = current package, `..` = parent, adds `.py` extension |
-        | Go         | Not applicable — Go imports are never relative             |
-        | PHP        | Not applicable — PHP imports are never relative            |
+        | Language   | Resolution rules                                                                    |
+        | ---------- | ----------------------------------------------------------------------------------- |
+        | TypeScript | `.js` → `.ts`, extensionless → `[.ts, /index.ts]`, `.jsx` → `.tsx`, `../` traversal |
+        | Python     | `.` = current package, `..` = parent, adds `.py` extension                          |
+        | Go         | Not applicable — Go imports are never relative                                      |
+        | PHP        | Not applicable — PHP imports are never relative                                     |
 
-        * **`buildQualifiedName?(namespace: string, symbolName: string): string`** — builds a fully qualified name from a namespace and symbol name. Used by languages like PHP where imports are resolved via namespace-qualified names rather than package names.
+        - **`buildQualifiedName?(namespace: string, symbolName: string): string`** — builds a fully qualified name from a namespace and symbol name. Used by languages like PHP where imports are resolved via namespace-qualified names rather than package names.
 
         | Language | Example                                   |
         | -------- | ----------------------------------------- |
@@ -141,10 +141,10 @@ rules:
       - |-
         An `AdapterRegistry` SHALL map language identifiers to `LanguageAdapter` instances. It provides:
 
-        * **`register(adapter: LanguageAdapter): void`** — registers an adapter for all languages it declares and all file extensions from `adapter.extensions()`
-        * **`getAdapter(languageId: string): LanguageAdapter | undefined`** — returns the adapter for a language, or `undefined` if none registered
-        * **`getAdapterForFile(filePath: string): LanguageAdapter | undefined`** — resolves extension → language → adapter using the dynamically built extension map
-        * **`getAdapters(): LanguageAdapter[]`** — returns all unique registered adapters
+        - **`register(adapter: LanguageAdapter): void`** — registers an adapter for all languages it declares and all file extensions from `adapter.extensions()`
+        - **`getAdapter(languageId: string): LanguageAdapter | undefined`** — returns the adapter for a language, or `undefined` if none registered
+        - **`getAdapterForFile(filePath: string): LanguageAdapter | undefined`** — resolves extension → language → adapter using the dynamically built extension map
+        - **`getAdapters(): LanguageAdapter[]`** — returns all unique registered adapters
 
         The extension-to-language map is built dynamically from registered adapters — there is no hardcoded extension list in the registry. Adding a new language requires only registering a new adapter.
 
@@ -481,6 +481,6 @@ scenarios:
     then:
       - it returns 'App\\Models\\User'
 contentHashes:
-  spec.md: sha256:d85e0e838da8ab68a47575ebe329b88109ff9ca727f1f5e23054f88006e21bf4
+  spec.md: sha256:0748b31ec86c5ef4843b63d4187616963968521fc57597fc12947a4ed9cea666
   verify.md: sha256:0cd4bf89790b18a869b03b21325c490dff51128dd2dc6df6ef413febedb6fc01
 generatedBy: core

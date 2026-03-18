@@ -432,11 +432,12 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         if (!moduleName.startsWith('.')) continue
 
         const resolved = this.resolveRelativeImportPath(filePath, moduleName)
-        if (resolved) {
+        const target = Array.isArray(resolved) ? resolved[0]! : resolved
+        if (target) {
           relations.push(
             createRelation({
               source: filePath,
-              target: resolved,
+              target,
               type: RelationType.Imports,
               metadata: { specifier: moduleName },
             }),
@@ -452,7 +453,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param specifier - The dot-prefixed module name.
    * @returns The resolved file path.
    */
-  resolveRelativeImportPath(fromFile: string, specifier: string): string {
+  resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
     const fromDir = fromFile.substring(0, fromFile.lastIndexOf('/'))
     const segments = fromDir.split('/')
 
@@ -478,10 +479,10 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     if (!modulePart) {
       return segments.join('/') + '/__init__.py'
     }
-    // Note: without filesystem access we cannot distinguish module files from package
+    // Without filesystem access we cannot distinguish module files from package
     // directories (e.g. `from .sub import bar` could be `sub.py` or `sub/__init__.py`).
-    // We default to `.py`; the caller/indexer resolves ambiguity at index time.
-    return segments.join('/') + '.py'
+    const base = segments.join('/')
+    return [base + '.py', base + '/__init__.py']
   }
 
   /**
