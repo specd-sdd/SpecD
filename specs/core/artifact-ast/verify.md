@@ -58,6 +58,19 @@
 - **WHEN** the adapter serializes it back to markdown
 - **THEN** re-parsing the output produces an identical AST
 
+#### Scenario: Delta apply preserves inline metadata of untouched markdown nodes
+
+- **GIVEN** a markdown AST where paragraph nodes keep adapter inline metadata for serialization
+- **AND** a delta modifies a sibling section only
+- **WHEN** the delta is applied and the AST is serialized
+- **THEN** untouched paragraph nodes still preserve equivalent inline formatting intent after re-parse
+
+#### Scenario: Mixed markdown style normalizes deterministically
+
+- **GIVEN** markdown content with mixed markers for unordered lists or emphasis
+- **WHEN** the markdown adapter serializes a parsed AST
+- **THEN** output uses deterministic project markdown style for ambiguous constructs
+
 ### Requirement: YAML AST
 
 #### Scenario: Scalar pair

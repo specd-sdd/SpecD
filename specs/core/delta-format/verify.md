@@ -200,6 +200,19 @@
 - **WHEN** a delta has three entries and the second selector resolves to no node
 - **THEN** `apply` throws `DeltaApplicationError` and none of the three operations are applied
 
+#### Scenario: modified operation does not strip inline formatting in untouched nodes
+
+- **GIVEN** a markdown document with one untouched paragraph containing `` `inline` ``, `*emphasis*`, and `**strong**`
+- **AND** a `modified` delta entry targets a different section
+- **WHEN** `apply` is executed and the result is serialized
+- **THEN** untouched paragraph inline formatting remains semantically equivalent and is not downgraded to plain text
+
+#### Scenario: markdown apply output is deterministic for mixed style input
+
+- **GIVEN** a markdown document that mixes supported style markers for the same construct
+- **WHEN** a delta is applied and the markdown result is serialized
+- **THEN** ambiguous constructs are emitted using deterministic project markdown conventions
+
 ### Requirement: Delta conflict detection
 
 #### Scenario: Two entries targeting the same node

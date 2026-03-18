@@ -76,6 +76,17 @@ describe('MarkdownParser', () => {
       })
     })
 
+    it('preserves ordered list start marker on round-trip', () => {
+      const content = '3. Third item\n4. Fourth item\n'
+      const ast = parser.parse(content)
+      const list = ast.root.children![0]!
+      expect(list).toMatchObject({ type: 'list', ordered: true, start: 3 })
+
+      const serialized = parser.serialize(ast)
+      expect(serialized).toContain('3. Third item')
+      expect(serialized).toContain('4. Fourth item')
+    })
+
     it('round-trip preserves structure', () => {
       const content =
         '## Requirements\n\n### Requirement: Login\n\nThe system must authenticate users.\n'
@@ -84,6 +95,67 @@ describe('MarkdownParser', () => {
       const reparsed = parser.parse(serialized)
       expect(reparsed.root.children![0]!.label).toBe('Requirements')
       expect(reparsed.root.children![0]!.children![0]!.label).toBe('Requirement: Login')
+    })
+
+    it('preserves source style when unambiguous', () => {
+      const content = '- item a\n- item b\n\nUse _emphasis_ and __strong__.\n'
+      const ast = parser.parse(content)
+      const serialized = parser.serialize(ast)
+      expect(serialized).toContain('- item a')
+      expect(serialized).toContain('_emphasis_')
+      expect(serialized).toContain('__strong__')
+    })
+
+    it('uses deterministic fallback style when source style is mixed', () => {
+      const content = '- item a\n* item b\n\nUse _one_ and *two*.\nUse __three__ and **four**.\n'
+      const ast = parser.parse(content)
+      const serialized = parser.serialize(ast)
+      expect(serialized).toContain('- item a')
+      expect(serialized).toContain('- item b')
+      expect(serialized).not.toContain('* item b')
+      expect(serialized).toContain('*one*')
+      expect(serialized).toContain('**three**')
+    })
+
+    it('preserves thematic break marker when source is unambiguous', () => {
+      const content = 'Before\n\n---\n\nAfter\n'
+      const ast = parser.parse(content)
+      const serialized = parser.serialize(ast)
+      expect(serialized).toContain('\n---\n')
+      expect(serialized).not.toContain('\n***\n')
+    })
+
+    it('preserves blockquote shape without escaping marker text', () => {
+      const content = '> ⚠ Warning: keep this as blockquote.\n'
+      const ast = parser.parse(content)
+      const serialized = parser.serialize(ast)
+      expect(serialized).toContain('> ⚠ Warning: keep this as blockquote.')
+      expect(serialized).not.toContain('\\>')
+    })
+
+    it('normalizes adjacent unordered lists to deterministic fallback bullet', () => {
+      const ast = {
+        root: {
+          type: 'document',
+          _markdownStyle: { bullet: '-', emphasis: '*', strong: '*', rule: '-' },
+          children: [
+            {
+              type: 'list',
+              ordered: false,
+              children: [{ type: 'list-item', label: 'first list item' }],
+            },
+            {
+              type: 'list',
+              ordered: false,
+              children: [{ type: 'list-item', label: 'second list item' }],
+            },
+          ],
+        },
+      }
+      const serialized = parser.serialize(ast)
+      expect(serialized).toContain('- first list item')
+      expect(serialized).toContain('- second list item')
+      expect(serialized).not.toContain('* second list item')
     })
   })
 
@@ -350,6 +422,73 @@ describe('MarkdownParser', () => {
       // Verify original AST is not modified (we got a new AST from apply)
       const original = ast.root.children![0]!
       expect(original.children![0]!.label).toBe('Requirement: A')
+    })
+
+    it('preserves untouched inline code formatting after modifying another section', () => {
+      const ast = parser.parse(
+        '## Requirement: Unchanged\n\nUse `specd change validate <name>`.\n\n## Requirement: Target\n\nOld text.\n',
+      )
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'section', matches: '^Requirement: Target$' },
+          content: 'New text.\n',
+        },
+      ])
+
+      const serialized = parser.serialize(result)
+      expect(serialized).toContain('`specd change validate <name>`')
+      expect(serialized).not.toContain('\\<name\\>')
+    })
+
+    it('preserves untouched thematic break marker after modifying another section', () => {
+      const ast = parser.parse(
+        '## Requirement: Unchanged\n\nBefore\n\n---\n\nAfter\n\n## Requirement: Target\n\nOld text.\n',
+      )
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'section', matches: '^Requirement: Target$' },
+          content: 'New text.\n',
+        },
+      ])
+      const serialized = parser.serialize(result)
+      expect(serialized).toContain('\n---\n')
+      expect(serialized).not.toContain('\n***\n')
+    })
+
+    it('preserves untouched blockquote markers after modifying another section', () => {
+      const ast = parser.parse(
+        '## Requirement: Unchanged\n\n> Warning line\n\n## Requirement: Target\n\nOld text.\n',
+      )
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'section', matches: '^Requirement: Target$' },
+          content: 'New text.\n',
+        },
+      ])
+
+      const serialized = parser.serialize(result)
+      expect(serialized).toContain('> Warning line')
+      expect(serialized).not.toContain('\\> Warning line')
+    })
+
+    it('preserves untouched ordered list numbering after modifying another section', () => {
+      const ast = parser.parse(
+        '## Requirement: Unchanged\n\n3. Keep as three\n4. Keep as four\n\n## Requirement: Target\n\nOld text.\n',
+      )
+      const result = parser.apply(ast, [
+        {
+          op: 'modified',
+          selector: { type: 'section', matches: '^Requirement: Target$' },
+          content: 'New text.\n',
+        },
+      ])
+      const serialized = parser.serialize(result)
+      expect(serialized).toContain('3. Keep as three')
+      expect(serialized).toContain('4. Keep as four')
+      expect(serialized).not.toContain('1. Keep as three')
     })
   })
 

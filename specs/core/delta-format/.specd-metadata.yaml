@@ -61,17 +61,17 @@ rules:
 
         In the context of delta application, the following additional constraints apply to the selector model:
 
-        * When a `selector` in a `modified` or `removed` entry matches zero nodes — `apply` rejects with `DeltaApplicationError`.
-        * When a `selector` in a `modified` or `removed` entry matches more than one node — `apply` rejects with `DeltaApplicationError`.
-        * `position.after` and `position.before` selectors in `added` entries are warnings on no match, not errors — insertion falls back to the end of the parent scope.
+        - When a `selector` in a `modified` or `removed` entry matches zero nodes — `apply` rejects with `DeltaApplicationError`.
+        - When a `selector` in a `modified` or `removed` entry matches more than one node — `apply` rejects with `DeltaApplicationError`.
+        - `position.after` and `position.before` selectors in `added` entries are warnings on no match, not errors — insertion falls back to the end of the parent scope.
 
         **Array merge strategies:**
 
         Delta entries targeting an array or sequence node (not an individual item) accept an optional `strategy` field:
 
-        * `replace` (default) — replaces the array value in its entirety with the supplied `value`
-        * `append` — appends the supplied `value` items to the end of the existing array
-        * `merge-by` — merges the supplied items into the existing array by matching objects on a key field; requires `mergeKey` to name the key field; items with a matching key are replaced, items with new keys are appended, existing items whose key does not appear in the supplied value are preserved
+        - `replace` (default) — replaces the array value in its entirety with the supplied `value`
+        - `append` — appends the supplied `value` items to the end of the existing array
+        - `merge-by` — merges the supplied items into the existing array by matching objects on a key field; requires `mergeKey` to name the key field; items with a matching key are replaced, items with new keys are appended, existing items whose key does not appear in the supplied value are preserved
   - requirement: Delta file format
     rules:
       - |-
@@ -81,22 +81,22 @@ rules:
 
         Each delta entry must include:
 
-        * `op` (string, required) — one of `added`, `modified`, `removed`
-        * `selector` (selector, required for `modified` and `removed`, not valid for `added`) — identifies the existing node to modify or remove; for `added` entries, use `position.parent` to scope the insertion; see Requirement: Selector model
-        * `position` (object, optional, `added` only) — declares where the new node is inserted. Contains:
-          * `parent` (selector, optional) — scopes the insertion to the children of the matched node; if omitted, insertion happens at document root level
-          * `after` (selector, optional) — inserts immediately after the matched sibling within the parent scope; if the selector resolves to no node, falls back to appending at the end of the parent scope with a warning
-          * `before` (selector, optional) — inserts immediately before the matched sibling within the parent scope; if the selector resolves to no node, falls back to appending at the end of the parent scope with a warning
-          * `first` (boolean, optional) — inserts as the first child of the parent scope (or document root if no `parent`); mutually exclusive with `after`, `before`, and `last`
-          * `last` (boolean, optional) — inserts as the last child of the parent scope (or document root if no `parent`); mutually exclusive with `after`, `before`, and `first`; this is the default when no placement hint is given
-          * `after`, `before`, `first`, and `last` are mutually exclusive
-          * If only `parent` is specified (no placement hint), the new node is appended as the last child of the matched parent
-          * If `position` is omitted entirely, the new node is appended at the end of the document
-        * `rename` (string, optional, `modified` only) — new value for the node's identifying property (e.g. new heading text for a `section`, new key for a `property` or `pair`); the selector still uses the current name to locate the node; if the rename target already exists as a sibling node, `apply` must reject with `DeltaApplicationError`
-        * `content` (string, optional) — the full new node content in the artifact's native format (e.g. markdown for `.md` files); for `added`, includes the identifying line (e.g. `### Heading` for markdown, key name for YAML/JSON) as the first line; for `modified`, contains only the body — the identifying line is preserved or replaced via `rename`; `apply` parses this string using `ArtifactParser.parse()` before inserting into the AST; mutually exclusive with `value`
-        * `value` (any, optional) — the node's value as a structured YAML value; used for structured nodes (e.g. JSON properties, YAML pairs); mutually exclusive with `content`
-        * `strategy` (`replace` | `append` | `merge-by`, optional, default `replace`) — array merge strategy; only valid when the selector targets an array or sequence node; see Requirement: Selector model
-        * `mergeKey` (string, optional) — key field for `merge-by` strategy; required when `strategy: merge-by`
+        - `op` (string, required) — one of `added`, `modified`, `removed`
+        - `selector` (selector, required for `modified` and `removed`, not valid for `added`) — identifies the existing node to modify or remove; for `added` entries, use `position.parent` to scope the insertion; see Requirement: Selector model
+        - `position` (object, optional, `added` only) — declares where the new node is inserted. Contains:
+          - `parent` (selector, optional) — scopes the insertion to the children of the matched node; if omitted, insertion happens at document root level
+          - `after` (selector, optional) — inserts immediately after the matched sibling within the parent scope; if the selector resolves to no node, falls back to appending at the end of the parent scope with a warning
+          - `before` (selector, optional) — inserts immediately before the matched sibling within the parent scope; if the selector resolves to no node, falls back to appending at the end of the parent scope with a warning
+          - `first` (boolean, optional) — inserts as the first child of the parent scope (or document root if no `parent`); mutually exclusive with `after`, `before`, and `last`
+          - `last` (boolean, optional) — inserts as the last child of the parent scope (or document root if no `parent`); mutually exclusive with `after`, `before`, and `first`; this is the default when no placement hint is given
+          - `after`, `before`, `first`, and `last` are mutually exclusive
+          - If only `parent` is specified (no placement hint), the new node is appended as the last child of the matched parent
+          - If `position` is omitted entirely, the new node is appended at the end of the document
+        - `rename` (string, optional, `modified` only) — new value for the node's identifying property (e.g. new heading text for a `section`, new key for a `property` or `pair`); the selector still uses the current name to locate the node; if the rename target already exists as a sibling node, `apply` must reject with `DeltaApplicationError`
+        - `content` (string, optional) — the full new node content in the artifact's native format (e.g. markdown for `.md` files); for `added`, includes the identifying line (e.g. `### Heading` for markdown, key name for YAML/JSON) as the first line; for `modified`, contains only the body — the identifying line is preserved or replaced via `rename`; `apply` parses this string using `ArtifactParser.parse()` before inserting into the AST; mutually exclusive with `value`
+        - `value` (any, optional) — the node's value as a structured YAML value; used for structured nodes (e.g. JSON properties, YAML pairs); mutually exclusive with `content`
+        - `strategy` (`replace` | `append` | `merge-by`, optional, default `replace`) — array merge strategy; only valid when the selector targets an array or sequence node; see Requirement: Selector model
+        - `mergeKey` (string, optional) — key field for `merge-by` strategy; required when `strategy: merge-by`
 
         Example (`spec.md.delta.yaml`):
 
@@ -185,31 +185,33 @@ rules:
   - requirement: Delta application
     rules:
       - |-
-        `ArtifactParser.apply(ast, delta)` applies a delta array to an artifact AST and returns a new AST. The algorithm:
+        Delta entries are applied in declaration order after all selectors are validated. For each entry:
 
-        1. **Validate** — resolve every `selector` in `modified` and `removed` entries against the AST. If any fails to resolve (no match, or ambiguous match), reject the entire delta with `DeltaApplicationError` without applying any operation. For `modified` entries with `rename`, also verify that no sibling node already carries the target name — if one exists, reject with `DeltaApplicationError`. `position.after`/`position.before` selectors in `added` entries are **not** validated at this stage — their failure is a recoverable warning, not an error. `position.parent` selectors are validated — if a `parent` is declared and resolves to no node, reject with `DeltaApplicationError`.
-        2. **Apply** — process entries in declaration order:
-           * `removed` — detach the matched node from its parent
-           * `modified` — if `rename` is present, update the node's identifying property to the new value; if `content` is present, call `ArtifactParser.parse(content)` to obtain an AST fragment and replace the node's body (everything except the identifying line/key); if `value` is present, replace the node's value directly; for array targets, apply the declared `strategy`; `rename` and `content`/`value` are independent and can be combined
-           * `added` — if `content` is present, call `ArtifactParser.parse(content)` to obtain the new AST node (the identifying property is derived from the first line of content for text-based formats, or from the `value` structure for structured formats); resolve `position`: if `position.parent` is declared, scope the insertion to that node's children; then apply the placement hint: `first` → prepend to the scope; `last` → append to the scope (this is also the default when no hint is given); `after`/`before` → attempt to resolve within the scope; if resolved, insert immediately after/before the matched sibling; if not resolved, emit a warning and append at the end of the scope; if no `position` is declared at all, append at the end of the document
+        - `modified`: replace the targeted node body (`content`) and/or rename the identifying field (`rename`)
+        - `removed`: remove the targeted node
+        - `added`: insert new node(s) according to `position` semantics
 
-        Declaration order is the authoritative execution order. No fixed operation ordering is imposed — the LLM is responsible for declaring operations in a valid, non-conflicting sequence.
+        `apply` first resolves selectors against the original AST to guarantee atomicity. If any selector is invalid or ambiguous, `apply` fails with `DeltaApplicationError` and applies nothing.
+
+        During `modified` operations on markdown artifacts, replacing node body content must not destroy inline formatting metadata for unaffected sibling/ancestor nodes. Implementations must preserve representable inline structure so serialization does not strip backticks or rewrite emphasis/strong markers in untouched nodes.
+
+        For markdown serialization after delta apply, list/emphasis/strong marker output should track source style when unambiguous. If the source is mixed/ambiguous for a construct, the serializer must choose deterministic project markdown conventions.
   - requirement: Delta conflict detection
     rules:
       - |-
         `apply` must detect and reject conflicting delta entries before applying any changes:
 
-        * Two `modified` or `removed` operations whose selectors resolve to the same node — error
-        * A `rename` target that matches an existing sibling node's identifying property — error
-        * A `rename` target that matches another `modified` entry's `rename` value within the same parent scope — error
-        * An `added` entry with more than one of `position.after`, `position.before`, `position.first`, `position.last` — error
-        * An `added` entry with `position.parent` that resolves to no node — error
-        * `content` and `value` both present in the same entry — error
-        * `selector` on an `added` entry — error; use `position.parent` to scope insertion
-        * `rename` on an `added` or `removed` entry — error
-        * `strategy: merge-by` without `mergeKey` — error
-        * `mergeKey` present without `strategy: merge-by` — error
-        * `strategy` on an entry whose selector targets a non-array node — error
+        - Two `modified` or `removed` operations whose selectors resolve to the same node — error
+        - A `rename` target that matches an existing sibling node's identifying property — error
+        - A `rename` target that matches another `modified` entry's `rename` value within the same parent scope — error
+        - An `added` entry with more than one of `position.after`, `position.before`, `position.first`, `position.last` — error
+        - An `added` entry with `position.parent` that resolves to no node — error
+        - `content` and `value` both present in the same entry — error
+        - `selector` on an `added` entry — error; use `position.parent` to scope insertion
+        - `rename` on an `added` or `removed` entry — error
+        - `strategy: merge-by` without `mergeKey` — error
+        - `mergeKey` present without `strategy: merge-by` — error
+        - `strategy` on an entry whose selector targets a non-array node — error
   - requirement: Delta structural validation
     rules:
       - "The `deltaValidations` field on a schema artifact allows schema authors to define JSONPath-based structural constraints checked against the normalized YAML AST of the delta file before application. The delta file is parsed by the YAML adapter to produce a normalized AST; `ValidateArtifacts` then evaluates each rule's `selector` JSONPath expression against that AST — the same mechanism used for `validations` against the artifact AST. The full rule format is specified in [`specs/core/schema-format/spec.md` — Requirement: Delta validation rules](../schema-format/spec.md)."
@@ -455,6 +457,40 @@ scenarios:
       - a delta has three entries and the second selector resolves to no node
     then:
       - apply throws DeltaApplicationError and none of the three operations are applied
+  - requirement: Delta application
+    name: modified operation does not strip inline formatting in untouched nodes
+    given:
+      - a markdown document with one untouched paragraph containing `inline`, *emphasis*, and **strong**
+      - AND a modified delta entry targets a different section
+    when:
+      - apply is executed and the result is serialized
+    then:
+      - untouched paragraph inline formatting remains semantically equivalent and is not downgraded to plain text
+  - requirement: Delta application
+    name: markdown apply output is deterministic for mixed style input
+    given:
+      - a markdown document that mixes supported style markers for the same construct
+    when:
+      - a delta is applied and the markdown result is serialized
+    then:
+      - ambiguous constructs are emitted using deterministic project markdown conventions
+  - requirement: Delta application
+    name: modified operation does not strip inline formatting in untouched nodes
+    given:
+      - a markdown document with one untouched paragraph containing `inline`, *emphasis*, and **strong**
+      - AND a modified delta entry targets a different section
+    when:
+      - apply is executed and the result is serialized
+    then:
+      - untouched paragraph inline formatting remains semantically equivalent and is not downgraded to plain text
+  - requirement: Delta application
+    name: markdown apply output is deterministic for mixed style input
+    given:
+      - a markdown document that mixes supported style markers for the same construct
+    when:
+      - a delta is applied and the markdown result is serialized
+    then:
+      - ambiguous constructs are emitted using deterministic project markdown conventions
   - requirement: Delta conflict detection
     name: Two entries targeting the same node
     when:
@@ -482,6 +518,6 @@ scenarios:
     then:
       - validation fails with the appropriate error
 contentHashes:
-  spec.md: sha256:f0e9ec519492997e83db2e2434dcb0f0c7a7c1caf0f3f7bb65f910c14f3e4a4c
-  verify.md: sha256:e28b9f1e35c48f3d40a4ca87a6917668bf102ba544bd4726ec084113f05d2ff7
+  spec.md: sha256:8cdd33fa754993625e5fedd918a90520041929caa5af43af3332134bd4480136
+  verify.md: sha256:1c9543ee0b06a313bf8248f2e04cc46c7065b82d60f377ff40f6685e0075b5a4
 generatedBy: core
