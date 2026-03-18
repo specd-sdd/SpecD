@@ -202,9 +202,10 @@ export class LadybugGraphStore extends GraphStore {
         await this.createRelation(conn, rel)
       }
 
-      this._lastIndexedAt = new Date().toISOString()
-      await this.updateMeta(conn, 'lastIndexedAt', this._lastIndexedAt)
+      const now = new Date().toISOString()
+      await this.updateMeta(conn, 'lastIndexedAt', now)
       await conn.query('COMMIT')
+      this._lastIndexedAt = now
     } catch (err) {
       await conn.query('ROLLBACK').catch(() => {})
       throw err
@@ -1010,12 +1011,16 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
-   * Escapes single quotes and backslashes for safe inclusion in Cypher query strings.
+   * Escapes single quotes, backslashes, and newlines for safe inclusion in Cypher query strings.
    * @param value - The string value to escape.
    * @returns The escaped string.
    */
   private escape(value: string): string {
-    return value.replaceAll('\\', '\\\\').replaceAll("'", "\\'")
+    return value
+      .replaceAll('\\', '\\\\')
+      .replaceAll("'", "\\'")
+      .replaceAll('\n', '\\n')
+      .replaceAll('\r', '\\r')
   }
 
   /**
