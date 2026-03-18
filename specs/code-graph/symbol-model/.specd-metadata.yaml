@@ -10,11 +10,11 @@ rules:
       - |-
         A `FileNode` SHALL represent a single source file in the workspace. It contains:
 
-        * **`path`** (`string`) — globally unique path in format `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`). Forward-slash-normalized. This is the node's identity.
-        * **`language`** (`string`) — language identifier (e.g. `typescript`, `python`). Determined by the language adapter at index time.
-        * **`contentHash`** (`string`) — hash of the file's content at last index. Used for incremental diffing.
-        * **`workspace`** (`string`) — the workspace name this file belongs to (e.g. `core`, `cli`, `default`).
-        * **`embedding`** (`Float32Array | undefined`) — optional vector embedding for semantic search. Deferred to v2+.
+        - **`path`** (`string`) — globally unique path in format `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`). Forward-slash-normalized. This is the node's identity.
+        - **`language`** (`string`) — language identifier (e.g. `typescript`, `python`). Determined by the language adapter at index time.
+        - **`contentHash`** (`string`) — hash of the file's content at last index. Used for incremental diffing.
+        - **`workspace`** (`string`) — the workspace name this file belongs to (e.g. `core`, `cli`, `default`).
+        - **`embedding`** (`Float32Array | undefined`) — optional vector embedding for semantic search. Deferred to v2+.
 
         Two `FileNode` values are equal if and only if their `path` fields match (since path includes the workspace name prefix).
   - requirement: Spec node
@@ -22,14 +22,14 @@ rules:
       - |-
         A `SpecNode` SHALL represent a spec directory in the workspace. It contains:
 
-        * **`specId`** (`string`) — the spec identifier in `workspace:package/topic` format (e.g. `core:core/change`, `_global:_global/architecture`). This is the node's identity.
-        * **`path`** (`string`) — workspace-relative path to the spec directory (e.g. `specs/core/change`).
-        * **`title`** (`string`) — from `.specd-metadata.yaml` `title` field. Falls back to the first `# Heading` in `spec.md` if metadata is absent.
-        * **`description`** (`string`) — from `.specd-metadata.yaml` `description` field. Empty string if absent.
-        * **`contentHash`** (`string`) — hash of concatenated spec artifacts, excluding `.specd-metadata.yaml`. `spec.md` first if present, then remaining artifacts in alphabetical order. Used for incremental diffing.
-        * **`content`** (`string`) — concatenated artifact text for full-text search. Same ordering as `contentHash`: `spec.md` first if present, then remaining artifacts alphabetically. Excludes `.specd-metadata.yaml`.
-        * **`dependsOn`** (`string[]`) — ordered list of spec IDs this spec depends on, extracted from `.specd-metadata.yaml` or the `## Spec Dependencies` section in `spec.md`.
-        * **`workspace`** (`string`) — the workspace name this spec belongs to (e.g. `core`, `_global`).
+        - **`specId`** (`string`) — the spec identifier in `workspace:package/topic` format (e.g. `core:core/change`, `_global:_global/architecture`). This is the node's identity.
+        - **`path`** (`string`) — workspace-relative path to the spec directory (e.g. `specs/core/change`).
+        - **`title`** (`string`) — from `.specd-metadata.yaml` `title` field. Falls back to the first `# Heading` in `spec.md` if metadata is absent.
+        - **`description`** (`string`) — from `.specd-metadata.yaml` `description` field. Empty string if absent.
+        - **`contentHash`** (`string`) — hash of concatenated spec artifacts, excluding `.specd-metadata.yaml`. `spec.md` first if present, then remaining artifacts in alphabetical order. Used for incremental diffing.
+        - **`content`** (`string`) — concatenated artifact text for full-text search. Same ordering as `contentHash`: `spec.md` first if present, then remaining artifacts alphabetically. Excludes `.specd-metadata.yaml`.
+        - **`dependsOn`** (`string[]`) — ordered list of spec IDs this spec depends on, extracted from `.specd-metadata.yaml` or the `## Spec Dependencies` section in `spec.md`.
+        - **`workspace`** (`string`) — the workspace name this spec belongs to (e.g. `core`, `_global`).
 
         Two `SpecNode` values are equal if their `specId` fields match.
   - requirement: Symbol node
@@ -37,13 +37,13 @@ rules:
       - |-
         A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:
 
-        * **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line` (e.g. `core:src/index.ts:function:main:1`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.
-        * **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).
-        * **`kind`** (`SymbolKind`) — the category of this symbol.
-        * **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol (e.g. `core:src/index.ts`).
-        * **`line`** (`number`) — 1-based line number of the symbol's declaration.
-        * **`column`** (`number`) — 0-based column offset of the symbol's declaration.
-        * **`comment`** (`string | undefined`) — the raw comment or JSDoc text immediately preceding the symbol's declaration. Stored verbatim (no parsing) to enable full-text search. Language adapters extract this from the AST; symbols without a preceding comment have `undefined`.
+        - **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line` (e.g. `core:src/index.ts:function:main:1`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.
+        - **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).
+        - **`kind`** (`SymbolKind`) — the category of this symbol.
+        - **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol (e.g. `core:src/index.ts`).
+        - **`line`** (`number`) — 1-based line number of the symbol's declaration.
+        - **`column`** (`number`) — 0-based column offset of the symbol's declaration.
+        - **`comment`** (`string | undefined`) — the raw comment or JSDoc text immediately preceding the symbol's declaration. Stored verbatim (no parsing) to enable full-text search. Language adapters extract this from the AST; symbols without a preceding comment have `undefined`.
 
         The `id` field is the symbol's identity for graph operations. Two `SymbolNode` values with the same `id` are considered the same symbol.
   - requirement: SymbolKind enum
@@ -51,13 +51,13 @@ rules:
       - |-
         `SymbolKind` SHALL be a closed string enum with the following members:
 
-        * `function`
-        * `class`
-        * `method`
-        * `variable`
-        * `type`
-        * `interface`
-        * `enum`
+        - `function`
+        - `class`
+        - `method`
+        - `variable`
+        - `type`
+        - `interface`
+        - `enum`
 
         No other values are permitted. Language adapters MUST map language-specific constructs to one of these kinds or skip the construct entirely.
   - requirement: Relation types
@@ -80,10 +80,10 @@ rules:
       - |-
         A `Relation` SHALL be a value object containing:
 
-        * **`source`** (`string`) — the id or path of the source node.
-        * **`target`** (`string`) — the id or path of the target node.
-        * **`type`** (`RelationType`) — one of the relation types defined above.
-        * **`metadata`** (`Record<string, unknown> | undefined`) — optional adapter-specific metadata (e.g. import specifier, call site line number).
+        - **`source`** (`string`) — the id or path of the source node.
+        - **`target`** (`string`) — the id or path of the target node.
+        - **`type`** (`RelationType`) — one of the relation types defined above.
+        - **`metadata`** (`Record<string, unknown> | undefined`) — optional adapter-specific metadata (e.g. import specifier, call site line number).
 
         Two `Relation` values are equal if `source`, `target`, and `type` all match.
   - requirement: Import declaration
@@ -91,10 +91,10 @@ rules:
       - |-
         An `ImportDeclaration` SHALL represent a parsed import statement extracted from source code. It contains:
 
-        * **`localName`** (`string`) — the identifier used locally in the importing file
-        * **`originalName`** (`string`) — the identifier as declared in the source module
-        * **`specifier`** (`string`) — the raw import specifier string
-        * **`isRelative`** (`boolean`) — true if the specifier is a relative path
+        - **`localName`** (`string`) — the identifier used locally in the importing file
+        - **`originalName`** (`string`) — the identifier as declared in the source module
+        - **`specifier`** (`string`) — the raw import specifier string
+        - **`isRelative`** (`boolean`) — true if the specifier is a relative path
 
         `ImportDeclaration` is a pure syntactic representation — it contains no resolution information. The indexer resolves specifiers to files and symbol ids using the adapter registry and monorepo package map.
   - requirement: Immutability
@@ -103,13 +103,13 @@ rules:
   - requirement: Error types
     rules:
       - |-
-        `@specd/code-graph` SHALL define its own `CodeGraphError` base class extending `Error`. All package-specific errors MUST extend `CodeGraphError`. Error types MUST NOT depend on `@specd/core` and MUST NOT use `SpecdError` or any core error type.
+        `@specd/code-graph` SHALL define its own `CodeGraphError` base class extending `Error`. All package-specific errors MUST extend `CodeGraphError`. Error types MUST NOT depend on `@specd/core` and MUST NOT use `SpecdError` or any core error type. Errors from `@specd/core` dependencies (e.g. `NodeContentHasher`) may propagate unmodified through `@specd/code-graph` — they are not wrapped or caught.
 
         Specific error subclasses include:
 
-        * `InvalidSymbolKindError` — when a symbol kind value is not in the `SymbolKind` enum
-        * `InvalidRelationTypeError` — when a relation type value is not in the defined set
-        * `DuplicateSymbolIdError` — when two symbols in the same file produce the same deterministic id
+        - `InvalidSymbolKindError` — when a symbol kind value is not in the `SymbolKind` enum
+        - `InvalidRelationTypeError` — when a relation type value is not in the defined set
+        - `DuplicateSymbolIdError` — when two symbols in the same file produce the same deterministic id
 constraints:
   - All model types are value objects — no identity beyond structural equality (except SymbolNode.id which is deterministic)
   - SymbolKind is a closed enum — adding a new kind requires a spec change
@@ -280,6 +280,6 @@ scenarios:
     then:
       - DuplicateSymbolIdError is thrown with both symbols' details
 contentHashes:
-  spec.md: sha256:17bed2518dc1e55810cbfba81d432d2ce5925877ad0f78ff9d2506d929f4ee7a
+  spec.md: sha256:c31362fed8a650f9990c68e55dc64a98aeb3995f8f6ce1c5abbc3dacff54e2e0
   verify.md: sha256:478e00f2daf6e6528d609fb71ba094aee98b8473b7b41f8f0159f52096f80070
 generatedBy: core
