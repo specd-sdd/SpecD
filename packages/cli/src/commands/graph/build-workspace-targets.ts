@@ -110,13 +110,14 @@ async function resolveSpecsFromRepo(
     }
     ordered.push(...contentFilenames.filter((f) => f !== 'spec.md').sort())
 
-    let content = ''
+    const parts: string[] = []
     for (const filename of ordered) {
       const artifact = await repo.artifact(spec, filename)
       if (artifact) {
-        content += artifact.content
+        parts.push(artifact.content)
       }
     }
+    const content = parts.join('\0')
 
     if (content === '' && !metadata) continue
 
