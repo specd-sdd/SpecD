@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { makeMockConfig, makeMockKernel, makeProgram, captureStdout } from './helpers.js'
 
