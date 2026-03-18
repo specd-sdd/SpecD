@@ -169,10 +169,10 @@ Exclude examples:
                   crossWorkspaceCallers: e.crossWorkspaceCallers,
                   fileImporters: e.fileImporters,
                   riskLevel: e.riskLevel,
-                  workspace:
-                    e.symbol.filePath.indexOf(':') !== -1
-                      ? e.symbol.filePath.substring(0, e.symbol.filePath.indexOf(':'))
-                      : '',
+                  workspace: (() => {
+                    const idx = e.symbol.filePath.indexOf(':')
+                    return idx !== -1 ? e.symbol.filePath.substring(0, idx) : ''
+                  })(),
                 })),
               },
               fmt,
