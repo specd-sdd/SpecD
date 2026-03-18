@@ -24,9 +24,9 @@ rules:
       - |-
         The indexer SHALL compute a content hash for each discovered file and compare it against the hash stored in the `GraphStore`. Only three categories of files are processed:
 
-        * **New** — file exists on disk but not in the store → extract and upsert
-        * **Changed** — file exists in both but hashes differ → extract and upsert (replaces previous data)
-        * **Deleted** — file exists in the store but not on disk → remove from store. Only files belonging to workspaces being indexed are considered for deletion — files from other workspaces are left untouched. This allows `--workspace <name>` to index a single workspace without destroying data from others.
+        - **New** — file exists on disk but not in the store → extract and upsert
+        - **Changed** — file exists in both but hashes differ → extract and upsert (replaces previous data)
+        - **Deleted** — file exists in the store but not on disk → remove from store. Only files belonging to workspaces being indexed are considered for deletion — files from other workspaces are left untouched. This allows `--workspace <name>` to index a single workspace without destroying data from others.
 
         Files whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison.
 
@@ -44,21 +44,21 @@ rules:
 
         `discoverFiles` itself has no workspace knowledge — it accepts a root directory and:
 
-        * Respects `.gitignore` rules hierarchically (finds git root by walking up from root)
-        * Excludes the following directories regardless of `.gitignore`: `node_modules`, `.git`, `.specd`, `dist`, `build`, `coverage`, `.next`, `.nuxt`
-        * Skips symbolic links — only regular files are indexed
-        * Skips files with no registered language adapter (determined by extension)
-        * Returns root-relative file paths with forward-slash normalization
+        - Respects `.gitignore` rules hierarchically (finds git root by walking up from root)
+        - Excludes the following directories regardless of `.gitignore`: `node_modules`, `.git`, `.specd`, `dist`, `build`, `coverage`, `.next`, `.nuxt`
+        - Skips symbolic links — only regular files are indexed
+        - Skips files with no registered language adapter (determined by extension)
+        - Returns root-relative file paths with forward-slash normalization
   - requirement: Two-pass extraction with in-memory index
     rules:
       - |-
         Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:
 
-        * **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter implements `extractNamespace` and `buildQualifiedName`, build a qualified name map for that language. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.
-        * **Pass 2 (Resolve imports + CALLS, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations. Accumulate all relations.
-        * **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.
-        * **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.
-        * **Rebuild FTS indexes** — After bulk load, call `GraphStore.rebuildFtsIndexes()` to drop and recreate full-text search indexes. This is required because LadybugDB FTS indexes are not automatically updated on insert.
+        - **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter implements `extractNamespace` and `buildQualifiedName`, build a qualified name map for that language. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.
+        - **Pass 2 (Resolve imports + CALLS, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations. Accumulate all relations.
+        - **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.
+        - **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.
+        - **Rebuild FTS indexes** — After bulk load, call `GraphStore.rebuildFtsIndexes()` to drop and recreate full-text search indexes. This is required because LadybugDB FTS indexes are not automatically updated on insert.
 
         This two-pass approach ensures all symbols exist in the index before import/call resolution, while avoiding any store queries during extraction.
   - requirement: Chunked processing
@@ -72,13 +72,13 @@ rules:
       - |-
         `IndexOptions` accepts an optional `onProgress` callback `(percent: number, phase: string) => void`. The indexer reports granular progress:
 
-        * 0-5%: File discovery and content hashing
-        * 5-7%: Diff computation and cleanup of deleted/changed files
-        * 7-50%: Pass 1 — symbol extraction (updates per file)
-        * 50-80%: Pass 2 — import resolution and CALLS extraction (updates per file)
-        * 80-83%: Spec discovery
-        * 83-95%: Bulk loading (updates per table and relation batch)
-        * 100%: Done
+        - 0-5%: File discovery and content hashing
+        - 5-7%: Diff computation and cleanup of deleted/changed files
+        - 7-50%: Pass 1 — symbol extraction (updates per file)
+        - 50-80%: Pass 2 — import resolution and CALLS extraction (updates per file)
+        - 80-83%: Spec discovery
+        - 83-95%: Bulk loading (updates per table and relation batch)
+        - 100%: Done
 
         Progress updates include a detail string (e.g. `"150/460 files"`) for phases that process individual items.
   - requirement: Cross-workspace package resolution
@@ -94,10 +94,10 @@ rules:
       - |-
         Errors during extraction or storage for a single file MUST NOT abort the entire indexing run. The indexer SHALL:
 
-        * Catch errors per file
-        * Record the file path and error message in the index result
-        * Continue processing remaining files
-        * Include the error count and details in the final result
+        - Catch errors per file
+        - Record the file path and error message in the index result
+        - Continue processing remaining files
+        - Include the error count and details in the final result
 
         Only infrastructure-level errors (e.g. store connection lost, disk full) may abort the entire run.
   - requirement: Index result
@@ -105,15 +105,15 @@ rules:
       - |-
         `IndexCodeGraph` SHALL return an `IndexResult` value object containing:
 
-        * **`filesDiscovered`** — total files found during discovery (across all workspaces)
-        * **`filesIndexed`** — files that were new or changed and successfully processed
-        * **`filesRemoved`** — files removed from the store (deleted from disk)
-        * **`filesSkipped`** — files skipped because their hash matched
-        * **`specsDiscovered`** — total spec directories found
-        * **`specsIndexed`** — specs that were new or changed and successfully processed
-        * **`errors`** — array of `{ filePath: string; message: string }` for files or specs that failed
-        * **`duration`** — elapsed time in milliseconds
-        * **`workspaces`** — per-workspace breakdown array of `{ name, filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }`
+        - **`filesDiscovered`** — total files found during discovery (across all workspaces)
+        - **`filesIndexed`** — files that were new or changed and successfully processed
+        - **`filesRemoved`** — files removed from the store (deleted from disk)
+        - **`filesSkipped`** — files skipped because their hash matched
+        - **`specsDiscovered`** — total spec directories found
+        - **`specsIndexed`** — specs that were new or changed and successfully processed
+        - **`errors`** — array of `{ filePath: string; message: string }` for files or specs that failed
+        - **`duration`** — elapsed time in milliseconds
+        - **`workspaces`** — per-workspace breakdown array of `{ name, filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }`
   - requirement: Spec dependency indexing
     rules:
       - |-
@@ -367,13 +367,13 @@ scenarios:
       - the indexer calls the callback instead of walking the filesystem
       - AND the returned specs are stored with the workspace name
   - requirement: Spec dependency indexing
-    name: Spec contentHash from all artifacts
+    name: Spec contentHash from content artifacts only
     given:
       - a spec with artifacts spec.md, verify.md, and .specd-metadata.yaml
     when:
       - the specs() callback builds the DiscoveredSpec
     then:
-      - contentHash is computed from all artifacts concatenated
+      - contentHash is computed from all artifacts EXCEPT .specd-metadata.yaml
       - AND spec.md is ordered first, then the remaining artifacts in alphabetical order
   - requirement: Spec dependency indexing
     name: Spec with .specd-metadata.yaml indexed
@@ -385,22 +385,22 @@ scenarios:
       - "a SpecNode with specId: 'core:core/change' and workspace: 'core' is upserted"
       - AND two DEPENDS_ON relations are created to core:core/config and core:core/storage
   - requirement: Spec dependency indexing
-    name: Spec without metadata falls back to spec.md parsing
+    name: Spec without metadata uses defaults
     given:
       - a spec in workspace code-graph with no .specd-metadata.yaml
-      - 'AND spec.md has a ## Spec Dependencies section linking to ../symbol-model/spec.md and ../graph-store/spec.md'
     when:
       - spec indexing runs
     then:
-      - DEPENDS_ON relations are created from the parsed links
+      - title defaults to the specId, description defaults to '', and dependsOn defaults to []
+      - AND no fallback parsing of spec.md is performed
   - requirement: Spec dependency indexing
-    name: Spec title extracted from heading
+    name: Spec title defaults to specId when metadata is absent
     given:
-      - 'a spec where spec.md starts with # Change'
+      - "a spec with specId: 'code-graph:code-graph/change' and no .specd-metadata.yaml"
     when:
       - spec indexing runs
     then:
-      - "the SpecNode has title: 'Change'"
+      - "the SpecNode has title: 'code-graph:code-graph/change'"
   - requirement: Spec dependency indexing
     name: Incremental spec indexing skips unchanged specs
     given:
@@ -463,5 +463,5 @@ scenarios:
       - AND the aggregate filesDiscovered equals the sum of per-workspace filesDiscovered
 contentHashes:
   spec.md: sha256:4772bf57028c2a26e9bebf5a6b2fd9fa0e319ef6fcabfafa519a5d798fbfe8b6
-  verify.md: sha256:6e3bdb03cfa30949187534fa7ee466382f7875083111b2075729da839c26f977
+  verify.md: sha256:a05130665f9620bba040606313f290829a1fed74b27934c3523c6b7a57521f38
 generatedBy: core
