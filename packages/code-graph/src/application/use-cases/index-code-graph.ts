@@ -212,6 +212,7 @@ export class IndexCodeGraph {
     const changedFiles: string[] = []
     const deletedFiles: string[] = []
 
+    const skippedFiles: string[] = []
     for (const prefixedPath of allDiscoveredPaths) {
       const hash = fileHashes.get(prefixedPath)
       const existing = existingMap.get(prefixedPath)
@@ -219,7 +220,10 @@ export class IndexCodeGraph {
         newFiles.push(prefixedPath)
       } else if (hash && existing.contentHash !== hash) {
         changedFiles.push(prefixedPath)
+      } else if (hash && existing.contentHash === hash) {
+        skippedFiles.push(prefixedPath)
       }
+      // Files with no hash (hash error) are neither new, changed, nor skipped
     }
 
     // Only consider files from the workspaces being indexed as candidates for deletion
@@ -456,10 +460,11 @@ export class IndexCodeGraph {
       }
     }
 
-    // Compute per-workspace skipped counts
-    for (const ws of options.workspaces) {
-      const breakdown = wsBreakdowns.get(ws.name)!
-      breakdown.filesSkipped = breakdown.filesDiscovered - breakdown.filesIndexed
+    // Compute per-workspace skipped counts from explicitly tracked unchanged files
+    for (const filePath of skippedFiles) {
+      const wsName = filePath.substring(0, filePath.indexOf(':'))
+      const breakdown = wsBreakdowns.get(wsName)
+      if (breakdown) breakdown.filesSkipped++
     }
 
     // ── Bulk load everything (83-95%) ──
@@ -505,7 +510,7 @@ export class IndexCodeGraph {
       filesDiscovered: allDiscoveredPaths.length,
       filesIndexed,
       filesRemoved,
-      filesSkipped: allDiscoveredPaths.length - filesToProcess.length,
+      filesSkipped: skippedFiles.length,
       specsDiscovered: totalSpecsDiscovered,
       specsIndexed,
       errors,
