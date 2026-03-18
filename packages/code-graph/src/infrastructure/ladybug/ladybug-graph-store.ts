@@ -316,6 +316,7 @@ export class LadybugGraphStore extends GraphStore {
     const prefix = join(tmpdir(), `codegraph-${Date.now()}-`)
     const csvFiles: string[] = []
 
+    await conn.query('BEGIN TRANSACTION')
     try {
       // Write File nodes CSV
       report(`Loading ${data.files.length} files`)
@@ -393,6 +394,10 @@ export class LadybugGraphStore extends GraphStore {
 
       this._lastIndexedAt = new Date().toISOString()
       await this.updateMeta(conn, 'lastIndexedAt', this._lastIndexedAt)
+      await conn.query('COMMIT')
+    } catch (err) {
+      await conn.query('ROLLBACK').catch(() => {})
+      throw err
     } finally {
       // Clean up temp files
       for (const f of csvFiles) {
