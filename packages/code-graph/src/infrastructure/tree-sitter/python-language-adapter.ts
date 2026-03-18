@@ -450,8 +450,13 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @returns The resolved file path.
    */
   resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
-    const fromDir = fromFile.substring(0, fromFile.lastIndexOf('/'))
-    const segments = fromDir.split('/')
+    // Separate workspace prefix (e.g. "core:src/models/user.py" → "core:", "src/models/user.py")
+    const colonIdx = fromFile.indexOf(':')
+    const wsPrefix = colonIdx === -1 ? '' : fromFile.substring(0, colonIdx + 1)
+    const relFile = colonIdx === -1 ? fromFile : fromFile.substring(colonIdx + 1)
+
+    const relDir = relFile.substring(0, relFile.lastIndexOf('/'))
+    const segments = relDir ? relDir.split('/') : []
 
     // Count leading dots: first dot = current dir, each extra dot = go up
     let dots = 0
@@ -459,7 +464,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
 
     // Go up (dots - 1) levels: first dot is the relative marker (current dir)
     for (let i = 1; i < dots; i++) {
-      if (segments.length > 1) segments.pop()
+      if (segments.length > 0) segments.pop()
     }
 
     // Remaining part after the dots is the module path
@@ -473,11 +478,11 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     // If there's no module part after dots, this is a package-level import (e.g. `from . import X`)
     // which refers to the __init__.py in the resolved directory
     if (!modulePart) {
-      return segments.join('/') + '/__init__.py'
+      return wsPrefix + segments.join('/') + '/__init__.py'
     }
     // Without filesystem access we cannot distinguish module files from package
     // directories (e.g. `from .sub import bar` could be `sub.py` or `sub/__init__.py`).
-    const base = segments.join('/')
+    const base = wsPrefix + segments.join('/')
     return [base + '.py', base + '/__init__.py']
   }
 

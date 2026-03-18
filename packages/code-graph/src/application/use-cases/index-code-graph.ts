@@ -425,6 +425,7 @@ export class IndexCodeGraph {
         if (existing.workspace === ws.name && !discoveredSpecIds.has(existing.specId)) {
           try {
             await this.store.removeSpec(existing.specId)
+            knownSpecIds.delete(existing.specId)
           } catch (err) {
             errors.push({ filePath: existing.path, message: String(err) })
           }
