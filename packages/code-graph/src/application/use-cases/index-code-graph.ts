@@ -6,7 +6,7 @@ import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type SpecNode } from '../../domain/value-objects/spec-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
-import { type IndexOptions } from '../../domain/value-objects/index-options.js'
+import { type IndexOptions, type DiscoveredSpec } from '../../domain/value-objects/index-options.js'
 import {
   type IndexResult,
   type IndexError,
@@ -384,8 +384,20 @@ export class IndexCodeGraph {
     const existingSpecs = await this.store.getAllSpecs()
     const existingSpecMap = new Map(existingSpecs.map((s) => [s.specId, s]))
 
+    // Build a global set of all known specIds (existing + all discovered across workspaces)
+    // so cross-workspace DEPENDS_ON relations resolve correctly
+    const allDiscoveredSpecs = new Map<string, { ws: string; specs: DiscoveredSpec[] }>()
+    const knownSpecIds = new Set(existingSpecs.map((s) => s.specId))
     for (const ws of options.workspaces) {
-      const discoveredSpecs = await ws.specs()
+      const discovered = await ws.specs()
+      allDiscoveredSpecs.set(ws.name, { ws: ws.name, specs: discovered })
+      for (const { spec } of discovered) {
+        knownSpecIds.add(spec.specId)
+      }
+    }
+
+    for (const ws of options.workspaces) {
+      const { specs: discoveredSpecs } = allDiscoveredSpecs.get(ws.name)!
 
       const wsBreakdown = wsBreakdowns.get(ws.name)!
       wsBreakdown.specsDiscovered = discoveredSpecs.length
@@ -415,7 +427,7 @@ export class IndexCodeGraph {
           }
 
           for (const depId of spec.dependsOn) {
-            if (discoveredSpecIds.has(depId)) {
+            if (knownSpecIds.has(depId)) {
               allRelations.push(
                 createRelation({
                   source: spec.specId,
