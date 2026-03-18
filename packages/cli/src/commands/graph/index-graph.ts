@@ -54,10 +54,11 @@ JSON/TOON output schema:
 
       await withProvider(config, opts.format, async (provider) => {
         const progressFn = (percent: number, phase: string): void => {
+          const clamped = Math.max(0, Math.min(100, percent))
           const width = 20
-          const filled = Math.round((percent / 100) * width)
+          const filled = Math.round((clamped / 100) * width)
           const bar = '█'.repeat(filled) + '░'.repeat(width - filled)
-          process.stderr.write(`\r\x1b[K  ${bar} ${String(percent).padStart(3)}% ${phase}`)
+          process.stderr.write(`\r\x1b[K  ${bar} ${String(clamped).padStart(3)}% ${phase}`)
         }
 
         const workspaces = await buildWorkspaceTargets(config, kernel, opts.workspace)
