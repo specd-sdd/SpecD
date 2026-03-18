@@ -71,7 +71,8 @@ export class GoLanguageAdapter implements LanguageAdapter {
       comment: string | undefined,
     ): void => {
       const line = node.range().start.line + 1
-      const key = `${kind}:${name}:${line}`
+      const col = node.range().start.column
+      const key = `${kind}:${name}:${line}:${col}`
       if (seen.has(key)) return
       seen.add(key)
       symbols.push(
