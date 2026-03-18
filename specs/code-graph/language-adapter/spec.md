@@ -61,7 +61,7 @@ The adapter maps TypeScript/JavaScript constructs to `SymbolKind` values:
 - **`localName`** (`string`) — the name used locally in the importing file (may differ from original via aliasing)
 - **`originalName`** (`string`) — the name as declared in the source module
 - **`specifier`** (`string`) — the raw import specifier string (e.g. `'./utils.js'`, `'@specd/core'`, `'os'`)
-- **`isRelative`** (`boolean`) — true if the specifier starts with `.` or `/`
+- **`isRelative`** (`boolean`) — true if the specifier is relative to the importing file (starts with `.` for all built-in adapters)
 
 Each adapter parses imports using its language's syntax:
 
