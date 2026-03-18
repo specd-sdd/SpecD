@@ -1,4 +1,4 @@
-import { readdirSync, statSync, readFileSync, existsSync } from 'node:fs'
+import { readdirSync, lstatSync, readFileSync, existsSync } from 'node:fs'
 import { join, relative, dirname } from 'node:path'
 import ignore from 'ignore'
 
@@ -119,7 +119,7 @@ export function discoverFiles(root: string, hasAdapter: (filePath: string) => bo
 
       let stat
       try {
-        stat = statSync(fullPath, { throwIfNoEntry: false })
+        stat = lstatSync(fullPath, { throwIfNoEntry: false })
       } catch {
         continue
       }
