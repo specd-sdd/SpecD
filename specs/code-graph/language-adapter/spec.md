@@ -117,14 +117,14 @@ Unlike extraction methods, `getPackageIdentity` performs I/O (reads a manifest f
 | Python     | `acme_auth.models`               | First segment, normalized (hyphens ↔ underscores).    |
 | PHP        | (uses qualified names, not this) | Not applicable — PHP resolves via `extractNamespace`. |
 
-- **`resolveRelativeImportPath?(fromFile: string, specifier: string): string`** — given the importing file path and a relative specifier, returns the resolved file path. Each language has its own rules for extension mapping and path resolution:
+- **`resolveRelativeImportPath?(fromFile: string, specifier: string): string | string[]`** — given the importing file path and a relative specifier, returns one or more candidate file paths. Returns multiple candidates when the specifier is ambiguous (e.g. could be a file or a directory with an index file). The indexer tries each candidate in order against the symbol index. Each language has its own rules for extension mapping and path resolution:
 
-| Language   | Resolution rules                                           |
-| ---------- | ---------------------------------------------------------- |
-| TypeScript | `.js` → `.ts`, extensionless → `.ts`, `../` path traversal |
-| Python     | `.` = current package, `..` = parent, adds `.py` extension |
-| Go         | Not applicable — Go imports are never relative             |
-| PHP        | Not applicable — PHP imports are never relative            |
+| Language   | Resolution rules                                                                    |
+| ---------- | ----------------------------------------------------------------------------------- |
+| TypeScript | `.js` → `.ts`, extensionless → `[.ts, /index.ts]`, `.jsx` → `.tsx`, `../` traversal |
+| Python     | `.` = current package, `..` = parent, adds `.py` extension                          |
+| Go         | Not applicable — Go imports are never relative                                      |
+| PHP        | Not applicable — PHP imports are never relative                                     |
 
 - **`buildQualifiedName?(namespace: string, symbolName: string): string`** — builds a fully qualified name from a namespace and symbol name. Used by languages like PHP where imports are resolved via namespace-qualified names rather than package names.
 

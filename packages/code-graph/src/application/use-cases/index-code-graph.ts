@@ -524,15 +524,14 @@ export class IndexCodeGraph {
       if (imp.isRelative) {
         // Delegate path resolution to the adapter
         if (adapter.resolveRelativeImportPath) {
-          const resolvedPath = adapter.resolveRelativeImportPath(filePath, imp.specifier)
-          let target = index.findByFile(resolvedPath).find((s) => s.name === imp.originalName)
-          // Fallback: specifier may point to a directory with an index file
-          if (!target) {
-            const indexPath = resolvedPath.replace(/\.[^.]+$/, '/index.ts')
-            target = index.findByFile(indexPath).find((s) => s.name === imp.originalName)
-          }
-          if (target) {
-            importMap.set(imp.localName, target.id)
+          const resolved = adapter.resolveRelativeImportPath(filePath, imp.specifier)
+          const candidates = Array.isArray(resolved) ? resolved : [resolved]
+          for (const candidatePath of candidates) {
+            const target = index.findByFile(candidatePath).find((s) => s.name === imp.originalName)
+            if (target) {
+              importMap.set(imp.localName, target.id)
+              break
+            }
           }
         }
       } else {

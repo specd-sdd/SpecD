@@ -448,11 +448,12 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
 
       if (!specifier.startsWith('.')) continue
 
-      const resolvedPath = this.resolveRelativeImportPath(filePath, specifier)
+      const resolved = this.resolveRelativeImportPath(filePath, specifier)
+      const target = Array.isArray(resolved) ? resolved[0]! : resolved
       relations.push(
         createRelation({
           source: filePath,
-          target: resolvedPath,
+          target,
           type: RelationType.Imports,
           metadata: { specifier },
         }),
@@ -561,7 +562,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param specifier - The relative import specifier.
    * @returns The resolved file path.
    */
-  resolveRelativeImportPath(fromFile: string, specifier: string): string {
+  resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
     const fromDir = fromFile.substring(0, fromFile.lastIndexOf('/'))
     const parts = specifier.split('/')
     const segments = fromDir.split('/')
@@ -585,8 +586,8 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     } else if (resolved.endsWith('.ts') || resolved.endsWith('.tsx')) {
       // Already a TS extension — keep as-is
     } else if (!resolved.includes('.', resolved.lastIndexOf('/') + 1)) {
-      // Extensionless — default to .ts
-      resolved += '.ts'
+      // Extensionless — could be a file or a directory with index.ts
+      return [resolved + '.ts', resolved + '/index.ts']
     }
 
     return resolved

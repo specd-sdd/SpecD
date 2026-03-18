@@ -83,13 +83,16 @@ export interface LanguageAdapter {
   resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined
 
   /**
-   * Resolves a relative import specifier to a file path.
+   * Resolves a relative import specifier to one or more candidate file paths.
    * Applies language-specific extension mapping and path traversal rules.
+   * Returns multiple candidates when the specifier is ambiguous (e.g. could
+   * be a file or a directory with an index file). The indexer tries each
+   * candidate in order against the symbol index.
    * @param fromFile - The importing file path (workspace-prefixed).
    * @param specifier - The relative import specifier.
-   * @returns The resolved file path.
+   * @returns The resolved file path(s), most likely candidate first.
    */
-  resolveRelativeImportPath?(fromFile: string, specifier: string): string
+  resolveRelativeImportPath?(fromFile: string, specifier: string): string | string[]
 
   /**
    * Builds a fully qualified name from a namespace and symbol name.
