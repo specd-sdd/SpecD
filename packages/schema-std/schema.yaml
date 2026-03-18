@@ -405,7 +405,7 @@ workflow:
           instruction: |
             Verify that all required artifacts are present and complete: proposal
             has been approved, specs and verify files exist for every capability,
-            design.md exists if warranted, and tasks.md lists all implementation
+            design.md exists and is complete, and tasks.md lists all implementation
             work items. This is a gate — do not proceed until everything is in place.
 
   - step: implementing
