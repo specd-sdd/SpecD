@@ -34,6 +34,11 @@ export interface ValidateArtifactsInput {
    * Encoded as `<workspace>:<capability-path>` (e.g. `"default:auth/oauth"`).
    */
   readonly specPath: string
+  /**
+   * When provided, only the artifact with this ID is validated.
+   * All other artifacts are skipped and the required-artifacts check is bypassed.
+   */
+  readonly artifactId?: string
 }
 
 /** A single validation failure — missing artifact, failed rule, or application error. */
@@ -139,6 +144,23 @@ export class ValidateArtifacts {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
     }
 
+    // --- Unknown artifact ID guard ---
+    if (input.artifactId !== undefined) {
+      const known = schema.artifacts().some((a) => a.id === input.artifactId)
+      if (!known) {
+        return {
+          passed: false,
+          failures: [
+            {
+              artifactId: input.artifactId,
+              description: `Unknown artifact ID '${input.artifactId}' — not defined in schema '${schema.name()}'`,
+            },
+          ],
+          warnings: [],
+        }
+      }
+    }
+
     const actor: ActorIdentity = await this._actor.identity()
     const failures: ValidationFailure[] = []
     const warnings: ValidationWarning[] = []
@@ -146,13 +168,15 @@ export class ValidateArtifacts {
     const { workspace, capPath: capabilityPath } = parseSpecId(input.specPath)
     const specRepo = this._specs.get(workspace)
 
-    // --- Required artifacts check ---
-    for (const artifactType of schema.artifacts()) {
-      if (!artifactType.optional && change.effectiveStatus(artifactType.id) === 'missing') {
-        failures.push({
-          artifactId: artifactType.id,
-          description: `Required artifact '${artifactType.id}' is missing`,
-        })
+    // --- Required artifacts check (skipped when artifactId is provided) ---
+    if (input.artifactId === undefined) {
+      for (const artifactType of schema.artifacts()) {
+        if (!artifactType.optional && change.effectiveStatus(artifactType.id) === 'missing') {
+          failures.push({
+            artifactId: artifactType.id,
+            description: `Required artifact '${artifactType.id}' is missing`,
+          })
+        }
       }
     }
 
@@ -198,6 +222,7 @@ export class ValidateArtifacts {
 
     // --- Per-artifact validation ---
     for (const artifactType of schema.artifacts()) {
+      if (input.artifactId !== undefined && artifactType.id !== input.artifactId) continue
       const effectiveStatus = change.effectiveStatus(artifactType.id)
       if (effectiveStatus === 'skipped' || effectiveStatus === 'missing') continue
 

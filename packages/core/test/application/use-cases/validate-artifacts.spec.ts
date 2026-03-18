@@ -1079,4 +1079,242 @@ describe('ValidateArtifacts', () => {
       expect(result.passed).toBe(false)
     })
   })
+
+  describe('artifactId filter', () => {
+    it('returns failure for unknown artifact ID without throwing', async () => {
+      const proposalType = makeArtifactType('proposal')
+      const schema = makeSchema([proposalType])
+      const change = makeChangeWithArtifacts('c', [])
+      const uc = new ValidateArtifacts(
+        makeChangeRepository([change]),
+        new Map(),
+        makeSchemaRegistry(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+        'test',
+        new Map(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+        artifactId: 'nonexistent',
+      })
+
+      expect(result.passed).toBe(false)
+      expect(result.failures).toHaveLength(1)
+      expect(result.failures[0]!.artifactId).toBe('nonexistent')
+      expect(result.failures[0]!.description).toContain('nonexistent')
+    })
+
+    it('validates only the specified artifact, ignoring others', async () => {
+      const proposalType = makeArtifactType('proposal', { format: 'markdown' })
+      const specsType = makeArtifactType('specs', { format: 'markdown' })
+      const schema = makeSchema([proposalType, specsType])
+
+      const content = 'proposal content'
+      const proposalArtifact = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({ key: 'proposal', filename: 'proposal.md', status: 'in-progress' }),
+          ],
+        ]),
+      })
+      // specs has no file — would fail required-artifacts if not filtered
+      const change = makeChangeWithArtifacts('c', [proposalArtifact])
+
+      const files = new Map([['proposal.md', content]])
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          const c = files.get(filename)
+          return c !== undefined ? new SpecArtifact(filename, c) : null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaRegistry(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+        'test',
+        new Map(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+        artifactId: 'proposal',
+      })
+
+      expect(result.passed).toBe(true)
+      expect(result.failures).toHaveLength(0)
+      // specs is missing but not reported
+      expect(result.failures.some((f) => f.artifactId === 'specs')).toBe(false)
+    })
+
+    it('reports dependency-blocked for specified artifact with unsatisfied deps', async () => {
+      const proposalType = makeArtifactType('proposal')
+      const specsType = makeArtifactType('specs', { requires: ['proposal'] })
+      const schema = makeSchema([proposalType, specsType])
+
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
+      })
+      // proposal has no artifact — so it's missing, not complete
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+
+      const files = new Map([['spec.md', 'specs content']])
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          const c = files.get(filename)
+          return c !== undefined ? new SpecArtifact(filename, c) : null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaRegistry(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+        'test',
+        new Map(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+        artifactId: 'specs',
+      })
+
+      expect(
+        result.failures.some((f) => f.artifactId === 'specs' && f.description.includes('blocked')),
+      ).toBe(true)
+    })
+
+    it('validates specified artifact normally when deps are satisfied', async () => {
+      const proposalType = makeArtifactType('proposal', { format: 'markdown' })
+      const specsType = makeArtifactType('specs', { requires: ['proposal'], format: 'markdown' })
+      const schema = makeSchema([proposalType, specsType])
+
+      const proposalContent = 'proposal content'
+      const specsContent = 'specs content'
+
+      const proposalArtifact = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'complete',
+              validatedHash: sha256(proposalContent),
+            }),
+          ],
+        ]),
+      })
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [proposalArtifact, specsArtifact])
+
+      const files = new Map([
+        ['proposal.md', proposalContent],
+        ['spec.md', specsContent],
+      ])
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          const c = files.get(filename)
+          return c !== undefined ? new SpecArtifact(filename, c) : null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaRegistry(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+        'test',
+        new Map(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+        artifactId: 'specs',
+      })
+
+      expect(result.passed).toBe(true)
+      const saved = repo.store.get('c')
+      const artifact = saved?.getArtifact('specs')
+      expect(artifact?.status).toBe('complete')
+    })
+
+    it('skips required-artifacts check when artifactId is provided', async () => {
+      const proposalType = makeArtifactType('proposal', { format: 'markdown' })
+      const specsType = makeArtifactType('specs')
+      const schema = makeSchema([proposalType, specsType])
+
+      const content = 'proposal content'
+      const proposalArtifact = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({ key: 'proposal', filename: 'proposal.md', status: 'in-progress' }),
+          ],
+        ]),
+      })
+      // specs is missing — normally would fail required-artifacts check
+      const change = makeChangeWithArtifacts('c', [proposalArtifact])
+
+      const files = new Map([['proposal.md', content]])
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          const c = files.get(filename)
+          return c !== undefined ? new SpecArtifact(filename, c) : null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaRegistry(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+        'test',
+        new Map(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+        artifactId: 'proposal',
+      })
+
+      // proposal passes, and missing specs is NOT reported
+      expect(result.passed).toBe(true)
+      expect(result.failures.some((f) => f.artifactId === 'specs')).toBe(false)
+    })
+  })
 })
