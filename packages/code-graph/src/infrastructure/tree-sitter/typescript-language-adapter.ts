@@ -564,20 +564,25 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @returns The resolved file path.
    */
   resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
-    const fromDir = fromFile.substring(0, fromFile.lastIndexOf('/'))
+    // Separate workspace prefix (e.g. "core:src/foo.ts" → "core:", "src/foo.ts")
+    const colonIdx = fromFile.indexOf(':')
+    const wsPrefix = colonIdx === -1 ? '' : fromFile.substring(0, colonIdx + 1)
+    const relFile = colonIdx === -1 ? fromFile : fromFile.substring(colonIdx + 1)
+
+    const relDir = relFile.substring(0, relFile.lastIndexOf('/'))
     const parts = specifier.split('/')
-    const segments = fromDir.split('/')
+    const segments = relDir ? relDir.split('/') : []
 
     for (const part of parts) {
       if (part === '.') continue
       if (part === '..') {
-        if (segments.length > 1) segments.pop()
+        if (segments.length > 0) segments.pop()
       } else {
         segments.push(part)
       }
     }
 
-    let resolved = segments.join('/')
+    let resolved = wsPrefix + segments.join('/')
 
     // Map JS extensions to TS equivalents (ESM convention)
     if (resolved.endsWith('.js')) {
