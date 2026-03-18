@@ -253,9 +253,9 @@ describe('TypeScriptLanguageAdapter', () => {
       expect(result).toBe('core:src/utils.ts')
     })
 
-    it('adds .ts for extensionless specifier', () => {
+    it('returns candidates for extensionless specifier', () => {
       const result = adapter.resolveRelativeImportPath('core:src/index.ts', './helpers/cli')
-      expect(result).toBe('core:src/helpers/cli.ts')
+      expect(result).toEqual(['core:src/helpers/cli.ts', 'core:src/helpers/cli/index.ts'])
     })
 
     it('resolves ./ specifier', () => {
