@@ -106,7 +106,13 @@ export function createKernelInternals(
     ...(options?.extraNodeModulesPaths ?? []),
   ]
 
-  const changes = createChangeRepository('fs', wsContext, storagePaths)
+  const changes = createChangeRepository('fs', wsContext, {
+    ...storagePaths,
+    resolveArtifactTypes: async () => {
+      const schema = await schemas.resolve(config.schemaRef, workspaceSchemasPaths)
+      return schema !== null ? schema.artifacts() : []
+    },
+  })
 
   const archive = createArchiveRepository('fs', wsContext, {
     ...storagePaths,

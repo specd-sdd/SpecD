@@ -173,8 +173,16 @@ export class ArchiveChange {
       for (const artifactType of schema.artifacts()) {
         if (artifactType.scope !== 'spec') continue
 
-        const effectiveStatus = change.effectiveStatus(artifactType.id)
-        if (effectiveStatus === 'skipped' || effectiveStatus === 'missing') continue
+        // Check per-file status for this specId
+        const changeArtifact = change.getArtifact(artifactType.id)
+        if (changeArtifact === null) continue
+        const specFile = changeArtifact.getFile(specId)
+        if (
+          specFile === undefined ||
+          specFile.status === 'missing' ||
+          specFile.status === 'skipped'
+        )
+          continue
 
         const outputBasename = path.basename(artifactType.output)
 
@@ -209,12 +217,8 @@ export class ArchiveChange {
           synced = true
         } else {
           // Non-delta spec-scoped artifact: copy from change dir to spec
-          // The file lives at specs/<workspace>/<capability-path>/<filename> within the change dir
-          const artifactFilename =
-            capabilityPath.length > 0
-              ? `specs/${workspace}/${capabilityPath}/${outputBasename}`
-              : `specs/${workspace}/${outputBasename}`
-          const artifactFile = await this._changes.artifact(change, artifactFilename)
+          // specFile.filename is the full relative path (e.g. specs/core/retry-policy/spec.md)
+          const artifactFile = await this._changes.artifact(change, specFile.filename)
           if (artifactFile === null) continue
 
           await specRepo.save(spec, new SpecArtifact(outputBasename, artifactFile.content), {

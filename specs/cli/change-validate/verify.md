@@ -9,6 +9,13 @@
 - **WHEN** `specd change validate my-change` is run without the spec ID
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
+#### Scenario: Artifact flag accepted
+
+- **GIVEN** a valid change `my-change` with spec `default:auth/login`
+- **WHEN** `specd change validate my-change default:auth/login --artifact proposal` is run
+- **THEN** the command invokes validation for only the `proposal` artifact
+- **AND** the process exits with code 0 if `proposal` passes validation
+
 ### Requirement: Output on success
 
 #### Scenario: All artifacts pass, no warnings
@@ -50,6 +57,25 @@
 - **WHEN** `specd change validate nonexistent default:auth/login` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
+
+### Requirement: Unknown artifact ID
+
+#### Scenario: Unknown artifact ID exits with failure
+
+- **GIVEN** a valid change `my-change` with spec `default:auth/login`
+- **AND** the active schema has no artifact with ID `nonexistent`
+- **WHEN** `specd change validate my-change default:auth/login --artifact nonexistent` is run
+- **THEN** the command exits with code 1
+- **AND** stdout contains the validation failure describing the unknown artifact ID
+
+#### Scenario: Unknown artifact ID with JSON format
+
+- **GIVEN** a valid change `my-change` with spec `default:auth/login`
+- **AND** the active schema has no artifact with ID `nonexistent`
+- **WHEN** `specd change validate my-change default:auth/login --artifact nonexistent --format json` is run
+- **THEN** stdout is valid JSON with `passed` equal to `false`
+- **AND** `failures` contains an entry describing the unknown artifact ID
+- **AND** the process exits with code 1
 
 ### Requirement: Output on success
 

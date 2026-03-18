@@ -69,15 +69,20 @@ For each spec ID in `change.specIds`:
 1. Resolve the active schema for that spec's workspace.
 2. For each artifact in the schema that declares `delta: true`:
    a. Look up the `ArtifactParser` for the artifact's `format` from `ArtifactParserRegistry`. If no adapter is registered for that format, throw — this is a configuration error.
-   b. Load the delta file from `ChangeRepository` (filename `<artifact-output-filename>.delta.yaml`). If absent or `skipped` (effective status `skipped`), skip — nothing to sync.
-   c. Parse the delta file as YAML to obtain the array of delta entries.
+   b. Retrieve the file for this spec ID from the artifact via `artifact.getFile(specId)`. If the file is absent or its status is `skipped`, skip — nothing to sync.
+   c. Load the delta file content from `ChangeRepository` using the file's `filename`. Parse the delta file as YAML to obtain the array of delta entries.
    d. Load the base artifact content from `SpecRepository`. If the base does not exist, treat it as an empty document (parse an empty string via `ArtifactParser.parse('')`).
    e. Parse the base content via `ArtifactParser.parse(baseContent)` to obtain a base AST.
    f. Call `ArtifactParser.apply(baseAST, deltaEntries)` to produce the merged AST. If `apply` throws `DeltaApplicationError`, re-throw it — this indicates a structural problem that should have been caught during `ValidateArtifacts`, or the delta was modified after validation.
    g. Serialize the merged AST via `ArtifactParser.serialize(mergedAST)` and save the result to `SpecRepository`.
+
+For markdown artifacts, the merge output must preserve inline formatting and list/style conventions from the base artifact wherever possible. Implementations must avoid destructive normalization of untouched sections during archive-time serialization.
+
+When the base markdown uses mixed style markers for the same construct (for example both `-` and `*` bullets, or both `*` and `_` for emphasis/strong), archive-time serialization must be deterministic and follow project markdown conventions configured for lint consistency.
+
 3. For each artifact in the schema that declares `delta: false` (new file artifacts created in-change):
-   a. Load the artifact file from `ChangeRepository`. If absent or `skipped` (effective status `skipped`), skip — nothing to sync.
-   b. Save the content directly to `SpecRepository` (creating the spec directory and file if they do not exist).
+   a. Retrieve the file for this spec ID from the artifact via `artifact.getFile(specId)`. If the file is absent or its status is `skipped`, skip — nothing to sync.
+   b. Load the artifact file content from `ChangeRepository` using the file's `filename`. Save the content directly to `SpecRepository` (creating the spec directory and file if they do not exist).
 
 ### Requirement: Archive repository call
 

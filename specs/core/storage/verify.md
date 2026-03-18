@@ -51,6 +51,30 @@
 - **WHEN** all `validatedHash` values are cleared
 - **THEN** its status becomes `in-progress` — file present but no valid hash
 
+#### Scenario: preHashCleanup normalized edit preserves complete status
+
+- **GIVEN** an artifact type with `preHashCleanup: [{ pattern: "- \\[x\\]", replacement: "- [ ]" }]`
+- **AND** the artifact was validated with content `- [ ] task one` (cleaned hash stored as `validatedHash`)
+- **WHEN** the file is edited to `- [x] task one`
+- **THEN** `FsChangeRepository` applies the cleanup before hashing, producing the same hash
+- **AND** the derived status is `complete`
+
+#### Scenario: Non-normalized edit still triggers in-progress
+
+- **GIVEN** an artifact type with `preHashCleanup: [{ pattern: "- \\[x\\]", replacement: "- [ ]" }]`
+- **AND** the artifact was validated with content `- [ ] task one`
+- **WHEN** the file is edited to `- [ ] task one\n- [ ] task two`
+- **THEN** the cleaned hash differs from `validatedHash`
+- **AND** the derived status is `in-progress`
+
+#### Scenario: No preHashCleanup rules hashes raw content
+
+- **GIVEN** an artifact type with no `preHashCleanup` rules
+- **AND** the artifact was validated with content `some content`
+- **WHEN** the file content is unchanged
+- **THEN** `sha256(rawContent) === validatedHash`
+- **AND** the derived status is `complete`
+
 ### Requirement: Artifact dependency cascade
 
 #### Scenario: Upstream artifact edited

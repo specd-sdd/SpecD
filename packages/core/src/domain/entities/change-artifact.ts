@@ -1,12 +1,8 @@
 import { type ArtifactStatus } from '../value-objects/artifact-status.js'
+import { ArtifactFile, SKIPPED_SENTINEL } from '../value-objects/artifact-file.js'
 import { ArtifactNotOptionalError } from '../errors/artifact-not-optional-error.js'
 
-/**
- * Sentinel hash stored in `validatedHash` when an optional artifact is skipped.
- * Presence of this value indicates the artifact was explicitly bypassed rather
- * than validated.
- */
-export const SKIPPED_SENTINEL = '__skipped__'
+export { SKIPPED_SENTINEL }
 
 /**
  * Construction properties for a {@link ChangeArtifact}.
@@ -14,35 +10,32 @@ export const SKIPPED_SENTINEL = '__skipped__'
 export interface ChangeArtifactProps {
   /** The artifact type identifier (e.g. `"proposal"`, `"specs"`, `"tasks"`). */
   readonly type: string
-  /** The artifact filename (e.g. `"proposal.md"`). */
-  readonly filename: string
   /** Whether the artifact is optional in the schema. Defaults to `false`. */
   readonly optional?: boolean
   /** Artifact type IDs that must be `complete` before this one can be validated. */
   readonly requires?: readonly string[]
-  /** Current validation status. Defaults to `"missing"`. */
-  readonly status?: ArtifactStatus
-  /** SHA-256 hash recorded at last successful validation, if any. */
-  readonly validatedHash?: string
+  /** Pre-populated files map. */
+  readonly files?: ReadonlyMap<string, ArtifactFile>
 }
 
 /**
- * Represents a single artifact file within a change (e.g. `proposal.md`, `spec.md`).
+ * Represents one artifact type within a change (e.g. proposal, specs, tasks).
  *
- * Tracks validation state for the artifact: whether it exists, whether it has
- * been validated, and what hash was recorded at last validation. Content is not
- * held in memory — it is loaded on demand by the repository port when needed.
+ * Contains zero or more {@link ArtifactFile} entries — one per file the artifact
+ * produces. For `scope: change` artifacts there is typically one file keyed by
+ * the artifact type id. For `scope: spec` artifacts there is one file per specId.
  *
- * Status is derived, not stored: `missing` until the file exists, `in-progress`
- * while unvalidated or dependencies are incomplete, `complete` after `markComplete`.
+ * Aggregated status: `complete` iff all files are complete or skipped;
+ * `missing` iff all files are missing or there are no files;
+ * `in-progress` otherwise.
+ *
+ * @see ArtifactFile
  */
 export class ChangeArtifact {
   private readonly _type: string
-  private readonly _filename: string
   private readonly _optional: boolean
   private readonly _requires: readonly string[]
-  private _status: ArtifactStatus
-  private _validatedHash: string | undefined
+  private _files: Map<string, ArtifactFile>
 
   /**
    * Creates a new `ChangeArtifact` from the given properties.
@@ -51,21 +44,17 @@ export class ChangeArtifact {
    */
   constructor(props: ChangeArtifactProps) {
     this._type = props.type
-    this._filename = props.filename
     this._optional = props.optional ?? false
     this._requires = [...(props.requires ?? [])]
-    this._status = props.status ?? 'missing'
-    this._validatedHash = props.validatedHash
+    this._files =
+      props.files !== undefined
+        ? new Map<string, ArtifactFile>(props.files)
+        : new Map<string, ArtifactFile>()
   }
 
   /** The artifact type identifier (matches the schema's `artifacts[].id`). */
   get type(): string {
     return this._type
-  }
-
-  /** The artifact filename (e.g. `"proposal.md"`). */
-  get filename(): string {
-    return this._filename
   }
 
   /** Whether this artifact is optional in the schema. */
@@ -78,38 +67,93 @@ export class ChangeArtifact {
     return [...this._requires]
   }
 
-  /** The current validation status of this artifact. */
-  get status(): ArtifactStatus {
-    return this._status
-  }
-
-  /** The SHA-256 hash recorded at the last successful validation, or `undefined`. */
-  get validatedHash(): string | undefined {
-    return this._validatedHash
-  }
-
-  /** Whether this artifact has been successfully validated (`status === "complete"`). */
-  get isComplete(): boolean {
-    return this._status === 'complete'
+  /** Read-only view of all files in this artifact. */
+  get files(): ReadonlyMap<string, ArtifactFile> {
+    return new Map(this._files)
   }
 
   /**
-   * Records a successful validation by storing the content hash and setting
-   * the status to `"complete"`.
+   * Aggregated validation status across all files.
    *
-   * @param hash - The SHA-256 hash of the validated artifact content
+   * - `complete` — all files are complete or skipped (and at least one file exists)
+   * - `skipped` — all files are skipped (and at least one file exists)
+   * - `missing` — all files are missing or there are no files
+   * - `in-progress` — some files exist but not all are complete/skipped
+   *
+   * @returns The aggregated artifact status
    */
-  markComplete(hash: string): void {
-    this._validatedHash = hash
-    this._status = 'complete'
+  get status(): ArtifactStatus {
+    if (this._files.size === 0) return 'missing'
+
+    let allComplete = true
+    let allMissing = true
+    let allSkipped = true
+
+    for (const file of this._files.values()) {
+      if (file.status !== 'complete' && file.status !== 'skipped') allComplete = false
+      if (file.status !== 'skipped') allSkipped = false
+      if (file.status !== 'missing') allMissing = false
+    }
+
+    if (allSkipped) return 'skipped'
+    if (allComplete) return 'complete'
+    if (allMissing) return 'missing'
+    return 'in-progress'
+  }
+
+  /** Whether all files in this artifact have been validated or skipped. */
+  get isComplete(): boolean {
+    const s = this.status
+    return s === 'complete' || s === 'skipped'
   }
 
   /**
-   * Marks this artifact as explicitly skipped, storing the sentinel hash and
-   * setting the status to `"skipped"`.
+   * Returns the file with the given key, or `undefined` if not present.
+   *
+   * @param key - The file key (artifact type id for scope:change, specId for scope:spec)
+   * @returns The file, or `undefined` if not found
+   */
+  getFile(key: string): ArtifactFile | undefined {
+    return this._files.get(key)
+  }
+
+  /**
+   * Adds or replaces a file in this artifact.
+   *
+   * @param file - The file to set
+   */
+  setFile(file: ArtifactFile): void {
+    this._files.set(file.key, file)
+  }
+
+  /**
+   * Removes a file from this artifact.
+   *
+   * @param key - The file key to remove
+   */
+  removeFile(key: string): void {
+    this._files.delete(key)
+  }
+
+  /**
+   * Records a successful validation for a specific file by storing the content
+   * hash and setting the file's status to `"complete"`.
+   *
+   * @param key - The file key to mark complete
+   * @param hash - The SHA-256 hash of the validated content
+   */
+  markComplete(key: string, hash: string): void {
+    const file = this._files.get(key)
+    if (file !== undefined) {
+      file.markComplete(hash)
+    }
+  }
+
+  /**
+   * Marks all files in this artifact as explicitly skipped.
    *
    * Only optional artifacts may be skipped. Skipped artifacts satisfy dependency
-   * requirements — dependents do not treat a skipped artifact as a blocker.
+   * requirements -- dependents do not treat a skipped artifact as a blocker.
    *
    * @throws {ArtifactNotOptionalError} If this artifact is not optional
    */
@@ -117,21 +161,21 @@ export class ChangeArtifact {
     if (!this._optional) {
       throw new ArtifactNotOptionalError(this._type)
     }
-    this._validatedHash = SKIPPED_SENTINEL
-    this._status = 'skipped'
+    for (const file of this._files.values()) {
+      file.markSkipped()
+    }
   }
 
   /**
-   * Resets the validation state by clearing `validatedHash` and rolling the
-   * status back to its unvalidated equivalent.
+   * Resets the validation state for all files.
    *
-   * - `complete` → `in-progress` (file still present, hash no longer valid)
-   * - `skipped` → `missing` (sentinel cleared, file treated as absent)
-   * - `in-progress` / `missing` — no status change, hash already unset
+   * - `complete` -> `in-progress`
+   * - `skipped` -> `missing`
+   * - `in-progress` / `missing` -- no status change
    */
   resetValidation(): void {
-    if (this._status === 'complete') this._status = 'in-progress'
-    else if (this._status === 'skipped') this._status = 'missing'
-    this._validatedHash = undefined
+    for (const file of this._files.values()) {
+      file.resetValidation()
+    }
   }
 }

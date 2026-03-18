@@ -104,6 +104,13 @@ class StubChangeRepository extends ChangeRepository {
   ): Promise<boolean> {
     return false
   }
+
+  override async scaffold(
+    _change: Change,
+    _specExists: (specId: string) => Promise<boolean>,
+  ): Promise<void> {
+    // no-op in tests
+  }
 }
 
 /**

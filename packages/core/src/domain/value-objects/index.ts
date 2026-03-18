@@ -1,3 +1,8 @@
+export {
+  ArtifactFile,
+  SKIPPED_SENTINEL as ARTIFACT_FILE_SKIPPED_SENTINEL,
+  type ArtifactFileProps,
+} from './artifact-file.js'
 export { DomainPath } from './domain-path.js'
 export { SpecPath } from './spec-path.js'
 export { SpecArtifact } from './spec-artifact.js'

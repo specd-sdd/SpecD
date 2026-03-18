@@ -7,7 +7,7 @@ describe('CreateChange', () => {
   describe('given no existing change with that name', () => {
     it('creates and saves a change with the given name', async () => {
       const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, makeActorResolver())
+      const uc = new CreateChange(repo, new Map(), makeActorResolver())
 
       const result = await uc.execute({
         name: 'add-oauth',
@@ -22,7 +22,7 @@ describe('CreateChange', () => {
 
     it('derives workspaces from specIds', async () => {
       const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, makeActorResolver())
+      const uc = new CreateChange(repo, new Map(), makeActorResolver())
 
       const result = await uc.execute({
         name: 'my-change',
@@ -38,7 +38,7 @@ describe('CreateChange', () => {
 
     it('appends a created event with the actor from ActorResolver', async () => {
       const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, makeActorResolver())
+      const uc = new CreateChange(repo, new Map(), makeActorResolver())
 
       const result = await uc.execute({
         name: 'my-change',
@@ -59,7 +59,7 @@ describe('CreateChange', () => {
 
     it('leaves the change in drafting state', async () => {
       const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, makeActorResolver())
+      const uc = new CreateChange(repo, new Map(), makeActorResolver())
 
       const result = await uc.execute({
         name: 'my-change',
@@ -73,7 +73,7 @@ describe('CreateChange', () => {
 
     it('allows empty specIds for bootstrapping', async () => {
       const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, makeActorResolver())
+      const uc = new CreateChange(repo, new Map(), makeActorResolver())
 
       const result = await uc.execute({
         name: 'bootstrap',
@@ -88,7 +88,7 @@ describe('CreateChange', () => {
 
     it('deduplicates specIds', async () => {
       const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, makeActorResolver())
+      const uc = new CreateChange(repo, new Map(), makeActorResolver())
 
       const result = await uc.execute({
         name: 'dedup-test',
@@ -105,7 +105,7 @@ describe('CreateChange', () => {
     it('throws ChangeAlreadyExistsError', async () => {
       const existing = makeChange('add-oauth')
       const repo = makeChangeRepository([existing])
-      const uc = new CreateChange(repo, makeActorResolver())
+      const uc = new CreateChange(repo, new Map(), makeActorResolver())
 
       await expect(
         uc.execute({
@@ -120,7 +120,7 @@ describe('CreateChange', () => {
     it('ChangeAlreadyExistsError has correct code', async () => {
       const existing = makeChange('add-oauth')
       const repo = makeChangeRepository([existing])
-      const uc = new CreateChange(repo, makeActorResolver())
+      const uc = new CreateChange(repo, new Map(), makeActorResolver())
 
       await expect(
         uc.execute({

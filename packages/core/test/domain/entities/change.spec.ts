@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { InvalidChangeError } from '../../../src/domain/errors/invalid-change-error.js'
 import type { ActorIdentity, ChangeEvent } from '../../../src/domain/entities/change.js'
@@ -19,7 +20,8 @@ function makeChange(history: ChangeEvent[] = []) {
 }
 
 function makeArtifact(type: string, status: ArtifactStatus, requires: string[] = []) {
-  return new ChangeArtifact({ type, filename: `${type}.md`, status, requires })
+  const file = new ArtifactFile({ key: type, filename: `${type}.md`, status })
+  return new ChangeArtifact({ type, requires, files: new Map([[type, file]]) })
 }
 
 describe('Change', () => {
@@ -246,41 +248,55 @@ describe('Change', () => {
     it('clears validatedHash and resets complete artifacts to in-progress', () => {
       const c = makeChange()
       c.transition('designing', actor)
-      const proposal = new ChangeArtifact({ type: 'proposal', filename: 'proposal.md' })
-      proposal.markComplete('sha256:abc')
+      const file = new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })
+      const proposal = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([['proposal', file]]),
+      })
+      proposal.markComplete('proposal', 'sha256:abc')
       c.setArtifact(proposal)
 
       c.invalidate('spec-change', actor)
 
-      expect(proposal.validatedHash).toBeUndefined()
+      expect(proposal.getFile('proposal')?.validatedHash).toBeUndefined()
       expect(proposal.status).toBe('in-progress')
     })
 
     it('clears validatedHash and resets skipped artifacts to missing', () => {
       const c = makeChange()
-      const adr = new ChangeArtifact({ type: 'adr', filename: 'adr.md', optional: true })
+      const file = new ArtifactFile({ key: 'adr', filename: 'adr.md' })
+      const adr = new ChangeArtifact({
+        type: 'adr',
+        optional: true,
+        files: new Map([['adr', file]]),
+      })
       adr.markSkipped()
       c.setArtifact(adr)
 
       c.invalidate('spec-change', actor)
 
-      expect(adr.validatedHash).toBeUndefined()
+      expect(adr.getFile('adr')?.validatedHash).toBeUndefined()
       expect(adr.status).toBe('missing')
     })
 
     it('clears hashes on all artifacts when invalidated', () => {
       const c = makeChange()
-      const proposal = new ChangeArtifact({ type: 'proposal', filename: 'proposal.md' })
-      proposal.markComplete('sha256:111')
-      const design = new ChangeArtifact({ type: 'design', filename: 'design.md' })
-      design.markComplete('sha256:222')
+      const pFile = new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })
+      const proposal = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([['proposal', pFile]]),
+      })
+      proposal.markComplete('proposal', 'sha256:111')
+      const dFile = new ArtifactFile({ key: 'design', filename: 'design.md' })
+      const design = new ChangeArtifact({ type: 'design', files: new Map([['design', dFile]]) })
+      design.markComplete('design', 'sha256:222')
       c.setArtifact(proposal)
       c.setArtifact(design)
 
       c.invalidate('artifact-change', actor)
 
-      expect(proposal.validatedHash).toBeUndefined()
-      expect(design.validatedHash).toBeUndefined()
+      expect(proposal.getFile('proposal')?.validatedHash).toBeUndefined()
+      expect(design.getFile('design')?.validatedHash).toBeUndefined()
     })
   })
 
@@ -413,7 +429,7 @@ describe('Change', () => {
       c.restore(otherActor)
       const evt = c.history[c.history.length - 1]
       expect(evt?.type).toBe('restored')
-      expect(evt?.by).toBe(otherActor)
+      if (evt?.type === 'restored') expect(evt.by).toBe(otherActor)
     })
   })
 
@@ -632,18 +648,23 @@ describe('Change', () => {
   describe('clearArtifactValidations', () => {
     it('clears only the specified artifacts', () => {
       const c = makeChange()
-      const proposal = new ChangeArtifact({ type: 'proposal', filename: 'proposal.md' })
-      proposal.markComplete('sha256:abc')
-      const tasks = new ChangeArtifact({ type: 'tasks', filename: 'tasks.md' })
-      tasks.markComplete('sha256:def')
+      const pFile = new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })
+      const proposal = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([['proposal', pFile]]),
+      })
+      proposal.markComplete('proposal', 'sha256:abc')
+      const tFile = new ArtifactFile({ key: 'tasks', filename: 'tasks.md' })
+      const tasks = new ChangeArtifact({ type: 'tasks', files: new Map([['tasks', tFile]]) })
+      tasks.markComplete('tasks', 'sha256:def')
       c.setArtifact(proposal)
       c.setArtifact(tasks)
 
       c.clearArtifactValidations(['proposal'])
 
-      expect(proposal.validatedHash).toBeUndefined()
+      expect(proposal.getFile('proposal')?.validatedHash).toBeUndefined()
       expect(proposal.status).toBe('in-progress')
-      expect(tasks.validatedHash).toBe('sha256:def')
+      expect(tasks.getFile('tasks')?.validatedHash).toBe('sha256:def')
       expect(tasks.status).toBe('complete')
     })
 
@@ -654,13 +675,17 @@ describe('Change', () => {
 
     it('does nothing when the list is empty', () => {
       const c = makeChange()
-      const proposal = new ChangeArtifact({ type: 'proposal', filename: 'proposal.md' })
-      proposal.markComplete('sha256:abc')
+      const pFile = new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })
+      const proposal = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([['proposal', pFile]]),
+      })
+      proposal.markComplete('proposal', 'sha256:abc')
       c.setArtifact(proposal)
 
       c.clearArtifactValidations([])
 
-      expect(proposal.validatedHash).toBe('sha256:abc')
+      expect(proposal.getFile('proposal')?.validatedHash).toBe('sha256:abc')
     })
   })
 

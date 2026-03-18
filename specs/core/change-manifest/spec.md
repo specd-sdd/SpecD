@@ -23,24 +23,36 @@ Each change is persisted as a `manifest.json` file inside its change directory. 
   "artifacts": [
     {
       "type": "proposal",
-      "filename": "proposal.md",
       "optional": false,
       "requires": [],
-      "validatedHash": "sha256:abc123...",
+      "files": [
+        { "key": "proposal", "filename": "proposal.md", "validatedHash": "sha256:abc123..." },
+      ],
     },
     {
       "type": "specs",
-      "filename": "specs.md",
       "optional": false,
       "requires": ["proposal"],
-      "validatedHash": null,
+      "files": [
+        {
+          "key": "default:auth/login",
+          "filename": "specs/default/auth/login/spec.md",
+          "validatedHash": null,
+        },
+        {
+          "key": "default:auth/register",
+          "filename": "specs/default/auth/register/spec.md",
+          "validatedHash": null,
+        },
+      ],
     },
     {
       "type": "design",
-      "filename": "design.md",
       "optional": true,
       "requires": ["proposal"],
-      "validatedHash": "__skipped__", // optional artifact explicitly not produced
+      "files": [
+        { "key": "design", "filename": "design.md", "validatedHash": "__skipped__" }, // optional artifact explicitly not produced
+      ],
     },
   ],
   "history": [
@@ -71,7 +83,7 @@ Field definitions:
 - **`workspaces`** — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from `specIds` via `parseSpecId()`
 - **`specIds`** — current snapshot of spec IDs; mutable
 - **`specDependsOn`** (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's declared dependencies. Captured at authoring time to ensure dependencies are tracked even before metadata is generated. Omitted from the manifest when empty.
-- **`artifacts`** — array of artifact descriptors; `validatedHash` is `null` when the artifact has not been validated, a SHA-256 string when validated, or `"__skipped__"` when an optional artifact has been explicitly marked as not produced. `ArtifactStatus` is never stored — it is derived at load time from `validatedHash` and file presence
+- **`artifacts`** — array of artifact descriptors. Each artifact has `type`, `optional`, `requires`, and a `files` array of `ManifestArtifactFile` entries. Each file entry has `key` (artifact type id for `scope: change`, spec ID for `scope: spec`), `filename` (relative path), and `validatedHash` (`null` when not validated, a SHA-256 string when validated, or `"__skipped__"` when explicitly skipped). `ArtifactStatus` is never stored — it is derived at load time from `validatedHash` and file presence
 - **`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field.
 
 The JSON serialization of each event type is:
@@ -98,6 +110,9 @@ The JSON serialization of each event type is:
 
 // optional artifact explicitly marked as not produced
 { "type": "artifact-skipped", "at": "...", "by": { "name": "...", "email": "..." }, "artifactId": "design", "reason": "not needed for this change" }
+
+// artifact sync reconciled the artifact map against the schema
+{ "type": "artifacts-synced", "at": "...", "by": { "name": "specd", "email": "system@specd.dev" }, "typesAdded": ["tasks"], "typesRemoved": [], "filesAdded": [{ "type": "specs", "key": "default:auth/register" }], "filesRemoved": [] }
 
 // permanently abandoned
 { "type": "discarded", "at": "...", "by": { "name": "...", "email": "..." }, "reason": "superseded", "supersededBy": ["new-auth-flow"] }

@@ -153,6 +153,18 @@ export abstract class ChangeRepository extends Repository {
    * @returns `true` if the file exists, `false` otherwise
    */
   abstract deltaExists(change: Change, specId: string, filename: string): Promise<boolean>
+
+  /**
+   * Ensures artifact directories exist for all files tracked by the change.
+   *
+   * For `scope: spec` artifacts, creates `specs/<ws>/<capPath>/` or
+   * `deltas/<ws>/<capPath>/` directories under the change directory.
+   * For `scope: change` artifacts, the root directory already exists.
+   *
+   * @param change - The change whose artifact directories to scaffold
+   * @param specExists - A function that returns whether a spec already exists in the repository
+   */
+  abstract scaffold(change: Change, specExists: (specId: string) => Promise<boolean>): Promise<void>
 }
 
 export type { ArtifactConflictError }

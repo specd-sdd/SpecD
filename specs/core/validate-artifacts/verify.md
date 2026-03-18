@@ -8,22 +8,62 @@
 
 - **GIVEN** a schema with a non-optional artifact `specs`
 - **AND** the change has no file for `specs` and `validatedHash` is unset
-- **WHEN** `ValidateArtifacts.execute` is called
+- **WHEN** `ValidateArtifacts.execute` is called without `artifactId`
 - **THEN** `result.passed` is `false` and `result.failures` lists `specs` as missing
 
 #### Scenario: Skipped optional artifact does not cause failure
 
 - **GIVEN** a schema with `optional: true` artifact `design`
 - **AND** the change has `design.validatedHash === "__skipped__"`
-- **WHEN** `ValidateArtifacts.execute` is called
+- **WHEN** `ValidateArtifacts.execute` is called without `artifactId`
 - **THEN** `design` does not appear in `result.failures` — skipped optional artifacts are resolved
 
 #### Scenario: Missing optional artifact does not cause failure
 
 - **GIVEN** a schema with `optional: true` artifact `design`
 - **AND** the change has no file and no `validatedHash` for `design`
-- **WHEN** `ValidateArtifacts.execute` is called
+- **WHEN** `ValidateArtifacts.execute` is called without `artifactId`
 - **THEN** `design` does not appear in `result.failures` — absent optional artifacts are allowed
+
+#### Scenario: Required artifacts check skipped when artifactId is provided
+
+- **GIVEN** a schema with non-optional artifacts `proposal` and `specs`
+- **AND** only `proposal` has a file; `specs` is missing
+- **AND** `artifactId` is `"proposal"`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `result.passed` is `true` (assuming `proposal` passes validation)
+- **AND** the missing `specs` artifact is not reported as a failure
+
+### Requirement: Input — artifactId filter
+
+#### Scenario: Unknown artifact ID returns failure
+
+- **GIVEN** `artifactId` is `"nonexistent"` and the schema has no artifact with that ID
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `result.passed` is `false` and `result.failures` includes a descriptive error for the unknown ID
+- **AND** no validation, delta check, or `markComplete` is performed
+
+#### Scenario: Only the specified artifact is validated
+
+- **GIVEN** the schema has artifacts `proposal`, `specs`, and `verify`
+- **AND** `artifactId` is `"specs"`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** only `specs` goes through dependency check, delta validation, structural validation, and hash computation
+- **AND** `proposal` and `verify` are not checked, not reported as missing, and not included in the result
+
+#### Scenario: Dependency order still applies to the specified artifact
+
+- **GIVEN** `artifactId` is `"specs"` and artifact `specs` requires `proposal`
+- **AND** `proposal` is not `complete` or `skipped`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `specs` is reported as dependency-blocked and `markComplete` is not called
+
+#### Scenario: Specified artifact with satisfied dependencies proceeds normally
+
+- **GIVEN** `artifactId` is `"specs"` and artifact `specs` requires `proposal`
+- **AND** `proposal` is `complete`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `specs` is validated normally and `markComplete` is called if all validations pass
 
 ### Requirement: Dependency order check
 

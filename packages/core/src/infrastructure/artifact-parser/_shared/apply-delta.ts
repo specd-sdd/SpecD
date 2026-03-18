@@ -142,7 +142,7 @@ function getNodeAtPath(root: ArtifactNode, path: readonly number[]): ArtifactNod
 }
 
 /**
- * Returns a deep clone of an AST node, copying all enumerable non-underscore-prefixed fields
+ * Returns a deep clone of an AST node, copying all enumerable fields
  * and recursively cloning any `children` arrays.
  *
  * @param node - The node to clone
@@ -151,7 +151,6 @@ function getNodeAtPath(root: ArtifactNode, path: readonly number[]): ArtifactNod
 function deepCloneNode(node: ArtifactNode): ArtifactNode {
   const clone: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(node)) {
-    if (k.startsWith('_')) continue
     if (k === 'children' && Array.isArray(v)) {
       clone[k] = (v as ArtifactNode[]).map(deepCloneNode)
     } else {
@@ -199,7 +198,7 @@ function isArrayLike(node: ArtifactNode): boolean {
 
 /**
  * Returns a shallow clone of `node` with `children` replaced by `newChildren`,
- * removing any existing `value` field.
+ * removing any existing `value` field while preserving adapter metadata.
  *
  * @param node - The node whose children should be replaced
  * @param newChildren - The new children array

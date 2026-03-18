@@ -66,5 +66,5 @@ export function createEditChange(
     discardedPath: opts.discardedPath,
   })
   const actor = new GitActorResolver()
-  return new EditChange(changeRepo, actor)
+  return new EditChange(changeRepo, new Map(), actor)
 }
