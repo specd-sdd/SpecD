@@ -419,14 +419,22 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const conn = this.conn!
 
-    await this.removeSpec(spec.specId)
+    await conn.query('BEGIN TRANSACTION')
+    try {
+      await this.removeSpec(spec.specId)
 
-    await conn.query(
-      `CREATE (s:Spec {specId: '${this.escape(spec.specId)}', path: '${this.escape(spec.path)}', title: '${this.escape(spec.title)}', description: '${this.escape(spec.description)}', contentHash: '${this.escape(spec.contentHash)}', content: '${this.escape(spec.content)}', workspace: '${this.escape(spec.workspace)}'})`,
-    )
+      await conn.query(
+        `CREATE (s:Spec {specId: '${this.escape(spec.specId)}', path: '${this.escape(spec.path)}', title: '${this.escape(spec.title)}', description: '${this.escape(spec.description)}', contentHash: '${this.escape(spec.contentHash)}', content: '${this.escape(spec.content)}', workspace: '${this.escape(spec.workspace)}'})`,
+      )
 
-    for (const rel of relations) {
-      await this.createRelation(conn, rel)
+      for (const rel of relations) {
+        await this.createRelation(conn, rel)
+      }
+
+      await conn.query('COMMIT')
+    } catch (err) {
+      await conn.query('ROLLBACK').catch(() => {})
+      throw err
     }
   }
 
