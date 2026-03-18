@@ -1,4 +1,4 @@
-import { Command } from 'commander'
+import { Command, Option } from 'commander'
 import { createCodeGraphProvider } from '@specd/code-graph'
 import { cliError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
@@ -83,7 +83,11 @@ export function registerGraphImpact(parent: Command): void {
     .option('--file <path>', 'analyze impact of a single file')
     .option('--symbol <name>', 'analyze impact of a symbol by name')
     .option('--changes <files...>', 'detect impact of changes to multiple files')
-    .option('--direction <dir>', 'traversal direction: upstream|downstream|both', 'upstream')
+    .addOption(
+      new Option('--direction <dir>', 'traversal direction')
+        .choices(['upstream', 'downstream', 'both'])
+        .default('upstream'),
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .addHelpText(
       'after',
