@@ -14,63 +14,71 @@ export function registerChangeValidate(parent: Command): void {
     .command('validate <name> <specPath>')
     .allowExcessArguments(false)
     .description('Validate artifact files against the active schema')
+    .option('--artifact <artifactId>', 'validate only this artifact')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
-    .action(async (name: string, specPath: string, opts: { format: string; config?: string }) => {
-      try {
-        const { config, kernel } = await resolveCliContext({
-          configPath: opts.config,
-        })
-        const parsed = parseSpecId(specPath, config)
-        const fullSpecPath = `${parsed.workspace}:${parsed.capabilityPath}`
+    .action(
+      async (
+        name: string,
+        specPath: string,
+        opts: { format: string; config?: string; artifact?: string },
+      ) => {
+        try {
+          const { config, kernel } = await resolveCliContext({
+            configPath: opts.config,
+          })
+          const parsed = parseSpecId(specPath, config)
+          const fullSpecPath = `${parsed.workspace}:${parsed.capabilityPath}`
 
-        const result = await kernel.changes.validate.execute({
-          name,
-          specPath: fullSpecPath,
-        })
+          const result = await kernel.changes.validate.execute({
+            name,
+            specPath: fullSpecPath,
+            ...(opts.artifact !== undefined ? { artifactId: opts.artifact } : {}),
+          })
 
-        const fmt = parseFormat(opts.format)
-        const passed = result.failures.length === 0
+          const fmt = parseFormat(opts.format)
+          const passed = result.failures.length === 0
 
-        if (fmt === 'text') {
-          if (passed) {
-            if (result.warnings.length > 0) {
-              const warningLines = result.warnings.map(
-                (w) => `warning: ${w.artifactId} — ${w.description}`,
-              )
-              output(
-                `validated ${name}/${fullSpecPath}: pass (${result.warnings.length} warning(s))\n${warningLines.join('\n')}`,
-                'text',
-              )
+          if (fmt === 'text') {
+            if (passed) {
+              if (result.warnings.length > 0) {
+                const warningLines = result.warnings.map(
+                  (w) => `warning: ${w.artifactId} — ${w.description}`,
+                )
+                output(
+                  `validated ${name}/${fullSpecPath}: pass (${result.warnings.length} warning(s))\n${warningLines.join('\n')}`,
+                  'text',
+                )
+              } else {
+                output(`validated ${name}/${fullSpecPath}: all artifacts pass`, 'text')
+              }
             } else {
-              output(`validated ${name}/${fullSpecPath}: all artifacts pass`, 'text')
+              const errorLines = result.failures.map(
+                (f) => `  error: ${f.artifactId} — ${f.description}`,
+              )
+              const warningLines = result.warnings.map(
+                (w) => `  warning: ${w.artifactId} — ${w.description}`,
+              )
+              const allLines = [...errorLines, ...warningLines]
+              output(`validation failed ${name}/${fullSpecPath}:\n${allLines.join('\n')}`, 'text')
+              process.exitCode = 1
             }
           } else {
-            const errorLines = result.failures.map(
-              (f) => `  error: ${f.artifactId} — ${f.description}`,
+            output(
+              {
+                passed,
+                failures: result.failures,
+                warnings: result.warnings,
+              },
+              fmt,
             )
-            const warningLines = result.warnings.map(
-              (w) => `  warning: ${w.artifactId} — ${w.description}`,
-            )
-            const allLines = [...errorLines, ...warningLines]
-            output(`validation failed ${name}/${fullSpecPath}:\n${allLines.join('\n')}`, 'text')
-            process.exitCode = 1
+            if (!passed) {
+              process.exitCode = 1
+            }
           }
-        } else {
-          output(
-            {
-              passed,
-              failures: result.failures,
-              warnings: result.warnings,
-            },
-            fmt,
-          )
-          if (!passed) {
-            process.exitCode = 1
-          }
+        } catch (err) {
+          handleError(err, opts.format)
         }
-      } catch (err) {
-        handleError(err, opts.format)
-      }
-    })
+      },
+    )
 }

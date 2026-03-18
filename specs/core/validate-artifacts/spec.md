@@ -34,8 +34,17 @@ class ValidateArtifacts {
 
 - `name` — the change name to validate
 - `specPath` — the spec ID to validate (one spec per execution); must be one of the IDs in `change.specIds`
+- `artifactId` — optional; when provided, only the artifact with this ID is validated. All other artifacts are skipped. The required-artifacts check is also skipped.
 
 Validating all specs in a change requires calling `execute` once per spec ID. Use cases that need to validate all specs call `execute` in a loop.
+
+When `artifactId` is provided:
+
+1. If the artifact ID does not exist in the schema, `execute` SHALL return a failure result with a descriptive error — it SHALL NOT throw.
+2. The required-artifacts check (Requirement: Required artifacts check) is skipped entirely.
+3. Only the specified artifact is evaluated through the dependency order check, delta validation, structural validation, and hash computation steps.
+4. All other artifacts are ignored — they are not checked, not reported as missing, and not included in the result.
+5. The dependency order check still applies to the specified artifact: if its `requires` are not satisfied, it is reported as dependency-blocked.
 
 ### Requirement: Schema name guard
 
@@ -43,7 +52,9 @@ After resolving the schema from config, `ValidateArtifacts` must compare `schema
 
 ### Requirement: Required artifacts check
 
-Before validating structure, `ValidateArtifacts` must verify that all non-optional artifact IDs are present in the change (aggregated status not `missing`). Optional artifacts with aggregated status `skipped` are considered resolved and do not cause a failure. If any non-optional artifact is absent, `ValidateArtifacts` must return a failure result listing the missing artifact IDs. It must not throw — missing required artifacts are a validation failure, not an error.
+Before validating structure, `ValidateArtifacts` must verify that all non-optional artifact IDs are present in the change (status not `missing`). Optional artifacts with status `skipped` (`validatedHash === "__skipped__"`) are considered resolved and do not cause a failure. If any non-optional artifact is absent, `ValidateArtifacts` must return a failure result listing the missing artifact IDs. It must not throw — missing required artifacts are a validation failure, not an error.
+
+This check is skipped when `artifactId` is provided — single-artifact validation does not enforce completeness of the full artifact set.
 
 ### Requirement: Dependency order check
 

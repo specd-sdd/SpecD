@@ -9,16 +9,17 @@ Before a change can advance, its artifacts must be verified against the schema t
 ### Requirement: Command signature
 
 ```
-specd change validate <name> <workspace:capability-path> [--format text|json|toon]
+specd change validate <name> <workspace:capability-path> [--artifact <artifactId>] [--format text|json|toon]
 ```
 
 - `<name>` — required positional; the name of the change to validate
 - `<workspace:capability-path>` — required positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`.
+- `--artifact <artifactId>` — optional; when provided, only the specified artifact is validated instead of all artifacts for the spec. The artifact ID must exist in the active schema.
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 ### Requirement: Behaviour
 
-The command invokes the `ValidateArtifacts` use case, passing the change name and spec ID.
+The command invokes the `ValidateArtifacts` use case, passing the change name, spec ID, and optionally the artifact ID from `--artifact`.
 
 ### Requirement: Output on success
 
@@ -71,6 +72,10 @@ If the given `<workspace:capability-path>` is not declared in the change's `spec
 - If the change does not exist, exits with code 1.
 - If the schema cannot be resolved, exits with code 3.
 
+### Requirement: Unknown artifact ID
+
+If `--artifact` is provided with an artifact ID that does not exist in the active schema, the command exits with code 1 and prints the validation failure from the use case to stdout (not stderr — it is a validation result, not a CLI error).
+
 ## Constraints
 
 - Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr
@@ -81,6 +86,8 @@ If the given `<workspace:capability-path>` is not declared in the change's `spec
 ```
 specd change validate add-oauth-login default:auth/oauth
 specd change validate update-billing default:billing/invoices
+specd change validate add-oauth-login default:auth/oauth --artifact proposal
+specd change validate update-billing default:billing/invoices --artifact specs
 ```
 
 ## Spec Dependencies
