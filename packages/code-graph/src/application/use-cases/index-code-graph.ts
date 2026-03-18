@@ -241,12 +241,13 @@ export class IndexCodeGraph {
 
     // ── Cleanup (6%) ──
     const toRemove = [...deletedFiles, ...changedFiles]
+    const deletedSet = new Set(deletedFiles)
     progress(6, 'Cleaning up', `${String(toRemove.length)} to remove`)
     let filesRemoved = 0
     for (const filePath of toRemove) {
       try {
         await this.store.removeFile(filePath)
-        if (deletedFiles.includes(filePath)) filesRemoved++
+        if (deletedSet.has(filePath)) filesRemoved++
       } catch (err) {
         errors.push({ filePath, message: String(err) })
       }
