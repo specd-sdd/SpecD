@@ -24,11 +24,11 @@ rules:
 
         - **`specId`** (`string`) — the spec identifier in `workspace:package/topic` format (e.g. `core:core/change`, `_global:_global/architecture`). This is the node's identity.
         - **`path`** (`string`) — workspace-relative path to the spec directory (e.g. `specs/core/change`).
-        - **`title`** (`string`) — from `.specd-metadata.yaml` `title` field. Falls back to the first `# Heading` in `spec.md` if metadata is absent.
+        - **`title`** (`string`) — from `.specd-metadata.yaml` `title` field. Defaults to the `specId` if metadata is absent.
         - **`description`** (`string`) — from `.specd-metadata.yaml` `description` field. Empty string if absent.
         - **`contentHash`** (`string`) — hash of concatenated spec artifacts, excluding `.specd-metadata.yaml`. `spec.md` first if present, then remaining artifacts in alphabetical order. Used for incremental diffing.
         - **`content`** (`string`) — concatenated artifact text for full-text search. Same ordering as `contentHash`: `spec.md` first if present, then remaining artifacts alphabetically. Excludes `.specd-metadata.yaml`.
-        - **`dependsOn`** (`string[]`) — ordered list of spec IDs this spec depends on, extracted from `.specd-metadata.yaml` or the `## Spec Dependencies` section in `spec.md`.
+        - **`dependsOn`** (`string[]`) — ordered list of spec IDs this spec depends on, extracted from `.specd-metadata.yaml`. Defaults to `[]` if metadata is absent.
         - **`workspace`** (`string`) — the workspace name this spec belongs to (e.g. `core`, `_global`).
 
         Two `SpecNode` values are equal if their `specId` fields match.
@@ -280,6 +280,6 @@ scenarios:
     then:
       - DuplicateSymbolIdError is thrown with both symbols' details
 contentHashes:
-  spec.md: sha256:c31362fed8a650f9990c68e55dc64a98aeb3995f8f6ce1c5abbc3dacff54e2e0
+  spec.md: sha256:3757c73831e009dce61fc2a74be9cae10d411324edbb8bb0806b18320a019091
   verify.md: sha256:478e00f2daf6e6528d609fb71ba094aee98b8473b7b41f8f0159f52096f80070
 generatedBy: core
