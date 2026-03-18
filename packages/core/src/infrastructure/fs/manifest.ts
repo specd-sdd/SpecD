@@ -16,16 +16,12 @@ export interface ManifestActorIdentity {
   readonly email: string
 }
 
-/** A single artifact descriptor as stored in the manifest `artifacts` array. */
-export interface ManifestArtifact {
-  /** The artifact type identifier (e.g. `"proposal"`, `"specs"`). */
-  readonly type: string
-  /** The artifact filename (e.g. `"proposal.md"`). */
+/** A single file within a manifest artifact. */
+export interface ManifestArtifactFile {
+  /** File key (artifact type id for scope:change, specId for scope:spec). */
+  readonly key: string
+  /** Relative filename within the change directory. */
   readonly filename: string
-  /** Whether the artifact is optional in the schema. */
-  readonly optional: boolean
-  /** Artifact type IDs that must be complete before this one can be validated. */
-  readonly requires: string[]
   /**
    * The hash recorded at last validation.
    *
@@ -34,6 +30,18 @@ export interface ManifestArtifact {
    * - `"sha256:..."` — validated
    */
   readonly validatedHash: string | null
+}
+
+/** A single artifact descriptor as stored in the manifest `artifacts` array. */
+export interface ManifestArtifact {
+  /** The artifact type identifier (e.g. `"proposal"`, `"specs"`). */
+  readonly type: string
+  /** Whether the artifact is optional in the schema. */
+  readonly optional: boolean
+  /** Artifact type IDs that must be complete before this one can be validated. */
+  readonly requires: string[]
+  /** Per-file tracking entries. */
+  readonly files: ManifestArtifactFile[]
 }
 
 /** Raw JSON shape of a `created` event. */
@@ -142,6 +150,24 @@ export interface RawDiscardedEvent {
   readonly supersededBy?: string[]
 }
 
+/** Raw JSON shape of an `artifacts-synced` event. */
+export interface RawArtifactsSyncedEvent {
+  /** Event discriminant. */
+  readonly type: 'artifacts-synced'
+  /** ISO 8601 timestamp. */
+  readonly at: string
+  /** System actor that performed the sync. */
+  readonly by: ManifestActorIdentity
+  /** Artifact type IDs added by the sync. */
+  readonly typesAdded: string[]
+  /** Artifact type IDs removed by the sync. */
+  readonly typesRemoved: string[]
+  /** Files added within existing or new artifacts. */
+  readonly filesAdded: Array<{ type: string; key: string }>
+  /** Files removed from existing artifacts. */
+  readonly filesRemoved: Array<{ type: string; key: string }>
+}
+
 /** Raw JSON shape of an `artifact-skipped` event. */
 export interface RawArtifactSkippedEvent {
   /** Event discriminant. */
@@ -167,6 +193,7 @@ export type RawChangeEvent =
   | RawRestoredEvent
   | RawDiscardedEvent
   | RawArtifactSkippedEvent
+  | RawArtifactsSyncedEvent
 
 // ---- Zod validation schemas ----
 
@@ -175,12 +202,17 @@ export const actorIdentitySchema = z.object({
   email: z.string(),
 })
 
+export const manifestArtifactFileSchema = z.object({
+  key: z.string(),
+  filename: z.string(),
+  validatedHash: z.string().nullable(),
+})
+
 export const manifestArtifactSchema = z.object({
   type: z.string(),
-  filename: z.string(),
   optional: z.boolean(),
   requires: z.array(z.string()),
-  validatedHash: z.string().nullable(),
+  files: z.array(manifestArtifactFileSchema),
 })
 
 export const rawChangeEventSchema = z

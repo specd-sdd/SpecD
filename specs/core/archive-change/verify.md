@@ -72,6 +72,19 @@
 - **WHEN** `ArchiveChange.execute` reaches the merge step
 - **THEN** `DeltaConflictError` is thrown
 
+#### Scenario: Markdown delta merge preserves untouched inline formatting
+
+- **GIVEN** a base markdown spec with untouched prose containing inline code like `` `specd change validate <name>` ``
+- **AND** the delta modifies a different section in the same file
+- **WHEN** `ArchiveChange.execute` merges and serializes the markdown artifact
+- **THEN** untouched prose still contains inline-code backticks and unescaped `<name>` text
+
+#### Scenario: Mixed markdown style serializes deterministically
+
+- **GIVEN** a base markdown spec that mixes unordered list markers (`-` and `*`) or emphasis markers (`*` and `_`) for the same construct
+- **WHEN** `ArchiveChange.execute` merges and serializes the markdown artifact
+- **THEN** output style is deterministic and follows project markdown conventions
+
 ### Requirement: ArchivedChange construction
 
 #### Scenario: archivedName derived from createdAt

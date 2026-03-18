@@ -13,15 +13,15 @@ rules:
       - |-
         The port MUST be declared as a TypeScript `interface` named `ArtifactParser`. It SHALL define the following members:
 
-        * `fileExtensions: readonly string[]` — the file extensions this adapter handles
-        * `parse(content: string): ArtifactAST` — parse content into a normalised AST
-        * `apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): ArtifactAST` — apply delta entries to an AST
-        * `serialize(ast: ArtifactAST): string` — serialise an AST back to native format
-        * `renderSubtree(node: ArtifactNode): string` — serialise a single node and its descendants
-        * `nodeTypes(): readonly NodeTypeDescriptor[]` — describe addressable node types for the format
-        * `outline(ast: ArtifactAST): readonly OutlineEntry[]` — produce a navigable summary of addressable nodes
-        * `deltaInstructions(): string` — return format-specific static text for delta generation context
-        * `parseDelta(content: string): readonly DeltaEntry[]` — parse a YAML delta file into typed entries
+        - `fileExtensions: readonly string[]` — the file extensions this adapter handles
+        - `parse(content: string): ArtifactAST` — parse content into a normalised AST
+        - `apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): ArtifactAST` — apply delta entries to an AST
+        - `serialize(ast: ArtifactAST): string` — serialise an AST back to native format
+        - `renderSubtree(node: ArtifactNode): string` — serialise a single node and its descendants
+        - `nodeTypes(): readonly NodeTypeDescriptor[]` — describe addressable node types for the format
+        - `outline(ast: ArtifactAST): readonly OutlineEntry[]` — produce a navigable summary of addressable nodes
+        - `deltaInstructions(): string` — return format-specific static text for delta generation context
+        - `parseDelta(content: string): readonly DeltaEntry[]` — parse a YAML delta file into typed entries
   - requirement: ArtifactParserRegistry type
     rules:
       - The `ArtifactParserRegistry` type MUST be declared as `ReadonlyMap<string, ArtifactParser>`, keyed by format name. Standard format names are `'markdown'`, `'json'`, `'yaml'`, and `'plaintext'`.
@@ -33,7 +33,14 @@ rules:
       - The `apply` method MUST resolve all selectors before applying any operation. If any selector fails to resolve (no match or ambiguous match), the entire application MUST be rejected with a `DeltaApplicationError`. Partial application SHALL NOT occur.
   - requirement: Serialize round-trip
     rules:
-      - Calling `serialize(parse(content))` MUST produce output that, when parsed again, yields an equivalent AST. Implementations SHOULD preserve formatting where practical, but semantic equivalence is the binding constraint.
+      - |-
+        Calling `serialize(parse(content))` MUST produce output that, when parsed again, yields an equivalent AST. Implementations SHOULD preserve formatting where practical, but semantic equivalence is the binding constraint.
+
+        For the markdown adapter, serialize/apply behavior MUST preserve inline formatting intent represented in the AST (for example inline code, emphasis, and strong markers) for nodes not targeted by delta operations.
+
+        The markdown adapter MUST support serializer style options derived from source content (at minimum unordered list marker, emphasis marker, and strong marker) so merged output can preserve original style where unambiguous.
+
+        If source style is ambiguous (mixed markers for the same construct), the markdown adapter MUST serialize deterministically using project markdown conventions so output is stable across runs.
   - requirement: RenderSubtree contract
     rules:
       - The `renderSubtree` method MUST accept a single `ArtifactNode` and return the native format string for that node and all its descendants. This is used by `ValidateArtifacts` for `contentMatches` evaluation and by the metadata extraction engine.
@@ -57,31 +64,31 @@ rules:
       - |-
         The `ArtifactNode` interface MUST contain:
 
-        * `type: string` — the node type identifier
-        * `label?: string` — optional label
-        * `value?: string | number | boolean | null` — optional scalar value
-        * `children?: readonly ArtifactNode[]` — optional child nodes
-        * `level?: number` — present on markdown section nodes
-        * `ordered?: boolean` — present on markdown list nodes
-        * Arbitrary extra fields via an index signature for adapter-specific metadata
+        - `type: string` — the node type identifier
+        - `label?: string` — optional label
+        - `value?: string | number | boolean | null` — optional scalar value
+        - `children?: readonly ArtifactNode[]` — optional child nodes
+        - `level?: number` — present on markdown section nodes
+        - `ordered?: boolean` — present on markdown list nodes
+        - Arbitrary extra fields via an index signature for adapter-specific metadata
   - requirement: DeltaEntry shape
     rules:
       - |-
         Each `DeltaEntry` MUST contain:
 
-        * `op: 'added' | 'modified' | 'removed'` — the operation type
-        * `selector?: Selector` — optional node selector
-        * `position?: DeltaPosition` — optional positioning directive
-        * `rename?: string` — optional new name for rename operations
-        * `content?: string` — optional content payload
-        * `value?: unknown` — optional value payload
-        * `strategy?: 'replace' | 'append' | 'merge-by'` — optional merge strategy
-        * `mergeKey?: string` — optional key for `merge-by` strategy
+        - `op: 'added' | 'modified' | 'removed'` — the operation type
+        - `selector?: Selector` — optional node selector
+        - `position?: DeltaPosition` — optional positioning directive
+        - `rename?: string` — optional new name for rename operations
+        - `content?: string` — optional content payload
+        - `value?: unknown` — optional value payload
+        - `strategy?: 'replace' | 'append' | 'merge-by'` — optional merge strategy
+        - `mergeKey?: string` — optional key for `merge-by` strategy
   - requirement: Supporting type shapes
     rules:
       - |-
-        * `NodeTypeDescriptor` MUST contain `type: string`, `identifiedBy: readonly string[]`, and `description: string`.
-        * `OutlineEntry` MUST contain `type: string`, `label: string`, `depth: number`, and optional `children: readonly OutlineEntry[]`.
+        - `NodeTypeDescriptor` MUST contain `type: string`, `identifiedBy: readonly string[]`, and `description: string`.
+        - `OutlineEntry` MUST contain `type: string`, `label: string`, `depth: number`, and optional `children: readonly OutlineEntry[]`.
 constraints:
   - The port lives in application/ports/ per the hexagonal architecture rule
   - No direct dependency on any parsing library (remark, yaml, etc.) at the port level
@@ -142,6 +149,56 @@ scenarios:
       - parse is called followed by serialize
     then:
       - parsing the serialized output produces an AST equivalent to the original
+  - requirement: Serialize round-trip
+    name: Markdown serialize preserves untouched inline formatting
+    given:
+      - a markdown AST containing inline code, emphasis, and strong in one paragraph
+      - AND delta application modifies a different node in the same document
+    when:
+      - the markdown adapter serializes the resulting AST
+    then:
+      - the untouched paragraph preserves inline formatting intent (inline code/emphasis/strong)
+  - requirement: Serialize round-trip
+    name: Markdown serializer uses source style when unambiguous
+    given:
+      - a markdown source that consistently uses - bullets and _ emphasis
+    when:
+      - the markdown adapter parses, applies delta, and serializes
+    then:
+      - output keeps - as bullet marker and _ as emphasis marker where representable
+  - requirement: Serialize round-trip
+    name: Markdown serializer resolves mixed style deterministically
+    given:
+      - a markdown source that mixes both supported markers for bullets or emphasis
+    when:
+      - the markdown adapter serializes the AST
+    then:
+      - output uses deterministic project markdown conventions for the ambiguous construct
+  - requirement: Serialize round-trip
+    name: Markdown serialize preserves untouched inline formatting
+    given:
+      - a markdown AST containing inline code, emphasis, and strong in one paragraph
+      - AND delta application modifies a different node in the same document
+    when:
+      - the markdown adapter serializes the resulting AST
+    then:
+      - the untouched paragraph preserves inline formatting intent (inline code/emphasis/strong)
+  - requirement: Serialize round-trip
+    name: Markdown serializer uses source style when unambiguous
+    given:
+      - a markdown source that consistently uses - bullets and _ emphasis
+    when:
+      - the markdown adapter parses, applies delta, and serializes
+    then:
+      - output keeps - as bullet marker and _ as emphasis marker where representable
+  - requirement: Serialize round-trip
+    name: Markdown serializer resolves mixed style deterministically
+    given:
+      - a markdown source that mixes both supported markers for bullets or emphasis
+    when:
+      - the markdown adapter serializes the AST
+    then:
+      - output uses deterministic project markdown conventions for the ambiguous construct
   - requirement: RenderSubtree contract
     name: Single node renders to native format
     given:
@@ -183,6 +240,6 @@ scenarios:
     then:
       - it has ordered set to true
 contentHashes:
-  spec.md: sha256:0aa5a207a59cbe4242d2b3fec8e8fdb45ebfee668b711071a0265bb569b05dfa
-  verify.md: sha256:34b0b1eb61ec808a622483e5baac27f2631543e0039174475181c8990ddef5b5
+  spec.md: sha256:edf0034e60944b0159760130905f3bd306b078f13e9d87ddf9ae6d2b2dddf973
+  verify.md: sha256:df4b8027a18943d23ebc6d4747cfa4a68ad8a423099d3864be4f792dde90df80
 generatedBy: core

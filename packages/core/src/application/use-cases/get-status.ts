@@ -9,12 +9,24 @@ export interface GetStatusInput {
   readonly name: string
 }
 
+/** Per-file status detail within an artifact. */
+export interface ArtifactFileStatus {
+  /** File key (artifact type id for scope:change, specId for scope:spec). */
+  readonly key: string
+  /** Filename (basename). */
+  readonly filename: string
+  /** Status of this individual file. */
+  readonly status: ArtifactStatus
+}
+
 /** Effective status of a single artifact, after dependency cascade. */
 export interface ArtifactStatusEntry {
   /** Artifact type identifier (e.g. `'proposal'`, `'spec'`). */
   readonly type: string
   /** Effective status after cascading through required dependencies. */
   readonly effectiveStatus: ArtifactStatus
+  /** Per-file status details. */
+  readonly files: ArtifactFileStatus[]
 }
 
 /** Result returned by the {@link GetStatus} use case. */
@@ -58,8 +70,12 @@ export class GetStatus {
     }
 
     const artifactStatuses: ArtifactStatusEntry[] = []
-    for (const [type] of change.artifacts) {
-      artifactStatuses.push({ type, effectiveStatus: change.effectiveStatus(type) })
+    for (const [type, artifact] of change.artifacts) {
+      const files: ArtifactFileStatus[] = []
+      for (const [key, file] of artifact.files) {
+        files.push({ key, filename: file.filename, status: file.status })
+      }
+      artifactStatuses.push({ type, effectiveStatus: change.effectiveStatus(type), files })
     }
 
     return { change, artifactStatuses }

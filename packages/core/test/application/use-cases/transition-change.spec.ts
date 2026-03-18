@@ -6,6 +6,7 @@ import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-
 import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import {
   makeChangeRepository,
@@ -210,10 +211,16 @@ describe('TransitionChange', () => {
 
     it('clears validatedHash for artifacts listed in implementingRequires', async () => {
       const change = makeVerifyingChange('my-change')
-      const spec = new ChangeArtifact({ type: 'spec', filename: 'spec.md' })
-      spec.markComplete('sha256:abc')
-      const tasks = new ChangeArtifact({ type: 'tasks', filename: 'tasks.md' })
-      tasks.markComplete('sha256:def')
+      const specFile = new ArtifactFile({ key: 'spec', filename: 'spec.md', status: 'in-progress' })
+      const spec = new ChangeArtifact({ type: 'spec', files: new Map([['spec', specFile]]) })
+      spec.markComplete('spec', 'sha256:abc')
+      const tasksFile = new ArtifactFile({
+        key: 'tasks',
+        filename: 'tasks.md',
+        status: 'in-progress',
+      })
+      const tasks = new ChangeArtifact({ type: 'tasks', files: new Map([['tasks', tasksFile]]) })
+      tasks.markComplete('tasks', 'sha256:def')
       change.setArtifact(spec)
       change.setArtifact(tasks)
 
@@ -227,16 +234,17 @@ describe('TransitionChange', () => {
         implementingRequires: ['spec'],
       })
 
-      expect(spec.validatedHash).toBeUndefined()
+      expect(spec.getFile('spec')?.validatedHash).toBeUndefined()
       expect(spec.status).toBe('in-progress')
-      expect(tasks.validatedHash).toBe('sha256:def')
+      expect(tasks.getFile('tasks')?.validatedHash).toBe('sha256:def')
       expect(tasks.status).toBe('complete')
     })
 
     it('does not clear hashes when implementingRequires is absent', async () => {
       const change = makeVerifyingChange('my-change')
-      const spec = new ChangeArtifact({ type: 'spec', filename: 'spec.md' })
-      spec.markComplete('sha256:abc')
+      const specFile = new ArtifactFile({ key: 'spec', filename: 'spec.md', status: 'in-progress' })
+      const spec = new ChangeArtifact({ type: 'spec', files: new Map([['spec', specFile]]) })
+      spec.markComplete('spec', 'sha256:abc')
       change.setArtifact(spec)
 
       const uc = makeUseCase(makeChangeRepository([change]))
@@ -248,7 +256,7 @@ describe('TransitionChange', () => {
         approvalsSignoff: false,
       })
 
-      expect(spec.validatedHash).toBe('sha256:abc')
+      expect(spec.getFile('spec')?.validatedHash).toBe('sha256:abc')
     })
   })
 
@@ -371,8 +379,13 @@ describe('TransitionChange', () => {
 
     it('allows transition when all required artifacts are complete', async () => {
       const change = makeReadyChange('my-change')
-      const tasks = new ChangeArtifact({ type: 'tasks', filename: 'tasks.md' })
-      tasks.markComplete('sha256:abc')
+      const tasksFile = new ArtifactFile({
+        key: 'tasks',
+        filename: 'tasks.md',
+        status: 'in-progress',
+      })
+      const tasks = new ChangeArtifact({ type: 'tasks', files: new Map([['tasks', tasksFile]]) })
+      tasks.markComplete('tasks', 'sha256:abc')
       change.setArtifact(tasks)
 
       const schema = makeSchema({
@@ -392,7 +405,16 @@ describe('TransitionChange', () => {
 
     it('allows transition when required artifact is skipped', async () => {
       const change = makeReadyChange('my-change')
-      const tasks = new ChangeArtifact({ type: 'tasks', filename: 'tasks.md', optional: true })
+      const tasksFile = new ArtifactFile({
+        key: 'tasks',
+        filename: 'tasks.md',
+        status: 'in-progress',
+      })
+      const tasks = new ChangeArtifact({
+        type: 'tasks',
+        optional: true,
+        files: new Map([['tasks', tasksFile]]),
+      })
       tasks.markSkipped()
       change.setArtifact(tasks)
 
@@ -429,8 +451,13 @@ describe('TransitionChange', () => {
 
     it('emits requires-check progress events', async () => {
       const change = makeReadyChange('my-change')
-      const tasks = new ChangeArtifact({ type: 'tasks', filename: 'tasks.md' })
-      tasks.markComplete('sha256:abc')
+      const tasksFile = new ArtifactFile({
+        key: 'tasks',
+        filename: 'tasks.md',
+        status: 'in-progress',
+      })
+      const tasks = new ChangeArtifact({ type: 'tasks', files: new Map([['tasks', tasksFile]]) })
+      tasks.markComplete('tasks', 'sha256:abc')
       change.setArtifact(tasks)
 
       const schema = makeSchema({
@@ -458,8 +485,13 @@ describe('TransitionChange', () => {
 
     it('blocks transition on first unsatisfied artifact when multiple required', async () => {
       const change = makeReadyChange('my-change')
-      const tasks = new ChangeArtifact({ type: 'tasks', filename: 'tasks.md' })
-      tasks.markComplete('sha256:abc')
+      const tasksFile = new ArtifactFile({
+        key: 'tasks',
+        filename: 'tasks.md',
+        status: 'in-progress',
+      })
+      const tasks = new ChangeArtifact({ type: 'tasks', files: new Map([['tasks', tasksFile]]) })
+      tasks.markComplete('tasks', 'sha256:abc')
       change.setArtifact(tasks)
       // 'spec' artifact is NOT set → effectiveStatus('spec') is 'missing'
 
@@ -881,8 +913,13 @@ describe('TransitionChange', () => {
 
     it('emits all events in correct order', async () => {
       const change = makeReadyChange('my-change')
-      const tasks = new ChangeArtifact({ type: 'tasks', filename: 'tasks.md' })
-      tasks.markComplete('sha256:abc')
+      const tasksFile = new ArtifactFile({
+        key: 'tasks',
+        filename: 'tasks.md',
+        status: 'in-progress',
+      })
+      const tasks = new ChangeArtifact({ type: 'tasks', files: new Map([['tasks', tasksFile]]) })
+      tasks.markComplete('tasks', 'sha256:abc')
       change.setArtifact(tasks)
 
       const schema = makeSchema({

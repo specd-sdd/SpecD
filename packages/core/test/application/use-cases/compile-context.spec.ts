@@ -9,6 +9,7 @@ import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-
 import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { Schema } from '../../../src/domain/value-objects/schema.js'
 import {
   ArtifactType,
@@ -673,9 +674,17 @@ describe('CompileContext', () => {
       }
       const tasksArtifact = new ChangeArtifact({
         type: 'tasks',
-        filename: 'tasks.md',
-        status: 'complete',
-        validatedHash: 'abc123',
+        files: new Map([
+          [
+            'tasks',
+            new ArtifactFile({
+              key: 'tasks',
+              filename: 'tasks.md',
+              status: 'complete',
+              validatedHash: 'abc123',
+            }),
+          ],
+        ]),
       })
       const change = makeChange('my-change', { artifacts: [tasksArtifact] })
       const schema = makeSchema({ workflow: [workflowStep] })
@@ -1499,9 +1508,18 @@ describe('CompileContext', () => {
       }
       const designArtifact = new ChangeArtifact({
         type: 'design',
-        filename: 'design.md',
-        status: 'skipped',
-        validatedHash: '__skipped__',
+        optional: true,
+        files: new Map([
+          [
+            'design',
+            new ArtifactFile({
+              key: 'design',
+              filename: 'design.md',
+              status: 'skipped',
+              validatedHash: '__skipped__',
+            }),
+          ],
+        ]),
       })
       const change = makeChange('my-change', { artifacts: [designArtifact] })
       const schema = makeSchema({ workflow: [workflowStep] })

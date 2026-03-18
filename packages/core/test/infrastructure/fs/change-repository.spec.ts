@@ -4,12 +4,14 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Change } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { type ActorIdentity } from '../../../src/domain/entities/change.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../../src/domain/errors/artifact-conflict-error.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { FsChangeRepository } from '../../../src/infrastructure/fs/change-repository.js'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
+import { ArtifactType } from '../../../src/domain/value-objects/artifact-type.js'
 
 const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
 
@@ -238,13 +240,17 @@ describe('FsChangeRepository', () => {
   describe('artifact status derivation', () => {
     function makeChangeWithArtifact(name: string, validatedHash: string | null): Change {
       const change = makeChange(name)
+      const fileProps: { key: string; filename: string; validatedHash?: string } = {
+        key: 'proposal',
+        filename: 'proposal.md',
+      }
+      if (validatedHash !== null) fileProps.validatedHash = validatedHash
       change.setArtifact(
         new ChangeArtifact({
           type: 'proposal',
-          filename: 'proposal.md',
           optional: false,
           requires: [],
-          ...(validatedHash !== null ? { validatedHash } : {}),
+          files: new Map([['proposal', new ArtifactFile(fileProps)]]),
         }),
       )
       return change
@@ -296,10 +302,18 @@ describe('FsChangeRepository', () => {
       change.setArtifact(
         new ChangeArtifact({
           type: 'proposal',
-          filename: 'proposal.md',
           optional: true,
           requires: [],
-          validatedHash: '__skipped__',
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                validatedHash: '__skipped__',
+              }),
+            ],
+          ]),
         }),
       )
       await ctx.repo.save(change)
@@ -575,7 +589,11 @@ describe('FsChangeRepository', () => {
     it('given a change with artifact-skipped event, when saved and loaded, then artifact-skipped event is preserved', async () => {
       const change = makeChange('add-auth')
       change.setArtifact(
-        new ChangeArtifact({ type: 'design', filename: 'design.md', optional: true }),
+        new ChangeArtifact({
+          type: 'design',
+          optional: true,
+          files: new Map([['design', new ArtifactFile({ key: 'design', filename: 'design.md' })]]),
+        }),
       )
       change.recordArtifactSkipped('design', actor, 'not needed')
       await ctx.repo.save(change)
@@ -584,6 +602,134 @@ describe('FsChangeRepository', () => {
       const evt = loaded?.history.find((e) => e.type === 'artifact-skipped')
       expect(evt?.type === 'artifact-skipped' && evt.artifactId).toBe('design')
       expect(evt?.type === 'artifact-skipped' && evt.reason).toBe('not needed')
+    })
+  })
+
+  describe('preHashCleanup in status derivation', () => {
+    function makeArtifactTypeWithCleanup(): ArtifactType {
+      return new ArtifactType({
+        id: 'tasks',
+        scope: 'change',
+        output: 'tasks.md',
+        requires: [],
+        validations: [],
+        deltaValidations: [],
+        preHashCleanup: [{ pattern: '^\\s*-\\s+\\[x\\]', replacement: '- [ ]' }],
+      })
+    }
+
+    function makeArtifactTypeNoCleanup(): ArtifactType {
+      return new ArtifactType({
+        id: 'tasks',
+        scope: 'change',
+        output: 'tasks.md',
+        requires: [],
+        validations: [],
+        deltaValidations: [],
+        preHashCleanup: [],
+      })
+    }
+
+    function makeRepoWithArtifactTypes(
+      basePath: string,
+      artifactTypes: readonly ArtifactType[],
+    ): FsChangeRepository {
+      return new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        changesPath: path.join(basePath, 'changes'),
+        draftsPath: path.join(basePath, 'drafts'),
+        discardedPath: path.join(basePath, 'discarded'),
+        artifactTypes,
+      })
+    }
+
+    function makeChangeWithTasks(name: string, validatedHash: string): Change {
+      const at = new Date('2024-01-15T10:00:00.000Z')
+      return new Change({
+        name,
+        createdAt: at,
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+        ],
+        artifacts: new Map([
+          [
+            'tasks',
+            new ChangeArtifact({
+              type: 'tasks',
+              optional: false,
+              requires: [],
+              files: new Map([
+                [
+                  'tasks',
+                  new ArtifactFile({
+                    key: 'tasks',
+                    filename: 'tasks.md',
+                    validatedHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+      })
+    }
+
+    it('preHashCleanup-normalized edit preserves complete status', async () => {
+      const originalContent = '- [ ] task one\n'
+      // Hash is computed after cleanup — but original already has [ ], so hash = sha256(original)
+      const cleanedHash = sha256(originalContent)
+
+      const repo = makeRepoWithArtifactTypes(ctx.tmpDir, [makeArtifactTypeWithCleanup()])
+      const change = makeChangeWithTasks('c1', cleanedHash)
+      await repo.save(change)
+
+      // Edit file to mark checkbox — cleanup normalizes [x] → [ ]
+      const dir = path.join(ctx.changesPath, '20240115-100000-c1')
+      await fs.writeFile(path.join(dir, 'tasks.md'), '- [x] task one\n', 'utf8')
+
+      const loaded = await repo.get('c1')
+      expect(loaded?.getArtifact('tasks')?.status).toBe('complete')
+    })
+
+    it('non-normalized edit triggers in-progress', async () => {
+      const originalContent = '- [ ] task one\n'
+      const cleanedHash = sha256(originalContent)
+
+      const repo = makeRepoWithArtifactTypes(ctx.tmpDir, [makeArtifactTypeWithCleanup()])
+      const change = makeChangeWithTasks('c1', cleanedHash)
+      await repo.save(change)
+
+      // Edit file with actual content change — cleanup can't normalize this
+      const dir = path.join(ctx.changesPath, '20240115-100000-c1')
+      await fs.writeFile(path.join(dir, 'tasks.md'), '- [ ] task one\n- [ ] task two\n', 'utf8')
+
+      const loaded = await repo.get('c1')
+      expect(loaded?.getArtifact('tasks')?.status).toBe('in-progress')
+    })
+
+    it('no preHashCleanup rules hashes raw content', async () => {
+      const content = '- [x] task one\n'
+      const rawHash = sha256(content)
+
+      const repo = makeRepoWithArtifactTypes(ctx.tmpDir, [makeArtifactTypeNoCleanup()])
+      const change = makeChangeWithTasks('c1', rawHash)
+      await repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-c1')
+      await fs.writeFile(path.join(dir, 'tasks.md'), content, 'utf8')
+
+      const loaded = await repo.get('c1')
+      expect(loaded?.getArtifact('tasks')?.status).toBe('complete')
     })
   })
 })

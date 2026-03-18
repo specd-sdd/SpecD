@@ -1,8 +1,10 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { Change } from '../../domain/entities/change.js'
+import { Change, SYSTEM_ACTOR } from '../../domain/entities/change.js'
 import { type ChangeEvent } from '../../domain/entities/change.js'
-import { ChangeArtifact, SKIPPED_SENTINEL } from '../../domain/entities/change-artifact.js'
+import { ChangeArtifact } from '../../domain/entities/change-artifact.js'
+import { ArtifactFile, SKIPPED_SENTINEL } from '../../domain/value-objects/artifact-file.js'
+import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
@@ -14,6 +16,9 @@ import {
   ChangeRepository,
   type ChangeRepositoryConfig,
 } from '../../application/ports/change-repository.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
+import { safeRegex } from '../../domain/services/safe-regex.js'
 import { changeDirName } from './dir-name.js'
 import { sha256 } from './hash.js'
 import { isEnoent } from './is-enoent.js'
@@ -21,6 +26,7 @@ import { writeFileAtomic } from './write-atomic.js'
 import {
   type ChangeManifest,
   type ManifestArtifact,
+  type ManifestArtifactFile,
   type RawChangeEvent,
   changeManifestSchema,
 } from './manifest.js'
@@ -43,6 +49,18 @@ export interface FsChangeRepositoryConfig extends ChangeRepositoryConfig {
    * manifest records a different schema. Advisory only; the change remains usable.
    */
   readonly activeSchema?: { name: string; version: number }
+  /**
+   * Resolved artifact types from the active schema. Used to sync the
+   * artifact map on every `get()` and `save()`. When not provided
+   * (e.g. in tests), sync is skipped.
+   */
+  readonly artifactTypes?: readonly ArtifactType[]
+  /**
+   * Async resolver for artifact types. Called lazily on first `get()` or
+   * `save()` when `artifactTypes` is not provided. Allows the repo to
+   * resolve schema asynchronously without requiring it at construction time.
+   */
+  readonly resolveArtifactTypes?: () => Promise<readonly ArtifactType[]>
 }
 
 /**
@@ -61,6 +79,9 @@ export class FsChangeRepository extends ChangeRepository {
   private readonly _changesPath: string
   private readonly _draftsPath: string
   private readonly _discardedPath: string
+  private _artifactTypes: readonly ArtifactType[]
+  private readonly _resolveArtifactTypes: (() => Promise<readonly ArtifactType[]>) | undefined
+  private _artifactTypesResolved: boolean
 
   /**
    * Creates a new `FsChangeRepository` instance.
@@ -72,6 +93,24 @@ export class FsChangeRepository extends ChangeRepository {
     this._changesPath = config.changesPath
     this._draftsPath = config.draftsPath
     this._discardedPath = config.discardedPath
+    this._artifactTypes = config.artifactTypes ?? []
+    this._resolveArtifactTypes = config.resolveArtifactTypes
+    this._artifactTypesResolved =
+      config.artifactTypes !== undefined && config.artifactTypes.length > 0
+  }
+
+  /**
+   * Lazily resolves artifact types from the schema if not already provided
+   * at construction time.
+   *
+   * @returns The resolved artifact types
+   */
+  private async _ensureArtifactTypes(): Promise<readonly ArtifactType[]> {
+    if (!this._artifactTypesResolved && this._resolveArtifactTypes !== undefined) {
+      this._artifactTypes = await this._resolveArtifactTypes()
+      this._artifactTypesResolved = true
+    }
+    return this._artifactTypes
   }
 
   /**
@@ -188,6 +227,10 @@ export class FsChangeRepository extends ChangeRepository {
    * @param change - The change whose manifest should be persisted
    */
   override async save(change: Change): Promise<void> {
+    const artifactTypes = await this._ensureArtifactTypes()
+    if (artifactTypes.length > 0) {
+      change.syncArtifacts(artifactTypes)
+    }
     const manifest = changeToManifest(change)
     const dirName = changeDirName(change.name, change.createdAt)
 
@@ -338,6 +381,54 @@ export class FsChangeRepository extends ChangeRepository {
     }
   }
 
+  /**
+   * Ensures artifact directories exist for all spec-scoped artifact files.
+   *
+   * For each spec-scoped artifact type and each specId in the change:
+   * - New specs (not in repo): creates `specs/<ws>/<capPath>/`
+   * - Existing specs with delta artifacts: creates `deltas/<ws>/<capPath>/`
+   * Change-scoped artifacts live in the change root (already exists).
+   *
+   * @param change - The change whose artifact directories to scaffold
+   * @param specExists - Returns whether a spec already exists in the repository
+   */
+  override async scaffold(
+    change: Change,
+    specExists: (specId: string) => Promise<boolean>,
+  ): Promise<void> {
+    const dir = await this._resolveDir(change.name)
+    if (dir === null) return
+
+    const artifactTypes = await this._ensureArtifactTypes()
+
+    for (const artifactType of artifactTypes) {
+      if (artifactType.scope !== 'spec') continue
+
+      for (const specId of change.specIds) {
+        const { workspace, capPath } = parseSpecId(specId)
+        const exists = await specExists(specId)
+
+        if (artifactType.delta && exists) {
+          // Delta directory for existing specs
+          const deltaDir =
+            capPath.length > 0
+              ? path.join(dir, 'deltas', workspace, capPath)
+              : path.join(dir, 'deltas', workspace)
+          await fs.mkdir(deltaDir, { recursive: true })
+        }
+
+        // Spec artifact directory (for new specs or non-delta artifacts)
+        if (!artifactType.delta || !exists) {
+          const specDir =
+            capPath.length > 0
+              ? path.join(dir, 'specs', workspace, capPath)
+              : path.join(dir, 'specs', workspace)
+          await fs.mkdir(specDir, { recursive: true })
+        }
+      }
+    }
+  }
+
   // ---- Private helpers ----
 
   /**
@@ -438,18 +529,54 @@ export class FsChangeRepository extends ChangeRepository {
    */
   private async _manifestToChange(manifest: ChangeManifest, dir: string): Promise<Change> {
     const artifactMap = new Map<string, ChangeArtifact>()
+    const artifactTypes = await this._ensureArtifactTypes()
+    const artifactTypeMap = new Map(artifactTypes.map((t) => [t.id, t]))
 
     for (const raw of manifest.artifacts) {
-      const status = await this._deriveArtifactStatus(raw, dir)
-      const artifactProps = {
+      const artType = artifactTypeMap.get(raw.type)
+      const filesMap = new Map<string, ArtifactFile>()
+      for (const rawFile of raw.files) {
+        const cleanup = artType?.preHashCleanup ?? []
+        let status = await this._deriveFileStatus(rawFile, dir, raw.optional, cleanup)
+        let resolvedFilename = rawFile.filename
+
+        // For delta-capable spec-scoped artifacts, check the delta file if the primary is missing
+        if (status === 'missing' && artType?.delta && artType.scope === 'spec') {
+          const { workspace: ws, capPath: cp } = parseSpecId(rawFile.key)
+          const basename = path.basename(rawFile.filename)
+          const deltaPath =
+            cp.length > 0
+              ? `deltas/${ws}/${cp}/${basename}.delta.yaml`
+              : `deltas/${ws}/${basename}.delta.yaml`
+          const deltaStatus = await this._deriveFileStatus(
+            { key: rawFile.key, filename: deltaPath, validatedHash: rawFile.validatedHash },
+            dir,
+            raw.optional,
+            cleanup,
+          )
+          if (deltaStatus !== 'missing') {
+            status = deltaStatus
+            resolvedFilename = deltaPath
+          }
+        }
+
+        filesMap.set(
+          rawFile.key,
+          new ArtifactFile({
+            key: rawFile.key,
+            filename: resolvedFilename,
+            status,
+            ...(rawFile.validatedHash !== null ? { validatedHash: rawFile.validatedHash } : {}),
+          }),
+        )
+      }
+
+      const artifact = new ChangeArtifact({
         type: raw.type,
-        filename: raw.filename,
         optional: raw.optional,
         requires: raw.requires,
-        status,
-        ...(raw.validatedHash !== null ? { validatedHash: raw.validatedHash } : {}),
-      }
-      const artifact = new ChangeArtifact(artifactProps)
+        files: filesMap,
+      })
       artifactMap.set(artifact.type, artifact)
     }
 
@@ -463,7 +590,7 @@ export class FsChangeRepository extends ChangeRepository {
       }
     }
 
-    return new Change({
+    const change = new Change({
       name: manifest.name,
       createdAt: new Date(manifest.createdAt),
       ...(manifest.description !== undefined ? { description: manifest.description } : {}),
@@ -472,24 +599,128 @@ export class FsChangeRepository extends ChangeRepository {
       artifacts: artifactMap,
       ...(specDependsOn !== undefined ? { specDependsOn } : {}),
     })
+
+    // Sync artifacts against schema to reconcile with current artifact types and specIds
+    // (artifactTypes already resolved above for manifest loading)
+    if (artifactTypes.length > 0) {
+      const changed = change.syncArtifacts(artifactTypes)
+
+      // Re-derive status for files added by sync (they default to 'missing' but may exist on disk)
+      // For delta-capable artifacts, also check the delta file path
+      const artifactTypeMap = new Map(artifactTypes.map((t) => [t.id, t]))
+
+      for (const [typeId, artifact] of change.artifacts) {
+        const artType = artifactTypeMap.get(typeId)
+        const syncCleanup = artType?.preHashCleanup ?? []
+
+        for (const [, file] of artifact.files) {
+          if (file.status === 'missing' && file.validatedHash === undefined) {
+            // First check the primary file path (specs/<ws>/<capPath>/<basename>)
+            let derivedStatus = await this._deriveFileStatus(
+              { key: file.key, filename: file.filename, validatedHash: null },
+              dir,
+              artifact.optional,
+              syncCleanup,
+            )
+
+            // For delta-capable spec-scoped artifacts, also check the delta file path
+            if (derivedStatus === 'missing' && artType?.delta && artType.scope === 'spec') {
+              const { workspace: ws, capPath: cp } = parseSpecId(file.key)
+              const basename = path.basename(file.filename)
+              const deltaPath =
+                cp.length > 0
+                  ? `deltas/${ws}/${cp}/${basename}.delta.yaml`
+                  : `deltas/${ws}/${basename}.delta.yaml`
+              derivedStatus = await this._deriveFileStatus(
+                { key: file.key, filename: deltaPath, validatedHash: null },
+                dir,
+                artifact.optional,
+                syncCleanup,
+              )
+              if (derivedStatus !== 'missing') {
+                // Delta file exists — update filename to the delta path
+                artifact.setFile(
+                  new ArtifactFile({
+                    key: file.key,
+                    filename: deltaPath,
+                    status: derivedStatus,
+                  }),
+                )
+                continue
+              }
+            }
+
+            if (derivedStatus !== 'missing') {
+              artifact.setFile(
+                new ArtifactFile({
+                  key: file.key,
+                  filename: file.filename,
+                  status: derivedStatus,
+                }),
+              )
+            }
+          }
+        }
+      }
+
+      // Persist the manifest if sync produced changes
+      if (changed) {
+        await this._writeManifestAtomic(dir, changeToManifest(change))
+      }
+    }
+
+    // Auto-invalidate if any previously-validated artifact drifted (content
+    // changed or file deleted). Applies when:
+    // - There are active approvals (spec or signoff) → invalidate approvals
+    // - The change is beyond 'designing' state → revert to designing
+    const hasDriftableState = change.state !== 'drafting' && change.state !== 'designing'
+    const hasActiveApprovals =
+      change.activeSpecApproval !== undefined || change.activeSignoff !== undefined
+
+    if (hasDriftableState || hasActiveApprovals) {
+      let drifted = false
+      for (const [, artifact] of change.artifacts) {
+        if (drifted) break
+        for (const [, file] of artifact.files) {
+          // File had a valid hash but is now missing or in-progress → drifted
+          if (
+            file.validatedHash !== undefined &&
+            (file.status === 'in-progress' || file.status === 'missing')
+          ) {
+            drifted = true
+            break
+          }
+        }
+      }
+      if (drifted) {
+        change.invalidate('artifact-change', SYSTEM_ACTOR)
+        await this._writeManifestAtomic(dir, changeToManifest(change))
+      }
+    }
+
+    return change
   }
 
   /**
-   * Derives the `ArtifactStatus` for a manifest artifact entry by inspecting
-   * `validatedHash` and the presence and content of the artifact file on disk.
+   * Derives the `ArtifactStatus` for a single manifest file entry by inspecting
+   * `validatedHash` and the presence and content of the file on disk.
    *
-   * @param artifact - The manifest artifact descriptor
+   * @param file - The manifest file descriptor
    * @param dir - Absolute path to the change directory
+   * @param optional - Whether the parent artifact is optional (affects skipped sentinel handling)
+   * @param preHashCleanup - Cleanup transforms to apply before hashing
    * @returns The derived `ArtifactStatus`
    */
-  private async _deriveArtifactStatus(
-    artifact: ManifestArtifact,
+  private async _deriveFileStatus(
+    file: ManifestArtifactFile,
     dir: string,
+    optional: boolean = true,
+    preHashCleanup: readonly PreHashCleanup[] = [],
   ): Promise<ArtifactStatus> {
-    if (artifact.validatedHash === SKIPPED_SENTINEL && artifact.optional) return 'skipped'
-    if (artifact.validatedHash === SKIPPED_SENTINEL) return 'in-progress'
+    if (file.validatedHash === SKIPPED_SENTINEL && optional) return 'skipped'
+    if (file.validatedHash === SKIPPED_SENTINEL) return 'in-progress'
 
-    const filePath = path.join(dir, artifact.filename)
+    const filePath = path.join(dir, file.filename)
     let content: string
     try {
       content = await fs.readFile(filePath, 'utf8')
@@ -498,10 +729,17 @@ export class FsChangeRepository extends ChangeRepository {
       throw err
     }
 
-    if (artifact.validatedHash === null) return 'in-progress'
+    if (file.validatedHash === null) return 'in-progress'
 
-    const currentHash = sha256(content)
-    return currentHash === artifact.validatedHash ? 'complete' : 'in-progress'
+    let cleaned = content
+    for (const rule of preHashCleanup) {
+      const re = safeRegex(rule.pattern, 'g')
+      if (re !== null) {
+        cleaned = cleaned.replace(re, rule.replacement)
+      }
+    }
+    const currentHash = sha256(cleaned)
+    return currentHash === file.validatedHash ? 'complete' : 'in-progress'
   }
 }
 
@@ -544,12 +782,19 @@ function changeToManifest(change: Change): ChangeManifest {
  * @returns The serialized artifact JSON object
  */
 function serializeArtifact(artifact: ChangeArtifact): ManifestArtifact {
+  const files: ManifestArtifactFile[] = []
+  for (const file of artifact.files.values()) {
+    files.push({
+      key: file.key,
+      filename: file.filename,
+      validatedHash: file.validatedHash ?? null,
+    })
+  }
   return {
     type: artifact.type,
-    filename: artifact.filename,
     optional: artifact.optional,
     requires: [...artifact.requires],
-    validatedHash: artifact.validatedHash ?? null,
+    files,
   }
 }
 
@@ -632,6 +877,16 @@ function serializeEvent(event: ChangeEvent): RawChangeEvent {
             by: event.by,
             artifactId: event.artifactId,
           }
+    case 'artifacts-synced':
+      return {
+        type: 'artifacts-synced',
+        at: event.at.toISOString(),
+        by: event.by,
+        typesAdded: [...event.typesAdded],
+        typesRemoved: [...event.typesRemoved],
+        filesAdded: event.filesAdded.map((f) => ({ type: f.type, key: f.key })),
+        filesRemoved: event.filesRemoved.map((f) => ({ type: f.type, key: f.key })),
+      }
   }
 }
 
@@ -742,6 +997,16 @@ function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
             reason: raw.reason,
           }
         : { type: 'artifact-skipped', at: new Date(raw.at), by: raw.by, artifactId: raw.artifactId }
+    case 'artifacts-synced':
+      return {
+        type: 'artifacts-synced',
+        at: new Date(raw.at),
+        by: raw.by ?? { name: 'specd', email: 'system@specd.dev' },
+        typesAdded: raw.typesAdded ?? [],
+        typesRemoved: raw.typesRemoved ?? [],
+        filesAdded: raw.filesAdded ?? [],
+        filesRemoved: raw.filesRemoved ?? [],
+      }
   }
 }
 

@@ -4,6 +4,7 @@ import { ChangeNotFoundError } from '../../../src/application/errors/change-not-
 import { ArtifactNotFoundError } from '../../../src/application/errors/artifact-not-found-error.js'
 import { ArtifactNotOptionalError } from '../../../src/domain/errors/artifact-not-optional-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { makeChangeRepository, makeActorResolver } from './helpers.js'
 
@@ -24,8 +25,10 @@ describe('SkipArtifact', () => {
     it('skips the artifact successfully', async () => {
       const artifact = new ChangeArtifact({
         type: 'proposal',
-        filename: 'proposal.md',
         optional: true,
+        files: new Map([
+          ['proposal', new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })],
+        ]),
       })
       const change = makeChangeWithArtifact('my-change', artifact)
       const repo = makeChangeRepository([change])
@@ -41,8 +44,10 @@ describe('SkipArtifact', () => {
     it('saves the change after skipping', async () => {
       const artifact = new ChangeArtifact({
         type: 'proposal',
-        filename: 'proposal.md',
         optional: true,
+        files: new Map([
+          ['proposal', new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })],
+        ]),
       })
       const change = makeChangeWithArtifact('my-change', artifact)
       const repo = makeChangeRepository([change])
@@ -58,8 +63,10 @@ describe('SkipArtifact', () => {
     it('records the reason when provided', async () => {
       const artifact = new ChangeArtifact({
         type: 'proposal',
-        filename: 'proposal.md',
         optional: true,
+        files: new Map([
+          ['proposal', new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })],
+        ]),
       })
       const change = makeChangeWithArtifact('my-change', artifact)
       const repo = makeChangeRepository([change])
@@ -81,8 +88,10 @@ describe('SkipArtifact', () => {
     it('omits reason from event when not provided', async () => {
       const artifact = new ChangeArtifact({
         type: 'proposal',
-        filename: 'proposal.md',
         optional: true,
+        files: new Map([
+          ['proposal', new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })],
+        ]),
       })
       const change = makeChangeWithArtifact('my-change', artifact)
       const repo = makeChangeRepository([change])
@@ -130,8 +139,8 @@ describe('SkipArtifact', () => {
     it('throws ArtifactNotOptionalError', async () => {
       const artifact = new ChangeArtifact({
         type: 'spec',
-        filename: 'spec.md',
         optional: false,
+        files: new Map([['spec', new ArtifactFile({ key: 'spec', filename: 'spec.md' })]]),
       })
       const change = makeChangeWithArtifact('my-change', artifact)
       const repo = makeChangeRepository([change])

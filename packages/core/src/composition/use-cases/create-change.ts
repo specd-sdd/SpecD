@@ -74,5 +74,5 @@ export function createCreateChange(
   }
   const changeRepo = createChangeRepository('fs', configOrContext, options!)
   const actor = new GitActorResolver()
-  return new CreateChange(changeRepo, actor)
+  return new CreateChange(changeRepo, new Map(), actor)
 }

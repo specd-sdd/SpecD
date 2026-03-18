@@ -30,6 +30,17 @@ Each entry in the `Kernel` interface must be typed as the concrete use case clas
 
 `createKernel` must build shared infrastructure adapters (repositories, VCS adapter, hook runner, content hasher, YAML serializer, file reader, actor resolver, artifact parser registry, config writer) exactly once via `createKernelInternals` and reuse them across all use cases. No adapter must be constructed more than once per kernel instantiation.
 
+`createKernelInternals` must pass a `resolveArtifactTypes` function to the `FsChangeRepository` options. This allows the change repository to lazily resolve artifact types from the active schema without requiring the schema to be resolved at construction time. The resolver uses the schema registry and workspace schema paths from the kernel config.
+
+### Requirement: Auto-invalidation on get when artifact files drift
+
+When `ChangeRepository.get()` loads a change, the `FsChangeRepository` implementation must check whether any previously-validated artifact file has drifted — i.e. the file had a `validatedHash` set but now has a derived status of `missing` or `in-progress`. If drift is detected AND either of the following conditions holds, the repository must call `change.invalidate('artifact-change', SYSTEM_ACTOR)` to roll the change back to `designing` and persist the updated state:
+
+1. The change is beyond `designing` state (has progressed past the initial design phase), OR
+2. The change has an active approval (spec approval or signoff) not superseded by a subsequent `invalidated` event.
+
+This ensures that both state-inconsistent artifact changes and approval drift are detected eagerly on any change load, not only during explicit validation. See [`specs/core/change-repository-port/spec.md`](../change-repository-port/spec.md) for the full port-level contract.
+
 ### Requirement: Kernel exposes repository instances for adapter access
 
 The kernel must expose the underlying `ChangeRepository` as `changes.repo` and the `SpecRepository` map as `specs.repos`. These allow delivery mechanisms to perform adapter-level queries (path resolution, existence checks) that do not warrant a full use case.

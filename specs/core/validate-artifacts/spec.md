@@ -34,8 +34,17 @@ class ValidateArtifacts {
 
 - `name` — the change name to validate
 - `specPath` — the spec ID to validate (one spec per execution); must be one of the IDs in `change.specIds`
+- `artifactId` — optional; when provided, only the artifact with this ID is validated. All other artifacts are skipped. The required-artifacts check is also skipped.
 
 Validating all specs in a change requires calling `execute` once per spec ID. Use cases that need to validate all specs call `execute` in a loop.
+
+When `artifactId` is provided:
+
+1. If the artifact ID does not exist in the schema, `execute` SHALL return a failure result with a descriptive error — it SHALL NOT throw.
+2. The required-artifacts check (Requirement: Required artifacts check) is skipped entirely.
+3. Only the specified artifact is evaluated through the dependency order check, delta validation, structural validation, and hash computation steps.
+4. All other artifacts are ignored — they are not checked, not reported as missing, and not included in the result.
+5. The dependency order check still applies to the specified artifact: if its `requires` are not satisfied, it is reported as dependency-blocked.
 
 ### Requirement: Schema name guard
 
@@ -45,6 +54,8 @@ After resolving the schema from config, `ValidateArtifacts` must compare `schema
 
 Before validating structure, `ValidateArtifacts` must verify that all non-optional artifact IDs are present in the change (status not `missing`). Optional artifacts with status `skipped` (`validatedHash === "__skipped__"`) are considered resolved and do not cause a failure. If any non-optional artifact is absent, `ValidateArtifacts` must return a failure result listing the missing artifact IDs. It must not throw — missing required artifacts are a validation failure, not an error.
 
+This check is skipped when `artifactId` is provided — single-artifact validation does not enforce completeness of the full artifact set.
+
 ### Requirement: Dependency order check
 
 Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped` (via `change.effectiveStatus(type)`). If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.
@@ -53,9 +64,17 @@ Before validating an artifact, `ValidateArtifacts` must check that all artifact 
 
 If the change has an active spec approval (`change.activeSpecApproval` is defined) and any artifact file's current content hash (after `preHashCleanup`) differs from the hash recorded in that approval's `artifactHashes`, `ValidateArtifacts` must call `change.invalidate('artifact-change', actor)` before proceeding with validation. This rolls the change back to `designing` and records the invalidation in history.
 
+Approval hash keys use the `type:key` format (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within that artifact.
+
 The same check applies to active signoff (`change.activeSignoff`): if any artifact's current hash differs from what was recorded in `activeSignoff.artifactHashes`, `change.invalidate('artifact-change', actor)` must be called.
 
 A single invalidation call is made per `execute` invocation even if multiple artifacts have changed — the first hash mismatch triggers invalidation and the remaining artifacts are checked against the now-cleared approval state.
+
+### Requirement: Per-file validation
+
+Validation operates per-file within each artifact type. For `scope: change` artifacts, the single file is keyed by the artifact type id. For `scope: spec` artifacts, validation targets the file keyed by the `specPath` input parameter. If the tracked file's filename ends with `.delta.yaml`, the file is read as a delta directly (no separate delta lookup). Otherwise, standard delta detection applies.
+
+The raw file content (not merged) is hashed for `markComplete` — this is the content that was actually written by the user/agent.
 
 ### Requirement: Delta validation
 
@@ -101,12 +120,12 @@ After a successful delta application preview (or for non-delta artifacts), `Vali
 
 ### Requirement: Hash computation and markComplete
 
-If all delta validations, conflict detection, and structural validations pass for an artifact, `ValidateArtifacts` must:
+If all delta validations, conflict detection, and structural validations pass for a file within an artifact, `ValidateArtifacts` must:
 
-1. Compute the cleaned hash: apply each `preHashCleanup` substitution in declaration order to the artifact file content, then compute SHA-256 of the result.
-2. Call `change.getArtifact(type).markComplete(cleanedHash)` on the corresponding `ChangeArtifact`.
+1. Compute the cleaned hash: apply each `preHashCleanup` substitution in declaration order to the raw file content (not the merged content), then compute SHA-256 of the result.
+2. Call `change.getArtifact(type).markComplete(key, cleanedHash)` on the corresponding `ChangeArtifact`, where `key` is the file key (artifact type id for `scope: change`, spec ID for `scope: spec`).
 
-If any validation step fails, `markComplete` must not be called for that artifact.
+If any validation step fails, `markComplete` must not be called for that file.
 
 ### Requirement: Result shape
 
@@ -133,6 +152,20 @@ After all artifacts have been evaluated, `ValidateArtifacts` must call `changeRe
 - A missing `deltaValidations[]` is not an error — the step is skipped
 - A missing `validations[]` is not an error — the step is skipped
 - A missing delta file for a `delta: true` artifact is not itself a validation error — the artifact may be new (no existing base spec to delta against); in that case, validate the artifact file directly against `validations[]`
+
+### Requirement: Automatic dependsOn extraction
+
+After successfully validating a `scope: spec` artifact, the use case extracts `dependsOn` from the validated content using the schema's `metadataExtraction` declarations. For delta artifacts, the extraction runs against the **merged** content (base + delta), ensuring dependencies added via deltas are captured.
+
+The extraction uses `extractMetadata` with the artifact's AST, then resolves raw paths to full spec IDs via `SpecRepository.resolveFromPath`. If dependencies are found, they are registered on the change via `change.setSpecDependsOn(specId, deps)`.
+
+This removes the need for agents or users to manually call `change deps --add` — the system extracts dependencies from the artifact content that was already written.
+
+Extraction only runs when:
+
+- The artifact is `scope: spec`
+- The schema declares `metadataExtraction.dependsOn` targeting this artifact type
+- The artifact passed validation (no failures)
 
 ## Spec Dependencies
 

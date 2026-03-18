@@ -74,31 +74,60 @@ When `approvals.signoff: false` (default), `done → archivable` is a free trans
 
 ### Requirement: Artifacts
 
-A Change holds a set of artifacts — typed files whose types and dependency graph are declared by the active schema. Each artifact has:
+A Change holds a set of artifacts — typed files whose types and dependency graph are declared by the active schema. Each artifact is a `ChangeArtifact` that contains zero or more `ArtifactFile` entries — one per file the artifact produces.
+
+A `ChangeArtifact` has:
 
 - **`type`** — the artifact type ID from the schema (e.g. `proposal`, `specs`, `design`, `tasks`)
-- **`filename`** — the file path within the change directory
 - **`optional`** — whether the artifact is required for archiving
 - **`requires`** — ordered list of artifact type IDs that must be complete before this artifact can be validated
-- **`status`** — derived at load time: `missing` | `in-progress` | `complete` | `skipped`
-- **`validatedHash`** — the hash recorded when the artifact was last validated, computed after applying `preHashCleanup` if declared in the schema. The sentinel value `"__skipped__"` is used when an optional artifact is explicitly marked as not produced.
+- **`files`** — a `Map<string, ArtifactFile>` of tracked files, keyed by file key
 
-`ArtifactStatus` is never stored directly — it is always derived on load from `validatedHash` and file presence:
+For `scope: change` artifacts there is typically one file keyed by the artifact type id. For `scope: spec` artifacts there is one file per spec ID in `change.specIds`.
+
+Each `ArtifactFile` value object has:
+
+- **`key`** — identifier for this file within the artifact (artifact type id for `scope: change`, spec ID for `scope: spec`)
+- **`filename`** — the file path within the change directory
+- **`status`** — derived at load time: `missing` | `in-progress` | `complete` | `skipped`
+- **`validatedHash`** — the hash recorded when the file was last validated, computed after applying `preHashCleanup` if declared in the schema. The sentinel value `"__skipped__"` is used when an optional artifact is explicitly marked as not produced.
+
+`ArtifactStatus` is never stored directly on the file — it is always derived on load from `validatedHash` and file presence:
 
 1. `validatedHash === "__skipped__"` → `skipped` (only valid for `optional: true` artifacts)
 2. File absent (and no sentinel) → `missing`
 3. File present and cleaned hash matches `validatedHash` → `complete`
 4. File present but hash differs or `validatedHash` is unset → `in-progress`
 
+The aggregated `status` getter on `ChangeArtifact` derives its value from all files:
+
+- `complete` — all files are complete or skipped (and at least one file exists)
+- `skipped` — all files are skipped (and at least one file exists)
+- `missing` — all files are missing or there are no files
+- `in-progress` — some files exist but not all are complete/skipped
+
 `skipped` is only valid for `optional: true` artifacts. Attempting to skip a non-optional artifact throws an error.
 
 The `skipped` state must be set explicitly by an actor — human or agent via a CLI command. The agent must be instructed (via the schema `instruction` or skill definition) to call that command when it decides not to produce an optional artifact. The specific CLI command is defined in the CLI spec.
 
-**Rollback:** when an `invalidated` event is appended, specd clears `validatedHash` for all artifacts in the change (sets to `null`). This resets them uniformly: `complete` artifacts become `in-progress` (file present, no valid hash), `skipped` artifacts become `missing` (file absent, sentinel cleared). For the `verifying → implementing` transition, only the `validatedHash` of artifacts in the `implementing` step's `requires` list is cleared.
+`ChangeArtifact.markComplete(key, hash)` takes two arguments — the file key and the content hash — and delegates to the corresponding `ArtifactFile.markComplete(hash)`. `ChangeArtifact.markSkipped()` marks ALL files in the artifact as skipped. These may only be called by the `ValidateArtifacts` and skip use cases respectively. No other code path may set these values.
 
-Effective status cascades: an artifact is `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`, even if its own hash matches. A `skipped` optional artifact satisfies the dependency — downstream artifacts and workflow steps treat it as resolved.
+**Rollback:** when an `invalidated` event is appended, specd calls `resetValidation()` on all artifacts in the change, which resets each file's `validatedHash` to `undefined`. This resets them uniformly: `complete` files become `in-progress` (file present, no valid hash), `skipped` files become `missing` (sentinel cleared). For the `verifying → implementing` transition, only artifacts in the `implementing` step's `requires` list are reset.
 
-`Artifact.markComplete(hash)` may only be called by the `ValidateArtifacts` use case. `Artifact.markSkipped()` sets `validatedHash` to the sentinel and may only be called by the skip use case. No other code path may set these values.
+Effective status cascades: an artifact is `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`, even if its own aggregated status matches. A `skipped` optional artifact satisfies the dependency — downstream artifacts and workflow steps treat it as resolved.
+
+### Requirement: Artifact sync
+
+A Change can reconcile its artifact map against the current schema's artifact types via the `syncArtifacts(artifactTypes)` method. This method:
+
+1. Compares the current artifact map against the provided `artifactTypes` array.
+2. Adds new artifact types and their expected files (based on scope and specIds).
+3. Removes artifact types no longer in the schema.
+4. For existing artifacts, adds files for new spec IDs and removes files for spec IDs no longer in the change.
+5. Returns `true` if any changes were made, `false` if the artifact map was already in sync.
+6. When changes are made, appends an `ArtifactsSyncedEvent` to history with the `SYSTEM_ACTOR` identity.
+
+`SYSTEM_ACTOR` is a constant `{ name: 'specd', email: 'system@specd.dev' }` used for automated operations like artifact sync. It is not a user actor and does not require VCS resolution.
 
 ### Requirement: History and event sourcing
 
@@ -128,9 +157,10 @@ Event types:
 | `drafted`          | `reason?: string`                                          | When a change is shelved to `drafts/`                          |
 | `restored`         | _(none beyond common fields)_                              | When a drafted change is moved back to `changes/`              |
 | `artifact-skipped` | `artifactId: string`, `reason?: string`                    | When an optional artifact is explicitly marked as not produced |
+| `artifacts-synced` | `typesAdded`, `typesRemoved`, `filesAdded`, `filesRemoved` | When artifact sync reconciles the artifact map against schema  |
 | `discarded`        | `reason: string`, `supersededBy?: string[]`                | When a change is permanently abandoned                         |
 
-**Approval invalidation:** when the spec list or any artifact content changes, specd appends an `invalidated` event (with the appropriate `cause`) followed immediately by a `transitioned` event rolling back to `designing`. The invalidated approvals remain in history for audit purposes and are identified as superseded by the presence of the subsequent `invalidated` event.
+**Approval invalidation:** when the spec list or any artifact content changes, specd appends an `invalidated` event (with the appropriate `cause`) followed immediately by a `transitioned` event rolling back to `designing`. The invalidated approvals remain in history for audit purposes and are identified as superseded by the presence of the subsequent `invalidated` event. Invalidation can be triggered by use cases explicitly or by the repository layer automatically — `FsChangeRepository.get()` calls `invalidate('artifact-change', SYSTEM_ACTOR)` when it detects artifact file drift on disk (see [`specs/core/change-repository-port/spec.md`](../change-repository-port/spec.md)).
 
 **Multiple approval cycles:** if a change is approved, then invalidated, then approved again, the history records all events. The active approval is the last `spec-approved` / `signed-off` event with no subsequent `invalidated` event.
 
@@ -169,15 +199,17 @@ A change may be moved between storage locations without affecting its lifecycle 
 - `workspaces` is a computed getter derived from `specIds` via `parseSpecId()` — it is not a declared or persisted field
 - `specIds` may be empty (empty specIds results in empty workspaces)
 - Current lifecycle state is derived from history (last `transitioned` event); no state snapshot is stored
-- Any modification to the spec list or any artifact content appends an `invalidated` event followed by a `transitioned` event back to `designing`
-- `ArtifactStatus` is never stored directly — always derived from `validatedHash` and file presence
+- Any modification to the spec list or any artifact content appends an `invalidated` event followed by a `transitioned` event back to `designing` — this may be triggered by use cases or automatically by `FsChangeRepository.get()` using `SYSTEM_ACTOR`
+- `ChangeArtifact` contains a `files: Map<string, ArtifactFile>` — artifact status is aggregated from per-file statuses
+- `ArtifactFile` status is never stored directly — always derived from `validatedHash` and file presence
 - `validatedHash === "__skipped__"` is the sentinel for `skipped` status — only valid on `optional: true` artifacts
 - `skipped` is only valid for `optional: true` artifacts; attempting to skip a non-optional artifact throws an error
 - `skipped` satisfies the dependency in `requires` chains and workflow step availability checks — treated as resolved
-- On `invalidated` event: all `validatedHash` values are cleared — resets `complete` → `in-progress` and `skipped` → `missing` uniformly
-- On `verifying → implementing`: only `validatedHash` of artifacts in `implementing.requires` is cleared
-- `Artifact.markComplete(hash)` may only be called from `ValidateArtifacts`
-- `Artifact.markSkipped()` may only be called from the skip use case; sets `validatedHash` to the sentinel
+- On `invalidated` event: all file `validatedHash` values are cleared via `resetValidation()` — resets `complete` → `in-progress` and `skipped` → `missing` uniformly
+- On `verifying → implementing`: only artifacts in `implementing.requires` are reset
+- `ChangeArtifact.markComplete(key, hash)` may only be called from `ValidateArtifacts`
+- `ChangeArtifact.markSkipped()` marks ALL files and may only be called from the skip use case
+- `syncArtifacts(artifactTypes)` reconciles the artifact map against the schema; appends `artifacts-synced` event with `SYSTEM_ACTOR` when changes occur
 - `archivable` is the only state from which a change may be archived; attempting to archive from any other state throws `InvalidStateTransitionError`
 - Both approval gates default to `false` — teams opt in via `approvals` in `specd.yaml`
 - When `approvals.spec: true`, spec approval is required before `implementing`

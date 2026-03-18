@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { GetStatus } from '../../../src/application/use-cases/get-status.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
+import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { makeChangeRepository, makeChange } from './helpers.js'
 
 describe('GetStatus', () => {
@@ -31,17 +32,35 @@ describe('GetStatus', () => {
       change.setArtifact(
         new ChangeArtifact({
           type: 'proposal',
-          filename: 'proposal.md',
-          status: 'complete',
           requires: [],
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'complete',
+                validatedHash: 'abc',
+              }),
+            ],
+          ]),
         }),
       )
       change.setArtifact(
         new ChangeArtifact({
           type: 'spec',
-          filename: 'spec.md',
-          status: 'complete',
           requires: ['proposal'],
+          files: new Map([
+            [
+              'spec',
+              new ArtifactFile({
+                key: 'spec',
+                filename: 'spec.md',
+                status: 'complete',
+                validatedHash: 'def',
+              }),
+            ],
+          ]),
         }),
       )
       const repo = makeChangeRepository([change])
@@ -61,17 +80,30 @@ describe('GetStatus', () => {
       change.setArtifact(
         new ChangeArtifact({
           type: 'proposal',
-          filename: 'proposal.md',
-          status: 'in-progress',
           requires: [],
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({ key: 'proposal', filename: 'proposal.md', status: 'in-progress' }),
+            ],
+          ]),
         }),
       )
       change.setArtifact(
         new ChangeArtifact({
           type: 'spec',
-          filename: 'spec.md',
-          status: 'complete',
           requires: ['proposal'],
+          files: new Map([
+            [
+              'spec',
+              new ArtifactFile({
+                key: 'spec',
+                filename: 'spec.md',
+                status: 'complete',
+                validatedHash: 'def',
+              }),
+            ],
+          ]),
         }),
       )
       const repo = makeChangeRepository([change])

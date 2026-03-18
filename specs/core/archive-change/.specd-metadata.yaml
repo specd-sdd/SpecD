@@ -53,8 +53,8 @@ rules:
       - |-
         `ArchiveChange.execute` receives:
 
-        * `name` — the change name to archive
-        * `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
+        - `name` — the change name to archive
+        - `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
   - requirement: Schema name guard
     rules:
       - After resolving the schema from config, `ArchiveChange` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before the archivable guard, any hooks, or file modifications.
@@ -79,15 +79,20 @@ rules:
         1. Resolve the active schema for that spec's workspace.
         2. For each artifact in the schema that declares `delta: true`:
            a. Look up the `ArtifactParser` for the artifact's `format` from `ArtifactParserRegistry`. If no adapter is registered for that format, throw — this is a configuration error.
-           b. Load the delta file from `ChangeRepository` (filename `<artifact-output-filename>.delta.yaml`). If absent or `skipped` (effective status `skipped`), skip — nothing to sync.
-           c. Parse the delta file as YAML to obtain the array of delta entries.
+           b. Retrieve the file for this spec ID from the artifact via `artifact.getFile(specId)`. If the file is absent or its status is `skipped`, skip — nothing to sync.
+           c. Load the delta file content from `ChangeRepository` using the file's `filename`. Parse the delta file as YAML to obtain the array of delta entries.
            d. Load the base artifact content from `SpecRepository`. If the base does not exist, treat it as an empty document (parse an empty string via `ArtifactParser.parse('')`).
            e. Parse the base content via `ArtifactParser.parse(baseContent)` to obtain a base AST.
            f. Call `ArtifactParser.apply(baseAST, deltaEntries)` to produce the merged AST. If `apply` throws `DeltaApplicationError`, re-throw it — this indicates a structural problem that should have been caught during `ValidateArtifacts`, or the delta was modified after validation.
            g. Serialize the merged AST via `ArtifactParser.serialize(mergedAST)` and save the result to `SpecRepository`.
-        3. For each artifact in the schema that declares `delta: false` (new file artifacts created in-change):
-           a. Load the artifact file from `ChangeRepository`. If absent or `skipped` (effective status `skipped`), skip — nothing to sync.
-           b. Save the content directly to `SpecRepository` (creating the spec directory and file if they do not exist).
+
+        For markdown artifacts, the merge output must preserve inline formatting and list/style conventions from the base artifact wherever possible. Implementations must avoid destructive normalization of untouched sections during archive-time serialization.
+
+        When the base markdown uses mixed style markers for the same construct (for example both `-` and `*` bullets, or both `*` and `_` for emphasis/strong), archive-time serialization must be deterministic and follow project markdown conventions configured for lint consistency.
+
+        1. For each artifact in the schema that declares `delta: false` (new file artifacts created in-change):
+           a. Retrieve the file for this spec ID from the artifact via `artifact.getFile(specId)`. If the file is absent or its status is `skipped`, skip — nothing to sync.
+           b. Load the artifact file content from `ChangeRepository` using the file's `filename`. Save the content directly to `SpecRepository` (creating the spec directory and file if they do not exist).
   - requirement: Archive repository call
     rules:
       - |-
@@ -97,11 +102,11 @@ rules:
 
         The port's contract requires:
 
-        * `archivedName` — the full timestamped directory name: `YYYYMMDD-HHmmss-<name>` where the timestamp is derived from `change.createdAt` (zero-padded), never from wall-clock time at execution
-        * `archivedAt` — the timestamp when the archive operation completes, set by the repository
-        * `archivedBy` (optional) — the git identity of the actor who performed the archive; absent if git identity was unavailable
-        * `workspace` — the `SpecPath` of the primary workspace (the first entry in `change.workspaces`)
-        * `artifacts` — artifact metadata tracked by the repository
+        - `archivedName` — the full timestamped directory name: `YYYYMMDD-HHmmss-<name>` where the timestamp is derived from `change.createdAt` (zero-padded), never from wall-clock time at execution
+        - `archivedAt` — the timestamp when the archive operation completes, set by the repository
+        - `archivedBy` (optional) — the git identity of the actor who performed the archive; absent if git identity was unavailable
+        - `workspace` — the `SpecPath` of the primary workspace (the first entry in `change.workspaces`)
+        - `artifacts` — artifact metadata tracked by the repository
 
         The `FsArchiveRepository` implementation additionally moves the change directory from its current location (`changes/` or `drafts/`) to the archive directory using the configured pattern, then appends an entry to `index.jsonl`. The use case has no knowledge of these implementation details.
 
@@ -136,9 +141,9 @@ rules:
       - |-
         `ArchiveChange.execute` must return a result object. The result must include:
 
-        * `archivedChange` — the `ArchivedChange` record that was persisted
-        * `postHookFailures` — array of hook commands that failed post-archive, empty on full success
-        * `staleMetadataSpecPaths` — array of spec paths where `.specd-metadata.yaml` generation failed during this archive (e.g. extraction produced no required fields); empty when all metadata was generated successfully
+        - `archivedChange` — the `ArchivedChange` record that was persisted
+        - `postHookFailures` — array of hook commands that failed post-archive, empty on full success
+        - `staleMetadataSpecPaths` — array of spec paths where `.specd-metadata.yaml` generation failed during this archive (e.g. extraction produced no required fields); empty when all metadata was generated successfully
 
         `ArchiveChange` throws on pre-archive hook failure or `assertArchivable` failure. Post-archive failures are returned, not thrown.
 constraints:
@@ -235,6 +240,40 @@ scenarios:
       - ArchiveChange.execute reaches the merge step
     then:
       - DeltaConflictError is thrown
+  - requirement: Delta merge and spec sync
+    name: Markdown delta merge preserves untouched inline formatting
+    given:
+      - a base markdown spec with untouched prose containing inline code like `specd change validate <name>`
+      - AND the delta modifies a different section in the same file
+    when:
+      - ArchiveChange.execute merges and serializes the markdown artifact
+    then:
+      - untouched prose still contains inline-code backticks and unescaped <name> text
+  - requirement: Delta merge and spec sync
+    name: Mixed markdown style serializes deterministically
+    given:
+      - a base markdown spec that mixes unordered list markers (- and *) or emphasis markers (* and _) for the same construct
+    when:
+      - ArchiveChange.execute merges and serializes the markdown artifact
+    then:
+      - output style is deterministic and follows project markdown conventions
+  - requirement: Delta merge and spec sync
+    name: Markdown delta merge preserves untouched inline formatting
+    given:
+      - a base markdown spec with untouched prose containing inline code like `specd change validate <name>`
+      - AND the delta modifies a different section in the same file
+    when:
+      - ArchiveChange.execute merges and serializes the markdown artifact
+    then:
+      - untouched prose still contains inline-code backticks and unescaped <name> text
+  - requirement: Delta merge and spec sync
+    name: Mixed markdown style serializes deterministically
+    given:
+      - a base markdown spec that mixes unordered list markers (- and *) or emphasis markers (* and _) for the same construct
+    when:
+      - ArchiveChange.execute merges and serializes the markdown artifact
+    then:
+      - output style is deterministic and follows project markdown conventions
   - requirement: ArchivedChange construction
     name: archivedName derived from createdAt
     given:
@@ -314,6 +353,6 @@ scenarios:
     then:
       - ArchiveChange.execute throws and does not return a result
 contentHashes:
-  spec.md: sha256:5650e0029f8f9c7ac5f3cf847baf2ccd82dd45eeb0b0f416e854a2bdc49efa17
-  verify.md: sha256:6dc4100ae7cafad7ec3a7e4ed3ebfe1241f49296c6b3bb5d34fdce106315283e
+  spec.md: sha256:daea2a3f40d7e8877f4a6b3d90792eef0416df4036c4e6acab251b9904c4df57
+  verify.md: sha256:9513f5cf5c6daf070c40195761b9213c46827c2ea802860d4559d51d6b82ad63
 generatedBy: core

@@ -23,6 +23,15 @@ Both signatures are public exports. The explicit form is used in tests and in sc
 
 Port implementations that have a single concrete class and no caller-visible configuration — `NodeHookRunner`, `GitVcsAdapter`, `FsFileReader` — are constructed inside use-case factories and never appear in any public export. Repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`) are also internal to the composition layer.
 
+### Requirement: FsChangeRepository options include artifact type resolution
+
+`FsChangeRepositoryOptions` accepts two optional fields for artifact sync:
+
+- **`artifactTypes`** (`readonly ArtifactType[]`, optional) — resolved artifact types from the active schema. When provided, the repository uses these directly for `syncArtifacts` on every `get()` and `save()`.
+- **`resolveArtifactTypes`** (`() => Promise<readonly ArtifactType[]>`, optional) — async resolver for artifact types. Used when artifact types aren't known at construction time (e.g. kernel-level repo created before schema is resolved). Resolved lazily on first use and cached thereafter.
+
+At least one of these should be provided; if neither is available, artifact sync is a no-op (empty artifact types array).
+
 ### Requirement: Kernel builds all use cases from SpecdConfig
 
 `createKernel(config: SpecdConfig)` calls every use-case factory with the given config and returns an object containing all pre-wired use cases. The kernel object groups use cases by domain area:

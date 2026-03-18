@@ -41,6 +41,85 @@ interface MdastRoot extends MdastParent {
   children: MdastNode[]
 }
 
+/** Detected Markdown formatting style (bullet, emphasis, strong, rule markers). */
+interface MarkdownStyleProfile {
+  bullet: '-' | '*' | '+'
+  emphasis: '*' | '_'
+  strong: '*' | '_'
+  rule: '*' | '-' | '_'
+}
+
+const MARKDOWN_STYLE_DEFAULTS: MarkdownStyleProfile = {
+  bullet: '-',
+  emphasis: '*',
+  strong: '*',
+  rule: '-',
+}
+
+/**
+ * Collects unique capture-group matches from all occurrences of `re` in `content`.
+ *
+ * @param content - The string to search
+ * @param re - The regular expression with capture groups
+ * @param index - Which capture group to collect (default 1)
+ * @returns Set of unique matched values
+ */
+function collectUniqueMatches(content: string, re: RegExp, index = 1): Set<string> {
+  const values = new Set<string>()
+  for (const match of content.matchAll(re)) {
+    const value = match[index]
+    if (value === undefined) continue
+    values.add(value)
+  }
+  return values
+}
+
+/**
+ * Returns the single detected marker if unambiguous, otherwise returns `fallback`.
+ *
+ * @param found - Set of detected markers
+ * @param fallback - Default marker to use when ambiguous
+ * @returns The chosen marker
+ */
+function chooseMarker<T extends string>(found: Set<T>, fallback: T): T {
+  if (found.size === 1) {
+    return found.values().next().value as T
+  }
+  return fallback
+}
+
+/**
+ * Detects the Markdown formatting style used in `content`.
+ *
+ * @param content - The Markdown source to analyze
+ * @returns The detected style profile
+ */
+function detectMarkdownStyle(content: string): MarkdownStyleProfile {
+  const bullets = collectUniqueMatches(content, /(?:^|\n)[ \t]{0,3}([*+-])[ \t]+/g)
+  const emphasis = collectUniqueMatches(content, /(^|[^*_])([*_])[^*\n_]+?\2(?!\2)/gm, 2)
+  const strong = collectUniqueMatches(content, /(^|[^*_])([*_])\2[^*\n_]+?\2\2(?!\2)/gm, 2)
+  const rules = collectUniqueMatches(
+    content,
+    /(?:^|\n)[ \t]{0,3}([*_-])(?:[ \t]*\1){2,}[ \t]*(?=\n|$)/g,
+  )
+
+  return {
+    bullet: chooseMarker(
+      bullets as Set<MarkdownStyleProfile['bullet']>,
+      MARKDOWN_STYLE_DEFAULTS.bullet,
+    ),
+    emphasis: chooseMarker(
+      emphasis as Set<MarkdownStyleProfile['emphasis']>,
+      MARKDOWN_STYLE_DEFAULTS.emphasis,
+    ),
+    strong: chooseMarker(
+      strong as Set<MarkdownStyleProfile['strong']>,
+      MARKDOWN_STYLE_DEFAULTS.strong,
+    ),
+    rule: chooseMarker(rules as Set<MarkdownStyleProfile['rule']>, MARKDOWN_STYLE_DEFAULTS.rule),
+  }
+}
+
 /**
  * Extracts text from inline MDAST nodes, preserving link syntax.
  *
@@ -66,6 +145,71 @@ function extractText(nodes: readonly MdastInline[]): string {
 interface StackEntry {
   level: number
   node: ArtifactNode & { children: ArtifactNode[] }
+}
+
+/**
+ * Appends a converted block node to a parent, normalizing adjacent unordered lists
+ * into a single list so fallback bullet style can be applied uniformly.
+ *
+ * @param parent - Parent node that receives block children
+ * @param converted - Converted block node to append
+ */
+function appendNormalizedBlockNode(
+  parent: ArtifactNode & { children: ArtifactNode[] },
+  converted: ArtifactNode,
+): void {
+  if (converted.type !== 'list' || converted.ordered === true) {
+    parent.children.push(converted)
+    return
+  }
+
+  const prev = parent.children[parent.children.length - 1]
+  if (!prev || prev.type !== 'list' || prev.ordered === true) {
+    parent.children.push(converted)
+    return
+  }
+
+  const prevChildren = (prev.children ?? []) as ArtifactNode[]
+  const nextChildren = (converted.children ?? []) as ArtifactNode[]
+  ;(prev as unknown as { children: ArtifactNode[] }).children = [...prevChildren, ...nextChildren]
+}
+
+/**
+ * Merges adjacent unordered list nodes so serialization can emit a single
+ * canonical marker for ambiguous mixed-list input.
+ *
+ * @param children - Block-level children to normalize
+ * @returns Normalized block-level children
+ */
+function normalizeBlockChildrenForSerialization(
+  children: readonly ArtifactNode[] | undefined,
+): ArtifactNode[] {
+  if (!children || children.length === 0) return []
+
+  const normalized: ArtifactNode[] = []
+  for (const child of children) {
+    const prev = normalized[normalized.length - 1]
+    const canMerge =
+      child.type === 'list' &&
+      child.ordered !== true &&
+      prev?.type === 'list' &&
+      prev.ordered !== true
+
+    if (!canMerge) {
+      normalized.push(child)
+      continue
+    }
+
+    const prevChildren = (prev.children ?? []) as ArtifactNode[]
+    const nextChildren = (child.children ?? []) as ArtifactNode[]
+    const merged: ArtifactNode = {
+      ...prev,
+      children: [...prevChildren, ...nextChildren],
+    }
+    normalized[normalized.length - 1] = merged
+  }
+
+  return normalized
 }
 
 /**
@@ -96,21 +240,33 @@ function convertBlockNode(node: MdastNode): ArtifactNode | null {
 
   if (node.type === 'list') {
     const ordered = (node as { ordered?: boolean | null }).ordered === true
+    const start = (node as { start?: number | null }).start
     const children = (node as MdastParent).children.map((item) =>
       convertListItem(item as MdastParent),
     )
+    if (ordered && typeof start === 'number') {
+      return { type: 'list', ordered, start, children }
+    }
     return { type: 'list', ordered, children }
   }
 
   if (node.type === 'blockquote') {
     const texts: string[] = []
+    const convertedChildren: ArtifactNode[] = []
     for (const child of (node as MdastParent).children) {
       const converted = convertBlockNode(child)
+      if (converted) {
+        convertedChildren.push(converted)
+      }
       if (converted && typeof converted.value === 'string') {
         texts.push(`> ${converted.value}`)
       }
     }
-    return { type: 'paragraph', value: texts.join('\n') }
+    return {
+      type: 'paragraph',
+      value: texts.join('\n'),
+      _blockquoteChildren: convertedChildren,
+    }
   }
 
   if (node.type === 'html') {
@@ -175,18 +331,20 @@ export class MarkdownParser implements ArtifactParser {
    */
   parse(content: string): ArtifactAST {
     const mdast = fromMarkdown(content) as unknown as MdastRoot
-    return this.mdastToAst(mdast)
+    return this.mdastToAst(mdast, content)
   }
 
   /**
    * Converts an MDAST root into a normalized `ArtifactAST` by sectionizing headings.
    *
    * @param mdast - The MDAST root node to convert
+   * @param sourceContent - The original Markdown source for style detection
    * @returns The normalized AST
    */
-  private mdastToAst(mdast: MdastRoot): ArtifactAST {
+  private mdastToAst(mdast: MdastRoot, sourceContent: string): ArtifactAST {
     const docNode: ArtifactNode & { children: ArtifactNode[] } = {
       type: 'document',
+      _markdownStyle: detectMarkdownStyle(sourceContent),
       children: [],
     }
 
@@ -215,7 +373,7 @@ export class MarkdownParser implements ArtifactParser {
       } else {
         const converted = convertBlockNode(child)
         if (converted !== null) {
-          stack[stack.length - 1]!.node.children.push(converted)
+          appendNormalizedBlockNode(stack[stack.length - 1]!.node, converted)
         }
       }
     }
@@ -247,7 +405,10 @@ export class MarkdownParser implements ArtifactParser {
    */
   serialize(ast: ArtifactAST): string {
     const mdastRoot = this.astToMdast(ast.root)
-    return toMarkdown(mdastRoot as Parameters<typeof toMarkdown>[0])
+    return toMarkdown(
+      mdastRoot as Parameters<typeof toMarkdown>[0],
+      this.markdownOptionsFor(ast.root),
+    )
   }
 
   /**
@@ -262,7 +423,25 @@ export class MarkdownParser implements ArtifactParser {
     }
     const mdastNodes = this.nodeToMdastNodes(node)
     const root: MdastRoot = { type: 'root', children: mdastNodes }
-    return toMarkdown(root as Parameters<typeof toMarkdown>[0])
+    return toMarkdown(root as Parameters<typeof toMarkdown>[0], this.markdownOptionsFor(node))
+  }
+
+  /**
+   * Builds mdast-util-to-markdown options from the node's detected style profile.
+   *
+   * @param node - The AST node whose style profile to use
+   * @returns The markdown serialization options
+   */
+  private markdownOptionsFor(node: ArtifactNode): NonNullable<Parameters<typeof toMarkdown>[1]> {
+    const style =
+      (node._markdownStyle as MarkdownStyleProfile | undefined) ?? MARKDOWN_STYLE_DEFAULTS
+    return {
+      bullet: style.bullet,
+      emphasis: style.emphasis,
+      strong: style.strong,
+      rule: style.rule,
+      ruleRepetition: 3,
+    }
   }
 
   /**
@@ -285,7 +464,7 @@ export class MarkdownParser implements ArtifactParser {
    */
   private collectMdastFromNode(node: ArtifactNode, out: MdastNode[]): void {
     if (node.type === 'document') {
-      for (const child of node.children ?? []) {
+      for (const child of normalizeBlockChildrenForSerialization(node.children)) {
         this.collectMdastFromNode(child, out)
       }
       return
@@ -311,7 +490,7 @@ export class MarkdownParser implements ArtifactParser {
         children: [{ type: 'text', value: node.label ?? '' }],
       }
       const result: MdastNode[] = [heading]
-      for (const child of node.children ?? []) {
+      for (const child of normalizeBlockChildrenForSerialization(node.children)) {
         const converted = this.nodeToMdastNodes(child)
         for (const c of converted) {
           result.push(c)
@@ -321,6 +500,18 @@ export class MarkdownParser implements ArtifactParser {
     }
 
     if (node.type === 'paragraph') {
+      const blockquoteChildren = node._blockquoteChildren as ArtifactNode[] | undefined
+      if (Array.isArray(blockquoteChildren) && blockquoteChildren.length > 0) {
+        const quoteNodes: MdastNode[] = []
+        for (const child of blockquoteChildren) {
+          const converted = this.nodeToMdastNodes(child)
+          for (const c of converted) {
+            quoteNodes.push(c)
+          }
+        }
+        return [{ type: 'blockquote', children: quoteNodes }]
+      }
+
       const inlines = node._inlines as MdastInline[] | undefined
       return [
         {
@@ -367,6 +558,10 @@ export class MarkdownParser implements ArtifactParser {
         {
           type: 'list',
           ordered: node.ordered === true,
+          start:
+            node.ordered === true && typeof (node as { start?: unknown }).start === 'number'
+              ? ((node as unknown as { start: number }).start ?? 1)
+              : null,
           spread: false,
           children: listItems,
         },
