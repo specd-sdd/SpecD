@@ -355,20 +355,24 @@ export class Change {
    * Internal recursive helper for `effectiveStatus` with cycle detection.
    *
    * @param type - The artifact type ID to evaluate
-   * @param visited - Set of already-visited artifact IDs for cycle detection
+   * @param visiting - Set of already-visited artifact IDs for cycle detection
    * @returns The effective `ArtifactStatus` after dependency resolution
    */
-  private _effectiveStatus(type: string, visited: Set<string>): ArtifactStatus {
+  private _effectiveStatus(type: string, visiting: Set<string>): ArtifactStatus {
     const artifact = this._artifacts.get(type)
     if (!artifact) return 'missing'
     if (artifact.status === 'missing') return 'missing'
-    if (visited.has(type)) return 'in-progress'
+    if (visiting.has(type)) return 'in-progress'
 
-    visited.add(type)
+    visiting.add(type)
     for (const req of artifact.requires) {
-      const reqStatus = this._effectiveStatus(req, visited)
-      if (reqStatus !== 'complete' && reqStatus !== 'skipped') return 'in-progress'
+      const reqStatus = this._effectiveStatus(req, visiting)
+      if (reqStatus !== 'complete' && reqStatus !== 'skipped') {
+        visiting.delete(type)
+        return 'in-progress'
+      }
     }
+    visiting.delete(type)
 
     return artifact.status
   }
