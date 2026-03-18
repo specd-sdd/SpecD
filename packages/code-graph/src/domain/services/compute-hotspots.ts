@@ -82,16 +82,17 @@ export async function computeHotspots(
     })
   }
 
-  // When a scope filter is explicitly provided, drop the restrictive defaults
-  // so scoped queries (e.g. { workspace: 'core' }) don't silently lose results.
-  // Threshold overrides (minScore, minRisk, limit) don't trigger this — they
-  // are explicit choices about the thresholds themselves.
+  // When any filter or threshold option is explicitly provided, drop the
+  // restrictive defaults so queries don't silently lose results.
   const hasScopeFilter =
     options?.workspace !== undefined ||
     options?.kind !== undefined ||
     options?.filePath !== undefined ||
     (options?.excludePaths?.length ?? 0) > 0 ||
-    (options?.excludeWorkspaces?.length ?? 0) > 0
+    (options?.excludeWorkspaces?.length ?? 0) > 0 ||
+    options?.limit !== undefined ||
+    options?.minScore !== undefined ||
+    options?.minRisk !== undefined
 
   // Also include symbols that have no callers but may have file importers,
   // or all symbols when minScore is 0

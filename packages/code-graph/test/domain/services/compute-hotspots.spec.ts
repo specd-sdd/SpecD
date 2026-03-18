@@ -93,9 +93,9 @@ describe('computeHotspots', () => {
     const defaultResult = await computeHotspots(store)
     expect(defaultResult.entries).toHaveLength(0)
 
-    // Explicit LOW should include it
+    // Explicit LOW should include the target (any filter drops all defaults)
     const lowResult = await computeHotspots(store, { minRisk: 'LOW' })
-    expect(lowResult.entries).toHaveLength(1)
+    expect(lowResult.entries.some((e) => e.symbol.name === 'target')).toBe(true)
   })
 
   it('scores cross-workspace callers higher', async () => {
