@@ -144,6 +144,7 @@ rules:
         - **`register(adapter: LanguageAdapter): void`** — registers an adapter for all languages it declares and all file extensions from `adapter.extensions()`
         - **`getAdapter(languageId: string): LanguageAdapter | undefined`** — returns the adapter for a language, or `undefined` if none registered
         - **`getAdapterForFile(filePath: string): LanguageAdapter | undefined`** — resolves extension → language → adapter using the dynamically built extension map
+        - **`getLanguageForFile(filePath: string): string | undefined`** — resolves extension → language identifier (e.g. `'typescript'`, `'python'`), or `undefined` if no adapter handles the extension
         - **`getAdapters(): LanguageAdapter[]`** — returns all unique registered adapters
 
         The extension-to-language map is built dynamically from registered adapters — there is no hardcoded extension list in the registry. Adding a new language requires only registering a new adapter.
@@ -481,6 +482,6 @@ scenarios:
     then:
       - it returns 'App\\Models\\User'
 contentHashes:
-  spec.md: sha256:78b6f4031b0a8194c9a2b2213c65028d6bf6a58e040f423f161c34638c2c47ef
+  spec.md: sha256:16e8d57c34fa05a0d98ea524c7bc0a667982562d54a07b569cee1260b5bd92d2
   verify.md: sha256:0cd4bf89790b18a869b03b21325c490dff51128dd2dc6df6ef413febedb6fc01
 generatedBy: core
