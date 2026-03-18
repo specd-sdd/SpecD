@@ -101,8 +101,6 @@ export class LadybugGraphStore extends GraphStore {
     await this.createFtsIndex('Symbol', 'symbol_fts', ['searchName', 'comment'])
     await this.createFtsIndex('Spec', 'spec_fts', ['title', 'description', 'content'])
 
-    this._isOpen = true
-
     const metaRows = await exec(
       this.conn,
       `MATCH (m:Meta {key: 'lastIndexedAt'}) RETURN m.value AS v`,
@@ -110,6 +108,8 @@ export class LadybugGraphStore extends GraphStore {
     if (metaRows.length > 0 && metaRows[0]) {
       this._lastIndexedAt = metaRows[0]['v'] as string
     }
+
+    this._isOpen = true
   }
 
   /**
@@ -159,14 +159,27 @@ export class LadybugGraphStore extends GraphStore {
    */
   async close(): Promise<void> {
     this._isOpen = false
-    if (this.conn) {
-      await this.conn.close()
-      this.conn = undefined
+    const conn = this.conn
+    const db = this.db
+    this.conn = undefined
+    this.db = undefined
+
+    let firstError: unknown
+    if (conn) {
+      try {
+        await conn.close()
+      } catch (err) {
+        firstError = err
+      }
     }
-    if (this.db) {
-      await this.db.close()
-      this.db = undefined
+    if (db) {
+      try {
+        await db.close()
+      } catch (err) {
+        firstError ??= err
+      }
     }
+    if (firstError) throw firstError as Error
   }
 
   /**
