@@ -173,7 +173,9 @@ export class InMemoryGraphStore extends GraphStore {
 
     if (query.filePath !== undefined) {
       if (query.filePath.includes('*')) {
-        const pattern = new RegExp('^' + query.filePath.replaceAll('*', '.*') + '$')
+        const pattern = new RegExp(
+          '^' + query.filePath.replaceAll('.', '\\.').replaceAll('*', '.*') + '$',
+        )
         results = results.filter((s) => pattern.test(s.filePath))
       } else {
         results = results.filter((s) => s.filePath === query.filePath)
@@ -183,7 +185,10 @@ export class InMemoryGraphStore extends GraphStore {
     if (query.name !== undefined) {
       if (query.name.includes('*')) {
         const flags = ci ? 'i' : ''
-        const pattern = new RegExp('^' + query.name.replaceAll('*', '.*') + '$', flags)
+        const pattern = new RegExp(
+          '^' + query.name.replaceAll('.', '\\.').replaceAll('*', '.*') + '$',
+          flags,
+        )
         results = results.filter((s) => pattern.test(s.name))
       } else if (ci) {
         const lower = query.name.toLowerCase()
@@ -258,7 +263,7 @@ export class InMemoryGraphStore extends GraphStore {
         )
         if (!regex.test(sym.filePath)) continue
       }
-      if (options.workspace && !sym.filePath.startsWith(options.workspace + '/')) continue
+      if (options.workspace && !sym.filePath.startsWith(options.workspace + ':')) continue
       if (matchesExclude(sym.filePath, options.excludePaths, options.excludeWorkspaces)) continue
       results.push({ symbol: sym, score: 1 })
     }
