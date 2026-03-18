@@ -338,6 +338,17 @@ export class IndexCodeGraph {
       }
     }
 
+    // Populate SymbolIndex with existing symbols from unchanged files so
+    // Pass 2 can resolve imports from changed files to unchanged targets
+    const processedPaths = new Set(filesToProcess)
+    for (const prefixedPath of allDiscoveredPaths) {
+      if (processedPaths.has(prefixedPath)) continue
+      const existing = await this.store.findSymbols({ filePath: prefixedPath })
+      if (existing.length > 0) {
+        symbolIndex.addFile(prefixedPath, existing)
+      }
+    }
+
     // ── Pass 2: Resolve imports + extract relations (50-80%) ──
     processed = 0
     for (const chunk of chunks) {
