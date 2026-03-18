@@ -393,9 +393,10 @@ export class LadybugGraphStore extends GraphStore {
         }
       }
 
-      this._lastIndexedAt = new Date().toISOString()
-      await this.updateMeta(conn, 'lastIndexedAt', this._lastIndexedAt)
+      const now = new Date().toISOString()
+      await this.updateMeta(conn, 'lastIndexedAt', now)
       await conn.query('COMMIT')
+      this._lastIndexedAt = now
     } catch (err) {
       await conn.query('ROLLBACK').catch(() => {})
       throw err
