@@ -24,11 +24,11 @@ A `SpecNode` SHALL represent a spec directory in the workspace. It contains:
 
 - **`specId`** (`string`) — the spec identifier in `workspace:package/topic` format (e.g. `core:core/change`, `_global:_global/architecture`). This is the node's identity.
 - **`path`** (`string`) — workspace-relative path to the spec directory (e.g. `specs/core/change`).
-- **`title`** (`string`) — from `.specd-metadata.yaml` `title` field. Falls back to the first `# Heading` in `spec.md` if metadata is absent.
+- **`title`** (`string`) — from `.specd-metadata.yaml` `title` field. Defaults to the `specId` if metadata is absent.
 - **`description`** (`string`) — from `.specd-metadata.yaml` `description` field. Empty string if absent.
 - **`contentHash`** (`string`) — hash of concatenated spec artifacts, excluding `.specd-metadata.yaml`. `spec.md` first if present, then remaining artifacts in alphabetical order. Used for incremental diffing.
 - **`content`** (`string`) — concatenated artifact text for full-text search. Same ordering as `contentHash`: `spec.md` first if present, then remaining artifacts alphabetically. Excludes `.specd-metadata.yaml`.
-- **`dependsOn`** (`string[]`) — ordered list of spec IDs this spec depends on, extracted from `.specd-metadata.yaml` or the `## Spec Dependencies` section in `spec.md`.
+- **`dependsOn`** (`string[]`) — ordered list of spec IDs this spec depends on, extracted from `.specd-metadata.yaml`. Defaults to `[]` if metadata is absent.
 - **`workspace`** (`string`) — the workspace name this spec belongs to (e.g. `core`, `_global`).
 
 Two `SpecNode` values are equal if their `specId` fields match.
