@@ -341,8 +341,12 @@ export class PythonLanguageAdapter implements LanguageAdapter {
 
             if (calleeName) {
               const importedId = importMap.get(calleeName)
+              // Unqualified calls (identifier) cannot resolve to methods in Python;
+              // only attribute calls (self.foo()) can. Pass the call type to filter candidates.
+              const isAttributeCall = nodeKind(funcNode) === 'attribute'
               const calleeId =
-                importedId ?? this.resolveLocalCallee(child, calleeName, localSymbolsByName)
+                importedId ??
+                this.resolveLocalCallee(child, calleeName, localSymbolsByName, isAttributeCall)
               if (calleeId) {
                 const callerId = this.findEnclosingSymbolId(child, symbols, filePath)
                 if (callerId) {
@@ -376,36 +380,27 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    * @param callNode - The call expression AST node.
    * @param name - The callee name to resolve.
    * @param candidates - Map of name → candidate symbols.
+   * @param isAttributeCall - Whether the call is an attribute access (e.g. self.foo()).
    * @returns The best-matching symbol id, or undefined.
    */
   private resolveLocalCallee(
     callNode: SgNode,
     name: string,
     candidates: Map<string, SymbolNode[]>,
+    isAttributeCall: boolean,
   ): string | undefined {
-    const syms = candidates.get(name)
-    if (!syms || syms.length === 0) return undefined
+    const allSyms = candidates.get(name)
+    if (!allSyms || allSyms.length === 0) return undefined
+
+    // In Python, unqualified calls (e.g. `helper()`) resolve via LEGB scope,
+    // not to sibling methods. Only attribute calls (e.g. `self.helper()`) can
+    // resolve to methods. Filter candidates accordingly.
+    const syms = isAttributeCall ? allSyms : allSyms.filter((s) => s.kind !== 'method')
+    if (syms.length === 0) return undefined
     if (syms.length === 1) return syms[0]!.id
 
-    // Find the enclosing scope to prefer same-scope symbols
-    const callLine = callNode.range().start.line + 1
-    let enclosingClass: string | undefined
-    let current = callNode.parent()
-    while (current) {
-      if (nodeKind(current) === 'class_definition') {
-        enclosingClass = current.field('name')?.text()
-        break
-      }
-      current = current.parent()
-    }
-
-    // Prefer method in same class over module-level function
-    if (enclosingClass) {
-      const method = syms.find((s) => s.kind === 'method' && s.line <= callLine)
-      if (method) return method.id
-    }
-
     // Fall back to the symbol defined closest before the call site
+    const callLine = callNode.range().start.line + 1
     let best: SymbolNode | undefined
     for (const s of syms) {
       if (s.line <= callLine) {
