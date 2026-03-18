@@ -274,7 +274,6 @@ export class IndexCodeGraph {
           const identity = adapter.getPackageIdentity(ws.codeRoot, ws.repoRoot)
           if (identity) {
             packageToWorkspace.set(identity, ws.name)
-            break
           }
         }
       }
