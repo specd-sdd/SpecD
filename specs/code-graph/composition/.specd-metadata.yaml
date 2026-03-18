@@ -15,13 +15,13 @@ rules:
       - |-
         `CodeGraphProvider` SHALL be the top-level API object that wraps all code graph functionality. It exposes:
 
-        * **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`
-        * **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getStatistics()` — delegates to `GraphStore`
-        * **Search**: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)` — full-text search with BM25 ranking and store-level filtering, delegates to `GraphStore`
-        * **Maintenance**: `clear(): Promise<void>` — removes all data from the store (for full re-index)
-        * **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
-        * **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `detectChanges(changedFiles)` — delegates to impact functions
-        * **Lifecycle**: `open(): Promise<void>`, `close(): Promise<void>` — manages the store connection
+        - **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`
+        - **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getStatistics()` — delegates to `GraphStore`
+        - **Search**: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)` — full-text search with BM25 ranking and store-level filtering, delegates to `GraphStore`
+        - **Maintenance**: `clear(): Promise<void>` — removes all data from the store (for full re-index)
+        - **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
+        - **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `detectChanges(changedFiles)` — delegates to impact functions
+        - **Lifecycle**: `open(): Promise<void>`, `close(): Promise<void>` — manages the store connection
 
         `CodeGraphProvider` is a thin orchestration layer — it holds no domain logic. All methods delegate to the appropriate domain service or use case.
   - requirement: Factory function
@@ -43,8 +43,8 @@ rules:
 
         `createCodeGraphProvider(options: CodeGraphOptions): CodeGraphProvider` accepts:
 
-        * **`storagePath`** (`string`, required) — workspace root path, used to locate the `.specd/code-graph.lbug` file
-        * **`adapters`** (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the 4 built-in adapters
+        - **`storagePath`** (`string`, required) — workspace root path, used to locate the `.specd/code-graph.lbug` file
+        - **`adapters`** (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the 4 built-in adapters
 
         The factory detects which overload is being used by checking for the `projectRoot` property (present on `SpecdConfig`) vs the `storagePath` property (present on `CodeGraphOptions`).
 
@@ -54,15 +54,15 @@ rules:
       - |-
         The `@specd/code-graph` package SHALL export only:
 
-        * `createCodeGraphProvider` — factory function
-        * `CodeGraphProvider` — type only (for type annotations, not construction)
-        * `CodeGraphOptions` — options type for the factory
-        * `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, `DiscoveredSpec` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).
-        * `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult` — traversal/impact types
-        * `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType` — model types
-        * `SymbolQuery`, `GraphStatistics` — query types
-        * `LanguageAdapter` — interface for custom adapters
-        * `CodeGraphError` and subclasses — error types
+        - `createCodeGraphProvider` — factory function
+        - `CodeGraphProvider` — type only (for type annotations, not construction)
+        - `CodeGraphOptions` — options type for the factory
+        - `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, `DiscoveredSpec` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).
+        - `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult` — traversal/impact types
+        - `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType` — model types
+        - `SymbolQuery`, `GraphStatistics` — query types
+        - `LanguageAdapter` — interface for custom adapters
+        - `CodeGraphError` and subclasses — error types
 
         Internal components (`LadybugGraphStore`, `AdapterRegistry`, `TypeScriptLanguageAdapter`, `IndexCodeGraph`, traversal functions) MUST NOT be exported from the package entry point.
   - requirement: Lifecycle management
@@ -73,7 +73,7 @@ rules:
         The provider does not auto-open or auto-close — callers manage the lifecycle explicitly. This follows the same pattern as database connections and avoids hidden state transitions.
   - requirement: Dependency on @specd/core
     rules:
-      - '`@specd/code-graph` depends on `@specd/core` as a runtime dependency. It uses types (`SpecdConfig`, `SpecdWorkspaceConfig`) and may use domain services (e.g. `parseMetadata`, `SpecRepository`) for spec resolution. The primary factory function accepts `SpecdConfig` to derive workspace targets, storage path, and spec sources.'
+      - '`@specd/code-graph` depends on `@specd/core` as a runtime dependency. It uses types (`SpecdConfig`, `SpecdWorkspaceConfig`) and may use domain services (e.g. `parseMetadata`, `SpecRepository`) for spec resolution. The primary factory function accepts `SpecdConfig` to derive `storagePath` only — the provider is stateless and does not cache the config. Workspace targets and spec sources are built by the caller and passed via `IndexOptions` at each `index()` call.'
 constraints:
   - createCodeGraphProvider is the only construction path — CodeGraphProvider constructor is not exported
   - Internal components are not re-exported from the package
@@ -201,6 +201,6 @@ scenarios:
       - its package.json has a dependency on @specd/core
       - AND the primary factory accepts SpecdConfig from @specd/core
 contentHashes:
-  spec.md: sha256:36b4413fe5e736cdece3b623cd3dca27df32a968d920098ce15c9731ceaa0bcd
+  spec.md: sha256:c02becfb1f182a2a5de1bccc78990d244798a6049701b543aa73f8a76cdedf5d
   verify.md: sha256:231ddedff29ba7b306d23cf054327cceb1facca60fb419f0c48d71fdee0e760f
 generatedBy: core
