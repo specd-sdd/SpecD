@@ -195,11 +195,11 @@
 - **THEN** the indexer calls the callback instead of walking the filesystem
 - **AND** the returned specs are stored with the workspace name
 
-#### Scenario: Spec contentHash from all artifacts
+#### Scenario: Spec contentHash from content artifacts only
 
 - **GIVEN** a spec with artifacts `spec.md`, `verify.md`, and `.specd-metadata.yaml`
 - **WHEN** the `specs()` callback builds the `DiscoveredSpec`
-- **THEN** `contentHash` is computed from all artifacts concatenated
+- **THEN** `contentHash` is computed from all artifacts EXCEPT `.specd-metadata.yaml`
 - **AND** `spec.md` is ordered first, then the remaining artifacts in alphabetical order
 
 #### Scenario: Spec with .specd-metadata.yaml indexed
@@ -209,18 +209,18 @@
 - **THEN** a `SpecNode` with `specId: 'core:core/change'` and `workspace: 'core'` is upserted
 - **AND** two `DEPENDS_ON` relations are created to `core:core/config` and `core:core/storage`
 
-#### Scenario: Spec without metadata falls back to spec.md parsing
+#### Scenario: Spec without metadata uses defaults
 
 - **GIVEN** a spec in workspace `code-graph` with no `.specd-metadata.yaml`
-- **AND** `spec.md` has a `## Spec Dependencies` section linking to `../symbol-model/spec.md` and `../graph-store/spec.md`
 - **WHEN** spec indexing runs
-- **THEN** `DEPENDS_ON` relations are created from the parsed links
+- **THEN** `title` defaults to the `specId`, `description` defaults to `''`, and `dependsOn` defaults to `[]`
+- **AND** no fallback parsing of `spec.md` is performed
 
-#### Scenario: Spec title extracted from heading
+#### Scenario: Spec title defaults to specId when metadata is absent
 
-- **GIVEN** a spec where `spec.md` starts with `# Change`
+- **GIVEN** a spec with `specId: 'code-graph:code-graph/change'` and no `.specd-metadata.yaml`
 - **WHEN** spec indexing runs
-- **THEN** the `SpecNode` has `title: 'Change'`
+- **THEN** the `SpecNode` has `title: 'code-graph:code-graph/change'`
 
 #### Scenario: Incremental spec indexing skips unchanged specs
 
