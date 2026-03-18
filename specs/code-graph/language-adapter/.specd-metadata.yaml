@@ -61,7 +61,7 @@ rules:
         - **`localName`** (`string`) — the name used locally in the importing file (may differ from original via aliasing)
         - **`originalName`** (`string`) — the name as declared in the source module
         - **`specifier`** (`string`) — the raw import specifier string (e.g. `'./utils.js'`, `'@specd/core'`, `'os'`)
-        - **`isRelative`** (`boolean`) — true if the specifier starts with `.` or `/`
+        - **`isRelative`** (`boolean`) — true if the specifier is relative to the importing file (starts with `.` for all built-in adapters)
 
         Each adapter parses imports using its language's syntax:
 
@@ -481,6 +481,6 @@ scenarios:
     then:
       - it returns 'App\\Models\\User'
 contentHashes:
-  spec.md: sha256:c4dfb330800129c9ca98a9ad43eef679224eb5d92432fb7fc2c9abca38389866
+  spec.md: sha256:78b6f4031b0a8194c9a2b2213c65028d6bf6a58e040f423f161c34638c2c47ef
   verify.md: sha256:0cd4bf89790b18a869b03b21325c490dff51128dd2dc6df6ef413febedb6fc01
 generatedBy: core
