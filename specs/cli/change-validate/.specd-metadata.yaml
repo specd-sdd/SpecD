@@ -11,15 +11,16 @@ rules:
     rules:
       - |-
         ```
-        specd change validate <name> <workspace:capability-path> [--format text|json|toon]
+        specd change validate <name> <workspace:capability-path> [--artifact <artifactId>] [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the name of the change to validate
-        * `<workspace:capability-path>` — required positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`.
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the name of the change to validate
+        - `<workspace:capability-path>` — required positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`.
+        - `--artifact <artifactId>` — optional; when provided, only the specified artifact is validated instead of all artifacts for the spec. The artifact ID must exist in the active schema.
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Behaviour
     rules:
-      - The command invokes the `ValidateArtifacts` use case, passing the change name and spec ID.
+      - The command invokes the `ValidateArtifacts` use case, passing the change name, spec ID, and optionally the artifact ID from `--artifact`.
   - requirement: Output on success
     rules:
       - |-
@@ -68,8 +69,11 @@ rules:
   - requirement: Error cases
     rules:
       - |-
-        * If the change does not exist, exits with code 1.
-        * If the schema cannot be resolved, exits with code 3.
+        - If the change does not exist, exits with code 1.
+        - If the schema cannot be resolved, exits with code 3.
+  - requirement: Unknown artifact ID
+    rules:
+      - If `--artifact` is provided with an artifact ID that does not exist in the active schema, the command exits with code 1 and prints the validation failure from the use case to stdout (not stderr — it is a validation result, not a CLI error).
 constraints:
   - Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr
   - The command marks artifacts as complete in the manifest when they pass
@@ -80,6 +84,15 @@ scenarios:
       - specd change validate my-change is run without the spec ID
     then:
       - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Command signature
+    name: Artifact flag accepted
+    given:
+      - a valid change my-change with spec default:auth/login
+    when:
+      - specd change validate my-change default:auth/login --artifact proposal is run
+    then:
+      - the command invokes validation for only the proposal artifact
+      - AND the process exits with code 0 if proposal passes validation
   - requirement: Output on success
     name: All artifacts pass, no warnings
     given:
@@ -123,6 +136,27 @@ scenarios:
     then:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
+  - requirement: Unknown artifact ID
+    name: Unknown artifact ID exits with failure
+    given:
+      - a valid change my-change with spec default:auth/login
+      - AND the active schema has no artifact with ID nonexistent
+    when:
+      - specd change validate my-change default:auth/login --artifact nonexistent is run
+    then:
+      - the command exits with code 1
+      - AND stdout contains the validation failure describing the unknown artifact ID
+  - requirement: Unknown artifact ID
+    name: Unknown artifact ID with JSON format
+    given:
+      - a valid change my-change with spec default:auth/login
+      - AND the active schema has no artifact with ID nonexistent
+    when:
+      - specd change validate my-change default:auth/login --artifact nonexistent --format json is run
+    then:
+      - stdout is valid JSON with passed equal to false
+      - AND failures contains an entry describing the unknown artifact ID
+      - AND the process exits with code 1
   - requirement: Output on success
     name: JSON output on pass
     given:
@@ -142,6 +176,6 @@ scenarios:
       - stdout is valid JSON with passed equal to false and failures containing at least one entry with artifactId and description
       - AND the process exits with code 1
 contentHashes:
-  spec.md: sha256:867685654c75655d1f0e94014fcae4e305fd6536d391e9f12058dcdd633b37f1
-  verify.md: sha256:ddafe2a6265131ea5c8164f731eac3d4a516deaacf533166353b1c9f640761c2
+  spec.md: sha256:ef0d83717dfe6f8482894849a60cd04061da33a8e404f601c3cbd9f237cbae8c
+  verify.md: sha256:d9228f533ea299d6b36e4b892632fed1d09581e24caa2df037c72cab4610cc9b
 generatedBy: core

@@ -46,9 +46,9 @@ rules:
       - |-
         The `Kernel` interface organises use cases into three groups that mirror the domain areas of the platform:
 
-        * `changes` — use cases that operate on change lifecycle (create, transition, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status)
-        * `specs` — use cases that operate on specs and approval gates (approve spec, approve signoff, list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context)
-        * `project` — use cases that operate on the project configuration (init, record skill install, get skills manifest, get project context)
+        - `changes` — use cases that operate on change lifecycle (create, transition, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status)
+        - `specs` — use cases that operate on specs and approval gates (approve spec, approve signoff, list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context)
+        - `project` — use cases that operate on the project configuration (init, record skill install, get skills manifest, get project context)
 
         Use cases must not appear at the top level of the kernel object — they must be nested under their domain-area group.
   - requirement: Every exported use case must have a kernel entry
@@ -62,7 +62,19 @@ rules:
       - Each entry in the `Kernel` interface must be typed as the concrete use case class it wraps. The kernel does not define its own method signatures — it delegates to the use case instances directly. Callers invoke use cases as `kernel.changes.create.execute(...)`, not through a kernel-level abstraction.
   - requirement: createKernel constructs shared adapters once
     rules:
-      - '`createKernel` must build shared infrastructure adapters (repositories, VCS adapter, hook runner, content hasher, YAML serializer, file reader, actor resolver, artifact parser registry, config writer) exactly once via `createKernelInternals` and reuse them across all use cases. No adapter must be constructed more than once per kernel instantiation.'
+      - |-
+        `createKernel` must build shared infrastructure adapters (repositories, VCS adapter, hook runner, content hasher, YAML serializer, file reader, actor resolver, artifact parser registry, config writer) exactly once via `createKernelInternals` and reuse them across all use cases. No adapter must be constructed more than once per kernel instantiation.
+
+        `createKernelInternals` must pass a `resolveArtifactTypes` function to the `FsChangeRepository` options. This allows the change repository to lazily resolve artifact types from the active schema without requiring the schema to be resolved at construction time. The resolver uses the schema registry and workspace schema paths from the kernel config.
+  - requirement: Auto-invalidation on get when artifact files drift
+    rules:
+      - |-
+        When `ChangeRepository.get()` loads a change, the `FsChangeRepository` implementation must check whether any previously-validated artifact file has drifted — i.e. the file had a `validatedHash` set but now has a derived status of `missing` or `in-progress`. If drift is detected AND either of the following conditions holds, the repository must call `change.invalidate('artifact-change', SYSTEM_ACTOR)` to roll the change back to `designing` and persist the updated state:
+
+        1. The change is beyond `designing` state (has progressed past the initial design phase), OR
+        2. The change has an active approval (spec approval or signoff) not superseded by a subsequent `invalidated` event.
+
+        This ensures that both state-inconsistent artifact changes and approval drift are detected eagerly on any change load, not only during explicit validation. See [`specs/core/change-repository-port/spec.md`](../change-repository-port/spec.md) for the full port-level contract.
   - requirement: Kernel exposes repository instances for adapter access
     rules:
       - The kernel must expose the underlying `ChangeRepository` as `changes.repo` and the `SpecRepository` map as `specs.repos`. These allow delivery mechanisms to perform adapter-level queries (path resolution, existence checks) that do not warrant a full use case.
@@ -258,6 +270,6 @@ scenarios:
     then:
       - the kernel object and its nested groups are not expected to change — there is no addUseCase() or removeUseCase() mechanism
 contentHashes:
-  spec.md: sha256:586a07148b9d2f6c4a487f7d8ddf30f0c5ec1b7e3f614649dfeaad6b3704b73f
+  spec.md: sha256:a1da6d1aebd151e1f247fa38dde350908ce5087c54b0d3fb34cfb641c001f587
   verify.md: sha256:557d6d97d8856cc560a5f2053f0b71916836b377d8e4c5bb0b34fa9a73ebe958
 generatedBy: core
