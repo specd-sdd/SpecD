@@ -277,7 +277,15 @@ export class IndexCodeGraph {
         if (adapter.getPackageIdentity) {
           const identity = adapter.getPackageIdentity(ws.codeRoot, ws.repoRoot)
           if (identity) {
-            packageToWorkspace.set(identity, ws.name)
+            const existingWs = packageToWorkspace.get(identity)
+            if (existingWs && existingWs !== ws.name) {
+              errors.push({
+                filePath: `${ws.name}:<manifest>`,
+                message: `Package identity collision: "${identity}" already mapped to workspace "${existingWs}"`,
+              })
+            } else {
+              packageToWorkspace.set(identity, ws.name)
+            }
           }
         }
       }
@@ -399,14 +407,27 @@ export class IndexCodeGraph {
     const existingSpecMap = new Map(existingSpecs.map((s) => [s.specId, s]))
 
     // Build a global set of all known specIds (existing + all discovered across workspaces)
-    // so cross-workspace DEPENDS_ON relations resolve correctly
+    // so cross-workspace DEPENDS_ON relations resolve correctly.
+    // Pre-prune specs that will be deleted so DEPENDS_ON edges never target stale specs.
     const allDiscoveredSpecs = new Map<string, { ws: string; specs: DiscoveredSpec[] }>()
+    const discoveredSpecIdsByWorkspace = new Map<string, Set<string>>()
     const knownSpecIds = new Set(existingSpecs.map((s) => s.specId))
     for (const ws of options.workspaces) {
       const discovered = await ws.specs()
       allDiscoveredSpecs.set(ws.name, { ws: ws.name, specs: discovered })
+      const wsDiscoveredIds = new Set(discovered.map((d) => d.spec.specId))
+      discoveredSpecIdsByWorkspace.set(ws.name, wsDiscoveredIds)
       for (const { spec } of discovered) {
         knownSpecIds.add(spec.specId)
+      }
+    }
+
+    // Remove specs that will be deleted from knownSpecIds before any DEPENDS_ON emission
+    for (const existing of existingSpecs) {
+      if (!indexedWorkspaceNames.has(existing.workspace)) continue
+      const discoveredIds = discoveredSpecIdsByWorkspace.get(existing.workspace)
+      if (!discoveredIds?.has(existing.specId)) {
+        knownSpecIds.delete(existing.specId)
       }
     }
 
@@ -425,7 +446,6 @@ export class IndexCodeGraph {
         if (existing.workspace === ws.name && !discoveredSpecIds.has(existing.specId)) {
           try {
             await this.store.removeSpec(existing.specId)
-            knownSpecIds.delete(existing.specId)
           } catch (err) {
             errors.push({ filePath: existing.path, message: String(err) })
           }
