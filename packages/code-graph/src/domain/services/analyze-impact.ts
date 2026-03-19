@@ -11,20 +11,22 @@ import { getDownstream } from './get-downstream.js'
  * @param store - The graph store to query.
  * @param target - The id of the symbol to analyze impact for.
  * @param direction - The traversal direction: upstream, downstream, or both.
+ * @param maxDepth - Maximum traversal depth (default: 3).
  * @returns The impact result with dependent counts, risk level, and affected files.
  */
 export async function analyzeImpact(
   store: GraphStore,
   target: string,
   direction: 'upstream' | 'downstream' | 'both',
+  maxDepth = 3,
 ): Promise<ImpactResult> {
   // CALLS-based traversal (symbol-level)
   const results = []
   if (direction === 'upstream' || direction === 'both') {
-    results.push(await getUpstream(store, target, { maxDepth: 3 }))
+    results.push(await getUpstream(store, target, { maxDepth }))
   }
   if (direction === 'downstream' || direction === 'both') {
-    results.push(await getDownstream(store, target, { maxDepth: 3 }))
+    results.push(await getDownstream(store, target, { maxDepth }))
   }
 
   const affectedFileSet = new Set<string>()
@@ -46,6 +48,7 @@ export async function analyzeImpact(
             name: symbol.name,
             filePath: symbol.filePath,
             line: symbol.line,
+            depth,
           })
         }
       }
@@ -60,7 +63,7 @@ export async function analyzeImpact(
     const visited = new Set<string>([symbol.filePath])
     let currentFiles = [symbol.filePath]
 
-    for (let depth = 1; depth <= 3; depth++) {
+    for (let depth = 1; depth <= maxDepth; depth++) {
       const nextFiles: string[] = []
 
       for (const fp of currentFiles) {
@@ -100,6 +103,7 @@ export async function analyzeImpact(
                   name: fs.name,
                   filePath: fs.filePath,
                   line: fs.line,
+                  depth,
                 })
                 foundViaCall = true
               }
@@ -117,6 +121,7 @@ export async function analyzeImpact(
                     name: es.name,
                     filePath: es.filePath,
                     line: es.line,
+                    depth,
                   })
                 }
               }

@@ -154,6 +154,96 @@ describe('Traversal services', () => {
       expect(result.directDependents).toBe(7)
       expect(result.riskLevel).toBe('HIGH')
     })
+
+    it('populates depth on affectedSymbols', async () => {
+      const a = sym('a', 'x.ts', 1)
+      const b = sym('b', 'x.ts', 2)
+      const c = sym('c', 'x.ts', 3)
+      const d = sym('d', 'x.ts', 4)
+
+      await store.upsertFile(
+        file('x.ts'),
+        [a, b, c, d],
+        [
+          createRelation({ source: b.id, target: a.id, type: RelationType.Calls }),
+          createRelation({ source: c.id, target: b.id, type: RelationType.Calls }),
+          createRelation({ source: d.id, target: c.id, type: RelationType.Calls }),
+        ],
+      )
+
+      const result = await analyzeImpact(store, a.id, 'upstream')
+      const byName = new Map(result.affectedSymbols.map((s) => [s.name, s]))
+      expect(byName.get('b')!.depth).toBe(1)
+      expect(byName.get('c')!.depth).toBe(2)
+      expect(byName.get('d')!.depth).toBe(3)
+    })
+
+    it('respects custom maxDepth', async () => {
+      const a = sym('a', 'x.ts', 1)
+      const b = sym('b', 'x.ts', 2)
+      const c = sym('c', 'x.ts', 3)
+      const d = sym('d', 'x.ts', 4)
+      const e = sym('e', 'x.ts', 5)
+
+      await store.upsertFile(
+        file('x.ts'),
+        [a, b, c, d, e],
+        [
+          createRelation({ source: b.id, target: a.id, type: RelationType.Calls }),
+          createRelation({ source: c.id, target: b.id, type: RelationType.Calls }),
+          createRelation({ source: d.id, target: c.id, type: RelationType.Calls }),
+          createRelation({ source: e.id, target: d.id, type: RelationType.Calls }),
+        ],
+      )
+
+      const result = await analyzeImpact(store, a.id, 'upstream', 5)
+      expect(result.affectedSymbols).toHaveLength(4)
+      expect(result.affectedSymbols.some((s) => s.name === 'e')).toBe(true)
+    })
+
+    it('defaults maxDepth to 3', async () => {
+      const a = sym('a', 'x.ts', 1)
+      const b = sym('b', 'x.ts', 2)
+      const c = sym('c', 'x.ts', 3)
+      const d = sym('d', 'x.ts', 4)
+      const e = sym('e', 'x.ts', 5)
+
+      await store.upsertFile(
+        file('x.ts'),
+        [a, b, c, d, e],
+        [
+          createRelation({ source: b.id, target: a.id, type: RelationType.Calls }),
+          createRelation({ source: c.id, target: b.id, type: RelationType.Calls }),
+          createRelation({ source: d.id, target: c.id, type: RelationType.Calls }),
+          createRelation({ source: e.id, target: d.id, type: RelationType.Calls }),
+        ],
+      )
+
+      const result = await analyzeImpact(store, a.id, 'upstream')
+      expect(result.affectedSymbols).toHaveLength(3)
+      expect(result.affectedSymbols.some((s) => s.name === 'e')).toBe(false)
+    })
+
+    it('maxDepth 1 returns only direct dependents', async () => {
+      const a = sym('a', 'x.ts', 1)
+      const b = sym('b', 'x.ts', 2)
+      const c = sym('c', 'x.ts', 3)
+
+      await store.upsertFile(
+        file('x.ts'),
+        [a, b, c],
+        [
+          createRelation({ source: b.id, target: a.id, type: RelationType.Calls }),
+          createRelation({ source: c.id, target: b.id, type: RelationType.Calls }),
+        ],
+      )
+
+      const result = await analyzeImpact(store, a.id, 'upstream', 1)
+      expect(result.affectedSymbols).toHaveLength(1)
+      expect(result.affectedSymbols[0]!.depth).toBe(1)
+      expect(result.indirectDependents).toBe(0)
+      expect(result.transitiveDependents).toBe(0)
+    })
   })
 
   describe('analyzeFileImpact', () => {

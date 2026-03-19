@@ -8,11 +8,13 @@ import { getUpstream } from './get-upstream.js'
  * Detects which symbols and files are affected by changes to a set of files.
  * @param store - The graph store to query.
  * @param changedFiles - The list of file paths that have changed.
+ * @param maxDepth - Maximum traversal depth (default: 3).
  * @returns The change detection result with affected symbols, files, and risk level.
  */
 export async function detectChanges(
   store: GraphStore,
   changedFiles: string[],
+  maxDepth = 3,
 ): Promise<ChangeDetectionResult> {
   const changedSymbols: SymbolNode[] = []
   const affectedSymbolMap = new Map<string, SymbolNode>()
@@ -24,7 +26,7 @@ export async function detectChanges(
     changedSymbols.push(...symbols)
 
     for (const symbol of symbols) {
-      const result = await getUpstream(store, symbol.id, { maxDepth: 3 })
+      const result = await getUpstream(store, symbol.id, { maxDepth })
       const totalDependents = result.totalCount
       const directDependents = result.levels.get(1)?.length ?? 0
 
