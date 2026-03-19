@@ -14,8 +14,8 @@ Changes must advance through a strict lifecycle, and the rules for doing so — 
 - `to` (ChangeState, required) — the requested target state
 - `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled
 - `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled
-- `implementingRequires` (readonly string[], optional) — artifact IDs whose validation is cleared on `verifying` to `implementing`
-- `implementingTaskChecks` (ReadonlyArray\<TaskCompletionCheck\>, optional) — task completion checks for `implementing` to `verifying`
+- `implementingRequires` (readonly string\[], optional) — artifact IDs whose validation is cleared on `verifying` to `implementing`
+- `implementingTaskChecks` (ReadonlyArray\<TaskCompletionCheck>, optional) — task completion checks for `implementing` to `verifying`
 - `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
 
 ### Requirement: Change must exist
@@ -54,6 +54,20 @@ When the current state is `implementing` and the effective target is `verifying`
 ### Requirement: Artifact validation clearing on verifying to implementing
 
 When the current state is `verifying` and the effective target is `implementing`, the use case MUST call `change.clearArtifactValidations` with the `implementingRequires` list (defaulting to an empty array) before performing the transition. This resets validation state for the specified artifacts.
+
+### Requirement: Transition to designing from any state
+
+Every state except `drafting` SHALL include `designing` as a valid transition target. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered.
+
+When the effective target is `designing`, the use case MUST:
+
+1. Invalidate the active spec approval if one exists — call `change.invalidate('redesign', actor)`.
+2. Invalidate the active signoff if one exists — the invalidation in step 1 already clears both.
+3. Proceed with the transition via `change.transition('designing', actor)`.
+
+If no active approvals exist, the transition proceeds directly without invalidation.
+
+The `archivable` state is no longer terminal — it can transition to `designing` like any other state.
 
 ### Requirement: Pre-hook execution
 
@@ -102,7 +116,7 @@ After a successful transition, the use case MUST persist the updated change via 
 - `SchemaRegistry` — for resolving the active schema to look up workflow steps and requires
 - `RunStepHooks` — for executing `run:` hooks at step boundaries
 - `schemaRef` (string) — the schema reference string from config
-- `workspaceSchemasPaths` (ReadonlyMap<string, string>) — workspace-to-schemas-path map
+- `workspaceSchemasPaths` (ReadonlyMap\<string, string>) — workspace-to-schemas-path map
 
 ## Constraints
 

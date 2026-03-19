@@ -1012,4 +1012,142 @@ describe('TransitionChange', () => {
       expect(result.postHookFailures).toEqual([])
     })
   })
+
+  describe('transition to designing', () => {
+    function makeArchivableChange(name: string): Change {
+      return makeChangeInState(name, [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'done', to: 'archivable', at: new Date(), by: actor },
+      ])
+    }
+
+    function makeImplementingChange(name: string): Change {
+      return makeChangeInState(name, [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+      ])
+    }
+
+    function makeImplementingChangeWithApproval(name: string): Change {
+      return makeChangeInState(name, [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        {
+          type: 'transitioned',
+          from: 'ready',
+          to: 'pending-spec-approval',
+          at: new Date(),
+          by: actor,
+        },
+        {
+          type: 'spec-approved',
+          reason: 'lgtm',
+          at: new Date(),
+          by: actor,
+          artifactHashes: {},
+        },
+        {
+          type: 'transitioned',
+          from: 'pending-spec-approval',
+          to: 'spec-approved',
+          at: new Date(),
+          by: actor,
+        },
+        {
+          type: 'transitioned',
+          from: 'spec-approved',
+          to: 'implementing',
+          at: new Date(),
+          by: actor,
+        },
+      ])
+    }
+
+    it('transitions from archivable to designing', async () => {
+      const change = makeArchivableChange('my-change')
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(result.change.state).toBe('designing')
+    })
+
+    it('transitions from implementing to designing', async () => {
+      const change = makeImplementingChange('my-change')
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(result.change.state).toBe('designing')
+    })
+
+    it('invalidates approvals when transitioning to designing with active spec approval', async () => {
+      const change = makeImplementingChangeWithApproval('my-change')
+      expect(change.activeSpecApproval).toBeDefined()
+
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(result.change.state).toBe('designing')
+      expect(result.change.activeSpecApproval).toBeUndefined()
+    })
+
+    it('does not invalidate when transitioning to designing without active approvals', async () => {
+      const change = makeImplementingChange('my-change')
+      expect(change.activeSpecApproval).toBeUndefined()
+      expect(change.activeSignoff).toBeUndefined()
+
+      const invalidateSpy = vi.spyOn(change, 'invalidate')
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo)
+
+      await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(invalidateSpy).not.toHaveBeenCalled()
+    })
+
+    it('does not trigger invalidation for drafting to designing', async () => {
+      const change = makeChangeInState('my-change', [])
+      expect(change.state).toBe('drafting')
+
+      const invalidateSpy = vi.spyOn(change, 'invalidate')
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(result.change.state).toBe('designing')
+      expect(invalidateSpy).not.toHaveBeenCalled()
+    })
+  })
 })
