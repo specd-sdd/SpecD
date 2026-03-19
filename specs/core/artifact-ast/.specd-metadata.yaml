@@ -244,23 +244,6 @@ scenarios:
       - the markdown adapter serializes a parsed AST
     then:
       - output uses deterministic project markdown style for ambiguous constructs
-  - requirement: Markdown AST
-    name: Delta apply preserves inline metadata of untouched markdown nodes
-    given:
-      - a markdown AST where paragraph nodes keep adapter inline metadata for serialization
-      - AND a delta modifies a sibling section only
-    when:
-      - the delta is applied and the AST is serialized
-    then:
-      - untouched paragraph nodes still preserve equivalent inline formatting intent after re-parse
-  - requirement: Markdown AST
-    name: Mixed markdown style normalizes deterministically
-    given:
-      - markdown content with mixed markers for unordered lists or emphasis
-    when:
-      - the markdown adapter serializes a parsed AST
-    then:
-      - output uses deterministic project markdown style for ambiguous constructs
   - requirement: YAML AST
     name: Scalar pair
     given:
@@ -327,5 +310,5 @@ scenarios:
       - the keywords property has children containing an array node with array-item children each having value
 contentHashes:
   spec.md: sha256:6b69a44b550fa5b661969996063fa171a059505325ca23855c6696e62d9cffa6
-  verify.md: sha256:c1a4369161c319052e18b7e24abb6630b39b863425dde3873c34ab4f5abbfda0
+  verify.md: sha256:0348685e5c899f40e53dbf01abb71fdcc9cab5f66aec5cbb5a03c384e4440185
 generatedBy: core

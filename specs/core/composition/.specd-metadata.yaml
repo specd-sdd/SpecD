@@ -14,13 +14,22 @@ rules:
       - |-
         Every use-case factory supports two call signatures:
 
-        * `createArchiveChange(config: SpecdConfig)` — extracts all required values from a fully resolved config object
-        * `createArchiveChange(context: ArchiveChangeContext, options: FsArchiveChangeOptions)` — accepts domain context and adapter options explicitly
+        - `createArchiveChange(config: SpecdConfig)` — extracts all required values from a fully resolved config object
+        - `createArchiveChange(context: ArchiveChangeContext, options: FsArchiveChangeOptions)` — accepts domain context and adapter options explicitly
 
         Both signatures are public exports. The explicit form is used in tests and in scenarios where only a subset of the config is available. The `SpecdConfig` form is used by the kernel and by delivery mechanisms that have already loaded config.
   - requirement: Internal ports are never exported
     rules:
       - Port implementations that have a single concrete class and no caller-visible configuration — `NodeHookRunner`, `GitVcsAdapter`, `FsFileReader` — are constructed inside use-case factories and never appear in any public export. Repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`) are also internal to the composition layer.
+  - requirement: FsChangeRepository options include artifact type resolution
+    rules:
+      - |-
+        `FsChangeRepositoryOptions` accepts two optional fields for artifact sync:
+
+        - **`artifactTypes`** (`readonly ArtifactType[]`, optional) — resolved artifact types from the active schema. When provided, the repository uses these directly for `syncArtifacts` on every `get()` and `save()`.
+        - **`resolveArtifactTypes`** (`() => Promise<readonly ArtifactType[]>`, optional) — async resolver for artifact types. Used when artifact types aren't known at construction time (e.g. kernel-level repo created before schema is resolved). Resolved lazily on first use and cached thereafter.
+
+        At least one of these should be provided; if neither is available, artifact sync is a no-op (empty artifact types array).
   - requirement: Kernel builds all use cases from SpecdConfig
     rules:
       - |-
@@ -45,8 +54,8 @@ rules:
 
         `SpecdConfig` includes the following fields relevant to schema customisation:
 
-        * `schemaPlugins` (`readonly string[]`, optional) — schema-plugin references in declaration order
-        * `schemaOverrides` (`SchemaOperations | undefined`, optional) — inline merge operations
+        - `schemaPlugins` (`readonly string[]`, optional) — schema-plugin references in declaration order
+        - `schemaOverrides` (`SchemaOperations | undefined`, optional) — inline merge operations
 
         The fields `artifactRules` and `workflow` (project-level hook additions) are no longer part of `SpecdConfig` — they have been replaced by `schemaOverrides`.
   - requirement: ResolveSchema factory wiring
@@ -54,11 +63,11 @@ rules:
       - |-
         `createResolveSchema(config: SpecdConfig)` must construct a `ResolveSchema` use case with:
 
-        * The `SchemaRegistry` adapter
-        * `config.schema` as the schema reference
-        * The resolved workspace schemas paths map
-        * `config.schemaPlugins` (defaulting to `[]` if absent)
-        * `config.schemaOverrides` (defaulting to `undefined` if absent)
+        - The `SchemaRegistry` adapter
+        - `config.schema` as the schema reference
+        - The resolved workspace schemas paths map
+        - `config.schemaPlugins` (defaulting to `[]` if absent)
+        - `config.schemaOverrides` (defaulting to `undefined` if absent)
 
         `createGetActiveSchema(config: SpecdConfig)` must construct `GetActiveSchema` with a `ResolveSchema` instance from `createResolveSchema(config)`.
 constraints:
@@ -139,6 +148,6 @@ scenarios:
     then:
       - it contains only readonly properties — no methods, no class instances
 contentHashes:
-  spec.md: sha256:1bbfe84eefb1c7a7bf5f1c1ba271120f24cfbb8eb14bac7e8586d8409a1daf89
+  spec.md: sha256:017905178dc6761ff46cf53ab2be35e9506895b26ea71f74355051b5ce71a087
   verify.md: sha256:0c52ccb33c86395ce167e95216bf13aa6c37f22c8563efee86a04974d7b6049b
 generatedBy: core

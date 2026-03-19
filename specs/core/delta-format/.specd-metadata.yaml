@@ -474,23 +474,6 @@ scenarios:
       - a delta is applied and the markdown result is serialized
     then:
       - ambiguous constructs are emitted using deterministic project markdown conventions
-  - requirement: Delta application
-    name: modified operation does not strip inline formatting in untouched nodes
-    given:
-      - a markdown document with one untouched paragraph containing `inline`, *emphasis*, and **strong**
-      - AND a modified delta entry targets a different section
-    when:
-      - apply is executed and the result is serialized
-    then:
-      - untouched paragraph inline formatting remains semantically equivalent and is not downgraded to plain text
-  - requirement: Delta application
-    name: markdown apply output is deterministic for mixed style input
-    given:
-      - a markdown document that mixes supported style markers for the same construct
-    when:
-      - a delta is applied and the markdown result is serialized
-    then:
-      - ambiguous constructs are emitted using deterministic project markdown conventions
   - requirement: Delta conflict detection
     name: Two entries targeting the same node
     when:
@@ -518,6 +501,6 @@ scenarios:
     then:
       - validation fails with the appropriate error
 contentHashes:
-  spec.md: sha256:8cdd33fa754993625e5fedd918a90520041929caa5af43af3332134bd4480136
-  verify.md: sha256:1c9543ee0b06a313bf8248f2e04cc46c7065b82d60f377ff40f6685e0075b5a4
+  spec.md: sha256:8fcbebfae4b7457113c03a40dd610c110c0aad7c78c4565b508eca3276d36521
+  verify.md: sha256:944a1a3c9760956130afe021b555057c00f5a34caa5798fc87d802666e26f9c4
 generatedBy: core

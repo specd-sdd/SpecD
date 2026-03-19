@@ -13,41 +13,53 @@ rules:
         specd change artifacts <name> [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the name of the change
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the name of the change
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Output format
     rules:
       - |-
-        In `text` mode (default), each artifact is listed on one line:
+        Artifacts are listed per-file. Multi-file artifacts (e.g. `scope: spec` with multiple
+        specIds) produce one row per file. Single-file artifacts produce one row.
+
+        In `text` mode (default), each file is listed on one line:
 
         ```
-        <artifact-id>  <effectiveStatus>  <exists>  <absolute-path>
+        <id>  <effectiveStatus>  <exists>
         ```
 
-        where `<exists>` is `yes` or `no`, and `<absolute-path>` is the full filesystem path to the artifact file within the change directory (whether or not the file currently exists on disk).
+        For multi-file artifacts, `<id>` includes the file key: `<artifact-id> [<file-key>]`.
+        For single-file artifacts, `<id>` is just the artifact type id.
+
+        When an artifact has no files yet (not synced), a summary row is shown with the
+        artifact-level `effectiveStatus`.
 
         In `json` or `toon` mode, the output is (encoded in the respective format):
 
         ```json
         {
           "name": "<change-name>",
-          "changeDir": "<absolute-path-to-change-directory>",
           "artifacts": [
             {
-              "id": "...",
-              "filename": "...",
-              "path": "<absolute-path>",
-              "effectiveStatus": "missing|in-progress|complete|skipped",
+              "id": "proposal",
+              "filename": "proposal.md",
+              "effectiveStatus": "complete",
+              "exists": true
+            },
+            {
+              "id": "specs [default:auth/login]",
+              "filename": "specs/default/auth/login/spec.md",
+              "effectiveStatus": "in-progress",
               "exists": true
             }
           ]
         }
         ```
 
-        Artifacts are listed in schema-declared order. `changeDir` is the absolute path to the root of the change directory.
+        Artifacts are listed in schema-declared order, with per-file entries within each
+        artifact.
   - requirement: Error cases
     rules:
-      - '* If the change does not exist, exits with code 1.'
+      - '- If the change does not exist, exits with code 1.'
 constraints:
   - Paths are always absolute — never relative
   - All artifacts declared by the schema are listed, regardless of whether their files exist on disk
@@ -110,6 +122,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:05310103f7405206edab032f2f8bdc524da9b94a5c8fdbe15c5d756aa56d74fb
+  spec.md: sha256:34e76751e7dd73c7c934872fd99d6c9ef8d8e9f7575c8be66ce3a88b71d205c8
   verify.md: sha256:e9a857428358ecc5fbf562cca125fb94077c481f69ca312e84cfd3abb7fcac03
 generatedBy: core

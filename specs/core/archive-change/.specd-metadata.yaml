@@ -90,7 +90,7 @@ rules:
 
         When the base markdown uses mixed style markers for the same construct (for example both `-` and `*` bullets, or both `*` and `_` for emphasis/strong), archive-time serialization must be deterministic and follow project markdown conventions configured for lint consistency.
 
-        1. For each artifact in the schema that declares `delta: false` (new file artifacts created in-change):
+        3. For each artifact in the schema that declares `delta: false` (new file artifacts created in-change):
            a. Retrieve the file for this spec ID from the artifact via `artifact.getFile(specId)`. If the file is absent or its status is `skipped`, skip — nothing to sync.
            b. Load the artifact file content from `ChangeRepository` using the file's `filename`. Save the content directly to `SpecRepository` (creating the spec directory and file if they do not exist).
   - requirement: Archive repository call
@@ -257,23 +257,6 @@ scenarios:
       - ArchiveChange.execute merges and serializes the markdown artifact
     then:
       - output style is deterministic and follows project markdown conventions
-  - requirement: Delta merge and spec sync
-    name: Markdown delta merge preserves untouched inline formatting
-    given:
-      - a base markdown spec with untouched prose containing inline code like `specd change validate <name>`
-      - AND the delta modifies a different section in the same file
-    when:
-      - ArchiveChange.execute merges and serializes the markdown artifact
-    then:
-      - untouched prose still contains inline-code backticks and unescaped <name> text
-  - requirement: Delta merge and spec sync
-    name: Mixed markdown style serializes deterministically
-    given:
-      - a base markdown spec that mixes unordered list markers (- and *) or emphasis markers (* and _) for the same construct
-    when:
-      - ArchiveChange.execute merges and serializes the markdown artifact
-    then:
-      - output style is deterministic and follows project markdown conventions
   - requirement: ArchivedChange construction
     name: archivedName derived from createdAt
     given:
@@ -353,6 +336,6 @@ scenarios:
     then:
       - ArchiveChange.execute throws and does not return a result
 contentHashes:
-  spec.md: sha256:daea2a3f40d7e8877f4a6b3d90792eef0416df4036c4e6acab251b9904c4df57
-  verify.md: sha256:9513f5cf5c6daf070c40195761b9213c46827c2ea802860d4559d51d6b82ad63
+  spec.md: sha256:eeb6f00842100100a7a3fd8f86082dc68b1eba6040b4e0f413210a0c9d028bc3
+  verify.md: sha256:346cb7df095dcba7aa1888cc813223612b0a11cda31b3e3c95cfe9f7bbb8b451
 generatedBy: core
