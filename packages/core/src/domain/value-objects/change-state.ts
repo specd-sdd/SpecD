@@ -27,16 +27,16 @@ export type ChangeState =
  */
 export const VALID_TRANSITIONS: Record<ChangeState, readonly ChangeState[]> = {
   drafting: ['designing'],
-  designing: ['ready'],
-  ready: ['implementing', 'pending-spec-approval'],
-  'pending-spec-approval': ['spec-approved'],
-  'spec-approved': ['implementing'],
-  implementing: ['verifying'],
-  verifying: ['implementing', 'done'],
-  done: ['archivable', 'pending-signoff'],
-  'pending-signoff': ['signed-off'],
-  'signed-off': ['archivable'],
-  archivable: [],
+  designing: ['ready', 'designing'],
+  ready: ['implementing', 'pending-spec-approval', 'designing'],
+  'pending-spec-approval': ['spec-approved', 'designing'],
+  'spec-approved': ['implementing', 'designing'],
+  implementing: ['verifying', 'designing'],
+  verifying: ['implementing', 'done', 'designing'],
+  done: ['archivable', 'pending-signoff', 'designing'],
+  'pending-signoff': ['signed-off', 'designing'],
+  'signed-off': ['archivable', 'designing'],
+  archivable: ['designing'],
 }
 
 /**

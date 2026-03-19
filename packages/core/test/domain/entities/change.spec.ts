@@ -298,6 +298,20 @@ describe('Change', () => {
       expect(proposal.getFile('proposal')?.validatedHash).toBeUndefined()
       expect(design.getFile('design')?.validatedHash).toBeUndefined()
     })
+
+    it('succeeds from archivable state', () => {
+      const c = makeChange()
+      c.transition('designing', actor)
+      c.transition('ready', actor)
+      c.transition('implementing', actor)
+      c.transition('verifying', actor)
+      c.transition('done', actor)
+      c.transition('archivable', actor)
+      expect(c.state).toBe('archivable')
+
+      c.invalidate('redesign', actor)
+      expect(c.state).toBe('designing')
+    })
   })
 
   describe('recordSpecApproval', () => {

@@ -24,24 +24,38 @@ describe('ChangeState', () => {
     it.each([
       ['drafting', 'designing'],
       ['designing', 'ready'],
+      ['designing', 'designing'],
       ['ready', 'implementing'],
       ['ready', 'pending-spec-approval'],
+      ['ready', 'designing'],
       ['pending-spec-approval', 'spec-approved'],
+      ['pending-spec-approval', 'designing'],
       ['spec-approved', 'implementing'],
+      ['spec-approved', 'designing'],
       ['implementing', 'verifying'],
+      ['implementing', 'designing'],
       ['verifying', 'implementing'],
       ['verifying', 'done'],
+      ['verifying', 'designing'],
       ['done', 'archivable'],
       ['done', 'pending-signoff'],
+      ['done', 'designing'],
       ['pending-signoff', 'signed-off'],
+      ['pending-signoff', 'designing'],
       ['signed-off', 'archivable'],
+      ['signed-off', 'designing'],
+      ['archivable', 'designing'],
     ] as [ChangeState, ChangeState][])('allows %s → %s', (from, to) => {
       expect(isValidTransition(from, to)).toBe(true)
     })
 
-    it('rejects archivable → anything (terminal state)', () => {
+    it('archivable only allows transition to designing', () => {
       for (const to of ALL_STATES) {
-        expect(isValidTransition('archivable', to)).toBe(false)
+        if (to === 'designing') {
+          expect(isValidTransition('archivable', to)).toBe(true)
+        } else {
+          expect(isValidTransition('archivable', to)).toBe(false)
+        }
       }
     })
 
@@ -58,9 +72,13 @@ describe('ChangeState', () => {
       expect(isValidTransition('done', 'implementing')).toBe(false)
     })
 
-    it('rejects self-transitions', () => {
+    it('rejects self-transitions (except designing)', () => {
       for (const state of ALL_STATES) {
-        expect(isValidTransition(state, state)).toBe(false)
+        if (state === 'designing') {
+          expect(isValidTransition(state, state)).toBe(true)
+        } else {
+          expect(isValidTransition(state, state)).toBe(false)
+        }
       }
     })
   })
@@ -72,8 +90,8 @@ describe('ChangeState', () => {
       }
     })
 
-    it('archivable has no valid transitions', () => {
-      expect(VALID_TRANSITIONS['archivable']).toHaveLength(0)
+    it('archivable allows only designing', () => {
+      expect(VALID_TRANSITIONS['archivable']).toEqual(['designing'])
     })
 
     it('ready has two valid transitions (free path and spec approval gate)', () => {

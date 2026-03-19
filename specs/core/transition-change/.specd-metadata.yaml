@@ -14,13 +14,13 @@ rules:
       - |-
         `TransitionChange.execute` SHALL accept a `TransitionChangeInput` with the following fields:
 
-        * `name` (string, required) — the change to transition
-        * `to` (ChangeState, required) — the requested target state
-        * `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled
-        * `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled
-        * `implementingRequires` (readonly string\[], optional) — artifact IDs whose validation is cleared on `verifying` to `implementing`
-        * `implementingTaskChecks` (ReadonlyArray\<TaskCompletionCheck>, optional) — task completion checks for `implementing` to `verifying`
-        * `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
+        - `name` (string, required) — the change to transition
+        - `to` (ChangeState, required) — the requested target state
+        - `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled
+        - `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled
+        - `implementingRequires` (readonly string\[], optional) — artifact IDs whose validation is cleared on `verifying` to `implementing`
+        - `implementingTaskChecks` (ReadonlyArray\<TaskCompletionCheck>, optional) — task completion checks for `implementing` to `verifying`
+        - `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
   - requirement: Change must exist
     rules:
       - The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
@@ -53,6 +53,20 @@ rules:
   - requirement: Artifact validation clearing on verifying to implementing
     rules:
       - When the current state is `verifying` and the effective target is `implementing`, the use case MUST call `change.clearArtifactValidations` with the `implementingRequires` list (defaulting to an empty array) before performing the transition. This resets validation state for the specified artifacts.
+  - requirement: Transition to designing from any state
+    rules:
+      - |-
+        Every state except `drafting` SHALL include `designing` as a valid transition target. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered.
+
+        When the effective target is `designing`, the use case MUST:
+
+        1. Invalidate the active spec approval if one exists — call `change.invalidate('redesign', actor)`.
+        2. Invalidate the active signoff if one exists — the invalidation in step 1 already clears both.
+        3. Proceed with the transition via `change.transition('designing', actor)`.
+
+        If no active approvals exist, the transition proceeds directly without invalidation.
+
+        The `archivable` state is no longer terminal — it can transition to `designing` like any other state.
   - requirement: Pre-hook execution
     rules:
       - |-
@@ -76,28 +90,28 @@ rules:
       - |-
         `TransitionChange.execute` MUST return a `TransitionChangeResult` containing:
 
-        * `change` — the updated `Change` instance after the transition
-        * `postHookFailures` — array of hook commands that failed during post-hook execution; empty when no post-hooks fail or when `skipHooks` is `true`
+        - `change` — the updated `Change` instance after the transition
+        - `postHookFailures` — array of hook commands that failed during post-hook execution; empty when no post-hooks fail or when `skipHooks` is `true`
   - requirement: Progress callback
     rules:
       - |-
         `TransitionChange.execute` SHALL accept an optional second parameter `onProgress?: OnTransitionProgress`. Progress events are:
 
-        * `{ type: 'requires-check', artifactId: string, satisfied: boolean }` — emitted per artifact during requires enforcement
-        * `{ type: 'hook-start', phase: 'pre' | 'post', hookId: string, command: string }` — emitted before each hook
-        * `{ type: 'hook-done', phase: 'pre' | 'post', hookId: string, success: boolean, exitCode: number }` — emitted after each hook
-        * `{ type: 'transitioned', from: ChangeState, to: ChangeState }` — emitted after state change
+        - `{ type: 'requires-check', artifactId: string, satisfied: boolean }` — emitted per artifact during requires enforcement
+        - `{ type: 'hook-start', phase: 'pre' | 'post', hookId: string, command: string }` — emitted before each hook
+        - `{ type: 'hook-done', phase: 'pre' | 'post', hookId: string, success: boolean, exitCode: number }` — emitted after each hook
+        - `{ type: 'transitioned', from: ChangeState, to: ChangeState }` — emitted after state change
   - requirement: Dependencies
     rules:
       - |-
         `TransitionChange` depends on the following ports injected via constructor:
 
-        * `ChangeRepository` — for loading, artifact content access, and persistence
-        * `ActorResolver` — for resolving the current actor identity
-        * `SchemaRegistry` — for resolving the active schema to look up workflow steps and requires
-        * `RunStepHooks` — for executing `run:` hooks at step boundaries
-        * `schemaRef` (string) — the schema reference string from config
-        * `workspaceSchemasPaths` (ReadonlyMap\<string, string>) — workspace-to-schemas-path map
+        - `ChangeRepository` — for loading, artifact content access, and persistence
+        - `ActorResolver` — for resolving the current actor identity
+        - `SchemaRegistry` — for resolving the active schema to look up workflow steps and requires
+        - `RunStepHooks` — for executing `run:` hooks at step boundaries
+        - `schemaRef` (string) — the schema reference string from config
+        - `workspaceSchemasPaths` (ReadonlyMap\<string, string>) — workspace-to-schemas-path map
 constraints:
   - The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates
   - Task completion checks use safeRegex to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
@@ -201,6 +215,49 @@ scenarios:
       - "execute is called with to: 'implementing' and no implementingRequires"
     then:
       - change.clearArtifactValidations is called with an empty array
+  - requirement: Transition to designing from any state
+    name: Transition from archivable to designing
+    given:
+      - a change in archivable state
+    when:
+      - "execute is called with to: 'designing'"
+    then:
+      - the change transitions to designing
+  - requirement: Transition to designing from any state
+    name: Transition from implementing to designing
+    given:
+      - a change in implementing state
+    when:
+      - "execute is called with to: 'designing'"
+    then:
+      - the change transitions to designing
+  - requirement: Transition to designing from any state
+    name: Transition to designing invalidates active approvals
+    given:
+      - a change in implementing state with an active spec approval
+    when:
+      - "execute is called with to: 'designing'"
+    then:
+      - change.invalidate is called before the transition
+      - AND the spec approval is cleared
+      - AND the change transitions to designing
+  - requirement: Transition to designing from any state
+    name: Transition to designing without active approvals skips invalidation
+    given:
+      - a change in implementing state with no active approvals
+    when:
+      - "execute is called with to: 'designing'"
+    then:
+      - change.invalidate is not called
+      - AND the change transitions to designing
+  - requirement: Transition to designing from any state
+    name: Transition to designing from drafting is not a special case
+    given:
+      - a change in drafting state
+    when:
+      - "execute is called with to: 'designing'"
+    then:
+      - the change transitions to designing via the normal transition path (no approval invalidation logic)
   - requirement: Transition delegation
     name: Invalid transition is rejected by entity
     given:
@@ -216,6 +273,6 @@ scenarios:
     then:
       - ChangeRepository.save was called with the updated Change instance
 contentHashes:
-  spec.md: sha256:087e93a9796e2e2a12b3ccdf3a191d2a31d12e2f3a49408dc48c2533a000eea7
-  verify.md: sha256:fe69bc4650cd6f6249815eb2cd461a74888484fc88cd2eb97abdea5a1435148b
+  spec.md: sha256:55ff3ccbf8d5dd9e3301de1e977873fcfb3535de98e3a1cc87df705d5fb22b3e
+  verify.md: sha256:4c28a65eb92b057bac113baf34ff1e9294313829cf1cf21a30065fc7b67a4a27
 generatedBy: core
