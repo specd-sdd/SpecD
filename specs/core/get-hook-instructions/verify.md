@@ -17,7 +17,14 @@
 
 - **GIVEN** a valid schema
 - **WHEN** `GetHookInstructions.execute` is called with `step: "reviewing"`
-- **THEN** `StepNotValidError` is thrown indicating `reviewing` is not a valid lifecycle state
+- **THEN** `StepNotValidError` is thrown because `reviewing` is not a valid `ChangeState`
+
+#### Scenario: Archiving step is accepted as a valid ChangeState
+
+- **GIVEN** a schema with workflow steps `[designing, implementing, verifying, archiving]`
+- **WHEN** `GetHookInstructions.execute` is called with `step: "archiving"`
+- **THEN** no error is thrown
+- **AND** the step is resolved normally via `schema.workflowStep("archiving")`
 
 #### Scenario: Valid state without workflow entry returns empty
 

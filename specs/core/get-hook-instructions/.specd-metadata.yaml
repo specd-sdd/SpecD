@@ -50,7 +50,7 @@ rules:
   - requirement: Step resolution
     rules:
       - |-
-        `GetHookInstructions` first validates that `step` is a valid `ChangeState` (a lifecycle state defined by the domain). If it is not, it MUST throw `StepNotValidError`.
+        `GetHookInstructions` validates that `step` is a valid `ChangeState` (a lifecycle state defined by the domain, which includes `archiving`). If it is not, it MUST throw `StepNotValidError`.
 
         If the step is a valid lifecycle state, `GetHookInstructions` looks up the workflow step entry via `schema.workflowStep(step)`. If no matching entry exists (the schema does not declare hooks for this state), the use case returns `{ phase, instructions: [] }` — no error is thrown.
   - requirement: Instruction collection
@@ -98,7 +98,16 @@ scenarios:
     when:
       - 'GetHookInstructions.execute is called with step: "reviewing"'
     then:
-      - StepNotValidError is thrown indicating reviewing is not a valid lifecycle state
+      - StepNotValidError is thrown because reviewing is not a valid ChangeState
+  - requirement: Step resolution
+    name: Archiving step is accepted as a valid ChangeState
+    given:
+      - a schema with workflow steps [designing, implementing, verifying, archiving]
+    when:
+      - 'GetHookInstructions.execute is called with step: "archiving"'
+    then:
+      - no error is thrown
+      - AND the step is resolved normally via schema.workflowStep("archiving")
   - requirement: Step resolution
     name: Valid state without workflow entry returns empty
     given:
@@ -158,6 +167,6 @@ scenarios:
     then:
       - 'the result is { phase: "pre", instructions: [] }'
 contentHashes:
-  spec.md: sha256:86fccec4434643773a6c1dd3ecde4bd84b2d9ce6e0d3ef6c36447e4b2e4b817b
-  verify.md: sha256:4341fc297188bd9be49dba589d299fe60d194805557d3e002c646e538ea000ee
+  spec.md: sha256:b669cda71168c6ea7b9f4842658b3ea074ed167a2bd2e19ae405b9fee5b212ef
+  verify.md: sha256:d1972ef205c45859e65a55e3d3dd7a698c787f58f15ea53294368734f9fd88d0
 generatedBy: core

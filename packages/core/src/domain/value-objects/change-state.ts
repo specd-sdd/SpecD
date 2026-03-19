@@ -15,6 +15,7 @@ export type ChangeState =
   | 'pending-signoff'
   | 'signed-off'
   | 'archivable'
+  | 'archiving'
 
 /**
  * Defines all permitted state transitions for the change lifecycle.
@@ -36,7 +37,8 @@ export const VALID_TRANSITIONS: Record<ChangeState, readonly ChangeState[]> = {
   done: ['archivable', 'pending-signoff', 'designing'],
   'pending-signoff': ['signed-off', 'designing'],
   'signed-off': ['archivable', 'designing'],
-  archivable: ['designing'],
+  archivable: ['archiving', 'designing'],
+  archiving: [],
 }
 
 /**
