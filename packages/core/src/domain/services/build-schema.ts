@@ -1,4 +1,5 @@
 import { Schema } from '../value-objects/schema.js'
+import { VALID_TRANSITIONS } from '../value-objects/change-state.js'
 import {
   ArtifactType,
   type ArtifactScope,
@@ -473,6 +474,17 @@ export function buildSchema(
       throw new SchemaValidationError(ref, `duplicate workflow step '${step.step}'`)
     }
     stepSet.add(step.step)
+  }
+
+  // Semantic validation: step names must be valid ChangeState values
+  const validStates = new Set(Object.keys(VALID_TRANSITIONS))
+  for (const step of workflow) {
+    if (!validStates.has(step.step)) {
+      throw new SchemaValidationError(
+        ref,
+        `workflow step '${step.step}' is not a valid lifecycle state`,
+      )
+    }
   }
 
   validateArtifactGraph(ref, artifacts)

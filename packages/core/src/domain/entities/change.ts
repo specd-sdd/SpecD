@@ -328,9 +328,9 @@ export class Change {
     this._specDependsOn.delete(specId)
   }
 
-  /** Whether this change is in `archivable` state and may be archived. */
+  /** Whether this change is in `archivable` or `archiving` state and may be archived. */
   get isArchivable(): boolean {
-    return this.state === 'archivable'
+    return this.state === 'archivable' || this.state === 'archiving'
   }
 
   /**

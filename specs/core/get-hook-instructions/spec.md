@@ -48,7 +48,7 @@ After resolving the schema, `GetHookInstructions` MUST compare `schema.name()` w
 
 ### Requirement: Step resolution
 
-`GetHookInstructions` first validates that `step` is a valid `ChangeState` (a lifecycle state defined by the domain). If it is not, it MUST throw `StepNotValidError`.
+`GetHookInstructions` validates that `step` is a valid `ChangeState` (a lifecycle state defined by the domain, which includes `archiving`). If it is not, it MUST throw `StepNotValidError`.
 
 If the step is a valid lifecycle state, `GetHookInstructions` looks up the workflow step entry via `schema.workflowStep(step)`. If no matching entry exists (the schema does not declare hooks for this state), the use case returns `{ phase, instructions: [] }` — no error is thrown.
 
