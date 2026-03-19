@@ -35,6 +35,14 @@ artifacts:
 
       Keep it concise (1–2 pages). Focus on the "why", not the "how" — implementation
       details belong in design.md.
+    rules:
+      post:
+        - id: resolve-open-questions
+          text: |
+            Review the "Open questions" section of the proposal. If any question
+            affects downstream artifacts (specs, design, tasks), it must be resolved
+            with the user before proceeding. Do not write specs or design while
+            unresolved questions could change the direction of those artifacts.
 
   # ── specs ──────────────────────────────────────────────────────────────────
   - id: specs
@@ -73,6 +81,15 @@ artifacts:
       - Mixing requirement content into the Purpose section.
       - Omitting spec dependencies — if the spec references another spec's concepts,
         list it.
+    rules:
+      post:
+        - id: proposal-specs-coverage
+          text: |
+            Cross-reference proposal.md's "Specs affected" section against the
+            spec artifacts just written. Every new spec listed in the proposal
+            must have a corresponding spec.md file. Every modified spec must
+            have a corresponding delta file. If any spec from the proposal is
+            missing coverage, write it before proceeding.
     delta: true
     deltaInstruction: |
       For every modified spec listed in the proposal's "Specs affected" section,
@@ -176,6 +193,15 @@ artifacts:
         The selector must target the `### Requirement: <name>` section by its exact heading text.
 
       Every `#### Scenario:` heading in `content` must use exactly four hashtags.
+    rules:
+      post:
+        - id: specs-verify-coverage
+          text: |
+            Cross-reference spec.md's requirements against the verify
+            scenarios just written. Every requirement in spec.md must have
+            at least one corresponding scenario in verify.md. If any
+            requirement is missing verification coverage, add a scenario
+            before proceeding.
     deltaValidations:
       - id: added-has-scenario
         type: sequence-item
@@ -209,11 +235,12 @@ artifacts:
     requires:
       - proposal
     instruction: |
-      Create the design document that analyses HOW to implement the change.
+      Create the design document that explains HOW to implement the change.
 
       This artifact is the bridge between specs and tasks. Its purpose is to study the
-      codebase, identify every file, symbol, and module affected, and document the
-      implementation approach so that the tasks artifact can be derived from it.
+      codebase, identify every file, symbol, and module affected, and produce a concrete
+      implementation blueprint so that the tasks artifact can be derived from it without
+      ambiguity.
 
       **Always write design.md.** The scope and depth should match the nature of the
       change — a code change needs codebase analysis, a docs change needs content
@@ -221,34 +248,90 @@ artifacts:
 
       Sections to include:
 
-      - **Affected areas**: List every file, module, symbol, document, or resource that
-        will be created, modified, or removed. Use the codebase and tooling to discover
-        these — do not guess. For each area, briefly explain what changes.
+      - **Non-goals**: What this design explicitly excludes. Scope boundaries prevent
+        creep during implementation. If the change is small enough that non-goals are
+        obvious, omit this section.
+
+      - **Affected areas**: List every existing file, module, symbol, document, or
+        resource that will be modified or removed. Use the codebase and tooling to
+        discover these — do not guess. For each area, explain what changes and why.
+
+      - **New constructs**: List every new file, class, interface, value object, factory,
+        service, function, or type that will be created. For each one, specify:
+        - **Location**: full file path where it will live.
+        - **Shape**: interface signatures, constructor parameters, method signatures,
+          key properties, and return types. Use TypeScript notation. This is the
+          contract — implementers should not need to invent signatures.
+        - **Responsibility**: one sentence on what it does and what it does not do.
+        - **Relationships**: what it depends on, what depends on it, and where it fits
+          in the dependency graph (layer, module, injection point).
+
+        Omit this section only when the change creates no new symbols.
+
       - **Approach**: The chosen strategy and why. How do the pieces fit together? What
-        is the order of operations?
-      - **Key decisions**: Each significant choice with its rationale. Note what
-        alternatives were considered and why they were rejected.
+        is the order of operations? Reference spec requirements to ensure full coverage
+        — any requirement without a clear path to implementation should be flagged.
+
+      - **Key decisions**: Each significant technical choice with its rationale. For each
+        decision, state what alternatives were considered and why they were rejected.
+        Format: **Decision** → rationale. **Alternatives rejected** → why.
+
       - **Trade-offs**: Known limitations or things that could go wrong, with mitigations.
+        Format: [Risk] → Mitigation.
+
+      - **Migration / Rollback**: Steps to deploy and roll back safely. Include this
+        section when the change affects runtime state, APIs, data models, or external
+        dependencies. Omit for purely additive internal changes.
+
+      - **Testing**: Plan how the implementation will be verified. Two layers:
+        - **Automated tests** (when a test suite exists): list every new test file or
+          describe block to create. Each scenario in verify.md must map to at least one
+          test. Beyond verify coverage, add tests for edge cases, error paths, and
+          anything that could reasonably break. Specify file paths and describe what
+          each test asserts.
+        - **Manual / E2E verification** (always): describe the manual steps to confirm
+          the change works end-to-end in a real environment. Even when automated tests
+          exist, manual verification catches integration issues that unit tests miss.
+          Include the commands to run, the expected output, and how to tell if something
+          is wrong.
+        Also note which linting rules or documentation sources apply, and flag gaps.
+
       - **Open questions**: Outstanding unknowns to resolve during implementation.
+
+      The design must be concrete, not generic. Avoid vague statements like "add a new
+      service" or "update the module" — specify the exact class name, method signatures,
+      and file paths. A developer reading the design should know precisely what to build
+      without needing to make design decisions of their own.
 
       The implementation approach must satisfy every requirement and scenario defined
       in the specs and verify artifacts of this change. Reference them to ensure full
-      coverage — any requirement without a clear path to implementation should be flagged.
-
-      Review the project's existing test infrastructure and documentation to determine
-      how the implementation will be validated. Note which test suites, linting rules,
-      or documentation sources apply, and flag any gaps where new tests or docs updates
-      are needed to verify correctness.
+      coverage.
 
       Adapt the depth to the change:
       - **Code changes**: analyse the codebase — identify affected symbols, layers, and
-        modules. Reference spec requirements; do not repeat them.
-      - **Non-code changes** (documentation, configuration): focus on
-        which files are affected, what content changes, and how it relates to existing
-        material.
+        modules. Define new constructs with full signatures. Reference spec requirements;
+        do not repeat them.
+      - **Non-code changes** (documentation, configuration): focus on which files are
+        affected, what content changes, and how it relates to existing material.
 
       Omit sections that genuinely do not apply (e.g. Trade-offs for a typo fix), but
-      Affected areas and Approach are always required.
+      Affected areas, Approach, and New constructs (when applicable) are always required.
+    rules:
+      post:
+        - id: specs-design-coverage
+          text: |
+            Cross-reference the spec and verify artifacts against the design
+            just written. Every requirement in spec.md must have a clear path
+            to implementation in design.md (mentioned in Affected areas, New
+            constructs, or Approach). Every scenario in verify.md must map to
+            at least one entry in the Testing section. If any requirement or
+            scenario lacks design coverage, add it before proceeding.
+        - id: resolve-open-questions
+          text: |
+            Review the "Open questions" section of the design. If any question
+            affects implementation tasks, it must be resolved with the user before
+            writing tasks.md. Unresolved design questions lead to ambiguous tasks
+            and rework during implementation.
 
   # ── tasks ──────────────────────────────────────────────────────────────────
   - id: tasks
@@ -302,6 +385,16 @@ artifacts:
       ```
 
       Each task should be verifiable — you know unambiguously when it is done.
+    rules:
+      post:
+        - id: design-tasks-coverage
+          text: |
+            Cross-reference design.md against the tasks just written. Every
+            item in Affected areas, every new construct in New constructs,
+            every automated test in Testing, and every manual / E2E
+            verification step must map to at least one task. If any item
+            from design.md is missing a corresponding task, add it before
+            proceeding.
     preHashCleanup:
       - id: normalize-checkboxes
         pattern: '^\s*-\s+\[x\]'

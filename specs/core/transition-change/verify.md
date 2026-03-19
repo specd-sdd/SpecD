@@ -83,6 +83,41 @@
 - **WHEN** `execute` is called with `to: 'implementing'` and no `implementingRequires`
 - **THEN** `change.clearArtifactValidations` is called with an empty array
 
+### Requirement: Transition to designing from any state
+
+#### Scenario: Transition from archivable to designing
+
+- **GIVEN** a change in `archivable` state
+- **WHEN** `execute` is called with `to: 'designing'`
+- **THEN** the change transitions to `designing`
+
+#### Scenario: Transition from implementing to designing
+
+- **GIVEN** a change in `implementing` state
+- **WHEN** `execute` is called with `to: 'designing'`
+- **THEN** the change transitions to `designing`
+
+#### Scenario: Transition to designing invalidates active approvals
+
+- **GIVEN** a change in `implementing` state with an active spec approval
+- **WHEN** `execute` is called with `to: 'designing'`
+- **THEN** `change.invalidate` is called before the transition
+- **AND** the spec approval is cleared
+- **AND** the change transitions to `designing`
+
+#### Scenario: Transition to designing without active approvals skips invalidation
+
+- **GIVEN** a change in `implementing` state with no active approvals
+- **WHEN** `execute` is called with `to: 'designing'`
+- **THEN** `change.invalidate` is not called
+- **AND** the change transitions to `designing`
+
+#### Scenario: Transition to designing from drafting is not a special case
+
+- **GIVEN** a change in `drafting` state
+- **WHEN** `execute` is called with `to: 'designing'`
+- **THEN** the change transitions to `designing` via the normal transition path (no approval invalidation logic)
+
 ### Requirement: Transition delegation
 
 #### Scenario: Invalid transition is rejected by entity

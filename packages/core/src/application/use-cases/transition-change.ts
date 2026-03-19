@@ -206,6 +206,15 @@ export class TransitionChange {
       change.clearArtifactValidations(input.implementingRequires ?? [])
     }
 
+    // --- Approval invalidation on transition to designing ---
+    let invalidated = false
+    if (effectiveTarget === 'designing' && change.state !== 'drafting') {
+      if (change.activeSpecApproval !== undefined || change.activeSignoff !== undefined) {
+        change.invalidate('redesign', actor)
+        invalidated = true
+      }
+    }
+
     // --- Pre-hooks (only when schema resolved a workflow step with hooks) ---
     const skipHooks = input.skipHooks ?? false
     const hasWorkflowStep = workflowStep !== null
@@ -213,8 +222,10 @@ export class TransitionChange {
       await this._executeHooks(input.name, effectiveTarget, 'pre', onProgress)
     }
 
-    // --- State transition ---
-    change.transition(effectiveTarget, actor)
+    // --- State transition (skip if invalidate() already moved to designing) ---
+    if (!invalidated) {
+      change.transition(effectiveTarget, actor)
+    }
     await this._changes.save(change)
     onProgress?.({ type: 'transitioned', from: fromState, to: effectiveTarget })
 
