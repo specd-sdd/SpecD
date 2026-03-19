@@ -31,6 +31,13 @@ describe('applyPreHashCleanup', () => {
     expect(applyPreHashCleanup('aaa', cleanups)).toBe('aaa')
   })
 
+  it('applies ^ anchored patterns to every line (multiline)', () => {
+    const cleanups = [{ pattern: '^\\s*-\\s+\\[x\\]', replacement: '- [ ]' }]
+    const input = '- [x] task one\n- [ ] task two\n- [x] task three'
+    const expected = '- [ ] task one\n- [ ] task two\n- [ ] task three'
+    expect(applyPreHashCleanup(input, cleanups)).toBe(expected)
+  })
+
   it('supports capture group references in replacement', () => {
     const cleanups = [{ pattern: '(\\w+)@(\\w+)', replacement: '$1 at $2' }]
     expect(applyPreHashCleanup('user@host', cleanups)).toBe('user at host')
