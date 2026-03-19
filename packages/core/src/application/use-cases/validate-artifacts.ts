@@ -14,7 +14,7 @@ import {
   type SignedOffEvent,
 } from '../../domain/entities/change.js'
 import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
-import { safeRegex } from '../../domain/services/safe-regex.js'
+import { applyPreHashCleanup } from '../../domain/services/pre-hash-cleanup.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
@@ -469,13 +469,6 @@ export class ValidateArtifacts {
    * @returns The cleaned content string
    */
   private _applyCleanup(content: string, cleanups: readonly PreHashCleanup[]): string {
-    let result = content
-    for (const cleanup of cleanups) {
-      const re = safeRegex(cleanup.pattern, 'g')
-      if (re !== null) {
-        result = result.replace(re, cleanup.replacement)
-      }
-    }
-    return result
+    return applyPreHashCleanup(content, cleanups)
   }
 }
