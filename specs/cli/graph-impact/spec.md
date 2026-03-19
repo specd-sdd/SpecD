@@ -8,8 +8,10 @@ Before modifying code, developers and agents need to understand the blast radius
 
 ### Requirement: Command signature
 
+### Requirement: Command signature
+
 ```text
-specd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction upstream|downstream|both] [--path <path>] [--format text|json|toon]
+specd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction upstream|downstream|both] [--depth <n>] [--path <path>] [--format text|json|toon]
 ```
 
 Exactly one of `--file`, `--symbol`, or `--changes` must be provided.
@@ -21,6 +23,7 @@ Exactly one of `--file`, `--symbol`, or `--changes` must be provided.
   - `upstream` — find symbols and files that depend on the target
   - `downstream` — find symbols and files that the target depends on
   - `both` — combined upstream and downstream analysis
+- `--depth` — optional; maximum traversal depth, defaults to `3`. Must be a positive integer. Passed through to `analyzeImpact`/`analyzeFileImpact` as `maxDepth`
 - `--path` — optional; workspace root, defaults to the current working directory
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
@@ -52,10 +55,12 @@ When `--changes` is provided:
 
 ### Requirement: Output format
 
+### Requirement: Output format
+
 **File impact** in `text` mode:
 
 ```text
-Impact analysis for src/auth.ts
+Impact analysis for src/auth.ts (depth=5)
   Risk level:       HIGH
   Direct deps:      6
   Indirect deps:    3
@@ -63,20 +68,22 @@ Impact analysis for src/auth.ts
   Affected files:   8
 
 Affected files:
-  src/login.ts: handleLogin:12, validateSession:45
-  src/session.ts: createSession:8
+  src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)
+  src/session.ts: createSession:8 (d=2)
 
 Per-symbol breakdown:
   src/auth.ts:function:validate:10:0  risk=HIGH direct=4
   src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2
 ```
 
-When affected symbols are available, each file line shows the symbols grouped after a colon: `path: name:line, name:line`. Files reached only via IMPORTS (file-level) are listed without symbols.
+When affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).
+
+When `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.
 
 **Symbol impact** in `text` mode:
 
 ```text
-Impact analysis for function createKernel (packages/core/src/composition/kernel.ts:147)
+Impact analysis for function createKernel (packages/core/src/composition/kernel.ts:147) (depth=5)
   Risk level:       CRITICAL
   Direct deps:      1
   Indirect deps:    1
@@ -84,7 +91,7 @@ Impact analysis for function createKernel (packages/core/src/composition/kernel.
   Affected files:   40
 
 Affected files:
-  packages/cli/src/kernel.ts: wireKernel:5
+  packages/cli/src/kernel.ts: wireKernel:5 (d=1)
   ...
 ```
 
@@ -92,7 +99,7 @@ When multiple symbols match, each analysis is listed sequentially.
 
 **Change detection** in `text` mode outputs the summary string from `ChangeDetectionResult.summary` followed by the affected files list.
 
-In `json` or `toon` mode, the full result object is output as-is.
+In `json` or `toon` mode, the full result object is output as-is. The `AffectedSymbol` entries in JSON include the `depth` field.
 
 ### Requirement: Error cases
 
@@ -102,10 +109,14 @@ If the provider cannot be opened, the command exits with code 3.
 
 ## Constraints
 
+## Constraints
+
 - The CLI does not contain impact analysis logic — it delegates entirely to `@specd/code-graph`
 - `process.exit(0)` is called explicitly after closing the provider
 - All file paths are workspace-relative, not absolute
 - `--direction` only applies to `--file` and `--symbol`, not to `--changes`
+- `--depth` applies to all selectors (`--file`, `--symbol`, `--changes`)
+- `--depth` must be a positive integer; invalid values exit with code 1
 
 ## Examples
 

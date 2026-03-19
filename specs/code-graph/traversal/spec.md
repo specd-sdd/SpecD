@@ -36,7 +36,11 @@ The traversal follows `CALLS` relations in reverse (target → source). Cycles a
 
 ### Requirement: Impact analysis
 
-`analyzeImpact(store: GraphStore, target: string, direction: 'upstream' | 'downstream' | 'both'): Promise<ImpactResult>` SHALL compute the blast radius of modifying the target symbol. It runs traversal in the specified direction and produces:
+### Requirement: Impact analysis
+
+`analyzeImpact(store: GraphStore, target: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute the blast radius of modifying the target symbol. The optional `maxDepth` parameter (default: 3) controls how deep the traversal goes — it is passed through to `getUpstream`/`getDownstream` and limits the IMPORTS BFS loop.
+
+The function produces an `ImpactResult` containing:
 
 - **`target`** — the symbol being analyzed
 - **`directDependents`** — count of depth-1 results (WILL BREAK)
@@ -44,7 +48,16 @@ The traversal follows `CALLS` relations in reverse (target → source). Cycles a
 - **`transitiveDependents`** — count of depth-3+ results (MAY NEED TESTING)
 - **`riskLevel`** — computed from dependent counts: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`
 - **`affectedFiles`** — unique file paths containing any affected symbol
+- **`affectedSymbols`** — array of `AffectedSymbol` entries with depth information
 - **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)
+
+`AffectedSymbol` SHALL contain:
+
+- **`id`** (`string`) — the symbol identifier
+- **`name`** (`string`) — the symbol's declared name
+- **`filePath`** (`string`) — workspace-prefixed file path
+- **`line`** (`number`) — 1-based line number
+- **`depth`** (`number`) — distance from the target: 1 = direct dependent, 2 = indirect, 3+ = transitive
 
 Risk level thresholds:
 
@@ -57,11 +70,15 @@ Risk level thresholds:
 
 ### Requirement: File impact
 
-`analyzeFileImpact(store: GraphStore, filePath: string, direction: 'upstream' | 'downstream' | 'both'): Promise<FileImpactResult>` SHALL compute aggregate impact for all symbols defined in the given file. It:
+### Requirement: File impact
+
+`analyzeFileImpact(store: GraphStore, filePath: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<FileImpactResult>` SHALL compute aggregate impact for all symbols defined in the given file. The optional `maxDepth` parameter (default: 3) is passed through to each per-symbol `analyzeImpact` call and limits the file-level IMPORTS BFS.
+
+It:
 
 1. Retrieves all symbols in the file via `findSymbols({ filePath })`
-2. Runs `analyzeImpact` for each symbol
-3. Merges results: deduplicates affected symbols, takes the maximum risk level, unions affected files
+2. Runs `analyzeImpact` for each symbol with the given `maxDepth`
+3. Merges results: deduplicates affected symbols (keeping the shallowest depth), takes the maximum risk level, unions affected files
 
 `FileImpactResult` extends `ImpactResult` with:
 
@@ -70,10 +87,10 @@ Risk level thresholds:
 
 ### Requirement: Change detection
 
-`detectChanges(store: GraphStore, changedFiles: string[]): Promise<ChangeDetectionResult>` SHALL identify the impact of a set of changed files on the code graph. It:
+`detectChanges(store: GraphStore, changedFiles: string[], maxDepth?: number): Promise<ChangeDetectionResult>` SHALL identify the impact of a set of changed files on the code graph. The optional `maxDepth` parameter (default: 3) is passed through to the upstream traversal for each changed symbol. It:
 
 1. For each changed file, finds all symbols defined in it
-2. Runs upstream traversal on each symbol
+2. Runs upstream traversal on each symbol with the given `maxDepth`
 3. Aggregates affected symbols, files, and execution flows
 4. Computes an overall risk level
 
