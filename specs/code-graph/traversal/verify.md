@@ -74,6 +74,32 @@
 - **WHEN** `analyzeImpact` is called
 - **THEN** `affectedFiles` contains `src/utils.ts` only once
 
+#### Scenario: affectedSymbols include depth
+
+- **GIVEN** a call chain: D calls C, C calls B, B calls target
+- **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
+- **THEN** `affectedSymbols` contains B with `depth: 1`, C with `depth: 2`, D with `depth: 3`
+
+#### Scenario: custom maxDepth limits traversal
+
+- **GIVEN** a call chain of depth 5
+- **WHEN** `analyzeImpact(store, target.id, 'upstream', 5)` is called
+- **THEN** symbols up to depth 5 are included in `affectedSymbols`
+- **AND** `transitiveDependents` counts depths 3 through 5
+
+#### Scenario: default maxDepth is 3
+
+- **GIVEN** a call chain of depth 5
+- **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called without maxDepth
+- **THEN** only symbols up to depth 3 are included
+
+#### Scenario: maxDepth 1 returns only direct dependents
+
+- **GIVEN** a symbol with direct and indirect callers
+- **WHEN** `analyzeImpact(store, target.id, 'upstream', 1)` is called
+- **THEN** only depth-1 symbols are returned
+- **AND** `indirectDependents` and `transitiveDependents` are 0
+
 ### Requirement: File impact
 
 #### Scenario: Aggregate risk is maximum across symbols
@@ -86,7 +112,14 @@
 
 - **GIVEN** symbols X and Y in the file share a common upstream dependent Z
 - **WHEN** `analyzeFileImpact` is called
-- **THEN** Z appears once in the aggregate result, not twice
+- **THEN** Z appears once in the aggregate result with the shallowest depth
+
+#### Scenario: maxDepth passed through to per-symbol analysis
+
+- **GIVEN** file `src/auth.ts` with symbols that have deep call chains
+- **WHEN** `analyzeFileImpact(store, 'src/auth.ts', 'upstream', 5)` is called
+- **THEN** each per-symbol `analyzeImpact` call uses `maxDepth: 5`
+- **AND** the file-level IMPORTS BFS also uses depth limit 5
 
 ### Requirement: Change detection
 
