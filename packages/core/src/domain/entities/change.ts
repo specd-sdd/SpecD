@@ -60,7 +60,7 @@ export interface InvalidatedEvent {
   readonly type: 'invalidated'
   readonly at: Date
   readonly by: ActorIdentity
-  readonly cause: 'spec-change' | 'artifact-change'
+  readonly cause: 'spec-change' | 'artifact-change' | 'redesign'
 }
 
 /** Appended when the change is shelved to `drafts/`. */
@@ -405,11 +405,6 @@ export class Change {
    */
   invalidate(cause: InvalidatedEvent['cause'], actor: ActorIdentity): void {
     const from = this.state
-    // Invalidation is a forced rollback — only throw if already in a terminal
-    // state (archivable) where no further transitions are meaningful.
-    if (from === 'archivable') {
-      throw new InvalidStateTransitionError(from, 'designing')
-    }
     const now = new Date()
     this._history.push({ type: 'invalidated', cause, at: now, by: actor })
     // Only push a transition event when we are not already in 'designing'.
