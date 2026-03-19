@@ -119,10 +119,10 @@ rules:
 
         JSDoc must include:
 
-        * A description of what the symbol does or represents
-        * `@param` for each parameter with a description
-        * `@returns` describing the return value (omit for `void` and constructors)
-        * `@throws` for each error type the function can throw
+        - A description of what the symbol does or represents
+        - `@param` for each parameter with a description
+        - `@returns` describing the return value (omit for `void` and constructors)
+        - `@throws` for each error type the function can throw
 
         ```typescript
         /**

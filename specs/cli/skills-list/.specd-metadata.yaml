@@ -12,8 +12,8 @@ rules:
         specd skills list [--agent claude] [--format text|json|toon]
         ```
 
-        * `--agent <id>` — optional; the agent to check installation status against (e.g. `claude`). When omitted, installation status is not shown.
-        * `--format text|json|toon` — optional; output format, defaults to `text`.
+        - `--agent <id>` — optional; the agent to check installation status against (e.g. `claude`). When omitted, installation status is not shown.
+        - `--format text|json|toon` — optional; output format, defaults to `text`.
   - requirement: Output format
     rules:
       - |-

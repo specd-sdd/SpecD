@@ -33,10 +33,10 @@ rules:
       - |-
         The use case calls `extractMetadata()` with:
 
-        * The schema's `metadataExtraction` declarations
-        * Parsed ASTs keyed by artifact type ID
-        * Renderers from the artifact parsers
-        * A transform map (see resolveSpecPath transform)
+        - The schema's `metadataExtraction` declarations
+        - Parsed ASTs keyed by artifact type ID
+        - Renderers from the artifact parsers
+        - A transform map (see resolveSpecPath transform)
 
         The extraction engine produces fields including `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, `scenarios`, and `context`.
   - requirement: dependsOn resolution
@@ -50,9 +50,9 @@ rules:
       - |-
         The final metadata object merges:
 
-        * All fields from `extractMetadata()` output
-        * `contentHashes` from the hashing step
-        * `generatedBy: 'core'`
+        - All fields from `extractMetadata()` output
+        - `contentHashes` from the hashing step
+        - `generatedBy: 'core'`
 
         The result is returned with `hasExtraction: true`.
 constraints:

@@ -12,8 +12,8 @@ rules:
       - |-
         The command is registered as `invalidate-metadata <specPath>` on the `spec` parent command. It accepts:
 
-        * `--format <fmt>` — output format: `text|json|toon` (default `text`)
-        * `--config <path>` — path to `specd.yaml`
+        - `--format <fmt>` — output format: `text|json|toon` (default `text`)
+        - `--config <path>` — path to `specd.yaml`
 
         The `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands.
   - requirement: Text output

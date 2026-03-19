@@ -13,9 +13,9 @@ rules:
         specd graph index [--workspace <name>] [--force] [--format text|json|toon]
         ```
 
-        * `--workspace` — optional; index only the named workspace instead of all workspaces
-        * `--force` — optional flag; when present, all existing graph data is cleared before indexing
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `--workspace` — optional; index only the named workspace instead of all workspaces
+        - `--force` — optional flag; when present, all existing graph data is cleared before indexing
+        - `--format text|json|toon` — optional; output format, defaults to `text`
 
         The `--path` option is removed — the workspace root is derived from `SpecdConfig` via `resolveCliContext()`.
   - requirement: Indexing behaviour
@@ -83,8 +83,17 @@ scenarios:
     when:
       - specd graph index --force is run
     then:
-      - the .lbug, .lbug.wal, and .lbug.lock files are deleted before opening the provider
-      - AND indexing re-processes all files (none skipped)
+      - clear() is called on the provider before indexing
+      - AND filesRemoved in the output reflects the previously indexed files
+  - requirement: Indexing behaviour
+    name: Custom path
+    given:
+      - /tmp/my-project is a valid workspace
+    when:
+      - specd graph index --path /tmp/my-project is run
+    then:
+      - the provider is created with /tmp/my-project as the workspace path
+      - AND indexing operates on files within that directory
   - requirement: Indexing behaviour
     name: Process exits explicitly
     given:

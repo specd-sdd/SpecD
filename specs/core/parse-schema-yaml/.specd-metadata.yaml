@@ -14,22 +14,22 @@ rules:
       - |-
         The module SHALL export a function `parseSchemaYaml(ref: string, yamlContent: string): SchemaYamlData`.
 
-        * `ref` — the schema reference string (e.g. `#my-schema`, `@specd/schema-std`). Used exclusively in error messages to identify which schema failed validation.
-        * `yamlContent` — the raw YAML content string to parse and validate.
-        * Returns a `SchemaYamlData` object on success.
+        - `ref` — the schema reference string (e.g. `#my-schema`, `@specd/schema-std`). Used exclusively in error messages to identify which schema failed validation.
+        - `yamlContent` — the raw YAML content string to parse and validate.
+        - Returns a `SchemaYamlData` object on success.
   - requirement: Output type
     rules:
       - |-
         The module SHALL export a `SchemaYamlData` type representing the validated intermediate structure. This type uses Zod-inferred shapes — it is NOT a domain `Schema` entity. The type SHALL contain:
 
-        * `name: string` — the schema's machine identifier
-        * `version: number` — integer schema version
-        * `description?: string` — optional human-readable summary
-        * `kind: 'schema' | 'schema-plugin'` — schema type discriminator
-        * `extends?: string` — optional parent schema reference
-        * `artifacts: ArtifactYaml[]` — array of raw artifact definitions as validated by Zod (NOT domain `ArtifactType` instances)
-        * `workflow?: WorkflowStepRaw[]` — optional array of raw workflow step definitions before domain transform
-        * `metadataExtraction?` — optional metadata extraction configuration as validated by Zod
+        - `name: string` — the schema's machine identifier
+        - `version: number` — integer schema version
+        - `description?: string` — optional human-readable summary
+        - `kind: 'schema' | 'schema-plugin'` — schema type discriminator
+        - `extends?: string` — optional parent schema reference
+        - `artifacts: ArtifactYaml[]` — array of raw artifact definitions as validated by Zod (NOT domain `ArtifactType` instances)
+        - `workflow?: WorkflowStepRaw[]` — optional array of raw workflow step definitions before domain transform
+        - `metadataExtraction?` — optional metadata extraction configuration as validated by Zod
 
         The `ArtifactYaml` and `WorkflowStepRaw` types SHALL also be exported for downstream use. These types represent the Zod-inferred output shapes of their respective schemas, preserving `| undefined` on optional fields.
   - requirement: YAML parsing
@@ -40,18 +40,18 @@ rules:
       - |-
         After successful YAML parsing, the function SHALL validate the parsed object against the `SchemaYaml` Zod schema. The Zod schema SHALL enforce:
 
-        * `name` is a required string
-        * `version` is a required integer
-        * `kind` is a required enum (`schema` | `schema-plugin`)
-        * `extends` is an optional string, only valid when `kind: schema`
-        * `artifacts` is a required array of artifact objects, each validated for required fields (`id`, `scope`, `output`) and optional fields with correct types
-        * Hook entries require an `id` field alongside `instruction` or `run`
-        * Validation/deltaValidation rule entries require an `id` field
-        * `preHashCleanup` entries require an `id` field
-        * `rules` on artifacts is an optional object with `pre` and `post` arrays of `{ id, text }`
-        * `workflow` is an optional array of workflow step objects
-        * `metadataExtraction` is an optional object matching the metadata extraction schema; array entries require an `id` field
-        * Unknown top-level fields SHALL be ignored (forward compatibility via Zod's default `strip` mode)
+        - `name` is a required string
+        - `version` is a required integer
+        - `kind` is a required enum (`schema` | `schema-plugin`)
+        - `extends` is an optional string, only valid when `kind: schema`
+        - `artifacts` is a required array of artifact objects, each validated for required fields (`id`, `scope`, `output`) and optional fields with correct types
+        - Hook entries require an `id` field alongside `instruction` or `run`
+        - Validation/deltaValidation rule entries require an `id` field
+        - `preHashCleanup` entries require an `id` field
+        - `rules` on artifacts is an optional object with `pre` and `post` arrays of `{ id, text }`
+        - `workflow` is an optional array of workflow step objects
+        - `metadataExtraction` is an optional object matching the metadata extraction schema; array entries require an `id` field
+        - Unknown top-level fields SHALL be ignored (forward compatibility via Zod's default `strip` mode)
 
         The Zod schemas for selector fields within validation rules, metadata extractors, and related structures SHALL be imported from the existing `infrastructure/zod/selector-schema.ts` module to avoid duplication.
   - requirement: Zod refinement rules
@@ -59,9 +59,9 @@ rules:
       - |-
         The Zod schema SHALL include refinement rules that enforce structural constraints at the artifact level:
 
-        * `deltaValidations` is only valid when `delta` is `true`
-        * `delta: true` is not valid when `scope` is `change`
-        * `kind: schema-plugin` must not declare `artifacts`, `workflow`, `metadataExtraction`, or `extends`
+        - `deltaValidations` is only valid when `delta` is `true`
+        - `delta: true` is not valid when `scope` is `change`
+        - `kind: schema-plugin` must not declare `artifacts`, `workflow`, `metadataExtraction`, or `extends`
 
         These refinements SHALL produce descriptive error messages.
   - requirement: Error handling
@@ -69,8 +69,8 @@ rules:
       - |-
         On any validation failure, the function SHALL throw a `SchemaValidationError` (a domain error extending `SpecdError`) with:
 
-        * The `ref` string identifying which schema failed
-        * A descriptive message that includes the Zod issue path when available, formatted as a dot-bracket string (e.g. `artifacts[0].scope: invalid enum value`)
+        - The `ref` string identifying which schema failed
+        - A descriptive message that includes the Zod issue path when available, formatted as a dot-bracket string (e.g. `artifacts[0].scope: invalid enum value`)
 
         The function SHALL report only the first Zod issue in the error message.
   - requirement: No semantic validation
@@ -78,12 +78,12 @@ rules:
       - |-
         The function SHALL NOT perform semantic validation. The following checks are explicitly out of scope and remain the responsibility of the caller (e.g. `SchemaRegistry.resolve()`):
 
-        * Duplicate `artifact.id` detection
-        * Duplicate `workflow[].step` detection
-        * `artifact.id` format validation (`/^[a-z][a-z0-9-]*$/`)
-        * Unknown artifact ID in `artifact.requires`
-        * Circular dependency detection in `artifact.requires`
-        * Non-optional artifact depending on optional artifact
+        - Duplicate `artifact.id` detection
+        - Duplicate `workflow[].step` detection
+        - `artifact.id` format validation (`/^[a-z][a-z0-9-]*$/`)
+        - Unknown artifact ID in `artifact.requires`
+        - Circular dependency detection in `artifact.requires`
+        - Non-optional artifact depending on optional artifact
   - requirement: No domain object construction
     rules:
       - The function SHALL NOT construct domain entities or value objects (`Schema`, `ArtifactType`, `WorkflowStep`, `Selector`, etc.). It returns the Zod-validated intermediate representation only. Domain object construction remains the responsibility of the adapter or caller.

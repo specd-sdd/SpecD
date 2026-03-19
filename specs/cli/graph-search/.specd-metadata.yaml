@@ -14,17 +14,17 @@ rules:
         specd graph search <query> [--symbols] [--specs] [--kind <kind>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--format text|json|toon]
         ```
 
-        * `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)
-        * `--symbols` — optional; search only symbols
-        * `--specs` — optional; search only specs
-        * `--kind <kind>` — optional; filter symbols by kind (`function|class|method|variable|type|interface|enum`)
-        * `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)
-        * `--workspace <name>` — optional; filter both symbols and specs to a single workspace
-        * `--exclude-path <pattern>` — optional, repeatable; exclude symbols/specs whose file path matches glob pattern (supports `*` wildcards, case-insensitive)
-        * `--exclude-workspace <name>` — optional, repeatable; exclude results from the given workspace
-        * `--limit <n>` — optional; maximum results per category, defaults to `10`
-        * `--spec-content` — optional; include full spec content in output. Only valid with `--format json` or `--format toon` — exits with code 1 if used with text format
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)
+        - `--symbols` — optional; search only symbols
+        - `--specs` — optional; search only specs
+        - `--kind <kind>` — optional; filter symbols by kind (`function|class|method|variable|type|interface|enum`)
+        - `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)
+        - `--workspace <name>` — optional; filter both symbols and specs to a single workspace
+        - `--exclude-path <pattern>` — optional, repeatable; exclude symbols/specs whose file path matches glob pattern (supports `*` wildcards, case-insensitive)
+        - `--exclude-workspace <name>` — optional, repeatable; exclude results from the given workspace
+        - `--limit <n>` — optional; maximum results per category, defaults to `10`
+        - `--spec-content` — optional; include full spec content in output. Only valid with `--format json` or `--format toon` — exits with code 1 if used with text format
+        - `--format text|json|toon` — optional; output format, defaults to `text`
 
         When neither `--symbols` nor `--specs` is provided, both categories are searched.
 
@@ -34,8 +34,8 @@ rules:
       - |-
         The command uses `resolveCliContext()` to load config and creates a `CodeGraphProvider` via `withProvider`. It delegates to:
 
-        * `provider.searchSymbols(options)` — full-text search on `Symbol.name` and `Symbol.comment`, with filters applied at the store level
-        * `provider.searchSpecs(options)` — full-text search on `Spec.title`, `Spec.description`, and `Spec.content`, with filters applied at the store level
+        - `provider.searchSymbols(options)` — full-text search on `Symbol.name` and `Symbol.comment`, with filters applied at the store level
+        - `provider.searchSpecs(options)` — full-text search on `Spec.title`, `Spec.description`, and `Spec.content`, with filters applied at the store level
 
         Both use LadybugDB's FTS extension with BM25 scoring. Results are returned ordered by score descending — highest relevance first.
   - requirement: Output format
@@ -55,10 +55,10 @@ rules:
 
         Each line shows:
 
-        * **Workspace** — in brackets (e.g. `[core]`, `[cli]`)
-        * **Score** — BM25 relevance score, right-aligned
-        * **Symbols**: kind, name, workspace-relative filePath:line, and comment preview (first 50 chars)
-        * **Specs**: specId and description preview (first 60 chars)
+        - **Workspace** — in brackets (e.g. `[core]`, `[cli]`)
+        - **Score** — BM25 relevance score, right-aligned
+        - **Symbols**: kind, name, workspace-relative filePath:line, and comment preview (first 50 chars)
+        - **Specs**: specId and description preview (first 60 chars)
 
         When no results are found, outputs `No results found.`
 

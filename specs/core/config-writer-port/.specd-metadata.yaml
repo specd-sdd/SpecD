@@ -22,19 +22,19 @@ rules:
       - |-
         The `InitProjectOptions` interface MUST contain:
 
-        * `projectRoot: string` — the directory to initialise (absolute path)
-        * `schemaRef: string` — schema reference string (e.g. `"@specd/schema-std"`)
-        * `workspaceId: string` — the default workspace name (e.g. `"default"`)
-        * `specsPath: string` — relative path for the specs directory (e.g. `"specs/"`)
-        * `force?: boolean` — when `true`, overwrite an existing `specd.yaml` without error
+        - `projectRoot: string` — the directory to initialise (absolute path)
+        - `schemaRef: string` — schema reference string (e.g. `"@specd/schema-std"`)
+        - `workspaceId: string` — the default workspace name (e.g. `"default"`)
+        - `specsPath: string` — relative path for the specs directory (e.g. `"specs/"`)
+        - `force?: boolean` — when `true`, overwrite an existing `specd.yaml` without error
   - requirement: InitProjectResult shape
     rules:
       - |-
         The `InitProjectResult` interface MUST contain:
 
-        * `configPath: string` — absolute path to the created `specd.yaml` file
-        * `schemaRef: string` — schema reference as written
-        * `workspaces: readonly string[]` — workspace IDs created
+        - `configPath: string` — absolute path to the created `specd.yaml` file
+        - `schemaRef: string` — schema reference as written
+        - `workspaces: readonly string[]` — workspace IDs created
   - requirement: InitProject behaviour
     rules:
       - |-

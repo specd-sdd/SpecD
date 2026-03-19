@@ -46,7 +46,7 @@ rules:
       - If there are no changes in `drafts/`, the command prints `no drafts` to stdout in text mode, or `[]` in JSON/toon mode, and exits with code 0.
   - requirement: Error cases
     rules:
-      - '* If an I/O error occurs while reading `drafts/`, the command exits with code 3 and prints an `error:` message to stderr.'
+      - '- If an I/O error occurs while reading `drafts/`, the command exits with code 3 and prints an `error:` message to stderr.'
 constraints:
   - Errors always go to stderr as plain text regardless of --format
   - --format only affects stdout

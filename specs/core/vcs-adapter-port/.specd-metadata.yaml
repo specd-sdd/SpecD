@@ -41,11 +41,11 @@ rules:
       - |-
         A `NullVcsAdapter` implementation MUST exist for environments where no VCS is detected. It MUST satisfy the following contract:
 
-        * `rootDir()` MUST reject with an `Error` containing a message indicating no VCS was detected.
-        * `branch()` MUST resolve to `"none"`.
-        * `isClean()` MUST resolve to `true`.
-        * `ref()` MUST resolve to `null`.
-        * `show()` MUST resolve to `null` for any arguments.
+        - `rootDir()` MUST reject with an `Error` containing a message indicating no VCS was detected.
+        - `branch()` MUST resolve to `"none"`.
+        - `isClean()` MUST resolve to `true`.
+        - `ref()` MUST resolve to `null`.
+        - `show()` MUST resolve to `null` for any arguments.
 
         The null implementation MUST NOT shell out to any external process or perform I/O.
 constraints:

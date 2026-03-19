@@ -13,8 +13,8 @@ rules:
       - |-
         `createConfigLoader(options)` SHALL accept an `FsConfigLoaderOptions` discriminated union and return a `ConfigLoader`. The options union has two forms:
 
-        * `{ startDir: string }` — discovery mode
-        * `{ configPath: string }` — forced mode
+        - `{ startDir: string }` — discovery mode
+        - `{ configPath: string }` — forced mode
 
         The returned `ConfigLoader` exposes a single method `load(): Promise<SpecdConfig>`.
   - requirement: Discovery mode
@@ -37,8 +37,8 @@ rules:
 
         The Zod schema MUST additionally enforce:
 
-        * `schemaPlugins` is an optional array of strings
-        * `schemaOverrides` is an optional object with five optional keys: `create`, `remove`, `set`, `append`, `prepend`
+        - `schemaPlugins` is an optional array of strings
+        - `schemaOverrides` is an optional object with five optional keys: `create`, `remove`, `set`, `append`, `prepend`
 
         The loader MUST NOT accept `artifactRules` or `workflow` at the top level of `specd.yaml` — these fields have been removed. If either field is present, the loader SHOULD emit a warning suggesting migration to `schemaOverrides`.
   - requirement: Default workspace is required
@@ -64,20 +64,20 @@ rules:
       - |-
         The loader MUST apply the following defaults when workspace fields are omitted:
 
-        * **`ownership`**: `'owned'` for the `default` workspace; `'readOnly'` for all other workspaces.
-        * **`codeRoot`**: the config file directory for the `default` workspace. For non-default workspaces, `codeRoot` is required — its absence MUST produce `ConfigValidationError`.
-        * **`schemasPath`**: for the `default` workspace, when `schemas` is omitted, defaults to `<configDir>/specd/schemas`. For non-default workspaces, when `schemas` is omitted, `schemasPath` MUST be `null`.
+        - **`ownership`**: `'owned'` for the `default` workspace; `'readOnly'` for all other workspaces.
+        - **`codeRoot`**: the config file directory for the `default` workspace. For non-default workspaces, `codeRoot` is required — its absence MUST produce `ConfigValidationError`.
+        - **`schemasPath`**: for the `default` workspace, when `schemas` is omitted, defaults to `<configDir>/specd/schemas`. For non-default workspaces, when `schemas` is omitted, `schemasPath` MUST be `null`.
   - requirement: contextIncludeSpecs and contextExcludeSpecs pattern validation
     rules:
       - |-
         The loader MUST validate all `contextIncludeSpecs` and `contextExcludeSpecs` patterns at both project level and workspace level. Valid pattern forms are:
 
-        * `*` — bare wildcard
-        * `workspace:*` — wildcard qualified by workspace name
-        * `prefix/*` — wildcard after a path prefix ending in `/`
-        * `workspace:prefix/*` — qualified wildcard after path prefix
-        * `path/name` — exact spec path (no wildcard)
-        * `workspace:path/name` — qualified exact spec path
+        - `*` — bare wildcard
+        - `workspace:*` — wildcard qualified by workspace name
+        - `prefix/*` — wildcard after a path prefix ending in `/`
+        - `workspace:prefix/*` — qualified wildcard after path prefix
+        - `path/name` — exact spec path (no wildcard)
+        - `workspace:path/name` — qualified exact spec path
 
         `*` SHALL only appear alone, after `workspace:`, or after a path prefix ending in `/`. Any other position MUST produce `ConfigValidationError`.
 

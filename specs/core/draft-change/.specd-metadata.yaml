@@ -11,8 +11,8 @@ rules:
       - |-
         `DraftChange.execute` SHALL accept a `DraftChangeInput` with the following fields:
 
-        * `name` (string, required) — the change to shelve
-        * `reason` (string, optional) — explanation for shelving the change
+        - `name` (string, required) — the change to shelve
+        - `reason` (string, optional) — explanation for shelving the change
   - requirement: Change must exist
     rules:
       - The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
@@ -24,10 +24,10 @@ rules:
       - |-
         The use case MUST call `change.draft(actor, reason)` to append a `drafted` event to the change's history. The event records:
 
-        * `type`: `'drafted'`
-        * `at`: the current timestamp
-        * `by`: the resolved actor identity
-        * `reason`: included only when provided in the input
+        - `type`: `'drafted'`
+        - `at`: the current timestamp
+        - `by`: the resolved actor identity
+        - `reason`: included only when provided in the input
   - requirement: Persistence
     rules:
       - After appending the drafted event, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` instance. The repository implementation is responsible for relocating the change directory to `drafts/`.
@@ -36,8 +36,8 @@ rules:
       - |-
         `DraftChange` depends on two ports injected via constructor:
 
-        * `ChangeRepository` — for loading and persistence
-        * `ActorResolver` — for resolving the current actor identity
+        - `ChangeRepository` — for loading and persistence
+        - `ActorResolver` — for resolving the current actor identity
 constraints:
   - The use case MUST NOT perform any state transitions — drafting is orthogonal to lifecycle state
   - The use case delegates directory relocation entirely to the repository layer

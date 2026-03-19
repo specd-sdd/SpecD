@@ -14,13 +14,13 @@ rules:
       - |-
         `TransitionChange.execute` SHALL accept a `TransitionChangeInput` with the following fields:
 
-        * `name` (string, required) — the change to transition
-        * `to` (ChangeState, required) — the requested target state
-        * `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled
-        * `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled
-        * `implementingRequires` (readonly string\[], optional) — artifact IDs whose validation is cleared on `verifying` to `implementing`
-        * `implementingTaskChecks` (ReadonlyArray\<TaskCompletionCheck>, optional) — task completion checks for `implementing` to `verifying`
-        * `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
+        - `name` (string, required) — the change to transition
+        - `to` (ChangeState, required) — the requested target state
+        - `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled
+        - `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled
+        - `implementingRequires` (readonly string\[], optional) — artifact IDs whose validation is cleared on `verifying` to `implementing`
+        - `implementingTaskChecks` (ReadonlyArray\<TaskCompletionCheck>, optional) — task completion checks for `implementing` to `verifying`
+        - `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
   - requirement: Change must exist
     rules:
       - The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
@@ -76,28 +76,28 @@ rules:
       - |-
         `TransitionChange.execute` MUST return a `TransitionChangeResult` containing:
 
-        * `change` — the updated `Change` instance after the transition
-        * `postHookFailures` — array of hook commands that failed during post-hook execution; empty when no post-hooks fail or when `skipHooks` is `true`
+        - `change` — the updated `Change` instance after the transition
+        - `postHookFailures` — array of hook commands that failed during post-hook execution; empty when no post-hooks fail or when `skipHooks` is `true`
   - requirement: Progress callback
     rules:
       - |-
         `TransitionChange.execute` SHALL accept an optional second parameter `onProgress?: OnTransitionProgress`. Progress events are:
 
-        * `{ type: 'requires-check', artifactId: string, satisfied: boolean }` — emitted per artifact during requires enforcement
-        * `{ type: 'hook-start', phase: 'pre' | 'post', hookId: string, command: string }` — emitted before each hook
-        * `{ type: 'hook-done', phase: 'pre' | 'post', hookId: string, success: boolean, exitCode: number }` — emitted after each hook
-        * `{ type: 'transitioned', from: ChangeState, to: ChangeState }` — emitted after state change
+        - `{ type: 'requires-check', artifactId: string, satisfied: boolean }` — emitted per artifact during requires enforcement
+        - `{ type: 'hook-start', phase: 'pre' | 'post', hookId: string, command: string }` — emitted before each hook
+        - `{ type: 'hook-done', phase: 'pre' | 'post', hookId: string, success: boolean, exitCode: number }` — emitted after each hook
+        - `{ type: 'transitioned', from: ChangeState, to: ChangeState }` — emitted after state change
   - requirement: Dependencies
     rules:
       - |-
         `TransitionChange` depends on the following ports injected via constructor:
 
-        * `ChangeRepository` — for loading, artifact content access, and persistence
-        * `ActorResolver` — for resolving the current actor identity
-        * `SchemaRegistry` — for resolving the active schema to look up workflow steps and requires
-        * `RunStepHooks` — for executing `run:` hooks at step boundaries
-        * `schemaRef` (string) — the schema reference string from config
-        * `workspaceSchemasPaths` (ReadonlyMap\<string, string>) — workspace-to-schemas-path map
+        - `ChangeRepository` — for loading, artifact content access, and persistence
+        - `ActorResolver` — for resolving the current actor identity
+        - `SchemaRegistry` — for resolving the active schema to look up workflow steps and requires
+        - `RunStepHooks` — for executing `run:` hooks at step boundaries
+        - `schemaRef` (string) — the schema reference string from config
+        - `workspaceSchemasPaths` (ReadonlyMap\<string, string>) — workspace-to-schemas-path map
 constraints:
   - The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates
   - Task completion checks use safeRegex to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)

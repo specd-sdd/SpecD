@@ -26,7 +26,7 @@ rules:
       - |-
         `GetArchivedChange.execute()` accepts a `GetArchivedChangeInput` object with a single required field:
 
-        * `name` (string) -- the change name to look up in the archive
+        - `name` (string) -- the change name to look up in the archive
   - requirement: Output on success
     rules:
       - When the archive contains a change matching the given name, `GetArchivedChange.execute()` MUST return `Promise<ArchivedChange>` -- the matching archived change entity.

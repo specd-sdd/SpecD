@@ -35,9 +35,9 @@ rules:
       - |-
         Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes three levels of factory:
 
-        * **Use-case factories** — one per use case; construct all required ports internally and return the pre-wired use case. Internal ports with a single concrete implementation are constructed here and never exported. Each factory supports two call signatures: `createX(config: SpecdConfig)` and `createX(context, options)`.
-        * **Kernel** — `createKernel(config: SpecdConfig)` calls every use-case factory and returns all use cases grouped by domain area. It is a convenience, not a mandatory entry point.
-        * **Config loader port** — `ConfigLoader` is defined in `application/ports/` and resolves a `SpecdConfig` from one or more sources. Implementations live in `infrastructure/`.
+        - **Use-case factories** — one per use case; construct all required ports internally and return the pre-wired use case. Internal ports with a single concrete implementation are constructed here and never exported. Each factory supports two call signatures: `createX(config: SpecdConfig)` and `createX(context, options)`.
+        - **Kernel** — `createKernel(config: SpecdConfig)` calls every use-case factory and returns all use cases grouped by domain area. It is a convenience, not a mandatory entry point.
+        - **Config loader port** — `ConfigLoader` is defined in `application/ports/` and resolves a `SpecdConfig` from one or more sources. Implementations live in `infrastructure/`.
 
         Concrete adapter classes and repository-level factories are never exported from `index.ts`. Delivery mechanisms (CLI, MCP) import only use-case factories, the kernel, and the config loader port — never ports, infrastructure classes, or use case constructors.
   - requirement: YAML inputs validated at the infrastructure boundary

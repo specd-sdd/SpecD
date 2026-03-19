@@ -67,8 +67,8 @@ rules:
       - |-
         The primary workspace of a change is the first entry in the computed `change.workspaces` (derived from `specIds`). It is used for:
 
-        * Archive path template resolution (`{{change.workspace}}`)
-        * Default metadata attribution when archiving
+        - Archive path template resolution (`{{change.workspace}}`)
+        - Default metadata attribution when archiving
   - requirement: Port-per-workspace pattern
     rules:
       - Use cases that operate across workspaces receive a `ReadonlyMap<string, RepositoryInstance>` keyed by workspace name. The composition layer constructs one repository instance per workspace declared in configuration and passes the complete map. Use cases look up the repository for a spec's workspace to resolve paths, load content, or write artifacts.
@@ -77,9 +77,9 @@ rules:
       - |-
         Each workspace may declare `contextIncludeSpecs` and `contextExcludeSpecs` patterns. These are applied only when the workspace is active:
 
-        * Omitting the workspace qualifier in a workspace-level pattern means "this workspace" (not `default`)
-        * `['*']` means all specs in this workspace
-        * `['auth/*']` means specs under `auth/` in this workspace
+        - Omitting the workspace qualifier in a workspace-level pattern means "this workspace" (not `default`)
+        - `['*']` means all specs in this workspace
+        - `['auth/*']` means specs under `auth/` in this workspace
 
         Workspace-level patterns are evaluated after project-level patterns. Specs added via `dependsOn` traversal are never subject to exclude patterns.
   - requirement: Cross-workspace references
@@ -89,15 +89,15 @@ rules:
 
         References to unknown workspaces are handled differently by context:
 
-        * At configuration validation time: error (abort)
-        * At runtime (context compilation): warning and skip
+        - At configuration validation time: error (abort)
+        - At runtime (context compilation): warning and skip
   - requirement: Workspace directory structure in changes
     rules:
       - |-
         Change artifacts always include an explicit workspace segment in the path, even for single-workspace changes:
 
-        * New spec artifacts: `specs/<workspace>/<capability-path>/<artifact-filename>`
-        * Delta files: `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`
+        - New spec artifacts: `specs/<workspace>/<capability-path>/<artifact-filename>`
+        - Delta files: `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`
 
         This ensures multi-workspace changes are unambiguous and tooling can resolve the correct repository without inspecting configuration.
   - requirement: Sole source of truth

@@ -13,8 +13,8 @@ rules:
         specd graph stats [--path <path>] [--format text|json|toon]
         ```
 
-        * `--path` — optional; workspace root, defaults to the current working directory
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `--path` — optional; workspace root, defaults to the current working directory
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Statistics retrieval
     rules:
       - |-
@@ -42,10 +42,10 @@ rules:
         Last indexed: 2026-03-14T10:38:30.178Z
         ```
 
-        * `Files`, `Symbols`, `Specs` show `fileCount`, `symbolCount`, `specCount`
-        * `Languages` shows the `languages` array joined by `, `
-        * `Relations` shows only non-zero relation counts from `relationCounts`, each on its own indented line
-        * `Last indexed` shows `lastIndexedAt` as an ISO 8601 timestamp
+        - `Files`, `Symbols`, `Specs` show `fileCount`, `symbolCount`, `specCount`
+        - `Languages` shows the `languages` array joined by `, `
+        - `Relations` shows only non-zero relation counts from `relationCounts`, each on its own indented line
+        - `Last indexed` shows `lastIndexedAt` as an ISO 8601 timestamp
 
         In `json` or `toon` mode, the full `GraphStatistics` object is output as-is.
   - requirement: Error cases

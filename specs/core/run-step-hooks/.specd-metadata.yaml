@@ -36,17 +36,17 @@ rules:
       - |-
         `RunStepHooks.execute` receives:
 
-        * `name` (string, required) — the change name
-        * `step` (string, required) — the workflow step name (e.g. `implementing`, `verifying`, `archiving`)
-        * `phase` (`'pre'` | `'post'`, required) — which hook phase to execute
-        * `only` (string, optional) — when provided, filters to a single hook by its `id`; all other hooks in the phase are skipped
+        - `name` (string, required) — the change name
+        - `step` (string, required) — the workflow step name (e.g. `implementing`, `verifying`, `archiving`)
+        - `phase` (`'pre'` | `'post'`, required) — which hook phase to execute
+        - `only` (string, optional) — when provided, filters to a single hook by its `id`; all other hooks in the phase are skipped
   - requirement: Progress callback
     rules:
       - |-
         `RunStepHooks.execute` SHALL accept an optional second parameter `onProgress?: OnHookProgress`. Progress events are:
 
-        * `{ type: 'hook-start', hookId: string, command: string }` — emitted before each hook execution
-        * `{ type: 'hook-done', hookId: string, success: boolean, exitCode: number }` — emitted after each hook execution
+        - `{ type: 'hook-start', hookId: string, command: string }` — emitted before each hook execution
+        - `{ type: 'hook-done', hookId: string, success: boolean, exitCode: number }` — emitted after each hook execution
   - requirement: Change lookup
     rules:
       - '`RunStepHooks` loads the change by name via `ChangeRepository`. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.'
@@ -76,9 +76,9 @@ rules:
       - |-
         `RunStepHooks` MUST build the contextual `TemplateVariables` from the resolved change and `ChangeRepository.changePath()`:
 
-        * `change.name` — the change name
-        * `change.workspace` — the primary workspace (first entry in `change.workspaces`)
-        * `change.path` — the absolute path to the change directory (via `ChangeRepository.changePath()`)
+        - `change.name` — the change name
+        - `change.workspace` — the primary workspace (first entry in `change.workspaces`)
+        - `change.path` — the absolute path to the change directory (via `ChangeRepository.changePath()`)
 
         Built-in variables (e.g. `project.root`) are already present in the `TemplateExpander` — the use case only builds the contextual `change` namespace.
   - requirement: Pre-phase execution (fail-fast)
@@ -92,15 +92,15 @@ rules:
       - |-
         `RunStepHooks.execute` MUST return a result object containing:
 
-        * `hooks` — array of per-hook results, each with:
-          * `id` (string) — the hook's `id` from the schema or project config
-          * `command` (string) — the expanded command string (after template variable substitution)
-          * `exitCode` (number) — the process exit code
-          * `stdout` (string) — captured stdout
-          * `stderr` (string) — captured stderr
-          * `success` (boolean) — `true` when exit code is 0
-        * `success` (boolean) — `true` when all executed hooks succeeded
-        * `failedHook` (object | null) — if a pre-hook failed (fail-fast), the failed hook result; `null` otherwise
+        - `hooks` — array of per-hook results, each with:
+          - `id` (string) — the hook's `id` from the schema or project config
+          - `command` (string) — the expanded command string (after template variable substitution)
+          - `exitCode` (number) — the process exit code
+          - `stdout` (string) — captured stdout
+          - `stderr` (string) — captured stderr
+          - `success` (boolean) — `true` when exit code is 0
+        - `success` (boolean) — `true` when all executed hooks succeeded
+        - `failedHook` (object | null) — if a pre-hook failed (fail-fast), the failed hook result; `null` otherwise
 
         When no hooks match (empty `run:` hook list for the step+phase, or the step has no hooks), the result is `{ hooks: [], success: true, failedHook: null }`.
   - requirement: Works for any step

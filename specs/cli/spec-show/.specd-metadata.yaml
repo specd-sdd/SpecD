@@ -12,8 +12,8 @@ rules:
         specd spec show <workspace:capability-path> [--format text|json|toon]
         ```
 
-        * `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Output format
     rules:
       - |-
@@ -36,8 +36,8 @@ rules:
   - requirement: Error cases
     rules:
       - |-
-        * If the spec does not exist (no artifact files found at the given path), the command exits with code 1 and prints an `error:` message to stderr.
-        * If the workspace portion of the path is not a configured workspace, exits with code 1.
+        - If the spec does not exist (no artifact files found at the given path), the command exits with code 1 and prints an `error:` message to stderr.
+        - If the workspace portion of the path is not a configured workspace, exits with code 1.
 constraints:
   - The workspace is always explicit in the path — there is no default-workspace inference for this command
   - Only spec-scoped artifacts are printed; change artifacts are not included

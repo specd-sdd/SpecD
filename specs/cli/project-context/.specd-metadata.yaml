@@ -16,12 +16,12 @@ rules:
           [--format text|json|toon]
         ```
 
-        * `--rules` — when present, includes only the rules sections of spec content in the output
-        * `--constraints` — when present, includes only the constraints sections of spec content in the output
-        * `--scenarios` — when present, includes only the scenarios sections of spec content in the output
-        * `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. By default (without this flag) `dependsOn` traversal is not performed.
-        * `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `--rules` — when present, includes only the rules sections of spec content in the output
+        - `--constraints` — when present, includes only the constraints sections of spec content in the output
+        - `--scenarios` — when present, includes only the scenarios sections of spec content in the output
+        - `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. By default (without this flag) `dependsOn` traversal is not performed.
+        - `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`
+        - `--format text|json|toon` — optional; output format, defaults to `text`
 
         When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block.
   - requirement: Behaviour
@@ -57,8 +57,8 @@ rules:
   - requirement: Error cases
     rules:
       - |-
-        * If the config cannot be loaded (discovery failure or parse error), exits per the entrypoint exit code rules.
-        * If the schema cannot be resolved, exits with code 3.
+        - If the config cannot be loaded (discovery failure or parse error), exits per the entrypoint exit code rules.
+        - If the schema cannot be resolved, exits with code 3.
 constraints:
   - This command is read-only
   - Only project-level contextIncludeSpecs/contextExcludeSpecs patterns are applied; workspace-level patterns are change-specific and not applied here

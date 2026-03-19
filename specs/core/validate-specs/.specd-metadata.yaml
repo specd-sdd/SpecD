@@ -50,17 +50,17 @@ rules:
       - |-
         The use case SHALL return a `ValidateSpecsResult` containing:
 
-        * `entries` — array of `SpecValidationEntry` objects, one per validated spec.
-        * `totalSpecs` — total number of specs validated.
-        * `passed` — number of specs with zero failures.
-        * `failed` — number of specs with one or more failures.
+        - `entries` — array of `SpecValidationEntry` objects, one per validated spec.
+        - `totalSpecs` — total number of specs validated.
+        - `passed` — number of specs with zero failures.
+        - `failed` — number of specs with one or more failures.
 
         Each `SpecValidationEntry` MUST include:
 
-        * `spec` — qualified label in `workspace:capabilityPath` format.
-        * `passed` — `true` if `failures` is empty.
-        * `failures` — array of `ValidationFailure` objects.
-        * `warnings` — array of `ValidationWarning` objects.
+        - `spec` — qualified label in `workspace:capabilityPath` format.
+        - `passed` — `true` if `failures` is empty.
+        - `failures` — array of `ValidationFailure` objects.
+        - `warnings` — array of `ValidationWarning` objects.
   - requirement: Format inference and parser resolution
     rules:
       - When an artifact type does not specify an explicit `format`, the use case SHALL infer it from the filename via `inferFormat`. If no parser is found for the resolved format, the artifact MUST be skipped without recording a failure or warning.

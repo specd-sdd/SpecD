@@ -24,18 +24,18 @@ rules:
 
         The comment must include:
 
-        * A description of what the symbol does or represents
-        * `@param` tags for all parameters (with description) on functions and methods
-        * `@returns` tag describing the return value on functions and methods (omit for `void`)
-        * `@throws` tag for each error type that can be thrown
+        - A description of what the symbol does or represents
+        - `@param` tags for all parameters (with description) on functions and methods
+        - `@returns` tag describing the return value on functions and methods (omit for `void`)
+        - `@throws` tag for each error type that can be thrown
   - requirement: Layer boundary enforcement
     rules:
       - |-
         ESLint must enforce the import constraints defined in `specs/_global/architecture/spec.md` via `no-restricted-imports` rules:
 
-        * Files under `domain/` must not import from `application/`, `infrastructure/`, or `composition/`
-        * Files under `application/` must not import from `infrastructure/` or `composition/`
-        * Files under `infrastructure/` must not import from `composition/`
+        - Files under `domain/` must not import from `application/`, `infrastructure/`, or `composition/`
+        - Files under `application/` must not import from `infrastructure/` or `composition/`
+        - Files under `infrastructure/` must not import from `composition/`
 
         These rules make layer boundary violations a lint error, not a convention violation.
 constraints:

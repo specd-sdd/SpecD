@@ -11,16 +11,16 @@ rules:
       - |-
         `SaveSpecMetadata.execute()` accepts a `SaveSpecMetadataInput` with the following fields:
 
-        * `workspace` (string, required) — the workspace name (e.g. `'default'`, `'billing'`)
-        * `specPath` (SpecPath, required) — the spec path within the workspace (e.g. `'auth/oauth'`)
-        * `content` (string, required) — raw YAML string to write as `.specd-metadata.yaml`
-        * `force` (boolean, optional) — when `true`, skip conflict detection and `dependsOn` overwrite protection
+        - `workspace` (string, required) — the workspace name (e.g. `'default'`, `'billing'`)
+        - `specPath` (SpecPath, required) — the spec path within the workspace (e.g. `'auth/oauth'`)
+        - `content` (string, required) — raw YAML string to write as `.specd-metadata.yaml`
+        - `force` (boolean, optional) — when `true`, skip conflict detection and `dependsOn` overwrite protection
   - requirement: Output contract
     rules:
       - |-
         On success, `execute()` SHALL return a `SaveSpecMetadataResult` containing:
 
-        * `spec` (string) — the qualified spec label in the form `workspace:specName` (e.g. `'default:auth/oauth'`)
+        - `spec` (string) — the qualified spec label in the form `workspace:specName` (e.g. `'default:auth/oauth'`)
   - requirement: Content validation before write
     rules:
       - |-
@@ -60,8 +60,8 @@ rules:
       - |-
         `SaveSpecMetadata` MUST be constructed with:
 
-        * `specRepos` — a `ReadonlyMap<string, SpecRepository>` mapping workspace names to their repositories
-        * `yaml` — a `YamlSerializer` for parsing YAML content
+        - `specRepos` — a `ReadonlyMap<string, SpecRepository>` mapping workspace names to their repositories
+        - `yaml` — a `YamlSerializer` for parsing YAML content
 
         These are injected by the kernel at composition time. The use case MUST NOT construct its own infrastructure adapters.
 constraints:

@@ -14,9 +14,9 @@ rules:
         specd spec resolve-path <path> [--format text|json|toon] [--config <path>]
         ```
 
-        * `<path>` — required positional; filesystem path (absolute or relative to cwd) pointing to a spec directory or a file within one (e.g. `specs/core/change/spec.md` or `specs/core/change`)
-        * `--format` — optional; output format, defaults to `text`
-        * `--config` — optional; path to `specd.yaml`
+        - `<path>` — required positional; filesystem path (absolute or relative to cwd) pointing to a spec directory or a file within one (e.g. `specs/core/change/spec.md` or `specs/core/change`)
+        - `--format` — optional; output format, defaults to `text`
+        - `--config` — optional; path to `specd.yaml`
   - requirement: Path resolution
     rules:
       - |-
@@ -49,8 +49,8 @@ rules:
   - requirement: Error cases
     rules:
       - |-
-        * Path does not fall under any configured workspace's `specsPath` — exit 1, error message to stderr
-        * Resolved path does not exist on disk — exit 1, error message to stderr
+        - Path does not fall under any configured workspace's `specsPath` — exit 1, error message to stderr
+        - Resolved path does not exist on disk — exit 1, error message to stderr
 constraints:
   - The resolver is a pure function — no I/O, just path math against config
   - When a path matches multiple workspaces, the most specific (longest specsPath prefix) wins

@@ -23,10 +23,10 @@ rules:
       - |-
         Each workflow step has a defined semantic role in the change lifecycle:
 
-        * **Designing** (`designing`) — the agent creates or modifies spec artifacts (proposal, specs, verify, design, tasks). This step iterates over the artifact DAG: `CompileContext` is called once per artifact being authored. The step is typically always available (empty `requires`).
-        * **Implementing** (`implementing`) — the agent writes code and completes tasks. All working artifacts (tasks, specs) must be complete. The step runs once (not per-artifact).
-        * **Verifying** (`verifying`) — the agent confirms the implementation satisfies verify.md scenarios. The step runs once. May loop back to implementing if verification fails.
-        * **Archiving** (`archiving`) — deterministic finalization: delta merge, spec sync, metadata generation, archive move. Executed atomically by the `ArchiveChange` use case, not by an agent interactively.
+        - **Designing** (`designing`) — the agent creates or modifies spec artifacts (proposal, specs, verify, design, tasks). This step iterates over the artifact DAG: `CompileContext` is called once per artifact being authored. The step is typically always available (empty `requires`).
+        - **Implementing** (`implementing`) — the agent writes code and completes tasks. All working artifacts (tasks, specs) must be complete. The step runs once (not per-artifact).
+        - **Verifying** (`verifying`) — the agent confirms the implementation satisfies verify.md scenarios. The step runs once. May loop back to implementing if verification fails.
+        - **Archiving** (`archiving`) — deterministic finalization: delta merge, spec sync, metadata generation, archive move. Executed atomically by the `ArchiveChange` use case, not by an agent interactively.
   - requirement: Requires-based gating
     rules:
       - |-

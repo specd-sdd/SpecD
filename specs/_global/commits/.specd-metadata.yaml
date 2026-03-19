@@ -77,21 +77,21 @@ rules:
 
         commitlint configuration must:
 
-        * Extend `@commitlint/config-conventional` as the base
-        * Restrict `scope-enum` to the known specd package names: `core`, `cli`, `mcp`, `skills`, `schema-std`, `schema-openspec`, `plugin-claude`, `plugin-copilot`, `plugin-codex`, `root`, `all`
-        * Enforce `subject-case: lower-case`
-        * Enforce `header-max-length: 72`
-        * Enforce `body-max-line-length: 100`
-        * Reject commits that include AI co-author trailers (`Co-Authored-By: ... @anthropic.com`)
+        - Extend `@commitlint/config-conventional` as the base
+        - Restrict `scope-enum` to the known specd package names: `core`, `cli`, `mcp`, `skills`, `schema-std`, `schema-openspec`, `plugin-claude`, `plugin-copilot`, `plugin-codex`, `root`, `all`
+        - Enforce `subject-case: lower-case`
+        - Enforce `header-max-length: 72`
+        - Enforce `body-max-line-length: 100`
+        - Reject commits that include AI co-author trailers (`Co-Authored-By: ... @anthropic.com`)
   - requirement: Commit body format
     rules:
       - |-
         Commit bodies are optional and used only when the subject line and diff cannot fully explain the change. When a body is present it must follow a consistent structure.
 
-        * Use setext-style section headers (`===` for primary, `---` for secondary) — never ATX headers (`###`), which conflict with git comment syntax
-        * Wrap all technical terms in backticks: filenames (`spec.md`), symbols (`mergeSpecs`), types (`DeltaConfig`), commands (`pnpm test`)
-        * Limit body lines to 100 characters
-        * Include at minimum a `Context` and `Changes` section when a body is present; add `Impact` or `Breaking` when they add value
+        - Use setext-style section headers (`===` for primary, `---` for secondary) — never ATX headers (`###`), which conflict with git comment syntax
+        - Wrap all technical terms in backticks: filenames (`spec.md`), symbols (`mergeSpecs`), types (`DeltaConfig`), commands (`pnpm test`)
+        - Limit body lines to 100 characters
+        - Include at minimum a `Context` and `Changes` section when a body is present; add `Impact` or `Breaking` when they add value
 
         ```
         feat(core): add RENAMED operation to mergeSpecs

@@ -13,10 +13,10 @@ rules:
         specd change skip-artifact <name> <artifact-id> [--reason <text>] [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the name of the change
-        * `<artifact-id>` — required positional; the artifact type ID to mark as skipped (e.g. `proposal`)
-        * `--reason <text>` — optional; a human-readable explanation for skipping the artifact
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the name of the change
+        - `<artifact-id>` — required positional; the artifact type ID to mark as skipped (e.g. `proposal`)
+        - `--reason <text>` — optional; a human-readable explanation for skipping the artifact
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Behaviour
     rules:
       - |-
@@ -31,14 +31,14 @@ rules:
       - |-
         On success, output depends on `--format`:
 
-        * `text` (default): prints to stdout:
-        * `json` or `toon`: outputs (encoded in the respective format):
+        - `text` (default): prints to stdout:
+        - `json` or `toon`: outputs (encoded in the respective format):
   - requirement: Error cases
     rules:
       - |-
-        * If the change does not exist, exits with code 1.
-        * If the artifact ID is not declared in the active schema, exits with code 1.
-        * If the artifact is not `optional: true`, exits with code 1.
+        - If the change does not exist, exits with code 1.
+        - If the artifact ID is not declared in the active schema, exits with code 1.
+        - If the artifact is not `optional: true`, exits with code 1.
 constraints:
   - Artifact.markSkipped() may only be called from this use case — no other code path may set validatedHash to the sentinel
   - Skipping satisfies the artifact's dependency in requires chains — downstream artifacts treat it as resolved

@@ -14,11 +14,11 @@ rules:
         specd change run-hooks <name> <step> --phase pre|post [--only <hook-id>] [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the change name
-        * `<step>` — required positional; the workflow step name (e.g. `implementing`, `verifying`, `archiving`)
-        * `--phase pre|post` — required flag; which hook phase to execute
-        * `--only <hook-id>` — optional flag; execute only the hook with this ID (useful for retrying a single failed hook)
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the change name
+        - `<step>` — required positional; the workflow step name (e.g. `implementing`, `verifying`, `archiving`)
+        - `--phase pre|post` — required flag; which hook phase to execute
+        - `--only <hook-id>` — optional flag; execute only the hook with this ID (useful for retrying a single failed hook)
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Delegates to RunStepHooks
     rules:
       - The command MUST delegate all hook resolution and execution to the `RunStepHooks` use case. It MUST NOT resolve schemas, collect hooks, or call `HookRunner` directly.
@@ -36,22 +36,22 @@ rules:
       - |-
         The command exits with code 1 for:
 
-        * Change not found (`ChangeNotFoundError`)
-        * Step is not a valid lifecycle state (`StepNotValidError`)
-        * Unknown hook ID when `--only` is specified (`HookNotFoundError` with reason `'not-found'`)
-        * Hook ID refers to an `instruction:` hook instead of a `run:` hook (`HookNotFoundError` with reason `'wrong-type'`)
-        * Schema mismatch (`SchemaMismatchError`)
+        - Change not found (`ChangeNotFoundError`)
+        - Step is not a valid lifecycle state (`StepNotValidError`)
+        - Unknown hook ID when `--only` is specified (`HookNotFoundError` with reason `'not-found'`)
+        - Hook ID refers to an `instruction:` hook instead of a `run:` hook (`HookNotFoundError` with reason `'wrong-type'`)
+        - Schema mismatch (`SchemaMismatchError`)
   - requirement: Text output format
     rules:
       - |-
         When `--format` is `text` (default):
 
-        * For each executed hook, print a result line to stdout:
-          * Success: `ok: <hook-id>`
-          * Failure: `failed: <hook-id> (exit code <n>)` followed by the hook's stderr on subsequent lines
-        * When all hooks succeed: no additional summary line
-        * When a pre-hook fails: only the hooks up to and including the failure are printed (fail-fast)
-        * When post-hooks fail: all hooks are printed, with failures clearly marked
+        - For each executed hook, print a result line to stdout:
+          - Success: `ok: <hook-id>`
+          - Failure: `failed: <hook-id> (exit code <n>)` followed by the hook's stderr on subsequent lines
+        - When all hooks succeed: no additional summary line
+        - When a pre-hook fails: only the hooks up to and including the failure are printed (fail-fast)
+        - When post-hooks fail: all hooks are printed, with failures clearly marked
   - requirement: JSON output format
     rules:
       - |-

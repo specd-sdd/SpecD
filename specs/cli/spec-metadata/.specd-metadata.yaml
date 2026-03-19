@@ -14,8 +14,8 @@ rules:
         specd spec metadata <workspace:capability-path> [--format text|json|toon]
         ```
 
-        * `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Behaviour
     rules:
       - |-
@@ -71,8 +71,8 @@ rules:
   - requirement: Error cases
     rules:
       - |-
-        * If the workspace is not configured, exits with code 1.
-        * If `.specd-metadata.yaml` does not exist, exits with code 1 and prints an `error:` message to stderr.
+        - If the workspace is not configured, exits with code 1.
+        - If `.specd-metadata.yaml` does not exist, exits with code 1 and prints an `error:` message to stderr.
 constraints:
   - This command is read-only — it never writes or updates metadata
   - Metadata regeneration is handled by specd spec generate-metadata or by a skill

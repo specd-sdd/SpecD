@@ -12,10 +12,10 @@ rules:
       - |-
         The command is registered as `write-metadata <specPath>` on the `spec` parent command. It accepts:
 
-        * `--input <file>` — read YAML content from a file path instead of stdin
-        * `--force` — skip conflict detection and overwrite unconditionally
-        * `--format <fmt>` — output format: `text|json|toon` (default `text`)
-        * `--config <path>` — path to `specd.yaml`
+        - `--input <file>` — read YAML content from a file path instead of stdin
+        - `--force` — skip conflict detection and overwrite unconditionally
+        - `--format <fmt>` — output format: `text|json|toon` (default `text`)
+        - `--config <path>` — path to `specd.yaml`
 
         The `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands.
   - requirement: Content source

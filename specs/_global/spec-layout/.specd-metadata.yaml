@@ -14,8 +14,8 @@ rules:
       - |-
         Each spec lives in its own named subdirectory and contains two files: `spec.md` and `verify.md`. The subdirectory name is kebab-case and describes the topic concisely.
 
-        * `spec.md` — what the system does: requirements, constraints, examples, rationale
-        * `verify.md` — how to confirm it works: WHEN/THEN scenarios
+        - `spec.md` — what the system does: requirements, constraints, examples, rationale
+        - `verify.md` — how to confirm it works: WHEN/THEN scenarios
 
         The two files are always paired. `spec.md` contains no WHEN/THEN scenarios; `verify.md` contains no requirement prose.
   - requirement: spec.md structure

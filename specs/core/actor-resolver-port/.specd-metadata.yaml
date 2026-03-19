@@ -33,8 +33,8 @@ rules:
       - |-
         A `NullActorResolver` implementation MUST exist for environments where no identity source is available. It MUST satisfy the following contract:
 
-        * `identity()` MUST reject with an `Error` whose message indicates that actor identity cannot be resolved because no VCS was detected.
-        * `NullActorResolver` MUST NOT perform any I/O or shell out to external processes.
+        - `identity()` MUST reject with an `Error` whose message indicates that actor identity cannot be resolved because no VCS was detected.
+        - `NullActorResolver` MUST NOT perform any I/O or shell out to external processes.
 
         Unlike `NullVcsAdapter` (which returns safe defaults for most methods), `NullActorResolver` always throws because there is no meaningful default identity to return.
 constraints:

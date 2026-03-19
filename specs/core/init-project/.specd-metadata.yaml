@@ -11,19 +11,19 @@ rules:
       - |-
         `execute(input)` MUST accept an `InitProjectOptions` object with the following fields:
 
-        * `projectRoot` (string, required) — absolute path to the directory to initialise.
-        * `schemaRef` (string, required) — schema reference string to write into `specd.yaml` (e.g. `"@specd/schema-std"`).
-        * `workspaceId` (string, required) — the default workspace name (e.g. `"default"`).
-        * `specsPath` (string, required) — relative path for the specs directory (e.g. `"specs/"`).
-        * `force` (boolean, optional) — when `true`, overwrite an existing `specd.yaml` without error.
+        - `projectRoot` (string, required) — absolute path to the directory to initialise.
+        - `schemaRef` (string, required) — schema reference string to write into `specd.yaml` (e.g. `"@specd/schema-std"`).
+        - `workspaceId` (string, required) — the default workspace name (e.g. `"default"`).
+        - `specsPath` (string, required) — relative path for the specs directory (e.g. `"specs/"`).
+        - `force` (boolean, optional) — when `true`, overwrite an existing `specd.yaml` without error.
   - requirement: Returns InitProjectResult on success
     rules:
       - |-
         On successful execution, `execute` MUST return an `InitProjectResult` containing:
 
-        * `configPath` — absolute path to the created `specd.yaml`.
-        * `schemaRef` — the schema reference as written.
-        * `workspaces` — array of workspace IDs created.
+        - `configPath` — absolute path to the created `specd.yaml`.
+        - `schemaRef` — the schema reference as written.
+        - `workspaces` — array of workspace IDs created.
   - requirement: Delegates entirely to ConfigWriter
     rules:
       - The use case MUST delegate all filesystem operations to the `ConfigWriter.initProject` method. It SHALL NOT perform any filesystem I/O directly. The use case is a thin orchestration layer over the port.
@@ -35,10 +35,10 @@ rules:
       - |-
         The `ConfigWriter.initProject` implementation MUST:
 
-        * Write `specd.yaml` with the provided schema reference, workspace, and specs path.
-        * Create standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`).
-        * Append `specd.local.yaml` to `.gitignore`.
-        * Create a `.gitignore` inside the archive directory to exclude `.specd-index.jsonl`.
+        - Write `specd.yaml` with the provided schema reference, workspace, and specs path.
+        - Create standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`).
+        - Append `specd.local.yaml` to `.gitignore`.
+        - Create a `.gitignore` inside the archive directory to exclude `.specd-index.jsonl`.
 constraints:
   - The use case has no business logic beyond delegation — it is a pass-through to the port.
   - 'InitProject is constructed with a single dependency: a ConfigWriter instance.'

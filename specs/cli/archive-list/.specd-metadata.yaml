@@ -47,7 +47,7 @@ rules:
       - If there are no archived changes, the command prints `no archived changes` to stdout in text mode, or `[]` in JSON/toon mode, and exits with code 0.
   - requirement: Error cases
     rules:
-      - '* If an I/O error occurs while reading the archive directory, the command exits with code 3 and prints an `error:` message to stderr.'
+      - '- If an I/O error occurs while reading the archive directory, the command exits with code 3 and prints an `error:` message to stderr.'
 constraints:
   - The archive path is determined by storage.archivePath in specd.yaml
   - Errors always go to stderr as plain text regardless of --format
