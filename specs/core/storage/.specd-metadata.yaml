@@ -22,6 +22,8 @@ rules:
         2. File absent (and no sentinel) → `missing`
         3. File present and cleaned hash matches `validatedHash` → `complete`
         4. File present but hash differs or `validatedHash` is `null` → `in-progress`
+
+        "Cleaned hash" means: read the file content, apply the artifact type's `preHashCleanup` rules in order (the same rules `ValidateArtifacts` applies before computing `validatedHash`), then compute SHA-256 of the result. `FsChangeRepository` must have access to the schema's artifact types at load time so that it can retrieve the `preHashCleanup` array for each artifact type. If no `preHashCleanup` rules are defined for an artifact type, the raw content is hashed directly.
   - requirement: Artifact dependency cascade
     rules:
       - '`Change.effectiveStatus(type)` must cascade through the artifact dependency graph. An artifact whose own hash matches its `validatedHash` must still be reported as `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`. A `skipped` optional artifact satisfies the dependency — it does not block downstream artifacts.'
@@ -102,6 +104,36 @@ scenarios:
       - all validatedHash values are cleared
     then:
       - its status becomes in-progress — file present but no valid hash
+  - requirement: Artifact status derivation
+    name: preHashCleanup normalized edit preserves complete status
+    given:
+      - 'an artifact type with preHashCleanup: [{ pattern: "- \\[x\\]", replacement: "- [ ]" }]'
+      - AND the artifact was validated with content - [ ] task one (cleaned hash stored as validatedHash)
+    when:
+      - the file is edited to - [x] task one
+    then:
+      - FsChangeRepository applies the cleanup before hashing, producing the same hash
+      - AND the derived status is complete
+  - requirement: Artifact status derivation
+    name: Non-normalized edit still triggers in-progress
+    given:
+      - 'an artifact type with preHashCleanup: [{ pattern: "- \\[x\\]", replacement: "- [ ]" }]'
+      - AND the artifact was validated with content - [ ] task one
+    when:
+      - the file is edited to - [ ] task one\n- [ ] task two
+    then:
+      - the cleaned hash differs from validatedHash
+      - AND the derived status is in-progress
+  - requirement: Artifact status derivation
+    name: No preHashCleanup rules hashes raw content
+    given:
+      - an artifact type with no preHashCleanup rules
+      - AND the artifact was validated with content some content
+    when:
+      - the file content is unchanged
+    then:
+      - sha256(rawContent) === validatedHash
+      - AND the derived status is complete
   - requirement: Artifact dependency cascade
     name: Upstream artifact edited
     when:
@@ -179,6 +211,6 @@ scenarios:
     then:
       - manifest.json contains the fields and structure defined in the change-manifest spec
 contentHashes:
-  spec.md: sha256:a9e75a7056654d220ea45c2ffb9ffe4bf6461e72352207e2ff23c45966024b8c
-  verify.md: sha256:785e2517a5cdbfa31327baa503c34eaf87da3d7bc28ece40ee8c70ad639d05f6
+  spec.md: sha256:50220a061755925c1ee39839056ac4430d2d08c0f63c9b388a5eff9d34809143
+  verify.md: sha256:9797f7538ee77bd5fcda12537eb52fe29761919d339906aba456053f5b1a9399
 generatedBy: core

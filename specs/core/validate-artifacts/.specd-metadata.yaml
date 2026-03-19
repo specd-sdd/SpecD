@@ -38,16 +38,28 @@ rules:
       - |-
         `ValidateArtifacts.execute` receives:
 
-        * `name` — the change name to validate
-        * `specPath` — the spec ID to validate (one spec per execution); must be one of the IDs in `change.specIds`
+        - `name` — the change name to validate
+        - `specPath` — the spec ID to validate (one spec per execution); must be one of the IDs in `change.specIds`
+        - `artifactId` — optional; when provided, only the artifact with this ID is validated. All other artifacts are skipped. The required-artifacts check is also skipped.
 
         Validating all specs in a change requires calling `execute` once per spec ID. Use cases that need to validate all specs call `execute` in a loop.
+
+        When `artifactId` is provided:
+
+        1. If the artifact ID does not exist in the schema, `execute` SHALL return a failure result with a descriptive error — it SHALL NOT throw.
+        2. The required-artifacts check (Requirement: Required artifacts check) is skipped entirely.
+        3. Only the specified artifact is evaluated through the dependency order check, delta validation, structural validation, and hash computation steps.
+        4. All other artifacts are ignored — they are not checked, not reported as missing, and not included in the result.
+        5. The dependency order check still applies to the specified artifact: if its `requires` are not satisfied, it is reported as dependency-blocked.
   - requirement: Schema name guard
     rules:
       - After resolving the schema from config, `ValidateArtifacts` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before any validation or artifact processing.
   - requirement: Required artifacts check
     rules:
-      - Before validating structure, `ValidateArtifacts` must verify that all non-optional artifact IDs are present in the change (status not `missing`). Optional artifacts with status `skipped` (`validatedHash === "__skipped__"`) are considered resolved and do not cause a failure. If any non-optional artifact is absent, `ValidateArtifacts` must return a failure result listing the missing artifact IDs. It must not throw — missing required artifacts are a validation failure, not an error.
+      - |-
+        Before validating structure, `ValidateArtifacts` must verify that all non-optional artifact IDs are present in the change (status not `missing`). Optional artifacts with status `skipped` (`validatedHash === "__skipped__"`) are considered resolved and do not cause a failure. If any non-optional artifact is absent, `ValidateArtifacts` must return a failure result listing the missing artifact IDs. It must not throw — missing required artifacts are a validation failure, not an error.
+
+        This check is skipped when `artifactId` is provided — single-artifact validation does not enforce completeness of the full artifact set.
   - requirement: Dependency order check
     rules:
       - Before validating an artifact, `ValidateArtifacts` must check that all artifact IDs in its `requires` list are either `complete` or `skipped` (via `change.effectiveStatus(type)`). If a required dependency is neither `complete` nor `skipped`, validation of the dependent artifact is skipped and reported as a dependency-blocked failure. A `skipped` optional artifact satisfies the dependency. `skipped` artifacts are not validated — there is no file to check.
@@ -56,9 +68,17 @@ rules:
       - |-
         If the change has an active spec approval (`change.activeSpecApproval` is defined) and any artifact file's current content hash (after `preHashCleanup`) differs from the hash recorded in that approval's `artifactHashes`, `ValidateArtifacts` must call `change.invalidate('artifact-change', actor)` before proceeding with validation. This rolls the change back to `designing` and records the invalidation in history.
 
+        Approval hash keys use the `type:key` format (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within that artifact.
+
         The same check applies to active signoff (`change.activeSignoff`): if any artifact's current hash differs from what was recorded in `activeSignoff.artifactHashes`, `change.invalidate('artifact-change', actor)` must be called.
 
         A single invalidation call is made per `execute` invocation even if multiple artifacts have changed — the first hash mismatch triggers invalidation and the remaining artifacts are checked against the now-cleared approval state.
+  - requirement: Per-file validation
+    rules:
+      - |-
+        Validation operates per-file within each artifact type. For `scope: change` artifacts, the single file is keyed by the artifact type id. For `scope: spec` artifacts, validation targets the file keyed by the `specPath` input parameter. If the tracked file's filename ends with `.delta.yaml`, the file is read as a delta directly (no separate delta lookup). Otherwise, standard delta detection applies.
+
+        The raw file content (not merged) is hashed for `markComplete` — this is the content that was actually written by the user/agent.
   - requirement: Delta validation
     rules:
       - |-
@@ -69,12 +89,12 @@ rules:
         For each rule in `deltaValidations[]`, apply the rule evaluation algorithm (identical for both `validations` and `deltaValidations`; only the document root differs):
 
         1. Select candidate nodes from the document root using one of:
-           * **Selector fields** (`type`, `matches`, `contains`, `parent`, `index`, `where`): apply the selector model defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md) against the AST.
-           * **`path`** (JSONPath string): evaluate the JSONPath expression against the document root.
+           - **Selector fields** (`type`, `matches`, `contains`, `parent`, `index`, `where`): apply the selector model defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md) against the AST.
+           - **`path`** (JSONPath string): evaluate the JSONPath expression against the document root.
         2. If zero nodes are selected: if `required: true`, record a failure; if `required: false`, record a warning. Skip `children` and `contentMatches` evaluation.
         3. If one or more nodes are selected: for each matched node:
-           * If `contentMatches` is present: call `parser.renderSubtree(node)` to serialize the subtree to its native format, then test the regex against the result. A non-matching node records a failure.
-           * Evaluate any `children` rules recursively, using the matched node as the document root.
+           - If `contentMatches` is present: call `parser.renderSubtree(node)` to serialize the subtree to its native format, then test the regex against the result. A non-matching node records a failure.
+           - Evaluate any `children` rules recursively, using the matched node as the document root.
 
         A rule passes vacuously when zero nodes are selected. If any `required: true` delta validation rule fails, the artifact is not advanced to the delta application preview step — the failure is reported immediately.
   - requirement: Delta application preview and conflict detection
@@ -104,20 +124,20 @@ rules:
   - requirement: Hash computation and markComplete
     rules:
       - |-
-        If all delta validations, conflict detection, and structural validations pass for an artifact, `ValidateArtifacts` must:
+        If all delta validations, conflict detection, and structural validations pass for a file within an artifact, `ValidateArtifacts` must:
 
-        1. Compute the cleaned hash: apply each `preHashCleanup` substitution in declaration order to the artifact file content, then compute SHA-256 of the result.
-        2. Call `change.getArtifact(type).markComplete(cleanedHash)` on the corresponding `ChangeArtifact`.
+        1. Compute the cleaned hash: apply each `preHashCleanup` substitution in declaration order to the raw file content (not the merged content), then compute SHA-256 of the result.
+        2. Call `change.getArtifact(type).markComplete(key, cleanedHash)` on the corresponding `ChangeArtifact`, where `key` is the file key (artifact type id for `scope: change`, spec ID for `scope: spec`).
 
-        If any validation step fails, `markComplete` must not be called for that artifact.
+        If any validation step fails, `markComplete` must not be called for that file.
   - requirement: Result shape
     rules:
       - |-
         `ValidateArtifacts.execute` must return a result object — it must not throw for validation failures. The result must include:
 
-        * `passed: boolean` — `true` only if all required artifacts are present and all validations pass with no errors
-        * `failures: ValidationFailure[]` — one entry per failed rule, missing artifact, or `DeltaApplicationError`
-        * `warnings: ValidationWarning[]` — one entry per `required: false` rule that was absent
+        - `passed: boolean` — `true` only if all required artifacts are present and all validations pass with no errors
+        - `failures: ValidationFailure[]` — one entry per failed rule, missing artifact, or `DeltaApplicationError`
+        - `warnings: ValidationWarning[]` — one entry per `required: false` rule that was absent
 
         Each `ValidationFailure` must include the artifact ID, the rule or error description, and enough context for the CLI to produce a useful error message.
   - requirement: Save after validation
@@ -140,7 +160,7 @@ scenarios:
       - a schema with a non-optional artifact specs
       - AND the change has no file for specs and validatedHash is unset
     when:
-      - ValidateArtifacts.execute is called
+      - ValidateArtifacts.execute is called without artifactId
     then:
       - result.passed is false and result.failures lists specs as missing
   - requirement: Required artifacts check
@@ -149,7 +169,7 @@ scenarios:
       - 'a schema with optional: true artifact design'
       - AND the change has design.validatedHash === "__skipped__"
     when:
-      - ValidateArtifacts.execute is called
+      - ValidateArtifacts.execute is called without artifactId
     then:
       - design does not appear in result.failures — skipped optional artifacts are resolved
   - requirement: Required artifacts check
@@ -158,9 +178,57 @@ scenarios:
       - 'a schema with optional: true artifact design'
       - AND the change has no file and no validatedHash for design
     when:
-      - ValidateArtifacts.execute is called
+      - ValidateArtifacts.execute is called without artifactId
     then:
       - design does not appear in result.failures — absent optional artifacts are allowed
+  - requirement: Required artifacts check
+    name: Required artifacts check skipped when artifactId is provided
+    given:
+      - a schema with non-optional artifacts proposal and specs
+      - AND only proposal has a file; specs is missing
+      - AND artifactId is "proposal"
+    when:
+      - ValidateArtifacts.execute is called
+    then:
+      - result.passed is true (assuming proposal passes validation)
+      - AND the missing specs artifact is not reported as a failure
+  - requirement: Input — artifactId filter
+    name: Unknown artifact ID returns failure
+    given:
+      - artifactId is "nonexistent" and the schema has no artifact with that ID
+    when:
+      - ValidateArtifacts.execute is called
+    then:
+      - result.passed is false and result.failures includes a descriptive error for the unknown ID
+      - AND no validation, delta check, or markComplete is performed
+  - requirement: Input — artifactId filter
+    name: Only the specified artifact is validated
+    given:
+      - the schema has artifacts proposal, specs, and verify
+      - AND artifactId is "specs"
+    when:
+      - ValidateArtifacts.execute is called
+    then:
+      - only specs goes through dependency check, delta validation, structural validation, and hash computation
+      - AND proposal and verify are not checked, not reported as missing, and not included in the result
+  - requirement: Input — artifactId filter
+    name: Dependency order still applies to the specified artifact
+    given:
+      - artifactId is "specs" and artifact specs requires proposal
+      - AND proposal is not complete or skipped
+    when:
+      - ValidateArtifacts.execute is called
+    then:
+      - specs is reported as dependency-blocked and markComplete is not called
+  - requirement: Input — artifactId filter
+    name: Specified artifact with satisfied dependencies proceeds normally
+    given:
+      - artifactId is "specs" and artifact specs requires proposal
+      - AND proposal is complete
+    when:
+      - ValidateArtifacts.execute is called
+    then:
+      - specs is validated normally and markComplete is called if all validations pass
   - requirement: Dependency order check
     name: Dependency complete — validation proceeds
     given:
@@ -338,6 +406,6 @@ scenarios:
     then:
       - changeRepository.save(change) is called — partial progress is persisted
 contentHashes:
-  spec.md: sha256:1156b6ad074734740031d865908ac2b53f6694a34edf72a948c761102511ca76
-  verify.md: sha256:e7a2776f4791714349f5fe816448efec4e7dbe1ba7cd99de282309d520697135
+  spec.md: sha256:b81a11e8e7ab0f00cce641dd40e5be2ddc75252d9908fa4f0be3714eb6720b7a
+  verify.md: sha256:8fbe8f888411984f6e51eb4161ec4db3fcf89fa36cad6f5f43c6561878a0211b
 generatedBy: core
