@@ -1,5 +1,9 @@
 import { type GraphStore } from '../ports/graph-store.js'
-import { type FileImpactResult, type ImpactResult } from '../value-objects/impact-result.js'
+import {
+  type AffectedSymbol,
+  type FileImpactResult,
+  type ImpactResult,
+} from '../value-objects/impact-result.js'
 import { computeRiskLevel, maxRisk } from '../value-objects/risk-level.js'
 import { analyzeImpact } from './analyze-impact.js'
 
@@ -9,19 +13,23 @@ import { analyzeImpact } from './analyze-impact.js'
  * @param store - The graph store to query.
  * @param filePath - The path of the file to analyze.
  * @param direction - The traversal direction: upstream, downstream, or both.
+ * @param maxDepth - Maximum traversal depth (default: 3).
  * @returns The aggregated file impact result across all symbols in the file.
  */
 export async function analyzeFileImpact(
   store: GraphStore,
   filePath: string,
   direction: 'upstream' | 'downstream' | 'both',
+  maxDepth = 3,
 ): Promise<FileImpactResult> {
   // Symbol-level impact via CALLS
   const symbols = await store.findSymbols({ filePath })
-  const symbolResults = await Promise.all(symbols.map((s) => analyzeImpact(store, s.id, direction)))
+  const symbolResults = await Promise.all(
+    symbols.map((s) => analyzeImpact(store, s.id, direction, maxDepth)),
+  )
 
   // File-level impact via IMPORTS (BFS)
-  const fileImpact = await analyzeFileImportImpact(store, filePath, direction)
+  const fileImpact = await analyzeFileImportImpact(store, filePath, direction, maxDepth)
 
   // Merge file-level and symbol-level affected files into a deduped set
   const affectedFileSet = new Set<string>()
@@ -63,7 +71,7 @@ export async function analyzeFileImpact(
     transitiveDependents,
     riskLevel: overallRisk,
     affectedFiles: [...affectedFileSet],
-    affectedSymbols: symbolResults.flatMap((r) => r.affectedSymbols),
+    affectedSymbols: deduplicateSymbols(symbolResults.flatMap((r) => r.affectedSymbols)),
     affectedProcesses: [],
     symbols: symbolResults,
   }
@@ -74,14 +82,15 @@ export async function analyzeFileImpact(
  * @param store - The graph store to query.
  * @param filePath - The file to analyze.
  * @param direction - upstream (importers), downstream (importees), or both.
+ * @param maxDepth - Maximum BFS depth.
  * @returns An impact result based on file-level import relationships.
  */
 async function analyzeFileImportImpact(
   store: GraphStore,
   filePath: string,
   direction: 'upstream' | 'downstream' | 'both',
+  maxDepth: number,
 ): Promise<ImpactResult> {
-  const maxDepth = 3
   const visited = new Set<string>([filePath])
   const depthFiles = new Map<number, string[]>()
 
@@ -142,4 +151,20 @@ async function analyzeFileImportImpact(
     affectedSymbols: [],
     affectedProcesses: [],
   }
+}
+
+/**
+ * Deduplicates affected symbols, keeping the entry with the shallowest depth.
+ * @param symbols - Array of affected symbols (may contain duplicates by id).
+ * @returns Deduplicated array, each symbol at its shallowest observed depth.
+ */
+function deduplicateSymbols(symbols: readonly AffectedSymbol[]): AffectedSymbol[] {
+  const map = new Map<string, AffectedSymbol>()
+  for (const s of symbols) {
+    const existing = map.get(s.id)
+    if (!existing || s.depth < existing.depth) {
+      map.set(s.id, s)
+    }
+  }
+  return [...map.values()]
 }

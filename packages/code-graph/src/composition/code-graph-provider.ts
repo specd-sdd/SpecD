@@ -145,26 +145,30 @@ export class CodeGraphProvider {
    * Analyzes the impact (blast radius) of changes to a symbol.
    * @param target - The symbol identifier to analyze.
    * @param direction - Direction of impact analysis.
+   * @param maxDepth - Maximum traversal depth (default: 3).
    * @returns The impact result with affected symbols and risk levels.
    */
   async analyzeImpact(
     target: string,
     direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
   ): Promise<ImpactResult> {
-    return analyzeImpact(this.store, target, direction)
+    return analyzeImpact(this.store, target, direction, maxDepth)
   }
 
   /**
    * Analyzes the impact (blast radius) of changes to a file.
    * @param filePath - The file path to analyze.
    * @param direction - Direction of impact analysis.
+   * @param maxDepth - Maximum traversal depth (default: 3).
    * @returns The file impact result with affected files and risk levels.
    */
   async analyzeFileImpact(
     filePath: string,
     direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
   ): Promise<FileImpactResult> {
-    return analyzeFileImpact(this.store, filePath, direction)
+    return analyzeFileImpact(this.store, filePath, direction, maxDepth)
   }
 
   /**
@@ -178,10 +182,11 @@ export class CodeGraphProvider {
   /**
    * Detects the scope of changes given a set of modified files.
    * @param changedFiles - Array of file paths that have changed.
+   * @param maxDepth - Maximum traversal depth (default: 3).
    * @returns The change detection result with affected symbols and flows.
    */
-  async detectChanges(changedFiles: string[]): Promise<ChangeDetectionResult> {
-    return detectChanges(this.store, changedFiles)
+  async detectChanges(changedFiles: string[], maxDepth?: number): Promise<ChangeDetectionResult> {
+    return detectChanges(this.store, changedFiles, maxDepth)
   }
 
   /**

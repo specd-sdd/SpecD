@@ -15,6 +15,7 @@ import { withProvider } from './with-provider.js'
  * @param result.transitiveDependents - Count of transitive dependents.
  * @param result.affectedFiles - List of affected file paths.
  * @param result.affectedSymbols - Optional list of affected symbols with name and file path.
+ * @param maxDepth - Maximum traversal depth used (default: 3). Non-default values shown in header.
  * @returns An array of formatted lines.
  */
 function formatImpact(
@@ -25,11 +26,13 @@ function formatImpact(
     indirectDependents: number
     transitiveDependents: number
     affectedFiles: readonly string[]
-    affectedSymbols?: readonly { name: string; filePath: string; line: number }[]
+    affectedSymbols?: readonly { name: string; filePath: string; line: number; depth: number }[]
   },
+  maxDepth = 3,
 ): string[] {
+  const depthSuffix = maxDepth !== 3 ? ` (depth=${String(maxDepth)})` : ''
   const lines = [
-    `Impact analysis for ${label}`,
+    `Impact analysis for ${label}${depthSuffix}`,
     `  Risk level:       ${result.riskLevel}`,
     `  Direct deps:      ${String(result.directDependents)}`,
     `  Indirect deps:    ${String(result.indirectDependents)}`,
@@ -38,14 +41,14 @@ function formatImpact(
   ]
 
   if (result.affectedSymbols && result.affectedSymbols.length > 0) {
-    // Group symbols by file, preserving line info for display
-    const byFile = new Map<string, Array<{ name: string; line: number }>>()
+    // Group symbols by file, preserving line and depth info for display
+    const byFile = new Map<string, Array<{ name: string; line: number; depth: number }>>()
     for (const s of result.affectedSymbols) {
       const existing = byFile.get(s.filePath)
       if (existing) {
-        existing.push({ name: s.name, line: s.line })
+        existing.push({ name: s.name, line: s.line, depth: s.depth })
       } else {
-        byFile.set(s.filePath, [{ name: s.name, line: s.line }])
+        byFile.set(s.filePath, [{ name: s.name, line: s.line, depth: s.depth }])
       }
     }
 
@@ -54,7 +57,9 @@ function formatImpact(
     for (const f of result.affectedFiles) {
       const syms = byFile.get(f)
       if (syms) {
-        const symList = syms.map((s) => `${s.name}:${String(s.line)}`).join(', ')
+        const symList = syms
+          .map((s) => `${s.name}:${String(s.line)} (d=${String(s.depth)})`)
+          .join(', ')
         lines.push(`  ${f}: ${symList}`)
       } else {
         lines.push(`  ${f}`)
@@ -88,6 +93,7 @@ export function registerGraphImpact(parent: Command): void {
         .choices(['upstream', 'downstream', 'both'])
         .default('upstream'),
     )
+    .option('--depth <n>', 'max traversal depth (positive integer)', '3')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .addHelpText(
       'after',
@@ -117,10 +123,15 @@ JSON/TOON output schema:
         symbol?: string
         changes?: string[]
         direction: string
+        depth: string
         format: string
       }) => {
         const fmt = parseFormat(opts.format)
         const direction = opts.direction as 'upstream' | 'downstream' | 'both'
+        const maxDepth = parseInt(opts.depth, 10)
+        if (Number.isNaN(maxDepth) || maxDepth <= 0) {
+          cliError('--depth must be a positive integer', opts.format, 1)
+        }
 
         const selectorCount = (opts.symbol ? 1 : 0) + (opts.changes ? 1 : 0) + (opts.file ? 1 : 0)
         if (selectorCount !== 1) {
@@ -131,11 +142,11 @@ JSON/TOON output schema:
 
         await withProvider(config, opts.format, async (provider) => {
           if (opts.symbol) {
-            await handleSymbolImpact(provider, opts.symbol, direction, fmt)
+            await handleSymbolImpact(provider, opts.symbol, direction, maxDepth, fmt)
           } else if (opts.changes) {
-            await handleChangesImpact(provider, opts.changes, fmt)
+            await handleChangesImpact(provider, opts.changes, maxDepth, fmt)
           } else if (opts.file) {
-            await handleFileImpact(provider, opts.file, direction, fmt)
+            await handleFileImpact(provider, opts.file, direction, maxDepth, fmt)
           }
         })
       },
@@ -147,18 +158,20 @@ JSON/TOON output schema:
  * @param provider - The code graph provider.
  * @param file - The file path to analyze.
  * @param direction - The traversal direction.
+ * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
  */
 async function handleFileImpact(
   provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
   file: string,
   direction: 'upstream' | 'downstream' | 'both',
+  maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
 ): Promise<void> {
-  const result = await provider.analyzeFileImpact(file, direction)
+  const result = await provider.analyzeFileImpact(file, direction, maxDepth)
 
   if (fmt === 'text') {
-    const lines = formatImpact(file, result)
+    const lines = formatImpact(file, result, maxDepth)
 
     if (result.symbols.length > 0) {
       lines.push('')
@@ -179,12 +192,14 @@ async function handleFileImpact(
  * @param provider - The code graph provider.
  * @param symbolName - The symbol name to search for.
  * @param direction - The traversal direction.
+ * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
  */
 async function handleSymbolImpact(
   provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
   symbolName: string,
   direction: 'upstream' | 'downstream' | 'both',
+  maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
 ): Promise<void> {
   const symbols = await provider.findSymbols({ name: symbolName })
@@ -200,12 +215,13 @@ async function handleSymbolImpact(
 
   if (symbols.length === 1) {
     const sym = symbols[0]!
-    const result = await provider.analyzeImpact(sym.id, direction)
+    const result = await provider.analyzeImpact(sym.id, direction, maxDepth)
 
     if (fmt === 'text') {
       const lines = formatImpact(
         `${sym.kind} ${sym.name} (${sym.filePath}:${String(sym.line)})`,
         result,
+        maxDepth,
       )
       output(lines.join('\n'), 'text')
     } else {
@@ -219,9 +235,13 @@ async function handleSymbolImpact(
     const allLines = [`${String(symbols.length)} symbols match "${symbolName}":\n`]
 
     for (const sym of symbols) {
-      const result = await provider.analyzeImpact(sym.id, direction)
+      const result = await provider.analyzeImpact(sym.id, direction, maxDepth)
       allLines.push(
-        ...formatImpact(`${sym.kind} ${sym.name} (${sym.filePath}:${String(sym.line)})`, result),
+        ...formatImpact(
+          `${sym.kind} ${sym.name} (${sym.filePath}:${String(sym.line)})`,
+          result,
+          maxDepth,
+        ),
       )
       allLines.push('')
     }
@@ -231,7 +251,7 @@ async function handleSymbolImpact(
     const results = await Promise.all(
       symbols.map(async (sym) => ({
         symbol: sym,
-        impact: await provider.analyzeImpact(sym.id, direction),
+        impact: await provider.analyzeImpact(sym.id, direction, maxDepth),
       })),
     )
     output(results, fmt)
@@ -242,14 +262,16 @@ async function handleSymbolImpact(
  * Handles change detection across multiple files.
  * @param provider - The code graph provider.
  * @param files - The list of changed file paths.
+ * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
  */
 async function handleChangesImpact(
   provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
   files: string[],
+  maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
 ): Promise<void> {
-  const result = await provider.detectChanges(files)
+  const result = await provider.detectChanges(files, maxDepth)
 
   if (fmt === 'text') {
     output(result.summary, 'text')
