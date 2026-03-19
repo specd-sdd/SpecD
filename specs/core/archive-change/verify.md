@@ -11,11 +11,14 @@
 - **AND** no hooks are run
 - **AND** no files are modified
 
-#### Scenario: Change in archivable state
+#### Scenario: Change in archivable state transitions to archiving
 
 - **GIVEN** the change is in `archivable` state
 - **WHEN** `ArchiveChange.execute` is called
-- **THEN** the archivable guard passes and execution proceeds to pre-archive hooks
+- **THEN** the archivable guard passes
+- **AND** the change transitions to `archiving` via `change.transition('archiving', actor)`
+- **AND** the change is persisted via `ChangeRepository.save(change)`
+- **AND** execution proceeds to pre-archive hooks
 
 ### Requirement: Pre-archive hooks
 

@@ -52,6 +52,8 @@ After resolving the schema from config, `ArchiveChange` must compare `schema.nam
 
 The first step of `ArchiveChange.execute` after the schema name guard must call `change.assertArchivable()`. If the change is not in `archivable` state, this throws `InvalidStateTransitionError` and the archive is aborted without running any hooks or modifying any files.
 
+After the guard passes, `ArchiveChange` MUST transition the change to `archiving` via `change.transition('archiving', actor)` and persist the change via `ChangeRepository.save(change)`. This records the state transition before any hooks execute or files are modified.
+
 ### Requirement: Pre-archive hooks
 
 After the archivable guard passes, when `skipHooks` is `false` (default), `ArchiveChange` must execute pre-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'pre' })`.

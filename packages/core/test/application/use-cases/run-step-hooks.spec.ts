@@ -116,6 +116,18 @@ describe('RunStepHooks', () => {
       ).rejects.toThrow(StepNotValidError)
     })
 
+    it('accepts archiving as a valid step', async () => {
+      const change = makeChange('my-change')
+      const schema = makeSchema({ workflow: [] })
+      const uc = makeUseCase({
+        changes: makeChangeRepository([change]),
+        schema,
+      })
+
+      const result = await uc.execute({ name: 'my-change', step: 'archiving', phase: 'pre' })
+      expect(result).toEqual({ hooks: [], success: true, failedHook: null })
+    })
+
     it('returns empty result when step is valid but schema has no workflowStep', async () => {
       const change = makeChange('my-change')
       // Schema with no workflow steps at all
