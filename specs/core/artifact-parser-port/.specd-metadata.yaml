@@ -174,31 +174,6 @@ scenarios:
       - the markdown adapter serializes the AST
     then:
       - output uses deterministic project markdown conventions for the ambiguous construct
-  - requirement: Serialize round-trip
-    name: Markdown serialize preserves untouched inline formatting
-    given:
-      - a markdown AST containing inline code, emphasis, and strong in one paragraph
-      - AND delta application modifies a different node in the same document
-    when:
-      - the markdown adapter serializes the resulting AST
-    then:
-      - the untouched paragraph preserves inline formatting intent (inline code/emphasis/strong)
-  - requirement: Serialize round-trip
-    name: Markdown serializer uses source style when unambiguous
-    given:
-      - a markdown source that consistently uses - bullets and _ emphasis
-    when:
-      - the markdown adapter parses, applies delta, and serializes
-    then:
-      - output keeps - as bullet marker and _ as emphasis marker where representable
-  - requirement: Serialize round-trip
-    name: Markdown serializer resolves mixed style deterministically
-    given:
-      - a markdown source that mixes both supported markers for bullets or emphasis
-    when:
-      - the markdown adapter serializes the AST
-    then:
-      - output uses deterministic project markdown conventions for the ambiguous construct
   - requirement: RenderSubtree contract
     name: Single node renders to native format
     given:
@@ -241,5 +216,5 @@ scenarios:
       - it has ordered set to true
 contentHashes:
   spec.md: sha256:edf0034e60944b0159760130905f3bd306b078f13e9d87ddf9ae6d2b2dddf973
-  verify.md: sha256:df4b8027a18943d23ebc6d4747cfa4a68ad8a423099d3864be4f792dde90df80
+  verify.md: sha256:ebe8a4d78121cb52366070d06c46f95a0a0b5f441839ce9d1a536b047deb306f
 generatedBy: core

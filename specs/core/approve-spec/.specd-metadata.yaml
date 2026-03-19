@@ -17,15 +17,16 @@ rules:
   - requirement: Artifact hash computation
     rules:
       - |-
-        Before recording the approval, the use case MUST compute a content hash for every artifact in the change. For each artifact:
+        Before recording the approval, the use case MUST compute a content hash for every file across all artifacts in the change. For each artifact, it iterates over the artifact's `files` map. For each file:
 
-        1. Load the artifact content from the repository via `ChangeRepository.artifact()`.
-        2. If the artifact cannot be loaded (returns `null`), skip it silently.
-        3. Resolve the active schema from the `SchemaRegistry` using the configured schema reference and workspace schema paths.
-        4. If the schema resolves, build a cleanup map of artifact-type to pre-hash cleanup rules; if it does not resolve, use an empty cleanup map.
-        5. Apply the matching cleanup rules (by artifact type) to the content, then hash the cleaned content via the `ContentHasher`.
+        1. Skip files with status `missing` or `skipped`.
+        2. Load the file content from the repository via `ChangeRepository.artifact(change, file.filename)`.
+        3. If the file cannot be loaded (returns `null`), skip it silently.
+        4. Resolve the active schema from the `SchemaRegistry` using the configured schema reference and workspace schema paths.
+        5. If the schema resolves, build a cleanup map of artifact-type to pre-hash cleanup rules; if it does not resolve, use an empty cleanup map.
+        6. Apply the matching cleanup rules (by artifact type) to the content, then hash the cleaned content via the `ContentHasher`.
 
-        The result is a `Record<string, string>` mapping artifact filename to hash string.
+        The result is a `Record<string, string>` mapping `type:key` hash keys to hash strings (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within the artifact.
   - requirement: Approval recording and state transition
     rules:
       - |-
@@ -43,9 +44,9 @@ rules:
       - |-
         The `ApproveSpecInput` interface MUST include:
 
-        * `name` (string) -- the change slug identifying the target change.
-        * `reason` (string) -- free-text rationale recorded in the approval event.
-        * `approvalsSpec` (boolean) -- whether the spec approval gate is enabled in the active configuration.
+        - `name` (string) -- the change slug identifying the target change.
+        - `reason` (string) -- free-text rationale recorded in the approval event.
+        - `approvalsSpec` (boolean) -- whether the spec approval gate is enabled in the active configuration.
 
         All fields are required and readonly.
 constraints:
@@ -129,6 +130,6 @@ scenarios:
       - name, reason, and approvalsSpec are all required
       - AND all fields are readonly
 contentHashes:
-  spec.md: sha256:4410ff617bcc5e4f89288735901706dab1b811455e101642df9f68ee41e1575b
+  spec.md: sha256:cd40e7ff9fffe939c3bef9febab592e5f17df9cb6e9daefae320ba221007c224
   verify.md: sha256:ace3cf15e0831ccb82a0fe1838f9c1ae9493fc2cca9b98644b07c0aedb109769
 generatedBy: core
