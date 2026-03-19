@@ -1775,4 +1775,35 @@ describe('ArchiveChange', () => {
       expect(archiveCalled).toBe(false)
     })
   })
+
+  describe('archiving state transition', () => {
+    it('transitions change to archiving before pre-hooks execute', async () => {
+      const change = makeArchivableChange('my-change')
+      let stateAtHookTime: string | undefined
+      const hookSpy = makeRunStepHooks({
+        execute: async (_input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          stateAtHookTime = change.state
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([change]),
+        new Map(),
+        makeArchiveRepository(),
+        hookSpy,
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaRegistry(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+        makeYaml(),
+        'std',
+        new Map(),
+      )
+
+      await uc.execute({ name: 'my-change' })
+      expect(stateAtHookTime).toBe('archiving')
+    })
+  })
 })

@@ -18,7 +18,7 @@ import {
 } from '../../application/ports/change-repository.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
-import { safeRegex } from '../../domain/services/safe-regex.js'
+import { applyPreHashCleanup } from '../../domain/services/pre-hash-cleanup.js'
 import { changeDirName } from './dir-name.js'
 import { sha256 } from './hash.js'
 import { isEnoent } from './is-enoent.js'
@@ -731,13 +731,7 @@ export class FsChangeRepository extends ChangeRepository {
 
     if (file.validatedHash === null) return 'in-progress'
 
-    let cleaned = content
-    for (const rule of preHashCleanup) {
-      const re = safeRegex(rule.pattern, 'g')
-      if (re !== null) {
-        cleaned = cleaned.replace(re, rule.replacement)
-      }
-    }
+    const cleaned = applyPreHashCleanup(content, preHashCleanup)
     const currentHash = sha256(cleaned)
     return currentHash === file.validatedHash ? 'complete' : 'in-progress'
   }

@@ -56,9 +56,9 @@ rules:
   - requirement: Step resolution
     rules:
       - |-
-        `RunStepHooks` first validates that `step` is a valid `ChangeState` (a lifecycle state defined by the domain). If it is not, it MUST throw `StepNotValidError`.
+        `RunStepHooks` validates that `step` is a valid `ChangeState` (a lifecycle state defined by the domain, which includes `archiving`). If it is not, it MUST throw `StepNotValidError`.
 
-        If the step is a valid lifecycle state, `RunStepHooks` looks up the workflow step entry via `schema.workflowStep(step)`. If no matching entry exists (the schema does not declare hooks for this state), the use case returns `{ hooks: [], success: true, failedHook: null }` — no error is thrown.
+        If the step is a valid lifecycle state, `RunStepHooks` looks up the workflow step entry via `schema.workflowStep(step)`. If no matching entry exists (the schema does not declare hooks for this step), the use case returns `{ hooks: [], success: true, failedHook: null }` — no error is thrown.
   - requirement: Hook collection
     rules:
       - |-
@@ -105,7 +105,7 @@ rules:
         When no hooks match (empty `run:` hook list for the step+phase, or the step has no hooks), the result is `{ hooks: [], success: true, failedHook: null }`.
   - requirement: Works for any step
     rules:
-      - '`RunStepHooks` MUST work for any workflow step, including `archiving`. While `ArchiveChange` delegates hook execution to `RunStepHooks`, `RunStepHooks` can also be called independently — for example, to run a pre-archive check without performing the full archive, or to retry a failed post-archive hook.'
+      - '`RunStepHooks` MUST work for any valid `ChangeState`, including `archiving`. While `ArchiveChange` delegates hook execution to `RunStepHooks`, `RunStepHooks` can also be called independently — for example, to run a pre-archive check without performing the full archive, or to retry a failed post-archive hook.'
 constraints:
   - RunStepHooks MUST NOT perform any state transition on the Change entity — it only executes hooks
   - 'RunStepHooks MUST NOT execute instruction: hooks — only run: hooks'
@@ -131,7 +131,16 @@ scenarios:
     when:
       - 'RunStepHooks.execute is called with step: "reviewing"'
     then:
-      - StepNotValidError is thrown indicating reviewing is not a valid lifecycle state
+      - StepNotValidError is thrown because reviewing is not a valid ChangeState
+  - requirement: Step resolution
+    name: Archiving step is accepted as a valid ChangeState
+    given:
+      - a schema with workflow steps [designing, implementing, verifying, archiving]
+    when:
+      - 'RunStepHooks.execute is called with step: "archiving"'
+    then:
+      - no error is thrown
+      - AND the step is resolved normally via schema.workflowStep("archiving")
   - requirement: Step resolution
     name: Valid state without workflow entry returns empty
     given:
@@ -237,6 +246,6 @@ scenarios:
       - pnpm test is executed via HookRunner
       - AND the result includes the hook outcome
 contentHashes:
-  spec.md: sha256:d77339c80d5f04b919d35fcaac41445555616ccf9d96ff8bb988228932690cae
-  verify.md: sha256:b7403675dad642ff3e5bd0c23dc7860ab1dbdb60f71470bdce457b14563c62a2
+  spec.md: sha256:210b76c5fd8605e3bd85a3c80fa5c49801f6e7ccdb96e9d8b66f2fef92be8bcb
+  verify.md: sha256:77421f479fdce88c7b0e71923837d8669551003b89a242958764d925a9ea858f
 generatedBy: core

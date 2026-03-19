@@ -455,7 +455,7 @@ describe('ResolveSchema — plugins', () => {
       version: 1,
       operations: {
         append: {
-          workflow: [{ step: 'reviewing', requires: [], hooks: { pre: [], post: [] } }],
+          workflow: [{ step: 'verifying', requires: [], hooks: { pre: [], post: [] } }],
         },
       },
     }
@@ -467,7 +467,7 @@ describe('ResolveSchema — plugins', () => {
 
     const schema = await resolve(registry, '#base', ['#plugin'])
     const steps = schema.workflow().map((s) => s.step)
-    expect(steps).toEqual(['designing', 'reviewing'])
+    expect(steps).toEqual(['designing', 'verifying'])
   })
 
   it('plugin append — adds hooks to existing workflow step', async () => {
@@ -600,7 +600,7 @@ describe('ResolveSchema — plugins', () => {
       name: 'plan-plugin',
       version: 1,
       operations: {
-        prepend: { workflow: [{ step: 'planning', requires: [], hooks: { pre: [], post: [] } }] },
+        prepend: { workflow: [{ step: 'ready', requires: [], hooks: { pre: [], post: [] } }] },
       },
     }
 
@@ -611,7 +611,7 @@ describe('ResolveSchema — plugins', () => {
 
     const schema = await resolve(registry, '#base', ['#plugin'])
     const steps = schema.workflow().map((s) => s.step)
-    expect(steps).toEqual(['planning', 'implementing'])
+    expect(steps).toEqual(['ready', 'implementing'])
   })
 
   // --- create ---
@@ -669,7 +669,7 @@ describe('ResolveSchema — plugins', () => {
       name: 'deploy-plugin',
       version: 1,
       operations: {
-        create: { workflow: [{ step: 'deploying', requires: [], hooks: { pre: [], post: [] } }] },
+        create: { workflow: [{ step: 'archiving', requires: [], hooks: { pre: [], post: [] } }] },
       },
     }
 
@@ -679,7 +679,26 @@ describe('ResolveSchema — plugins', () => {
     })
 
     const schema = await resolve(registry, '#base', ['#plugin'])
-    expect(schema.workflowStep('deploying')).not.toBeNull()
+    expect(schema.workflowStep('archiving')).not.toBeNull()
+  })
+
+  it('plugin create — rejects invalid workflow step name', async () => {
+    const base = minimalData({ name: 'base' })
+    const plugin: SchemaYamlData = {
+      kind: 'schema-plugin',
+      name: 'bad-plugin',
+      version: 1,
+      operations: {
+        create: { workflow: [{ step: 'reviewing', requires: [], hooks: { pre: [], post: [] } }] },
+      },
+    }
+
+    const registry = makeRegistry({
+      '#base': rawResult(base),
+      '#plugin': rawResult(plugin, '/plugins/bad/schema.yaml'),
+    })
+
+    await expect(resolve(registry, '#base', ['#plugin'])).rejects.toThrow(SchemaValidationError)
   })
 
   // --- remove ---

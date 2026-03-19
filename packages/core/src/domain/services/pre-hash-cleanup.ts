@@ -16,7 +16,7 @@ import { safeRegex } from './safe-regex.js'
 export function applyPreHashCleanup(content: string, cleanups: readonly PreHashCleanup[]): string {
   let result = content
   for (const cleanup of cleanups) {
-    const re = safeRegex(cleanup.pattern, 'g')
+    const re = safeRegex(cleanup.pattern, 'gm')
     if (re !== null) {
       result = result.replace(re, cleanup.replacement)
     }

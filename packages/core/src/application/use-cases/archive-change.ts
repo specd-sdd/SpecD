@@ -138,8 +138,13 @@ export class ArchiveChange {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
     }
 
-    // --- Archivable guard ---
+    // --- Archivable guard + transition to archiving ---
     change.assertArchivable()
+    const archivingActor = await this._actor.identity()
+    if (change.state !== 'archiving') {
+      change.transition('archiving', archivingActor)
+      await this._changes.save(change)
+    }
 
     // --- Pre-archive hooks (delegated to RunStepHooks) ---
     const skipHooks = input.skipHooks ?? false
@@ -238,16 +243,9 @@ export class ArchiveChange {
     }
 
     // --- Archive ---
-    let actor: { name: string; email: string } | undefined
-    try {
-      actor = await this._actor.identity()
-    } catch {
-      // If git identity is unavailable (e.g. no git config), proceed without it
-    }
-    const { archivedChange, archiveDirPath } = await this._archive.archive(
-      change,
-      actor !== undefined ? { actor } : undefined,
-    )
+    const { archivedChange, archiveDirPath } = await this._archive.archive(change, {
+      actor: archivingActor,
+    })
 
     // --- Post-archive hooks (delegated to RunStepHooks) ---
     const postHookFailures: string[] = []
