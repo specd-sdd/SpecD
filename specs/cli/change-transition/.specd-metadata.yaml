@@ -15,17 +15,17 @@ rules:
         specd change transition <name> <step> [--no-hooks] [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the name of the change to transition
-        * `<step>` — required positional; the target lifecycle state (e.g. `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`)
-        * `--no-hooks` — optional flag; skips `run:` hook execution, allowing the caller to manage hooks separately via `specd change run-hooks`
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the name of the change to transition
+        - `<step>` — required positional; the target lifecycle state (e.g. `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`)
+        - `--no-hooks` — optional flag; skips `run:` hook execution, allowing the caller to manage hooks separately via `specd change run-hooks`
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Approval-gate routing
     rules:
       - |-
         The CLI passes the `approvalsSpec` and `approvalsSignoff` flags from the loaded `SpecdConfig` to the `TransitionChange` use case. The use case then applies smart routing:
 
-        * When the change is in `ready` and `approvalsSpec: true`, `implementing` is silently routed to `pending-spec-approval`
-        * When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`
+        - When the change is in `ready` and `approvalsSpec: true`, `implementing` is silently routed to `pending-spec-approval`
+        - When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`
 
         The user always specifies the logical target state; routing is transparent.
   - requirement: Hook execution
@@ -36,10 +36,10 @@ rules:
       - |-
         The CLI passes an `onProgress` callback to the use case that renders step-by-step feedback to stdout:
 
-        * `requires-check` → `✓ artifactId [complete]` or `✗ artifactId [status]`
-        * `hook-start` → spinner `⠋ phase › hookId: command`
-        * `hook-done` → `✓ hookId (exit 0)` or `✗ hookId (exit N)`
-        * `transitioned` → `✓ from → to`
+        - `requires-check` → `✓ artifactId [complete]` or `✗ artifactId [status]`
+        - `hook-start` → spinner `⠋ phase › hookId: command`
+        - `hook-done` → `✓ hookId (exit 0)` or `✗ hookId (exit N)`
+        - `transitioned` → `✓ from → to`
 
         Progress output is only rendered in `text` format. JSON and toon formats include progress data in the structured output.
   - requirement: Output on success
@@ -47,8 +47,8 @@ rules:
       - |-
         On success, output depends on `--format`:
 
-        * `text` (default): prints a single line to stdout:
-        * `json` or `toon`: outputs the following to stdout (encoded in the respective format):
+        - `text` (default): prints a single line to stdout:
+        - `json` or `toon`: outputs the following to stdout (encoded in the respective format):
 
         where `<to>` is the effective target state after routing.
   - requirement: Post-hook failure warning

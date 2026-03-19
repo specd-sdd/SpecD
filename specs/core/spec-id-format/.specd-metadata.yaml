@@ -14,8 +14,8 @@ rules:
       - |-
         The canonical spec ID format SHALL be `workspace:capabilityPath`, where:
 
-        * `workspace` is the workspace name (e.g. `default`, `billing`)
-        * `capabilityPath` is the slash-separated path to the spec within the workspace (e.g. `auth/login`, `_global/architecture`)
+        - `workspace` is the workspace name (e.g. `default`, `billing`)
+        - `capabilityPath` is the slash-separated path to the spec within the workspace (e.g. `auth/login`, `_global/architecture`)
 
         The workspace and capability path are separated by `:` (colon). All `/` characters belong to the capability path.
 

@@ -14,9 +14,9 @@ rules:
         specd schema fork <ref> [--name <name>] [--workspace <workspace>]
         ```
 
-        * `<ref>` (required) — the schema reference to fork (npm package, workspace-qualified, bare name, or path). Uses the same reference conventions as the `schema` field in `specd.yaml`.
-        * `--name <name>` (optional) — the name for the forked schema directory. Defaults to the source schema's `name` field.
-        * `--workspace <workspace>` (optional) — the workspace whose `schemas.fs.path` is used as the target directory. Defaults to `default`.
+        - `<ref>` (required) — the schema reference to fork (npm package, workspace-qualified, bare name, or path). Uses the same reference conventions as the `schema` field in `specd.yaml`.
+        - `--name <name>` (optional) — the name for the forked schema directory. Defaults to the source schema's `name` field.
+        - `--workspace <workspace>` (optional) — the workspace whose `schemas.fs.path` is used as the target directory. Defaults to `default`.
   - requirement: Fork behaviour
     rules:
       - |-
@@ -31,9 +31,9 @@ rules:
   - requirement: Error cases
     rules:
       - |-
-        * Source schema not found — exits with code 3
-        * Target directory already exists — exits with code 1, message identifies the existing path
-        * Target workspace has no `schemas` section — exits with code 1
+        - Source schema not found — exits with code 3
+        - Target directory already exists — exits with code 1, message identifies the existing path
+        - Target workspace has no `schemas` section — exits with code 1
 constraints:
   - The fork is a one-time copy — there is no ongoing link between source and fork
   - The command does not modify specd.yaml — the user must update the schema field manually

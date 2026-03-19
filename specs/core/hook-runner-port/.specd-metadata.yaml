@@ -28,17 +28,17 @@ rules:
       - |-
         The `run` method MUST always resolve (never reject) and return a `HookResult` containing:
 
-        * `exitCode()` — the process exit code (0 for success, non-zero for failure)
-        * `stdout()` — all captured standard output as a string
-        * `stderr()` — all captured standard error as a string
-        * `isSuccess()` — returns `true` when exit code is 0
+        - `exitCode()` — the process exit code (0 for success, non-zero for failure)
+        - `stdout()` — all captured standard output as a string
+        - `stderr()` — all captured standard error as a string
+        - `isSuccess()` — returns `true` when exit code is 0
   - requirement: HookVariables shape
     rules:
       - |-
         The `HookVariables` type MUST contain:
 
-        * `change?` (optional) — an object with `name: string`, `workspace: string`, and `path: string` fields representing the active change context. Absent for lifecycle points with no active change.
-        * `project` (required) — an object with `root: string` representing the absolute path to the git repository root.
+        - `change?` (optional) — an object with `name: string`, `workspace: string`, and `path: string` fields representing the active change context. Absent for lifecycle points with no active change.
+        - `project` (required) — an object with `root: string` representing the absolute path to the git repository root.
   - requirement: Hook type distinction
     rules:
       - The port executes only `run:` hooks (deterministic shell commands). `instruction:` hooks are not executed by this port — they are injected as text into the agent context by a different mechanism. The port SHALL NOT handle or interpret `instruction:` hook types.
@@ -47,9 +47,9 @@ rules:
       - |-
         The port itself does not enforce lifecycle semantics, but callers rely on the following guarantees:
 
-        * `pre-*` hooks: a non-zero exit code signals the caller to abort the operation
-        * `post-*` CLI-owned operations: the caller runs post hooks before returning
-        * `post-*` agent-driven operations: not supported via `run:` hooks (use `instruction:` hooks instead)
+        - `pre-*` hooks: a non-zero exit code signals the caller to abort the operation
+        - `post-*` CLI-owned operations: the caller runs post hooks before returning
+        - `post-*` agent-driven operations: not supported via `run:` hooks (use `instruction:` hooks instead)
 constraints:
   - The port lives in application/ports/ per the hexagonal architecture rule
   - No direct dependency on child_process, shell detection, or any I/O at the port level

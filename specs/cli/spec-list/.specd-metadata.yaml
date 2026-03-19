@@ -12,12 +12,12 @@ rules:
         specd spec list [--summary] [--metadata-status [filter]] [--format text|json|toon]
         ```
 
-        * `--summary` — optional flag; when present, a short summary is included for each spec alongside the title
-        * `--metadata-status` — optional flag with optional filter value; when present, a metadata-freshness METADATA STATUS column is included for each spec
-          * Without a filter value (`--metadata-status`), all specs are shown with their status
-          * With a comma-separated filter value (`--metadata-status stale`, `--metadata-status stale,missing`), only specs matching at least one of the listed statuses are shown
-          * Valid filter tokens: `fresh`, `stale`, `missing`, `invalid`
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `--summary` — optional flag; when present, a short summary is included for each spec alongside the title
+        - `--metadata-status` — optional flag with optional filter value; when present, a metadata-freshness METADATA STATUS column is included for each spec
+          - Without a filter value (`--metadata-status`), all specs are shown with their status
+          - With a comma-separated filter value (`--metadata-status stale`, `--metadata-status stale,missing`), only specs matching at least one of the listed statuses are shown
+          - Valid filter tokens: `fresh`, `stale`, `missing`, `invalid`
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Title resolution
     rules:
       - |-
@@ -59,13 +59,13 @@ rules:
       - |-
         In `text` mode (default), specs are grouped by workspace. Each group is rendered as a table:
 
-        * The workspace name is printed as a bold title line above the table.
-        * Each workspace group begins with an inverse-video workspace header row: `  workspace: <name>  `, padded to the same inner width as the column header row below it.
-        * Immediately below the workspace header is an inverse-video column header row. The header includes columns depending on which flags are passed: `PATH  TITLE` (default), with `METADATA STATUS` appended when `--metadata-status` is present, and `SUMMARY` appended when `--summary` is present.
-        * Data rows list one spec per line. The PATH column displays the fully-qualified spec identifier `workspace:capability-path` (e.g. `default:auth/login`). All columns are aligned to globally fixed widths (computed across all entries in all workspaces).
-        * When `--metadata-status` is passed, a `METADATA STATUS` column appears after `TITLE`, showing `fresh`, `stale`, `missing`, or `invalid`.
-        * When `--summary` is passed, `SUMMARY` follows as an additional aligned column using wrap overflow (capped at 60 characters).
-        * Workspace groups are separated by a blank line.
+        - The workspace name is printed as a bold title line above the table.
+        - Each workspace group begins with an inverse-video workspace header row: `  workspace: <name>  `, padded to the same inner width as the column header row below it.
+        - Immediately below the workspace header is an inverse-video column header row. The header includes columns depending on which flags are passed: `PATH  TITLE` (default), with `METADATA STATUS` appended when `--metadata-status` is present, and `SUMMARY` appended when `--summary` is present.
+        - Data rows list one spec per line. The PATH column displays the fully-qualified spec identifier `workspace:capability-path` (e.g. `default:auth/login`). All columns are aligned to globally fixed widths (computed across all entries in all workspaces).
+        - When `--metadata-status` is passed, a `METADATA STATUS` column appears after `TITLE`, showing `fresh`, `stale`, `missing`, or `invalid`.
+        - When `--summary` is passed, `SUMMARY` follows as an additional aligned column using wrap overflow (capped at 60 characters).
+        - Workspace groups are separated by a blank line.
 
         ```
           workspace: default

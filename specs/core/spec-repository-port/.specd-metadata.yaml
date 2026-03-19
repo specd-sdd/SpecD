@@ -36,9 +36,9 @@ rules:
       - |-
         `resolveFromPath(inputPath, from?)` MUST resolve a storage path to a spec identity within this workspace. The method MUST support both absolute paths and relative spec links. When `inputPath` is relative (e.g. `../storage/spec.md`), `from` MUST be provided as the reference spec. The method MUST return one of three results:
 
-        * `{ specPath, specId }` — the path resolved to a spec within this workspace
-        * `{ crossWorkspaceHint }` — the relative path escaped this workspace; the caller SHOULD try other repositories with the hint segments
-        * `null` — the input is not a valid spec link
+        - `{ specPath, specId }` — the path resolved to a spec within this workspace
+        - `{ crossWorkspaceHint }` — the relative path escaped this workspace; the caller SHOULD try other repositories with the hint segments
+        - `null` — the input is not a valid spec link
 
         Relative resolution MUST be pure computation (no I/O). Absolute resolution MAY require filesystem access.
   - requirement: Abstract class with abstract methods

@@ -11,9 +11,9 @@ rules:
       - |-
         `execute(input)` MUST accept a `RecordSkillInstallInput` object with the following fields:
 
-        * `configPath` (string, required) — absolute path to the `specd.yaml` to update.
-        * `agent` (string, required) — the agent name (e.g. `"claude"`).
-        * `skillNames` (readonly string\[], required) — the skill names to record.
+        - `configPath` (string, required) — absolute path to the `specd.yaml` to update.
+        - `agent` (string, required) — the agent name (e.g. `"claude"`).
+        - `skillNames` (readonly string\[], required) — the skill names to record.
   - requirement: Delegates to ConfigWriter.recordSkillInstall
     rules:
       - The use case MUST call `ConfigWriter.recordSkillInstall(configPath, agent, skillNames)` with the values from the input object. It SHALL NOT perform any filesystem I/O directly.

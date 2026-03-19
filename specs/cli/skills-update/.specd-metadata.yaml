@@ -14,8 +14,8 @@ rules:
         specd skills update [--agent claude] [--format text|json|toon]
         ```
 
-        * `--agent <id>` — optional; restricts the update to one agent's skills. When omitted, all agents in the manifest are updated.
-        * `--format text|json|toon` — optional; output format, defaults to `text`.
+        - `--agent <id>` — optional; restricts the update to one agent's skills. When omitted, all agents in the manifest are updated.
+        - `--format text|json|toon` — optional; output format, defaults to `text`.
   - requirement: Reading the installation manifest
     rules:
       - 'The CLI calls `GetSkillsManifest` from `@specd/core`, which returns a typed map of `{ [agentId: string]: string[] }`. The CLI never reads `specd.yaml` directly — it has no knowledge of the storage format.'
@@ -34,17 +34,17 @@ rules:
       - |-
         If a recorded skill name is not present in the current `@specd/skills` bundle (renamed or removed in an upgrade):
 
-        * Prints a warning to stderr: `warning: skill <name> is no longer available — skipped`
-        * Continues updating the remaining skills
-        * Exits with code 0
+        - Prints a warning to stderr: `warning: skill <name> is no longer available — skipped`
+        - Continues updating the remaining skills
+        - Exits with code 0
   - requirement: No skills recorded
     rules:
       - If the manifest is empty (or empty for the filtered agent), the command prints `no skills to update` to stdout and exits with code 0.
   - requirement: Output on success
     rules:
       - |-
-        * `text` (default): prints one line per updated skill to stdout:
-        * `json` or `toon`: outputs an array: `warning` is omitted when absent.
+        - `text` (default): prints one line per updated skill to stdout:
+        - `json` or `toon`: outputs an array: `warning` is omitted when absent.
 constraints:
   - Only project-level installs (recorded in the manifest) are updated; user-level (--global) installs are not tracked and not touched
   - The command never mutates the manifest — it only reads via GetSkillsManifest

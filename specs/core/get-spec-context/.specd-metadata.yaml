@@ -16,13 +16,13 @@ rules:
       - |-
         For each resolved spec, the use case SHALL load all artifact files and attempt to read `.specd-metadata.yaml`. When metadata exists and content hashes confirm freshness, the entry SHALL include:
 
-        * `spec` — display label in `workspace:capabilityPath` format.
-        * `stale` — `false`.
-        * `title` — from metadata, when present (included only when no section filter is active or all sections requested).
-        * `description` — from metadata, when present (same inclusion rule as `title`).
-        * `rules` — from metadata, when present and non-empty (included when no section filter or `'rules'` is in `sections`).
-        * `constraints` — from metadata, when present and non-empty (included when no section filter or `'constraints'` is in `sections`).
-        * `scenarios` — from metadata, when present and non-empty (included when no section filter or `'scenarios'` is in `sections`).
+        - `spec` — display label in `workspace:capabilityPath` format.
+        - `stale` — `false`.
+        - `title` — from metadata, when present (included only when no section filter is active or all sections requested).
+        - `description` — from metadata, when present (same inclusion rule as `title`).
+        - `rules` — from metadata, when present and non-empty (included when no section filter or `'rules'` is in `sections`).
+        - `constraints` — from metadata, when present and non-empty (included when no section filter or `'constraints'` is in `sections`).
+        - `scenarios` — from metadata, when present and non-empty (included when no section filter or `'scenarios'` is in `sections`).
   - requirement: Stale or absent metadata produces minimal entry
     rules:
       - 'When `.specd-metadata.yaml` is absent or content hashes indicate staleness, the use case SHALL return a minimal entry with only `spec` (the label) and `stale: true`. No title, description, rules, constraints, or scenarios SHALL be included.'
@@ -40,10 +40,10 @@ rules:
       - |-
         During dependency traversal, the use case SHALL emit warnings (not throw) for:
 
-        * Missing `.specd-metadata.yaml` on the current spec during traversal — `type: 'missing-metadata'`.
-        * Unknown workspace referenced in a dependency — `type: 'unknown-workspace'`.
-        * Dependency spec not found in its workspace — `type: 'missing-spec'`.
-        * Stale metadata on any resolved entry — `type: 'stale-metadata'`.
+        - Missing `.specd-metadata.yaml` on the current spec during traversal — `type: 'missing-metadata'`.
+        - Unknown workspace referenced in a dependency — `type: 'unknown-workspace'`.
+        - Dependency spec not found in its workspace — `type: 'missing-spec'`.
+        - Stale metadata on any resolved entry — `type: 'stale-metadata'`.
 
         Warnings MUST be collected in the result's `warnings` array and MUST NOT interrupt traversal.
   - requirement: Result shape
@@ -51,8 +51,8 @@ rules:
       - |-
         `GetSpecContextResult` MUST include:
 
-        * `entries` — ordered array of `SpecContextEntry` objects (root first, then dependencies in DFS order).
-        * `warnings` — array of `ContextWarning` objects accumulated during resolution.
+        - `entries` — ordered array of `SpecContextEntry` objects (root first, then dependencies in DFS order).
+        - `warnings` — array of `ContextWarning` objects accumulated during resolution.
 constraints:
   - The use case receives a ReadonlyMap<string, SpecRepository> — it MUST NOT modify the map or the repositories.
   - Cycle detection uses the workspace:capabilityPath label as the identity key.

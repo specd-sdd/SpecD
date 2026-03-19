@@ -66,13 +66,13 @@ rules:
       - |-
         Array entries are matched by their identity field:
 
-        * `artifacts[]` — matched by `id`
-        * `workflow[]` — matched by `step`
-        * `workflow[].hooks.pre[]`, `workflow[].hooks.post[]` — matched by `id`
-        * `artifacts[].validations[]`, `artifacts[].deltaValidations[]` — matched by `id`
-        * `artifacts[].rules.pre[]`, `artifacts[].rules.post[]` — matched by `id`
-        * `artifacts[].preHashCleanup[]` — matched by `id`
-        * `metadataExtraction` array entries (`rules[]`, `constraints[]`, `scenarios[]`, `context[]`) — matched by `id`
+        - `artifacts[]` — matched by `id`
+        - `workflow[]` — matched by `step`
+        - `workflow[].hooks.pre[]`, `workflow[].hooks.post[]` — matched by `id`
+        - `artifacts[].validations[]`, `artifacts[].deltaValidations[]` — matched by `id`
+        - `artifacts[].rules.pre[]`, `artifacts[].rules.post[]` — matched by `id`
+        - `artifacts[].preHashCleanup[]` — matched by `id`
+        - `metadataExtraction` array entries (`rules[]`, `constraints[]`, `scenarios[]`, `context[]`) — matched by `id`
 
         When an operation targets a nested array (e.g. hooks within a specific workflow step), the path must identify both the parent entry (by its identity) and the nested array. The operation structure mirrors the schema structure:
 
@@ -91,25 +91,25 @@ rules:
       - |-
         Operations mirror the schema's hierarchical structure. Each operation key maps to the schema field it targets:
 
-        * **Top-level scalars** — `set` can target `name`, `version`, `description`
-        * **`artifacts`** — operations target the `artifacts[]` array; each entry is identified by `id`
-        * **`workflow`** — operations target the `workflow[]` array; each entry is identified by `step`
-        * **Nested arrays** — when an operation entry includes a parent identity and nested arrays (e.g. a workflow step entry with `hooks.post`), the merge engine locates the parent entry first, then applies the nested operation to the sub-array
+        - **Top-level scalars** — `set` can target `name`, `version`, `description`
+        - **`artifacts`** — operations target the `artifacts[]` array; each entry is identified by `id`
+        - **`workflow`** — operations target the `workflow[]` array; each entry is identified by `step`
+        - **Nested arrays** — when an operation entry includes a parent identity and nested arrays (e.g. a workflow step entry with `hooks.post`), the merge engine locates the parent entry first, then applies the nested operation to the sub-array
   - requirement: Remove operation semantics
     rules:
       - |-
         `remove` accepts:
 
-        * **Array entry removal** — specify the identity value to remove. The entry is deleted from the array. If the identity does not exist, throw `SchemaValidationError`.
-        * **Nested removal** — specify a parent identity and nested removals (e.g. remove a specific hook from a specific workflow step). The parent must exist.
-        * **Scalar removal** — set a scalar field to `null` in `remove` to clear it (e.g. remove `description` from an artifact). Only optional fields may be removed; removing a required field MUST throw `SchemaValidationError`.
+        - **Array entry removal** — specify the identity value to remove. The entry is deleted from the array. If the identity does not exist, throw `SchemaValidationError`.
+        - **Nested removal** — specify a parent identity and nested removals (e.g. remove a specific hook from a specific workflow step). The parent must exist.
+        - **Scalar removal** — set a scalar field to `null` in `remove` to clear it (e.g. remove `description` from an artifact). Only optional fields may be removed; removing a required field MUST throw `SchemaValidationError`.
   - requirement: Post-merge validation
     rules:
       - |-
         After all layers are applied, `mergeSchemaLayers` MUST validate:
 
-        * No duplicate identities in any array (artifact `id`, workflow `step`, hook `id`, etc.)
-        * No dangling references in `artifact.requires` (all referenced IDs must exist)
+        - No duplicate identities in any array (artifact `id`, workflow `step`, hook `id`, etc.)
+        - No dangling references in `artifact.requires` (all referenced IDs must exist)
 
         Violations MUST throw `SchemaValidationError` identifying the layer that caused the issue.
   - requirement: Immutability

@@ -19,12 +19,12 @@ rules:
           [--config <path>]
         ```
 
-        * `<name>` — required positional; the change name
-        * `<specId>` — required positional; the spec within the change whose dependencies are being managed (must be in `change.specIds`)
-        * `--add <id>` — repeatable; adds dependency spec IDs to this spec's `dependsOn`
-        * `--remove <id>` — repeatable; removes dependency spec IDs
-        * `--set <id>` — repeatable; replaces all dependencies (mutually exclusive with `--add`/`--remove`)
-        * At least one of `--add`, `--remove`, or `--set` is required
+        - `<name>` — required positional; the change name
+        - `<specId>` — required positional; the spec within the change whose dependencies are being managed (must be in `change.specIds`)
+        - `--add <id>` — repeatable; adds dependency spec IDs to this spec's `dependsOn`
+        - `--remove <id>` — repeatable; removes dependency spec IDs
+        - `--set <id>` — repeatable; replaces all dependencies (mutually exclusive with `--add`/`--remove`)
+        - At least one of `--add`, `--remove`, or `--set` is required
   - requirement: Output
     rules:
       - |-
@@ -52,11 +52,11 @@ rules:
       - |-
         All errors exit with code 1 and write to stderr:
 
-        * Change not found
-        * `specId` not in `change.specIds`
-        * `--set` used with `--add` or `--remove`
-        * `--remove` value not in current deps
-        * No flags provided
+        - Change not found
+        - `specId` not in `change.specIds`
+        - `--set` used with `--add` or `--remove`
+        - `--remove` value not in current deps
+        - No flags provided
 constraints:
   - --set is mutually exclusive with --add and --remove
   - At least one modification flag must be provided

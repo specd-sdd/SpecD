@@ -21,9 +21,9 @@ rules:
   - requirement: Additive relation insertion
     rules:
       - |-
-        `GraphStore` SHALL provide `addRelations(relations: Relation[]): Promise<void>`. This operation adds relations to the store without removing any existing data. It is used for cross-file relations (e.g. `CALLS` between symbols in different files) that are added separately from the per-file upsert.
+        `GraphStore` SHALL provide `addRelations(relations: Relation[]): Promise<void>`. This operation adds relations to the store without removing any existing data. It is used for cross-file relations (e.g. `CALLS` between symbols in different files) that must not be deleted when either file is re-upserted.
 
-        Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely additive. Note: cross-file relations ARE removed when either endpoint's file is removed or re-upserted — the indexer re-adds them during bulk load.
+        Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely additive.
   - requirement: File removal
     rules:
       - '`GraphStore` SHALL provide `removeFile(filePath: string): Promise<void>`. This operation MUST atomically remove the `FileNode`, all `SymbolNode` entries with that `filePath`, and all `Relation` entries where the file or any of its symbols appear as `source` or `target`.'
@@ -32,16 +32,16 @@ rules:
       - |-
         `GraphStore` SHALL provide the following query methods:
 
-        * **`getFile(path: string): Promise<FileNode | undefined>`** — retrieve a file node by path
-        * **`getSymbol(id: string): Promise<SymbolNode | undefined>`** — retrieve a symbol by id
-        * **`getCallers(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `target` matches
-        * **`getCallees(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `source` matches
-        * **`getImporters(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `target` matches
-        * **`getImportees(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `source` matches
-        * **`getSpec(specId: string): Promise<SpecNode | undefined>`** — retrieve a spec node by id
-        * **`getSpecDependencies(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `source` matches
-        * **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches
-        * **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, or file path
+        - **`getFile(path: string): Promise<FileNode | undefined>`** — retrieve a file node by path
+        - **`getSymbol(id: string): Promise<SymbolNode | undefined>`** — retrieve a symbol by id
+        - **`getCallers(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `target` matches
+        - **`getCallees(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `source` matches
+        - **`getImporters(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `target` matches
+        - **`getImportees(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `source` matches
+        - **`getSpec(specId: string): Promise<SpecNode | undefined>`** — retrieve a spec node by id
+        - **`getSpecDependencies(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `source` matches
+        - **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches
+        - **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, or file path
 
         `SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kind` (SymbolKind), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive).
   - requirement: Graph statistics
@@ -49,12 +49,12 @@ rules:
       - |-
         `GraphStore` SHALL provide `getStatistics(): Promise<GraphStatistics>` returning:
 
-        * **`fileCount`** — total number of `FileNode` entries
-        * **`symbolCount`** — total number of `SymbolNode` entries
-        * **`specCount`** — total number of `SpecNode` entries
-        * **`relationCounts`** — a `Record<RelationType, number>` with counts per relation type
-        * **`languages`** — array of distinct language identifiers across all files
-        * **`lastIndexedAt`** — ISO 8601 timestamp of the most recent `upsertFile` call
+        - **`fileCount`** — total number of `FileNode` entries
+        - **`symbolCount`** — total number of `SymbolNode` entries
+        - **`specCount`** — total number of `SpecNode` entries
+        - **`relationCounts`** — a `Record<RelationType, number>` with counts per relation type
+        - **`languages`** — array of distinct language identifiers across all files
+        - **`lastIndexedAt`** — ISO 8601 timestamp of the most recent `upsertFile` call
   - requirement: LadybugDB adapter
     rules:
       - |-
@@ -62,10 +62,10 @@ rules:
 
         The adapter MUST:
 
-        * Create the `.specd/` directory and database file on first `open()` if they do not exist
-        * Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text and a `searchName STRING` column for FTS-optimized name search (computed from the symbol name using `expandSymbolName`).
-        * Use parameterized Cypher queries for all operations (no string interpolation of user data)
-        * Support schema migration: if the database schema version does not match the expected version, migrate on `open()`
+        - Create the `.specd/` directory and database file on first `open()` if they do not exist
+        - Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text and a `searchName STRING` column for FTS-optimized name search (computed from the symbol name using `expandSymbolName`).
+        - Use parameterized Cypher queries for all operations (no string interpolation of user data)
+        - Support schema migration: if the database schema version does not match the expected version, migrate on `open()`
 
         The adapter uses CSV-based bulk loading (`COPY FROM`) for large datasets via the `bulkLoad()` method. Relations are loaded in batches of 500 to prevent LadybugDB from blocking. The `IGNORE_ERRORS=true` flag is used for relation COPY operations to silently skip rows referencing non-existent nodes (dangling imports to external files).
   - requirement: Spec upsert and removal
@@ -73,38 +73,38 @@ rules:
       - |-
         `GraphStore` SHALL provide:
 
-        * **`upsertSpec(spec: SpecNode, relations: Relation[]): Promise<void>`** — atomically replaces all data for a spec node. Removes existing `DEPENDS_ON` relations where this spec is the source and replaces them with the provided relations.
-        * **`removeSpec(specId: string): Promise<void>`** — removes the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target.
+        - **`upsertSpec(spec: SpecNode, relations: Relation[]): Promise<void>`** — atomically replaces all data for a spec node. Removes existing `DEPENDS_ON` relations where this spec is the source and replaces them with the provided relations.
+        - **`removeSpec(specId: string): Promise<void>`** — removes the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target.
 
         These follow the same atomic pattern as `upsertFile` / `removeFile`.
 
         The Spec node table includes:
 
-        * `specId STRING` — primary key
-        * `path STRING`
-        * `title STRING`
-        * `description STRING` — from `.specd-metadata.yaml`
-        * `contentHash STRING` — hash of concatenated artifacts (excluding `.specd-metadata.yaml`)
-        * `content STRING` — concatenated artifact text for full-text search
-        * `workspace STRING`
+        - `specId STRING` — primary key
+        - `path STRING`
+        - `title STRING`
+        - `description STRING` — from `.specd-metadata.yaml`
+        - `contentHash STRING` — hash of concatenated artifacts (excluding `.specd-metadata.yaml`)
+        - `content STRING` — concatenated artifact text for full-text search
+        - `workspace STRING`
   - requirement: Full-text search
     rules:
       - |-
         `GraphStore` SHALL provide:
 
-        * **`searchSymbols(options: SearchOptions): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.searchName` and `Symbol.comment`. The `searchName` column contains the original symbol name plus camelCase/snake\_case/kebab-case tokenized parts (e.g. `handleError` is indexed as `"handleError handle error"`), so searches for individual words within compound names match correctly. Returns results ranked by BM25 score descending.
-        * **`searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>`** — full-text search across `Spec.title`, `Spec.description`, and `Spec.content`. Returns results ranked by BM25 score descending.
-        * **`rebuildFtsIndexes(): Promise<void>`** — drops and recreates FTS indexes. Must be called after bulk data changes because LadybugDB FTS indexes are not automatically updated on insert.
+        - **`searchSymbols(options: SearchOptions): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.searchName` and `Symbol.comment`. The `searchName` column contains the original symbol name plus camelCase/snake\_case/kebab-case tokenized parts (e.g. `handleError` is indexed as `"handleError handle error"`), so searches for individual words within compound names match correctly. Returns results ranked by BM25 score descending.
+        - **`searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>`** — full-text search across `Spec.title`, `Spec.description`, and `Spec.content`. Returns results ranked by BM25 score descending.
+        - **`rebuildFtsIndexes(): Promise<void>`** — drops and recreates FTS indexes. Must be called after bulk data changes because LadybugDB FTS indexes are not automatically updated on insert.
 
         `SearchOptions` is a value object with:
 
-        * **query** — the search query string (required)
-        * **limit** — maximum results to return (default 20)
-        * **kind** — filter symbols by `SymbolKind` (symbols only)
-        * **filePattern** — filter symbols by file path glob (supports `*` wildcards, case-insensitive; symbols only)
-        * **workspace** — filter results to a single workspace
-        * **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)
-        * **excludeWorkspaces** — array of workspace names to exclude
+        - **query** — the search query string (required)
+        - **limit** — maximum results to return (default 20)
+        - **kind** — filter symbols by `SymbolKind` (symbols only)
+        - **filePattern** — filter symbols by file path glob (supports `*` wildcards, case-insensitive; symbols only)
+        - **workspace** — filter results to a single workspace
+        - **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)
+        - **excludeWorkspaces** — array of workspace names to exclude
 
         All filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied **before** LIMIT in the query — not as post-query filters. The `LadybugGraphStore` implementation adds WHERE clauses between the FTS CALL and RETURN. The `InMemoryGraphStore` test helper applies filters before slicing to limit.
   - requirement: Bulk operations

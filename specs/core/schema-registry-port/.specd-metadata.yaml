@@ -24,10 +24,10 @@ rules:
       - |-
         The `resolve` method MUST route references by prefix:
 
-        * `@scope/name` — npm package; loaded from `node_modules/@scope/name/schema.yaml`
-        * `#workspace:name` — workspace-qualified; loaded from the `schemasPath` for the given workspace
-        * `#name` or bare name (no prefix) — equivalent to `#default:name`
-        * Relative or absolute filesystem path — loaded directly from that path
+        - `@scope/name` — npm package; loaded from `node_modules/@scope/name/schema.yaml`
+        - `#workspace:name` — workspace-qualified; loaded from the `schemasPath` for the given workspace
+        - `#name` or bare name (no prefix) — equivalent to `#default:name`
+        - Relative or absolute filesystem path — loaded directly from that path
 
         There SHALL be no implicit multi-level fallback between these resolution strategies.
   - requirement: ResolveRaw method signature
@@ -40,9 +40,9 @@ rules:
 
         It MUST return `Promise<SchemaRawResult | null>`. `SchemaRawResult` is an object containing:
 
-        * `data: SchemaYamlData` — the parsed and Zod-validated intermediate data (before domain construction)
-        * `templates: ReadonlyMap<string, string>` — loaded template content keyed by relative path
-        * `resolvedPath: string` — the absolute path of the resolved schema file (used for extends cycle detection)
+        - `data: SchemaYamlData` — the parsed and Zod-validated intermediate data (before domain construction)
+        - `templates: ReadonlyMap<string, string>` — loaded template content keyed by relative path
+        - `resolvedPath: string` — the absolute path of the resolved schema file (used for extends cycle detection)
 
         This method is used by `ResolveSchema` to obtain the intermediate representation needed for the merge pipeline. The existing `resolve` method continues to return the fully-built `Schema` entity for consumers that do not need the merge pipeline.
 
@@ -63,10 +63,10 @@ rules:
       - |-
         Each `SchemaEntry` returned by `list` MUST contain:
 
-        * `ref: string` — the full reference string that can be passed to `resolve()` (e.g. `"@specd/schema-std"`, `"#spec-driven"`, `"#billing:my-schema"`)
-        * `name: string` — the schema name suitable for display, without prefix or workspace qualifier
-        * `source: 'npm' | 'workspace'` — where the schema was discovered
-        * `workspace?: string` — the workspace name; present only when `source` is `"workspace"`
+        - `ref: string` — the full reference string that can be passed to `resolve()` (e.g. `"@specd/schema-std"`, `"#spec-driven"`, `"#billing:my-schema"`)
+        - `name: string` — the schema name suitable for display, without prefix or workspace qualifier
+        - `source: 'npm' | 'workspace'` — where the schema was discovered
+        - `workspace?: string` — the workspace name; present only when `source` is `"workspace"`
   - requirement: Schema re-export
     rules:
       - The port module MUST re-export the `Schema` type from `domain/value-objects/schema.ts` so that consumers can import both the port and the value object from a single location.

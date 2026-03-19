@@ -14,18 +14,18 @@ rules:
       - |-
         `execute(input)` MUST accept a `GetProjectContextInput` object with the following fields:
 
-        * `config` (`CompileContextConfig`, required) — the resolved project configuration containing `context` entries, `contextIncludeSpecs`, and `contextExcludeSpecs`.
-        * `followDeps` (boolean, optional) — when `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. When `false` or absent, traversal is not performed.
-        * `depth` (number, optional) — limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`. `1` means direct dependencies only; absent means unlimited.
-        * `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per spec (`"rules"`, `"constraints"`, `"scenarios"`). When absent, all sections are rendered including the description.
+        - `config` (`CompileContextConfig`, required) — the resolved project configuration containing `context` entries, `contextIncludeSpecs`, and `contextExcludeSpecs`.
+        - `followDeps` (boolean, optional) — when `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. When `false` or absent, traversal is not performed.
+        - `depth` (number, optional) — limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`. `1` means direct dependencies only; absent means unlimited.
+        - `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per spec (`"rules"`, `"constraints"`, `"scenarios"`). When absent, all sections are rendered including the description.
   - requirement: Returns GetProjectContextResult on success
     rules:
       - |-
         `execute` MUST return a `GetProjectContextResult` containing:
 
-        * `contextEntries` (string\[]) — rendered project-level context entries (instruction text or file content).
-        * `specs` (`GetProjectContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `workspace`, `path`, and `content` fields.
-        * `warnings` (`ContextWarning[]`) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.
+        - `contextEntries` (string\[]) — rendered project-level context entries (instruction text or file content).
+        - `specs` (`GetProjectContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `workspace`, `path`, and `content` fields.
+        - `warnings` (`ContextWarning[]`) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.
   - requirement: Resolves schema before processing
     rules:
       - The use case MUST resolve the project's schema via `SchemaRegistry.resolve` before processing any specs. If the schema reference cannot be resolved (returns `null`), the use case MUST throw `SchemaNotFoundError`.
@@ -34,8 +34,8 @@ rules:
       - |-
         For each entry in `config.context`:
 
-        * If the entry has an `instruction` key, the instruction text MUST be rendered with the label `**Source: instruction**`.
-        * If the entry has a `file` key, the file content MUST be read via the `FileReader` port. If the file exists, its content is rendered with the label `**Source: <path>**` and headings shifted down by one level. If the file does not exist, a `missing-file` warning MUST be emitted and the entry skipped.
+        - If the entry has an `instruction` key, the instruction text MUST be rendered with the label `**Source: instruction**`.
+        - If the entry has a `file` key, the file content MUST be read via the `FileReader` port. If the file exists, its content is rendered with the label `**Source: <path>**` and headings shifted down by one level. If the file does not exist, a `missing-file` warning MUST be emitted and the entry skipped.
 
         Context entries MUST appear in declaration order and before any spec content.
   - requirement: Applies project-level include/exclude patterns
@@ -64,13 +64,13 @@ rules:
       - |-
         `GetProjectContext` MUST be constructed with the following dependencies:
 
-        * `specs` (`ReadonlyMap<string, SpecRepository>`) — spec repositories keyed by workspace name.
-        * `schemas` (`SchemaRegistry`) — registry for resolving schema references.
-        * `files` (`FileReader`) — reader for project-level context file entries.
-        * `parsers` (`ArtifactParserRegistry`) — registry of artifact format parsers for extraction fallback.
-        * `hasher` (`ContentHasher`) — content hasher for metadata freshness checks.
-        * `schemaRef` (`string`) — schema reference string from `specd.yaml`.
-        * `workspaceSchemasPaths` (`ReadonlyMap<string, string>`) — map of workspace name to absolute schemas directory path.
+        - `specs` (`ReadonlyMap<string, SpecRepository>`) — spec repositories keyed by workspace name.
+        - `schemas` (`SchemaRegistry`) — registry for resolving schema references.
+        - `files` (`FileReader`) — reader for project-level context file entries.
+        - `parsers` (`ArtifactParserRegistry`) — registry of artifact format parsers for extraction fallback.
+        - `hasher` (`ContentHasher`) — content hasher for metadata freshness checks.
+        - `schemaRef` (`string`) — schema reference string from `specd.yaml`.
+        - `workspaceSchemasPaths` (`ReadonlyMap<string, string>`) — map of workspace name to absolute schemas directory path.
 constraints:
   - The use case operates without a change context — it treats all workspaces as active.
   - Workspace-level context patterns are never applied — only project-level patterns.

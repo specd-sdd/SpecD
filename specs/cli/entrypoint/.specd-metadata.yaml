@@ -35,9 +35,9 @@ rules:
       - |-
         Every `specd` command accepts a `--format text|json|toon` flag at the end of its flag list, defaulting to `text`. The three values are:
 
-        * `text` — human-readable visual output (the default behaviour)
-        * `json` — machine-friendly JSON written to stdout
-        * `toon` — LLM-friendly Token-Oriented Object Notation (TOON) encoding of the same data model as `json`, written to stdout
+        - `text` — human-readable visual output (the default behaviour)
+        - `json` — machine-friendly JSON written to stdout
+        - `toon` — LLM-friendly Token-Oriented Object Notation (TOON) encoding of the same data model as `json`, written to stdout
 
         Errors always go to stderr as plain `error:` or `fatal:` text for human consumption and logging.
   - requirement: Structured error output
@@ -54,10 +54,10 @@ rules:
         }
         ```
 
-        * `result` — always the string `"error"`
-        * `code` — the machine-readable error code from the `SpecdError` subclass (e.g. `DEPENDS_ON_OVERWRITE`, `CHANGE_NOT_FOUND`, `HOOK_FAILED`, `SCHEMA_NOT_FOUND`)
-        * `message` — the same message written to stderr (without the `error:`/`fatal:` prefix)
-        * `exitCode` — the numeric exit code (1, 2, or 3)
+        - `result` — always the string `"error"`
+        - `code` — the machine-readable error code from the `SpecdError` subclass (e.g. `DEPENDS_ON_OVERWRITE`, `CHANGE_NOT_FOUND`, `HOOK_FAILED`, `SCHEMA_NOT_FOUND`)
+        - `message` — the same message written to stderr (without the `error:`/`fatal:` prefix)
+        - `exitCode` — the numeric exit code (1, 2, or 3)
 
         Structured error output is only emitted for known error types — subtypes of `SpecdError` that carry a machine-readable `code`. Generic or unexpected errors (exit code 3 from unhandled exceptions) are written to stderr only; stdout remains empty.
 
@@ -67,11 +67,11 @@ rules:
       - |-
         Every command that supports `--format json|toon` MUST include a human-readable description of its JSON output schema in the command help text, appended after the options list using Commander's `addHelpText('after', ...)`. The schema block MUST:
 
-        * Start with a header line: `\nJSON/TOON output schema:`
-        * Show the output shape as a TypeScript-style type annotation with one property per line
-        * Use `// comment` for brief field descriptions only when the field name is not self-explanatory
-        * Use `?` suffix for optional/conditional fields
-        * Show array element types inline (e.g. `Array<{ name: string, score: number }>`)
+        - Start with a header line: `\nJSON/TOON output schema:`
+        - Show the output shape as a TypeScript-style type annotation with one property per line
+        - Use `// comment` for brief field descriptions only when the field name is not self-explanatory
+        - Use `?` suffix for optional/conditional fields
+        - Show array element types inline (e.g. `Array<{ name: string, score: number }>`)
 
         Example:
 

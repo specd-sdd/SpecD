@@ -11,9 +11,9 @@ rules:
       - |-
         `DiscardChange.execute` SHALL accept a `DiscardChangeInput` with the following fields:
 
-        * `name` (string, required) — the change to permanently discard
-        * `reason` (string, required) — mandatory explanation for discarding
-        * `supersededBy` (string\[], optional) — names of changes that supersede this one
+        - `name` (string, required) — the change to permanently discard
+        - `reason` (string, required) — mandatory explanation for discarding
+        - `supersededBy` (string\[], optional) — names of changes that supersede this one
   - requirement: Change must exist
     rules:
       - The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
@@ -25,11 +25,11 @@ rules:
       - |-
         The use case MUST call `change.discard(reason, actor, supersededBy)` to append a `discarded` event to the change's history. The event records:
 
-        * `type`: `'discarded'`
-        * `at`: the current timestamp
-        * `by`: the resolved actor identity
-        * `reason`: the mandatory discard reason
-        * `supersededBy`: included only when provided in the input
+        - `type`: `'discarded'`
+        - `at`: the current timestamp
+        - `by`: the resolved actor identity
+        - `reason`: the mandatory discard reason
+        - `supersededBy`: included only when provided in the input
   - requirement: Persistence
     rules:
       - After appending the discarded event, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` instance. The repository implementation is responsible for relocating the change directory to `discarded/`.
@@ -38,8 +38,8 @@ rules:
       - |-
         `DiscardChange` depends on two ports injected via constructor:
 
-        * `ChangeRepository` — for loading and persistence
-        * `ActorResolver` — for resolving the current actor identity
+        - `ChangeRepository` — for loading and persistence
+        - `ActorResolver` — for resolving the current actor identity
 constraints:
   - The use case MUST NOT perform any state transitions — discarding is orthogonal to lifecycle state
   - The reason field is mandatory — the use case input type enforces this at the type level

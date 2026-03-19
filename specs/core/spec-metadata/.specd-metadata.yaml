@@ -64,33 +64,33 @@ rules:
               - 'the Change remains in state open'
         ```
 
-        * **`title`** (string, optional) — short human-readable name for the spec, suitable for display in lists and tooling (e.g. `"Change"`, `"Storage"`, `"Schema Format"`). If absent, tooling falls back to the spec's path.
-        * **`description`** (string, optional) — 2–3 sentences written for discovery: what does this spec cover, why does it exist in the system, and when would you need to read it? Used by tooling and the LLM to assess relevance without reading the full spec content — for example when selecting which specs to include in a context or presenting a list of available specs. Should not read like a dictionary definition.
-        * **`keywords`** (array of strings, optional) — topic tags for this spec, used by tooling to find related specs (e.g. `specd spec find --keyword auth`). Should capture domain concepts, patterns, and cross-cutting concerns present in the spec. Lowercase, hyphen-separated.
-        * **`dependsOn`** (array of strings, optional) — spec IDs this spec depends on for context. Each ID is a capability path relative to the workspace and may include an optional workspace qualifier (e.g. `billing:payments/invoices`) for cross-workspace dependencies. An unqualified ID is resolved within the same workspace as the referencing spec. An empty array or absent field means no declared dependencies.
-        * **`contentHashes`** (map of filename → hash string, optional) — a SHA-256 hash per `requiredSpecArtifacts` file at the time the metadata was last derived. Keys are the resolved filenames: specd reads `requiredSpecArtifacts` from the active schema, looks up each artifact's `output` field, and resolves the concrete filename for this spec directory — that resolved filename is the key (e.g. `spec.md`, `verify.md`). Used to detect when any artifact file has changed and the metadata may be stale. A missing entry or absent field is treated as stale for that file.
-        * **`rules`** (array of objects, optional) — normative statements extracted from the spec, grouped by requirement name. Each entry has a `requirement` key (string) and a `rules` key (array of plain-text sentences). Preserves named functions, APIs, field names, state/enum values, and transition graphs. Omits explanation and rationale. Used by the LLM as a dense summary of requirements without loading the full spec.
-        * **`constraints`** (array of strings, optional) — hard invariants extracted from the spec's `## Constraints` section. Each entry is a single plain-text sentence. Omitted if the spec has no `## Constraints` section.
-        * **`scenarios`** (array of objects, optional) — BDD-style verification scenarios extracted from verify files. Flat array: one object per scenario, not one object per requirement. Each entry has:
-          * `requirement` (string) — name of the requirement this scenario verifies; multiple scenarios may share the same `requirement` value
-          * `name` (string) — the scenario title as it appears in the verify file (e.g. `"Config found — nearest file used"`)
-          * `given` (array of strings) — preconditions; may be empty
-          * `when` (array of strings) — the action or event being tested
-          * `then` (array of strings) — expected outcomes
+        - **`title`** (string, optional) — short human-readable name for the spec, suitable for display in lists and tooling (e.g. `"Change"`, `"Storage"`, `"Schema Format"`). If absent, tooling falls back to the spec's path.
+        - **`description`** (string, optional) — 2–3 sentences written for discovery: what does this spec cover, why does it exist in the system, and when would you need to read it? Used by tooling and the LLM to assess relevance without reading the full spec content — for example when selecting which specs to include in a context or presenting a list of available specs. Should not read like a dictionary definition.
+        - **`keywords`** (array of strings, optional) — topic tags for this spec, used by tooling to find related specs (e.g. `specd spec find --keyword auth`). Should capture domain concepts, patterns, and cross-cutting concerns present in the spec. Lowercase, hyphen-separated.
+        - **`dependsOn`** (array of strings, optional) — spec IDs this spec depends on for context. Each ID is a capability path relative to the workspace and may include an optional workspace qualifier (e.g. `billing:payments/invoices`) for cross-workspace dependencies. An unqualified ID is resolved within the same workspace as the referencing spec. An empty array or absent field means no declared dependencies.
+        - **`contentHashes`** (map of filename → hash string, optional) — a SHA-256 hash per `requiredSpecArtifacts` file at the time the metadata was last derived. Keys are the resolved filenames: specd reads `requiredSpecArtifacts` from the active schema, looks up each artifact's `output` field, and resolves the concrete filename for this spec directory — that resolved filename is the key (e.g. `spec.md`, `verify.md`). Used to detect when any artifact file has changed and the metadata may be stale. A missing entry or absent field is treated as stale for that file.
+        - **`rules`** (array of objects, optional) — normative statements extracted from the spec, grouped by requirement name. Each entry has a `requirement` key (string) and a `rules` key (array of plain-text sentences). Preserves named functions, APIs, field names, state/enum values, and transition graphs. Omits explanation and rationale. Used by the LLM as a dense summary of requirements without loading the full spec.
+        - **`constraints`** (array of strings, optional) — hard invariants extracted from the spec's `## Constraints` section. Each entry is a single plain-text sentence. Omitted if the spec has no `## Constraints` section.
+        - **`scenarios`** (array of objects, optional) — BDD-style verification scenarios extracted from verify files. Flat array: one object per scenario, not one object per requirement. Each entry has:
+          - `requirement` (string) — name of the requirement this scenario verifies; multiple scenarios may share the same `requirement` value
+          - `name` (string) — the scenario title as it appears in the verify file (e.g. `"Config found — nearest file used"`)
+          - `given` (array of strings) — preconditions; may be empty
+          - `when` (array of strings) — the action or event being tested
+          - `then` (array of strings) — expected outcomes
             Omitted if the spec has no verification scenarios.
   - requirement: Write-time structural validation
     rules:
       - |-
         The `SaveSpecMetadata` use case validates the YAML content against the `strictSpecMetadataSchema` Zod schema before writing. The content must be a YAML mapping (not empty, not a scalar). `title` and `description` are required; other fields are optional but when present must conform to their declared types and formats:
 
-        * `title` (required) must be a non-empty string
-        * `description` (required) must be a non-empty string
-        * `keywords` must be an array of non-empty lowercase strings
-        * `dependsOn` must be an array of strings, each matching a valid spec ID pattern (`capabilityPath` or `workspace:capabilityPath` where workspace matches `/^[a-z][a-z0-9-]*$/` and capability path segments match `/^[a-z0-9_][a-z0-9_-]*$/`)
-        * `contentHashes` (required) must be a non-empty record of filename to hash string, where each hash matches `sha256:<64 hex chars>`
-        * `rules` must be an array of objects with `requirement` (non-empty string) and `rules` (non-empty array of non-empty strings)
-        * `constraints` must be a non-empty array of non-empty strings
-        * `scenarios` must be an array of objects with `requirement` (non-empty string), `name` (non-empty string), `when` (non-empty array of strings), `then` (non-empty array of strings), and `given` (optional array of strings)
+        - `title` (required) must be a non-empty string
+        - `description` (required) must be a non-empty string
+        - `keywords` must be an array of non-empty lowercase strings
+        - `dependsOn` must be an array of strings, each matching a valid spec ID pattern (`capabilityPath` or `workspace:capabilityPath` where workspace matches `/^[a-z][a-z0-9-]*$/` and capability path segments match `/^[a-z0-9_][a-z0-9_-]*$/`)
+        - `contentHashes` (required) must be a non-empty record of filename to hash string, where each hash matches `sha256:<64 hex chars>`
+        - `rules` must be an array of objects with `requirement` (non-empty string) and `rules` (non-empty array of non-empty strings)
+        - `constraints` must be a non-empty array of non-empty strings
+        - `scenarios` must be an array of objects with `requirement` (non-empty string), `name` (non-empty string), `when` (non-empty array of strings), `then` (non-empty array of strings), and `given` (optional array of strings)
 
         If validation fails, `SaveSpecMetadata` throws a `MetadataValidationError` (a domain error extending `SpecdError`) with the Zod issues formatted as a human-readable message. The file is not written.
 
@@ -109,9 +109,9 @@ rules:
 
         `DependsOnOverwriteError` is a domain error extending `SpecdError` with code `DEPENDS_ON_OVERWRITE`. It exposes:
 
-        * `existingDeps: readonly string[]` — the entries currently on disk
-        * `incomingDeps: readonly string[]` — the entries in the incoming content
-        * A human-readable message listing which entries would be removed and which would be added
+        - `existingDeps: readonly string[]` — the entries currently on disk
+        - `incomingDeps: readonly string[]` — the entries in the incoming content
+        - A human-readable message listing which entries would be removed and which would be added
 
         A static helper `DependsOnOverwriteError.areSame(a, b)` compares two `dependsOn` arrays for equality ignoring order.
   - requirement: Deterministic generation at archive time

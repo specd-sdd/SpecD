@@ -11,9 +11,9 @@ rules:
       - |-
         `SkipArtifact.execute` SHALL accept a `SkipArtifactInput` with the following fields:
 
-        * `name` (required, string) — the change slug
-        * `artifactId` (required, string) — the artifact type ID to skip (e.g. `'proposal'`)
-        * `reason` (optional, string) — explanation for why the artifact is being skipped
+        - `name` (required, string) — the change slug
+        - `artifactId` (required, string) — the artifact type ID to skip (e.g. `'proposal'`)
+        - `reason` (optional, string) — explanation for why the artifact is being skipped
   - requirement: Change lookup
     rules:
       - The use case MUST load the change by `name` via `ChangeRepository.get`. If no change with the given name exists, it MUST throw `ChangeNotFoundError`.

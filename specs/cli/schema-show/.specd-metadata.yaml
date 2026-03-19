@@ -13,7 +13,7 @@ rules:
         specd schema show [--format text|json|toon]
         ```
 
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Output format
     rules:
       - |-
@@ -61,7 +61,7 @@ rules:
         ```
   - requirement: Error cases
     rules:
-      - '* If the schema reference in `specd.yaml` cannot be resolved, exits with code 3.'
+      - '- If the schema reference in `specd.yaml` cannot be resolved, exits with code 3.'
 constraints:
   - This command is read-only
   - Artifact instruction, deltaInstruction, and validations are not included in the output — this command focuses on structure, not content

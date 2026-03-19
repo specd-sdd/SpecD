@@ -13,11 +13,11 @@ rules:
       - |-
         `UpdateSpecDeps.execute` SHALL accept an `UpdateSpecDepsInput` with the following fields:
 
-        * `name` (required, string) — the change slug
-        * `specId` (required, string) — the spec whose dependencies are being updated; MUST be present in the change's `specIds`
-        * `add` (optional, readonly string array) — dependency spec IDs to merge with existing dependencies
-        * `remove` (optional, readonly string array) — dependency spec IDs to remove from existing dependencies
-        * `set` (optional, readonly string array) — replaces all dependencies for the spec
+        - `name` (required, string) — the change slug
+        - `specId` (required, string) — the spec whose dependencies are being updated; MUST be present in the change's `specIds`
+        - `add` (optional, readonly string array) — dependency spec IDs to merge with existing dependencies
+        - `remove` (optional, readonly string array) — dependency spec IDs to remove from existing dependencies
+        - `set` (optional, readonly string array) — replaces all dependencies for the spec
   - requirement: Change lookup
     rules:
       - The use case MUST load the change by `name` via `ChangeRepository.get`. If no change with the given name exists, it MUST throw `ChangeNotFoundError`.

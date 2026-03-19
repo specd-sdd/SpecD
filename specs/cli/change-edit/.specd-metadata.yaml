@@ -18,11 +18,11 @@ rules:
           [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the name of the change to edit
-        * `--add-spec <id>` — repeatable; adds a spec ID to `specIds`. `<id>` follows the same `[<workspace>:]<capability-path>` format as `change create`, defaulting to `default` workspace when prefix is omitted
-        * `--remove-spec <id>` — repeatable; removes a spec ID from `specIds`
-        * `--description <text>` — optional; sets or replaces the free-text description of the change
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the name of the change to edit
+        - `--add-spec <id>` — repeatable; adds a spec ID to `specIds`. `<id>` follows the same `[<workspace>:]<capability-path>` format as `change create`, defaulting to `default` workspace when prefix is omitted
+        - `--remove-spec <id>` — repeatable; removes a spec ID from `specIds`
+        - `--description <text>` — optional; sets or replaces the free-text description of the change
+        - `--format text|json|toon` — optional; output format, defaults to `text`
 
         At least one flag must be provided; running with no flags is a CLI usage error (exit code 1).
   - requirement: Workspace derivation
@@ -39,15 +39,15 @@ rules:
       - |-
         On success, output depends on `--format`:
 
-        * `text` (default): prints to stdout: If approval invalidation occurred, a warning is also printed to stderr:
-        * `json` or `toon`: outputs (encoded in the respective format):
+        - `text` (default): prints to stdout: If approval invalidation occurred, a warning is also printed to stderr:
+        - `json` or `toon`: outputs (encoded in the respective format):
   - requirement: Error cases
     rules:
       - |-
-        * If the change does not exist, exits with code 1.
-        * If a `--remove-spec` value is not in the current `specIds`, exits with code 1.
-        * If an `--add-spec` value uses a workspace prefix not declared in `specd.yaml`, exits with code 1.
-        * If the result would leave `specIds` empty, exits with code 1.
+        - If the change does not exist, exits with code 1.
+        - If a `--remove-spec` value is not in the current `specIds`, exits with code 1.
+        - If an `--add-spec` value uses a workspace prefix not declared in `specd.yaml`, exits with code 1.
+        - If the result would leave `specIds` empty, exits with code 1.
 constraints:
   - All edits are applied atomically — either all succeed or none are applied
   - The change name and createdAt are immutable and cannot be changed

@@ -13,8 +13,8 @@ rules:
         specd drafts restore <name> [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the name of the drafted change to restore
-        * `--format` — controls output encoding; defaults to `text`
+        - `<name>` — required positional; the name of the drafted change to restore
+        - `--format` — controls output encoding; defaults to `text`
   - requirement: Behaviour
     rules:
       - The command moves the change from `drafts/` to `changes/` and appends a `restored` event to history. The lifecycle state is preserved exactly as it was when the change was drafted.
@@ -39,8 +39,8 @@ rules:
   - requirement: Error cases
     rules:
       - |-
-        * If no change with the given name exists (in any location), the command exits with code 1 and prints an `error:` message to stderr.
-        * If the change exists but is not currently in `drafts/` (i.e. it is active or discarded), the command exits with code 1 and prints an `error:` message to stderr.
+        - If no change with the given name exists (in any location), the command exits with code 1 and prints an `error:` message to stderr.
+        - If the change exists but is not currently in `drafts/` (i.e. it is active or discarded), the command exits with code 1 and prints an `error:` message to stderr.
 constraints:
   - Restoring does not affect lifecycle state
   - A change may be drafted and restored multiple times; each cycle appends events to history

@@ -13,9 +13,9 @@ rules:
         specd change draft <name> [--reason <text>] [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the name of the change to shelve
-        * `--reason <text>` — optional; a human-readable explanation for shelving the change
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the name of the change to shelve
+        - `--reason <text>` — optional; a human-readable explanation for shelving the change
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Behaviour
     rules:
       - The command moves the change from `changes/` to `drafts/` and appends a `drafted` event to history. The lifecycle state is preserved. The change can be recovered at any time using `specd change restore`.
@@ -24,13 +24,13 @@ rules:
       - |-
         On success, output depends on `--format`:
 
-        * `text` (default): prints a single line to stdout:
-        * `json` or `toon`: outputs the following to stdout (encoded in the respective format):
+        - `text` (default): prints a single line to stdout:
+        - `json` or `toon`: outputs the following to stdout (encoded in the respective format):
   - requirement: Error cases
     rules:
       - |-
-        * If the change does not exist, the command exits with code 1 and prints an `error:` message to stderr.
-        * If the change is already in `drafts/`, the command exits with code 1 and prints an `error:` message to stderr.
+        - If the change does not exist, the command exits with code 1 and prints an `error:` message to stderr.
+        - If the change is already in `drafts/`, the command exits with code 1 and prints an `error:` message to stderr.
 constraints:
   - Drafting does not affect lifecycle state
   - A change may be drafted at any point before archiving

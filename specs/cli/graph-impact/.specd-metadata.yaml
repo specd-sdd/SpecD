@@ -15,15 +15,15 @@ rules:
 
         Exactly one of `--file`, `--symbol`, or `--changes` must be provided.
 
-        * `--file` — analyze impact of a single file
-        * `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed
-        * `--changes` — detect impact of changes to multiple files (variadic; accepts multiple space-separated paths)
-        * `--direction` — optional; analysis direction, defaults to `upstream`. Values:
-          * `upstream` — find symbols and files that depend on the target
-          * `downstream` — find symbols and files that the target depends on
-          * `both` — combined upstream and downstream analysis
-        * `--path` — optional; workspace root, defaults to the current working directory
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `--file` — analyze impact of a single file
+        - `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed
+        - `--changes` — detect impact of changes to multiple files (variadic; accepts multiple space-separated paths)
+        - `--direction` — optional; analysis direction, defaults to `upstream`. Values:
+          - `upstream` — find symbols and files that depend on the target
+          - `downstream` — find symbols and files that the target depends on
+          - `both` — combined upstream and downstream analysis
+        - `--path` — optional; workspace root, defaults to the current working directory
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: File impact analysis
     rules:
       - |-

@@ -37,10 +37,10 @@ rules:
       - |-
         `GetHookInstructions.execute` receives:
 
-        * `name` (string, required) — the change name
-        * `step` (string, required) — the workflow step name
-        * `phase` (`'pre'` | `'post'`, required) — which hook phase to query
-        * `only` (string, optional) — when provided, filters to a single hook by its `id`
+        - `name` (string, required) — the change name
+        - `step` (string, required) — the workflow step name
+        - `phase` (`'pre'` | `'post'`, required) — which hook phase to query
+        - `only` (string, optional) — when provided, filters to a single hook by its `id`
   - requirement: Change lookup
     rules:
       - '`GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.'
@@ -70,10 +70,10 @@ rules:
       - |-
         `GetHookInstructions.execute` MUST return a result object containing:
 
-        * `phase` (`'pre'` | `'post'`) — the queried phase (always matches the input)
-        * `instructions` — array of instruction entries, each with:
-          * `id` (string) — the hook's `id`
-          * `text` (string) — the instruction text verbatim
+        - `phase` (`'pre'` | `'post'`) — the queried phase (always matches the input)
+        - `instructions` — array of instruction entries, each with:
+          - `id` (string) — the hook's `id`
+          - `text` (string) — the instruction text verbatim
 
         When no `instruction:` hooks exist for the step+phase, the result is `{ phase, instructions: [] }`.
 constraints:

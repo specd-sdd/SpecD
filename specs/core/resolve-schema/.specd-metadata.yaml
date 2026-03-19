@@ -15,11 +15,11 @@ rules:
       - |-
         `ResolveSchema` MUST be constructed with:
 
-        * `schemas` (`SchemaRegistry`) — the registry port for resolving schema and plugin references
-        * `schemaRef` (`string`) — the base schema reference from `specd.yaml`
-        * `workspaceSchemasPaths` (`ReadonlyMap<string, string>`) — workspace-to-schemas-path map
-        * `schemaPlugins` (`readonly string[]`) — plugin references from `specd.yaml`, in declaration order
-        * `schemaOverrides` (`SchemaOperations | undefined`) — inline overrides from `specd.yaml`
+        - `schemas` (`SchemaRegistry`) — the registry port for resolving schema and plugin references
+        - `schemaRef` (`string`) — the base schema reference from `specd.yaml`
+        - `workspaceSchemasPaths` (`ReadonlyMap<string, string>`) — workspace-to-schemas-path map
+        - `schemaPlugins` (`readonly string[]`) — plugin references from `specd.yaml`, in declaration order
+        - `schemaOverrides` (`SchemaOperations | undefined`) — inline overrides from `specd.yaml`
   - requirement: Execute takes no arguments
     rules:
       - '`execute()` MUST take no arguments. All configuration is provided at construction time.'
@@ -46,9 +46,9 @@ rules:
       - |-
         `SchemaRegistry.resolve()` must return enough information for `ResolveSchema` to:
 
-        * Access the parsed `SchemaYamlData` (for the merge engine)
-        * Access loaded templates (for `buildSchema`)
-        * Know the resolved file path (for cycle detection in extends)
+        - Access the parsed `SchemaYamlData` (for the merge engine)
+        - Access loaded templates (for `buildSchema`)
+        - Know the resolved file path (for cycle detection in extends)
 
         This may require extending `SchemaRegistry.resolve()` to return a richer result type, or `ResolveSchema` may call a lower-level method that returns intermediate data before domain construction.
 constraints:

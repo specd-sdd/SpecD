@@ -14,10 +14,10 @@ rules:
         specd change approve signoff <name> --reason <text> [--format text|json|toon]
         ```
 
-        * `spec` / `signoff` — required sub-verb selecting which approval gate to exercise
-        * `<name>` — required positional; the name of the change to approve
-        * `--reason <text>` — required; a human-readable explanation for the approval decision
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `spec` / `signoff` — required sub-verb selecting which approval gate to exercise
+        - `<name>` — required positional; the name of the change to approve
+        - `--reason <text>` — required; a human-readable explanation for the approval decision
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Artifact hash computation
     rules:
       - Before invoking the use case, the CLI computes the current hash of each artifact file on disk (applying `preHashCleanup` if declared in the schema) and passes the resulting `artifactHashes` map to the use case. The user never supplies artifact hashes.
@@ -32,16 +32,16 @@ rules:
       - |-
         On success, output depends on `--format`:
 
-        * `text` (default): prints to stdout:
-        * `json` or `toon`: outputs the following to stdout (encoded in the respective format):
+        - `text` (default): prints to stdout:
+        - `json` or `toon`: outputs the following to stdout (encoded in the respective format):
 
         where `<gate>` is `spec` or `signoff`.
   - requirement: Error cases
     rules:
       - |-
-        * `--reason` is mandatory; omitting it is a CLI usage error (exit code 1).
-        * If the change is not in the expected state for the gate, the command exits with code 1 and prints an `error:` message.
-        * If the change does not exist, exits with code 1.
+        - `--reason` is mandatory; omitting it is a CLI usage error (exit code 1).
+        - If the change is not in the expected state for the gate, the command exits with code 1 and prints an `error:` message.
+        - If the change does not exist, exits with code 1.
 constraints:
   - Artifact hashes are computed automatically from disk — the user never specifies them
   - Both spec and signoff sub-verbs are required even when only one approval gate is enabled; the gate state enforces which command is currently valid

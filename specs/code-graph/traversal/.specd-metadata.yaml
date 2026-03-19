@@ -11,9 +11,9 @@ rules:
       - |-
         `getUpstream(store: GraphStore, symbolId: string, options?: TraversalOptions): Promise<TraversalResult>` SHALL return all callers of the given symbol, transitively up to `maxDepth` (default: 3). Results MUST be grouped by depth level:
 
-        * **Depth 1** — direct callers (symbols that call the target)
-        * **Depth 2** — callers of the direct callers
-        * **Depth N** — callers at N steps removed
+        - **Depth 1** — direct callers (symbols that call the target)
+        - **Depth 2** — callers of the direct callers
+        - **Depth N** — callers at N steps removed
 
         The traversal follows `CALLS` relations in reverse (target → source). Cycles are detected and broken — a symbol already visited at a shallower depth is not revisited.
   - requirement: Downstream traversal
@@ -24,27 +24,27 @@ rules:
       - |-
         `TraversalOptions` is a value object with:
 
-        * **`maxDepth`** (`number`, default: 3) — maximum traversal depth
-        * **`includeFiles`** (`boolean`, default: false) — reserved for future use. When true, traversal would also follow `IMPORTS` relations in addition to `CALLS`. Currently not implemented — traversal follows `CALLS` only.
+        - **`maxDepth`** (`number`, default: 3) — maximum traversal depth
+        - **`includeFiles`** (`boolean`, default: true) — whether to include `IMPORTS` relations in addition to `CALLS`
 
         `TraversalResult` is a value object with:
 
-        * **`root`** (`string`) — the starting symbol id
-        * **`levels`** — `Map<number, SymbolNode[]>` — symbols grouped by depth (1-indexed)
-        * **`totalCount`** — total number of unique symbols found across all levels
-        * **`truncated`** (`boolean`) — true if traversal hit `maxDepth` and there are potentially more results
+        - **`root`** (`string`) — the starting symbol id
+        - **`levels`** — `Map<number, SymbolNode[]>` — symbols grouped by depth (1-indexed)
+        - **`totalCount`** — total number of unique symbols found across all levels
+        - **`truncated`** (`boolean`) — true if traversal hit `maxDepth` and there are potentially more results
   - requirement: Impact analysis
     rules:
       - |-
         `analyzeImpact(store: GraphStore, target: string, direction: 'upstream' | 'downstream' | 'both'): Promise<ImpactResult>` SHALL compute the blast radius of modifying the target symbol. It runs traversal in the specified direction and produces:
 
-        * **`target`** — the symbol being analyzed
-        * **`directDependents`** — count of depth-1 results (WILL BREAK)
-        * **`indirectDependents`** — count of depth-2 results (LIKELY AFFECTED)
-        * **`transitiveDependents`** — count of depth-3+ results (MAY NEED TESTING)
-        * **`riskLevel`** — computed from dependent counts: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`
-        * **`affectedFiles`** — unique file paths containing any affected symbol
-        * **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)
+        - **`target`** — the symbol being analyzed
+        - **`directDependents`** — count of depth-1 results (WILL BREAK)
+        - **`indirectDependents`** — count of depth-2 results (LIKELY AFFECTED)
+        - **`transitiveDependents`** — count of depth-3+ results (MAY NEED TESTING)
+        - **`riskLevel`** — computed from dependent counts: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`
+        - **`affectedFiles`** — unique file paths containing any affected symbol
+        - **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)
 
         Risk level thresholds:
 
@@ -65,8 +65,8 @@ rules:
 
         `FileImpactResult` extends `ImpactResult` with:
 
-        * **`symbols`** — array of per-symbol `ImpactResult` entries
-        * **`riskLevel`** — the maximum risk level across all symbols in the file
+        - **`symbols`** — array of per-symbol `ImpactResult` entries
+        - **`riskLevel`** — the maximum risk level across all symbols in the file
   - requirement: Change detection
     rules:
       - |-
@@ -79,12 +79,12 @@ rules:
 
         `ChangeDetectionResult` contains:
 
-        * **`changedFiles`** — the input file paths
-        * **`changedSymbols`** — symbols defined in the changed files
-        * **`affectedSymbols`** — symbols affected by the changes (upstream dependents)
-        * **`affectedFiles`** — files containing affected symbols
-        * **`riskLevel`** — maximum risk level across all changed symbols
-        * **`summary`** — human-readable summary string
+        - **`changedFiles`** — the input file paths
+        - **`changedSymbols`** — symbols defined in the changed files
+        - **`affectedSymbols`** — symbols affected by the changes (upstream dependents)
+        - **`affectedFiles`** — files containing affected symbols
+        - **`riskLevel`** — maximum risk level across all changed symbols
+        - **`summary`** — human-readable summary string
   - requirement: Pure functions
     rules:
       - All traversal operations SHALL be stateless pure functions defined in `domain/services/`. They receive a `GraphStore` instance (for reads only) and return value objects. They MUST NOT mutate the store, manage lifecycle, or hold state between calls.

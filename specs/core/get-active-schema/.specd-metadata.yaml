@@ -22,7 +22,7 @@ rules:
       - |-
         `GetActiveSchema` MUST be constructed with one dependency:
 
-        * `resolveSchema` (`ResolveSchema`) — the use case that orchestrates the full schema resolution pipeline.
+        - `resolveSchema` (`ResolveSchema`) — the use case that orchestrates the full schema resolution pipeline.
 
         All lower-level dependencies (schema registry, schema ref, plugins, overrides) are provided to `ResolveSchema` at its construction time.
 constraints:

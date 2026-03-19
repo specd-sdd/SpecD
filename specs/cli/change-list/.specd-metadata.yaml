@@ -13,7 +13,7 @@ rules:
         specd change list [--format text|json|toon]
         ```
 
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Output format
     rules:
       - |-

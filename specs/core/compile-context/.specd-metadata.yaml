@@ -47,12 +47,12 @@ rules:
       - |-
         `CompileContext.execute` receives:
 
-        * `name` — the change name to compile context for
-        * `step` — the lifecycle step name being entered (e.g. `'designing'`, `'implementing'`, `'verifying'`, `'archiving'`)
-        * `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, and per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`
-        * `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1–4 are included.
-        * `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.
-        * `sections` (optional) — when present, restricts the metadata content rendered for each spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, all available sections are rendered (description + rules + constraints + scenarios). `sections` applies only to spec content — it does not affect project context entries or available steps.
+        - `name` — the change name to compile context for
+        - `step` — the lifecycle step name being entered (e.g. `'designing'`, `'implementing'`, `'verifying'`, `'archiving'`)
+        - `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, and per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`
+        - `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1–4 are included.
+        - `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.
+        - `sections` (optional) — when present, restricts the metadata content rendered for each spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, all available sections are rendered (description + rules + constraints + scenarios). `sections` applies only to spec content — it does not affect project context entries or available steps.
   - requirement: Schema name guard
     rules:
       - After resolving the schema from config, `CompileContext` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before any context collection or instruction assembly.
@@ -61,11 +61,11 @@ rules:
       - |-
         Every spec ID handled by `CompileContext` carries an explicit or implicit workspace qualifier:
 
-        * **Explicit qualifier** (e.g. `billing:auth/login`) — the workspace name before `:` is used to look up the corresponding `SpecRepository` in the map.
-        * **No qualifier** (e.g. `auth/login`) — the workspace is inferred from context:
-          * In include/exclude patterns at project level, an unqualified path resolves to `default`.
-          * In include/exclude patterns at workspace level, an unqualified path resolves to that workspace.
-          * In `dependsOn` entries from `.specd-metadata.yaml`, an unqualified path resolves to the same workspace as the spec that declared it.
+        - **Explicit qualifier** (e.g. `billing:auth/login`) — the workspace name before `:` is used to look up the corresponding `SpecRepository` in the map.
+        - **No qualifier** (e.g. `auth/login`) — the workspace is inferred from context:
+          - In include/exclude patterns at project level, an unqualified path resolves to `default`.
+          - In include/exclude patterns at workspace level, an unqualified path resolves to that workspace.
+          - In `dependsOn` entries from `.specd-metadata.yaml`, an unqualified path resolves to the same workspace as the spec that declared it.
 
         If a pattern or `dependsOn` entry references a workspace name that has no entry in the `specs` map, `CompileContext` must emit a warning and skip that path. It must not throw.
   - requirement: Context spec collection
@@ -100,8 +100,8 @@ rules:
       - |-
         For every spec in the collected context set, `CompileContext` must check whether the spec's `.specd-metadata.yaml` exists and whether its `contentHashes` are fresh (all required artifact file hashes match the recorded values).
 
-        * **Fresh metadata** — use the structured content from `.specd-metadata.yaml` (`rules`, `constraints`, `scenarios`, `description`).
-        * **Stale or absent metadata** — fall back to the full raw content of the spec's artifact files. Emit a warning identifying the spec path so the caller knows metadata should be regenerated.
+        - **Fresh metadata** — use the structured content from `.specd-metadata.yaml` (`rules`, `constraints`, `scenarios`, `description`).
+        - **Stale or absent metadata** — fall back to the full raw content of the spec's artifact files. Emit a warning identifying the spec path so the caller knows metadata should be regenerated.
 
         Staleness is advisory — it never blocks context compilation. The fallback ensures the context is always assembled, even for specs whose metadata has not yet been generated.
   - requirement: Step availability
@@ -117,18 +117,18 @@ rules:
 
         1. **Project context entries** — for each entry in `config.context` (in declaration order): resolve `instruction` values verbatim; resolve `file` values by reading the file at the given path relative to the `specd.yaml` directory and injecting its content verbatim. Missing files emit a warning and are skipped. This block appears before all other content.
         2. **Spec content** — for each spec in the collected context set, include its content using the following strategy. When `sections` is present, only the listed sections are rendered; when absent, all available sections are included (description + rules + constraints + scenarios).
-           * If `.specd-metadata.yaml` exists and is fresh: include the requested sections from the metadata. This is the compact, machine-optimised representation.
-           * If metadata is absent or stale: fall back to the schema's `metadataExtraction` declarations. For each declared metadata field (rules, constraints, scenarios, etc.), the extraction engine loads the referenced artifact from `SpecRepository`, parses it via `ArtifactParser.parse()`, runs the declared extractors against the AST, and produces the same structured output as fresh metadata would. Only sections matching the `sections` filter are included when present. Extractors whose selectors match no nodes are silently skipped. Emit a staleness warning for this spec.
+           - If `.specd-metadata.yaml` exists and is fresh: include the requested sections from the metadata. This is the compact, machine-optimised representation.
+           - If metadata is absent or stale: fall back to the schema's `metadataExtraction` declarations. For each declared metadata field (rules, constraints, scenarios, etc.), the extraction engine loads the referenced artifact from `SpecRepository`, parses it via `ArtifactParser.parse()`, runs the declared extractors against the AST, and produces the same structured output as fresh metadata would. Only sections matching the `sections` filter are included when present. Extractors whose selectors match no nodes are silently skipped. Emit a staleness warning for this spec.
         3. **Available steps** — list all steps declared in the schema's `workflow[]`, each annotated with whether it is currently available. Unavailable steps must name the blocking artifacts.
   - requirement: Result shape
     rules:
       - |-
         `CompileContext.execute` must return a result object. The result must include:
 
-        * `stepAvailable: boolean` — whether the requested step is currently available
-        * `blockingArtifacts: string[]` — artifact IDs blocking the step (empty if available)
-        * `contextBlock: string` — the fully assembled context text
-        * `warnings: ContextWarning[]` — stale metadata warnings and any other advisory conditions
+        - `stepAvailable: boolean` — whether the requested step is currently available
+        - `blockingArtifacts: string[]` — artifact IDs blocking the step (empty if available)
+        - `contextBlock: string` — the fully assembled context text
+        - `warnings: ContextWarning[]` — stale metadata warnings and any other advisory conditions
 
         `CompileContext` must not throw on availability failures. It must throw on `ChangeNotFoundError` (change not found) and on schema resolution errors.
   - requirement: Missing spec IDs emit a warning

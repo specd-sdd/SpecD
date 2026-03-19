@@ -15,13 +15,13 @@ rules:
           [--format text|json|toon]
         ```
 
-        * `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
-        * `--rules` — when present, includes only the rules sections in the output
-        * `--constraints` — when present, includes only the constraints sections in the output
-        * `--scenarios` — when present, includes only the scenarios sections in the output
-        * `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively and includes each dependency's context in the output
-        * `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only, 2 = deps of deps, etc.); defaults to unlimited when `--follow-deps` is passed without `--depth`
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
+        - `--rules` — when present, includes only the rules sections in the output
+        - `--constraints` — when present, includes only the constraints sections in the output
+        - `--scenarios` — when present, includes only the scenarios sections in the output
+        - `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively and includes each dependency's context in the output
+        - `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only, 2 = deps of deps, etc.); defaults to unlimited when `--follow-deps` is passed without `--depth`
+        - `--format text|json|toon` — optional; output format, defaults to `text`
 
         When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included (description + rules + constraints + scenarios). When one or more section flags are passed, only those sections are included.
   - requirement: Behaviour
@@ -66,9 +66,9 @@ rules:
   - requirement: Error cases
     rules:
       - |-
-        * If the workspace is not configured, exits with code 1.
-        * If no artifact files exist for the spec at the given path, exits with code 1.
-        * `--depth` without `--follow-deps` is a CLI usage error (exit code 1).
+        - If the workspace is not configured, exits with code 1.
+        - If no artifact files exist for the spec at the given path, exits with code 1.
+        - `--depth` without `--follow-deps` is a CLI usage error (exit code 1).
 constraints:
   - This command is read-only — it never updates metadata
   - The workspace is always explicit in the path

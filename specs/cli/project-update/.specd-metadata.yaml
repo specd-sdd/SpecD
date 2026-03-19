@@ -14,7 +14,7 @@ rules:
         specd project update [--format text|json|toon]
         ```
 
-        * `--format text|json|toon` — optional; output format, defaults to `text`.
+        - `--format text|json|toon` — optional; output format, defaults to `text`.
   - requirement: Skills update step
     rules:
       - "The command runs the skills update logic for all agents recorded in `specd.yaml`'s `skills` section (equivalent to `specd skills update` with no `--agent` filter). All behaviour defined in the `skills update` spec applies: missing-skill warnings, no-skills output, idempotent overwrites."

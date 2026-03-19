@@ -21,15 +21,15 @@ rules:
       - |-
         The use case SHALL return a `GetSpecResult` containing:
 
-        * `spec` — the `Spec` entity as returned by the repository.
-        * `artifacts` — a `Map<string, SpecArtifact>` of all successfully loaded artifacts.
+        - `spec` — the `Spec` entity as returned by the repository.
+        - `artifacts` — a `Map<string, SpecArtifact>` of all successfully loaded artifacts.
   - requirement: Input shape
     rules:
       - |-
         `GetSpecInput` MUST include:
 
-        * `workspace` — the workspace name (string).
-        * `specPath` — a `SpecPath` value object identifying the spec within the workspace.
+        - `workspace` — the workspace name (string).
+        - `specPath` — a `SpecPath` value object identifying the spec within the workspace.
 constraints:
   - The use case receives a ReadonlyMap<string, SpecRepository> — it MUST NOT modify the map or the repositories.
   - The use case throws on missing workspace or missing spec — it does not return null for these cases.

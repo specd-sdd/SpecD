@@ -13,9 +13,9 @@ rules:
         specd change artifact-instruction <name> [artifact-id] [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the change name
-        * `[artifact-id]` — optional positional; the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on based on the dependency graph — the first artifact whose `requires` are all satisfied but that is not yet complete
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the change name
+        - `[artifact-id]` — optional positional; the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on based on the dependency graph — the first artifact whose `requires` are all satisfied but that is not yet complete
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Delegates to GetArtifactInstruction
     rules:
       - The command MUST delegate to the `GetArtifactInstruction` use case. It MUST NOT resolve schemas, collect rules, or generate delta context directly.
@@ -27,10 +27,10 @@ rules:
       - |-
         The command exits with code 1 for:
 
-        * Change not found (`ChangeNotFoundError`)
-        * Unknown artifact ID (`ArtifactNotFoundError`)
-        * Schema mismatch (`SchemaMismatchError`)
-        * No parser registered for the artifact's format (`ParserNotRegisteredError`)
+        - Change not found (`ChangeNotFoundError`)
+        - Unknown artifact ID (`ArtifactNotFoundError`)
+        - Schema mismatch (`SchemaMismatchError`)
+        - No parser registered for the artifact's format (`ParserNotRegisteredError`)
   - requirement: Text output format
     rules:
       - When `--format` is `text` (default), the structured result parts are printed with labelled sections. Each non-empty part is printed with a header (`[rules.pre]`, `[instruction]`, `[delta]`, `[rules.post]`), separated by blank lines. Empty parts are omitted. This allows skills to parse sections or consume the full output.

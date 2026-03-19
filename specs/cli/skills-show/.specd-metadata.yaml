@@ -13,8 +13,8 @@ rules:
         specd skills show <name> [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the name of the skill to display.
-        * `--format text|json|toon` — optional; output format, defaults to `text`.
+        - `<name>` — required positional; the name of the skill to display.
+        - `--format text|json|toon` — optional; output format, defaults to `text`.
   - requirement: Output format
     rules:
       - |-

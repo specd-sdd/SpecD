@@ -35,9 +35,9 @@ rules:
 
         Examples:
 
-        * `specs/default/core/config/spec.md`
-        * `specs/default/auth/login/verify.md`
-        * `specs/billing/invoices/spec.md`
+        - `specs/default/core/config/spec.md`
+        - `specs/default/auth/login/verify.md`
+        - `specs/billing/invoices/spec.md`
 
         This layout mirrors the permanent spec directory structure so that the files can be synced without path transformation during `ArchiveChange`. At archive time, the file at `specs/<workspace>/<capability-path>/<filename>` in the change directory is written to `<workspace.specs.path>/<capability-path>/<filename>` in the project.
   - requirement: Delta files
@@ -51,9 +51,9 @@ rules:
 
         Examples:
 
-        * `deltas/default/core/config/spec.md.delta.yaml`
-        * `deltas/default/auth/login/verify.md.delta.yaml`
-        * `deltas/billing/invoices/spec.md.delta.yaml`
+        - `deltas/default/core/config/spec.md.delta.yaml`
+        - `deltas/default/auth/login/verify.md.delta.yaml`
+        - `deltas/billing/invoices/spec.md.delta.yaml`
 
         Delta files are change artifacts — they are never synced to the permanent spec directories. The `deltas/` prefix separates them unambiguously from new spec files under `specs/`.
   - requirement: Workspace segment is always present

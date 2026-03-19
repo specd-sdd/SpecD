@@ -14,11 +14,11 @@ rules:
         specd change hook-instruction <name> <step> --phase pre|post [--only <hook-id>] [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the change name
-        * `<step>` — required positional; the workflow step name (e.g. `implementing`, `verifying`)
-        * `--phase pre|post` — required flag; which hook phase to query
-        * `--only <hook-id>` — optional flag; return only the instruction with this ID
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the change name
+        - `<step>` — required positional; the workflow step name (e.g. `implementing`, `verifying`)
+        - `--phase pre|post` — required flag; which hook phase to query
+        - `--only <hook-id>` — optional flag; return only the instruction with this ID
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Delegates to GetHookInstructions
     rules:
       - The command MUST delegate to the `GetHookInstructions` use case. It MUST NOT resolve schemas or collect hooks directly.
@@ -33,18 +33,18 @@ rules:
       - |-
         The command exits with code 1 for:
 
-        * Change not found (`ChangeNotFoundError`)
-        * Step is not a valid lifecycle state (`StepNotValidError`)
-        * Unknown hook ID when `--only` is specified (`HookNotFoundError` with reason `'not-found'`)
-        * Hook ID refers to a `run:` hook instead of an `instruction:` hook (`HookNotFoundError` with reason `'wrong-type'`)
-        * Schema mismatch (`SchemaMismatchError`)
+        - Change not found (`ChangeNotFoundError`)
+        - Step is not a valid lifecycle state (`StepNotValidError`)
+        - Unknown hook ID when `--only` is specified (`HookNotFoundError` with reason `'not-found'`)
+        - Hook ID refers to a `run:` hook instead of an `instruction:` hook (`HookNotFoundError` with reason `'wrong-type'`)
+        - Schema mismatch (`SchemaMismatchError`)
   - requirement: Text output format
     rules:
       - |-
         When `--format` is `text` (default):
 
-        * When returning all instructions: each instruction is printed with a header line `[<phase>] <hook-id>:` followed by the instruction text, separated by a blank line between entries
-        * When returning a single instruction (`--only`): the instruction text is printed directly without any header — raw text suitable for piping into an external hook system
+        - When returning all instructions: each instruction is printed with a header line `[<phase>] <hook-id>:` followed by the instruction text, separated by a blank line between entries
+        - When returning a single instruction (`--only`): the instruction text is printed directly without any header — raw text suitable for piping into an external hook system
   - requirement: JSON output format
     rules:
       - |-

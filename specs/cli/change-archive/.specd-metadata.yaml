@@ -15,9 +15,9 @@ rules:
         specd change archive <name> [--no-hooks] [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the name of the change to archive
-        * `--no-hooks` — optional flag; skips `run:` hook execution, allowing the caller to manage hooks separately via `specd change run-hooks`
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the name of the change to archive
+        - `--no-hooks` — optional flag; skips `run:` hook execution, allowing the caller to manage hooks separately via `specd change run-hooks`
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Prerequisites
     rules:
       - The change must be in `archivable` state. If the change is in any other state, the command exits with code 1 and prints an `error:` message to stderr naming the current state.
@@ -40,16 +40,16 @@ rules:
       - |-
         On success, output depends on `--format`:
 
-        * `text` (default): prints to stdout:
-        * `json` or `toon`: outputs the following to stdout (encoded in the respective format):
+        - `text` (default): prints to stdout:
+        - `json` or `toon`: outputs the following to stdout (encoded in the respective format):
 
         where `<archive-path>` is the path to the archived change directory relative to the project root.
   - requirement: Error cases
     rules:
       - |-
-        * If the change does not exist, exits with code 1.
-        * If the change is not in `archivable` state, exits with code 1.
-        * If a delta merge fails (conflict or parse error), exits with code 1 and prints a descriptive error.
+        - If the change does not exist, exits with code 1.
+        - If the change is not in `archivable` state, exits with code 1.
+        - If a delta merge fails (conflict or parse error), exits with code 1 and prints a descriptive error.
 constraints:
   - Only changes in archivable state may be archived
   - The archive path is determined by storage.archivePattern in specd.yaml

@@ -13,8 +13,8 @@ rules:
         specd archive show <name> [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the name of the archived change to show
-        * `--format` — controls output encoding; defaults to `text`
+        - `<name>` — required positional; the name of the archived change to show
+        - `--format` — controls output encoding; defaults to `text`
   - requirement: Output format — text
     rules:
       - |-
@@ -41,7 +41,7 @@ rules:
       - When `--format toon` is passed, the command writes the same data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout.
   - requirement: Error cases
     rules:
-      - '* If no change with the given name exists in the archive directory, the command exits with code 1 and prints an `error:` message to stderr.'
+      - '- If no change with the given name exists in the archive directory, the command exits with code 1 and prints an `error:` message to stderr.'
 constraints:
   - Errors always go to stderr as plain text regardless of --format
   - --format only affects stdout

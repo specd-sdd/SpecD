@@ -12,8 +12,8 @@ rules:
       - |-
         `FileNode.path` SHALL be globally unique by prefixing the workspace name to the code-root-relative path:
 
-        * **`path`** = `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`)
-        * **`workspace`** = workspace name string (e.g. `core`, `cli`, `default`)
+        - **`path`** = `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`)
+        - **`workspace`** = workspace name string (e.g. `core`, `cli`, `default`)
 
         This ensures that two workspaces with identical relative paths (e.g. both having `src/index.ts`) produce distinct `FileNode.path` values. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.
   - requirement: SymbolNode ID includes workspace
@@ -21,7 +21,7 @@ rules:
       - |-
         `SymbolNode.id` SHALL include the workspace-prefixed path:
 
-        * **`id`** = `{workspace}:{relativePath}:{kind}:{name}:{line}` (e.g. `core:src/index.ts:function:main:1`)
+        - **`id`** = `{workspace}:{relativePath}:{kind}:{name}:{line}` (e.g. `core:src/index.ts:function:main:1`)
 
         This follows naturally from `SymbolNode.filePath` being the `FileNode.path`.
   - requirement: SpecNode workspace field
@@ -29,7 +29,7 @@ rules:
       - |-
         `SpecNode` SHALL include a `workspace` field:
 
-        * **`workspace`** (`string`) — the workspace name this spec belongs to (e.g. `core`, `_global`)
+        - **`workspace`** (`string`) — the workspace name this spec belongs to (e.g. `core`, `_global`)
 
         Spec IDs use the format `{workspace}:{specPath}` (e.g. `core:core/change`, `default:_global/architecture`), matching the format produced by `SpecRepository`. The workspace name prefix in the specPath comes from the workspace's configured `prefix` in `specd.yaml`.
   - requirement: File discovery from codeRoot
@@ -67,9 +67,9 @@ rules:
       - |-
         During Pass 2 (import resolution), the indexer SHALL resolve imports across workspaces:
 
-        * **Relative imports** — resolved within the same workspace (same path prefix)
-        * **Package imports** — the `packageName → workspaceName` map (built from `LanguageAdapter.getPackageIdentity`) correlates package names with workspace names, allowing resolution across workspace boundaries. This works for both monorepo and multirepo setups.
-        * **PHP qualified names** — resolved globally across all workspaces
+        - **Relative imports** — resolved within the same workspace (same path prefix)
+        - **Package imports** — the `packageName → workspaceName` map (built from `LanguageAdapter.getPackageIdentity`) correlates package names with workspace names, allowing resolution across workspace boundaries. This works for both monorepo and multirepo setups.
+        - **PHP qualified names** — resolved globally across all workspaces
 
         The in-memory `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins, enabling cross-workspace resolution.
   - requirement: WorkspaceIndexTarget
@@ -86,8 +86,8 @@ rules:
         }
         ```
 
-        * **`workspaces`** — one entry per workspace to index
-        * **`projectRoot`** — absolute path to the monorepo/project root (for monorepo package resolution)
+        - **`workspaces`** — one entry per workspace to index
+        - **`projectRoot`** — absolute path to the monorepo/project root (for monorepo package resolution)
   - requirement: Per-workspace IndexResult breakdown
     rules:
       - |-

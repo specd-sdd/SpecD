@@ -11,7 +11,7 @@ rules:
       - |-
         `execute(input)` MUST accept a `GetSkillsManifestInput` object with the following field:
 
-        * `configPath` (string, required) — absolute path to the `specd.yaml` to read.
+        - `configPath` (string, required) — absolute path to the `specd.yaml` to read.
   - requirement: Delegates to ConfigWriter.readSkillsManifest
     rules:
       - The use case MUST call `ConfigWriter.readSkillsManifest(configPath)` with the path from the input object. It SHALL NOT read or parse `specd.yaml` directly.

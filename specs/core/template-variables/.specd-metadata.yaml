@@ -88,11 +88,11 @@ rules:
         }
         ```
 
-        * The `builtins` provided at construction (e.g. `{ project: { root: '...' } }`) are always present in every expansion.
-        * `expand(template, variables?)` — merges contextual `variables` with built-ins and substitutes values verbatim. Used by `GetHookInstructions` and `GetArtifactInstruction` for instruction text.
-        * `expandForShell(template, variables?)` — merges contextual `variables` with built-ins and substitutes values with shell escaping. Used by `HookRunner` for `run:` commands.
-        * Contextual variables MUST NOT override built-in variables. If a contextual namespace collides with a built-in namespace, the built-in keys take precedence.
-        * Both methods share the same traversal and resolution logic — only the substitution step differs.
+        - The `builtins` provided at construction (e.g. `{ project: { root: '...' } }`) are always present in every expansion.
+        - `expand(template, variables?)` — merges contextual `variables` with built-ins and substitutes values verbatim. Used by `GetHookInstructions` and `GetArtifactInstruction` for instruction text.
+        - `expandForShell(template, variables?)` — merges contextual `variables` with built-ins and substitutes values with shell escaping. Used by `HookRunner` for `run:` commands.
+        - Contextual variables MUST NOT override built-in variables. If a contextual namespace collides with a built-in namespace, the built-in keys take precedence.
+        - Both methods share the same traversal and resolution logic — only the substitution step differs.
 
         The composition layer constructs a single `TemplateExpander` instance with built-in variables and injects it into all use cases that need expansion.
   - requirement: Variable map construction

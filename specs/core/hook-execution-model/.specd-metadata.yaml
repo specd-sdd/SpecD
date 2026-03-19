@@ -18,8 +18,8 @@ rules:
       - |-
         Workflow hooks come in exactly two types, distinguished by their key:
 
-        * **`instruction:`** — a text block consumed by `GetHookInstructions` at query time. It is returned as contextual guidance for the agent or external tool. `instruction:` hooks are never executed at runtime — they have no process, exit code, or side effects.
-        * **`run:`** — a shell command executed by the `HookRunner` port. It produces an exit code, stdout, and stderr. `run:` hooks are never injected into agent context — they are operational commands.
+        - **`instruction:`** — a text block consumed by `GetHookInstructions` at query time. It is returned as contextual guidance for the agent or external tool. `instruction:` hooks are never executed at runtime — they have no process, exit code, or side effects.
+        - **`run:`** — a shell command executed by the `HookRunner` port. It produces an exit code, stdout, and stderr. `run:` hooks are never injected into agent context — they are operational commands.
 
         Every hook entry declares exactly one of these two keys alongside its `id`. An entry with both keys or neither key is a `SchemaValidationError` (enforced by schema validation, not by this model).
 
@@ -35,8 +35,8 @@ rules:
       - |-
         By default, `TransitionChange` and `ArchiveChange` auto-execute `run:` hooks at step boundaries:
 
-        * **`TransitionChange`** — when transitioning to a state that has a workflow step with `run:` hooks, executes pre-hooks before the state change and post-hooks after. Pre-hook failure aborts the transition (fail-fast). Post-hook failures are collected but do not roll back (fail-soft). Hook execution is delegated to `RunStepHooks`.
-        * **`ArchiveChange`** — executes pre-archive hooks before any file modifications and post-archive hooks after the archive completes. Pre-hook failure aborts the archive. Post-hook failures are collected. Hook execution is delegated to `RunStepHooks`.
+        - **`TransitionChange`** — when transitioning to a state that has a workflow step with `run:` hooks, executes pre-hooks before the state change and post-hooks after. Pre-hook failure aborts the transition (fail-fast). Post-hook failures are collected but do not roll back (fail-soft). Hook execution is delegated to `RunStepHooks`.
+        - **`ArchiveChange`** — executes pre-archive hooks before any file modifications and post-archive hooks after the archive completes. Pre-hook failure aborts the archive. Post-hook failures are collected. Hook execution is delegated to `RunStepHooks`.
 
         Both use cases delegate hook execution to `RunStepHooks`, which handles hook collection, variable expansion, and execution semantics.
   - requirement: Manual hook control with skipHooks
@@ -56,9 +56,9 @@ rules:
       - |-
         When a `run:` pre-hook exits with a non-zero code:
 
-        * **`TransitionChange`** — throws `HookFailedError`. No state transition occurs.
-        * **`ArchiveChange`** — throws `HookFailedError`. No files are modified.
-        * **`RunStepHooks` (standalone)** — returns immediately with the failure result. The CLI exits with code 2. The agent SHOULD NOT proceed with the step's work and SHOULD offer to fix the problem before retrying.
+        - **`TransitionChange`** — throws `HookFailedError`. No state transition occurs.
+        - **`ArchiveChange`** — throws `HookFailedError`. No files are modified.
+        - **`RunStepHooks` (standalone)** — returns immediately with the failure result. The CLI exits with code 2. The agent SHOULD NOT proceed with the step's work and SHOULD offer to fix the problem before retrying.
 
         In all cases, pre-hooks use **fail-fast** semantics: execution stops at the first failure, and subsequent hooks in the list are not run.
   - requirement: Post-hook failure semantics
@@ -66,9 +66,9 @@ rules:
       - |-
         When a `run:` post-hook exits with a non-zero code:
 
-        * **`TransitionChange`** — collects the failure in `postHookFailures` but does not roll back the transition. All remaining post-hooks continue to execute.
-        * **`ArchiveChange`** — collects the failure in `postHookFailures` but does not roll back the archive. All remaining post-hooks continue to execute.
-        * **`RunStepHooks` (standalone)** — continues executing remaining post-hooks, collecting all failures. The CLI exits with code 2 if any post-hook failed.
+        - **`TransitionChange`** — collects the failure in `postHookFailures` but does not roll back the transition. All remaining post-hooks continue to execute.
+        - **`ArchiveChange`** — collects the failure in `postHookFailures` but does not roll back the archive. All remaining post-hooks continue to execute.
+        - **`RunStepHooks` (standalone)** — continues executing remaining post-hooks, collecting all failures. The CLI exits with code 2 if any post-hook failed.
 
         In all cases, post-hooks use **fail-soft** semantics: all hooks execute regardless of individual failures, and failures are collected rather than thrown.
   - requirement: Hook ordering
@@ -85,10 +85,10 @@ rules:
       - |-
         Before executing a `run:` hook command, `HookRunner` expands `{{key.path}}` template variables using a `HookVariables` object. The variables available are:
 
-        * `{{change.name}}` — the change name
-        * `{{change.workspace}}` — the primary workspace name
-        * `{{change.path}}` — the absolute path to the change directory
-        * `{{project.root}}` — the absolute path to the project root
+        - `{{change.name}}` — the change name
+        - `{{change.workspace}}` — the primary workspace name
+        - `{{change.path}}` — the absolute path to the change directory
+        - `{{project.root}}` — the absolute path to the project root
 
         Unknown variable paths are left unexpanded (the original `{{key.path}}` token is preserved). All substituted values are shell-escaped to prevent injection attacks.
 constraints:

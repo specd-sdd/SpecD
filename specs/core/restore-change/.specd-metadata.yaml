@@ -12,7 +12,7 @@ rules:
       - |-
         `RestoreChange.execute` SHALL accept a `RestoreChangeInput` with the following field:
 
-        * `name` (string, required) — the drafted change to restore
+        - `name` (string, required) — the drafted change to restore
   - requirement: Change must exist
     rules:
       - The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
@@ -24,9 +24,9 @@ rules:
       - |-
         The use case MUST call `change.restore(actor)` to append a `restored` event to the change's history. The event records:
 
-        * `type`: `'restored'`
-        * `at`: the current timestamp
-        * `by`: the resolved actor identity
+        - `type`: `'restored'`
+        - `at`: the current timestamp
+        - `by`: the resolved actor identity
   - requirement: Persistence
     rules:
       - After appending the restored event, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` instance. The repository implementation is responsible for relocating the change directory back to `changes/`.
@@ -35,8 +35,8 @@ rules:
       - |-
         `RestoreChange` depends on two ports injected via constructor:
 
-        * `ChangeRepository` — for loading and persistence
-        * `ActorResolver` — for resolving the current actor identity
+        - `ChangeRepository` — for loading and persistence
+        - `ActorResolver` — for resolving the current actor identity
 constraints:
   - The use case MUST NOT perform any state transitions — restoring is orthogonal to lifecycle state
   - The use case delegates directory relocation entirely to the repository layer

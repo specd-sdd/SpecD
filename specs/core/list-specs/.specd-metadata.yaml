@@ -33,10 +33,10 @@ rules:
       - |-
         When `options.includeMetadataStatus` is `true`, the use case SHALL resolve a `metadataStatus` field for each entry. The status values SHALL be:
 
-        * `'missing'` — no `.specd-metadata.yaml` file exists for the spec.
-        * `'invalid'` — the metadata file exists but fails structural validation against `strictSpecMetadataSchema`.
-        * `'stale'` — the metadata file exists and is structurally valid, but content hashes are absent or do not match current file contents.
-        * `'fresh'` — the metadata file exists, is structurally valid, and all content hashes match current files.
+        - `'missing'` — no `.specd-metadata.yaml` file exists for the spec.
+        - `'invalid'` — the metadata file exists but fails structural validation against `strictSpecMetadataSchema`.
+        - `'stale'` — the metadata file exists and is structurally valid, but content hashes are absent or do not match current file contents.
+        - `'fresh'` — the metadata file exists, is structurally valid, and all content hashes match current files.
 
         When `options.includeMetadataStatus` is `false` or omitted, the `metadataStatus` field MUST NOT appear on any entry.
   - requirement: Silent error handling for metadata and summary reads
@@ -47,9 +47,9 @@ rules:
       - |-
         Each entry MUST include the following required fields:
 
-        * `workspace` — the workspace name the spec belongs to.
-        * `path` — the spec's capability path rendered with `/` separators.
-        * `title` — the resolved title string.
+        - `workspace` — the workspace name the spec belongs to.
+        - `path` — the spec's capability path rendered with `/` separators.
+        - `title` — the resolved title string.
 
         Optional fields (`summary`, `metadataStatus`) MUST only be present when explicitly requested and successfully resolved.
 constraints:

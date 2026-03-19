@@ -13,9 +13,9 @@ rules:
         specd change discard <name> --reason <text> [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the name of the change to discard
-        * `--reason <text>` — required; a human-readable explanation for discarding the change
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the name of the change to discard
+        - `--reason <text>` — required; a human-readable explanation for discarding the change
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Behaviour
     rules:
       - The command moves the change from `changes/` or `drafts/` to `discarded/` and appends a `discarded` event to history. This operation is irreversible.
@@ -24,13 +24,13 @@ rules:
       - |-
         On success, output depends on `--format`:
 
-        * `text` (default): prints a single line to stdout:
-        * `json` or `toon`: outputs the following to stdout (encoded in the respective format):
+        - `text` (default): prints a single line to stdout:
+        - `json` or `toon`: outputs the following to stdout (encoded in the respective format):
   - requirement: Error cases
     rules:
       - |-
-        * If the change does not exist, the command exits with code 1 and prints an `error:` message.
-        * `--reason` is mandatory; omitting it is a CLI usage error (exit code 1).
+        - If the change does not exist, the command exits with code 1 and prints an `error:` message.
+        - `--reason` is mandatory; omitting it is a CLI usage error (exit code 1).
 constraints:
   - Discarding is irreversible — there is no undo command
   - A change may be discarded from changes/ or drafts/; it cannot be discarded from discarded/ (already there) or from the archive

@@ -14,28 +14,28 @@ rules:
         specd project init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--agent <id>...] [--force] [--format text|json|toon]
         ```
 
-        * `--schema <ref>` — optional; the schema reference to activate (e.g. `@specd/schema-std`, `./schemas/custom/schema.yaml`). Defaults to `@specd/schema-std`.
-        * `--workspace <id>` — optional; the ID of the default workspace. Defaults to `default`.
-        * `--workspace-path <path>` — optional; the specs path for the default workspace, relative to the config file. Defaults to `specs/`.
-        * `--agent <id>` — optional, repeatable; agents to install skills for immediately after initialisation (e.g. `--agent claude`). When not provided in interactive mode, the wizard asks.
-        * `--force` — optional; overwrite an existing config without prompting.
-        * `--format text|json|toon` — optional; forces non-interactive mode; defaults to `text`.
+        - `--schema <ref>` — optional; the schema reference to activate (e.g. `@specd/schema-std`, `./schemas/custom/schema.yaml`). Defaults to `@specd/schema-std`.
+        - `--workspace <id>` — optional; the ID of the default workspace. Defaults to `default`.
+        - `--workspace-path <path>` — optional; the specs path for the default workspace, relative to the config file. Defaults to `specs/`.
+        - `--agent <id>` — optional, repeatable; agents to install skills for immediately after initialisation (e.g. `--agent claude`). When not provided in interactive mode, the wizard asks.
+        - `--force` — optional; overwrite an existing config without prompting.
+        - `--format text|json|toon` — optional; forces non-interactive mode; defaults to `text`.
   - requirement: Interactive mode
     rules:
       - |-
         The command enters interactive mode when **all** of the following are true:
 
-        * stdout is a TTY
-        * `--format` is not `json` or `toon`
-        * No configuration flags (`--schema`, `--workspace`, `--workspace-path`, `--agent`) are provided
+        - stdout is a TTY
+        - `--format` is not `json` or `toon`
+        - No configuration flags (`--schema`, `--workspace`, `--workspace-path`, `--agent`) are provided
 
         In interactive mode the command presents a guided wizard:
 
         1. **Welcome header** — an ASCII banner and a short description of specd, shown once at startup.
         2. **Project settings prompts** — prompts for each setting with its default value pre-filled:
-           * Schema reference (default: `@specd/schema-std`)
-           * Default workspace ID (default: `default`)
-           * Specs path (default: `specs/`)
+           - Schema reference (default: `@specd/schema-std`)
+           - Default workspace ID (default: `default`)
+           - Specs path (default: `specs/`)
         3. **Agent selection** — a multi-select listing all known agents. The user selects which agents to install skills for. Selecting none is valid (skills can be installed later with `specd skills install`).
         4. **Confirmation summary** — shows the resolved settings and asks for confirmation before writing any files. If the user cancels, the command exits with code 0 and no files are written.
         5. **Progress** — a spinner is shown while `InitProject` runs and skills are installed.
@@ -45,8 +45,8 @@ rules:
       - |-
         When not in interactive mode, the command uses the flag values (or defaults) directly, calls `InitProject`, optionally installs skills for agents specified via `--agent`, and prints output according to `--format`.
 
-        * `text`: prints `initialized specd in <absolute-project-root-path>` followed by any skills installed.
-        * `json` or `toon`: outputs `{"result":"ok","configPath":"...","schema":"...","workspaces":[...],"skillsInstalled":{}}` where `skillsInstalled` maps agent ids to arrays of installed skill names.
+        - `text`: prints `initialized specd in <absolute-project-root-path>` followed by any skills installed.
+        - `json` or `toon`: outputs `{"result":"ok","configPath":"...","schema":"...","workspaces":[...],"skillsInstalled":{}}` where `skillsInstalled` maps agent ids to arrays of installed skill names.
   - requirement: Config file placement
     rules:
       - The target directory is the **git root** when inside a git repository, or the **current working directory** otherwise. This resolution happens in the CLI before entering the wizard or calling `InitProject`.
@@ -61,8 +61,8 @@ rules:
       - |-
         If `specd.yaml` already exists and `--force` is not provided:
 
-        * **Interactive mode**: the wizard informs the user and asks whether to overwrite or cancel.
-        * **Non-interactive mode**: exits with code 1 and prints an `error:` message to stderr.
+        - **Interactive mode**: the wizard informs the user and asks whether to overwrite or cancel.
+        - **Non-interactive mode**: exits with code 1 and prints an `error:` message to stderr.
 constraints:
   - specd project init does not require an existing specd.yaml to run; standard config discovery is not invoked
   - The CLI never reads or writes YAML — all config format knowledge lives in @specd/core
