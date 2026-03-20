@@ -20,10 +20,12 @@ rules:
       - |-
         The `FsChangeRepository` implementation of `get()` MUST detect artifact file drift and auto-invalidate the change when appropriate. After loading a change and deriving artifact statuses, the repository checks whether any previously-validated artifact file has drifted — that is, the file's `validatedHash` was set (indicating a prior validation) but the derived status is now `missing` or `in-progress` (indicating the file was deleted or modified on disk).
 
-        If drift is detected AND either of the following conditions is true, the repository MUST call `change.invalidate('artifact-change', SYSTEM_ACTOR)` and persist the updated manifest before returning:
+        If drift is detected AND either of the following conditions is true, the repository MUST collect the artifact type IDs of all drifted artifacts and call `change.invalidate('artifact-change', SYSTEM_ACTOR, driftedArtifactIds)` and persist the updated manifest before returning:
 
         1. The change is beyond `designing` state (i.e. has progressed past the initial design phase), OR
         2. The change has an active approval (spec approval or signoff) that has not been superseded by a subsequent `invalidated` event.
+
+        When `driftedArtifactIds` is provided, `invalidate()` only resets the drifted artifacts and their downstream dependents in the artifact DAG — upstream artifacts that the drifted artifacts depend on are left intact. Approval revocation and state transition to `designing` still happen globally.
 
         This ensures that approval drift and state-inconsistent artifact changes are detected eagerly on any change load, not only during explicit validation. The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@specd.dev' }`) is used as the actor for these automated invalidations.
   - requirement: list returns active changes in creation order
@@ -92,6 +94,40 @@ scenarios:
       - get() loads that change
     then:
       - the artifact whose hash differs from validatedHash has status in-progress
+  - requirement: Auto-invalidation on get when artifact files drift
+    name: Single artifact drifts — only it and downstream are reset
+    given:
+      - a change in implementing state with all artifacts complete
+      - 'AND the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks'
+    when:
+      - tasks.md is modified on disk (hash changes)
+      - AND FsChangeRepository.get() is called
+    then:
+      - change.invalidate('artifact-change', SYSTEM_ACTOR, ['tasks']) is called
+      - AND only tasks has its validatedHash cleared
+      - AND proposal, specs, verify, and design remain complete
+      - AND the change transitions to designing
+  - requirement: Auto-invalidation on get when artifact files drift
+    name: Upstream artifact drifts — it and all downstream are reset
+    given:
+      - a change in implementing state with all artifacts complete
+      - 'AND the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks'
+    when:
+      - spec.md is modified on disk (specs artifact drifts)
+      - AND FsChangeRepository.get() is called
+    then:
+      - change.invalidate('artifact-change', SYSTEM_ACTOR, ['specs']) is called
+      - AND specs, verify, and tasks are cleared
+      - AND proposal and design remain complete
+  - requirement: Auto-invalidation on get when artifact files drift
+    name: No drift — no invalidation
+    given:
+      - a change in implementing state with all artifacts complete
+    when:
+      - no file has changed on disk
+      - AND FsChangeRepository.get() is called
+    then:
+      - no invalidation occurs and all artifacts remain complete
   - requirement: list returns active changes in creation order
     name: Mixed active and drafted changes
     given:
@@ -206,6 +242,6 @@ scenarios:
     then:
       - false is returned
 contentHashes:
-  spec.md: sha256:b862ee31fbe41584101882f7d079fbae4359d821f9cb17299afbc26182aa7799
-  verify.md: sha256:c1a29fbc48b6df85f3bc1f9b7f648b36536d029aa727035c7422286641c4c289
+  spec.md: sha256:a81d3334fb5803d4df251b946865403438588bab7baa59898705cad6bb378229
+  verify.md: sha256:d9d0393981d88ca0f0ee02499ce9f96b17c4a28c4c08b70e1e62495407b8a592
 generatedBy: core

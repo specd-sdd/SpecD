@@ -66,13 +66,13 @@ rules:
   - requirement: Approval invalidation on content change
     rules:
       - |-
-        If the change has an active spec approval (`change.activeSpecApproval` is defined) and any artifact file's current content hash (after `preHashCleanup`) differs from the hash recorded in that approval's `artifactHashes`, `ValidateArtifacts` must call `change.invalidate('artifact-change', actor)` before proceeding with validation. This rolls the change back to `designing` and records the invalidation in history.
+        If the change has an active spec approval (`change.activeSpecApproval` is defined) and any artifact file's current content hash (after `preHashCleanup`) differs from the hash recorded in that approval's `artifactHashes`, `ValidateArtifacts` must collect the artifact type IDs of all drifted artifacts and call `change.invalidate('artifact-change', actor, driftedArtifactIds)` before proceeding with validation. This rolls the change back to `designing`, records the invalidation in history, and selectively resets only the drifted artifacts and their downstream dependents — upstream artifacts remain validated.
 
         Approval hash keys use the `type:key` format (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within that artifact.
 
-        The same check applies to active signoff (`change.activeSignoff`): if any artifact's current hash differs from what was recorded in `activeSignoff.artifactHashes`, `change.invalidate('artifact-change', actor)` must be called.
+        The same check applies to active signoff (`change.activeSignoff`): if any artifact's current hash differs from what was recorded in `activeSignoff.artifactHashes`, `change.invalidate('artifact-change', actor, driftedArtifactIds)` must be called.
 
-        A single invalidation call is made per `execute` invocation even if multiple artifacts have changed — the first hash mismatch triggers invalidation and the remaining artifacts are checked against the now-cleared approval state.
+        A single invalidation call is made per `execute` invocation even if multiple artifacts have changed — all drifted artifact IDs are collected first, then a single `invalidate()` call is made with the full set of drifted IDs.
   - requirement: Per-file validation
     rules:
       - |-
@@ -262,30 +262,28 @@ scenarios:
     then:
       - no delta validation, application preview, or structural validation is run for design — there is no file to check
   - requirement: Approval invalidation on content change
-    name: Content changed since approval — invalidation triggered
+    name: Approval invalidation resets only drifted artifacts and downstream
     given:
-      - 'an active spec approval with artifactHashes: { specs: "abc123" }'
-      - AND the current cleaned hash of specs is "xyz789"
+      - a change with an active spec approval
+      - 'AND the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks'
+      - AND only design.md has changed since approval (hash mismatch)
     when:
-      - ValidateArtifacts.execute is called
+      - ValidateArtifacts.execute detects the hash mismatch
     then:
-      - change.invalidate('artifact-change', actor) is called before validation proceeds
+      - change.invalidate('artifact-change', actor, ['design']) is called
+      - AND design and tasks are reset (design + its downstream)
+      - AND proposal, specs, and verify remain complete
   - requirement: Approval invalidation on content change
-    name: Invalidation called at most once per execution
+    name: Multiple artifacts drift — all drifted IDs collected in single call
     given:
-      - two artifacts whose hashes both differ from the active approval
+      - a change with an active spec approval
+      - AND both specs and design have changed since approval
     when:
-      - ValidateArtifacts.execute is called
+      - ValidateArtifacts.execute detects the mismatches
     then:
-      - change.invalidate is called exactly once — not once per artifact
-  - requirement: Approval invalidation on content change
-    name: No invalidation when hashes match
-    given:
-      - an active spec approval whose artifactHashes match the current cleaned hashes
-    when:
-      - ValidateArtifacts.execute is called
-    then:
-      - change.invalidate is not called
+      - a single change.invalidate('artifact-change', actor, ['specs', 'design']) is called
+      - AND specs, verify, design, and tasks are reset
+      - AND proposal remains complete
   - requirement: Delta validation
     name: Delta validation failure blocks application
     given:
@@ -406,6 +404,6 @@ scenarios:
     then:
       - changeRepository.save(change) is called — partial progress is persisted
 contentHashes:
-  spec.md: sha256:b81a11e8e7ab0f00cce641dd40e5be2ddc75252d9908fa4f0be3714eb6720b7a
-  verify.md: sha256:8fbe8f888411984f6e51eb4161ec4db3fcf89fa36cad6f5f43c6561878a0211b
+  spec.md: sha256:50f73b18b6fba20e69d6ad106c888b1e4db095052685cbd6fa3319ec5d1207c9
+  verify.md: sha256:76d97bea6f07da4b98f5428cee70b748481f9588d08571033f131afd6fc3d117
 generatedBy: core

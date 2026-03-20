@@ -62,13 +62,13 @@ Before validating an artifact, `ValidateArtifacts` must check that all artifact 
 
 ### Requirement: Approval invalidation on content change
 
-If the change has an active spec approval (`change.activeSpecApproval` is defined) and any artifact file's current content hash (after `preHashCleanup`) differs from the hash recorded in that approval's `artifactHashes`, `ValidateArtifacts` must call `change.invalidate('artifact-change', actor)` before proceeding with validation. This rolls the change back to `designing` and records the invalidation in history.
+If the change has an active spec approval (`change.activeSpecApproval` is defined) and any artifact file's current content hash (after `preHashCleanup`) differs from the hash recorded in that approval's `artifactHashes`, `ValidateArtifacts` must collect the artifact type IDs of all drifted artifacts and call `change.invalidate('artifact-change', actor, driftedArtifactIds)` before proceeding with validation. This rolls the change back to `designing`, records the invalidation in history, and selectively resets only the drifted artifacts and their downstream dependents — upstream artifacts remain validated.
 
 Approval hash keys use the `type:key` format (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within that artifact.
 
-The same check applies to active signoff (`change.activeSignoff`): if any artifact's current hash differs from what was recorded in `activeSignoff.artifactHashes`, `change.invalidate('artifact-change', actor)` must be called.
+The same check applies to active signoff (`change.activeSignoff`): if any artifact's current hash differs from what was recorded in `activeSignoff.artifactHashes`, `change.invalidate('artifact-change', actor, driftedArtifactIds)` must be called.
 
-A single invalidation call is made per `execute` invocation even if multiple artifacts have changed — the first hash mismatch triggers invalidation and the remaining artifacts are checked against the now-cleared approval state.
+A single invalidation call is made per `execute` invocation even if multiple artifacts have changed — all drifted artifact IDs are collected first, then a single `invalidate()` call is made with the full set of drifted IDs.
 
 ### Requirement: Per-file validation
 

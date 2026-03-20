@@ -678,22 +678,21 @@ export class FsChangeRepository extends ChangeRepository {
       change.activeSpecApproval !== undefined || change.activeSignoff !== undefined
 
     if (hasDriftableState || hasActiveApprovals) {
-      let drifted = false
+      const driftedIds = new Set<string>()
       for (const [, artifact] of change.artifacts) {
-        if (drifted) break
         for (const [, file] of artifact.files) {
           // File had a valid hash but is now missing or in-progress → drifted
           if (
             file.validatedHash !== undefined &&
             (file.status === 'in-progress' || file.status === 'missing')
           ) {
-            drifted = true
+            driftedIds.add(artifact.type)
             break
           }
         }
       }
-      if (drifted) {
-        change.invalidate('artifact-change', SYSTEM_ACTOR)
+      if (driftedIds.size > 0) {
+        change.invalidate('artifact-change', SYSTEM_ACTOR, driftedIds)
         await this._writeManifestAtomic(dir, changeToManifest(change))
       }
     }

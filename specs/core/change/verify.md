@@ -200,10 +200,26 @@
 - **WHEN** an attempt is made to skip an artifact with `optional: false`
 - **THEN** the operation fails with an error and `validatedHash` is not modified
 
-#### Scenario: invalidated event clears all validatedHash values
+#### Scenario: invalidated event with driftedArtifactIds clears only downstream
 
-- **GIVEN** a change with one `complete` artifact (hash set) and one `skipped` artifact (sentinel set)
-- **WHEN** an `invalidated` event is appended
+- **GIVEN** a DAG: proposal → specs → verify, proposal → design, specs + design → tasks
+- **AND** all artifacts are `complete`
+- **WHEN** `invalidate('artifact-change', actor, ['tasks'])` is called
+- **THEN** only `tasks.validatedHash` is cleared (no downstream dependents)
+- **AND** `proposal`, `specs`, `verify`, and `design` remain `complete`
+
+#### Scenario: invalidated event with driftedArtifactIds cascades downstream
+
+- **GIVEN** a DAG: proposal → specs → verify, proposal → design, specs + design → tasks
+- **AND** all artifacts are `complete`
+- **WHEN** `invalidate('artifact-change', actor, ['specs'])` is called
+- **THEN** `specs`, `verify`, and `tasks` are cleared (specs + its downstream)
+- **AND** `proposal` and `design` remain `complete`
+
+#### Scenario: invalidated event without driftedArtifactIds clears all
+
+- **GIVEN** a change with one `complete` artifact and one `skipped` artifact
+- **WHEN** `invalidate('artifact-change', actor)` is called without `driftedArtifactIds`
 - **THEN** all `validatedHash` values are cleared — the `complete` artifact becomes `in-progress` and the `skipped` artifact becomes `missing`
 
 #### Scenario: verifying → implementing clears only implementing.requires artifacts

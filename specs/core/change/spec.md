@@ -112,7 +112,7 @@ The `skipped` state must be set explicitly by an actor — human or agent via a 
 
 `ChangeArtifact.markComplete(key, hash)` takes two arguments — the file key and the content hash — and delegates to the corresponding `ArtifactFile.markComplete(hash)`. `ChangeArtifact.markSkipped()` marks ALL files in the artifact as skipped. These may only be called by the `ValidateArtifacts` and skip use cases respectively. No other code path may set these values.
 
-**Rollback:** when an `invalidated` event is appended, specd calls `resetValidation()` on all artifacts in the change, which resets each file's `validatedHash` to `undefined`. This resets them uniformly: `complete` files become `in-progress` (file present, no valid hash), `skipped` files become `missing` (sentinel cleared). For the `verifying → implementing` transition, only artifacts in the `implementing` step's `requires` list are reset.
+**Rollback:** `invalidate()` accepts an optional `driftedArtifactIds` parameter — a set of artifact type IDs whose content has actually changed. When provided, only the drifted artifacts and their downstream dependents (artifacts whose `requires` chain includes a drifted artifact) have their `validatedHash` cleared via `resetValidation()`. Upstream artifacts that the drifted artifacts depend on are left intact. When `driftedArtifactIds` is not provided, all artifacts are reset (backward-compatible fallback). For the `verifying → implementing` transition, only artifacts in the `implementing` step's `requires` list are reset.
 
 Effective status cascades: an artifact is `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`, even if its own aggregated status matches. A `skipped` optional artifact satisfies the dependency — downstream artifacts and workflow steps treat it as resolved.
 
@@ -176,22 +176,16 @@ A **`schemaVersion` mismatch** within the same schema name is advisory. A warnin
 
 A change may be moved between storage locations without affecting its lifecycle state. All operations are recorded as events in history.
 
-- **Draft** (`changes/` → `drafts/`) — shelves the change. Appends a `drafted` event with:
+- **Draft** (`changes/` → `drafts/`) — shelves the change. Appends a `drafted` event with: Can be performed at any point before archiving. The change retains its full history and lifecycle state.
   - **`by`** — mandatory git identity (name + email) of the person shelving
   - **`at`** — timestamp
   - **`reason`** — optional explanation
-
-  Can be performed at any point before archiving. The change retains its full history and lifecycle state.
-
 - **Restore** (`drafts/` → `changes/`) — recovers a drafted change. Appends a `restored` event. The change resumes from its preserved state.
-
-- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Appends a `discarded` event with:
+- **Discard** (`changes/` or `drafts/` → `discarded/`) — permanently abandons the change. Appends a `discarded` event with: Cannot be undone. A change may be drafted and restored multiple times before being discarded; the full cycle is preserved in history.
   - **`reason`** — mandatory human-provided explanation
   - **`by`** — mandatory git identity (name + email) of the person discarding
   - **`at`** — timestamp
   - **`supersededBy`** — optional list of change names that replace this one
-
-  Cannot be undone. A change may be drafted and restored multiple times before being discarded; the full cycle is preserved in history.
 
 ## Constraints
 

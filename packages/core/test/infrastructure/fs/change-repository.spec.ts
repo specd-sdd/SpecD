@@ -732,4 +732,312 @@ describe('FsChangeRepository', () => {
       expect(loaded?.getArtifact('tasks')?.status).toBe('complete')
     })
   })
+
+  describe('auto-invalidation with drifted IDs', () => {
+    function makeRepoWithTypes(
+      basePath: string,
+      artifactTypes: readonly ArtifactType[],
+    ): FsChangeRepository {
+      return new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        changesPath: path.join(basePath, 'changes'),
+        draftsPath: path.join(basePath, 'drafts'),
+        discardedPath: path.join(basePath, 'discarded'),
+        artifactTypes,
+      })
+    }
+
+    function makeArtifactTypes(): readonly ArtifactType[] {
+      return [
+        new ArtifactType({
+          id: 'proposal',
+          scope: 'change',
+          output: 'proposal.md',
+          requires: [],
+          validations: [],
+          deltaValidations: [],
+          preHashCleanup: [],
+        }),
+        new ArtifactType({
+          id: 'design',
+          scope: 'change',
+          output: 'design.md',
+          requires: ['proposal'],
+          validations: [],
+          deltaValidations: [],
+          preHashCleanup: [],
+        }),
+        new ArtifactType({
+          id: 'tasks',
+          scope: 'change',
+          output: 'tasks.md',
+          requires: ['design'],
+          validations: [],
+          deltaValidations: [],
+          preHashCleanup: [],
+        }),
+      ]
+    }
+
+    it('single artifact drifts — only it and downstream are reset, upstream stays complete', async () => {
+      const proposalContent = '# Proposal\n'
+      const designContent = '# Design\n'
+      const tasksContent = '# Tasks\n'
+      const proposalHash = sha256(proposalContent)
+      const designHash = sha256(designContent)
+      const tasksHash = sha256(tasksContent)
+
+      const at = new Date('2024-01-15T10:00:00.000Z')
+      const change = new Change({
+        name: 'c1',
+        createdAt: at,
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+          { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+          { type: 'transitioned', from: 'ready', to: 'implementing', at, by: actor },
+        ],
+        artifacts: new Map([
+          [
+            'proposal',
+            new ChangeArtifact({
+              type: 'proposal',
+              requires: [],
+              files: new Map([
+                [
+                  'proposal',
+                  new ArtifactFile({
+                    key: 'proposal',
+                    filename: 'proposal.md',
+                    validatedHash: proposalHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+          [
+            'design',
+            new ChangeArtifact({
+              type: 'design',
+              requires: ['proposal'],
+              files: new Map([
+                [
+                  'design',
+                  new ArtifactFile({
+                    key: 'design',
+                    filename: 'design.md',
+                    validatedHash: designHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+          [
+            'tasks',
+            new ChangeArtifact({
+              type: 'tasks',
+              requires: ['design'],
+              files: new Map([
+                [
+                  'tasks',
+                  new ArtifactFile({
+                    key: 'tasks',
+                    filename: 'tasks.md',
+                    validatedHash: tasksHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+      })
+
+      const repo = makeRepoWithTypes(ctx.tmpDir, makeArtifactTypes())
+      await repo.save(change)
+
+      // Write original content for proposal and design (no drift)
+      const dir = path.join(ctx.changesPath, '20240115-100000-c1')
+      await fs.writeFile(path.join(dir, 'proposal.md'), proposalContent, 'utf8')
+      await fs.writeFile(path.join(dir, 'design.md'), designContent, 'utf8')
+      // Write MODIFIED content for tasks (drift)
+      await fs.writeFile(path.join(dir, 'tasks.md'), '# Tasks MODIFIED\n', 'utf8')
+
+      const loaded = await repo.get('c1')
+
+      // State should be rolled back to designing
+      expect(loaded?.state).toBe('designing')
+      // Proposal (upstream) should remain complete
+      expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(proposalHash)
+      // Design (upstream of tasks) should remain complete
+      expect(loaded?.getArtifact('design')?.getFile('design')?.validatedHash).toBe(designHash)
+      // Tasks (drifted) should be reset — no downstream, so only tasks
+      expect(loaded?.getArtifact('tasks')?.getFile('tasks')?.validatedHash).toBeUndefined()
+    })
+
+    it('upstream artifact drifts — it and all downstream are reset', async () => {
+      const proposalContent = '# Proposal\n'
+      const designContent = '# Design\n'
+      const tasksContent = '# Tasks\n'
+      const proposalHash = sha256(proposalContent)
+      const designHash = sha256(designContent)
+      const tasksHash = sha256(tasksContent)
+
+      const at = new Date('2024-01-15T10:00:00.000Z')
+      const change = new Change({
+        name: 'c2',
+        createdAt: at,
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+          { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+          { type: 'transitioned', from: 'ready', to: 'implementing', at, by: actor },
+        ],
+        artifacts: new Map([
+          [
+            'proposal',
+            new ChangeArtifact({
+              type: 'proposal',
+              requires: [],
+              files: new Map([
+                [
+                  'proposal',
+                  new ArtifactFile({
+                    key: 'proposal',
+                    filename: 'proposal.md',
+                    validatedHash: proposalHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+          [
+            'design',
+            new ChangeArtifact({
+              type: 'design',
+              requires: ['proposal'],
+              files: new Map([
+                [
+                  'design',
+                  new ArtifactFile({
+                    key: 'design',
+                    filename: 'design.md',
+                    validatedHash: designHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+          [
+            'tasks',
+            new ChangeArtifact({
+              type: 'tasks',
+              requires: ['design'],
+              files: new Map([
+                [
+                  'tasks',
+                  new ArtifactFile({
+                    key: 'tasks',
+                    filename: 'tasks.md',
+                    validatedHash: tasksHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+      })
+
+      const repo = makeRepoWithTypes(ctx.tmpDir, makeArtifactTypes())
+      await repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-c2')
+      await fs.writeFile(path.join(dir, 'proposal.md'), proposalContent, 'utf8')
+      // Drift design — should cascade to tasks
+      await fs.writeFile(path.join(dir, 'design.md'), '# Design MODIFIED\n', 'utf8')
+      await fs.writeFile(path.join(dir, 'tasks.md'), tasksContent, 'utf8')
+
+      const loaded = await repo.get('c2')
+
+      expect(loaded?.state).toBe('designing')
+      // Proposal (upstream of drifted) should remain complete
+      expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(proposalHash)
+      // Design (drifted) should be reset
+      expect(loaded?.getArtifact('design')?.getFile('design')?.validatedHash).toBeUndefined()
+      // Tasks (downstream of design) should be reset
+      expect(loaded?.getArtifact('tasks')?.getFile('tasks')?.validatedHash).toBeUndefined()
+    })
+
+    it('no drift — no invalidation', async () => {
+      const proposalContent = '# Proposal\n'
+      const proposalHash = sha256(proposalContent)
+
+      const at = new Date('2024-01-15T10:00:00.000Z')
+      const change = new Change({
+        name: 'c3',
+        createdAt: at,
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+          { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+          { type: 'transitioned', from: 'ready', to: 'implementing', at, by: actor },
+        ],
+        artifacts: new Map([
+          [
+            'proposal',
+            new ChangeArtifact({
+              type: 'proposal',
+              requires: [],
+              files: new Map([
+                [
+                  'proposal',
+                  new ArtifactFile({
+                    key: 'proposal',
+                    filename: 'proposal.md',
+                    validatedHash: proposalHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+      })
+
+      const repo = makeRepoWithTypes(ctx.tmpDir, [makeArtifactTypes()[0]!])
+      await repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-c3')
+      await fs.writeFile(path.join(dir, 'proposal.md'), proposalContent, 'utf8')
+
+      const loaded = await repo.get('c3')
+
+      expect(loaded?.state).toBe('implementing')
+      expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(proposalHash)
+    })
+  })
 })
