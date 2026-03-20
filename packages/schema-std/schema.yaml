@@ -397,8 +397,8 @@ artifacts:
             proceeding.
     preHashCleanup:
       - id: normalize-checkboxes
-        pattern: '^\s*-\s+\[x\]'
-        replacement: '- [ ]'
+        pattern: '^([ \t]*-\s+)\[x\]'
+        replacement: '$1[ ]'
     taskCompletionCheck:
       incompletePattern: '^\s*-\s+\[ \]'
       completePattern: '^\s*-\s+\[x\]'
