@@ -8,7 +8,7 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
-    "test": "turbo test --filter=@specd/core --filter=@specd/cli",
+    "test": "turbo test --filter=@specd/core --filter=@specd/cli --filter=@specd/code-graph",
     "typecheck": "turbo typecheck",
     "lint": "eslint . && turbo typecheck",
     "lint:fix": "eslint . --fix",
