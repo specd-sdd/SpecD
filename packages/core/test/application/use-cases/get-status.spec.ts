@@ -3,14 +3,104 @@ import { GetStatus } from '../../../src/application/use-cases/get-status.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
-import { makeChangeRepository, makeChange } from './helpers.js'
+import { VALID_TRANSITIONS } from '../../../src/domain/value-objects/change-state.js'
+import {
+  makeChangeRepository,
+  makeChange,
+  makeSchemaRegistry,
+  makeSchema,
+  makeArtifactType,
+} from './helpers.js'
+
+const defaultApprovals = { spec: false, signoff: false }
+
+function makeGetStatus(
+  changes: ReturnType<typeof makeChangeRepository>,
+  opts: {
+    schema?: ReturnType<typeof makeSchema> | null
+    approvals?: { spec: boolean; signoff: boolean }
+    failSchema?: boolean
+  } = {},
+) {
+  const schema = opts.schema === undefined ? makeStdSchema() : opts.schema
+  const registry = opts.failSchema
+    ? {
+        async resolve() {
+          throw new Error('schema resolution failed')
+        },
+        async resolveRaw() {
+          return null
+        },
+        async list() {
+          return []
+        },
+      }
+    : makeSchemaRegistry(schema)
+  return new GetStatus(
+    changes,
+    registry,
+    'test-schema',
+    new Map<string, string>(),
+    opts.approvals ?? defaultApprovals,
+  )
+}
+
+function makeStdSchema() {
+  return makeSchema({
+    artifacts: [
+      makeArtifactType('proposal', { requires: [] }),
+      makeArtifactType('specs', { scope: 'spec', requires: ['proposal'], delta: true }),
+      makeArtifactType('verify', { scope: 'spec', requires: ['specs'], delta: true }),
+      makeArtifactType('design', { requires: ['proposal', 'specs', 'verify'] }),
+      makeArtifactType('tasks', { requires: ['specs', 'design'] }),
+    ],
+    workflow: [
+      { step: 'designing', requires: [], hooks: { pre: [], post: [] } },
+      {
+        step: 'ready',
+        requires: ['proposal', 'specs', 'verify', 'design', 'tasks'],
+        hooks: { pre: [], post: [] },
+      },
+      {
+        step: 'implementing',
+        requires: ['proposal', 'specs', 'verify', 'design', 'tasks'],
+        hooks: { pre: [], post: [] },
+      },
+      { step: 'verifying', requires: ['verify'], hooks: { pre: [], post: [] } },
+    ],
+  })
+}
+
+function addCompleteArtifact(
+  change: ReturnType<typeof makeChange>,
+  type: string,
+  requires: string[] = [],
+) {
+  change.setArtifact(
+    new ChangeArtifact({
+      type,
+      requires,
+      files: new Map([
+        [
+          type,
+          new ArtifactFile({
+            key: type,
+            filename: `${type}.md`,
+            status: 'complete',
+            validatedHash: `hash-${type}`,
+          }),
+        ],
+      ]),
+    }),
+  )
+}
 
 describe('GetStatus', () => {
   describe('given a change exists', () => {
     it('returns the change', async () => {
       const change = makeChange('add-oauth')
       const repo = makeChangeRepository([change])
-      const uc = new GetStatus(repo)
+      const uc = makeGetStatus(repo)
 
       const result = await uc.execute({ name: 'add-oauth' })
 
@@ -20,7 +110,7 @@ describe('GetStatus', () => {
     it('returns empty artifact statuses when change has no artifacts', async () => {
       const change = makeChange('add-oauth')
       const repo = makeChangeRepository([change])
-      const uc = new GetStatus(repo)
+      const uc = makeGetStatus(repo)
 
       const result = await uc.execute({ name: 'add-oauth' })
 
@@ -64,7 +154,7 @@ describe('GetStatus', () => {
         }),
       )
       const repo = makeChangeRepository([change])
-      const uc = new GetStatus(repo)
+      const uc = makeGetStatus(repo)
 
       const result = await uc.execute({ name: 'add-oauth' })
 
@@ -107,7 +197,7 @@ describe('GetStatus', () => {
         }),
       )
       const repo = makeChangeRepository([change])
-      const uc = new GetStatus(repo)
+      const uc = makeGetStatus(repo)
 
       const result = await uc.execute({ name: 'add-oauth' })
 
@@ -119,17 +209,250 @@ describe('GetStatus', () => {
   describe('given no change with that name', () => {
     it('throws ChangeNotFoundError', async () => {
       const repo = makeChangeRepository()
-      const uc = new GetStatus(repo)
+      const uc = makeGetStatus(repo)
 
       await expect(uc.execute({ name: 'missing' })).rejects.toThrow(ChangeNotFoundError)
     })
 
     it('ChangeNotFoundError has correct code', async () => {
       const repo = makeChangeRepository()
-      const uc = new GetStatus(repo)
+      const uc = makeGetStatus(repo)
 
       await expect(uc.execute({ name: 'missing' })).rejects.toMatchObject({
         code: 'CHANGE_NOT_FOUND',
+      })
+    })
+  })
+
+  describe('lifecycle', () => {
+    describe('validTransitions', () => {
+      it('returns valid transitions for the current state', async () => {
+        const change = makeChange('test')
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo)
+
+        const result = await uc.execute({ name: 'test' })
+
+        expect(result.lifecycle.validTransitions).toEqual(VALID_TRANSITIONS['drafting'])
+      })
+    })
+
+    describe('availableTransitions and blockers', () => {
+      it('includes transition when all workflow requires are satisfied', async () => {
+        const change = makeChange('test')
+        // Transition to designing first
+        change.transition('designing', { name: 'Test', email: 'test@test.com' })
+        // Add all required artifacts as complete
+        addCompleteArtifact(change, 'proposal')
+        addCompleteArtifact(change, 'specs', ['proposal'])
+        addCompleteArtifact(change, 'verify', ['specs'])
+        addCompleteArtifact(change, 'design', ['proposal', 'specs', 'verify'])
+        addCompleteArtifact(change, 'tasks', ['specs', 'design'])
+
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo)
+
+        const result = await uc.execute({ name: 'test' })
+
+        expect(result.lifecycle.availableTransitions).toContain('ready')
+      })
+
+      it('excludes transition when requires are not satisfied', async () => {
+        const change = makeChange('test')
+        change.transition('designing', { name: 'Test', email: 'test@test.com' })
+        // Only proposal is complete — specs, verify, design, tasks are missing
+        addCompleteArtifact(change, 'proposal')
+
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo)
+
+        const result = await uc.execute({ name: 'test' })
+
+        expect(result.lifecycle.availableTransitions).not.toContain('ready')
+        const blocker = result.lifecycle.blockers.find((b) => b.transition === 'ready')
+        expect(blocker).toBeDefined()
+        expect(blocker!.reason).toBe('requires')
+        expect(blocker!.blocking).toContain('specs')
+      })
+
+      it('skipped artifacts count as satisfied requires', async () => {
+        const change = makeChange('test')
+        change.transition('designing', { name: 'Test', email: 'test@test.com' })
+        addCompleteArtifact(change, 'proposal')
+        addCompleteArtifact(change, 'specs', ['proposal'])
+        // verify is skipped
+        change.setArtifact(
+          new ChangeArtifact({
+            type: 'verify',
+            requires: ['specs'],
+            files: new Map([
+              [
+                'verify',
+                new ArtifactFile({
+                  key: 'verify',
+                  filename: 'verify.md',
+                  status: 'skipped',
+                }),
+              ],
+            ]),
+          }),
+        )
+        addCompleteArtifact(change, 'design', ['proposal', 'specs', 'verify'])
+        addCompleteArtifact(change, 'tasks', ['specs', 'design'])
+
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo)
+
+        const result = await uc.execute({ name: 'test' })
+
+        expect(result.lifecycle.availableTransitions).toContain('ready')
+      })
+
+      it('treats transition as available when no workflow step exists', async () => {
+        const change = makeChange('test')
+        change.transition('designing', { name: 'Test', email: 'test@test.com' })
+
+        // Schema with no workflow step for 'designing' (the self-transition)
+        const schema = makeSchema({
+          artifacts: [makeArtifactType('proposal')],
+          workflow: [
+            {
+              step: 'ready',
+              requires: ['proposal'],
+              hooks: { pre: [], post: [] },
+            },
+          ],
+        })
+
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo, { schema })
+
+        const result = await uc.execute({ name: 'test' })
+
+        // 'designing' is a valid transition from designing state but has no workflow step
+        expect(result.lifecycle.availableTransitions).toContain('designing')
+      })
+    })
+
+    describe('approvals', () => {
+      it('reflects injected approvals config', async () => {
+        const change = makeChange('test')
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo, { approvals: { spec: true, signoff: false } })
+
+        const result = await uc.execute({ name: 'test' })
+
+        expect(result.lifecycle.approvals).toEqual({ spec: true, signoff: false })
+      })
+    })
+
+    describe('nextArtifact', () => {
+      it('resolves first unsatisfied artifact with met requires', async () => {
+        const change = makeChange('test')
+        change.transition('designing', { name: 'Test', email: 'test@test.com' })
+        addCompleteArtifact(change, 'proposal')
+        // specs requires proposal (satisfied), but specs itself is missing
+
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo)
+
+        const result = await uc.execute({ name: 'test' })
+
+        expect(result.lifecycle.nextArtifact).toBe('specs')
+      })
+
+      it('returns null when all artifacts are complete', async () => {
+        const change = makeChange('test')
+        change.transition('designing', { name: 'Test', email: 'test@test.com' })
+        addCompleteArtifact(change, 'proposal')
+        addCompleteArtifact(change, 'specs', ['proposal'])
+        addCompleteArtifact(change, 'verify', ['specs'])
+        addCompleteArtifact(change, 'design', ['proposal', 'specs', 'verify'])
+        addCompleteArtifact(change, 'tasks', ['specs', 'design'])
+
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo)
+
+        const result = await uc.execute({ name: 'test' })
+
+        expect(result.lifecycle.nextArtifact).toBeNull()
+      })
+
+      it('skips artifacts whose requires are not met', async () => {
+        const change = makeChange('test')
+        change.transition('designing', { name: 'Test', email: 'test@test.com' })
+        // proposal is missing, so specs (requires proposal) is skipped
+        // nextArtifact should be proposal (no requires)
+
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo)
+
+        const result = await uc.execute({ name: 'test' })
+
+        expect(result.lifecycle.nextArtifact).toBe('proposal')
+      })
+    })
+
+    describe('changePath', () => {
+      it('returns changePath from repository', async () => {
+        const change = makeChange('test')
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo)
+
+        const result = await uc.execute({ name: 'test' })
+
+        expect(result.lifecycle.changePath).toBe('/test/changes/test')
+      })
+    })
+
+    describe('schemaInfo', () => {
+      it('returns schema name and version when resolution succeeds', async () => {
+        const change = makeChange('test')
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo)
+
+        const result = await uc.execute({ name: 'test' })
+
+        expect(result.lifecycle.schemaInfo).toEqual({ name: 'test-schema', version: 1 })
+      })
+
+      it('returns null when schema resolution fails', async () => {
+        const change = makeChange('test')
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo, { failSchema: true })
+
+        const result = await uc.execute({ name: 'test' })
+
+        expect(result.lifecycle.schemaInfo).toBeNull()
+      })
+    })
+
+    describe('graceful degradation', () => {
+      it('does not throw when schema resolution fails', async () => {
+        const change = makeChange('test')
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo, { failSchema: true })
+
+        await expect(uc.execute({ name: 'test' })).resolves.toBeDefined()
+      })
+
+      it('returns degraded lifecycle fields when schema resolution fails', async () => {
+        const change = makeChange('test')
+        const repo = makeChangeRepository([change])
+        const uc = makeGetStatus(repo, {
+          failSchema: true,
+          approvals: { spec: true, signoff: false },
+        })
+
+        const result = await uc.execute({ name: 'test' })
+
+        expect(result.lifecycle.validTransitions).toEqual(VALID_TRANSITIONS['drafting'])
+        expect(result.lifecycle.availableTransitions).toEqual([])
+        expect(result.lifecycle.blockers).toEqual([])
+        expect(result.lifecycle.approvals).toEqual({ spec: true, signoff: false })
+        expect(result.lifecycle.nextArtifact).toBeNull()
+        expect(result.lifecycle.schemaInfo).toBeNull()
+        expect(result.lifecycle.changePath).toBe('/test/changes/test')
       })
     })
   })

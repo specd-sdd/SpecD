@@ -351,6 +351,15 @@ describe('change status', () => {
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', state: 'designing', specIds: ['auth/login'] }),
       artifactStatuses: [{ type: 'spec', effectiveStatus: 'pending' }],
+      lifecycle: {
+        validTransitions: [],
+        availableTransitions: [],
+        blockers: [],
+        approvals: { spec: false, signoff: false },
+        nextArtifact: null,
+        changePath: '.specd/changes/feat',
+        schemaInfo: { name: '@specd/schema-std', version: 1 },
+      },
     })
 
     const program = makeProgram()
@@ -369,6 +378,15 @@ describe('change status', () => {
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'feat', state: 'designing' }),
       artifactStatuses: [{ type: 'spec', effectiveStatus: 'pending' }],
+      lifecycle: {
+        validTransitions: [],
+        availableTransitions: [],
+        blockers: [],
+        approvals: { spec: false, signoff: false },
+        nextArtifact: null,
+        changePath: '.specd/changes/feat',
+        schemaInfo: { name: '@specd/schema-std', version: 1 },
+      },
     })
 
     const program = makeProgram()
@@ -404,6 +422,15 @@ describe('change status', () => {
         schemaVersion: 1,
       }),
       artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
+      lifecycle: {
+        validTransitions: [],
+        availableTransitions: [],
+        blockers: [],
+        approvals: { spec: false, signoff: false },
+        nextArtifact: null,
+        changePath: '.specd/changes/add-login',
+        schemaInfo: { name: 'std', version: 1 },
+      },
     })
 
     const program = makeProgram()

@@ -173,7 +173,10 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
     changes: {
       repo: i.changes,
       create: new CreateChange(i.changes, i.specs, i.actor),
-      status: new GetStatus(i.changes),
+      status: new GetStatus(i.changes, i.schemas, i.schemaRef, i.workspaceSchemasPaths, {
+        spec: config.approvals.spec,
+        signoff: config.approvals.signoff,
+      }),
       transition: new TransitionChange(
         i.changes,
         i.actor,
