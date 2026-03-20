@@ -18,20 +18,19 @@ export function registerChangeStatus(parent: Command): void {
     .action(async (name: string, opts: { format: string; config?: string }) => {
       try {
         const { kernel } = await resolveCliContext({ configPath: opts.config })
-        const { change, artifactStatuses } = await kernel.changes.status.execute({ name })
+        const { change, artifactStatuses, lifecycle } = await kernel.changes.status.execute({
+          name,
+        })
 
-        // Schema version warning
-        try {
-          const activeSchema = await kernel.specs.getActiveSchema.execute()
+        // Schema version warning (using lifecycle.schemaInfo instead of independent resolution)
+        if (lifecycle.schemaInfo !== null) {
           const recorded = `${change.schemaName}@${change.schemaVersion}`
-          const current = `${activeSchema.name()}@${activeSchema.version()}`
+          const current = `${lifecycle.schemaInfo.name}@${lifecycle.schemaInfo.version}`
           if (recorded !== current) {
             process.stderr.write(
               `warning: change was created with schema ${recorded} but active schema is ${current}\n`,
             )
           }
-        } catch {
-          // If schema resolution fails, skip the warning
         }
 
         const fmt = parseFormat(opts.format)
@@ -50,6 +49,29 @@ export function registerChangeStatus(parent: Command): void {
           for (const a of artifactStatuses) {
             lines.push(`  ${a.type}  ${a.effectiveStatus}`)
           }
+
+          // Lifecycle section
+          lines.push('')
+          lines.push('lifecycle:')
+          if (lifecycle.availableTransitions.length > 0) {
+            lines.push(`  transitions:  ${lifecycle.availableTransitions.join(', ')}`)
+          }
+          if (lifecycle.nextArtifact !== null) {
+            lines.push(`  next artifact: ${lifecycle.nextArtifact}`)
+          }
+          const specGate = lifecycle.approvals.spec ? 'on' : 'off'
+          const signoffGate = lifecycle.approvals.signoff ? 'on' : 'off'
+          lines.push(`  approvals:     spec=${specGate}  signoff=${signoffGate}`)
+          lines.push(`  path:          ${lifecycle.changePath}`)
+
+          if (lifecycle.blockers.length > 0) {
+            lines.push('')
+            lines.push('blockers:')
+            for (const b of lifecycle.blockers) {
+              lines.push(`  \u2192 ${b.transition}: ${b.reason} \u2014 ${b.blocking.join(', ')}`)
+            }
+          }
+
           output(lines.join('\n'), 'text')
         } else {
           output(
@@ -63,6 +85,19 @@ export function registerChangeStatus(parent: Command): void {
                 type: a.type,
                 effectiveStatus: a.effectiveStatus,
               })),
+              lifecycle: {
+                validTransitions: [...lifecycle.validTransitions],
+                availableTransitions: [...lifecycle.availableTransitions],
+                blockers: lifecycle.blockers.map((b) => ({
+                  transition: b.transition,
+                  reason: b.reason,
+                  blocking: [...b.blocking],
+                })),
+                approvals: lifecycle.approvals,
+                nextArtifact: lifecycle.nextArtifact,
+                changePath: lifecycle.changePath,
+                schemaInfo: lifecycle.schemaInfo,
+              },
             },
             fmt,
           )

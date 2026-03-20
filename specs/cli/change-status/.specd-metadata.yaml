@@ -3,6 +3,7 @@ description: Users and agents need a quick way to see where a change stands — 
 dependsOn:
   - cli:cli/entrypoint
   - core:core/change
+  - core:core/get-status
 context:
   - Users and agents need a quick way to see where a change stands — its lifecycle state and which artifacts are done, in progress, or missing. `specd change status <name>` reports the current lifecycle state and artifact statuses of a named change.
 rules:
@@ -13,8 +14,8 @@ rules:
         specd change status <name> [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the name of the change to inspect
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the name of the change to inspect
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Output format
     rules:
       - |-
@@ -29,19 +30,54 @@ rules:
         artifacts:
           <type>  <effectiveStatus>
           ...
+
+        lifecycle:
+          transitions:  <available1>, <available2>, ...    ← only availableTransitions
+          next artifact: <artifactId>                      ← omitted when null
+          approvals:     spec=on|off  signoff=on|off
+          path:          <changePath>
         ```
 
         The `description:` line is omitted when no description is set on the change.
 
         Each artifact line shows the artifact type ID and its effective status (`missing`, `in-progress`, `complete`, or `skipped`). Artifacts are listed in schema-declared order.
 
+        The `lifecycle:` section is always present. The `transitions:` line shows only `availableTransitions` (transitions that would succeed now). It is omitted when the list is empty. The `next artifact:` line is omitted when `nextArtifact` is `null`.
+
+        If there are blockers, they are shown after the lifecycle section:
+
+        ```
+        blockers:
+          → <transition>: <reason> — <blocking1>, <blocking2>, ...
+        ```
+
+        The `blockers:` section is omitted when there are no blockers.
+
         In `json` or `toon` mode, the output is:
 
         ```json
-        {"name":"...","state":"...","specIds":[...],"schema":{"name":"...","version":N},"description":"...","artifacts":[{"type":"...","effectiveStatus":"..."}]}
+        {
+          "name": "...",
+          "state": "...",
+          "specIds": ["..."],
+          "schema": { "name": "...", "version": 1 },
+          "description": "...",
+          "artifacts": [{ "type": "...", "effectiveStatus": "..." }],
+          "lifecycle": {
+            "validTransitions": ["..."],
+            "availableTransitions": ["..."],
+            "blockers": [
+              { "transition": "...", "reason": "requires", "blocking": ["..."] }
+            ],
+            "approvals": { "spec": false, "signoff": false },
+            "nextArtifact": "...",
+            "changePath": "...",
+            "schemaInfo": { "name": "...", "version": 1 }
+          }
+        }
         ```
 
-        `description` is omitted from the JSON object when not set.
+        `description` is omitted from the JSON object when not set. The `lifecycle` object is always present. `nextArtifact` is `null` (not omitted) when all artifacts are done.
   - requirement: Schema version warning
     rules:
       - |-
@@ -52,12 +88,16 @@ rules:
         ```
 
         The command still exits with code 0.
+
+        The CLI command MUST NOT resolve the schema independently. It SHALL compare `change.schemaName`/`change.schemaVersion` against `lifecycle.schemaInfo` from the `GetStatusResult`. If `lifecycle.schemaInfo` is `null` (schema resolution failed), the warning is skipped.
   - requirement: Change not found
     rules:
       - If no change with the given name exists, the command exits with code 1 and prints an `error:` message to stderr.
 constraints:
   - The output includes all artifacts declared by the schema, not only those present on disk
   - effectiveStatus reflects dependency cascading — an artifact may be in-progress because a dependency is incomplete even if its own hash matches
+  - The CLI command is a pure serializer — all lifecycle computation is performed by the GetStatus use case in @specd/core
+  - The CLI command MUST NOT call SchemaRegistry, config show, or any other use case to compute lifecycle data — it serializes what GetStatus returns
 scenarios:
   - requirement: Command signature
     name: Missing name argument
@@ -73,6 +113,7 @@ scenarios:
       - specd change status add-login is run
     then:
       - 'stdout shows change: add-login, state: designing, specs: auth/login, and an artifact line'
+      - 'AND stdout includes a lifecycle: section with approvals: and path: lines'
       - AND the process exits with code 0
   - requirement: Output format
     name: Effective status reflects dependency cascading
@@ -82,6 +123,58 @@ scenarios:
       - specd change status <name> is run
     then:
       - the spec artifact line shows in-progress even if its own hash is valid
+  - requirement: Output format
+    name: Text output shows available transitions
+    given:
+      - a change in designing state with all artifacts complete
+    when:
+      - specd change status <name> is run
+    then:
+      - 'the lifecycle: section includes a transitions: line listing the available transitions'
+  - requirement: Output format
+    name: Text output omits transitions line when none available
+    given:
+      - a change in designing state with artifacts still missing
+      - AND no transitions are available
+    when:
+      - specd change status <name> is run
+    then:
+      - 'the lifecycle: section does not include a transitions: line'
+  - requirement: Output format
+    name: Text output shows blockers
+    given:
+      - a change in designing state with artifact specs missing
+      - AND the ready transition is blocked by specs
+    when:
+      - specd change status <name> is run
+    then:
+      - 'stdout includes a blockers: section with an entry for ready'
+  - requirement: Output format
+    name: Text output shows next artifact
+    given:
+      - a change with proposal complete and specs as the next artifact
+    when:
+      - specd change status <name> is run
+    then:
+      - 'the lifecycle: section includes next artifact: specs'
+  - requirement: Output format
+    name: Text output omits next artifact when all done
+    given:
+      - all artifacts are complete
+    when:
+      - specd change status <name> is run
+    then:
+      - 'the lifecycle: section does not include a next artifact: line'
+  - requirement: Output format
+    name: JSON output contains lifecycle object
+    given:
+      - a change add-login in state designing
+    when:
+      - specd change status add-login --format json is run
+    then:
+      - stdout is valid JSON containing a lifecycle object
+      - AND lifecycle has validTransitions, availableTransitions, blockers, approvals, nextArtifact, and changePath
+      - AND approvals has spec and signoff boolean fields
   - requirement: Schema version warning
     name: Schema mismatch
     given:
@@ -98,18 +191,7 @@ scenarios:
     then:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
-  - requirement: Change not found
-    name: JSON output contains correct structure
-    given:
-      - a change add-login in state designing with specId auth/login, schema std version 1, and one artifact proposal with effectiveStatus complete
-    when:
-      - specd change status add-login --format json is run
-    then:
-      - stdout is valid JSON with name, state, specIds, schema, and artifacts
-      - AND schema has name equal to "std" and version equal to 1
-      - AND artifacts contains one entry with type equal to "proposal" and effectiveStatus equal to "complete"
-      - AND the process exits with code 0
 contentHashes:
-  spec.md: sha256:f06e759d143160c9ddc0375d939a2bb05c2160197caedf92a67de8f24850a010
-  verify.md: sha256:99fa75949e7c2ae65c406ff7fea61a224b3a0818695a319456441ea2e5f7c2fb
+  spec.md: sha256:d9eeba99703242cf2241deabe84eb393ce4aaf01f728c28b985789da925f3b84
+  verify.md: sha256:7d5fe1856869a175ea663da6a0f589e17ef1b11397e3788a5b9d4ea12d6aa896
 generatedBy: core
