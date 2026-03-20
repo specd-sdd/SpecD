@@ -399,11 +399,19 @@ export class Change {
    * Called when specIds or artifact content changes and supersedes any active
    * spec approval or signoff.
    *
+   * When `driftedArtifactIds` is provided, only the specified artifacts and
+   * their downstream dependents have their validation reset. When omitted,
+   * all artifacts are reset (backward-compatible fallback).
+   *
    * @param cause - The reason for invalidation
    * @param actor - Identity of the actor triggering the change
-   * @throws {InvalidStateTransitionError} If the current state cannot transition to `designing`
+   * @param driftedArtifactIds - Optional set of artifact type IDs that actually drifted
    */
-  invalidate(cause: InvalidatedEvent['cause'], actor: ActorIdentity): void {
+  invalidate(
+    cause: InvalidatedEvent['cause'],
+    actor: ActorIdentity,
+    driftedArtifactIds?: ReadonlySet<string>,
+  ): void {
     const from = this.state
     const now = new Date()
     this._history.push({ type: 'invalidated', cause, at: now, by: actor })
@@ -411,8 +419,18 @@ export class Change {
     if (from !== 'designing') {
       this._history.push({ type: 'transitioned', from, to: 'designing', at: now, by: actor })
     }
-    for (const artifact of this._artifacts.values()) {
-      artifact.resetValidation()
+
+    if (driftedArtifactIds === undefined) {
+      for (const artifact of this._artifacts.values()) {
+        artifact.resetValidation()
+      }
+    } else {
+      const toReset = this._downstreamClosure(driftedArtifactIds)
+      for (const [typeId, artifact] of this._artifacts) {
+        if (toReset.has(typeId)) {
+          artifact.resetValidation()
+        }
+      }
     }
   }
 
@@ -673,6 +691,34 @@ export class Change {
    */
   getArtifact(type: string): ChangeArtifact | null {
     return this._artifacts.get(type) ?? null
+  }
+
+  /**
+   * Computes the transitive downstream closure from a set of seed artifact IDs.
+   *
+   * Starting from the seeds, iteratively adds any artifact whose `requires`
+   * list includes an artifact already in the closure, until no more can be added.
+   *
+   * @param seeds - The initial set of artifact type IDs
+   * @returns A set containing the seeds plus all their transitive dependents
+   */
+  private _downstreamClosure(seeds: ReadonlySet<string>): Set<string> {
+    const closure = new Set(seeds)
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const [typeId, artifact] of this._artifacts) {
+        if (closure.has(typeId)) continue
+        for (const req of artifact.requires) {
+          if (closure.has(req)) {
+            closure.add(typeId)
+            changed = true
+            break
+          }
+        }
+      }
+    }
+    return closure
   }
 
   /**

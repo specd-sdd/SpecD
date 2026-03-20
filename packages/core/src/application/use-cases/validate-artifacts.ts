@@ -184,9 +184,8 @@ export class ValidateArtifacts {
     const approval: SpecApprovedEvent | undefined = change.activeSpecApproval
     const signoff: SignedOffEvent | undefined = change.activeSignoff
     if (approval !== undefined || signoff !== undefined) {
-      let invalidated = false
+      const driftedIds = new Set<string>()
       for (const artifactType of schema.artifacts()) {
-        if (invalidated) break
         const changeArtifact = change.getArtifact(artifactType.id)
         if (
           changeArtifact === null ||
@@ -196,7 +195,6 @@ export class ValidateArtifacts {
           continue
         }
         for (const [fileKey, file] of changeArtifact.files) {
-          if (invalidated) break
           if (file.status === 'missing' || file.status === 'skipped') continue
           const diskPath = this._resolveFilePath(file.filename)
           const artifactContent = await this._changes.artifact(change, diskPath)
@@ -213,10 +211,13 @@ export class ValidateArtifacts {
             (approvalHash !== undefined && approvalHash !== cleanedHash) ||
             (signoffHash !== undefined && signoffHash !== cleanedHash)
           ) {
-            change.invalidate('artifact-change', actor)
-            invalidated = true
+            driftedIds.add(artifactType.id)
+            break
           }
         }
+      }
+      if (driftedIds.size > 0) {
+        change.invalidate('artifact-change', actor, driftedIds)
       }
     }
 

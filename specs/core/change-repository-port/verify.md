@@ -20,6 +20,36 @@
 - **WHEN** `get()` loads that change
 - **THEN** the artifact whose hash differs from `validatedHash` has status `in-progress`
 
+### Requirement: Auto-invalidation on get when artifact files drift
+
+#### Scenario: Single artifact drifts — only it and downstream are reset
+
+- **GIVEN** a change in `implementing` state with all artifacts `complete`
+- **AND** the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks
+- **WHEN** `tasks.md` is modified on disk (hash changes)
+- **AND** `FsChangeRepository.get()` is called
+- **THEN** `change.invalidate('artifact-change', SYSTEM_ACTOR, ['tasks'])` is called
+- **AND** only `tasks` has its `validatedHash` cleared
+- **AND** `proposal`, `specs`, `verify`, and `design` remain `complete`
+- **AND** the change transitions to `designing`
+
+#### Scenario: Upstream artifact drifts — it and all downstream are reset
+
+- **GIVEN** a change in `implementing` state with all artifacts `complete`
+- **AND** the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks
+- **WHEN** `spec.md` is modified on disk (specs artifact drifts)
+- **AND** `FsChangeRepository.get()` is called
+- **THEN** `change.invalidate('artifact-change', SYSTEM_ACTOR, ['specs'])` is called
+- **AND** `specs`, `verify`, and `tasks` are cleared
+- **AND** `proposal` and `design` remain `complete`
+
+#### Scenario: No drift — no invalidation
+
+- **GIVEN** a change in `implementing` state with all artifacts `complete`
+- **WHEN** no file has changed on disk
+- **AND** `FsChangeRepository.get()` is called
+- **THEN** no invalidation occurs and all artifacts remain `complete`
+
 ### Requirement: list returns active changes in creation order
 
 #### Scenario: Mixed active and drafted changes

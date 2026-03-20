@@ -18,10 +18,12 @@ Without an abstraction over change storage, use cases would couple directly to f
 
 The `FsChangeRepository` implementation of `get()` MUST detect artifact file drift and auto-invalidate the change when appropriate. After loading a change and deriving artifact statuses, the repository checks whether any previously-validated artifact file has drifted — that is, the file's `validatedHash` was set (indicating a prior validation) but the derived status is now `missing` or `in-progress` (indicating the file was deleted or modified on disk).
 
-If drift is detected AND either of the following conditions is true, the repository MUST call `change.invalidate('artifact-change', SYSTEM_ACTOR)` and persist the updated manifest before returning:
+If drift is detected AND either of the following conditions is true, the repository MUST collect the artifact type IDs of all drifted artifacts and call `change.invalidate('artifact-change', SYSTEM_ACTOR, driftedArtifactIds)` and persist the updated manifest before returning:
 
 1. The change is beyond `designing` state (i.e. has progressed past the initial design phase), OR
 2. The change has an active approval (spec approval or signoff) that has not been superseded by a subsequent `invalidated` event.
+
+When `driftedArtifactIds` is provided, `invalidate()` only resets the drifted artifacts and their downstream dependents in the artifact DAG — upstream artifacts that the drifted artifacts depend on are left intact. Approval revocation and state transition to `designing` still happen globally.
 
 This ensures that approval drift and state-inconsistent artifact changes are detected eagerly on any change load, not only during explicit validation. The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@specd.dev' }`) is used as the actor for these automated invalidations.
 

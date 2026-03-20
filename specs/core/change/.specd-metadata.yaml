@@ -118,7 +118,7 @@ rules:
 
         `ChangeArtifact.markComplete(key, hash)` takes two arguments — the file key and the content hash — and delegates to the corresponding `ArtifactFile.markComplete(hash)`. `ChangeArtifact.markSkipped()` marks ALL files in the artifact as skipped. These may only be called by the `ValidateArtifacts` and skip use cases respectively. No other code path may set these values.
 
-        **Rollback:** when an `invalidated` event is appended, specd calls `resetValidation()` on all artifacts in the change, which resets each file's `validatedHash` to `undefined`. This resets them uniformly: `complete` files become `in-progress` (file present, no valid hash), `skipped` files become `missing` (sentinel cleared). For the `verifying → implementing` transition, only artifacts in the `implementing` step's `requires` list are reset.
+        **Rollback:** `invalidate()` accepts an optional `driftedArtifactIds` parameter — a set of artifact type IDs whose content has actually changed. When provided, only the drifted artifacts and their downstream dependents (artifacts whose `requires` chain includes a drifted artifact) have their `validatedHash` cleared via `resetValidation()`. Upstream artifacts that the drifted artifacts depend on are left intact. When `driftedArtifactIds` is not provided, all artifacts are reset (backward-compatible fallback). For the `verifying → implementing` transition, only artifacts in the `implementing` step's `requires` list are reset.
 
         Effective status cascades: an artifact is `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`, even if its own aggregated status matches. A `skipped` optional artifact satisfies the dependency — downstream artifacts and workflow steps treat it as resolved.
   - requirement: Artifact sync
@@ -447,11 +447,31 @@ scenarios:
     then:
       - the operation fails with an error and validatedHash is not modified
   - requirement: Artifacts
-    name: invalidated event clears all validatedHash values
+    name: invalidated event with driftedArtifactIds clears only downstream
     given:
-      - a change with one complete artifact (hash set) and one skipped artifact (sentinel set)
+      - 'a DAG: proposal → specs → verify, proposal → design, specs + design → tasks'
+      - AND all artifacts are complete
     when:
-      - an invalidated event is appended
+      - invalidate('artifact-change', actor, ['tasks']) is called
+    then:
+      - only tasks.validatedHash is cleared (no downstream dependents)
+      - AND proposal, specs, verify, and design remain complete
+  - requirement: Artifacts
+    name: invalidated event with driftedArtifactIds cascades downstream
+    given:
+      - 'a DAG: proposal → specs → verify, proposal → design, specs + design → tasks'
+      - AND all artifacts are complete
+    when:
+      - invalidate('artifact-change', actor, ['specs']) is called
+    then:
+      - specs, verify, and tasks are cleared (specs + its downstream)
+      - AND proposal and design remain complete
+  - requirement: Artifacts
+    name: invalidated event without driftedArtifactIds clears all
+    given:
+      - a change with one complete artifact and one skipped artifact
+    when:
+      - invalidate('artifact-change', actor) is called without driftedArtifactIds
     then:
       - all validatedHash values are cleared — the complete artifact becomes in-progress and the skipped artifact becomes missing
   - requirement: Artifacts
@@ -603,6 +623,6 @@ scenarios:
     then:
       - no operation exists to move a change out of discarded/
 contentHashes:
-  spec.md: sha256:e1dbbf5d2128c43a200d2ba97571e38f06afc0de7b3bc7bef616ebcf3eb1d302
-  verify.md: sha256:ffda2913c4976cff57dd97f14a001f8c79b1f6fb3812b86018a1d821524a6a3c
+  spec.md: sha256:813570012867a722a2a248586780cd9a46460fcbc574523714fe6dea30606b98
+  verify.md: sha256:e249651126ddd975b3417a60541ecf7ced466b79ac84607a165d16469a543e99
 generatedBy: core

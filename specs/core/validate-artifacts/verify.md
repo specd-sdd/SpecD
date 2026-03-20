@@ -93,24 +93,24 @@
 
 ### Requirement: Approval invalidation on content change
 
-#### Scenario: Content changed since approval — invalidation triggered
+#### Scenario: Approval invalidation resets only drifted artifacts and downstream
 
-- **GIVEN** an active spec approval with `artifactHashes: { specs: "abc123" }`
-- **AND** the current cleaned hash of `specs` is `"xyz789"`
-- **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `change.invalidate('artifact-change', actor)` is called before validation proceeds
+- **GIVEN** a change with an active spec approval
+- **AND** the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks
+- **AND** only `design.md` has changed since approval (hash mismatch)
+- **WHEN** `ValidateArtifacts.execute` detects the hash mismatch
+- **THEN** `change.invalidate('artifact-change', actor, ['design'])` is called
+- **AND** `design` and `tasks` are reset (design + its downstream)
+- **AND** `proposal`, `specs`, and `verify` remain `complete`
 
-#### Scenario: Invalidation called at most once per execution
+#### Scenario: Multiple artifacts drift — all drifted IDs collected in single call
 
-- **GIVEN** two artifacts whose hashes both differ from the active approval
-- **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `change.invalidate` is called exactly once — not once per artifact
-
-#### Scenario: No invalidation when hashes match
-
-- **GIVEN** an active spec approval whose `artifactHashes` match the current cleaned hashes
-- **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `change.invalidate` is not called
+- **GIVEN** a change with an active spec approval
+- **AND** both `specs` and `design` have changed since approval
+- **WHEN** `ValidateArtifacts.execute` detects the mismatches
+- **THEN** a single `change.invalidate('artifact-change', actor, ['specs', 'design'])` is called
+- **AND** `specs`, `verify`, `design`, and `tasks` are reset
+- **AND** `proposal` remains `complete`
 
 ### Requirement: Delta validation
 

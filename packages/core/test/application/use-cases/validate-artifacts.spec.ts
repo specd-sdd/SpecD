@@ -545,6 +545,85 @@ describe('ValidateArtifacts', () => {
       expect(invalidatedCount).toBe(1)
     })
 
+    it('passes drifted artifact IDs to invalidate when single artifact changed', async () => {
+      const proposalType = makeArtifactType('proposal')
+      const designType = makeArtifactType('design', { requires: ['proposal'] })
+      const schema = makeSchema([proposalType, designType])
+
+      const proposalContent = 'proposal content'
+      const designContent = 'design content'
+      const proposalHash = sha256(proposalContent)
+
+      const proposalArt = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({ key: 'proposal', filename: 'proposal.md', status: 'in-progress' }),
+          ],
+        ]),
+      })
+      const designArt = new ChangeArtifact({
+        type: 'design',
+        requires: ['proposal'],
+        files: new Map([
+          [
+            'design',
+            new ArtifactFile({ key: 'design', filename: 'design.md', status: 'in-progress' }),
+          ],
+        ]),
+      })
+
+      const history: import('../../../src/domain/entities/change.js').ChangeEvent[] = [
+        {
+          type: 'spec-approved',
+          at: new Date(),
+          by: testActor,
+          reason: 'approved',
+          artifactHashes: {
+            'proposal:proposal': proposalHash,
+            'design:design': 'sha256:oldDesignHash',
+          },
+        },
+      ]
+      const change = makeChangeWithArtifacts('c', [proposalArt, designArt], { history })
+      const invalidateSpy = vi.spyOn(change, 'invalidate')
+
+      const files = new Map([
+        ['proposal.md', proposalContent],
+        ['design.md', designContent],
+      ])
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          const c = files.get(filename)
+          return c !== undefined ? new SpecArtifact(filename, c) : null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaRegistry(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+        'test',
+        new Map(),
+      )
+
+      await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+      })
+
+      expect(invalidateSpy).toHaveBeenCalledOnce()
+      const [cause, , driftedIds] = invalidateSpy.mock.calls[0]!
+      expect(cause).toBe('artifact-change')
+      expect(driftedIds).toBeInstanceOf(Set)
+      expect(driftedIds).toEqual(new Set(['design']))
+    })
+
     it('does not call invalidate when hashes match', async () => {
       const specsType = makeArtifactType('specs')
       const schema = makeSchema([specsType])
