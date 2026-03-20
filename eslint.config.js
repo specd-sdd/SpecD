@@ -4,7 +4,20 @@ import unicorn from 'eslint-plugin-unicorn'
 import jsdoc from 'eslint-plugin-jsdoc'
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', '**/*.config.*', '**/*.mjs', '**/.history/**'] },
+  {
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/*.config.*',
+      '**/*.mjs',
+      '**/.history/**',
+      'packages/schema-std/**',
+      'packages/schema-openspec/**',
+      'packages/mcp/**',
+      'packages/skills/**',
+      'packages/plugins/**',
+    ],
+  },
 
   // Base TypeScript rules (type-aware)
   ...tseslint.configs.recommendedTypeChecked,
