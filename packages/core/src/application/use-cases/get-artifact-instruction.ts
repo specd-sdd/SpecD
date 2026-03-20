@@ -33,6 +33,7 @@ export interface GetArtifactInstructionResult {
   readonly artifactId: string
   readonly rulesPre: readonly string[]
   readonly instruction: string | null
+  readonly template: string | null
   readonly delta: {
     readonly formatInstructions: string
     readonly domainInstructions: string | null
@@ -133,6 +134,12 @@ export class GetArtifactInstruction {
         ? this._templates.expand(artifactType.instruction, contextVars)
         : null
 
+    // template
+    const template =
+      artifactType.template !== undefined
+        ? this._templates.expand(artifactType.template, contextVars)
+        : null
+
     // delta
     let delta: GetArtifactInstructionResult['delta'] = null
     if (artifactType.delta) {
@@ -177,6 +184,7 @@ export class GetArtifactInstruction {
       artifactId: resolvedId,
       rulesPre,
       instruction,
+      template,
       delta,
       rulesPost,
     }

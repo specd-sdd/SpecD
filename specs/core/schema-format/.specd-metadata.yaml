@@ -13,20 +13,20 @@ rules:
       - |-
         A schema file must be a valid YAML document with the following top-level fields:
 
-        * `kind` (`schema` | `schema-plugin`, required) — discriminates full schemas from plugins; see Requirement: Schema kind field
-        * `name` (string, required) — machine identifier, e.g. `spec-driven`
-        * `version` (integer, required) — schema version, monotonically increasing
-        * `description` (string, optional) — human-readable summary
-        * `extends` (string, optional) — reference to a parent schema; see Requirement: Schema extends
-        * `artifacts` (array, required for `kind: schema`) — one entry per artifact type
-        * `workflow` (array, optional, only valid for `kind: schema`) — named phases of the change lifecycle, each with optional artifact prerequisites and hooks; see Requirement: Workflow
+        - `kind` (`schema` | `schema-plugin`, required) — discriminates full schemas from plugins; see Requirement: Schema kind field
+        - `name` (string, required) — machine identifier, e.g. `spec-driven`
+        - `version` (integer, required) — schema version, monotonically increasing
+        - `description` (string, optional) — human-readable summary
+        - `extends` (string, optional) — reference to a parent schema; see Requirement: Schema extends
+        - `artifacts` (array, required for `kind: schema`) — one entry per artifact type
+        - `workflow` (array, optional, only valid for `kind: schema`) — named phases of the change lifecycle, each with optional artifact prerequisites and hooks; see Requirement: Workflow
   - requirement: Schema kind field
     rules:
       - |-
         Every schema file must declare a `kind` field:
 
-        * `kind: schema` — a full schema with `artifacts`, `workflow`, `metadataExtraction`, and optional `extends`. `artifacts` is required; `workflow` and `metadataExtraction` are optional.
-        * `kind: schema-plugin` — a partial schema containing only `description` and merge operations. `artifacts`, `workflow`, `metadataExtraction`, and `extends` are not valid on a plugin and must be rejected at validation time.
+        - `kind: schema` — a full schema with `artifacts`, `workflow`, `metadataExtraction`, and optional `extends`. `artifacts` is required; `workflow` and `metadataExtraction` are optional.
+        - `kind: schema-plugin` — a partial schema containing only `description` and merge operations. `artifacts`, `workflow`, `metadataExtraction`, and `extends` are not valid on a plugin and must be rejected at validation time.
 
         Omitting `kind` is a `SchemaValidationError`.
   - requirement: Schema extends
@@ -44,12 +44,12 @@ rules:
       - |-
         Every entry in the following schema arrays must carry an `id` field:
 
-        * `workflow[].hooks.pre[]` and `workflow[].hooks.post[]`
-        * `artifacts[].validations[]`
-        * `artifacts[].deltaValidations[]`
-        * `artifacts[].rules.pre[]` and `artifacts[].rules.post[]`
-        * `artifacts[].preHashCleanup[]`
-        * `metadataExtraction` array entries (entries in `rules[]`, `constraints[]`, `scenarios[]`, `context[]`)
+        - `workflow[].hooks.pre[]` and `workflow[].hooks.post[]`
+        - `artifacts[].validations[]`
+        - `artifacts[].deltaValidations[]`
+        - `artifacts[].rules.pre[]` and `artifacts[].rules.post[]`
+        - `artifacts[].preHashCleanup[]`
+        - `metadataExtraction` array entries (entries in `rules[]`, `constraints[]`, `scenarios[]`, `context[]`)
 
         Format: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters. IDs must be unique within their immediate array. Duplicate IDs within the same array produce a `SchemaValidationError`.
 
@@ -61,28 +61,28 @@ rules:
       - |-
         Each entry in `artifacts` must include:
 
-        * `id` (string, required) — unique identifier within the schema, e.g. `proposal`, `specs`, `design`, `tasks`
-        * `scope` (`spec` | `change`, required) — declares where this artifact lives after the change is archived. `spec` means the artifact file is synced to the `SpecRepository` (e.g. `spec.md`, `verify.md` — files that become part of the project's permanent spec record). `change` means the artifact stays only in the change directory and is never synced (e.g. `proposal.md`, `tasks.md` — working documents used during the change process).
-        * `optional` (boolean, optional, default `false`) — when `false`, `ValidateArtifacts` requires this artifact to be present in the change before validation can pass. When `true`, the artifact may be absent without failing validation; if present, it is validated and (for `scope: spec` artifacts) synced normally. `scope` and `optional` are independent.
-        * `output` (string or glob, required) — path pattern for the artifact's files **relative to the change directory**, e.g. `proposal.md` or `specs/**/spec.md`. When creating a new artifact file within a change, the filename is derived from the last literal segment of the glob (e.g. `spec.md` from `specs/**/spec.md`); if the last segment is a wildcard, the filename falls back to the template filename (e.g. `spec.md` from `template: templates/spec.md`). If neither the glob nor the template yields a determinate filename, `SchemaRegistry.resolve()` must throw a `SchemaValidationError`. The final location of these files in the project repo after syncing is configured separately and may differ.
-        * `description` (string, optional) — human-readable summary for tooling
-        * `template` (string, optional) — path to a template file, relative to the schema directory; see Requirement: Template resolution
-        * `instruction` (string, optional) — AI instruction text assembled by `GetArtifactInstruction`
-        * `requires` (array of artifact IDs, optional) — artifacts that must be resolved before this one; used to compute `Change.effectiveStatus()`. A dependency is resolved when its status is `complete` or `skipped`. `skipped` is only reachable for `optional: true` artifacts. Any other state (`missing`, `in-progress`) blocks the dependent artifact.
-        * `format` (`markdown` | `json` | `yaml` | `plaintext`, optional) — declares the file format of this artifact. Used by `GetArtifactInstruction` to select the correct `ArtifactParser` adapter when injecting delta instructions. If omitted, the format is inferred from the file extension of the derived output filename (`.md` → `markdown`, `.json` → `json`, `.yaml` / `.yml` → `yaml`); any other extension defaults to `plaintext`. Must be declared explicitly when the extension is ambiguous or non-standard.
-        * `delta` (boolean, optional, default `false`) — declares that this artifact supports delta files. Only valid when `scope: spec`; `SchemaRegistry.resolve()` must throw a `SchemaValidationError` if `delta: true` is combined with `scope: change`. When `true`, a delta file for this artifact (`deltas/<workspace>/<capability-path>/<filename>.delta.yaml`) may be present in the change directory. When `false`, delta files for this artifact are rejected at validation time.
-        * `deltaInstruction` (string, optional) — domain-specific guidance injected by `GetArtifactInstruction` alongside the format-level delta instructions when `delta: true`. Describes which domain concepts to add, modify, or remove (e.g. requirements, scenarios) without repeating the technical delta format, which is provided automatically by the `ArtifactParser` adapter. Only valid when `delta: true`.
-        * `deltaValidations` (array, optional) — structural validation rules checked against the normalized YAML AST of the delta file before application; see Requirement: Delta validation rules. Only valid when `delta: true`.
-        * `validations` (array, optional) — structural validation rules for the base artifact (after delta application); see Requirement: Validation rules
-        * `metadataExtraction` (object, optional) — top-level declaration of how to extract metadata fields from artifact content; see Requirement: Metadata extraction
-        * `rules` (object, optional) — constraint text blocks injected by `GetArtifactInstruction` around the artifact's `instruction`. Rules exist as a **schema composition mechanism**: they allow extending schemas and schema plugins to wrap an artifact's instruction with additional constraints without overriding the `instruction` field itself. A base schema defines the core instruction; child schemas or plugins add `rules.pre`/`rules.post` entries to augment it.
-          * `pre` (array, optional) — entries injected **before** the instruction. Each entry: `{ id: string, text: string }`.
-          * `post` (array, optional) — entries injected **after** the instruction. Each entry: `{ id: string, text: string }`.
+        - `id` (string, required) — unique identifier within the schema, e.g. `proposal`, `specs`, `design`, `tasks`
+        - `scope` (`spec` | `change`, required) — declares where this artifact lives after the change is archived. `spec` means the artifact file is synced to the `SpecRepository` (e.g. `spec.md`, `verify.md` — files that become part of the project's permanent spec record). `change` means the artifact stays only in the change directory and is never synced (e.g. `proposal.md`, `tasks.md` — working documents used during the change process).
+        - `optional` (boolean, optional, default `false`) — when `false`, `ValidateArtifacts` requires this artifact to be present in the change before validation can pass. When `true`, the artifact may be absent without failing validation; if present, it is validated and (for `scope: spec` artifacts) synced normally. `scope` and `optional` are independent.
+        - `output` (string or glob, required) — path pattern for the artifact's files **relative to the change directory**, e.g. `proposal.md` or `specs/**/spec.md`. When creating a new artifact file within a change, the filename is derived from the last literal segment of the glob (e.g. `spec.md` from `specs/**/spec.md`); if the last segment is a wildcard, the filename falls back to the template filename (e.g. `spec.md` from `template: templates/spec.md`). If neither the glob nor the template yields a determinate filename, `SchemaRegistry.resolve()` must throw a `SchemaValidationError`. The final location of these files in the project repo after syncing is configured separately and may differ.
+        - `description` (string, optional) — human-readable summary for tooling
+        - `template` (string, optional) — path to a template file, relative to the schema directory; see Requirement: Template resolution
+        - `instruction` (string, optional) — AI instruction text assembled by `GetArtifactInstruction`
+        - `requires` (array of artifact IDs, optional) — artifacts that must be resolved before this one; used to compute `Change.effectiveStatus()`. A dependency is resolved when its status is `complete` or `skipped`. `skipped` is only reachable for `optional: true` artifacts. Any other state (`missing`, `in-progress`) blocks the dependent artifact.
+        - `format` (`markdown` | `json` | `yaml` | `plaintext`, optional) — declares the file format of this artifact. Used by `GetArtifactInstruction` to select the correct `ArtifactParser` adapter when injecting delta instructions. If omitted, the format is inferred from the file extension of the derived output filename (`.md` → `markdown`, `.json` → `json`, `.yaml` / `.yml` → `yaml`); any other extension defaults to `plaintext`. Must be declared explicitly when the extension is ambiguous or non-standard.
+        - `delta` (boolean, optional, default `false`) — declares that this artifact supports delta files. Only valid when `scope: spec`; `SchemaRegistry.resolve()` must throw a `SchemaValidationError` if `delta: true` is combined with `scope: change`. When `true`, a delta file for this artifact (`deltas/<workspace>/<capability-path>/<filename>.delta.yaml`) may be present in the change directory. When `false`, delta files for this artifact are rejected at validation time.
+        - `deltaInstruction` (string, optional) — domain-specific guidance injected by `GetArtifactInstruction` alongside the format-level delta instructions when `delta: true`. Describes which domain concepts to add, modify, or remove (e.g. requirements, scenarios) without repeating the technical delta format, which is provided automatically by the `ArtifactParser` adapter. Only valid when `delta: true`.
+        - `deltaValidations` (array, optional) — structural validation rules checked against the normalized YAML AST of the delta file before application; see Requirement: Delta validation rules. Only valid when `delta: true`.
+        - `validations` (array, optional) — structural validation rules for the base artifact (after delta application); see Requirement: Validation rules
+        - `metadataExtraction` (object, optional) — top-level declaration of how to extract metadata fields from artifact content; see Requirement: Metadata extraction
+        - `rules` (object, optional) — constraint text blocks injected by `GetArtifactInstruction` around the artifact's `instruction`. Rules exist as a **schema composition mechanism**: they allow extending schemas and schema plugins to wrap an artifact's instruction with additional constraints without overriding the `instruction` field itself. A base schema defines the core instruction; child schemas or plugins add `rules.pre`/`rules.post` entries to augment it.
+          - `pre` (array, optional) — entries injected **before** the instruction. Each entry: `{ id: string, text: string }`.
+          - `post` (array, optional) — entries injected **after** the instruction. Each entry: `{ id: string, text: string }`.
             `id` follows the standard array entry identity format. `text` is injected verbatim as a constraint block.
-        * `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has `id` (string, required — standard array entry identity format), `pattern` (regex string), and `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
-        * `taskCompletionCheck` (object, optional) — declares how to detect task completion within this artifact's file content. Used to gate the `implementing → verifying` transition: if the artifact is listed in the `implementing` step's `requires`, all items matching `incompletePattern` must be absent (zero matches) before the transition is allowed. Both fields are optional and default to markdown checkbox syntax: When both patterns are present, the CLI can report progress (e.g. `3/5 tasks complete`) by counting matches of each. If `taskCompletionCheck` is omitted entirely, the defaults apply.
-          * `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item
-          * `completePattern` (string, regex, default `^\s*-\s+\[x\]`, case-insensitive) — matches a complete task item
+        - `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has `id` (string, required — standard array entry identity format), `pattern` (regex string), and `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
+        - `taskCompletionCheck` (object, optional) — declares how to detect task completion within this artifact's file content. Used to gate the `implementing → verifying` transition: if the artifact is listed in the `implementing` step's `requires`, all items matching `incompletePattern` must be absent (zero matches) before the transition is allowed. Both fields are optional and default to markdown checkbox syntax: When both patterns are present, the CLI can report progress (e.g. `3/5 tasks complete`) by counting matches of each. If `taskCompletionCheck` is omitted entirely, the defaults apply.
+          - `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item
+          - `completePattern` (string, regex, default `^\s*-\s+\[x\]`, case-insensitive) — matches a complete task item
   - requirement: Template resolution
     rules:
       - |-
@@ -106,14 +106,14 @@ rules:
 
         **Node identification** — one of two mutually exclusive approaches:
 
-        * **Selector fields** — the selector fields defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md): `type`, `matches`, `contains`, `parent`, `index`, `where`. Identifies nodes by type, label pattern, value pattern, ancestry, or position.
-        * **`path`** (string) — a JSONPath expression (RFC 9535) evaluated against the normalized AST. Use when the structural query requires more expressive power than the selector fields provide.
+        - **Selector fields** — the selector fields defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md): `type`, `matches`, `contains`, `parent`, `index`, `where`. Identifies nodes by type, label pattern, value pattern, ancestry, or position.
+        - **`path`** (string) — a JSONPath expression (RFC 9535) evaluated against the normalized AST. Use when the structural query requires more expressive power than the selector fields provide.
 
         **Additional fields** — compatible with both identification styles:
 
-        * `required` (boolean, optional, default `true`) — whether absence of a matching node is an error (`true`) or a warning (`false`)
-        * `contentMatches` (string, optional) — a regex matched case-insensitively against the serialized text of the matched node's subtree; `ArtifactParser` serializes the subtree to its native format before matching; useful for asserting that a node's full rendered content contains expected text regardless of its internal AST structure
-        * `children` (array, optional) — sub-rules evaluated with each matched node as root; each entry is a full validation rule
+        - `required` (boolean, optional, default `true`) — whether absence of a matching node is an error (`true`) or a warning (`false`)
+        - `contentMatches` (string, optional) — a regex matched case-insensitively against the serialized text of the matched node's subtree; `ArtifactParser` serializes the subtree to its native format before matching; useful for asserting that a node's full rendered content contains expected text regardless of its internal AST structure
+        - `children` (array, optional) — sub-rules evaluated with each matched node as root; each entry is a full validation rule
 
         A rule passes vacuously when it matches zero nodes — no error or warning is produced.
 
@@ -185,15 +185,15 @@ rules:
 
         Each metadata field maps to one or more `MetadataExtractorEntry` objects with:
 
-        * `artifact` (string, required) — the artifact ID whose content to extract from (e.g. `specs`, `verify`)
-        * `extractor` (object, required) — an `Extractor` declaring how to extract content:
-          * `selector` (selector, required) — identifies which node(s) to extract, using the selector model defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md)
-          * `extract` (`content` | `label` | `both`, optional, default `content`) — what to extract for each matched node
-          * `capture` (string, optional) — regex with capture group applied to extracted text
-          * `strip` (string, optional) — regex removed from labels/values
-          * `groupBy` (`label`, optional) — group matched nodes by their label
-          * `transform` (string, optional) — named post-processing callback (e.g. `resolveSpecPath`)
-          * `fields` (object, optional) — structured field mapping for complex objects (e.g. scenarios)
+        - `artifact` (string, required) — the artifact ID whose content to extract from (e.g. `specs`, `verify`)
+        - `extractor` (object, required) — an `Extractor` declaring how to extract content:
+          - `selector` (selector, required) — identifies which node(s) to extract, using the selector model defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md)
+          - `extract` (`content` | `label` | `both`, optional, default `content`) — what to extract for each matched node
+          - `capture` (string, optional) — regex with capture group applied to extracted text
+          - `strip` (string, optional) — regex removed from labels/values
+          - `groupBy` (`label`, optional) — group matched nodes by their label
+          - `transform` (string, optional) — named post-processing callback (e.g. `resolveSpecPath`)
+          - `fields` (object, optional) — structured field mapping for complex objects (e.g. scenarios)
 
         Supported metadata fields: `title`, `description`, `dependsOn`, `keywords` (single-entry), `rules`, `constraints`, `scenarios`, `context` (array-entry).
   - requirement: Artifact scope
@@ -213,18 +213,20 @@ rules:
 
         Steps are not limited to AI agent invocations. They may represent human review phases, automated checks, artifact generation, or any recurring activity in the change lifecycle. `CompileContext` uses step definitions to gate context compilation and evaluate step availability.
 
-        \> The semantic model of workflow steps — canonical step semantics, requires-based gating, execution modes, and step-to-state mapping — is defined in \[specs/core/workflow-model/spec.md]\(../workflow-model/spec.md). The hook execution model — who executes which hook type, when, and with what failure semantics — is defined in \[specs/core/hook-execution-model/spec.md]\(../hook-execution-model/spec.md). The schema format only defines the structure of step entries — step naming conventions and execution semantics are out of scope here.
+        A step's `requires` array serves as a defensive gate: `CompileContext` evaluates whether all required artifacts are `complete` (or `skipped`) to determine step availability. If any required artifact is missing or incomplete, the step is blocked. This prevents the agent from entering a phase when prerequisites have been deleted or corrupted. Steps that need all artifacts intact (e.g. implementing, archiving) SHOULD require all artifacts. Steps that focus on a specific concern (e.g. verifying) MAY require only the relevant artifacts.
+
+        Note: `CompileContext` does NOT include change artifact content (proposal.md, design.md, tasks.md) in the compiled context block — it only includes spec content and project context. The agent reads change artifacts directly from disk, guided by hook instructions.
 
         Entries must include:
 
-        * `step` (string, required) — step name identifying a phase of the change lifecycle
-        * `requires` (array of artifact IDs, optional) — artifacts that must be `complete` before this step is available; empty or omitted means always available
-        * `hooks` (object, optional) — hooks for this step's boundaries; each key is `pre` or `post`, each value is an array of `instruction:` or `run:` hook entries
+        - `step` (string, required) — step name identifying a phase of the change lifecycle
+        - `requires` (array of artifact IDs, optional) — artifacts that must be `complete` before this step is available; empty or omitted means always available
+        - `hooks` (object, optional) — hooks for this step's boundaries; each key is `pre` or `post`, each value is an array of `instruction:` or `run:` hook entries
 
         Every hook entry must include an `id` field (standard array entry identity format) and exactly one of:
 
-        * `{ id: string, instruction: string }` — AI context injected when this step is compiled; used to guide agent behaviour during this phase
-        * `{ id: string, run: string }` — shell command executed at the phase boundary; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`
+        - `{ id: string, instruction: string }` — AI context injected when this step is compiled; used to guide agent behaviour during this phase
+        - `{ id: string, run: string }` — shell command executed at the phase boundary; supports template variables `{{change.name}}`, `{{change.path}}`, `{{project.root}}`
 
         **`pre` hook failure** — if a `run:` hook exits with a non-zero code, the step is aborted and the user is informed of the failure. The agent should offer to attempt to fix the problem before retrying.
 
@@ -238,10 +240,10 @@ rules:
       - |-
         A schema file with `kind: schema-plugin` is a partial schema that provides only merge operations for composing with a base schema. A plugin must declare:
 
-        * `kind: schema-plugin` (required)
-        * `name` (string, required) — plugin identifier
-        * `version` (integer, required) — plugin version
-        * `description` (string, optional) — human-readable summary
+        - `kind: schema-plugin` (required)
+        - `name` (string, required) — plugin identifier
+        - `version` (integer, required) — plugin version
+        - `description` (string, optional) — human-readable summary
 
         A plugin must not declare `artifacts`, `workflow`, `metadataExtraction`, or `extends` — these are validation errors. The plugin's customisation intent is expressed via `schemaOverrides`-style operations when referenced in `specd.yaml`'s `schemaPlugins`. The plugin file itself contains the operations inline under top-level operation keys (`create`, `remove`, `set`, `append`, `prepend`).
 
@@ -251,10 +253,10 @@ rules:
       - |-
         `SchemaRegistry.resolve(ref)` interprets the `schema` value from `specd.yaml` using a prefix convention. The prefix determines exactly where to look — there is no implicit fallback across multiple locations:
 
-        * **`@scope/name`** (starts with `@`) — npm package. Loads from `node_modules/@scope/name/schema.yaml`.
-        * **`#workspace:name`** — workspace-qualified name. Loads from `workspaces.<workspace>.schemas.fs.path/<name>/schema.yaml`.
-        * **`#name`** or **bare name** (no prefix, not a path) — equivalent to `#default:name`. Loads from `workspaces.default.schemas.fs.path/<name>/schema.yaml`.
-        * **Relative or absolute path** — direct file reference. Relative paths are resolved from the directory containing `specd.yaml`.
+        - **`@scope/name`** (starts with `@`) — npm package. Loads from `node_modules/@scope/name/schema.yaml`.
+        - **`#workspace:name`** — workspace-qualified name. Loads from `workspaces.<workspace>.schemas.fs.path/<name>/schema.yaml`.
+        - **`#name`** or **bare name** (no prefix, not a path) — equivalent to `#default:name`. Loads from `workspaces.default.schemas.fs.path/<name>/schema.yaml`.
+        - **Relative or absolute path** — direct file reference. Relative paths are resolved from the directory containing `specd.yaml`.
 
         `SchemaRegistry.resolve()` receives the full `ref` string and a resolved map of workspace schema paths. It does not read `specd.yaml` itself.
 
@@ -264,18 +266,18 @@ rules:
       - |-
         `SchemaRegistry.resolve()` must validate the parsed YAML against a Zod schema before constructing the `Schema` object. Unknown top-level fields must be ignored (forward compatibility). Structural mismatches and semantic errors must produce a `SchemaValidationError` — a domain error extending `SpecdError` — before any domain object construction takes place. Validation covers:
 
-        * `kind` missing or not one of `schema` | `schema-plugin`
-        * `kind: schema-plugin` declaring `artifacts`, `workflow`, `metadataExtraction`, or `extends`
-        * Duplicate `artifact.id` within `artifacts`
-        * Duplicate `workflow[].step` within `workflow`
-        * `artifact.id` not matching `/^[a-z][a-z0-9-]*$/`
-        * Array entry `id` not matching `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` or exceeding 64 characters
-        * Duplicate `id` within the same array (hooks, validations, rules, deltaValidations, preHashCleanup, metadataExtraction entries)
-        * Unknown artifact ID referenced in `artifact.requires`
-        * Circular dependency in artifact `requires` graph
-        * Non-optional artifact hard-depending on an optional artifact
-        * `deltaValidations` declared on an artifact with `delta: false`
-        * Cycle in `extends` chain (detected via resolved file path)
+        - `kind` missing or not one of `schema` | `schema-plugin`
+        - `kind: schema-plugin` declaring `artifacts`, `workflow`, `metadataExtraction`, or `extends`
+        - Duplicate `artifact.id` within `artifacts`
+        - Duplicate `workflow[].step` within `workflow`
+        - `artifact.id` not matching `/^[a-z][a-z0-9-]*$/`
+        - Array entry `id` not matching `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` or exceeding 64 characters
+        - Duplicate `id` within the same array (hooks, validations, rules, deltaValidations, preHashCleanup, metadataExtraction entries)
+        - Unknown artifact ID referenced in `artifact.requires`
+        - Circular dependency in artifact `requires` graph
+        - Non-optional artifact hard-depending on an optional artifact
+        - `deltaValidations` declared on an artifact with `delta: false`
+        - Cycle in `extends` chain (detected via resolved file path)
   - requirement: verify.md format
     rules:
       - |-
@@ -735,6 +737,16 @@ scenarios:
     then:
       - CompileContext must report that the step is blocked
   - requirement: Workflow
+    name: Step blocked when required artifact deleted mid-lifecycle
+    given:
+      - 'a workflow step implementing with requires: [proposal, specs, verify, design, tasks]'
+      - AND a change where design artifact has been deleted (status reverts to missing)
+    when:
+      - CompileContext evaluates step availability for implementing
+    then:
+      - stepAvailable is false
+      - AND blockingArtifacts includes "design"
+  - requirement: Workflow
     name: Hook entries require id
     when:
       - a workflow[].hooks.pre entry omits the id field
@@ -823,6 +835,6 @@ scenarios:
     then:
       - both spec.md and verify.md are read and included together in the LLM context
 contentHashes:
-  spec.md: sha256:d5db31b27e33fc1d9448633e8d94da19bcdf80fbb10a266e4eee7d2a26147c52
-  verify.md: sha256:b7f9d6369f707b18356327e0ee39014c64e06b55ed9560f4790b4022d8acfe5b
+  spec.md: sha256:8cd63d02dab1d3850b0ea65a8c5865a7893b83d4a574ec9b686857eca9595438
+  verify.md: sha256:5136fcf0fdf11876592db813cb646c17349d8d8135628cfb61b9622ae2321874
 generatedBy: core

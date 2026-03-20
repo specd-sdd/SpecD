@@ -37,6 +37,12 @@
 - **AND** stdout contains an `[instruction]` section with "Write the spec"
 - **AND** sections are separated by blank lines
 
+#### Scenario: Template section in text output
+
+- **GIVEN** an artifact with a declared template
+- **WHEN** `specd change artifact-instruction add-auth specs`
+- **THEN** stdout contains a `[template]` section with the template content
+
 ### Requirement: JSON output format
 
 #### Scenario: JSON output with instruction
@@ -44,3 +50,9 @@
 - **GIVEN** an artifact with `instruction: "Write the spec"`
 - **WHEN** `specd change artifact-instruction add-auth specs --format json`
 - **THEN** stdout contains JSON with `"result": "ok"`, `"artifactId": "specs"`, and `"instruction": "Write the spec"`
+
+#### Scenario: JSON output includes template
+
+- **GIVEN** an artifact with a declared template containing scaffolding content
+- **WHEN** `specd change artifact-instruction add-auth specs --format json`
+- **THEN** stdout contains JSON with a `"template"` field containing the resolved template content

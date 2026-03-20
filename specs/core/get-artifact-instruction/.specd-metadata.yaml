@@ -28,14 +28,14 @@ rules:
         }
         ```
 
-        `ArtifactParserRegistry` is needed to generate delta format instructions and existing artifact outlines. `SpecRepository` is needed to read existing artifact files for outlines. `TemplateExpander.expand()` is called on `instruction`, `deltaInstruction`, and `rules` text before returning them (verbatim expansion, no shell escaping). The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander.
+        `ArtifactParserRegistry` is needed to generate delta format instructions and existing artifact outlines. `SpecRepository` is needed to read existing artifact files for outlines. `TemplateExpander.expand()` is called on `instruction`, `template`, `deltaInstruction`, and `rules` text before returning them (verbatim expansion, no shell escaping). `SchemaRegistry` is needed to resolve the template file path and read its content. The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander.
   - requirement: Input
     rules:
       - |-
         `GetArtifactInstruction.execute` receives:
 
-        * `name` (string, required) — the change name
-        * `artifactId` (string, optional) — the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on by walking the schema's artifact list in declaration order: the first artifact whose `requires` dependencies are all satisfied (complete or skipped) but that is itself not yet complete or skipped. If all artifacts are already complete/skipped, it throws `ArtifactNotFoundError`.
+        - `name` (string, required) — the change name
+        - `artifactId` (string, optional) — the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on by walking the schema's artifact list in declaration order: the first artifact whose `requires` dependencies are all satisfied (complete or skipped) but that is itself not yet complete or skipped. If all artifacts are already complete/skipped, it throws `ArtifactNotFoundError`.
   - requirement: Change lookup
     rules:
       - '`GetArtifactInstruction` loads the change by name via `ChangeRepository`. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.'
@@ -50,13 +50,14 @@ rules:
       - |-
         `GetArtifactInstruction` MUST resolve each instruction component independently:
 
-        * **`rulesPre`** — if the artifact declares `rules.pre`, collect all entries' `text` in declaration order. These are composition rules added by extending schemas or plugins to augment the base instruction.
-        * **`instruction`** — the artifact's `instruction` field from the schema. `null` if not declared.
-        * **`delta`** — if the artifact has `delta: true`, resolve three sub-components:
-          * **`formatInstructions`** — call `parsers.get(artifact.format).deltaInstructions()` for the technical delta format guidance.
-          * **`domainInstructions`** — the artifact's `deltaInstruction` field. `null` if not declared.
-          * **`outlines`** — for each spec ID in `change.specIds`, read the corresponding artifact file from `SpecRepository`, parse it via `ArtifactParser.parse()`, and call `ArtifactParser.outline()` to obtain an `OutlineEntry[]` tree. An outline is a navigable summary of the artifact's addressable nodes (sections in markdown, keys in YAML/JSON) without their content — it tells the agent what structure exists so it can target delta operations correctly. Missing files are silently skipped. Each entry includes the `specId` and its `outline`.
-        * **`rulesPost`** — if the artifact declares `rules.post`, collect all entries' `text` in declaration order.
+        - **`rulesPre`** — if the artifact declares `rules.pre`, collect all entries' `text` in declaration order. These are composition rules added by extending schemas or plugins to augment the base instruction.
+        - **`instruction`** — the artifact's `instruction` field from the schema. `null` if not declared.
+        - **`template`** — if the artifact declares a `template` path, read the file content from the schema directory via `SchemaRegistry` and return the resolved string. `null` if the artifact has no template. Template variable expansion (via `TemplateExpander`) MUST be applied to the template content using the same contextual variables as `instruction`.
+        - **`delta`** — if the artifact has `delta: true`, resolve three sub-components:
+          - **`formatInstructions`** — call `parsers.get(artifact.format).deltaInstructions()` for the technical delta format guidance.
+          - **`domainInstructions`** — the artifact's `deltaInstruction` field. `null` if not declared.
+          - **`outlines`** — for each spec ID in `change.specIds`, read the corresponding artifact file from `SpecRepository`, parse it via `ArtifactParser.parse()`, and call `ArtifactParser.outline()` to obtain an `OutlineEntry[]` tree. An outline is a navigable summary of the artifact's addressable nodes (sections in markdown, keys in YAML/JSON) without their content — it tells the agent what structure exists so it can target delta operations correctly. Missing files are silently skipped. Each entry includes the `specId` and its `outline`.
+        - **`rulesPost`** — if the artifact declares `rules.post`, collect all entries' `text` in declaration order.
 
         When `delta` is `false`, the `delta` field in the result is `null`.
   - requirement: Result shape
@@ -64,18 +65,19 @@ rules:
       - |-
         `GetArtifactInstruction.execute` MUST return a structured result containing:
 
-        * `artifactId` (string) — the artifact ID
-        * `rulesPre` (string\[]) — `rules.pre` texts in declaration order; empty array if none
-        * `instruction` (string | null) — the artifact's instruction text; `null` if not declared
-        * `delta` (object | null) — delta-specific instruction components; `null` when `delta: false`:
-          * `formatInstructions` (string) — format-specific delta writing guidance
-          * `domainInstructions` (string | null) — the artifact's `deltaInstruction` text; `null` if not declared
-          * `outlines` (array) — one entry per spec in `change.specIds` that has an existing artifact file:
-            * `specId` (string) — the spec ID
-            * `outline` (OutlineEntry\[]) — the navigable node structure
-        * `rulesPost` (string\[]) — `rules.post` texts in declaration order; empty array if none
+        - `artifactId` (string) — the artifact ID
+        - `rulesPre` (string\[]) — `rules.pre` texts in declaration order; empty array if none
+        - `instruction` (string | null) — the artifact's instruction text; `null` if not declared
+        - `template` (string | null) — the resolved template file content with variables expanded; `null` when the artifact has no template declared
+        - `delta` (object | null) — delta-specific instruction components; `null` when `delta: false`:
+          - `formatInstructions` (string) — format-specific delta writing guidance
+          - `domainInstructions` (string | null) — the artifact's `deltaInstruction` text; `null` if not declared
+          - `outlines` (array) — one entry per spec in `change.specIds` that has an existing artifact file:
+            - `specId` (string) — the spec ID
+            - `outline` (OutlineEntry\[]) — the navigable node structure
+        - `rulesPost` (string\[]) — `rules.post` texts in declaration order; empty array if none
 
-        The caller decides which parts to use. A subagent creating artifacts from scratch uses `rulesPre` + `instruction` + `rulesPost`. A subagent creating deltas uses `rulesPre` + `delta` + `rulesPost`.
+        The caller decides which parts to use. A subagent creating artifacts from scratch uses `rulesPre` + `instruction` + `template` + `rulesPost`. A subagent creating deltas uses `rulesPre` + `delta` + `rulesPost` (the template is not needed for deltas since `outlines` provides the existing structure).
 constraints:
   - This use case is read-only — it does not modify the change or execute any commands
   - rules.pre and rules.post are schema composition mechanisms — they augment the instruction without replacing it
@@ -171,6 +173,15 @@ scenarios:
     then:
       - rulesPre is ["Use formal language"]
       - AND instruction is "Write specs"
+  - requirement: Instruction resolution
+    name: Template content resolved and returned
+    given:
+      - 'an artifact with template: "templates/design.md" pointing to a file containing # Design: {{change.name}}'
+      - AND a change named add-auth
+    when:
+      - GetArtifactInstruction.execute is called for this artifact
+    then:
+      - 'template is "# Design: add-auth" (variables expanded)'
   - requirement: Result shape
     name: Rules-only artifact has null instruction
     given:
@@ -180,7 +191,15 @@ scenarios:
     then:
       - instruction is null
       - AND rulesPost is ["Check grammar"]
+  - requirement: Result shape
+    name: Result includes template field
+    given:
+      - 'an artifact with template: "templates/tasks.md"'
+    when:
+      - GetArtifactInstruction.execute is called
+    then:
+      - the result includes a template field with the resolved file content
 contentHashes:
-  spec.md: sha256:adbb86182196c58df5261b1559eb8b490dff7772592d0b32da9b5e7465c07e56
-  verify.md: sha256:63db59259579a235b95b6cfc269b3de53c211c06a66e3389dc648faf2b91e92a
+  spec.md: sha256:5d7c8aaa94b1424badc3e3544a5cb58d425f2229cdf8879225685181450854fc
+  verify.md: sha256:8fb3e51960aac596c29e006ecef5933bc869442f091c3d6c85c2f0f0e4caf01e
 generatedBy: core

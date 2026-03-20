@@ -365,6 +365,14 @@
 - **WHEN** a step's `requires` lists an artifact that is not `complete`
 - **THEN** `CompileContext` must report that the step is blocked
 
+#### Scenario: Step blocked when required artifact deleted mid-lifecycle
+
+- **GIVEN** a workflow step `implementing` with `requires: [proposal, specs, verify, design, tasks]`
+- **AND** a change where `design` artifact has been deleted (status reverts to `missing`)
+- **WHEN** `CompileContext` evaluates step availability for `implementing`
+- **THEN** `stepAvailable` is `false`
+- **AND** `blockingArtifacts` includes `"design"`
+
 #### Scenario: Hook entries require id
 
 - **WHEN** a `workflow[].hooks.pre` entry omits the `id` field

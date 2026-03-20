@@ -35,7 +35,7 @@ The command exits with code 1 for:
 
 ### Requirement: Text output format
 
-When `--format` is `text` (default), the structured result parts are printed with labelled sections. Each non-empty part is printed with a header (`[rules.pre]`, `[instruction]`, `[delta]`, `[rules.post]`), separated by blank lines. Empty parts are omitted. This allows skills to parse sections or consume the full output.
+When `--format` is `text` (default), the structured result parts are printed with labelled sections. Each non-empty part is printed with a header (`[rules.pre]`, `[instruction]`, `[template]`, `[delta]`, `[rules.post]`), separated by blank lines. Empty parts are omitted. This allows skills to parse sections or consume the full output.
 
 ### Requirement: JSON output format
 
@@ -47,6 +47,7 @@ When `--format` is `json` or `toon`, output to stdout:
   "artifactId": "<artifact-id>",
   "rulesPre": ["<rule text>"],
   "instruction": "<instruction text>" | null,
+  "template": "<resolved template content>" | null,
   "delta": {
     "formatInstructions": "<format guidance>",
     "domainInstructions": "<delta instruction>" | null,
