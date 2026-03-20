@@ -26,7 +26,9 @@ export function registerSchemaShow(parent: Command): void {
             const label = a.optional ? 'optional' : 'required'
             const requires = a.requires
             const reqStr = requires.length > 0 ? `  requires=[${requires.join(',')}]` : ''
-            return `  ${a.id}  ${a.scope}  ${label}${reqStr}`
+            const outStr = `  output=${a.output}`
+            const descStr = a.description !== undefined ? `  [${a.description}]` : ''
+            return `  ${a.id}  ${a.scope}  ${label}${reqStr}${outStr}${descStr}`
           })
           const workflowLines = schema.workflow().map((s) => {
             const reqStr = `requires=[${s.requires.join(',')}]`
@@ -53,6 +55,9 @@ export function registerSchemaShow(parent: Command): void {
                 requires: [...a.requires],
                 format: a.format,
                 delta: a.delta,
+                description: a.description ?? null,
+                output: a.output,
+                hasTaskCompletionCheck: a.taskCompletionCheck !== undefined,
               })),
               workflow: schema.workflow().map((s) => ({
                 step: s.step,

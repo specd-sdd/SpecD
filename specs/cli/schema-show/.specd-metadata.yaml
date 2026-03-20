@@ -13,7 +13,7 @@ rules:
         specd schema show [--format text|json|toon]
         ```
 
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Output format
     rules:
       - |-
@@ -25,7 +25,7 @@ rules:
         plugins: <count> applied  (only if schemaPlugins is non-empty)
 
         artifacts:
-          <id>  <scope>  <optional>  requires=[<id>,...]
+          <id>  <scope>  <optional>  requires=[<id>,...]  output=<pattern>  [<description>]
           ...
 
         workflow:
@@ -33,7 +33,7 @@ rules:
           ...
         ```
 
-        where `<optional>` is `optional` or `required`, and `requires` lists the artifact IDs or step names that must be complete before this entry is available. The `requires` field is omitted when empty.
+        where `<optional>` is `optional` or `required`, and `requires` lists the artifact IDs or step names that must be complete before this entry is available. The `requires` field is omitted when empty. `output` is always shown. `<description>` is shown in brackets when present.
 
         In `json` or `toon` mode, the output is (encoded in the respective format):
 
@@ -48,7 +48,10 @@ rules:
               "optional": false,
               "requires": [],
               "format": "...",
-              "delta": false
+              "delta": false,
+              "description": "..." | null,
+              "output": "...",
+              "hasTaskCompletionCheck": false
             }
           ],
           "workflow": [
@@ -59,12 +62,16 @@ rules:
           ]
         }
         ```
+
+        - `description` (string | null) — human-readable summary of the artifact's purpose; `null` when the schema does not declare one
+        - `output` (string) — the filename or glob pattern for the artifact's output files (e.g. `"proposal.md"`, `"specs/**/spec.md"`)
+        - `hasTaskCompletionCheck` (boolean) — `true` when the artifact declares a `taskCompletionCheck` configuration; `false` otherwise
   - requirement: Error cases
     rules:
-      - '* If the schema reference in `specd.yaml` cannot be resolved, exits with code 3.'
+      - '- If the schema reference in `specd.yaml` cannot be resolved, exits with code 3.'
 constraints:
   - This command is read-only
-  - Artifact instruction, deltaInstruction, and validations are not included in the output — this command focuses on structure, not content
+  - Artifact instruction, deltaInstruction, validations, and template are not included in the output — this command focuses on structure, not content
 scenarios:
   - requirement: Output format
     name: Text output shows schema name, kind, artifacts, and workflow
@@ -125,6 +132,16 @@ scenarios:
       - AND each artifact entry has id, scope, optional, requires, format, and delta
       - AND each workflow entry has step and requires
       - AND the process exits with code 0
+  - requirement: Output format
+    name: JSON output includes description, output, and hasTaskCompletionCheck
+    given:
+      - 'a schema with artifact tasks that has description: "Implementation checklist", output: "tasks.md", and a taskCompletionCheck declared'
+    when:
+      - specd schema show --format json is run
+    then:
+      - 'the tasks artifact entry includes "description": "Implementation checklist"'
+      - 'AND the entry includes "output": "tasks.md"'
+      - 'AND the entry includes "hasTaskCompletionCheck": true'
   - requirement: Error cases
     name: Schema cannot be resolved
     given:
@@ -135,6 +152,6 @@ scenarios:
       - the command exits with code 3
       - 'AND stderr contains a fatal: message'
 contentHashes:
-  spec.md: sha256:a83474386cf6cf0ccb05ba73fb65a910ceaced95b29f951ae178736342212231
-  verify.md: sha256:b2e6b3f5a957b83b3fb8e3c6d64ecc00a2cf8d001161c7912a3a4bfa2efef063
+  spec.md: sha256:d30d38a85c4b96eeab1df1b84b62fd6e460e26152be04761ffff5135bd399b94
+  verify.md: sha256:013f43b2dec8919fca9e15757cb3bdcc14e22b4878bfeab9c333931e8cc0e432
 generatedBy: core

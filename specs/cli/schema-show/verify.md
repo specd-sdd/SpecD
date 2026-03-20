@@ -50,6 +50,14 @@
 - **AND** each workflow entry has `step` and `requires`
 - **AND** the process exits with code 0
 
+#### Scenario: JSON output includes description, output, and hasTaskCompletionCheck
+
+- **GIVEN** a schema with artifact `tasks` that has `description: "Implementation checklist"`, `output: "tasks.md"`, and a `taskCompletionCheck` declared
+- **WHEN** `specd schema show --format json` is run
+- **THEN** the `tasks` artifact entry includes `"description": "Implementation checklist"`
+- **AND** the entry includes `"output": "tasks.md"`
+- **AND** the entry includes `"hasTaskCompletionCheck": true`
+
 ### Requirement: Error cases
 
 #### Scenario: Schema cannot be resolved

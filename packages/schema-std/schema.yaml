@@ -234,7 +234,14 @@ artifacts:
     template: templates/design.md
     requires:
       - proposal
+      - specs
+      - verify
     instruction: |
+      Read the upstream artifacts before writing:
+      - proposal.md — the problem, motivation, and scope
+      - specs (spec.md and deltas) — the final requirements the implementation must satisfy
+      - verify (verify.md and deltas) — the verification scenarios the implementation must pass
+
       Create the design document that explains HOW to implement the change.
 
       This artifact is the bridge between specs and tasks. Its purpose is to study the
@@ -353,11 +360,16 @@ artifacts:
         ```
         - [ ] <n>.<m> <short description>
               <file>: <symbol> — <what to change and why>
+              Approach: <concrete implementation detail from design.md — the specific
+              technique, algorithm, signature, or code pattern to use>
+              (Req: requirement name)
         ```
         The checkbox line is tracked by SpecD. The indented lines below it provide
         the actionable context from design.md: which file, which symbol or function,
-        and what the change does. A developer reading a single task should know exactly
-        where to go and what to do.
+        what the change does, and HOW to do it. The `Approach:` line carries the key
+        design decision or code pattern from design.md so the implementer does not need
+        to cross-reference. A developer reading a single task should know exactly
+        where to go, what to do, and how to do it.
       - Order tasks by dependency — what must be done first?
       - Tasks should be small enough to complete in a single session.
 
@@ -371,10 +383,15 @@ artifacts:
       - [ ] 1.1 Add optional `artifactId` field to input interface
             `packages/core/src/application/use-cases/validate-artifacts.ts`:
             `ValidateArtifactsInput` — add `artifactId?: string` property
+            Approach: add as optional field; when present, `execute()` filters
+            the schema artifacts array to only the matching ID before validation
             (Req: Input)
       - [ ] 1.2 Guard unknown artifact IDs with failure result
             `packages/core/src/application/use-cases/validate-artifacts.ts`:
             `execute()` — return failure when `artifactId` not in schema, do not throw
+            Approach: check `schema.artifact(artifactId) === null` before the
+            validation loop; return `{ result: 'failure', errors: [...] }` instead
+            of throwing, consistent with other validation failures
             (Req: Input, scenario: unknown artifact ID)
 
       ## 2. Tests
@@ -382,6 +399,8 @@ artifacts:
       - [ ] 2.1 Add test for single-artifact validation
             `packages/core/test/application/use-cases/validate-artifacts.spec.ts`:
             new describe block — verify only specified artifact is validated
+            Approach: create a change with two artifacts, validate with artifactId
+            targeting one, assert only that artifact's errors are returned
       ```
 
       Each task should be verifiable — you know unambiguously when it is done.
@@ -477,18 +496,6 @@ metadataExtraction:
 workflow:
   - step: designing
     requires: []
-    hooks:
-      pre:
-        - id: designing-guidance
-          instruction: |
-            Start with the proposal — establish why the change is needed and which specs
-            will be created or modified. Once the proposal is ready, write
-            `specs/<workspace>/<capability-path>/spec.md` and the paired `verify.md` for
-            each new spec. For modified specs, produce delta files at
-            `deltas/<workspace>/<capability-path>/<filename>.delta.yaml` instead of
-            rewriting the existing files. Then write design.md — analyse the codebase to
-            identify affected files and symbols, and document the implementation approach.
-            If the change has no code implementation, state that explicitly in design.md.
 
   - step: ready
     requires: [proposal, specs, verify, design, tasks]
@@ -502,14 +509,26 @@ workflow:
             work items. This is a gate — do not proceed until everything is in place.
 
   - step: implementing
-    requires: [tasks]
+    requires: [proposal, specs, verify, design, tasks]
     hooks:
       pre:
         - id: implementing-guidance
           instruction: |
-            Read tasks.md. Work through tasks one by one in order, marking each complete
-            (- [x]) as you go. Pause and ask for guidance if you hit a blocker or the
-            task is ambiguous. Do not advance to verifying while any - [ ] items remain.
+            Read all change artifacts before starting:
+            - proposal.md — the problem being solved and why
+            - specs (spec.md and deltas) — the final specification of what the system should do
+            - verify (verify.md and deltas) — the verification scenarios that the
+              implementation must satisfy
+            - design.md — the implementation approach, key decisions, affected areas,
+              and code snippets. This is the primary technical reference, you MUST read it.
+            - tasks.md — the progress checklist
+            Work through tasks one by one in order. Use design.md as the technical
+            reference for how to implement each task, specs for what the system should
+            do, verify for the scenarios the implementation must pass, and proposal.md
+            for the motivation behind decisions. Mark each task complete (- [x]) as
+            you go. Pause and ask for guidance if you hit a blocker or the task is
+            ambiguous, If ambiguous: design.md is the source of truth. Do not advance
+            to verifying while any - [ ] items remain.
       post:
         - id: run-tests
           run: 'pnpm test'

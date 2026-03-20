@@ -13,9 +13,9 @@ rules:
         specd change artifact-instruction <name> [artifact-id] [--format text|json|toon]
         ```
 
-        * `<name>` — required positional; the change name
-        * `[artifact-id]` — optional positional; the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on based on the dependency graph — the first artifact whose `requires` are all satisfied but that is not yet complete
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `<name>` — required positional; the change name
+        - `[artifact-id]` — optional positional; the artifact ID from the schema (e.g. `specs`, `verify`, `tasks`). When omitted, the use case auto-resolves the next artifact to work on based on the dependency graph — the first artifact whose `requires` are all satisfied but that is not yet complete
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Delegates to GetArtifactInstruction
     rules:
       - The command MUST delegate to the `GetArtifactInstruction` use case. It MUST NOT resolve schemas, collect rules, or generate delta context directly.
@@ -27,13 +27,13 @@ rules:
       - |-
         The command exits with code 1 for:
 
-        * Change not found (`ChangeNotFoundError`)
-        * Unknown artifact ID (`ArtifactNotFoundError`)
-        * Schema mismatch (`SchemaMismatchError`)
-        * No parser registered for the artifact's format (`ParserNotRegisteredError`)
+        - Change not found (`ChangeNotFoundError`)
+        - Unknown artifact ID (`ArtifactNotFoundError`)
+        - Schema mismatch (`SchemaMismatchError`)
+        - No parser registered for the artifact's format (`ParserNotRegisteredError`)
   - requirement: Text output format
     rules:
-      - When `--format` is `text` (default), the structured result parts are printed with labelled sections. Each non-empty part is printed with a header (`[rules.pre]`, `[instruction]`, `[delta]`, `[rules.post]`), separated by blank lines. Empty parts are omitted. This allows skills to parse sections or consume the full output.
+      - When `--format` is `text` (default), the structured result parts are printed with labelled sections. Each non-empty part is printed with a header (`[rules.pre]`, `[instruction]`, `[template]`, `[delta]`, `[rules.post]`), separated by blank lines. Empty parts are omitted. This allows skills to parse sections or consume the full output.
   - requirement: JSON output format
     rules:
       - |-
@@ -45,6 +45,7 @@ rules:
           "artifactId": "<artifact-id>",
           "rulesPre": ["<rule text>"],
           "instruction": "<instruction text>" | null,
+          "template": "<resolved template content>" | null,
           "delta": {
             "formatInstructions": "<format guidance>",
             "domainInstructions": "<delta instruction>" | null,
@@ -94,6 +95,14 @@ scenarios:
       - stdout contains a [rules.pre] section with "Use formal language"
       - AND stdout contains an [instruction] section with "Write the spec"
       - AND sections are separated by blank lines
+  - requirement: Text output format
+    name: Template section in text output
+    given:
+      - an artifact with a declared template
+    when:
+      - specd change artifact-instruction add-auth specs
+    then:
+      - stdout contains a [template] section with the template content
   - requirement: JSON output format
     name: JSON output with instruction
     given:
@@ -102,7 +111,15 @@ scenarios:
       - specd change artifact-instruction add-auth specs --format json
     then:
       - 'stdout contains JSON with "result": "ok", "artifactId": "specs", and "instruction": "Write the spec"'
+  - requirement: JSON output format
+    name: JSON output includes template
+    given:
+      - an artifact with a declared template containing scaffolding content
+    when:
+      - specd change artifact-instruction add-auth specs --format json
+    then:
+      - stdout contains JSON with a "template" field containing the resolved template content
 contentHashes:
-  spec.md: sha256:42cd67da2b8215e24d89f3cf27999bd325c6a18e75f052a1c262ae2863a6fccc
-  verify.md: sha256:4c732d426510a2c2059afc354796eb6db67169c6d0060bf7e22d5d0f9ea60584
+  spec.md: sha256:778451e6cc7bc0070ffcb28c731b18340941162028639690a307d2de2f88a1f4
+  verify.md: sha256:ce4bb9b9083d8f527f95983075084f35dda34393a52b8c617974d6674b98276a
 generatedBy: core

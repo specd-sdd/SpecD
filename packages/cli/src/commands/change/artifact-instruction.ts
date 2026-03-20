@@ -35,6 +35,7 @@ export function registerChangeArtifactInstruction(parent: Command): void {
             const hasContent =
               result.rulesPre.length > 0 ||
               result.instruction !== null ||
+              result.template !== null ||
               result.delta !== null ||
               result.rulesPost.length > 0
 
@@ -51,6 +52,10 @@ export function registerChangeArtifactInstruction(parent: Command): void {
 
             if (result.instruction !== null) {
               sections.push(`[instruction]\n${result.instruction}`)
+            }
+
+            if (result.template !== null) {
+              sections.push(`[template]\n${result.template}`)
             }
 
             if (result.delta !== null) {
@@ -79,6 +84,7 @@ export function registerChangeArtifactInstruction(parent: Command): void {
                 artifactId: result.artifactId,
                 rulesPre: result.rulesPre,
                 instruction: result.instruction,
+                template: result.template,
                 delta: result.delta,
                 rulesPost: result.rulesPost,
               },
