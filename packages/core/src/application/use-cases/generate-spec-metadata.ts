@@ -1,7 +1,7 @@
 import { extractMetadata, type SubtreeRenderer } from '../../domain/services/extract-metadata.js'
 import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
@@ -41,36 +41,28 @@ export interface GenerateSpecMetadataResult {
  */
 export class GenerateSpecMetadata {
   private readonly _specs: ReadonlyMap<string, SpecRepository>
-  private readonly _schemas: SchemaRegistry
+  private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new GenerateSpecMetadata use case instance.
    *
    * @param specs - Spec repositories keyed by workspace name
-   * @param schemas - Registry for resolving schema references
+   * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hashing service
-   * @param schemaRef - The schema reference string to resolve
-   * @param workspaceSchemasPaths - Map of workspace names to schema paths
    */
   constructor(
     specs: ReadonlyMap<string, SpecRepository>,
-    schemas: SchemaRegistry,
+    schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
   ) {
     this._specs = specs
-    this._schemas = schemas
+    this._schemaProvider = schemaProvider
     this._parsers = parsers
     this._hasher = hasher
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
@@ -81,8 +73,8 @@ export class GenerateSpecMetadata {
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    */
   async execute(input: GenerateSpecMetadataInput): Promise<GenerateSpecMetadataResult> {
-    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+    const schema = await this._schemaProvider.get()
+    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     const extraction = schema.metadataExtraction()
     if (extraction === undefined) {

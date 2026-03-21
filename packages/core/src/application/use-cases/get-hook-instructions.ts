@@ -3,7 +3,7 @@ import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
 import { StepNotValidError } from '../../domain/errors/step-not-valid-error.js'
 import { HookNotFoundError } from '../../domain/errors/hook-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type TemplateExpander } from '../template-expander.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
@@ -33,10 +33,8 @@ export interface GetHookInstructionsResult {
  */
 export class GetHookInstructions {
   private readonly _changes: ChangeRepository
-  private readonly _schemas: SchemaRegistry
+  private readonly _schemaProvider: SchemaProvider
   private readonly _templates: TemplateExpander
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
   private readonly _projectWorkflowHooks: readonly {
     readonly step: string
     readonly hooks: {
@@ -49,18 +47,14 @@ export class GetHookInstructions {
    * Creates a new `GetHookInstructions` use case.
    *
    * @param changes - Repository for loading change entities
-   * @param schemas - Registry for resolving the active schema
+   * @param schemaProvider - Provider for the fully-resolved schema
    * @param templates - Template expander for variable substitution
-   * @param schemaRef - Schema reference string from config
-   * @param workspaceSchemasPaths - Map of workspace names to schema directory paths
    * @param projectWorkflowHooks - Project-level workflow hook overrides
    */
   constructor(
     changes: ChangeRepository,
-    schemas: SchemaRegistry,
+    schemaProvider: SchemaProvider,
     templates: TemplateExpander,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
     projectWorkflowHooks?: readonly {
       readonly step: string
       readonly hooks: {
@@ -70,10 +64,8 @@ export class GetHookInstructions {
     }[],
   ) {
     this._changes = changes
-    this._schemas = schemas
+    this._schemaProvider = schemaProvider
     this._templates = templates
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
     this._projectWorkflowHooks = projectWorkflowHooks ?? []
   }
 
@@ -87,8 +79,8 @@ export class GetHookInstructions {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+    const schema = await this._schemaProvider.get()
+    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     if (schema.name() !== change.schemaName) {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())

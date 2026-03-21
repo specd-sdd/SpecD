@@ -11,7 +11,7 @@ context:
 rules:
   - requirement: Resolve the active schema
     rules:
-      - The use case SHALL resolve the schema via `SchemaRegistry.resolve(schemaRef, workspaceSchemasPaths)`. If the schema cannot be resolved (returns `null`), the use case MUST throw a `SchemaNotFoundError`.
+      - The use case SHALL obtain the schema via `SchemaProvider.get()`. If the schema cannot be resolved (returns `null`), the use case MUST throw a `SchemaNotFoundError`.
   - requirement: Filter to spec-scoped artifact types
     rules:
       - The use case SHALL call `schema.artifacts()` and retain only those artifact types where `scope === 'spec'`. Change-scoped artifact types MUST be excluded from validation.
@@ -50,17 +50,17 @@ rules:
       - |-
         The use case SHALL return a `ValidateSpecsResult` containing:
 
-        * `entries` — array of `SpecValidationEntry` objects, one per validated spec.
-        * `totalSpecs` — total number of specs validated.
-        * `passed` — number of specs with zero failures.
-        * `failed` — number of specs with one or more failures.
+        - `entries` — array of `SpecValidationEntry` objects, one per validated spec.
+        - `totalSpecs` — total number of specs validated.
+        - `passed` — number of specs with zero failures.
+        - `failed` — number of specs with one or more failures.
 
         Each `SpecValidationEntry` MUST include:
 
-        * `spec` — qualified label in `workspace:capabilityPath` format.
-        * `passed` — `true` if `failures` is empty.
-        * `failures` — array of `ValidationFailure` objects.
-        * `warnings` — array of `ValidationWarning` objects.
+        - `spec` — qualified label in `workspace:capabilityPath` format.
+        - `passed` — `true` if `failures` is empty.
+        - `failures` — array of `ValidationFailure` objects.
+        - `warnings` — array of `ValidationWarning` objects.
   - requirement: Format inference and parser resolution
     rules:
       - When an artifact type does not specify an explicit `format`, the use case SHALL infer it from the filename via `inferFormat`. If no parser is found for the resolved format, the artifact MUST be skipped without recording a failure or warning.
@@ -73,7 +73,7 @@ scenarios:
   - requirement: Resolve the active schema
     name: Schema not found throws SchemaNotFoundError
     when:
-      - the schema registry returns null for the configured schema reference
+      - SchemaProvider.get() returns null for the configured schema reference
     then:
       - a SchemaNotFoundError is thrown
   - requirement: Filter to spec-scoped artifact types
@@ -185,6 +185,6 @@ scenarios:
     then:
       - no failure or warning is recorded for that artifact
 contentHashes:
-  spec.md: sha256:1f03a236d4b6ccadab68b82679419290a024496b6cbeb557825e191c61261454
-  verify.md: sha256:02961b677afa757dfcec6fbb8e8f948fde4b5fd988dc90566750b27416429379
+  spec.md: sha256:9cbeae7136c768a182e3531f37c7ce1c07b6b31d426eab64d11cae59149f4794
+  verify.md: sha256:805d8e2933faae7ae1601b79edda203c735a5156ad4812c09b9705362a9274da
 generatedBy: core

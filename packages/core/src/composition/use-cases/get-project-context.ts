@@ -5,6 +5,8 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { createSpecRepository } from '../spec-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
@@ -88,16 +90,16 @@ export function createGetProjectContext(
     nodeModulesPaths: opts.nodeModulesPaths,
     configDir: opts.configDir,
   })
+  const resolveSchema = new ResolveSchema(
+    schemas,
+    opts.schemaRef,
+    opts.workspaceSchemasPaths,
+    [],
+    undefined,
+  )
+  const schemaProvider = new LazySchemaProvider(resolveSchema)
   const files = new FsFileReader()
   const parsers = createArtifactParserRegistry()
   const hasher = new NodeContentHasher()
-  return new GetProjectContext(
-    opts.specRepositories,
-    schemas,
-    files,
-    parsers,
-    hasher,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
-  )
+  return new GetProjectContext(opts.specRepositories, schemaProvider, files, parsers, hasher)
 }

@@ -26,6 +26,7 @@ export {
   type ArtifactParser,
   type ArtifactParserRegistry,
 } from './artifact-parser.js'
+export { type SchemaProvider } from './schema-provider.js'
 export { type ConfigLoader } from './config-loader.js'
 export {
   type ConfigWriter,

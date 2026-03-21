@@ -6,10 +6,9 @@
 
 #### Scenario: Project-level include applied regardless of active workspace
 
-- **GIVEN** `contextIncludeSpecs: ['_global/*']` at the project level
-- **AND** the current change has no spec from `_global`
-- **WHEN** `CompileContext.execute` is called
-- **THEN** all specs under `_global/` are included in the context
+- **GIVEN** a project-level `contextIncludeSpecs` pattern that matches specs in multiple workspaces
+- **WHEN** `CompileContext.execute` is called for a specific workspace
+- **THEN** all specs matching the project-level pattern are included regardless of the active workspace
 
 #### Scenario: Workspace-level include applied only for active workspace
 

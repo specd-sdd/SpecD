@@ -6,10 +6,9 @@
 
 #### Scenario: Non-optional artifact missing — failure
 
-- **GIVEN** a schema with a non-optional artifact `specs`
-- **AND** the change has no file for `specs` and `validatedHash` is unset
-- **WHEN** `ValidateArtifacts.execute` is called without `artifactId`
-- **THEN** `result.passed` is `false` and `result.failures` lists `specs` as missing
+- **GIVEN** a change with a required (non-optional) artifact that has no files
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** the result includes a validation failure for the missing artifact
 
 #### Scenario: Skipped optional artifact does not cause failure
 

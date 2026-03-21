@@ -4,6 +4,8 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { createSpecRepository } from '../spec-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 
 /** Filesystem adapter options for `createValidateSpecs(options)`. */
@@ -79,12 +81,14 @@ export function createValidateSpecs(
     nodeModulesPaths: configOrOptions.nodeModulesPaths,
     configDir: configOrOptions.configDir,
   })
-  const parsers = createArtifactParserRegistry()
-  return new ValidateSpecs(
-    configOrOptions.specRepositories,
+  const resolveSchema = new ResolveSchema(
     schemas,
-    parsers,
     configOrOptions.schemaRef,
     configOrOptions.workspaceSchemasPaths,
+    [],
+    undefined,
   )
+  const schemaProvider = new LazySchemaProvider(resolveSchema)
+  const parsers = createArtifactParserRegistry()
+  return new ValidateSpecs(configOrOptions.specRepositories, schemaProvider, parsers)
 }

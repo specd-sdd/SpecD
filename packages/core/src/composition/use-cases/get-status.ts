@@ -4,6 +4,8 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { LazySchemaProvider } from '../lazy-schema-provider.js'
 
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
@@ -107,11 +109,13 @@ export function createGetStatus(
     nodeModulesPaths: opts.nodeModulesPaths,
     configDir: opts.configDir,
   })
-  return new GetStatus(
-    changeRepo,
+  const resolveSchema = new ResolveSchema(
     schemas,
     opts.schemaRef,
     opts.workspaceSchemasPaths,
-    opts.approvals,
+    [],
+    undefined,
   )
+  const schemaProvider = new LazySchemaProvider(resolveSchema)
+  return new GetStatus(changeRepo, schemaProvider, opts.approvals)
 }

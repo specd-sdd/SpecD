@@ -8,7 +8,7 @@ import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js
 import {
   makeChangeRepository,
   makeActorResolver,
-  makeSchemaRegistry,
+  makeSchemaProvider,
   makeSchema,
   makeContentHasher,
   testActor,
@@ -44,10 +44,8 @@ describe('ApproveSignoff', () => {
       const uc = new ApproveSignoff(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -67,10 +65,8 @@ describe('ApproveSignoff', () => {
       const uc = new ApproveSignoff(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -90,10 +86,8 @@ describe('ApproveSignoff', () => {
       const uc = new ApproveSignoff(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         hasher,
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -112,10 +106,8 @@ describe('ApproveSignoff', () => {
       const uc = new ApproveSignoff(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -134,10 +126,8 @@ describe('ApproveSignoff', () => {
       const uc = new ApproveSignoff(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(),
+        makeSchemaProvider(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await expect(
@@ -154,10 +144,8 @@ describe('ApproveSignoff', () => {
       const uc = new ApproveSignoff(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(),
+        makeSchemaProvider(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await expect(
@@ -183,10 +171,8 @@ describe('ApproveSignoff', () => {
       const uc = new ApproveSignoff(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await expect(
@@ -205,10 +191,8 @@ describe('ApproveSignoff', () => {
       const uc = new ApproveSignoff(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await expect(

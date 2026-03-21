@@ -120,7 +120,7 @@
 
 #### Scenario: Schema resolution failure degrades lifecycle fields
 
-- **GIVEN** `SchemaRegistry.resolve()` throws an error
+- **GIVEN** `SchemaProvider.get()` returns `null`
 - **WHEN** `execute()` is called
 - **THEN** the result does not throw
 - **AND** `lifecycle.validTransitions` is populated normally

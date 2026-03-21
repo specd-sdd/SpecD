@@ -7,7 +7,7 @@
 #### Scenario: Non-existent change is rejected
 
 - **WHEN** `TransitionChange.execute` is called with a name that does not exist in the repository
-- **THEN** it throws `ChangeNotFoundError`
+- **THEN** a `ChangeNotFoundError` is thrown
 
 ### Requirement: Approval-gate routing for spec approval
 

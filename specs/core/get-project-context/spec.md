@@ -19,13 +19,13 @@ Tooling sometimes needs the project's compiled spec context without an active ch
 
 `execute` MUST return a `GetProjectContextResult` containing:
 
-- `contextEntries` (string[]) — rendered project-level context entries (instruction text or file content).
+- `contextEntries` (string\[]) — rendered project-level context entries (instruction text or file content).
 - `specs` (`GetProjectContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `workspace`, `path`, and `content` fields.
 - `warnings` (`ContextWarning[]`) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.
 
 ### Requirement: Resolves schema before processing
 
-The use case MUST resolve the project's schema via `SchemaRegistry.resolve` before processing any specs. If the schema reference cannot be resolved (returns `null`), the use case MUST throw `SchemaNotFoundError`.
+The use case MUST obtain the project's schema via `SchemaProvider.get()` before processing any specs. If the schema cannot be resolved (returns `null`), the use case MUST throw `SchemaNotFoundError`.
 
 ### Requirement: Renders project-level context entries
 
@@ -63,15 +63,15 @@ When metadata is stale or absent, the use case MUST:
 
 ### Requirement: Construction dependencies
 
-`GetProjectContext` MUST be constructed with the following dependencies:
+`GetProjectContext` depends on the following ports injected via constructor:
 
-- `specs` (`ReadonlyMap<string, SpecRepository>`) — spec repositories keyed by workspace name.
-- `schemas` (`SchemaRegistry`) — registry for resolving schema references.
-- `files` (`FileReader`) — reader for project-level context file entries.
-- `parsers` (`ArtifactParserRegistry`) — registry of artifact format parsers for extraction fallback.
-- `hasher` (`ContentHasher`) — content hasher for metadata freshness checks.
-- `schemaRef` (`string`) — schema reference string from `specd.yaml`.
-- `workspaceSchemasPaths` (`ReadonlyMap<string, string>`) — map of workspace name to absolute schemas directory path.
+- `specs` (`ReadonlyMap<string, SpecRepository>`) — per-workspace spec repositories
+- `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema (replaces `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths`)
+- `files` (`FileReader`) — for reading context entry files from disk
+- `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale
+- `hasher` (`ContentHasher`) — for comparing content hashes against metadata
+
+All dependencies are injected at construction time. The schema is resolved lazily on first access.
 
 ## Constraints
 

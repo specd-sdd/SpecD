@@ -12,23 +12,21 @@ rules:
   - requirement: Ports and constructor
     rules:
       - |-
-        `GetArtifactInstruction` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances, `SchemaRegistry`, `ArtifactParserRegistry`, `TemplateExpander`, `schemaRef`, and `workspaceSchemasPaths`.
+        `GetArtifactInstruction` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances, `SchemaProvider`, `ArtifactParserRegistry`, and `TemplateExpander`.
 
         ```typescript
         class GetArtifactInstruction {
           constructor(
             changes: ChangeRepository,
             specs: ReadonlyMap<string, SpecRepository>,
-            schemas: SchemaRegistry,
+            schemaProvider: SchemaProvider,
             parsers: ArtifactParserRegistry,
-            templates: TemplateExpander,
-            schemaRef: string,
-            workspaceSchemasPaths: ReadonlyMap<string, string>,
+            expander: TemplateExpander,
           )
         }
         ```
 
-        `ArtifactParserRegistry` is needed to generate delta format instructions and existing artifact outlines. `SpecRepository` is needed to read existing artifact files for outlines. `TemplateExpander.expand()` is called on `instruction`, `template`, `deltaInstruction`, and `rules` text before returning them (verbatim expansion, no shell escaping). `SchemaRegistry` is needed to resolve the template file path and read its content. The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander.
+        `ArtifactParserRegistry` is needed to generate delta format instructions and existing artifact outlines. `SpecRepository` is needed to read existing artifact files for outlines. `TemplateExpander.expand()` is called on `instruction`, `template`, `deltaInstruction`, and `rules` text before returning them (verbatim expansion, no shell escaping). `SchemaProvider` provides the fully-resolved schema (with plugins and overrides applied), which includes pre-loaded template content in each `ArtifactType`. It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander.
   - requirement: Input
     rules:
       - |-
@@ -97,9 +95,9 @@ scenarios:
     name: Schema mismatch throws SchemaMismatchError
     given:
       - a change created with schema spec-driven
-      - AND the active schema in specd.yaml is custom-schema
+      - AND SchemaProvider.get() returns a schema named custom-schema
     when:
-      - GetArtifactInstruction.execute is called
+      - execute is called
     then:
       - SchemaMismatchError is thrown
   - requirement: Artifact resolution
@@ -200,6 +198,6 @@ scenarios:
     then:
       - the result includes a template field with the resolved file content
 contentHashes:
-  spec.md: sha256:5d7c8aaa94b1424badc3e3544a5cb58d425f2229cdf8879225685181450854fc
-  verify.md: sha256:8fb3e51960aac596c29e006ecef5933bc869442f091c3d6c85c2f0f0e4caf01e
+  spec.md: sha256:7b6d83682d6f32be96782bf5b04cce67bed71ee8b745eac81c1883e1144fbac1
+  verify.md: sha256:6dbc0fd3afebb25538f418d0ed2cb469129a5d4f1404f5de4fe88f8a94595bcc
 generatedBy: core

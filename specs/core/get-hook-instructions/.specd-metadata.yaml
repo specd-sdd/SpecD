@@ -12,26 +12,20 @@ rules:
   - requirement: Ports and constructor
     rules:
       - |-
-        `GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaRegistry`, `TemplateExpander`, `schemaRef`, `workspaceSchemasPaths`, and `projectWorkflowHooks`.
+        `GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaProvider`, `TemplateExpander`, and `projectWorkflowHooks`.
 
         ```typescript
         class GetHookInstructions {
           constructor(
             changes: ChangeRepository,
-            schemas: SchemaRegistry,
-            templates: TemplateExpander,
-            schemaRef: string,
-            workspaceSchemasPaths: ReadonlyMap<string, string>,
+            schemaProvider: SchemaProvider,
+            expander: TemplateExpander,
             projectWorkflowHooks: ProjectWorkflowHooks,
           )
         }
         ```
 
-        `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml`. `GetHookInstructions` filters internally for the requested step. If `undefined`, it defaults to `[]`.
-
-        `TemplateExpander.expand()` is called on each instruction text before returning it (verbatim expansion, no shell escaping). The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander.
-
-        This use case does not need `HookRunner` — it only reads and expands instruction text, it never executes commands.
+        `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml`. All are injected at kernel composition time.
   - requirement: Input
     rules:
       - |-
@@ -86,11 +80,12 @@ scenarios:
     name: Schema mismatch throws SchemaMismatchError
     given:
       - a change created with schema spec-driven
-      - AND the active schema in specd.yaml is custom-schema
+      - AND SchemaProvider.get() returns a schema named custom-schema
     when:
-      - GetHookInstructions.execute is called
+      - execute is called
     then:
       - SchemaMismatchError is thrown
+      - AND no hooks are executed
   - requirement: Step resolution
     name: Invalid step name throws StepNotValidError
     given:
@@ -167,6 +162,6 @@ scenarios:
     then:
       - 'the result is { phase: "pre", instructions: [] }'
 contentHashes:
-  spec.md: sha256:b669cda71168c6ea7b9f4842658b3ea074ed167a2bd2e19ae405b9fee5b212ef
-  verify.md: sha256:d1972ef205c45859e65a55e3d3dd7a698c787f58f15ea53294368734f9fd88d0
+  spec.md: sha256:dc67b6ad3032bc4ae3528dfb95d192d1003628c117ce5bc98e6d1cdde97c8339
+  verify.md: sha256:b103e4880e72236df7c977893156fc0a65c89d38d4bd0e31c74708d241b9c20c
 generatedBy: core

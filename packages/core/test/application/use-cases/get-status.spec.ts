@@ -7,7 +7,7 @@ import { VALID_TRANSITIONS } from '../../../src/domain/value-objects/change-stat
 import {
   makeChangeRepository,
   makeChange,
-  makeSchemaRegistry,
+  makeSchemaProvider,
   makeSchema,
   makeArtifactType,
 } from './helpers.js'
@@ -23,26 +23,14 @@ function makeGetStatus(
   } = {},
 ) {
   const schema = opts.schema === undefined ? makeStdSchema() : opts.schema
-  const registry = opts.failSchema
+  const schemaProvider = opts.failSchema
     ? {
-        async resolve() {
+        async get() {
           throw new Error('schema resolution failed')
         },
-        async resolveRaw() {
-          return null
-        },
-        async list() {
-          return []
-        },
       }
-    : makeSchemaRegistry(schema)
-  return new GetStatus(
-    changes,
-    registry,
-    'test-schema',
-    new Map<string, string>(),
-    opts.approvals ?? defaultApprovals,
-  )
+    : makeSchemaProvider(schema)
+  return new GetStatus(changes, schemaProvider, opts.approvals ?? defaultApprovals)
 }
 
 function makeStdSchema() {

@@ -4,7 +4,7 @@ import { StepNotValidError } from '../../domain/errors/step-not-valid-error.js'
 import { HookNotFoundError } from '../../domain/errors/hook-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type HookRunner, type TemplateVariables } from '../ports/hook-runner.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
@@ -55,9 +55,7 @@ export interface RunStepHooksResult {
 export class RunStepHooks {
   private readonly _changes: ChangeRepository
   private readonly _hooks: HookRunner
-  private readonly _schemas: SchemaRegistry
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
+  private readonly _schemaProvider: SchemaProvider
   private readonly _projectWorkflowHooks: readonly {
     readonly step: string
     readonly hooks: {
@@ -71,17 +69,13 @@ export class RunStepHooks {
    *
    * @param changes - Repository for loading change entities
    * @param hooks - Hook runner for executing shell commands
-   * @param schemas - Registry for resolving the active schema
-   * @param schemaRef - Schema reference string from config
-   * @param workspaceSchemasPaths - Map of workspace names to schema directory paths
+   * @param schemaProvider - Provider for the fully-resolved schema
    * @param projectWorkflowHooks - Project-level workflow hook overrides
    */
   constructor(
     changes: ChangeRepository,
     hooks: HookRunner,
-    schemas: SchemaRegistry,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
+    schemaProvider: SchemaProvider,
     projectWorkflowHooks?: readonly {
       readonly step: string
       readonly hooks: {
@@ -92,9 +86,7 @@ export class RunStepHooks {
   ) {
     this._changes = changes
     this._hooks = hooks
-    this._schemas = schemas
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
+    this._schemaProvider = schemaProvider
     this._projectWorkflowHooks = projectWorkflowHooks ?? []
   }
 
@@ -112,8 +104,8 @@ export class RunStepHooks {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+    const schema = await this._schemaProvider.get()
+    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     if (schema.name() !== change.schemaName) {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())

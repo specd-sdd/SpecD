@@ -36,7 +36,7 @@ When neither approval-gate routing condition is met, the use case MUST transitio
 
 ### Requirement: Workflow requires enforcement
 
-After resolving the effective target, the use case MUST resolve the active schema via `SchemaRegistry` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError`.
+After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError`.
 
 If no workflow step exists for the effective target (the schema does not declare one), or the schema cannot be resolved, the requires check is skipped.
 
@@ -113,16 +113,14 @@ After a successful transition, the use case MUST persist the updated change via 
 
 - `ChangeRepository` — for loading, artifact content access, and persistence
 - `ActorResolver` — for resolving the current actor identity
-- `SchemaRegistry` — for resolving the active schema to look up workflow steps and requires
+- `SchemaProvider` — for obtaining the fully-resolved active schema to look up workflow steps and requires
 - `RunStepHooks` — for executing `run:` hooks at step boundaries
-- `schemaRef` (string) — the schema reference string from config
-- `workspaceSchemasPaths` (ReadonlyMap\<string, string>) — workspace-to-schemas-path map
 
 ## Constraints
 
-- The use case MUST NOT bypass the `Change` entity's transition validation — it only resolves the effective target and delegates
-- Task completion checks use `safeRegex` to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
-- The `implementingTaskChecks` and `implementingRequires` inputs default to empty arrays when not provided
+- The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates
+- Task completion checks use safeRegex to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
+- The implementingTaskChecks and implementingRequires inputs default to empty arrays when not provided
 - Approval-gate routing is purely input-driven — the use case does not read configuration directly
 - Pre-hook failure aborts the transition — no state change occurs
 - Post-hook failures are collected in the result — no rollback

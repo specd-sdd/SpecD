@@ -17,7 +17,7 @@ import {
 import {
   makeChange,
   makeChangeRepository,
-  makeSchemaRegistry,
+  makeSchemaProvider,
   makeSchema,
   makeHookRunner,
 } from './helpers.js'
@@ -27,8 +27,6 @@ function makeUseCase(opts: {
   changes?: ReturnType<typeof makeChangeRepository>
   hookRunner?: HookRunner
   schema?: ReturnType<typeof makeSchema> | null
-  schemaRef?: string
-  workspaceSchemasPaths?: ReadonlyMap<string, string>
   projectWorkflowHooks?: readonly {
     readonly step: string
     readonly hooks: {
@@ -40,9 +38,7 @@ function makeUseCase(opts: {
   return new RunStepHooks(
     opts.changes ?? makeChangeRepository(),
     opts.hookRunner ?? makeHookRunner(),
-    makeSchemaRegistry(opts.schema === undefined ? makeSchema() : opts.schema),
-    opts.schemaRef ?? 'test-ref',
-    opts.workspaceSchemasPaths ?? new Map(),
+    makeSchemaProvider(opts.schema === undefined ? makeSchema() : opts.schema),
     opts.projectWorkflowHooks,
   )
 }

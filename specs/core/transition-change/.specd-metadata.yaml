@@ -36,7 +36,7 @@ rules:
   - requirement: Workflow requires enforcement
     rules:
       - |-
-        After resolving the effective target, the use case MUST resolve the active schema via `SchemaRegistry` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError`.
+        After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError`.
 
         If no workflow step exists for the effective target (the schema does not declare one), or the schema cannot be resolved, the requires check is skipped.
 
@@ -108,10 +108,8 @@ rules:
 
         - `ChangeRepository` — for loading, artifact content access, and persistence
         - `ActorResolver` — for resolving the current actor identity
-        - `SchemaRegistry` — for resolving the active schema to look up workflow steps and requires
+        - `SchemaProvider` — for obtaining the fully-resolved active schema to look up workflow steps and requires
         - `RunStepHooks` — for executing `run:` hooks at step boundaries
-        - `schemaRef` (string) — the schema reference string from config
-        - `workspaceSchemasPaths` (ReadonlyMap\<string, string>) — workspace-to-schemas-path map
 constraints:
   - The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates
   - Task completion checks use safeRegex to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
@@ -126,7 +124,7 @@ scenarios:
     when:
       - TransitionChange.execute is called with a name that does not exist in the repository
     then:
-      - it throws ChangeNotFoundError
+      - a ChangeNotFoundError is thrown
   - requirement: Approval-gate routing for spec approval
     name: Ready to implementing is rerouted when spec approval is active
     given:
@@ -273,6 +271,6 @@ scenarios:
     then:
       - ChangeRepository.save was called with the updated Change instance
 contentHashes:
-  spec.md: sha256:55ff3ccbf8d5dd9e3301de1e977873fcfb3535de98e3a1cc87df705d5fb22b3e
-  verify.md: sha256:4c28a65eb92b057bac113baf34ff1e9294313829cf1cf21a30065fc7b67a4a27
+  spec.md: sha256:f8fd4364fd8807a517fda9dd97e2028af5c8cc6e10cdfe0de06ddb0a7d956665
+  verify.md: sha256:5c7eefbafa60bae6cae829ef3db602a10a227b90860430897bf125b6116a1f6a
 generatedBy: core

@@ -3,6 +3,8 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
@@ -90,13 +92,14 @@ export function createApproveSpec(
     nodeModulesPaths: [options!.projectRoot + '/node_modules'],
     configDir: options!.projectRoot,
   })
-  const hasher = new NodeContentHasher()
-  return new ApproveSpec(
-    changeRepo,
-    actor,
+  const resolveSchema = new ResolveSchema(
     schemas,
-    hasher,
     options!.schemaRef,
     options!.workspaceSchemasPaths,
+    [],
+    undefined,
   )
+  const schemaProvider = new LazySchemaProvider(resolveSchema)
+  const hasher = new NodeContentHasher()
+  return new ApproveSpec(changeRepo, actor, schemaProvider, hasher)
 }

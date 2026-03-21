@@ -36,7 +36,7 @@
 
 #### Scenario: Schema does not resolve
 
-- **GIVEN** the `SchemaRegistry` returns `null` for the configured schema reference
+- **GIVEN** `SchemaProvider.get()` returns `null` for the configured schema
 - **WHEN** the use case computes artifact hashes
 - **THEN** all artifacts are hashed without any pre-hash cleanup rules applied
 

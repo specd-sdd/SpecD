@@ -8,26 +8,20 @@ Workflow steps declare `instruction:` hooks — text blocks that guide agent beh
 
 ### Requirement: Ports and constructor
 
-`GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaRegistry`, `TemplateExpander`, `schemaRef`, `workspaceSchemasPaths`, and `projectWorkflowHooks`.
+`GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaProvider`, `TemplateExpander`, and `projectWorkflowHooks`.
 
 ```typescript
 class GetHookInstructions {
   constructor(
     changes: ChangeRepository,
-    schemas: SchemaRegistry,
-    templates: TemplateExpander,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
+    schemaProvider: SchemaProvider,
+    expander: TemplateExpander,
     projectWorkflowHooks: ProjectWorkflowHooks,
   )
 }
 ```
 
-`projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml`. `GetHookInstructions` filters internally for the requested step. If `undefined`, it defaults to `[]`.
-
-`TemplateExpander.expand()` is called on each instruction text before returning it (verbatim expansion, no shell escaping). The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander.
-
-This use case does not need `HookRunner` — it only reads and expands instruction text, it never executes commands.
+`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml`. All are injected at kernel composition time.
 
 ### Requirement: Input
 

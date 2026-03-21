@@ -7,6 +7,8 @@ import { createChangeRepository } from '../change-repository.js'
 import { createSpecRepository } from '../spec-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
@@ -132,17 +134,23 @@ export function createCompileContext(
     nodeModulesPaths: opts.nodeModulesPaths,
     configDir: opts.configDir,
   })
+  const resolveSchema = new ResolveSchema(
+    schemas,
+    opts.schemaRef,
+    opts.workspaceSchemasPaths,
+    [],
+    undefined,
+  )
+  const schemaProvider = new LazySchemaProvider(resolveSchema)
   const files = new FsFileReader()
   const parsers = createArtifactParserRegistry()
   const hasher = new NodeContentHasher()
   return new CompileContext(
     changeRepo,
     opts.specRepositories,
-    schemas,
+    schemaProvider,
     files,
     parsers,
     hasher,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
   )
 }

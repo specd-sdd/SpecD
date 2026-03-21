@@ -2,7 +2,7 @@ import { type Change } from '../../domain/entities/change.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 
 /** Input for the {@link GetStatus} use case. */
@@ -78,33 +78,25 @@ export interface GetStatusResult {
  */
 export class GetStatus {
   private readonly _changes: ChangeRepository
-  private readonly _schemas: SchemaRegistry
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
+  private readonly _schemaProvider: SchemaProvider
   private readonly _approvals: { readonly spec: boolean; readonly signoff: boolean }
 
   /**
    * Creates a new `GetStatus` use case instance.
    *
    * @param changes - Repository for loading the change
-   * @param schemas - Registry for resolving the active schema
-   * @param schemaRef - Schema reference string from project config
-   * @param workspaceSchemasPaths - Workspace-to-schemas-path map for schema resolution
+   * @param schemaProvider - Provider for the fully-resolved schema
    * @param approvals - Whether approval gates are active
    * @param approvals.spec - Whether the spec approval gate is enabled
    * @param approvals.signoff - Whether the signoff gate is enabled
    */
   constructor(
     changes: ChangeRepository,
-    schemas: SchemaRegistry,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
+    schemaProvider: SchemaProvider,
     approvals: { readonly spec: boolean; readonly signoff: boolean },
   ) {
     this._changes = changes
-    this._schemas = schemas
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
+    this._schemaProvider = schemaProvider
     this._approvals = approvals
   }
 
@@ -136,10 +128,10 @@ export class GetStatus {
     const validTransitions = VALID_TRANSITIONS[change.state]
 
     // 2. Resolve schema (may fail)
-    let schema: Awaited<ReturnType<SchemaRegistry['resolve']>> = null
+    let schema: Awaited<ReturnType<SchemaProvider['get']>> = null
     let schemaInfo: LifecycleContext['schemaInfo'] = null
     try {
-      schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
+      schema = await this._schemaProvider.get()
       if (schema !== null) {
         schemaInfo = { name: schema.name(), version: schema.version() }
       }

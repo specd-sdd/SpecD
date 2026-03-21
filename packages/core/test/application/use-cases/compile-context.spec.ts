@@ -19,7 +19,7 @@ import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { type ChangeRepository } from '../../../src/application/ports/change-repository.js'
 import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
-import { type SchemaRegistry } from '../../../src/application/ports/schema-registry.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import { type FileReader } from '../../../src/application/ports/file-reader.js'
 import {
   type ArtifactParserRegistry,
@@ -197,35 +197,31 @@ function makeSut(opts: {
 }): {
   sut: CompileContext
   changeRepo: ChangeRepository
-  schemaRegistry: SchemaRegistry
+  schemaProvider: SchemaProvider
 } {
   const { change, schema, specRepos, fileReader, parsers } = opts
   const changeRepo = makeStubChangeRepo(change)
-  const schemaRegistry = makeStubSchemaRegistry(schema ?? null)
+  const schemaProvider = makeStubSchemaProvider(schema ?? null)
 
   const sut = new CompileContext(
     changeRepo,
     specRepos ?? new Map(),
-    schemaRegistry,
+    schemaProvider,
     fileReader ?? makeStubFileReader(),
     parsers ?? (new Map() as ArtifactParserRegistry),
     makeContentHasher(),
-    'test',
-    new Map(),
   )
 
-  return { sut, changeRepo, schemaRegistry }
+  return { sut, changeRepo, schemaProvider }
 }
 
 function makeStubChangeRepo(change?: Change) {
   return makeChangeRepository(change ? [change] : [])
 }
 
-function makeStubSchemaRegistry(schema: Schema | null): SchemaRegistry {
+function makeStubSchemaProvider(schema: Schema | null): SchemaProvider {
   return {
-    resolve: async () => schema,
-    resolveRaw: async () => null,
-    list: async () => [],
+    get: async () => schema,
   }
 }
 
@@ -247,12 +243,10 @@ describe('CompileContext', () => {
           new CompileContext(
             makeStubChangeRepo(),
             new Map(),
-            makeStubSchemaRegistry(null),
+            makeStubSchemaProvider(null),
             makeStubFileReader(),
             new Map() as ArtifactParserRegistry,
             makeContentHasher(),
-            'test',
-            new Map(),
           ),
       ).not.toThrow()
     })
@@ -263,12 +257,10 @@ describe('CompileContext', () => {
       const sut = new CompileContext(
         makeStubChangeRepo(),
         new Map(),
-        makeStubSchemaRegistry(makeSchema()),
+        makeStubSchemaProvider(makeSchema()),
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
         makeContentHasher(),
-        'test',
-        new Map(),
       )
       await expect(
         sut.execute({
@@ -285,12 +277,10 @@ describe('CompileContext', () => {
       const sut = new CompileContext(
         makeStubChangeRepo(change),
         new Map(),
-        makeStubSchemaRegistry(null),
+        makeStubSchemaProvider(null),
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
         makeContentHasher(),
-        'test',
-        new Map(),
       )
       await expect(
         sut.execute({

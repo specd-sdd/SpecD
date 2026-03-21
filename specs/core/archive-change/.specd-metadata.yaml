@@ -20,7 +20,7 @@ rules:
   - requirement: Ports and constructor
     rules:
       - |-
-        `ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaRegistry`, `SaveSpecMetadata`, `YamlSerializer`, `schemaRef`, `workspaceSchemasPaths`, and `ActorResolver`.
+        `ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaProvider`, `SaveSpecMetadata`, `YamlSerializer`, and `ActorResolver`.
 
         ```typescript
         class ArchiveChange {
@@ -31,19 +31,17 @@ rules:
             runStepHooks: RunStepHooks,
             actor: ActorResolver,
             parsers: ArtifactParserRegistry,
-            schemas: SchemaRegistry,
+            schemaProvider: SchemaProvider,
             generateMetadata: GenerateSpecMetadata,
             saveMetadata: SaveSpecMetadata,
             yaml: YamlSerializer,
-            schemaRef: string,
-            workspaceSchemasPaths: ReadonlyMap<string, string>,
           )
         }
         ```
 
         Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not receive `HookRunner` or `projectWorkflowHooks` directly.
 
-        `schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. All are injected at kernel composition time, not passed per invocation.
+        `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
 
         `specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec ID's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.
 
@@ -57,7 +55,7 @@ rules:
         - `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
   - requirement: Schema name guard
     rules:
-      - After resolving the schema from config, `ArchiveChange` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before the archivable guard, any hooks, or file modifications.
+      - After obtaining the schema from `SchemaProvider`, `ArchiveChange` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before the archivable guard, any hooks, or file modifications.
   - requirement: Archivable guard
     rules:
       - |-
@@ -162,12 +160,13 @@ constraints:
 scenarios:
   - requirement: Archivable guard
     name: Change not in archivable state
+    given:
+      - a change that is not in archivable state
     when:
-      - ArchiveChange.execute is called for a change in done state
+      - ArchiveChange.execute is called
     then:
-      - change.assertArchivable() throws InvalidStateTransitionError
-      - AND no hooks are run
-      - AND no files are modified
+      - InvalidStateTransitionError is thrown
+      - AND no hooks are executed and no files are modified
   - requirement: Archivable guard
     name: Change in archivable state transitions to archiving
     given:
@@ -342,6 +341,6 @@ scenarios:
     then:
       - ArchiveChange.execute throws and does not return a result
 contentHashes:
-  spec.md: sha256:c726a3cd3394243ba965c2c81438469a2f1fb370671ee9cac55e53e1c0e5359e
-  verify.md: sha256:435930e4249a70a3dfc3503fac16aea3bc873ddf538630148a09f1c951fcae52
+  spec.md: sha256:8beeb258884e134eb2b3bdf1aacb6b0077503a261d2710234f991bbea2e8921e
+  verify.md: sha256:b2a557dc83f0d4c85dffabb3ed7e16c302f72545cc3e00d1ff1b0950128900ad
 generatedBy: core

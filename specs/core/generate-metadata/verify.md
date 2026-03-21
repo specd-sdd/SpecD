@@ -6,7 +6,7 @@
 
 #### Scenario: Schema not found
 
-- **WHEN** `GenerateSpecMetadata` is executed with a schema reference that cannot be resolved
+- **WHEN** `SchemaProvider.get()` returns `null` for the configured schema reference
 - **THEN** it throws `SchemaNotFoundError`
 
 #### Scenario: Schema has no metadataExtraction
