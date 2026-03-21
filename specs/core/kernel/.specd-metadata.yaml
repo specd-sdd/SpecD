@@ -296,5 +296,5 @@ scenarios:
       - the kernel object and its nested groups are not expected to change — there is no addUseCase() or removeUseCase() mechanism
 contentHashes:
   spec.md: sha256:cd8bebefc9d8f0456da3583b4c067578b7a9c09738ee82ae823ef4805597eb9c
-  verify.md: sha256:4d63f80b6911b997ea449c9f1bbf203924bfd79f8fddf1193e536b83103d4488
+  verify.md: sha256:d854600e874841f9beb95a4e5ce47991a0ea75b9fe0de05f581b4badd9fe3ddb
 generatedBy: core

@@ -13,7 +13,7 @@ rules:
         specd config show [--format text|json|toon]
         ```
 
-        * `--format text|json|toon` — optional; output format, defaults to `text`
+        - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Output format
     rules:
       - |-
@@ -35,7 +35,33 @@ rules:
           archive:   <absolute-path>
         ```
 
-        In `json` or `toon` mode, the output is the full `SpecdConfig` object encoded in the respective format, with all paths resolved to absolute values.
+        Optional fields are shown only when present in the config:
+
+        ```
+        context:
+          file: <path>
+          instruction: <text>
+          ...
+
+        contextIncludeSpecs: <pattern>, <pattern>, ...
+        contextExcludeSpecs: <pattern>, <pattern>, ...
+        llmOptimizedContext: <true|false>
+        schemaPlugins: <ref>, <ref>, ...
+
+        workflow:
+          <step>  pre: <count> hooks  post: <count> hooks
+          ...
+
+        artifactRules:
+          <artifactId>: <count> rules
+          ...
+
+        schemaOverrides: (present)
+        ```
+
+        The `schemaOverrides` field, when present, shows `(present)` in text mode — its structure is complex and best inspected via JSON output.
+
+        In `json` or `toon` mode, the command MUST serialize the `SpecdConfig` object directly — no manual field selection. The output is the config as-is, encoded in the respective format. This ensures that new fields added to `SpecdConfig` appear automatically without CLI changes. Optional fields that are `undefined` are omitted by the serializer.
   - requirement: Sensitive fields
     rules:
       - The config contains no sensitive values — all fields are filesystem paths, schema references, and boolean flags. No redaction is required.
@@ -49,11 +75,14 @@ scenarios:
   - requirement: Output format
     name: Text output shows all sections
     given:
-      - a valid specd.yaml with one workspace and storage paths configured
+      - a valid config with one workspace, storage paths, and optional fields set (contextIncludeSpecs, workflow, llmOptimizedContext)
     when:
       - specd config show is run
     then:
       - stdout contains projectRoot, schemaRef, approvals, workspaces, and storage sections
+      - AND stdout contains contextIncludeSpecs line
+      - AND stdout contains llmOptimizedContext line
+      - AND stdout contains workflow section with step entries
       - AND all paths are absolute
       - AND the process exits with code 0
   - requirement: Output format
@@ -66,12 +95,26 @@ scenarios:
       - stdout shows spec=true and signoff=false
   - requirement: Output format
     name: JSON output is full SpecdConfig
+    given:
+      - a config with workflow, contextIncludeSpecs, context, and llmOptimizedContext set
     when:
       - specd config show --format json is run
     then:
-      - stdout is valid JSON containing projectRoot, schemaRef, workspaces, storage, and approvals
+      - stdout is valid JSON containing projectRoot, schemaRef, workspaces, storage, approvals
+      - AND JSON contains workflow array with step entries
+      - AND JSON contains contextIncludeSpecs array
+      - AND JSON contains context array
+      - AND JSON contains llmOptimizedContext boolean
       - AND all path values are absolute strings
       - AND the process exits with code 0
+  - requirement: Output format
+    name: Optional fields omitted when not set
+    given:
+      - a config with no workflow, context, schemaOverrides, or schemaPlugins set
+    when:
+      - specd config show --format json is run
+    then:
+      - the JSON output does not contain workflow, context, schemaOverrides, or schemaPlugins keys
   - requirement: Output format
     name: Multiple workspaces listed
     given:
@@ -90,6 +133,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message describing the discovery failure'
 contentHashes:
-  spec.md: sha256:73591380fba8e186525f35235810b013012bb59c8545569ab8fd4c2b536e7d2e
-  verify.md: sha256:9635c5f461912c17d5a051f1dc25481399af010e9e7e5e5ec2219a8f349e88e8
+  spec.md: sha256:8d6a7f0bef3f87a50d72e39530f7308e894732b8639255a073c27df9d7704c0b
+  verify.md: sha256:535aabd4ae968f8e4d5094a17014e07a4d60f5ed0c809b5c87f2c8488512d344
 generatedBy: core
