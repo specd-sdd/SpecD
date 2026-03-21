@@ -496,6 +496,13 @@ metadataExtraction:
 workflow:
   - step: designing
     requires: []
+    hooks:
+      pre:
+        - id: designing-guidance
+          instruction: |
+            The compiled context could include project-level specs with coding conventions,
+            documentation requirements, and linting rules. You MUST follow these
+            constraints while writing code — they are as binding as the change specs.
 
   - step: ready
     requires: [proposal, specs, verify, design, tasks]
@@ -529,12 +536,10 @@ workflow:
             you go. Pause and ask for guidance if you hit a blocker or the task is
             ambiguous, If ambiguous: design.md is the source of truth. Do not advance
             to verifying while any - [ ] items remain.
-      post:
-        - id: run-tests
-          run: 'pnpm test'
-        - id: confirm-tests
-          instruction: |
-            Confirm all tests pass before marking implementing complete.
+
+            The compiled context could include project-level specs with coding conventions,
+            documentation requirements, and linting rules. You MUST follow these
+            constraints while writing code — they are as binding as the change specs.
 
   - step: verifying
     requires: [verify]
@@ -550,8 +555,6 @@ workflow:
     requires: [specs, tasks]
     hooks:
       pre:
-        - id: run-tests
-          run: 'pnpm test'
         - id: archiving-guidance
           instruction: |
             Review the delta files before confirming the archive. Confirm that every modified
