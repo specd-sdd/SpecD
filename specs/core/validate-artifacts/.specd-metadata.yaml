@@ -14,25 +14,21 @@ rules:
   - requirement: Ports and constructor
     rules:
       - |-
-        `ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaRegistry`, `ArtifactParserRegistry`, `VcsAdapter`, `schemaRef`, and `workspaceSchemasPaths`.
+        `ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, and `VcsAdapter`.
 
         ```typescript
         class ValidateArtifacts {
           constructor(
             changes: ChangeRepository,
             specs: ReadonlyMap<string, SpecRepository>,
-            schemas: SchemaRegistry,
+            schemaProvider: SchemaProvider,
             parsers: ArtifactParserRegistry,
-            git: VcsAdapter,
-            schemaRef: string,
-            workspaceSchemasPaths: ReadonlyMap<string, string>,
+            vcs: VcsAdapter,
           )
         }
         ```
 
-        `schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. Both are injected at kernel composition time, not passed per invocation.
-
-        `specs` is keyed by workspace name. When loading a base spec for delta application preview, `ValidateArtifacts` looks up the `SpecRepository` for the spec ID's workspace. `ArtifactParserRegistry` maps format names to `ArtifactParser` adapters and is used for both `deltaValidations` checks and delta application preview.
+        `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
   - requirement: Input
     rules:
       - |-
@@ -53,7 +49,7 @@ rules:
         5. The dependency order check still applies to the specified artifact: if its `requires` are not satisfied, it is reported as dependency-blocked.
   - requirement: Schema name guard
     rules:
-      - After resolving the schema from config, `ValidateArtifacts` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before any validation or artifact processing.
+      - After obtaining the schema from `SchemaProvider`, `ValidateArtifacts` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`. This MUST happen before any artifact validation logic.
   - requirement: Required artifacts check
     rules:
       - |-
@@ -157,12 +153,11 @@ scenarios:
   - requirement: Required artifacts check
     name: Non-optional artifact missing — failure
     given:
-      - a schema with a non-optional artifact specs
-      - AND the change has no file for specs and validatedHash is unset
+      - a change with a required (non-optional) artifact that has no files
     when:
-      - ValidateArtifacts.execute is called without artifactId
+      - ValidateArtifacts.execute is called
     then:
-      - result.passed is false and result.failures lists specs as missing
+      - the result includes a validation failure for the missing artifact
   - requirement: Required artifacts check
     name: Skipped optional artifact does not cause failure
     given:
@@ -404,6 +399,6 @@ scenarios:
     then:
       - changeRepository.save(change) is called — partial progress is persisted
 contentHashes:
-  spec.md: sha256:50f73b18b6fba20e69d6ad106c888b1e4db095052685cbd6fa3319ec5d1207c9
-  verify.md: sha256:76d97bea6f07da4b98f5428cee70b748481f9588d08571033f131afd6fc3d117
+  spec.md: sha256:66c8e73c640558f48bd90f1df8d120918e1feab1ba6892d4f0b5a7e0edeb3bc3
+  verify.md: sha256:ba0b3d6ebad13ba77d5f743c204ad5b763c92f8470c7424b66c9c24138a55b2b
 generatedBy: core

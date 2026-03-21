@@ -8,31 +8,21 @@ AI agents entering a lifecycle step need relevant spec content and project conte
 
 ### Requirement: Ports and constructor
 
-`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaRegistry`, `FileReader`, `ArtifactParserRegistry`, `schemaRef`, and `workspaceSchemasPaths`.
+`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, and `ArtifactParserRegistry`.
 
 ```typescript
 class CompileContext {
   constructor(
     changes: ChangeRepository,
     specs: ReadonlyMap<string, SpecRepository>,
-    schemas: SchemaRegistry,
+    schemaProvider: SchemaProvider,
     files: FileReader,
     parsers: ArtifactParserRegistry,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
   )
 }
 ```
 
-`schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. Both are injected at kernel composition time, not passed per invocation.
-
-`ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `CompileContext` uses it for the `metadataExtraction` fallback path when metadata is absent or stale.
-
-`specs` is keyed by workspace name (e.g. `'default'`, `'billing'`). The bootstrap layer constructs one `SpecRepository` instance per workspace declared in `specd.yaml` and passes them all here. `CompileContext` does not create or configure repositories — it only reads from them.
-
-Each `SpecRepository` in the map must have been constructed with the matching `RepositoryConfig.workspace` value so that `repo.workspace()` returns the same key used in the map.
-
-`FileReader` is the port used to read arbitrary files by absolute path — used for resolving `config.context[].file` entries. It returns the file content as a string, or `null` if the file does not exist. The bootstrap layer constructs it bound to the project root (the directory containing `specd.yaml`). `CompileContext` does not perform direct filesystem reads.
+`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
 
 ### Requirement: Input
 
@@ -109,11 +99,9 @@ If the step is not available (one or more required artifacts are neither `comple
 `CompileContext` must assemble the context block by combining the following components in order:
 
 1. **Project context entries** — for each entry in `config.context` (in declaration order): resolve `instruction` values verbatim; resolve `file` values by reading the file at the given path relative to the `specd.yaml` directory and injecting its content verbatim. Missing files emit a warning and are skipped. This block appears before all other content.
-
 2. **Spec content** — for each spec in the collected context set, include its content using the following strategy. When `sections` is present, only the listed sections are rendered; when absent, all available sections are included (description + rules + constraints + scenarios).
    - If `.specd-metadata.yaml` exists and is fresh: include the requested sections from the metadata. This is the compact, machine-optimised representation.
    - If metadata is absent or stale: fall back to the schema's `metadataExtraction` declarations. For each declared metadata field (rules, constraints, scenarios, etc.), the extraction engine loads the referenced artifact from `SpecRepository`, parses it via `ArtifactParser.parse()`, runs the declared extractors against the AST, and produces the same structured output as fresh metadata would. Only sections matching the `sections` filter are included when present. Extractors whose selectors match no nodes are silently skipped. Emit a staleness warning for this spec.
-
 3. **Available steps** — list all steps declared in the schema's `workflow[]`, each annotated with whether it is currently available. Unavailable steps must name the blocking artifacts.
 
 ### Requirement: Result shape

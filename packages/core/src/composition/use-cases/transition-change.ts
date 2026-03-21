@@ -5,6 +5,8 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
 import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
 import { TemplateExpander } from '../../application/template-expander.js'
@@ -123,23 +125,22 @@ export function createTransitionChange(
     nodeModulesPaths: opts.nodeModulesPaths,
     configDir: opts.configDir,
   })
+  const resolveSchema = new ResolveSchema(
+    schemas,
+    opts.schemaRef,
+    opts.workspaceSchemasPaths,
+    [],
+    undefined,
+  )
+  const schemaProvider = new LazySchemaProvider(resolveSchema)
   const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
   const hooks = new NodeHookRunner(expander)
   const actor = new GitActorResolver()
   const runStepHooks = new RunStepHooks(
     changeRepo,
     hooks,
-    schemas,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
+    schemaProvider,
     opts.projectWorkflowHooks,
   )
-  return new TransitionChange(
-    changeRepo,
-    actor,
-    schemas,
-    runStepHooks,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
-  )
+  return new TransitionChange(changeRepo, actor, schemaProvider, runStepHooks)
 }

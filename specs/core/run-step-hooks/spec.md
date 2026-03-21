@@ -8,16 +8,14 @@ Agent-driven workflow steps declare `run:` hooks that need to be executed at ste
 
 ### Requirement: Ports and constructor
 
-`RunStepHooks` receives at construction time: `ChangeRepository`, `HookRunner`, `SchemaRegistry`, `schemaRef`, `workspaceSchemasPaths`, and `projectWorkflowHooks`.
+`RunStepHooks` receives at construction time: `ChangeRepository`, `HookRunner`, `SchemaProvider`, and `projectWorkflowHooks`.
 
 ```typescript
 class RunStepHooks {
   constructor(
     changes: ChangeRepository,
     hooks: HookRunner,
-    schemas: SchemaRegistry,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
+    schemaProvider: SchemaProvider,
     projectWorkflowHooks: ProjectWorkflowHooks,
   )
 }
@@ -25,7 +23,7 @@ class RunStepHooks {
 
 `HookRunner` uses `TemplateExpander.expandForShell()` internally — `RunStepHooks` does not call the expander directly. It builds the `TemplateVariables` map and passes it to `HookRunner.run()`.
 
-`schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml` — `RunStepHooks` filters internally for the requested step. If `undefined`, it defaults to `[]`. All are injected at kernel composition time, not passed per invocation.
+`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml` — `RunStepHooks` filters internally for the requested step. If `undefined`, it defaults to `[]`. All are injected at kernel composition time, not passed per invocation.
 
 ### Requirement: Input
 
@@ -49,7 +47,7 @@ class RunStepHooks {
 
 ### Requirement: Schema name guard
 
-After resolving the schema from config, `RunStepHooks` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`. This MUST happen before any hook resolution or execution.
+After obtaining the schema from `SchemaProvider`, `RunStepHooks` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`. This MUST happen before any hook resolution or execution.
 
 ### Requirement: Step resolution
 

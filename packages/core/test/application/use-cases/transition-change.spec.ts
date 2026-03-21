@@ -11,7 +11,7 @@ import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js
 import {
   makeChangeRepository,
   makeActorResolver,
-  makeSchemaRegistry,
+  makeSchemaProvider,
   makeSchema,
   makeRunStepHooks,
   testActor,
@@ -39,10 +39,8 @@ function makeUseCase(
   return new TransitionChange(
     repo,
     makeActorResolver(),
-    makeSchemaRegistry(overrides?.schema ?? null),
+    makeSchemaProvider(overrides?.schema ?? null),
     overrides?.runStepHooks ?? makeRunStepHooks(),
-    'test-ref',
-    new Map(),
   )
 }
 

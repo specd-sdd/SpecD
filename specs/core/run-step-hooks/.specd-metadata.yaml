@@ -13,16 +13,14 @@ rules:
   - requirement: Ports and constructor
     rules:
       - |-
-        `RunStepHooks` receives at construction time: `ChangeRepository`, `HookRunner`, `SchemaRegistry`, `schemaRef`, `workspaceSchemasPaths`, and `projectWorkflowHooks`.
+        `RunStepHooks` receives at construction time: `ChangeRepository`, `HookRunner`, `SchemaProvider`, and `projectWorkflowHooks`.
 
         ```typescript
         class RunStepHooks {
           constructor(
             changes: ChangeRepository,
             hooks: HookRunner,
-            schemas: SchemaRegistry,
-            schemaRef: string,
-            workspaceSchemasPaths: ReadonlyMap<string, string>,
+            schemaProvider: SchemaProvider,
             projectWorkflowHooks: ProjectWorkflowHooks,
           )
         }
@@ -30,7 +28,7 @@ rules:
 
         `HookRunner` uses `TemplateExpander.expandForShell()` internally — `RunStepHooks` does not call the expander directly. It builds the `TemplateVariables` map and passes it to `HookRunner.run()`.
 
-        `schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml` — `RunStepHooks` filters internally for the requested step. If `undefined`, it defaults to `[]`. All are injected at kernel composition time, not passed per invocation.
+        `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml` — `RunStepHooks` filters internally for the requested step. If `undefined`, it defaults to `[]`. All are injected at kernel composition time, not passed per invocation.
   - requirement: Input
     rules:
       - |-
@@ -52,7 +50,7 @@ rules:
       - '`RunStepHooks` loads the change by name via `ChangeRepository`. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.'
   - requirement: Schema name guard
     rules:
-      - After resolving the schema from config, `RunStepHooks` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`. This MUST happen before any hook resolution or execution.
+      - After obtaining the schema from `SchemaProvider`, `RunStepHooks` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`. This MUST happen before any hook resolution or execution.
   - requirement: Step resolution
     rules:
       - |-
@@ -118,9 +116,9 @@ scenarios:
     name: Schema mismatch throws SchemaMismatchError
     given:
       - a change created with schema spec-driven
-      - AND the active schema in specd.yaml is custom-schema
+      - AND SchemaProvider.get() returns a schema named custom-schema
     when:
-      - RunStepHooks.execute is called
+      - execute is called
     then:
       - SchemaMismatchError is thrown
       - AND no hooks are executed
@@ -246,6 +244,6 @@ scenarios:
       - pnpm test is executed via HookRunner
       - AND the result includes the hook outcome
 contentHashes:
-  spec.md: sha256:210b76c5fd8605e3bd85a3c80fa5c49801f6e7ccdb96e9d8b66f2fef92be8bcb
-  verify.md: sha256:77421f479fdce88c7b0e71923837d8669551003b89a242958764d925a9ea858f
+  spec.md: sha256:97a4793afa90bdc988e83af38d5249efcf6d82973c86a4e30296bfeb983690ea
+  verify.md: sha256:31035ef283e401b1ba576d3c1bca1ac6a98193e4fc2eb8efea747ef431233866
 generatedBy: core

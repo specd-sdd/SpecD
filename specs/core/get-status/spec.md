@@ -38,12 +38,10 @@ If no change with the given name exists in the repository, `execute()` MUST thro
 `GetStatus` MUST accept the following constructor arguments:
 
 - `changes: ChangeRepository` — for loading changes by name
-- `schemas: SchemaRegistry` — for resolving the active schema
-- `schemaRef: string` — the schema reference string from project config
-- `workspaceSchemasPaths: ReadonlyMap<string, string>` — workspace-to-schemas-path map for schema resolution
+- `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema
 - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
 
-It MUST delegate to `ChangeRepository.get(name)` to load the change. The additional dependencies follow the same injection pattern used by `TransitionChange`, `CompileContext`, and other use cases that need schema access.
+It MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
 
 ### Requirement: Reports effective status for every artifact
 
@@ -66,7 +64,7 @@ On success, `GetStatusResult` MUST include a `lifecycle` object with the followi
 
 ### Requirement: Graceful degradation when schema resolution fails
 
-If schema resolution fails (e.g. schema not found, version mismatch), the `lifecycle` object MUST still be present with degraded values:
+If `SchemaProvider.get()` returns `null` or throws, the `lifecycle` object MUST still be present with degraded values:
 
 - `validTransitions` MUST be populated normally (it is a static lookup, independent of schema)
 - `availableTransitions` MUST be an empty array
@@ -91,5 +89,5 @@ The use case MUST NOT throw when schema resolution fails — it degrades the lif
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, artifact status derivation, `VALID_TRANSITIONS` map
 - [`specs/core/kernel/spec.md`](../kernel/spec.md) — Kernel wiring for `GetStatus` constructor
 - [`specs/core/transition-change/spec.md`](../transition-change/spec.md) — `VALID_TRANSITIONS` map, workflow requires enforcement pattern
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `SchemaRegistry`, `workflowStep()`, `artifacts()` API
+- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `SchemaProvider`, `workflowStep()`, `artifacts()` API
 - [`specs/core/config/spec.md`](../config/spec.md) — approvals configuration

@@ -6,10 +6,10 @@
 
 #### Scenario: Change not in archivable state
 
-- **WHEN** `ArchiveChange.execute` is called for a change in `done` state
-- **THEN** `change.assertArchivable()` throws `InvalidStateTransitionError`
-- **AND** no hooks are run
-- **AND** no files are modified
+- **GIVEN** a change that is not in `archivable` state
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** `InvalidStateTransitionError` is thrown
+- **AND** no hooks are executed and no files are modified
 
 #### Scenario: Change in archivable state transitions to archiving
 

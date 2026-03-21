@@ -9,7 +9,7 @@ import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js
 import {
   makeChangeRepository,
   makeSpecRepository,
-  makeSchemaRegistry,
+  makeSchemaProvider,
   makeParsers,
   makeArtifactType,
   makeSchema,
@@ -63,21 +63,19 @@ function makeSut(
 
   const changeRepo = makeChangeRepository([change])
   const specRepo = makeSpecRepository()
-  const schemaRegistry = makeSchemaRegistry(schema)
+  const schemaProvider = makeSchemaProvider(schema)
   const parsers = makeParsers()
   const templates = makeTemplateExpander()
 
   const sut = new GetArtifactInstruction(
     changeRepo,
     new Map([['default', specRepo]]),
-    schemaRegistry,
+    schemaProvider,
     parsers,
     templates,
-    schemaName,
-    new Map([['default', '/schemas']]),
   )
 
-  return { sut, changeRepo, schemaRegistry }
+  return { sut, changeRepo, schemaProvider }
 }
 
 // ---------------------------------------------------------------------------
@@ -139,17 +137,15 @@ describe('GetArtifactInstruction', () => {
     it('throws SchemaNotFoundError when schema cannot be resolved', async () => {
       const change = makeChange('my-change', { schemaName: 'test-schema' })
       const changeRepo = makeChangeRepository([change])
-      const schemaRegistry = makeSchemaRegistry(null)
+      const schemaProvider = makeSchemaProvider(null)
       const templates = makeTemplateExpander()
 
       const sut = new GetArtifactInstruction(
         changeRepo,
         new Map([['default', makeSpecRepository()]]),
-        schemaRegistry,
+        schemaProvider,
         makeParsers(),
         templates,
-        'test-schema',
-        new Map([['default', '/schemas']]),
       )
 
       await expect(sut.execute({ name: 'my-change', artifactId: 'spec' })).rejects.toThrow(
@@ -161,17 +157,15 @@ describe('GetArtifactInstruction', () => {
       const change = makeChange('my-change', { schemaName: 'old-schema' })
       const schema = makeSchema({ name: 'new-schema', artifacts: [makeArtifactType('spec')] })
       const changeRepo = makeChangeRepository([change])
-      const schemaRegistry = makeSchemaRegistry(schema)
+      const schemaProvider = makeSchemaProvider(schema)
       const templates = makeTemplateExpander()
 
       const sut = new GetArtifactInstruction(
         changeRepo,
         new Map([['default', makeSpecRepository()]]),
-        schemaRegistry,
+        schemaProvider,
         makeParsers(),
         templates,
-        'new-schema',
-        new Map([['default', '/schemas']]),
       )
 
       await expect(sut.execute({ name: 'my-change', artifactId: 'spec' })).rejects.toThrow(

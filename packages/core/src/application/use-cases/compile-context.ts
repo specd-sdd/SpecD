@@ -5,7 +5,7 @@ import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type FileReader } from '../ports/file-reader.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { Spec } from '../../domain/entities/spec.js'
@@ -99,43 +99,35 @@ export interface CompileContextResult {
 export class CompileContext {
   private readonly _changes: ChangeRepository
   private readonly _specs: ReadonlyMap<string, SpecRepository>
-  private readonly _schemas: SchemaRegistry
+  private readonly _schemaProvider: SchemaProvider
   private readonly _files: FileReader
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new `CompileContext` use case instance.
    *
    * @param changes - Repository for loading the change
    * @param specs - Spec repositories keyed by workspace name
-   * @param schemas - Registry for resolving schema references
+   * @param schemaProvider - Provider for the fully-resolved schema
    * @param files - Reader for project-level context file entries
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hasher for metadata freshness checks
-   * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
-   * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
    */
   constructor(
     changes: ChangeRepository,
     specs: ReadonlyMap<string, SpecRepository>,
-    schemas: SchemaRegistry,
+    schemaProvider: SchemaProvider,
     files: FileReader,
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
   ) {
     this._changes = changes
     this._specs = specs
-    this._schemas = schemas
+    this._schemaProvider = schemaProvider
     this._files = files
     this._parsers = parsers
     this._hasher = hasher
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
@@ -150,8 +142,8 @@ export class CompileContext {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+    const schema = await this._schemaProvider.get()
+    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     // --- Schema name guard ---
     if (schema.name() !== change.schemaName) {

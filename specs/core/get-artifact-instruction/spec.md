@@ -8,23 +8,21 @@ When an agent is creating or modifying a specific artifact during the designing 
 
 ### Requirement: Ports and constructor
 
-`GetArtifactInstruction` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances, `SchemaRegistry`, `ArtifactParserRegistry`, `TemplateExpander`, `schemaRef`, and `workspaceSchemasPaths`.
+`GetArtifactInstruction` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances, `SchemaProvider`, `ArtifactParserRegistry`, and `TemplateExpander`.
 
 ```typescript
 class GetArtifactInstruction {
   constructor(
     changes: ChangeRepository,
     specs: ReadonlyMap<string, SpecRepository>,
-    schemas: SchemaRegistry,
+    schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
-    templates: TemplateExpander,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
+    expander: TemplateExpander,
   )
 }
 ```
 
-`ArtifactParserRegistry` is needed to generate delta format instructions and existing artifact outlines. `SpecRepository` is needed to read existing artifact files for outlines. `TemplateExpander.expand()` is called on `instruction`, `template`, `deltaInstruction`, and `rules` text before returning them (verbatim expansion, no shell escaping). `SchemaRegistry` is needed to resolve the template file path and read its content. The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander.
+`ArtifactParserRegistry` is needed to generate delta format instructions and existing artifact outlines. `SpecRepository` is needed to read existing artifact files for outlines. `TemplateExpander.expand()` is called on `instruction`, `template`, `deltaInstruction`, and `rules` text before returning them (verbatim expansion, no shell escaping). `SchemaProvider` provides the fully-resolved schema (with plugins and overrides applied), which includes pre-loaded template content in each `ArtifactType`. It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander.
 
 ### Requirement: Input
 

@@ -19,7 +19,7 @@ import { DeltaApplicationError } from '../../../src/domain/errors/delta-applicat
 import {
   makeChangeRepository,
   makeActorResolver,
-  makeSchemaRegistry,
+  makeSchemaProvider,
   makeSpecRepository,
   makeArtifactType,
   makeSchema,
@@ -77,12 +77,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository(),
         new Map(),
-        makeSchemaRegistry(makeSchema([])),
+        makeSchemaProvider(makeSchema([])),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
       await expect(
         uc.execute({
@@ -99,12 +97,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
         new Map(),
-        makeSchemaRegistry(makeSchema([])),
+        makeSchemaProvider(makeSchema([])),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
       await expect(
         uc.execute({
@@ -121,12 +117,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
         new Map(),
-        makeSchemaRegistry(null),
+        makeSchemaProvider(null),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
       await expect(
         uc.execute({
@@ -143,12 +137,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
         new Map(),
-        makeSchemaRegistry(makeSchema({ name: 'schema-b' })),
+        makeSchemaProvider(makeSchema({ name: 'schema-b' })),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
       await expect(
         uc.execute({
@@ -168,12 +160,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -208,12 +198,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -232,12 +220,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -286,12 +272,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -347,12 +331,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -409,12 +391,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -463,12 +443,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -527,12 +505,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -604,12 +580,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -659,12 +633,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -703,12 +675,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -751,12 +721,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -803,12 +771,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(parser),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -858,12 +824,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(parser),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -906,12 +870,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(parser),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -969,12 +931,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map([['default', specsRepo]]),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(parser, yamlParser),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1015,12 +975,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1075,12 +1033,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -1118,12 +1074,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1142,12 +1096,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1167,12 +1119,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1217,12 +1167,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1263,12 +1211,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1327,12 +1273,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1377,12 +1321,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({

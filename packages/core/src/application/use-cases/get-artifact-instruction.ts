@@ -1,7 +1,7 @@
 import * as path from 'node:path'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry, type OutlineEntry } from '../ports/artifact-parser.js'
 import { type TemplateExpander } from '../template-expander.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
@@ -54,39 +54,31 @@ export interface GetArtifactInstructionResult {
 export class GetArtifactInstruction {
   private readonly _changes: ChangeRepository
   private readonly _specs: ReadonlyMap<string, SpecRepository>
-  private readonly _schemas: SchemaRegistry
+  private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
   private readonly _templates: TemplateExpander
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new `GetArtifactInstruction` use case.
    *
    * @param changes - Repository for loading change entities
    * @param specs - Map of workspace names to spec repositories
-   * @param schemas - Registry for resolving the active schema
+   * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact parsers by format
    * @param templates - Template expander for variable substitution
-   * @param schemaRef - Schema reference string from config
-   * @param workspaceSchemasPaths - Map of workspace names to schema directory paths
    */
   constructor(
     changes: ChangeRepository,
     specs: ReadonlyMap<string, SpecRepository>,
-    schemas: SchemaRegistry,
+    schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
     templates: TemplateExpander,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
   ) {
     this._changes = changes
     this._specs = specs
-    this._schemas = schemas
+    this._schemaProvider = schemaProvider
     this._parsers = parsers
     this._templates = templates
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
@@ -99,8 +91,8 @@ export class GetArtifactInstruction {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+    const schema = await this._schemaProvider.get()
+    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     if (schema.name() !== change.schemaName) {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())

@@ -10,7 +10,14 @@ context:
 rules:
   - requirement: Gate guard
     rules:
-      - The use case MUST reject the operation with an `ApprovalGateDisabledError` if the `approvalsSpec` input flag is `false`. The gate check MUST occur before any repository access or side effects.
+      - |-
+        Before recording the approval, the use case MUST verify that the change is in a valid state for spec approval. The gate guard sequence is:
+
+        1. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.
+        2. Assert the change is in `ready` state. If not, throw `InvalidStateTransitionError`.
+        3. Resolve the current actor identity via `ActorResolver`.
+        4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved (returns `null`), throw `SchemaNotFoundError`.
+        5. Compare `schema.name()` with `change.schemaName`. If they differ, throw `SchemaMismatchError`.
   - requirement: Change lookup
     rules:
       - The use case MUST load the change by name from the `ChangeRepository`. If no change with the given name exists, it MUST throw a `ChangeNotFoundError`.
@@ -91,7 +98,7 @@ scenarios:
   - requirement: Artifact hash computation
     name: Schema does not resolve
     given:
-      - the SchemaRegistry returns null for the configured schema reference
+      - SchemaProvider.get() returns null for the configured schema
     when:
       - the use case computes artifact hashes
     then:
@@ -130,6 +137,6 @@ scenarios:
       - name, reason, and approvalsSpec are all required
       - AND all fields are readonly
 contentHashes:
-  spec.md: sha256:cd40e7ff9fffe939c3bef9febab592e5f17df9cb6e9daefae320ba221007c224
-  verify.md: sha256:ace3cf15e0831ccb82a0fe1838f9c1ae9493fc2cca9b98644b07c0aedb109769
+  spec.md: sha256:cfb05f1edaec5d2b0b8423e89e726162c7b3c086f772bcf645ddf1d389e723e9
+  verify.md: sha256:1be02ca613e71a11b5cfaa599eff56433dbbb034f274b0eee74d4477b273dccf
 generatedBy: core

@@ -7,8 +7,8 @@
 #### Scenario: Schema mismatch throws SchemaMismatchError
 
 - **GIVEN** a change created with schema `spec-driven`
-- **AND** the active schema in `specd.yaml` is `custom-schema`
-- **WHEN** `RunStepHooks.execute` is called
+- **AND** `SchemaProvider.get()` returns a schema named `custom-schema`
+- **WHEN** `execute` is called
 - **THEN** `SchemaMismatchError` is thrown
 - **AND** no hooks are executed
 

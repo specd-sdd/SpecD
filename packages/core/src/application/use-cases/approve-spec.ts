@@ -1,7 +1,7 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-error.js'
@@ -28,35 +28,27 @@ export interface ApproveSpecInput {
 export class ApproveSpec {
   private readonly _changes: ChangeRepository
   private readonly _actor: ActorResolver
-  private readonly _schemas: SchemaRegistry
+  private readonly _schemaProvider: SchemaProvider
   private readonly _hasher: ContentHasher
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new `ApproveSpec` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
    * @param actor - Resolver for the actor identity
-   * @param schemas - Registry for resolving the active schema
+   * @param schemaProvider - Provider for the fully-resolved schema
    * @param hasher - Content hasher for computing artifact hashes
-   * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
-   * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
    */
   constructor(
     changes: ChangeRepository,
     actor: ActorResolver,
-    schemas: SchemaRegistry,
+    schemaProvider: SchemaProvider,
     hasher: ContentHasher,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
   ) {
     this._changes = changes
     this._actor = actor
-    this._schemas = schemas
+    this._schemaProvider = schemaProvider
     this._hasher = hasher
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
@@ -95,7 +87,7 @@ export class ApproveSpec {
    * @returns Map of artifact filename to hash string
    */
   private async _computeArtifactHashes(change: Change): Promise<Record<string, string>> {
-    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
+    const schema = await this._schemaProvider.get()
     const cleanupMap: ReadonlyMap<string, readonly PreHashCleanup[]> =
       schema !== null ? buildCleanupMap(schema) : new Map()
 

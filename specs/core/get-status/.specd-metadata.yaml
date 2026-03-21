@@ -40,12 +40,10 @@ rules:
         `GetStatus` MUST accept the following constructor arguments:
 
         - `changes: ChangeRepository` — for loading changes by name
-        - `schemas: SchemaRegistry` — for resolving the active schema
-        - `schemaRef: string` — the schema reference string from project config
-        - `workspaceSchemasPaths: ReadonlyMap<string, string>` — workspace-to-schemas-path map for schema resolution
+        - `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema
         - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
 
-        It MUST delegate to `ChangeRepository.get(name)` to load the change. The additional dependencies follow the same injection pattern used by `TransitionChange`, `CompileContext`, and other use cases that need schema access.
+        It MUST delegate to `ChangeRepository.get(name)` to load the change. `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
   - requirement: Reports effective status for every artifact
     rules:
       - The `artifactStatuses` array MUST contain exactly one entry per artifact in the change's artifact map. It MUST NOT omit artifacts and MUST NOT include entries for artifacts that do not exist on the change.
@@ -67,7 +65,7 @@ rules:
   - requirement: Graceful degradation when schema resolution fails
     rules:
       - |-
-        If schema resolution fails (e.g. schema not found, version mismatch), the `lifecycle` object MUST still be present with degraded values:
+        If `SchemaProvider.get()` returns `null` or throws, the `lifecycle` object MUST still be present with degraded values:
 
         - `validTransitions` MUST be populated normally (it is a static lookup, independent of schema)
         - `availableTransitions` MUST be an empty array
@@ -222,7 +220,7 @@ scenarios:
   - requirement: Graceful degradation when schema resolution fails
     name: Schema resolution failure degrades lifecycle fields
     given:
-      - SchemaRegistry.resolve() throws an error
+      - SchemaProvider.get() returns null
     when:
       - execute() is called
     then:
@@ -235,6 +233,6 @@ scenarios:
       - AND lifecycle.changePath is populated normally
       - AND lifecycle.schemaInfo is null
 contentHashes:
-  spec.md: sha256:e8e88efbb0f74c4326bc42fb7bfa3898ae2a3dd317d1038b53c462b793225f11
-  verify.md: sha256:0b64d31454a3c115724661d942f1653bc17e03a45cc566f83280e6a18733aa73
+  spec.md: sha256:c0d556908a3fa9519b492621e610a087964de4c13056f66cefaa923ab767a45e
+  verify.md: sha256:3179a35f1ab5ee4be40845f43eea85479eb5943e47e04df35d084058254ed6cb
 generatedBy: core

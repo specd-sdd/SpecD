@@ -25,7 +25,7 @@ import {
   makeChangeRepository,
   makeActorResolver,
   makeRunStepHooks,
-  makeSchemaRegistry,
+  makeSchemaProvider,
   makeSpecRepository,
   makeArtifactType,
   makeSchema,
@@ -151,12 +151,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await expect(uc.execute({ name: 'missing' })).rejects.toThrow(ChangeNotFoundError)
     })
@@ -172,12 +170,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(null),
+        makeSchemaProvider(null),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaNotFoundError)
     })
@@ -231,12 +227,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(InvalidStateTransitionError)
     })
@@ -252,12 +246,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema({ name: 'schema-b' })),
+        makeSchemaProvider(makeSchema({ name: 'schema-b' })),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaMismatchError)
     })
@@ -273,12 +265,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       const result = await uc.execute({ name: 'my-change' })
       expect(result.archivedChange).toBeDefined()
@@ -296,12 +286,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       const result = await uc.execute({ name: 'add-auth-flow' })
 
@@ -316,12 +304,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -364,12 +350,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -431,12 +415,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -483,12 +465,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -533,12 +513,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -565,12 +543,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -596,12 +572,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -645,12 +619,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -693,12 +665,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -717,12 +687,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -767,12 +735,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       const result = await uc.execute({ name: 'my-change', skipHooks: true })
 
@@ -815,12 +781,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       const result = await uc.execute({ name: 'my-change', skipHooks: true })
 
@@ -865,12 +829,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       const result = await uc.execute({ name: 'my-change', skipHooks: true })
 
@@ -894,12 +856,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       const result = await uc.execute({ name: 'my-change', skipHooks: true })
 
@@ -958,12 +918,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1018,12 +976,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(DeltaApplicationError)
@@ -1083,12 +1039,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1151,12 +1105,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1222,12 +1174,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1290,12 +1240,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1358,12 +1306,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1413,12 +1359,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1442,12 +1386,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1487,12 +1429,10 @@ describe('ArchiveChange', () => {
         makeRunStepHooks(),
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1527,12 +1467,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1585,12 +1523,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -1616,12 +1552,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1644,12 +1578,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1703,12 +1635,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -1763,12 +1693,10 @@ describe('ArchiveChange', () => {
         runStepHooks,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -1794,12 +1722,10 @@ describe('ArchiveChange', () => {
         hookSpy,
         makeActorResolver(),
         makeParsers(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
         makeYaml(),
-        'std',
-        new Map(),
       )
 
       await uc.execute({ name: 'my-change' })

@@ -28,9 +28,20 @@ Each entry in the `Kernel` interface must be typed as the concrete use case clas
 
 ### Requirement: createKernel constructs shared adapters once
 
-`createKernel` must build shared infrastructure adapters (repositories, VCS adapter, hook runner, content hasher, YAML serializer, file reader, actor resolver, artifact parser registry, config writer) exactly once via `createKernelInternals` and reuse them across all use cases. No adapter must be constructed more than once per kernel instantiation.
+`createKernel(config)` MUST construct all shared adapters, ports, and use cases exactly once and wire them together. Constructing the same adapter or use case twice would waste resources and risk inconsistent state.
 
-`createKernelInternals` must pass a `resolveArtifactTypes` function to the `FsChangeRepository` options. This allows the change repository to lazily resolve artifact types from the active schema without requiring the schema to be resolved at construction time. The resolver uses the schema registry and workspace schema paths from the kernel config.
+Shared infrastructure includes:
+
+- One `ChangeRepository` instance (shared by all change use cases)
+- One `SpecRepository` per workspace
+- One `SchemaRegistry` instance
+- One `SchemaProvider` instance — a lazy, caching provider that resolves the schema (with plugins and overrides) on first access via `ResolveSchema`, then returns the cached result. All use cases that need the schema MUST receive this provider instead of the raw `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple.
+- One `HookRunner` instance
+- One `RunStepHooks` instance (shared by `TransitionChange`, `ArchiveChange`, and exposed directly)
+- One `ContentHasher` instance
+- One `ArtifactParserRegistry` instance
+
+No use case constructor may call `SchemaRegistry.resolve()` directly. Schema access is exclusively through `SchemaProvider.get()`, which returns the fully-resolved schema with extends chains, plugins, and `schemaOverrides` applied.
 
 ### Requirement: Auto-invalidation on get when artifact files drift
 
@@ -53,7 +64,7 @@ The kernel must expose the underlying `ChangeRepository` as `changes.repo` and t
 
 The following table is the exhaustive mapping between kernel paths and use case classes. Each entry is a binding contract — consumers access use cases exclusively through these paths.
 
-#### `kernel.changes`
+#### kernel.changes
 
 | Kernel path                      | Use case class           | Spec                                                            | Description                                             |
 | -------------------------------- | ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------- |
@@ -79,7 +90,7 @@ The following table is the exhaustive mapping between kernel paths and use case 
 | `changes.getHookInstructions`    | `GetHookInstructions`    | [get-hook-instructions](../get-hook-instructions/spec.md)       | Returns instruction: hook text for a step and phase     |
 | `changes.getArtifactInstruction` | `GetArtifactInstruction` | [get-artifact-instruction](../get-artifact-instruction/spec.md) | Returns artifact instruction block with rules and delta |
 
-#### `kernel.specs`
+#### kernel.specs
 
 | Kernel path                | Use case class                        | Spec                                                            | Description                                                 |
 | -------------------------- | ------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
@@ -96,7 +107,7 @@ The following table is the exhaustive mapping between kernel paths and use case 
 | `specs.getContext`         | `GetSpecContext`                      | [get-spec-context](../get-spec-context/spec.md)                 | Builds structured context entries with dependency traversal |
 | `specs.resolveSchema`      | `ResolveSchema`                       | [resolve-schema](../resolve-schema/spec.md)                     | Resolves base schema with extends, plugins, and overrides   |
 
-#### `kernel.project`
+#### kernel.project
 
 | Kernel path                  | Use case class       | Spec                                                    | Description                                     |
 | ---------------------------- | -------------------- | ------------------------------------------------------- | ----------------------------------------------- |

@@ -9,7 +9,7 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
@@ -64,12 +64,10 @@ export class ArchiveChange {
   private readonly _runStepHooks: RunStepHooks
   private readonly _actor: ActorResolver
   private readonly _parsers: ArtifactParserRegistry
-  private readonly _schemas: SchemaRegistry
+  private readonly _schemaProvider: SchemaProvider
   private readonly _generateMetadata: GenerateSpecMetadata
   private readonly _saveMetadata: SaveSpecMetadata
   private readonly _yaml: YamlSerializer
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new `ArchiveChange` use case instance.
@@ -80,12 +78,10 @@ export class ArchiveChange {
    * @param runStepHooks - Use case for executing workflow hooks
    * @param actor - Resolver for the actor identity
    * @param parsers - Registry of artifact format parsers
-   * @param schemas - Registry for resolving schema references
+   * @param schemaProvider - Provider for the fully-resolved schema
    * @param generateMetadata - Use case for deterministic metadata extraction
    * @param saveMetadata - Use case for writing `.specd-metadata.yaml`
    * @param yaml - YAML serializer for metadata content
-   * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
-   * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
    */
   constructor(
     changes: ChangeRepository,
@@ -94,12 +90,10 @@ export class ArchiveChange {
     runStepHooks: RunStepHooks,
     actor: ActorResolver,
     parsers: ArtifactParserRegistry,
-    schemas: SchemaRegistry,
+    schemaProvider: SchemaProvider,
     generateMetadata: GenerateSpecMetadata,
     saveMetadata: SaveSpecMetadata,
     yaml: YamlSerializer,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
   ) {
     this._changes = changes
     this._specs = specs
@@ -107,12 +101,10 @@ export class ArchiveChange {
     this._runStepHooks = runStepHooks
     this._actor = actor
     this._parsers = parsers
-    this._schemas = schemas
+    this._schemaProvider = schemaProvider
     this._generateMetadata = generateMetadata
     this._saveMetadata = saveMetadata
     this._yaml = yaml
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
@@ -130,8 +122,8 @@ export class ArchiveChange {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+    const schema = await this._schemaProvider.get()
+    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     // --- Schema name guard ---
     if (schema.name() !== change.schemaName) {

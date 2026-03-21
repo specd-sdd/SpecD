@@ -63,9 +63,20 @@ rules:
   - requirement: createKernel constructs shared adapters once
     rules:
       - |-
-        `createKernel` must build shared infrastructure adapters (repositories, VCS adapter, hook runner, content hasher, YAML serializer, file reader, actor resolver, artifact parser registry, config writer) exactly once via `createKernelInternals` and reuse them across all use cases. No adapter must be constructed more than once per kernel instantiation.
+        `createKernel(config)` MUST construct all shared adapters, ports, and use cases exactly once and wire them together. Constructing the same adapter or use case twice would waste resources and risk inconsistent state.
 
-        `createKernelInternals` must pass a `resolveArtifactTypes` function to the `FsChangeRepository` options. This allows the change repository to lazily resolve artifact types from the active schema without requiring the schema to be resolved at construction time. The resolver uses the schema registry and workspace schema paths from the kernel config.
+        Shared infrastructure includes:
+
+        - One `ChangeRepository` instance (shared by all change use cases)
+        - One `SpecRepository` per workspace
+        - One `SchemaRegistry` instance
+        - One `SchemaProvider` instance — a lazy, caching provider that resolves the schema (with plugins and overrides) on first access via `ResolveSchema`, then returns the cached result. All use cases that need the schema MUST receive this provider instead of the raw `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple.
+        - One `HookRunner` instance
+        - One `RunStepHooks` instance (shared by `TransitionChange`, `ArchiveChange`, and exposed directly)
+        - One `ContentHasher` instance
+        - One `ArtifactParserRegistry` instance
+
+        No use case constructor may call `SchemaRegistry.resolve()` directly. Schema access is exclusively through `SchemaProvider.get()`, which returns the fully-resolved schema with extends chains, plugins, and `schemaOverrides` applied.
   - requirement: Auto-invalidation on get when artifact files drift
     rules:
       - |-
@@ -225,11 +236,25 @@ scenarios:
       - its type is the concrete use case class, not a wrapper, proxy, or simplified interface
   - requirement: createKernel constructs shared adapters once
     name: No duplicate adapter construction
+    given:
+      - a valid SpecdConfig with one workspace
     when:
       - createKernel(config) is called
     then:
-      - createKernelInternals is called exactly once
-      - AND the returned adapter instances (repositories, VCS adapter, hook runner, hasher, etc.) are shared across all use case instantiations
+      - only one ChangeRepository instance is created
+      - AND only one SchemaRegistry instance is created
+      - AND only one SchemaProvider instance is created and shared across all use cases
+      - AND only one RunStepHooks instance is created
+  - requirement: createKernel constructs shared adapters once
+    name: SchemaProvider replaces direct SchemaRegistry usage
+    given:
+      - a valid SpecdConfig with schemaOverrides declared
+    when:
+      - createKernel(config) is called
+    then:
+      - no use case constructor receives SchemaRegistry directly
+      - AND all use cases that need the schema receive SchemaProvider
+      - AND SchemaProvider.get() returns the schema with overrides applied
   - requirement: Kernel exposes repository instances for adapter access
     name: ChangeRepository accessible via kernel
     when:
@@ -270,6 +295,6 @@ scenarios:
     then:
       - the kernel object and its nested groups are not expected to change — there is no addUseCase() or removeUseCase() mechanism
 contentHashes:
-  spec.md: sha256:a1da6d1aebd151e1f247fa38dde350908ce5087c54b0d3fb34cfb641c001f587
-  verify.md: sha256:557d6d97d8856cc560a5f2053f0b71916836b377d8e4c5bb0b34fa9a73ebe958
+  spec.md: sha256:cd8bebefc9d8f0456da3583b4c067578b7a9c09738ee82ae823ef4805597eb9c
+  verify.md: sha256:4d63f80b6911b997ea449c9f1bbf203924bfd79f8fddf1193e536b83103d4488
 generatedBy: core

@@ -13,7 +13,7 @@ rules:
       - "The use case takes a `specId` string (e.g. `'core/change'` or `'billing:invoices/create'`). It returns `{ metadata: SpecMetadata, hasExtraction: boolean }`. `metadata` contains the extracted fields plus content hashes and a `generatedBy` marker. `hasExtraction` indicates whether the active schema declares any `metadataExtraction` rules."
   - requirement: Schema resolution
     rules:
-      - 'The use case resolves the active schema via `SchemaRegistry.resolve()`. If the schema reference cannot be resolved, it throws `SchemaNotFoundError`. If the resolved schema has no `metadataExtraction` declarations, the use case returns `{ metadata: {}, hasExtraction: false }` immediately — there is nothing to extract.'
+      - 'The use case obtains the active schema via `SchemaProvider.get()`. If the schema cannot be resolved (returns `null`), it throws `SchemaNotFoundError`. If the resolved schema has no `metadataExtraction` declarations, the use case returns `{ metadata: {}, hasExtraction: false }` immediately — there is nothing to extract.'
   - requirement: Spec resolution
     rules:
       - The use case parses `specId` via `parseSpecId()` to obtain a workspace name and capability path. It looks up the workspace's `SpecRepository` from the injected map. If the workspace is unknown, it throws `WorkspaceNotFoundError`. If the spec is not found via `SpecRepository.get()`, it throws `SpecNotFoundError`.
@@ -33,10 +33,10 @@ rules:
       - |-
         The use case calls `extractMetadata()` with:
 
-        * The schema's `metadataExtraction` declarations
-        * Parsed ASTs keyed by artifact type ID
-        * Renderers from the artifact parsers
-        * A transform map (see resolveSpecPath transform)
+        - The schema's `metadataExtraction` declarations
+        - Parsed ASTs keyed by artifact type ID
+        - Renderers from the artifact parsers
+        - A transform map (see resolveSpecPath transform)
 
         The extraction engine produces fields including `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, `scenarios`, and `context`.
   - requirement: dependsOn resolution
@@ -50,9 +50,9 @@ rules:
       - |-
         The final metadata object merges:
 
-        * All fields from `extractMetadata()` output
-        * `contentHashes` from the hashing step
-        * `generatedBy: 'core'`
+        - All fields from `extractMetadata()` output
+        - `contentHashes` from the hashing step
+        - `generatedBy: 'core'`
 
         The result is returned with `hasExtraction: true`.
 constraints:
@@ -64,7 +64,7 @@ scenarios:
   - requirement: Schema resolution
     name: Schema not found
     when:
-      - GenerateSpecMetadata is executed with a schema reference that cannot be resolved
+      - SchemaProvider.get() returns null for the configured schema reference
     then:
       - it throws SchemaNotFoundError
   - requirement: Schema resolution
@@ -167,6 +167,6 @@ scenarios:
       - the returned metadata contains both the extractMetadata() output fields and contentHashes
       - AND hasExtraction is true
 contentHashes:
-  spec.md: sha256:2bee70f494375e29006a0f676975b6018b1522847711768811b4a8fa08fd21bc
-  verify.md: sha256:fe59cc90e251d4dafbc5efbaf3d700791717aaedea931e90ce5f359a5dd5407c
+  spec.md: sha256:4e415f1e6349fc8c194879ce2b035347578125de57cdf6c05765456837bb2302
+  verify.md: sha256:02ea21d4dbd1b87fd1a83d61445aeb94653ee85fc10dc0f56c9f67ebe28e380d
 generatedBy: core

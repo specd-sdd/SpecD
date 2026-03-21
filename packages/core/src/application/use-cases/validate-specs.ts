@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { type SpecRepository } from '../ports/spec-repository.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
 import { type ValidationFailure, type ValidationWarning } from './validate-artifacts.js'
@@ -53,32 +53,24 @@ export interface ValidateSpecsResult {
  */
 export class ValidateSpecs {
   private readonly _specs: ReadonlyMap<string, SpecRepository>
-  private readonly _schemas: SchemaRegistry
+  private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new `ValidateSpecs` use case instance.
    *
    * @param specs - Spec repositories keyed by workspace name
-   * @param schemas - Registry for resolving schema references
+   * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact format parsers
-   * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
-   * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
    */
   constructor(
     specs: ReadonlyMap<string, SpecRepository>,
-    schemas: SchemaRegistry,
+    schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
   ) {
     this._specs = specs
-    this._schemas = schemas
+    this._schemaProvider = schemaProvider
     this._parsers = parsers
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
@@ -89,8 +81,8 @@ export class ValidateSpecs {
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    */
   async execute(input: ValidateSpecsInput): Promise<ValidateSpecsResult> {
-    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+    const schema = await this._schemaProvider.get()
+    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     const specArtifactTypes = schema.artifacts().filter((a) => a.scope === 'spec')
     const entries: SpecValidationEntry[] = []

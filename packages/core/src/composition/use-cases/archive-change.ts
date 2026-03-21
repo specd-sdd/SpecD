@@ -8,6 +8,8 @@ import { createSpecRepository } from '../spec-repository.js'
 import { createArchiveRepository } from '../archive-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
 import { TemplateExpander } from '../../application/template-expander.js'
 import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
@@ -174,6 +176,14 @@ export function createArchiveChange(
     nodeModulesPaths: opts.nodeModulesPaths,
     configDir: opts.configDir,
   })
+  const resolveSchema = new ResolveSchema(
+    schemas,
+    opts.schemaRef,
+    opts.workspaceSchemasPaths,
+    [],
+    undefined,
+  )
+  const schemaProvider = new LazySchemaProvider(resolveSchema)
   const parsers = createArtifactParserRegistry()
   const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
   const hooks = new NodeHookRunner(expander)
@@ -182,19 +192,15 @@ export function createArchiveChange(
   const yaml = new NodeYamlSerializer()
   const generateMetadata = new GenerateSpecMetadata(
     opts.specRepositories,
-    schemas,
+    schemaProvider,
     parsers,
     hasher,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
   )
   const saveMetadata = new SaveSpecMetadata(opts.specRepositories, yaml)
   const runStepHooks = new RunStepHooks(
     changeRepo,
     hooks,
-    schemas,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
+    schemaProvider,
     opts.projectWorkflowHooks,
   )
   return new ArchiveChange(
@@ -204,11 +210,9 @@ export function createArchiveChange(
     runStepHooks,
     actor,
     parsers,
-    schemas,
+    schemaProvider,
     generateMetadata,
     saveMetadata,
     yaml,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
   )
 }
