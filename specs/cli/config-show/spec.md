@@ -34,7 +34,33 @@ storage:
   archive:   <absolute-path>
 ```
 
-In `json` or `toon` mode, the output is the full `SpecdConfig` object encoded in the respective format, with all paths resolved to absolute values.
+Optional fields are shown only when present in the config:
+
+```
+context:
+  file: <path>
+  instruction: <text>
+  ...
+
+contextIncludeSpecs: <pattern>, <pattern>, ...
+contextExcludeSpecs: <pattern>, <pattern>, ...
+llmOptimizedContext: <true|false>
+schemaPlugins: <ref>, <ref>, ...
+
+workflow:
+  <step>  pre: <count> hooks  post: <count> hooks
+  ...
+
+artifactRules:
+  <artifactId>: <count> rules
+  ...
+
+schemaOverrides: (present)
+```
+
+The `schemaOverrides` field, when present, shows `(present)` in text mode — its structure is complex and best inspected via JSON output.
+
+In `json` or `toon` mode, the command MUST serialize the `SpecdConfig` object directly — no manual field selection. The output is the config as-is, encoded in the respective format. This ensures that new fields added to `SpecdConfig` appear automatically without CLI changes. Optional fields that are `undefined` are omitted by the serializer.
 
 ### Requirement: Sensitive fields
 
@@ -65,6 +91,12 @@ storage:
   drafts:    /home/user/project/.specd/drafts
   discarded: /home/user/project/.specd/discarded
   archive:   /home/user/project/.specd/archive
+
+contextIncludeSpecs: default:*
+llmOptimizedContext: true
+
+workflow:
+  implementing  pre: 0 hooks  post: 1 hooks
 ```
 
 ## Spec Dependencies
