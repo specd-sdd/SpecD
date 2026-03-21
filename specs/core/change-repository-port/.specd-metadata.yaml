@@ -60,10 +60,35 @@ rules:
       - "`changePath(change)` MUST accept a `Change` and return the absolute filesystem path to that change's directory. This is used by use cases that need the change path for template variable construction (e.g. `change.path` in `TemplateVariables`). The implementation resolves the path from its internal storage layout."
   - requirement: scaffold creates artifact directories
     rules:
-      - "`scaffold(change, specExists)` MUST create the directory structure needed for the change's artifacts. For `scope: spec` artifacts, it creates `specs/<ws>/<capPath>/` or `deltas/<ws>/<capPath>/` directories under the change directory. For `scope: change` artifacts, the root directory already exists. The `specExists` callback is an async function that returns whether a spec already exists in the repository, used to determine whether to create spec-scoped or delta-scoped directories."
+      - '### Requirement: scaffold creates artifact directories'
+      - |-
+        `scaffold(change, specExists)` MUST create the directory structure needed for the change's
+        artifacts. For `scope: spec` artifacts, it creates `specs/<ws>/<capPath>/` or
+        `deltas/<ws>/<capPath>/` directories under the change directory. For `scope: change`
+        artifacts, the root directory already exists. The `specExists` callback is an async function
+        that returns whether a spec already exists in the repository, used to determine whether
+        to create spec-scoped or delta-scoped directories.
+  - requirement: unscaffold removes spec directories
+    rules:
+      - |-
+        `unscaffold(change, specIds)` MUST remove the scaffolded directories for the given
+        spec IDs from the change directory. For each spec ID, it MUST remove:
+
+        - `specs/<workspace>/<capability-path>/` — new-spec artifact directories
+        - `deltas/<workspace>/<capability-path>/` — delta artifact directories
+
+        The operation MUST be idempotent — if a directory does not exist, it MUST be silently
+        skipped. If a directory contains files, all files and subdirectories MUST be removed
+        along with the directory itself.
   - requirement: Abstract class with abstract methods
     rules:
-      - '`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `scaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.'
+      - '### Requirement: Abstract class with abstract methods'
+      - |-
+        `ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage
+        operations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`,
+        `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `scaffold`, `unscaffold`)
+        MUST be declared as `abstract` methods. This follows the architecture spec requirement that
+        ports with shared construction are abstract classes.
 constraints:
   - Changes are stored globally, not per-workspace — the inherited workspace context is unused
   - get() in FsChangeRepository may auto-invalidate and persist the change before returning, if artifact drift is detected and the change is beyond designing or has active approvals
@@ -241,7 +266,32 @@ scenarios:
       - deltaExists(change, "auth/login", "nonexistent.delta.yaml") is called
     then:
       - false is returned
+  - requirement: unscaffold removes spec directories
+    name: Unscaffold removes specs and deltas directories
+    given:
+      - a change directory with specs/core/core/edit-change/ and deltas/core/core/edit-change/ subdirectories
+    when:
+      - unscaffold(change, ['core:core/edit-change']) is called
+    then:
+      - both specs/core/core/edit-change/ and deltas/core/core/edit-change/ directories are removed
+  - requirement: unscaffold removes spec directories
+    name: Unscaffold is idempotent — non-existent directory is silently skipped
+    given:
+      - a change directory with no specs/core/core/edit-change/ directory
+    when:
+      - unscaffold(change, ['core:core/edit-change']) is called
+    then:
+      - no error is thrown
+      - AND the operation completes successfully
+  - requirement: unscaffold removes spec directories
+    name: Unscaffold removes directories with files
+    given:
+      - a change directory with specs/core/core/edit-change/spec.md (a file inside the directory)
+    when:
+      - unscaffold(change, ['core:core/edit-change']) is called
+    then:
+      - the specs/core/core/edit-change/ directory and its contents are removed
 contentHashes:
-  spec.md: sha256:a81d3334fb5803d4df251b946865403438588bab7baa59898705cad6bb378229
-  verify.md: sha256:d9d0393981d88ca0f0ee02499ce9f96b17c4a28c4c08b70e1e62495407b8a592
+  spec.md: sha256:7c6080d18b5a35651128597ebb815a72f88564c1d8a9f9d2c7032336b2c6db4c
+  verify.md: sha256:f721570d1799a61861c7e182539d4043fc8d8b54cee82c05e34d1d279e4df47f
 generatedBy: core

@@ -165,6 +165,18 @@ export abstract class ChangeRepository extends Repository {
    * @param specExists - A function that returns whether a spec already exists in the repository
    */
   abstract scaffold(change: Change, specExists: (specId: string) => Promise<boolean>): Promise<void>
+
+  /**
+   * Removes the scaffolded directories for the given spec IDs from the change directory.
+   *
+   * For each spec ID, removes both `specs/<workspace>/<capability-path>/` and
+   * `deltas/<workspace>/<capability-path>/` directories. The operation is idempotent —
+   * if a directory does not exist, it is silently skipped.
+   *
+   * @param change - The change whose spec directories to remove
+   * @param specIds - The spec IDs whose directories to remove
+   */
+  abstract unscaffold(change: Change, specIds: readonly string[]): Promise<void>
 }
 
 export type { ArtifactConflictError }

@@ -1040,4 +1040,44 @@ describe('FsChangeRepository', () => {
       expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(proposalHash)
     })
   })
+
+  describe('unscaffold', () => {
+    it('removes specs/ and deltas/ directories for a spec', async () => {
+      const change = makeChange('remove-test')
+      await ctx.repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-remove-test')
+      await fs.mkdir(path.join(dir, 'specs', 'default', 'auth', 'login'), { recursive: true })
+      await fs.mkdir(path.join(dir, 'deltas', 'default', 'auth', 'login'), { recursive: true })
+
+      await ctx.repo.unscaffold(change, ['default:auth/login'])
+
+      await expect(fs.access(path.join(dir, 'specs', 'default', 'auth', 'login'))).rejects.toThrow()
+      await expect(
+        fs.access(path.join(dir, 'deltas', 'default', 'auth', 'login')),
+      ).rejects.toThrow()
+    })
+
+    it('is idempotent when directory does not exist', async () => {
+      const change = makeChange('remove-test')
+      await ctx.repo.save(change)
+
+      await expect(ctx.repo.unscaffold(change, ['default:auth/login'])).resolves.toBeUndefined()
+    })
+
+    it('removes directories containing files', async () => {
+      const change = makeChange('remove-test')
+      await ctx.repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-remove-test')
+      const specsDir = path.join(dir, 'specs', 'default', 'auth', 'login')
+      await fs.mkdir(specsDir, { recursive: true })
+      await fs.writeFile(path.join(specsDir, 'spec.md'), '# Spec\n', 'utf8')
+
+      await ctx.repo.unscaffold(change, ['default:auth/login'])
+
+      await expect(fs.access(specsDir)).rejects.toThrow()
+      await expect(fs.access(path.join(specsDir, 'spec.md'))).rejects.toThrow()
+    })
+  })
 })

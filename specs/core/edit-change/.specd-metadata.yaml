@@ -34,14 +34,23 @@ rules:
       - "If the resulting `specIds` list is identical (same length, same order) to the change's current `specIds`, the use case MUST return the unchanged change with `invalidated: false` without persisting."
   - requirement: Approval invalidation on effective change
     rules:
+      - '### Requirement: Approval invalidation on effective change'
+  - requirement: Directory cleanup on removal
+    rules:
       - |-
-        When the resulting `specIds` differ from the current set, the use case MUST:
+        When the resulting `specIds` differ from the current set due to removals, the use
+        case MUST call `ChangeRepository.unscaffold(change, removedSpecIds)` to remove the
+        scaffolded directories for each removed spec from the change directory. This call
+        MUST happen after the change is persisted and before returning the result. If any
+        directory contains files, they MUST be removed along with the directory.
 
-        1. Resolve the current actor via `ActorResolver.identity()`
-        2. Call `change.updateSpecIds(newSpecIds, actor)` — this records an `invalidated` event with cause `spec-change` and a `transitioned` event
-        3. Persist the change via `ChangeRepository.save`
-        4. Call `ChangeRepository.scaffold(change, specExists)` to create directories for any newly added spec-scoped artifacts, using the `specs` map for the `specExists` check
-        5. Return `{ change, invalidated: true }`
+        Directories to remove follow the change directory layout:
+
+        - `specs/<workspace>/<capability-path>/` — new-spec artifact directories
+        - `deltas/<workspace>/<capability-path>/` — delta artifact directories
+
+        The `unscaffold` operation is idempotent — if a directory does not exist, it
+        is silently skipped.
   - requirement: Output contract
     rules:
       - |-
@@ -51,10 +60,11 @@ rules:
         - `invalidated` — `true` if approvals were invalidated, `false` otherwise
   - requirement: Dependencies
     rules:
+      - '### Requirement: Dependencies'
       - |-
         `EditChange` depends on the following ports injected via constructor:
 
-        - `ChangeRepository` — for loading, persisting, and scaffolding changes
+        - `ChangeRepository` — for loading, persisting, scaffolding, and unscaffolding changes
         - `ActorResolver` — for resolving the current actor identity
         - `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding
 constraints:
@@ -137,7 +147,34 @@ scenarios:
       - change.updateSpecIds is called with ['auth/login'] and the resolved actor
       - AND the change is persisted
       - AND invalidated is true
+  - requirement: Directory cleanup on removal
+    name: Removing a spec cleans up its scaffolded directories
+    given:
+      - "a change with specIds: ['core:core/edit-change'] and scaffolded directories at specs/core/core/edit-change/ and deltas/core/core/edit-change/"
+    when:
+      - "execute is called with removeSpecIds: ['core:core/edit-change']"
+    then:
+      - ChangeRepository.unscaffold is called with the removed spec IDs
+      - AND the directories specs/core/core/edit-change/ and deltas/core/core/edit-change/ are removed from the change directory
+  - requirement: Directory cleanup on removal
+    name: Removing multiple specs cleans up all their directories
+    given:
+      - "a change with specIds: ['core:core/edit-change', 'core:core/change-repository-port']"
+      - AND scaffolded directories for both specs exist
+    when:
+      - "execute is called with removeSpecIds: ['core:core/edit-change', 'core:core/change-repository-port']"
+    then:
+      - ChangeRepository.unscaffold is called with both removed spec IDs
+      - AND all corresponding directories are removed
+  - requirement: Directory cleanup on removal
+    name: Adding a spec does not trigger unscaffold
+    given:
+      - "a change with specIds: ['core:core/edit-change']"
+    when:
+      - "execute is called with addSpecIds: ['core:core/change-repository-port']"
+    then:
+      - ChangeRepository.unscaffold is NOT called
 contentHashes:
-  spec.md: sha256:7502dda4f74cf027ab6449be947fa5da22ce5f6faae28d514350db6686cfb1b9
-  verify.md: sha256:ca361b2f72285373ef03bcee3edf2e6339f234c67690d728d8c4e3c93a4695c7
+  spec.md: sha256:21b51c580fe176040fccf3850dafd2824272d8efbc76d81e1d684d9af70cda1e
+  verify.md: sha256:dc567acef5dd4a47598e73e8e4592f910da0410ed27ff11b07415f0769f9699f
 generatedBy: core

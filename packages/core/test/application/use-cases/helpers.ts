@@ -14,6 +14,7 @@ import {
   type ResolveFromPathResult,
 } from '../../../src/application/ports/spec-repository.js'
 import { type SchemaRegistry } from '../../../src/application/ports/schema-registry.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import {
   type ArtifactParser,
   type ArtifactParserRegistry,
@@ -109,6 +110,10 @@ class StubChangeRepository extends ChangeRepository {
     _change: Change,
     _specExists: (specId: string) => Promise<boolean>,
   ): Promise<void> {
+    // no-op in tests
+  }
+
+  override async unscaffold(_change: Change, _specIds: readonly string[]): Promise<void> {
     // no-op in tests
   }
 }
@@ -258,6 +263,17 @@ export function makeSchemaRegistry(schema: Schema | null = null): SchemaRegistry
     },
     async list() {
       return []
+    },
+  }
+}
+
+/**
+ * Creates a mock `SchemaProvider` that returns a fixed schema on `get()`.
+ */
+export function makeSchemaProvider(schema: Schema | null = null): SchemaProvider {
+  return {
+    async get(): Promise<Schema | null> {
+      return schema
     },
   }
 }

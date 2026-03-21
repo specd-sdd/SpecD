@@ -69,11 +69,36 @@ This ensures that approval drift and state-inconsistent artifact changes are det
 
 ### Requirement: scaffold creates artifact directories
 
-`scaffold(change, specExists)` MUST create the directory structure needed for the change's artifacts. For `scope: spec` artifacts, it creates `specs/<ws>/<capPath>/` or `deltas/<ws>/<capPath>/` directories under the change directory. For `scope: change` artifacts, the root directory already exists. The `specExists` callback is an async function that returns whether a spec already exists in the repository, used to determine whether to create spec-scoped or delta-scoped directories.
+### Requirement: scaffold creates artifact directories
+
+`scaffold(change, specExists)` MUST create the directory structure needed for the change's
+artifacts. For `scope: spec` artifacts, it creates `specs/<ws>/<capPath>/` or
+`deltas/<ws>/<capPath>/` directories under the change directory. For `scope: change`
+artifacts, the root directory already exists. The `specExists` callback is an async function
+that returns whether a spec already exists in the repository, used to determine whether
+to create spec-scoped or delta-scoped directories.
+
+### Requirement: unscaffold removes spec directories
+
+`unscaffold(change, specIds)` MUST remove the scaffolded directories for the given
+spec IDs from the change directory. For each spec ID, it MUST remove:
+
+- `specs/<workspace>/<capability-path>/` — new-spec artifact directories
+- `deltas/<workspace>/<capability-path>/` — delta artifact directories
+
+The operation MUST be idempotent — if a directory does not exist, it MUST be silently
+skipped. If a directory contains files, all files and subdirectories MUST be removed
+along with the directory itself.
 
 ### Requirement: Abstract class with abstract methods
 
-`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `scaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+### Requirement: Abstract class with abstract methods
+
+`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage
+operations (`get`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`,
+`saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `scaffold`, `unscaffold`)
+MUST be declared as `abstract` methods. This follows the architecture spec requirement that
+ports with shared construction are abstract classes.
 
 ## Constraints
 

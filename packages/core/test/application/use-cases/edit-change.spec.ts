@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { EditChange } from '../../../src/application/use-cases/edit-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
@@ -27,6 +27,17 @@ describe('EditChange', () => {
       expect(result.change.specIds).toEqual(['auth/login'])
       expect(result.invalidated).toBe(false)
     })
+
+    it('does not call unscaffold when adding specs', async () => {
+      const change = makeChange('my-change', { specIds: ['auth/login'] })
+      const repo = makeChangeRepository([change])
+      const unscaffoldSpy = vi.spyOn(repo, 'unscaffold')
+      const uc = new EditChange(repo, new Map(), makeActorResolver())
+
+      await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
+
+      expect(unscaffoldSpy).not.toHaveBeenCalled()
+    })
   })
 
   describe('removing spec IDs', () => {
@@ -48,6 +59,32 @@ describe('EditChange', () => {
       await expect(
         uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay'] }),
       ).rejects.toThrow(SpecNotInChangeError)
+    })
+
+    it('calls unscaffold with the removed spec IDs', async () => {
+      const change = makeChange('my-change', { specIds: ['auth/login', 'billing/pay'] })
+      const repo = makeChangeRepository([change])
+      const unscaffoldSpy = vi.spyOn(repo, 'unscaffold')
+      const uc = new EditChange(repo, new Map(), makeActorResolver())
+
+      await uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay'] })
+
+      expect(unscaffoldSpy).toHaveBeenCalledOnce()
+      expect(unscaffoldSpy).toHaveBeenCalledWith(change, ['billing/pay'])
+    })
+
+    it('calls unscaffold with all removed spec IDs when removing multiple', async () => {
+      const change = makeChange('my-change', {
+        specIds: ['auth/login', 'billing/pay', 'core/config'],
+      })
+      const repo = makeChangeRepository([change])
+      const unscaffoldSpy = vi.spyOn(repo, 'unscaffold')
+      const uc = new EditChange(repo, new Map(), makeActorResolver())
+
+      await uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay', 'core/config'] })
+
+      expect(unscaffoldSpy).toHaveBeenCalledOnce()
+      expect(unscaffoldSpy).toHaveBeenCalledWith(change, ['billing/pay', 'core/config'])
     })
   })
 
