@@ -27,19 +27,11 @@ function makeUseCase(opts: {
   changes?: ReturnType<typeof makeChangeRepository>
   hookRunner?: HookRunner
   schema?: ReturnType<typeof makeSchema> | null
-  projectWorkflowHooks?: readonly {
-    readonly step: string
-    readonly hooks: {
-      readonly pre: readonly HookEntry[]
-      readonly post: readonly HookEntry[]
-    }
-  }[]
 }): RunStepHooks {
   return new RunStepHooks(
     opts.changes ?? makeChangeRepository(),
     opts.hookRunner ?? makeHookRunner(),
     makeSchemaProvider(opts.schema === undefined ? makeSchema() : opts.schema),
-    opts.projectWorkflowHooks,
   )
 }
 
@@ -142,36 +134,6 @@ describe('RunStepHooks', () => {
   // ── Hook Collection & Filtering ──────────────────────────────────
 
   describe('hook collection & filtering', () => {
-    it('collects schema hooks then project hooks in order', async () => {
-      const change = makeChange('my-change')
-      const schemaHook: HookEntry = { id: 'schema-lint', type: 'run', command: 'pnpm lint' }
-      const projectHook: HookEntry = { id: 'proj-test', type: 'run', command: 'pnpm test' }
-
-      const commands: string[] = []
-      const hookRunner = {
-        async run(command: string, _variables: TemplateVariables): Promise<HookResult> {
-          commands.push(command)
-          return new HookResult(0, '', '')
-        },
-      }
-
-      const uc = makeUseCase({
-        changes: makeChangeRepository([change]),
-        schema: makeSchemaWithHooks([schemaHook]),
-        hookRunner,
-        projectWorkflowHooks: [
-          {
-            step: 'implementing',
-            hooks: { pre: [projectHook], post: [] },
-          },
-        ],
-      })
-
-      await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' })
-
-      expect(commands).toEqual(['pnpm lint', 'pnpm test'])
-    })
-
     it('filters out instruction hooks and only executes run hooks', async () => {
       const change = makeChange('my-change')
       const instrHook: HookEntry = { id: 'review', type: 'instruction', text: 'Review the code' }

@@ -51,15 +51,6 @@ function renderText(config: SpecdConfig): string[] {
     lines.push('', `schemaPlugins: ${config.schemaPlugins.join(', ')}`)
   }
 
-  if (config.workflow !== undefined && config.workflow.length > 0) {
-    lines.push('', 'workflow:')
-    for (const step of config.workflow) {
-      const pre = step.hooks.pre.length
-      const post = step.hooks.post.length
-      lines.push(`  ${step.step}  pre: ${pre} hooks  post: ${post} hooks`)
-    }
-  }
-
   if (config.artifactRules !== undefined) {
     lines.push('', 'artifactRules:')
     for (const [id, rules] of Object.entries(config.artifactRules)) {

@@ -25,17 +25,11 @@ Schema resolution involves multiple steps (base lookup, extends chain, plugin me
 `execute` MUST perform the following steps in order:
 
 1. **Resolve base** — call `SchemaRegistry.resolve(schemaRef, workspaceSchemasPaths)` to obtain the base schema's raw YAML data. If `null`, throw `SchemaNotFoundError`.
-
 2. **Resolve extends chain** — if the base schema declares `extends`, resolve the parent schema recursively until a schema with no `extends` is reached. Each resolved schema becomes an `extends` layer. Detect cycles by tracking resolved file paths; throw `SchemaValidationError` if a cycle is found.
-
 3. **Build extends layers** — construct `SchemaLayer[]` from the extends chain, ordered from root ancestor to immediate parent. Each layer has `source: 'extends'`.
-
 4. **Resolve plugins** — for each reference in `schemaPlugins`, call `SchemaRegistry.resolve(ref, workspaceSchemasPaths)`. If `null`, throw `SchemaNotFoundError`. If the resolved file has `kind: schema` instead of `kind: schema-plugin`, throw `SchemaValidationError`. Each plugin's operations become a `SchemaLayer` with `source: 'plugin'`.
-
-5. **Build override layer** — if `schemaOverrides` is defined, construct a single `SchemaLayer` with `source: 'override'`.
-
+5. **Build override layer** — if `schemaOverrides` is defined, normalize its workflow hook entries from YAML format to domain format before constructing the layer. Hook entries using `{ id, run }` MUST be transformed to `{ id, type: 'run', command }`, and entries using `{ id, instruction }` MUST be transformed to `{ id, type: 'instruction', text }`. This normalization MUST be applied recursively to all workflow entries in every operation key (`append`, `prepend`, `create`, `set`). Then construct a single `SchemaLayer` with `source: 'override'`.
 6. **Merge** — call `mergeSchemaLayers(base, [...extendsLayers, ...pluginLayers, ...overrideLayers])` to produce a merged `SchemaYamlData`.
-
 7. **Build** — call `buildSchema(schemaRef, mergedData, templates)` to construct the final `Schema` entity. Template loading happens during base resolution (step 1) — templates from the extends chain are merged (child templates override parent templates with the same path).
 
 ### Requirement: Returns the resolved Schema

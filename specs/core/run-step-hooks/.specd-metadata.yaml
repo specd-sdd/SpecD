@@ -13,7 +13,7 @@ rules:
   - requirement: Ports and constructor
     rules:
       - |-
-        `RunStepHooks` receives at construction time: `ChangeRepository`, `HookRunner`, `SchemaProvider`, and `projectWorkflowHooks`.
+        `RunStepHooks` receives at construction time: `ChangeRepository`, `HookRunner`, and `SchemaProvider`.
 
         ```typescript
         class RunStepHooks {
@@ -21,14 +21,13 @@ rules:
             changes: ChangeRepository,
             hooks: HookRunner,
             schemaProvider: SchemaProvider,
-            projectWorkflowHooks: ProjectWorkflowHooks,
           )
         }
         ```
 
         `HookRunner` uses `TemplateExpander.expandForShell()` internally — `RunStepHooks` does not call the expander directly. It builds the `TemplateVariables` map and passes it to `HookRunner.run()`.
 
-        `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml` — `RunStepHooks` filters internally for the requested step. If `undefined`, it defaults to `[]`. All are injected at kernel composition time, not passed per invocation.
+        `SchemaProvider` returns the fully-resolved schema with plugins and overrides applied — all workflow hooks (including those added via `schemaOverrides`) are already present in the schema's workflow steps. All dependencies are injected at kernel composition time, not passed per invocation.
   - requirement: Input
     rules:
       - |-
@@ -60,12 +59,11 @@ rules:
   - requirement: Hook collection
     rules:
       - |-
-        For the matched step and phase, `RunStepHooks` MUST collect `run:` hooks in the following order:
+        For the matched step and phase, `RunStepHooks` MUST collect `run:` hooks from `workflow[step].hooks[phase]` — only entries with `type: 'run'`, in declaration order.
 
-        1. Schema-level hooks from `workflow[step].hooks[phase]` — only entries with a `run:` key, in declaration order
-        2. Project-level hooks from `projectWorkflowHooks` targeting the same step and phase — only entries with a `run:` key, in declaration order
+        `instruction:` entries (type `'instruction'`) MUST be skipped — they are not executable.
 
-        `instruction:` entries MUST be skipped — they are not executable.
+        All hooks — whether from the base schema, plugins, or overrides — are already merged into the schema's workflow steps by `ResolveSchema`. There is no separate project-level hook collection.
   - requirement: Hook filtering with --only
     rules:
       - When `only` is provided, `RunStepHooks` MUST filter the collected hook list to the single hook whose `id` matches the value. If no hook matches the ID, it MUST throw `HookNotFoundError` with reason `'not-found'`. If the ID matches an `instruction:` hook instead of a `run:` hook, it MUST throw `HookNotFoundError` with reason `'wrong-type'`.
@@ -150,21 +148,12 @@ scenarios:
   - requirement: Hook collection
     name: instruction hooks are excluded from collection
     given:
-      - 'a step with hooks pre: [{ id: "guidance", instruction: "Read tasks" }, { id: "lint", run: "pnpm lint" }, { id: "test", run: "pnpm test" }]'
+      - 'a step with hooks pre: [{ id: "guidance", type: "instruction", text: "Read tasks" }, { id: "lint", type: "run", command: "pnpm lint" }, { id: "test", type: "run", command: "pnpm test" }]'
     when:
       - RunStepHooks collects hooks for the pre phase
     then:
       - the collection contains only lint and test in that order
       - AND guidance is not in the collection
-  - requirement: Hook collection
-    name: Schema hooks precede project hooks
-    given:
-      - 'schema pre-hooks [{ id: "s-test", run: "pnpm test" }]'
-      - 'AND project pre-hooks [{ id: "p-lint", run: "pnpm lint" }]'
-    when:
-      - RunStepHooks collects hooks for the pre phase
-    then:
-      - the collection is [s-test, p-lint] in that order
   - requirement: Hook filtering with --only
     name: Single hook selected by ID
     given:
@@ -244,6 +233,6 @@ scenarios:
       - pnpm test is executed via HookRunner
       - AND the result includes the hook outcome
 contentHashes:
-  spec.md: sha256:97a4793afa90bdc988e83af38d5249efcf6d82973c86a4e30296bfeb983690ea
-  verify.md: sha256:31035ef283e401b1ba576d3c1bca1ac6a98193e4fc2eb8efea747ef431233866
+  spec.md: sha256:8d6ba61b7984b8787270aa464f659d576cdb9f41395da7c4488fb0e7bae14140
+  verify.md: sha256:5e7af7f567ccd5b7cde729989d6e84b71f2343f819e6869f1587072dd3ee220f
 generatedBy: core

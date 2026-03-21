@@ -64,15 +64,6 @@ describe('Output format', () => {
 
   it('JSON output is full SpecdConfig', async () => {
     const config = makeMockConfig({
-      workflow: [
-        {
-          step: 'implementing',
-          hooks: {
-            pre: [],
-            post: [{ id: 'run-tests', type: 'run' as const, command: 'pnpm test' }],
-          },
-        },
-      ],
       contextIncludeSpecs: ['default:*'],
       context: [{ file: 'AGENTS.md' }],
       llmOptimizedContext: true,
@@ -92,8 +83,6 @@ describe('Output format', () => {
     expect(Array.isArray(parsed.workspaces)).toBe(true)
     expect(parsed.storage).toBeDefined()
     expect(parsed.approvals).toBeDefined()
-    expect(parsed.workflow).toHaveLength(1)
-    expect(parsed.workflow[0].step).toBe('implementing')
     expect(parsed.contextIncludeSpecs).toEqual(['default:*'])
     expect(parsed.context).toEqual([{ file: 'AGENTS.md' }])
     expect(parsed.llmOptimizedContext).toBe(true)
@@ -110,7 +99,7 @@ describe('Output format', () => {
     await program.parseAsync(['node', 'specd', 'config', 'show', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed.workflow).toBeUndefined()
+    // workflow was removed from SpecdConfig
     expect(parsed.context).toBeUndefined()
     expect(parsed.schemaOverrides).toBeUndefined()
     expect(parsed.schemaPlugins).toBeUndefined()

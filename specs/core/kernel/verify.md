@@ -91,6 +91,7 @@
 - **THEN** no use case constructor receives `SchemaRegistry` directly
 - **AND** all use cases that need the schema receive `SchemaProvider`
 - **AND** `SchemaProvider.get()` returns the schema with overrides applied
+- **AND** `RunStepHooks` and `GetHookInstructions` do not receive project-level workflow hooks
 
 ### Requirement: Kernel exposes repository instances for adapter access
 

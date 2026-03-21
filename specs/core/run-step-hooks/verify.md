@@ -37,17 +37,10 @@
 
 #### Scenario: instruction hooks are excluded from collection
 
-- **GIVEN** a step with hooks `pre: [{ id: "guidance", instruction: "Read tasks" }, { id: "lint", run: "pnpm lint" }, { id: "test", run: "pnpm test" }]`
+- **GIVEN** a step with hooks `pre: [{ id: "guidance", type: "instruction", text: "Read tasks" }, { id: "lint", type: "run", command: "pnpm lint" }, { id: "test", type: "run", command: "pnpm test" }]`
 - **WHEN** `RunStepHooks` collects hooks for the pre phase
 - **THEN** the collection contains only `lint` and `test` in that order
 - **AND** `guidance` is not in the collection
-
-#### Scenario: Schema hooks precede project hooks
-
-- **GIVEN** schema pre-hooks `[{ id: "s-test", run: "pnpm test" }]`
-- **AND** project pre-hooks `[{ id: "p-lint", run: "pnpm lint" }]`
-- **WHEN** `RunStepHooks` collects hooks for the pre phase
-- **THEN** the collection is `[s-test, p-lint]` in that order
 
 ### Requirement: Hook filtering with --only
 

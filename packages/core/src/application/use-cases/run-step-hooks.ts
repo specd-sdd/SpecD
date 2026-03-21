@@ -48,21 +48,14 @@ export interface RunStepHooksResult {
 /**
  * Executes `run:` hooks for a given workflow step and phase.
  *
- * Resolves hooks from the schema and project configuration, builds
- * template variables from the active change, and executes them via
- * `HookRunner` with fail-fast (pre) or fail-soft (post) semantics.
+ * Resolves hooks from the schema, builds template variables from the
+ * active change, and executes them via `HookRunner` with fail-fast
+ * (pre) or fail-soft (post) semantics.
  */
 export class RunStepHooks {
   private readonly _changes: ChangeRepository
   private readonly _hooks: HookRunner
   private readonly _schemaProvider: SchemaProvider
-  private readonly _projectWorkflowHooks: readonly {
-    readonly step: string
-    readonly hooks: {
-      readonly pre: readonly HookEntry[]
-      readonly post: readonly HookEntry[]
-    }
-  }[]
 
   /**
    * Creates a new `RunStepHooks` use case.
@@ -70,24 +63,11 @@ export class RunStepHooks {
    * @param changes - Repository for loading change entities
    * @param hooks - Hook runner for executing shell commands
    * @param schemaProvider - Provider for the fully-resolved schema
-   * @param projectWorkflowHooks - Project-level workflow hook overrides
    */
-  constructor(
-    changes: ChangeRepository,
-    hooks: HookRunner,
-    schemaProvider: SchemaProvider,
-    projectWorkflowHooks?: readonly {
-      readonly step: string
-      readonly hooks: {
-        readonly pre: readonly HookEntry[]
-        readonly post: readonly HookEntry[]
-      }
-    }[],
-  ) {
+  constructor(changes: ChangeRepository, hooks: HookRunner, schemaProvider: SchemaProvider) {
     this._changes = changes
     this._hooks = hooks
     this._schemaProvider = schemaProvider
-    this._projectWorkflowHooks = projectWorkflowHooks ?? []
   }
 
   /**
@@ -121,18 +101,17 @@ export class RunStepHooks {
       return { hooks: [], success: true, failedHook: null }
     }
 
-    // Collect run: hooks (schema first, then project)
-    const allHooks = this._collectHooks(input.step, input.phase, workflowStep.hooks[input.phase])
-
-    // Filter for run: hooks only
-    let runHooks = allHooks.filter((h) => h.type === 'run')
+    // Collect run: hooks from schema
+    let runHooks = this._collectHooks(workflowStep.hooks[input.phase])
 
     // --only filter
     if (input.only !== undefined) {
       const match = runHooks.find((h) => h.id === input.only)
       if (match === undefined) {
         // Check if it's an instruction hook
-        const instrMatch = allHooks.find((h) => h.id === input.only && h.type === 'instruction')
+        const instrMatch = workflowStep.hooks[input.phase].find(
+          (h) => h.id === input.only && h.type === 'instruction',
+        )
         if (instrMatch !== undefined) {
           throw new HookNotFoundError(input.only, 'wrong-type')
         }
@@ -191,23 +170,14 @@ export class RunStepHooks {
   }
 
   /**
-   * Collects hooks from schema and project configuration in declaration order.
+   * Collects `run:` hooks from schema for the given phase.
    *
-   * @param step - The workflow step name
-   * @param phase - The hook phase (pre or post)
    * @param schemaHooks - Schema-level hooks for this step and phase
-   * @returns Combined list of hooks (schema first, then project)
+   * @returns Schema hooks filtered to `type === 'run'`
    */
   private _collectHooks(
-    step: string,
-    phase: 'pre' | 'post',
     schemaHooks: readonly HookEntry[],
-  ): readonly HookEntry[] {
-    const hooks: HookEntry[] = [...schemaHooks]
-    const projectStep = this._projectWorkflowHooks.find((s) => s.step === step)
-    if (projectStep !== undefined) {
-      hooks.push(...projectStep.hooks[phase])
-    }
-    return hooks
+  ): readonly Extract<HookEntry, { type: 'run' }>[] {
+    return schemaHooks.filter((h): h is Extract<HookEntry, { type: 'run' }> => h.type === 'run')
   }
 }

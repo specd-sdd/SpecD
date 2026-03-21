@@ -18,7 +18,6 @@ import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { NodeYamlSerializer } from '../../infrastructure/node/yaml-serializer.js'
 import { GenerateSpecMetadata } from '../../application/use-cases/generate-spec-metadata.js'
 import { SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata.js'
-import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
 
 /**
  * Domain context for the primary (default) workspace used by `ArchiveChange`.
@@ -62,14 +61,6 @@ export interface FsArchiveChangeOptions {
   readonly workspaceSchemasPaths: ReadonlyMap<string, string>
   /** Absolute path to the project root. */
   readonly projectRoot: string
-  /** Project-level workflow hook definitions from `specd.yaml`. */
-  readonly projectWorkflowHooks?: readonly {
-    readonly step: string
-    readonly hooks: {
-      readonly pre: readonly HookEntry[]
-      readonly post: readonly HookEntry[]
-    }
-  }[]
 }
 
 /**
@@ -156,7 +147,6 @@ export function createArchiveChange(
         schemaRef: config.schemaRef,
         workspaceSchemasPaths,
         projectRoot: config.projectRoot,
-        ...(config.workflow !== undefined ? { projectWorkflowHooks: config.workflow } : {}),
       },
     )
   }
@@ -197,12 +187,7 @@ export function createArchiveChange(
     hasher,
   )
   const saveMetadata = new SaveSpecMetadata(opts.specRepositories, yaml)
-  const runStepHooks = new RunStepHooks(
-    changeRepo,
-    hooks,
-    schemaProvider,
-    opts.projectWorkflowHooks,
-  )
+  const runStepHooks = new RunStepHooks(changeRepo, hooks, schemaProvider)
   return new ArchiveChange(
     changeRepo,
     opts.specRepositories,

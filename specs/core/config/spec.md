@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Every tool in the specd ecosystem needs a shared, authoritative source for project-level settings — schema selection, workspace layout, storage paths, workflow hooks, and installed plugins — to avoid each adapter hardcoding its own assumptions. `specd.yaml` is that single project-level configuration file: it declares which schema governs the project, how specs are organised across workspaces, where changes and archives are stored, per-artifact constraints, and installed plugins. The CLI, MCP server, and all plugins derive their wiring from it.
+Every tool in the specd ecosystem needs a shared, authoritative source for project-level settings — schema selection, workspace layout, storage paths, and installed plugins — to avoid each adapter hardcoding its own assumptions. `specd.yaml` is that single project-level configuration file: it declares which schema governs the project, how specs are organised across workspaces, where changes and archives are stored, per-artifact constraints, and installed plugins. The CLI, MCP server, and all plugins derive their wiring from it.
 
 ## Requirements
 
@@ -179,27 +179,26 @@ All four sub-keys (`changes`, `drafts`, `discarded`, `archive`) are required. `a
 
 ### Requirement: Template variables
 
-Several fields in `specd.yaml` support template variable interpolation using `{{variable}}` syntax. Template variables are resolved at runtime by the application layer before the value is used.
+Some configuration values support template variables that specd expands at use time. The following sets of variables are defined:
 
-The following variables are available in **`storage.archive.fs.pattern`**:
+The following variables are available in **`archivePattern`**:
 
 | Variable                  | Value                                                                                                   |
 | ------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `{{change.name}}`         | The change's slug name (e.g. `add-auth-flow`)                                                           |
+| `{{change.name}}`         | The change's slug name                                                                                  |
 | `{{change.archivedName}}` | The change's full archived directory name (e.g. `2024-01-15-add-auth-flow`) — the default pattern value |
 | `{{change.workspace}}`    | The primary workspace of the change                                                                     |
 | `{{year}}`                | Four-digit current year (e.g. `2024`)                                                                   |
 | `{{date}}`                | ISO date at archive time (e.g. `2024-01-15`)                                                            |
 
-The following variables are available in **`workflow` hook `run` commands**:
+The following variables are available in **`schemaOverrides` workflow hook `run` commands** and in **schema-level workflow hook `run` commands**:
 
-| Variable               | Value                                                           |
-| ---------------------- | --------------------------------------------------------------- |
-| `{{change.name}}`      | The change's slug name                                          |
-| `{{change.workspace}}` | The primary workspace of the change                             |
-| `{{codeRoot}}`         | The resolved absolute path to the active workspace's `codeRoot` |
-
-Unknown variables in a template are left as-is and a warning is emitted.
+| Variable               | Value                                                        |
+| ---------------------- | ------------------------------------------------------------ |
+| `{{change.name}}`      | The change's slug name                                       |
+| `{{change.workspace}}` | The primary workspace of the change                          |
+| `{{change.path}}`      | Absolute path to the change directory                        |
+| `{{project.root}}`     | Absolute path to the project root (where `specd.yaml` lives) |
 
 ### Requirement: Schema plugins
 
