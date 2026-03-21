@@ -65,7 +65,7 @@ export class ResolveSchema {
       overrideLayers.push({
         source: 'override',
         ref: this._schemaRef,
-        operations: this._schemaOverrides,
+        operations: normalizeOverrideHooks(this._schemaOverrides),
       })
     }
 
@@ -247,4 +247,64 @@ export class ResolveSchema {
     if (data.operations === undefined) return {}
     return data.operations as SchemaOperations
   }
+}
+
+// ---------------------------------------------------------------------------
+// Override hook normalization
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalizes a single raw YAML hook entry to the domain `HookEntry` format.
+ *
+ * YAML format uses `{ id, run }` or `{ id, instruction }`, but the domain
+ * expects `{ id, type: 'run', command }` or `{ id, type: 'instruction', text }`.
+ * Entries that already have a `type` field are returned as-is.
+ *
+ * @param hook - A raw hook entry from schema overrides
+ * @returns The normalized hook entry in domain format
+ */
+function normalizeHookEntry(hook: Record<string, unknown>): Record<string, unknown> {
+  if ('type' in hook) return hook
+  if ('run' in hook) return { id: hook.id, type: 'run', command: hook.run }
+  if ('instruction' in hook) return { id: hook.id, type: 'instruction', text: hook.instruction }
+  return hook
+}
+
+/**
+ * Normalizes hook entries in a workflow step's hooks arrays.
+ *
+ * @param step - A raw workflow step entry from schema overrides
+ * @returns The step with normalized hook entries
+ */
+function normalizeWorkflowStepHooks(step: Record<string, unknown>): Record<string, unknown> {
+  const hooks = step.hooks as Record<string, unknown> | undefined
+  if (hooks === undefined) return step
+  const result = { ...step, hooks: { ...hooks } }
+  const h = result.hooks as Record<string, unknown>
+  if (Array.isArray(h.pre)) h.pre = h.pre.map((e: Record<string, unknown>) => normalizeHookEntry(e))
+  if (Array.isArray(h.post))
+    h.post = h.post.map((e: Record<string, unknown>) => normalizeHookEntry(e))
+  return result
+}
+
+/**
+ * Normalizes YAML-format hooks in schema override operations to the domain format.
+ *
+ * Walks all operation keys (`append`, `prepend`, `create`, `set`) and transforms
+ * hook entries in `workflow[].hooks.pre[]` and `workflow[].hooks.post[]`.
+ *
+ * @param overrides - The raw schema overrides from config
+ * @returns A new `SchemaOperations` with normalized hook entries
+ */
+function normalizeOverrideHooks(overrides: SchemaOperations): SchemaOperations {
+  const result: Record<string, unknown> = { ...overrides }
+  for (const key of ['append', 'prepend', 'create', 'set'] as const) {
+    const ops = result[key] as Record<string, unknown> | undefined
+    if (ops === undefined || !Array.isArray(ops.workflow)) continue
+    result[key] = {
+      ...ops,
+      workflow: (ops.workflow as Record<string, unknown>[]).map(normalizeWorkflowStepHooks),
+    }
+  }
+  return result as SchemaOperations
 }

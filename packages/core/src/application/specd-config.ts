@@ -2,32 +2,6 @@ import { z } from 'zod'
 import { type SchemaOperations } from '../domain/services/merge-schema-layers.js'
 
 /**
- * A lifecycle hook declared in the project-level `workflow` section of `specd.yaml`.
- *
- * Project-level hooks use the same run/instruction discriminant as schema hooks.
- * Unlike schema workflow steps, project-level steps may not declare `requires`.
- */
-export type SpecdWorkflowHook =
-  | { readonly id: string; readonly type: 'run'; readonly command: string }
-  | { readonly id: string; readonly type: 'instruction'; readonly text: string }
-
-/**
- * A project-level workflow step from `specd.yaml`.
- *
- * Project-level workflow entries may not declare `requires` — only `step` and
- * `hooks` are valid. `requires` is schema-only.
- */
-export interface SpecdWorkflowStep {
-  /** The step name matching a schema workflow step (e.g. `'implementing'`). */
-  readonly step: string
-  /** Hooks to fire before and after the step. */
-  readonly hooks: {
-    readonly pre: readonly SpecdWorkflowHook[]
-    readonly post: readonly SpecdWorkflowHook[]
-  }
-}
-
-/**
  * A project-level context entry from the `context` section of `specd.yaml`.
  *
  * Each entry is either an inline instruction or a file reference. The file
@@ -120,8 +94,6 @@ export interface SpecdConfig {
   readonly storage: SpecdStorageConfig
   /** Approval gate settings (both default to `false`). */
   readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
-  /** Project-level workflow hook additions (matched to schema steps by `step` name). */
-  readonly workflow?: readonly SpecdWorkflowStep[]
   /** Per-artifact constraint strings injected after the schema instruction. */
   readonly artifactRules?: Readonly<Record<string, readonly string[]>>
   /** Freeform context entries prepended to the compiled context. */

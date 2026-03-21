@@ -8,22 +8,17 @@ Agent-driven workflow steps declare `run:` hooks that need to be executed at ste
 
 ### Requirement: Ports and constructor
 
-`RunStepHooks` receives at construction time: `ChangeRepository`, `HookRunner`, `SchemaProvider`, and `projectWorkflowHooks`.
+`RunStepHooks` receives at construction time: `ChangeRepository`, `HookRunner`, and `SchemaProvider`.
 
 ```typescript
 class RunStepHooks {
-  constructor(
-    changes: ChangeRepository,
-    hooks: HookRunner,
-    schemaProvider: SchemaProvider,
-    projectWorkflowHooks: ProjectWorkflowHooks,
-  )
+  constructor(changes: ChangeRepository, hooks: HookRunner, schemaProvider: SchemaProvider)
 }
 ```
 
 `HookRunner` uses `TemplateExpander.expandForShell()` internally — `RunStepHooks` does not call the expander directly. It builds the `TemplateVariables` map and passes it to `HookRunner.run()`.
 
-`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml` — `RunStepHooks` filters internally for the requested step. If `undefined`, it defaults to `[]`. All are injected at kernel composition time, not passed per invocation.
+`SchemaProvider` returns the fully-resolved schema with plugins and overrides applied — all workflow hooks (including those added via `schemaOverrides`) are already present in the schema's workflow steps. All dependencies are injected at kernel composition time, not passed per invocation.
 
 ### Requirement: Input
 
@@ -57,12 +52,11 @@ If the step is a valid lifecycle state, `RunStepHooks` looks up the workflow ste
 
 ### Requirement: Hook collection
 
-For the matched step and phase, `RunStepHooks` MUST collect `run:` hooks in the following order:
+For the matched step and phase, `RunStepHooks` MUST collect `run:` hooks from `workflow[step].hooks[phase]` — only entries with `type: 'run'`, in declaration order.
 
-1. Schema-level hooks from `workflow[step].hooks[phase]` — only entries with a `run:` key, in declaration order
-2. Project-level hooks from `projectWorkflowHooks` targeting the same step and phase — only entries with a `run:` key, in declaration order
+`instruction:` entries (type `'instruction'`) MUST be skipped — they are not executable.
 
-`instruction:` entries MUST be skipped — they are not executable.
+All hooks — whether from the base schema, plugins, or overrides — are already merged into the schema's workflow steps by `ResolveSchema`. There is no separate project-level hook collection.
 
 ### Requirement: Hook filtering with --only
 

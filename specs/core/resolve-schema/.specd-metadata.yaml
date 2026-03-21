@@ -15,11 +15,11 @@ rules:
       - |-
         `ResolveSchema` MUST be constructed with:
 
-        * `schemas` (`SchemaRegistry`) — the registry port for resolving schema and plugin references
-        * `schemaRef` (`string`) — the base schema reference from `specd.yaml`
-        * `workspaceSchemasPaths` (`ReadonlyMap<string, string>`) — workspace-to-schemas-path map
-        * `schemaPlugins` (`readonly string[]`) — plugin references from `specd.yaml`, in declaration order
-        * `schemaOverrides` (`SchemaOperations | undefined`) — inline overrides from `specd.yaml`
+        - `schemas` (`SchemaRegistry`) — the registry port for resolving schema and plugin references
+        - `schemaRef` (`string`) — the base schema reference from `specd.yaml`
+        - `workspaceSchemasPaths` (`ReadonlyMap<string, string>`) — workspace-to-schemas-path map
+        - `schemaPlugins` (`readonly string[]`) — plugin references from `specd.yaml`, in declaration order
+        - `schemaOverrides` (`SchemaOperations | undefined`) — inline overrides from `specd.yaml`
   - requirement: Execute takes no arguments
     rules:
       - '`execute()` MUST take no arguments. All configuration is provided at construction time.'
@@ -32,7 +32,7 @@ rules:
         2. **Resolve extends chain** — if the base schema declares `extends`, resolve the parent schema recursively until a schema with no `extends` is reached. Each resolved schema becomes an `extends` layer. Detect cycles by tracking resolved file paths; throw `SchemaValidationError` if a cycle is found.
         3. **Build extends layers** — construct `SchemaLayer[]` from the extends chain, ordered from root ancestor to immediate parent. Each layer has `source: 'extends'`.
         4. **Resolve plugins** — for each reference in `schemaPlugins`, call `SchemaRegistry.resolve(ref, workspaceSchemasPaths)`. If `null`, throw `SchemaNotFoundError`. If the resolved file has `kind: schema` instead of `kind: schema-plugin`, throw `SchemaValidationError`. Each plugin's operations become a `SchemaLayer` with `source: 'plugin'`.
-        5. **Build override layer** — if `schemaOverrides` is defined, construct a single `SchemaLayer` with `source: 'override'`.
+        5. **Build override layer** — if `schemaOverrides` is defined, normalize its workflow hook entries from YAML format to domain format before constructing the layer. Hook entries using `{ id, run }` MUST be transformed to `{ id, type: 'run', command }`, and entries using `{ id, instruction }` MUST be transformed to `{ id, type: 'instruction', text }`. This normalization MUST be applied recursively to all workflow entries in every operation key (`append`, `prepend`, `create`, `set`). Then construct a single `SchemaLayer` with `source: 'override'`.
         6. **Merge** — call `mergeSchemaLayers(base, [...extendsLayers, ...pluginLayers, ...overrideLayers])` to produce a merged `SchemaYamlData`.
         7. **Build** — call `buildSchema(schemaRef, mergedData, templates)` to construct the final `Schema` entity. Template loading happens during base resolution (step 1) — templates from the extends chain are merged (child templates override parent templates with the same path).
   - requirement: Returns the resolved Schema
@@ -46,9 +46,9 @@ rules:
       - |-
         `SchemaRegistry.resolve()` must return enough information for `ResolveSchema` to:
 
-        * Access the parsed `SchemaYamlData` (for the merge engine)
-        * Access loaded templates (for `buildSchema`)
-        * Know the resolved file path (for cycle detection in extends)
+        - Access the parsed `SchemaYamlData` (for the merge engine)
+        - Access loaded templates (for `buildSchema`)
+        - Know the resolved file path (for cycle detection in extends)
 
         This may require extending `SchemaRegistry.resolve()` to return a richer result type, or `ResolveSchema` may call a lower-level method that returns intermediate data before domain construction.
 constraints:
@@ -94,6 +94,15 @@ scenarios:
       - execute() is called
     then:
       - the resolved schema's description is 'Custom'
+  - requirement: Resolution pipeline
+    name: Override workflow hooks are normalized from YAML format
+    given:
+      - "a base schema with workflow step implementing and schemaOverrides appending a hook { id: 'test', run: 'echo ok' } in YAML format"
+    when:
+      - execute() is called
+    then:
+      - "the resolved schema's implementing workflow step contains a hook with { id: 'test', type: 'run', command: 'echo ok' }"
+      - AND the hook is usable by RunStepHooks (matches h.type === 'run')
   - requirement: Resolution pipeline
     name: Full pipeline — extends + plugins + overrides
     given:
@@ -153,6 +162,6 @@ scenarios:
     then:
       - both calls produce an equivalent Schema object
 contentHashes:
-  spec.md: sha256:17754e5a08888f152ff881355e622271f25f8224e4916ce911431db5b6b008a3
-  verify.md: sha256:1a3400b68d528c85d78c8f810a3589b1db9572838ded339ca834eb20b8e04d1a
+  spec.md: sha256:7245d0edd29f007ed0108df537caab8c97fc1af40431ab3de701170da7b553db
+  verify.md: sha256:d17c66345c871094dcb88df855b1abaa82a7ff79c96bed6cab2d45e8475dee00
 generatedBy: core

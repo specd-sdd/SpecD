@@ -157,9 +157,6 @@ export interface KernelOptions {
 export function createKernel(config: SpecdConfig, options?: KernelOptions): Kernel {
   const i = createKernelInternals(config, options)
 
-  // Project-level workflow hooks from config
-  const projectWorkflowHooks = config.workflow
-
   // Shared ResolveSchema + LazySchemaProvider — resolves once with plugins and overrides
   const resolveSchema = new ResolveSchema(
     i.schemas,
@@ -171,7 +168,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
   const schemaProvider = new LazySchemaProvider(resolveSchema)
 
   // Shared RunStepHooks instance — used by TransitionChange, ArchiveChange, and exposed directly
-  const runStepHooks = new RunStepHooks(i.changes, i.hooks, schemaProvider, projectWorkflowHooks)
+  const runStepHooks = new RunStepHooks(i.changes, i.hooks, schemaProvider)
 
   return {
     changes: {
@@ -215,12 +212,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       listArchived: new ListArchived(i.archive),
       getArchived: new GetArchivedChange(i.archive),
       runStepHooks,
-      getHookInstructions: new GetHookInstructions(
-        i.changes,
-        schemaProvider,
-        i.expander,
-        projectWorkflowHooks,
-      ),
+      getHookInstructions: new GetHookInstructions(i.changes, schemaProvider, i.expander),
       getArtifactInstruction: new GetArtifactInstruction(
         i.changes,
         i.specs,

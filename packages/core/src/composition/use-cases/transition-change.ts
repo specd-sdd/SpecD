@@ -43,14 +43,6 @@ export interface FsTransitionChangeOptions {
   readonly workspaceSchemasPaths: ReadonlyMap<string, string>
   /** Absolute path to the project root. */
   readonly projectRoot: string
-  /** Project-level workflow hook definitions from `specd.yaml`. */
-  readonly projectWorkflowHooks?: readonly {
-    readonly step: string
-    readonly hooks: {
-      readonly pre: readonly import('../../domain/value-objects/workflow-step.js').HookEntry[]
-      readonly post: readonly import('../../domain/value-objects/workflow-step.js').HookEntry[]
-    }
-  }[]
 }
 
 /**
@@ -111,7 +103,6 @@ export function createTransitionChange(
         schemaRef: config.schemaRef,
         workspaceSchemasPaths,
         projectRoot: config.projectRoot,
-        ...(config.workflow !== undefined ? { projectWorkflowHooks: config.workflow } : {}),
       },
     )
   }
@@ -136,11 +127,6 @@ export function createTransitionChange(
   const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
   const hooks = new NodeHookRunner(expander)
   const actor = new GitActorResolver()
-  const runStepHooks = new RunStepHooks(
-    changeRepo,
-    hooks,
-    schemaProvider,
-    opts.projectWorkflowHooks,
-  )
+  const runStepHooks = new RunStepHooks(changeRepo, hooks, schemaProvider)
   return new TransitionChange(changeRepo, actor, schemaProvider, runStepHooks)
 }

@@ -1,5 +1,4 @@
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
-import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
 import { StepNotValidError } from '../../domain/errors/step-not-valid-error.js'
 import { HookNotFoundError } from '../../domain/errors/hook-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
@@ -35,13 +34,6 @@ export class GetHookInstructions {
   private readonly _changes: ChangeRepository
   private readonly _schemaProvider: SchemaProvider
   private readonly _templates: TemplateExpander
-  private readonly _projectWorkflowHooks: readonly {
-    readonly step: string
-    readonly hooks: {
-      readonly pre: readonly HookEntry[]
-      readonly post: readonly HookEntry[]
-    }
-  }[]
 
   /**
    * Creates a new `GetHookInstructions` use case.
@@ -49,24 +41,15 @@ export class GetHookInstructions {
    * @param changes - Repository for loading change entities
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param templates - Template expander for variable substitution
-   * @param projectWorkflowHooks - Project-level workflow hook overrides
    */
   constructor(
     changes: ChangeRepository,
     schemaProvider: SchemaProvider,
     templates: TemplateExpander,
-    projectWorkflowHooks?: readonly {
-      readonly step: string
-      readonly hooks: {
-        readonly pre: readonly HookEntry[]
-        readonly post: readonly HookEntry[]
-      }
-    }[],
   ) {
     this._changes = changes
     this._schemaProvider = schemaProvider
     this._templates = templates
-    this._projectWorkflowHooks = projectWorkflowHooks ?? []
   }
 
   /**
@@ -95,21 +78,15 @@ export class GetHookInstructions {
       return { phase: input.phase, instructions: [] }
     }
 
-    // Collect all hooks (schema first, then project)
-    const allHooks: HookEntry[] = [...workflowStep.hooks[input.phase]]
-    const projectStep = this._projectWorkflowHooks.find((s) => s.step === input.step)
-    if (projectStep !== undefined) {
-      allHooks.push(...projectStep.hooks[input.phase])
-    }
-
-    // Filter for instruction: hooks only
-    let instrHooks = allHooks.filter((h) => h.type === 'instruction')
+    // Collect schema hooks filtered to instruction: type
+    const schemaHooks = workflowStep.hooks[input.phase]
+    let instrHooks = schemaHooks.filter((h) => h.type === 'instruction')
 
     // --only filter
     if (input.only !== undefined) {
       const match = instrHooks.find((h) => h.id === input.only)
       if (match === undefined) {
-        const runMatch = allHooks.find((h) => h.id === input.only && h.type === 'run')
+        const runMatch = schemaHooks.find((h) => h.id === input.only && h.type === 'run')
         if (runMatch !== undefined) {
           throw new HookNotFoundError(input.only, 'wrong-type')
         }

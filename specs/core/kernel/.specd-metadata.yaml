@@ -77,6 +77,8 @@ rules:
         - One `ArtifactParserRegistry` instance
 
         No use case constructor may call `SchemaRegistry.resolve()` directly. Schema access is exclusively through `SchemaProvider.get()`, which returns the fully-resolved schema with extends chains, plugins, and `schemaOverrides` applied.
+
+        `RunStepHooks` and `GetHookInstructions` do not receive project-level workflow hooks — all hooks are merged into the schema by `ResolveSchema` via `schemaOverrides`. The kernel does not read `config.workflow`.
   - requirement: Auto-invalidation on get when artifact files drift
     rules:
       - |-
@@ -255,6 +257,7 @@ scenarios:
       - no use case constructor receives SchemaRegistry directly
       - AND all use cases that need the schema receive SchemaProvider
       - AND SchemaProvider.get() returns the schema with overrides applied
+      - AND RunStepHooks and GetHookInstructions do not receive project-level workflow hooks
   - requirement: Kernel exposes repository instances for adapter access
     name: ChangeRepository accessible via kernel
     when:
@@ -295,6 +298,6 @@ scenarios:
     then:
       - the kernel object and its nested groups are not expected to change — there is no addUseCase() or removeUseCase() mechanism
 contentHashes:
-  spec.md: sha256:cd8bebefc9d8f0456da3583b4c067578b7a9c09738ee82ae823ef4805597eb9c
-  verify.md: sha256:d854600e874841f9beb95a4e5ce47991a0ea75b9fe0de05f581b4badd9fe3ddb
+  spec.md: sha256:e97ef152ac0a46beb5717c7af8d51e5722418b54ddf560e18cb9c2c81095ea4e
+  verify.md: sha256:27bc41de377c001ea4dfd731a0ff50f11c6bab8570faab699c0d15fe90a7e3af
 generatedBy: core

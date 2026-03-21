@@ -8,20 +8,15 @@ Workflow steps declare `instruction:` hooks — text blocks that guide agent beh
 
 ### Requirement: Ports and constructor
 
-`GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaProvider`, `TemplateExpander`, and `projectWorkflowHooks`.
+`GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaProvider`, and `TemplateExpander`.
 
 ```typescript
 class GetHookInstructions {
-  constructor(
-    changes: ChangeRepository,
-    schemaProvider: SchemaProvider,
-    expander: TemplateExpander,
-    projectWorkflowHooks: ProjectWorkflowHooks,
-  )
+  constructor(changes: ChangeRepository, schemaProvider: SchemaProvider, expander: TemplateExpander)
 }
 ```
 
-`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml`. All are injected at kernel composition time.
+`SchemaProvider` returns the fully-resolved schema with plugins and overrides applied — all workflow hooks (including those added via `schemaOverrides`) are already present in the schema's workflow steps. All dependencies are injected at kernel composition time.
 
 ### Requirement: Input
 
@@ -48,12 +43,11 @@ If the step is a valid lifecycle state, `GetHookInstructions` looks up the workf
 
 ### Requirement: Instruction collection
 
-For the matched step and phase, `GetHookInstructions` MUST collect `instruction:` hooks in the following order:
+For the matched step and phase, `GetHookInstructions` MUST collect `instruction:` hooks from `workflow[step].hooks[phase]` — only entries with `type: 'instruction'`, in declaration order.
 
-1. Schema-level hooks from `workflow[step].hooks[phase]` — only entries with an `instruction:` key, in declaration order
-2. Project-level hooks from `projectWorkflowHooks` targeting the same step and phase — only entries with an `instruction:` key, in declaration order
+`run:` entries (type `'run'`) MUST be skipped — they are not instruction text.
 
-`run:` entries MUST be skipped — they are not instruction text.
+All hooks — whether from the base schema, plugins, or overrides — are already merged into the schema's workflow steps by `ResolveSchema`. There is no separate project-level hook collection.
 
 ### Requirement: Hook filtering with --only
 

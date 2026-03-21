@@ -31,6 +31,13 @@
 - **WHEN** `execute()` is called
 - **THEN** the resolved schema's description is `'Custom'`
 
+#### Scenario: Override workflow hooks are normalized from YAML format
+
+- **GIVEN** a base schema with workflow step `implementing` and `schemaOverrides` appending a hook `{ id: 'test', run: 'echo ok' }` in YAML format
+- **WHEN** `execute()` is called
+- **THEN** the resolved schema's `implementing` workflow step contains a hook with `{ id: 'test', type: 'run', command: 'echo ok' }`
+- **AND** the hook is usable by `RunStepHooks` (matches `h.type === 'run'`)
+
 #### Scenario: Full pipeline — extends + plugins + overrides
 
 - **GIVEN** schema A extends schema B, one plugin, and overrides

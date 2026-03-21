@@ -12,7 +12,7 @@ rules:
   - requirement: Ports and constructor
     rules:
       - |-
-        `GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaProvider`, `TemplateExpander`, and `projectWorkflowHooks`.
+        `GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaProvider`, and `TemplateExpander`.
 
         ```typescript
         class GetHookInstructions {
@@ -20,12 +20,11 @@ rules:
             changes: ChangeRepository,
             schemaProvider: SchemaProvider,
             expander: TemplateExpander,
-            projectWorkflowHooks: ProjectWorkflowHooks,
           )
         }
         ```
 
-        `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml`. All are injected at kernel composition time.
+        `SchemaProvider` returns the fully-resolved schema with plugins and overrides applied — all workflow hooks (including those added via `schemaOverrides`) are already present in the schema's workflow steps. All dependencies are injected at kernel composition time.
   - requirement: Input
     rules:
       - |-
@@ -50,12 +49,11 @@ rules:
   - requirement: Instruction collection
     rules:
       - |-
-        For the matched step and phase, `GetHookInstructions` MUST collect `instruction:` hooks in the following order:
+        For the matched step and phase, `GetHookInstructions` MUST collect `instruction:` hooks from `workflow[step].hooks[phase]` — only entries with `type: 'instruction'`, in declaration order.
 
-        1. Schema-level hooks from `workflow[step].hooks[phase]` — only entries with an `instruction:` key, in declaration order
-        2. Project-level hooks from `projectWorkflowHooks` targeting the same step and phase — only entries with an `instruction:` key, in declaration order
+        `run:` entries (type `'run'`) MUST be skipped — they are not instruction text.
 
-        `run:` entries MUST be skipped — they are not instruction text.
+        All hooks — whether from the base schema, plugins, or overrides — are already merged into the schema's workflow steps by `ResolveSchema`. There is no separate project-level hook collection.
   - requirement: Hook filtering with --only
     rules:
       - When `only` is provided, the result MUST contain only the hook whose `id` matches. If no hook matches the ID, the use case MUST throw `HookNotFoundError` with reason `'not-found'`. If the ID matches a `run:` hook instead of an `instruction:` hook, the use case MUST throw `HookNotFoundError` with reason `'wrong-type'`.
@@ -114,21 +112,12 @@ scenarios:
   - requirement: Instruction collection
     name: Only instruction hooks are collected
     given:
-      - 'a step with hooks.pre: [{ id: "guidance", instruction: "Read tasks" }, { id: "lint", run: "pnpm lint" }, { id: "review", instruction: "Review changes" }]'
+      - 'a step with hooks.pre: [{ id: "guidance", type: "instruction", text: "Read tasks" }, { id: "lint", type: "run", command: "pnpm lint" }, { id: "review", type: "instruction", text: "Review changes" }]'
     when:
       - GetHookInstructions collects hooks for the pre phase
     then:
       - 'the result contains [{ id: "guidance", text: "Read tasks" }, { id: "review", text: "Review changes" }]'
       - AND lint is not included
-  - requirement: Instruction collection
-    name: Schema hooks precede project hooks
-    given:
-      - 'schema pre instruction hooks [{ id: "s-read", instruction: "Schema instruction" }]'
-      - 'AND project pre instruction hooks [{ id: "p-read", instruction: "Project instruction" }]'
-    when:
-      - GetHookInstructions collects hooks for the pre phase
-    then:
-      - the result is [s-read, p-read] in that order
   - requirement: Hook filtering with --only
     name: Single instruction hook returned by ID
     given:
@@ -162,6 +151,6 @@ scenarios:
     then:
       - 'the result is { phase: "pre", instructions: [] }'
 contentHashes:
-  spec.md: sha256:dc67b6ad3032bc4ae3528dfb95d192d1003628c117ce5bc98e6d1cdde97c8339
-  verify.md: sha256:b103e4880e72236df7c977893156fc0a65c89d38d4bd0e31c74708d241b9c20c
+  spec.md: sha256:77a75d06ab0c8ba951a565e10dbb849ac21438968fa9667f74b9850a37b4dbdd
+  verify.md: sha256:d145bfba13cff85358fab2cd44b77a933845cacc5694992ef26de1e77fd529d7
 generatedBy: core

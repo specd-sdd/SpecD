@@ -37,17 +37,10 @@
 
 #### Scenario: Only instruction hooks are collected
 
-- **GIVEN** a step with `hooks.pre: [{ id: "guidance", instruction: "Read tasks" }, { id: "lint", run: "pnpm lint" }, { id: "review", instruction: "Review changes" }]`
+- **GIVEN** a step with `hooks.pre: [{ id: "guidance", type: "instruction", text: "Read tasks" }, { id: "lint", type: "run", command: "pnpm lint" }, { id: "review", type: "instruction", text: "Review changes" }]`
 - **WHEN** `GetHookInstructions` collects hooks for the pre phase
 - **THEN** the result contains `[{ id: "guidance", text: "Read tasks" }, { id: "review", text: "Review changes" }]`
 - **AND** `lint` is not included
-
-#### Scenario: Schema hooks precede project hooks
-
-- **GIVEN** schema pre instruction hooks `[{ id: "s-read", instruction: "Schema instruction" }]`
-- **AND** project pre instruction hooks `[{ id: "p-read", instruction: "Project instruction" }]`
-- **WHEN** `GetHookInstructions` collects hooks for the pre phase
-- **THEN** the result is `[s-read, p-read]` in that order
 
 ### Requirement: Hook filtering with --only
 
