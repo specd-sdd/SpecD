@@ -152,3 +152,24 @@
 
 - **WHEN** `deltaExists(change, "auth/login", "nonexistent.delta.yaml")` is called
 - **THEN** `false` is returned
+
+### Requirement: unscaffold removes spec directories
+
+#### Scenario: Unscaffold removes specs and deltas directories
+
+- **GIVEN** a change directory with `specs/core/core/edit-change/` and `deltas/core/core/edit-change/` subdirectories
+- **WHEN** `unscaffold(change, ['core:core/edit-change'])` is called
+- **THEN** both `specs/core/core/edit-change/` and `deltas/core/core/edit-change/` directories are removed
+
+#### Scenario: Unscaffold is idempotent — non-existent directory is silently skipped
+
+- **GIVEN** a change directory with no `specs/core/core/edit-change/` directory
+- **WHEN** `unscaffold(change, ['core:core/edit-change'])` is called
+- **THEN** no error is thrown
+- **AND** the operation completes successfully
+
+#### Scenario: Unscaffold removes directories with files
+
+- **GIVEN** a change directory with `specs/core/core/edit-change/spec.md` (a file inside the directory)
+- **WHEN** `unscaffold(change, ['core:core/edit-change'])` is called
+- **THEN** the `specs/core/core/edit-change/` directory and its contents are removed

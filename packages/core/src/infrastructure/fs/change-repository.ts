@@ -429,6 +429,37 @@ export class FsChangeRepository extends ChangeRepository {
     }
   }
 
+  /**
+   * Removes the scaffolded directories for the given spec IDs from the change directory.
+   *
+   * For each spec ID, removes both `specs/<workspace>/<capability-path>/` and
+   * `deltas/<workspace>/<capability-path>/` directories. The operation is idempotent —
+   * if a directory does not exist, it is silently skipped.
+   *
+   * @param change - The change whose spec directories to remove
+   * @param specIds - The spec IDs whose directories to remove
+   */
+  override async unscaffold(change: Change, specIds: readonly string[]): Promise<void> {
+    const dir = await this._resolveDir(change.name)
+    if (dir === null) return
+
+    for (const specId of specIds) {
+      const { workspace, capPath } = parseSpecId(specId)
+
+      const specsDir =
+        capPath.length > 0
+          ? path.join(dir, 'specs', workspace, capPath)
+          : path.join(dir, 'specs', workspace)
+      await this._rmrf(specsDir)
+
+      const deltasDir =
+        capPath.length > 0
+          ? path.join(dir, 'deltas', workspace, capPath)
+          : path.join(dir, 'deltas', workspace)
+      await this._rmrf(deltasDir)
+    }
+  }
+
   // ---- Private helpers ----
 
   /**
@@ -480,6 +511,21 @@ export class FsChangeRepository extends ChangeRepository {
     if (isDiscardedChange(change)) return path.join(this._discardedPath, dirName)
     if (change.isDrafted) return path.join(this._draftsPath, dirName)
     return path.join(this._changesPath, dirName)
+  }
+
+  /**
+   * Removes a directory and all its contents recursively.
+   *
+   * Idempotent — if the directory does not exist, the operation completes silently.
+   *
+   * @param dirPath - Absolute path to the directory to remove
+   */
+  private async _rmrf(dirPath: string): Promise<void> {
+    try {
+      await fs.rm(dirPath, { recursive: true })
+    } catch (err) {
+      if (!isEnoent(err)) throw err
+    }
   }
 
   /**
