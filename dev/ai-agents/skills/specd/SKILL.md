@@ -533,6 +533,56 @@ The compiled context contains the spec content — use it alongside the change a
 If any task is ambiguous, consult the design artifact first — it is the source of truth
 for implementation approach. If still unclear, ask the user before proceeding.
 
+### C.2b Scope reconciliation during implementation
+
+While implementing, you may discover that the actual code changes touch areas not
+covered by the change's specs, or that specs originally in scope are not actually
+affected. This is normal — designing is speculative, implementation is concrete.
+
+**After completing each task** (and updating the checkbox), briefly assess whether the
+code you just wrote touches modules, adapters, or domain concepts outside the change's
+current specIds or dependencies. If it does:
+
+1. Cross-reference against existing specs:
+
+   ```bash
+   node packages/cli/dist/index.js spec list --format text --summary
+   ```
+
+2. Surface findings to the user:
+
+   > While implementing `<task>`, I touched `<module/area>`. This is covered by spec
+   > `<workspace>:<path>` which is not in this change's scope.
+   >
+   > - Should I **add it as a modified spec**? (requires going back to designing for a delta)
+   > - Or register it as a **dependency**? (context only)
+   > - Or is this incidental and can be ignored?
+
+3. If the user wants to add a modified spec, this requires returning to designing:
+
+   ```bash
+   node packages/cli/dist/index.js change edit <name> --add-spec <workspace>:<path>
+   ```
+
+   Note: `change edit` may reset the state to `designing` and invalidate approvals.
+   The artifact loop must run again for the new spec's artifacts. Inform the user of
+   this cost before proceeding.
+
+4. If it's just a dependency:
+
+   ```bash
+   node packages/cli/dist/index.js change deps <name> <specId> --add <dep-spec-id>
+   ```
+
+5. If the implementation reveals that a spec in the change is **not actually being
+   modified** (the design was wrong about scope), flag it:
+   > Spec `<specId>` is in this change but I haven't needed to modify anything it
+   > covers. Should I remove it from scope?
+
+Do not block implementation for minor scope questions — batch them if several arise
+in quick succession and present them together. But do surface them before transitioning
+to verifying, as verification checks against the declared scope.
+
 ### C.3 Run hooks
 
 ```bash
@@ -742,6 +792,61 @@ When this skill is invoked, always run status first. Here's how to handle every 
 For `pending-spec-approval` and `pending-signoff`: these require human action. The agent
 cannot proceed — inform the user and stop. When the user re-invokes the skill after
 approving, the skill detects the new state and continues.
+
+---
+
+## Cross-cutting: Conversational scope detection
+
+**This applies at all times during the lifecycle, not just within a specific phase.**
+
+Throughout the conversation — whether inside a lifecycle phase or during free discussion
+between phases — the user may make statements, decisions, or observations that have
+spec implications. Examples:
+
+- "Actually, we should also handle the case where X happens" → may need a new spec or
+  a delta to an existing one
+- "Let's not touch the auth layer after all" → a spec may need to be removed from scope
+- "I realized this also affects how Y works" → a dependency or modified spec may be needed
+- "We decided in the team meeting to change the approach to Z" → may invalidate current
+  specs or require new ones
+
+**When you detect a statement with spec implications:**
+
+1. **Identify the implication.** What area, module, or domain concept is affected? Is it
+   already covered by a spec?
+
+2. **Cross-reference against existing specs:**
+
+   ```bash
+   node packages/cli/dist/index.js spec list --format text --summary
+   ```
+
+3. **Surface it explicitly to the user.** Do not silently absorb the information — make
+   the spec implication visible:
+
+   > What you just described affects `<area>`. I see a few possibilities:
+   >
+   > - **New spec needed:** There's no existing spec covering `<area>`. Should we create
+   >   one? (This would expand the change's scope.)
+   > - **Existing spec affected:** `<workspace>:<path>` covers this area. Should I add
+   >   it to this change as a modified spec or dependency?
+   > - **Scope reduction:** If this means we're no longer touching `<specId>`, should I
+   >   remove it from the change?
+   > - **Separate change:** If this is big enough, it might warrant its own change
+   >   rather than expanding this one.
+
+4. **Act on the user's decision.** Use the appropriate CLI commands (`change edit`,
+   `change deps`, `change create`) as needed. If adding a spec requires going back to
+   designing, inform the user of the lifecycle cost.
+
+5. **If no active change exists** and the conversation reveals a spec-worthy decision,
+   note it to the user:
+
+   > That sounds like it could warrant a spec. Want me to start a new change for it?
+
+**Key principle:** The LLM is the last line of defense against undocumented decisions.
+If something the user says would change system behavior, constraints, or architecture,
+and there is no spec for it, that is worth surfacing — even if the user didn't ask.
 
 ---
 
