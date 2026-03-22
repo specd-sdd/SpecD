@@ -268,6 +268,21 @@ export class ValidateArtifacts {
         }
 
         if (deltaFile !== null) {
+          // --- No-op bypass ---
+          // If the delta contains only no-op entries, skip deltaValidations,
+          // delta application, and structural validation. Go straight to markComplete.
+          if (yamlParser !== undefined) {
+            const deltaEntries = yamlParser.parseDelta(deltaFile.content)
+            if (deltaEntries.length > 0 && deltaEntries.every((e) => e.op === 'no-op')) {
+              const cleanedContent = this._applyCleanup(
+                deltaFile.content,
+                artifactType.preHashCleanup,
+              )
+              changeArtifact.markComplete(fileKey, this._sha256(cleanedContent))
+              continue
+            }
+          }
+
           if (artifactType.deltaValidations.length > 0 && yamlParser !== undefined) {
             const deltaAST = yamlParser.parse(deltaFile.content)
             const result = evaluateRules(

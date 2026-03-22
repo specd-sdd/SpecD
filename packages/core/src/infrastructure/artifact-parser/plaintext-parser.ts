@@ -163,6 +163,29 @@ Plain text files are parsed into paragraph nodes separated by blank lines.
   selector:
     type: paragraph
     contains: "text to remove"
+\`\`\`
+
+### Description Field
+
+All delta entries accept an optional \`description\` field (string) to document what the entry does or why. It is ignored during application.
+
+\`\`\`yaml
+- op: modified
+  description: "Update introduction paragraph"
+  selector:
+    type: paragraph
+    contains: "old text"
+  content: |
+    New replacement paragraph text.
+\`\`\`
+
+### No-op Operation
+
+Use \`op: no-op\` when the artifact requires no changes for this spec. A \`no-op\` entry must be the only entry in the delta array. It accepts only \`op\` and optionally \`description\` — no other fields are valid.
+
+\`\`\`yaml
+- op: no-op
+  description: "Existing content remains valid — no changes needed"
 \`\`\``
   }
 

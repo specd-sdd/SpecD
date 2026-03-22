@@ -16,11 +16,7 @@ rules:
 
         ```typescript
         class GetHookInstructions {
-          constructor(
-            changes: ChangeRepository,
-            schemaProvider: SchemaProvider,
-            expander: TemplateExpander,
-          )
+          constructor(changes: ChangeRepository, schemaProvider: SchemaProvider, expander: TemplateExpander)
         }
         ```
 
@@ -151,6 +147,6 @@ scenarios:
     then:
       - 'the result is { phase: "pre", instructions: [] }'
 contentHashes:
-  spec.md: sha256:77a75d06ab0c8ba951a565e10dbb849ac21438968fa9667f74b9850a37b4dbdd
+  spec.md: sha256:20121d2102a8e29f1ee435afa87977e2eaf040567a1426a9348bce93b8e83db2
   verify.md: sha256:d145bfba13cff85358fab2cd44b77a933845cacc5694992ef26de1e77fd529d7
 generatedBy: core

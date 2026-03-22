@@ -728,6 +728,30 @@ Delta files live at \`deltas/<workspace>/<capability-path>/<filename>.md.delta.y
   selector:
     type: section
     matches: 'Requirement: Old behaviour'
+\`\`\`
+
+### Description Field
+
+All delta entries accept an optional \`description\` field (string) to document what the entry does or why. It is ignored during application.
+
+\`\`\`yaml
+- op: modified
+  description: "Update login to add rate limiting"
+  selector:
+    type: section
+    matches: 'Requirement: Login'
+  content: |
+    The system SHALL authenticate users with email and password.
+    Failed attempts SHALL be rate-limited to 5 per minute.
+\`\`\`
+
+### No-op Operation
+
+Use \`op: no-op\` when the artifact requires no changes for this spec. A \`no-op\` entry must be the only entry in the delta array. It accepts only \`op\` and optionally \`description\` — no other fields are valid.
+
+\`\`\`yaml
+- op: no-op
+  description: "Existing scenarios remain valid — no changes needed"
 \`\`\``
   }
 

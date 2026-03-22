@@ -21,7 +21,7 @@ export interface ArtifactAST {
 
 /** A single operation entry in a delta file. */
 export interface DeltaEntry {
-  readonly op: 'added' | 'modified' | 'removed'
+  readonly op: 'added' | 'modified' | 'removed' | 'no-op'
   readonly selector?: Selector
   readonly position?: DeltaPosition
   readonly rename?: string
@@ -29,6 +29,8 @@ export interface DeltaEntry {
   readonly value?: unknown
   readonly strategy?: 'replace' | 'append' | 'merge-by'
   readonly mergeKey?: string
+  /** Free-text description of what this entry does or why. Ignored during application. */
+  readonly description?: string
 }
 
 /** Describes one addressable node type for a file format. */

@@ -183,6 +183,50 @@
 - **WHEN** a file named `spec.md.delta.yaml` is present in the change directory
 - **THEN** the system associates it with the artifact whose output filename is `spec.md`
 
+#### Scenario: no-op is never passed to apply
+
+- **GIVEN** a delta file containing `[{ op: "no-op" }]`
+- **WHEN** `ValidateArtifacts` processes this delta
+- **THEN** `apply` is never called — the caller skips loading the base artifact, delta application, and structural validation
+- **AND** `markComplete` is called with the hash of the raw delta file content
+
+#### Scenario: no-op with description
+
+- **GIVEN** a delta file containing `[{ op: "no-op", description: "Existing scenarios still valid" }]`
+- **WHEN** `ValidateArtifacts` processes this delta
+- **THEN** `apply` is never called and `description` has no effect on processing
+- **AND** `markComplete` is called with the hash of the raw delta file content
+
+#### Scenario: no-op mixed with other entries — parseDelta rejects
+
+- **GIVEN** a delta file containing `[{ op: "no-op" }, { op: "modified", selector: { type: section, matches: "Foo" }, content: "bar" }]`
+- **WHEN** `parseDelta` is called
+- **THEN** it throws `SchemaValidationError` with a message explaining that `no-op` cannot be mixed with other operations
+
+#### Scenario: no-op with selector — parseDelta rejects
+
+- **GIVEN** a delta file containing `[{ op: "no-op", selector: { type: section, matches: "Foo" } }]`
+- **WHEN** `parseDelta` is called
+- **THEN** it throws `SchemaValidationError` because `selector` is not valid on `no-op`
+
+#### Scenario: no-op with content — parseDelta rejects
+
+- **GIVEN** a delta file containing `[{ op: "no-op", content: "some content" }]`
+- **WHEN** `parseDelta` is called
+- **THEN** it throws `SchemaValidationError` because `content` is not valid on `no-op`
+
+#### Scenario: no-op with value — parseDelta rejects
+
+- **GIVEN** a delta file containing `[{ op: "no-op", value: 42 }]`
+- **WHEN** `parseDelta` is called
+- **THEN** it throws `SchemaValidationError` because `value` is not valid on `no-op`
+
+#### Scenario: description on regular delta entry — ignored during application
+
+- **GIVEN** a delta file containing `[{ op: "modified", selector: { type: section, matches: "Foo" }, content: "new body", description: "Updating Foo" }]`
+- **WHEN** `apply` is called
+- **THEN** the modification is applied normally and the `description` field has no effect on the result
+
 ### Requirement: Delta application
 
 #### Scenario: entries applied in declaration order
@@ -213,6 +257,12 @@
 - **WHEN** a delta is applied and the markdown result is serialized
 - **THEN** ambiguous constructs are emitted using deterministic project markdown conventions
 
+#### Scenario: no-op delta is never passed to apply
+
+- **GIVEN** a delta containing only `[{ op: "no-op" }]`
+- **WHEN** the caller (e.g. `ValidateArtifacts`) processes this delta
+- **THEN** `apply` is never called — the base artifact is not loaded or parsed
+
 ### Requirement: Delta conflict detection
 
 #### Scenario: Two entries targeting the same node
@@ -229,6 +279,26 @@
 
 - **WHEN** an `added` entry declares both `position.first: true` and `position.last: true` (or any two of `first`, `last`, `after`, `before`)
 - **THEN** `apply` must throw `DeltaApplicationError`
+
+#### Scenario: selector on no-op entry — error
+
+- **WHEN** a delta entry has `op: no-op` and includes `selector`
+- **THEN** `parseDelta` must throw `SchemaValidationError`
+
+#### Scenario: position on no-op entry — error
+
+- **WHEN** a delta entry has `op: no-op` and includes `position`
+- **THEN** `parseDelta` must throw `SchemaValidationError`
+
+#### Scenario: rename on no-op entry — error
+
+- **WHEN** a delta entry has `op: no-op` and includes `rename`
+- **THEN** `parseDelta` must throw `SchemaValidationError`
+
+#### Scenario: strategy on no-op entry — error
+
+- **WHEN** a delta entry has `op: no-op` and includes `strategy`
+- **THEN** `parseDelta` must throw `SchemaValidationError`
 
 ### Requirement: Delta structural validation
 

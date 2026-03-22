@@ -55,7 +55,10 @@ rules:
       - 'The `deltaInstructions` method MUST return a format-specific static text block that is injected verbatim when `delta: true` is active for an artifact.'
   - requirement: ParseDelta contract
     rules:
-      - The `parseDelta` method MUST accept a YAML delta file's raw content and return a typed array of `DeltaEntry` objects. Only the YAML adapter is expected to return a non-empty result; other adapters MAY return an empty array.
+      - |-
+        The `parseDelta` method MUST accept a YAML delta file's raw content and return a typed array of `DeltaEntry` objects. Only the YAML adapter is expected to return a non-empty result; other adapters MAY return an empty array.
+
+        If the parsed array contains a `no-op` entry alongside any other entry, `parseDelta` MUST throw a `SchemaValidationError` explaining that `no-op` cannot be mixed with other operations.
   - requirement: ArtifactAST shape
     rules:
       - 'The `ArtifactAST` interface MUST contain a single `root: ArtifactNode` property.'
@@ -76,14 +79,15 @@ rules:
       - |-
         Each `DeltaEntry` MUST contain:
 
-        - `op: 'added' | 'modified' | 'removed'` — the operation type
-        - `selector?: Selector` — optional node selector
-        - `position?: DeltaPosition` — optional positioning directive
-        - `rename?: string` — optional new name for rename operations
-        - `content?: string` — optional content payload
-        - `value?: unknown` — optional value payload
-        - `strategy?: 'replace' | 'append' | 'merge-by'` — optional merge strategy
-        - `mergeKey?: string` — optional key for `merge-by` strategy
+        - `op: 'added' | 'modified' | 'removed' | 'no-op'` — the operation type
+        - `selector?: Selector` — optional node selector; not valid for `no-op`
+        - `position?: DeltaPosition` — optional positioning directive; not valid for `no-op`
+        - `rename?: string` — optional new name for rename operations; not valid for `no-op`
+        - `content?: string` — optional content payload; not valid for `no-op`
+        - `value?: unknown` — optional value payload; not valid for `no-op`
+        - `strategy?: 'replace' | 'append' | 'merge-by'` — optional merge strategy; not valid for `no-op`
+        - `mergeKey?: string` — optional key for `merge-by` strategy; not valid for `no-op`
+        - `description?: string` — optional free-text description of what this entry does or why; valid on all operation types; ignored during application
   - requirement: Supporting type shapes
     rules:
       - |-
@@ -198,6 +202,38 @@ scenarios:
       - parseDelta is called with any content
     then:
       - it MAY return an empty array
+  - requirement: ParseDelta contract
+    name: no-op mixed with other entries — rejection
+    given:
+      - 'the YAML adapter and delta content containing [{ op: "no-op" }, { op: "added", content: "..." }]'
+    when:
+      - parseDelta is called
+    then:
+      - it throws SchemaValidationError explaining that no-op cannot be mixed with other operations
+  - requirement: ParseDelta contract
+    name: no-op as sole entry — accepted
+    given:
+      - 'the YAML adapter and delta content containing [{ op: "no-op", description: "No changes needed" }]'
+    when:
+      - parseDelta is called
+    then:
+      - it returns an array with one DeltaEntry where op is "no-op" and description is "No changes needed"
+  - requirement: DeltaEntry shape
+    name: DeltaEntry with no-op op
+    given:
+      - 'a delta entry with op: "no-op"'
+    when:
+      - parseDelta is called
+    then:
+      - the returned DeltaEntry has op equal to "no-op"
+  - requirement: DeltaEntry shape
+    name: DeltaEntry with description field
+    given:
+      - 'a delta entry with op: "modified" and description: "Update constructor"'
+    when:
+      - parseDelta is called
+    then:
+      - the returned DeltaEntry has description equal to "Update constructor"
   - requirement: ArtifactNode shape
     name: Markdown section node has level
     given:
@@ -215,6 +251,6 @@ scenarios:
     then:
       - it has ordered set to true
 contentHashes:
-  spec.md: sha256:edf0034e60944b0159760130905f3bd306b078f13e9d87ddf9ae6d2b2dddf973
-  verify.md: sha256:ebe8a4d78121cb52366070d06c46f95a0a0b5f441839ce9d1a536b047deb306f
+  spec.md: sha256:30a115804362dab7c6846da0bef357bb4972a99b8288fc16599dbf58c5646824
+  verify.md: sha256:8e1395d3f5448c9e0cfe3a64aee100f8ce5c9204ee1cd0b5db842e8120797f31
 generatedBy: core

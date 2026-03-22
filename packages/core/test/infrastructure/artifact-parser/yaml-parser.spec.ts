@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { YamlParser } from '../../../src/infrastructure/artifact-parser/yaml-parser.js'
 import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
+import { SchemaValidationError } from '../../../src/domain/errors/schema-validation-error.js'
 
 describe('YamlParser', () => {
   const parser = new YamlParser()
@@ -216,6 +217,95 @@ describe('YamlParser', () => {
 
     it('returns empty array for non-array YAML', () => {
       expect(parser.parseDelta('key: value')).toEqual([])
+    })
+
+    it('parses no-op entry', () => {
+      const entries = parser.parseDelta('- op: no-op\n')
+      expect(entries).toHaveLength(1)
+      expect(entries[0]!.op).toBe('no-op')
+    })
+
+    it('parses no-op entry with description', () => {
+      const entries = parser.parseDelta('- op: no-op\n  description: "No changes needed"\n')
+      expect(entries).toHaveLength(1)
+      expect(entries[0]!.op).toBe('no-op')
+      expect(entries[0]!.description).toBe('No changes needed')
+    })
+
+    it('rejects no-op mixed with other entries', () => {
+      const content = `
+- op: no-op
+- op: modified
+  selector:
+    type: pair
+    matches: model
+  value: new
+`
+      expect(() => parser.parseDelta(content)).toThrow(SchemaValidationError)
+    })
+
+    it('rejects no-op with selector', () => {
+      const content = `
+- op: no-op
+  selector:
+    type: pair
+    matches: foo
+`
+      expect(() => parser.parseDelta(content)).toThrow(SchemaValidationError)
+    })
+
+    it('rejects no-op with content', () => {
+      expect(() => parser.parseDelta('- op: no-op\n  content: "some content"\n')).toThrow(
+        SchemaValidationError,
+      )
+    })
+
+    it('rejects no-op with value', () => {
+      expect(() => parser.parseDelta('- op: no-op\n  value: 42\n')).toThrow(SchemaValidationError)
+    })
+
+    it('rejects no-op with position', () => {
+      const content = `
+- op: no-op
+  position:
+    parent:
+      type: pair
+      matches: root
+`
+      expect(() => parser.parseDelta(content)).toThrow(SchemaValidationError)
+    })
+
+    it('rejects no-op with rename', () => {
+      expect(() => parser.parseDelta('- op: no-op\n  rename: "new"\n')).toThrow(
+        SchemaValidationError,
+      )
+    })
+
+    it('rejects no-op with strategy', () => {
+      expect(() => parser.parseDelta('- op: no-op\n  strategy: append\n')).toThrow(
+        SchemaValidationError,
+      )
+    })
+
+    it('rejects no-op with mergeKey', () => {
+      expect(() => parser.parseDelta('- op: no-op\n  mergeKey: name\n')).toThrow(
+        SchemaValidationError,
+      )
+    })
+
+    it('parses description on regular delta entry', () => {
+      const content = `
+- op: modified
+  description: "Update model value"
+  selector:
+    type: pair
+    matches: model
+  value: new
+`
+      const entries = parser.parseDelta(content)
+      expect(entries).toHaveLength(1)
+      expect(entries[0]!.op).toBe('modified')
+      expect(entries[0]!.description).toBe('Update model value')
     })
   })
 
