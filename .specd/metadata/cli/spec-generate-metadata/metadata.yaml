@@ -3,6 +3,7 @@ description: Metadata files must be regenerated whenever spec content changes, a
 dependsOn:
   - core:core/generate-metadata
   - core:core/spec-metadata
+  - core:core/list-specs
   - default:_global/architecture
 context:
   - Metadata files must be regenerated whenever spec content changes, and doing it manually is error-prone. The `specd spec generate-metadata` command generates metadata content deterministically from schema extraction rules, delegating to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence.
@@ -10,10 +11,12 @@ rules:
   - requirement: Command signature
     rules:
       - |-
-        The command is registered as `generate-metadata <specPath>` on the `spec` parent command. It accepts:
+        The command is registered as `generate-metadata [specPath]` on the `spec` parent command. The `specPath` positional argument is optional when `--all` is used. It accepts:
 
-        - `--write` — persist the generated metadata to the spec directory
+        - `--write` — persist the generated metadata
         - `--force` — skip conflict detection when writing (requires `--write`)
+        - `--all` — batch mode: generate metadata for all specs matching `--status` filter. Mutually exclusive with `<specPath>`. Requires `--write`.
+        - `--status <values>` — comma-separated metadata status filter for `--all`. Accepted values: `stale`, `missing`, `invalid`, `fresh`, or the keyword `all` (every spec regardless of status). Default: `stale,missing`. Requires `--all`.
         - `--format <fmt>` — output format: `text|json|toon` (default `text`)
         - `--config <path>` — path to `specd.yaml`
 
@@ -35,6 +38,20 @@ rules:
   - requirement: Force flag
     rules:
       - '`--force` requires `--write`. Without `--write`, the command writes `error: --force requires --write` to stderr and exits with code 1. With `--write`, the command passes `force: true` to `SaveSpecMetadata` to skip conflict detection.'
+  - requirement: Batch mode (--all)
+    rules:
+      - |-
+        With `--all`, the command iterates over all specs across all workspaces, filters by metadata status using `--status` (default `stale,missing`), generates metadata for each matching spec, and writes it. `--all` requires `--write` — without it the command exits with `error: --all requires --write`. `--all` is mutually exclusive with a positional `<specPath>` — providing both exits with `error: --all and <specPath> are mutually exclusive`.
+
+        The `--status` filter accepts a comma-separated list of: `stale`, `missing`, `invalid`, `fresh`. The keyword `all` is a shorthand for every status (equivalent to regenerating every spec). `--status` without `--all` exits with `error: --status requires --all`.
+
+        For each matching spec, the command calls `GenerateSpecMetadata` and then `SaveSpecMetadata`. If `GenerateSpecMetadata` returns `hasExtraction: false`, the entire batch stops with the existing `no metadataExtraction` error (this is a schema-level issue, not per-spec).
+
+        Individual spec failures during batch mode (e.g. `DependsOnOverwriteError` when `--force` is not set) are reported as warnings and the batch continues to the next spec. The command exits with code 1 if any spec failed, 0 if all succeeded.
+
+        **Text output:** one line per spec processed: `wrote metadata for <specId>` on success, `error: <specId>: <message>` on failure. A summary line at the end: `generated metadata for N/M specs` (where M is total matched, N is successful).
+
+        **JSON output:** `{ result: "ok"|"partial"|"error", total: M, succeeded: N, failed: F, specs: [{ spec: "<id>", status: "ok"|"error", error?: "<msg>" }] }`
   - requirement: Error — spec not found
     rules:
       - 'If the spec or workspace does not exist, the core use case throws `SpecNotFoundError` or `WorkspaceNotFoundError`. The error propagates through `handleError` which writes `error: ...` to stderr and exits with code 1.'
@@ -51,6 +68,8 @@ constraints:
   - The command contains no business logic — all generation is delegated to GenerateSpecMetadata and all writing to SaveSpecMetadata
   - 'YAML serialization uses lineWidth: 0 for literal scalars'
   - The command never reads or writes the filesystem directly for spec content — it uses the kernel
+  - 'Batch mode uses ListSpecs with includeMetadataStatus: true for filtering — no custom metadata resolution in the CLI layer'
+  - --status values are validated at the CLI boundary before any spec processing begins
 scenarios:
   - requirement: Command signature
     name: Missing path argument
@@ -146,7 +165,77 @@ scenarios:
       - specd spec generate-metadata auth/login --write --force is invoked
     then:
       - the write succeeds
+  - requirement: Batch mode (--all)
+    name: --all without --write
+    when:
+      - specd spec generate-metadata --all is run without --write
+    then:
+      - 'stderr contains error: --all requires --write and exit code is 1'
+  - requirement: Batch mode (--all)
+    name: --all with specPath
+    when:
+      - specd spec generate-metadata core:config --all --write is run
+    then:
+      - 'stderr contains error: --all and <specPath> are mutually exclusive and exit code is 1'
+  - requirement: Batch mode (--all)
+    name: --status without --all
+    when:
+      - specd spec generate-metadata --status stale --write is run without --all
+    then:
+      - 'stderr contains error: --status requires --all and exit code is 1'
+  - requirement: Batch mode (--all)
+    name: --all with default status filter
+    given:
+      - '3 specs exist: one with stale metadata, one with missing metadata, one with fresh metadata'
+    when:
+      - specd spec generate-metadata --all --write is run
+    then:
+      - metadata is generated and written for the stale and missing specs only
+      - AND the fresh spec is skipped
+      - AND text output shows wrote metadata for ... for each processed spec
+      - AND a summary line shows generated metadata for 2/2 specs
+  - requirement: Batch mode (--all)
+    name: --all --status all
+    given:
+      - 3 specs exist with varying metadata status
+    when:
+      - specd spec generate-metadata --all --write --status all is run
+    then:
+      - metadata is generated for all 3 specs regardless of status
+  - requirement: Batch mode (--all)
+    name: --all with individual failures continues batch
+    given:
+      - 2 specs have stale metadata, one will fail with DependsOnOverwriteError
+    when:
+      - specd spec generate-metadata --all --write is run without --force
+    then:
+      - the failing spec is reported as an error
+      - AND the other spec succeeds
+      - AND exit code is 1
+      - AND summary shows generated metadata for 1/2 specs
+  - requirement: Batch mode (--all)
+    name: --all --force skips conflict detection
+    given:
+      - specs with stale metadata and existing dependsOn
+    when:
+      - specd spec generate-metadata --all --write --force is run
+    then:
+      - all specs are regenerated without conflict errors
+  - requirement: Batch mode (--all)
+    name: --all JSON output
+    given:
+      - 2 specs with stale metadata
+    when:
+      - specd spec generate-metadata --all --write --format json is run
+    then:
+      - 'output is { result: "ok", total: 2, succeeded: 2, failed: 0, specs: [...] }'
+  - requirement: Batch mode (--all)
+    name: invalid --status value
+    when:
+      - specd spec generate-metadata --all --write --status bogus is run
+    then:
+      - stderr contains an error about invalid status value and exit code is 1
 contentHashes:
-  spec.md: sha256:9a9306831bcf1e0433ef1daa1f2486869735edbc85f12bfe6f4108eb63a48e79
-  verify.md: sha256:d4f716e870110077fbebd3a5178d49e0d0e46d62b4e1478c479c7d2a0db5a70d
+  spec.md: sha256:4c854f84409782e481a4f2b7da07d8668e5f7eb234e6dc1646a069a7f538e646
+  verify.md: sha256:9b45e0ff5020f1ea0dd09cf28c86e4780001f2511a65f5b587e1974be1daed84
 generatedBy: core
