@@ -8,10 +8,12 @@ Metadata files must be regenerated whenever spec content changes, and doing it m
 
 ### Requirement: Command signature
 
-The command is registered as `generate-metadata <specPath>` on the `spec` parent command. It accepts:
+The command is registered as `generate-metadata [specPath]` on the `spec` parent command. The `specPath` positional argument is optional when `--all` is used. It accepts:
 
-- `--write` — persist the generated metadata to the spec directory
+- `--write` — persist the generated metadata
 - `--force` — skip conflict detection when writing (requires `--write`)
+- `--all` — batch mode: generate metadata for all specs matching `--status` filter. Mutually exclusive with `<specPath>`. Requires `--write`.
+- `--status <values>` — comma-separated metadata status filter for `--all`. Accepted values: `stale`, `missing`, `invalid`, `fresh`, or the keyword `all` (every spec regardless of status). Default: `stale,missing`. Requires `--all`.
 - `--format <fmt>` — output format: `text|json|toon` (default `text`)
 - `--config <path>` — path to `specd.yaml`
 
@@ -35,6 +37,20 @@ With `--write`, the command generates metadata, persists it via `SaveSpecMetadat
 
 `--force` requires `--write`. Without `--write`, the command writes `error: --force requires --write` to stderr and exits with code 1. With `--write`, the command passes `force: true` to `SaveSpecMetadata` to skip conflict detection.
 
+### Requirement: Batch mode (--all)
+
+With `--all`, the command iterates over all specs across all workspaces, filters by metadata status using `--status` (default `stale,missing`), generates metadata for each matching spec, and writes it. `--all` requires `--write` — without it the command exits with `error: --all requires --write`. `--all` is mutually exclusive with a positional `<specPath>` — providing both exits with `error: --all and <specPath> are mutually exclusive`.
+
+The `--status` filter accepts a comma-separated list of: `stale`, `missing`, `invalid`, `fresh`. The keyword `all` is a shorthand for every status (equivalent to regenerating every spec). `--status` without `--all` exits with `error: --status requires --all`.
+
+For each matching spec, the command calls `GenerateSpecMetadata` and then `SaveSpecMetadata`. If `GenerateSpecMetadata` returns `hasExtraction: false`, the entire batch stops with the existing `no metadataExtraction` error (this is a schema-level issue, not per-spec).
+
+Individual spec failures during batch mode (e.g. `DependsOnOverwriteError` when `--force` is not set) are reported as warnings and the batch continues to the next spec. The command exits with code 1 if any spec failed, 0 if all succeeded.
+
+**Text output:** one line per spec processed: `wrote metadata for <specId>` on success, `error: <specId>: <message>` on failure. A summary line at the end: `generated metadata for N/M specs` (where M is total matched, N is successful).
+
+**JSON output:** `{ result: "ok"|"partial"|"error", total: M, succeeded: N, failed: F, specs: [{ spec: "<id>", status: "ok"|"error", error?: "<msg>" }] }`
+
 ### Requirement: Error — spec not found
 
 If the spec or workspace does not exist, the core use case throws `SpecNotFoundError` or `WorkspaceNotFoundError`. The error propagates through `handleError` which writes `error: ...` to stderr and exits with code 1.
@@ -54,9 +70,12 @@ When `--write --force` is used, the overwrite check is skipped entirely.
 - The command contains no business logic — all generation is delegated to `GenerateSpecMetadata` and all writing to `SaveSpecMetadata`
 - YAML serialization uses `lineWidth: 0` for literal scalars
 - The command never reads or writes the filesystem directly for spec content — it uses the kernel
+- Batch mode uses `ListSpecs` with `includeMetadataStatus: true` for filtering — no custom metadata resolution in the CLI layer
+- `--status` values are validated at the CLI boundary before any spec processing begins
 
 ## Spec Dependencies
 
 - [`specs/core/generate-metadata/spec.md`](../../core/generate-metadata/spec.md) — the core use case
 - [`specs/core/spec-metadata/spec.md`](../../core/spec-metadata/spec.md) — metadata format and validation
+- [`specs/core/list-specs/spec.md`](../../core/list-specs/spec.md) — batch mode uses `ListSpecs` with `includeMetadataStatus` for filtering
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — adapter packages contain no business logic

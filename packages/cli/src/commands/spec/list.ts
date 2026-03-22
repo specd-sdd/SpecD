@@ -2,6 +2,7 @@ import { type Command } from 'commander'
 import chalk from 'chalk'
 import { type SpecListEntry, type SpecMetadataStatus } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
+import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { colWidth, renderTable } from '../../helpers/table.js'
@@ -214,12 +215,9 @@ function parseMetadataStatusFilter(
   value: boolean | string | undefined,
 ): Set<SpecMetadataStatus> | null {
   if (typeof value !== 'string') return null
-  const tokens = value
-    .toLowerCase()
-    .split(',')
-    .map((t: string) => t.trim())
-    .filter((t: string): t is SpecMetadataStatus =>
-      VALID_METADATA_STATUSES.has(t as SpecMetadataStatus),
-    )
-  return tokens.length > 0 ? new Set(tokens) : null
+  try {
+    return parseCommaSeparatedValues(value, VALID_METADATA_STATUSES, '--metadata-status')
+  } catch {
+    return null
+  }
 }
