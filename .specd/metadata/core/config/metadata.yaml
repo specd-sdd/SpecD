@@ -928,6 +928,6 @@ scenarios:
     then:
       - it reads /shared/instructions.md directly, without resolving relative to the specd.yaml directory
 contentHashes:
-  spec.md: sha256:4e1633028774e6ac8ffa8a9e9f0b126714eb29dd02418db3511a36f89cc89ac7
+  spec.md: sha256:aa940d2b07f745147030bdc06fd905ca3529cf7211a829cd6aa7d3f98d250471
   verify.md: sha256:6107c3bc644834e8c94190c3cfc7f40e7844170087b8174e92c81b5ef96d3117
 generatedBy: core
