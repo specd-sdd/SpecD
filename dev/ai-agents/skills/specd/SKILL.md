@@ -1,4 +1,5 @@
 ---
+name: specd
 description: Drive a specd change through its full lifecycle — from creation through designing, approval gates, implementation, verification, and archiving. Callable at any point; it detects where the change is and continues from there.
 allowed-tools: Bash(node *), Bash(pnpm *), Read, Write, Edit, Grep, Glob, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
 argument-hint: '[change-name] or leave empty to list/create'
