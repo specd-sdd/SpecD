@@ -8,6 +8,7 @@ import { createSchemaRegistry } from '../schema-registry.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
+import { createArchiveRepository } from '../archive-repository.js'
 import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
 import { TemplateExpander } from '../../application/template-expander.js'
 
@@ -33,6 +34,10 @@ export interface FsTransitionChangeOptions {
   readonly draftsPath: string
   /** Absolute path to the `discarded/` directory. */
   readonly discardedPath: string
+  /** Absolute path to the archive root directory. */
+  readonly archivePath: string
+  /** Optional archive directory pattern (e.g. `'{{year}}/{{change.archivedName}}'`). */
+  readonly archivePattern?: string
   /** Additional `node_modules` directories for schema resolution. */
   readonly nodeModulesPaths: readonly string[]
   /** Project root directory for resolving relative schema paths. */
@@ -95,6 +100,10 @@ export function createTransitionChange(
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,
         discardedPath: config.storage.discardedPath,
+        archivePath: config.storage.archivePath,
+        ...(config.storage.archivePattern !== undefined
+          ? { archivePattern: config.storage.archivePattern }
+          : {}),
         nodeModulesPaths: [
           path.join(config.projectRoot, 'node_modules'),
           ...(kernelOpts?.extraNodeModulesPaths ?? []),
@@ -112,6 +121,12 @@ export function createTransitionChange(
     draftsPath: opts.draftsPath,
     discardedPath: opts.discardedPath,
   })
+  const archiveRepo = createArchiveRepository('fs', configOrContext, {
+    changesPath: opts.changesPath,
+    draftsPath: opts.draftsPath,
+    archivePath: opts.archivePath,
+    ...(opts.archivePattern !== undefined ? { pattern: opts.archivePattern } : {}),
+  })
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: opts.nodeModulesPaths,
     configDir: opts.configDir,
@@ -127,6 +142,6 @@ export function createTransitionChange(
   const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
   const hooks = new NodeHookRunner(expander)
   const actor = new GitActorResolver()
-  const runStepHooks = new RunStepHooks(changeRepo, hooks, schemaProvider)
+  const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, schemaProvider)
   return new TransitionChange(changeRepo, actor, schemaProvider, runStepHooks)
 }

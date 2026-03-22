@@ -2,6 +2,7 @@ import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/
 import { StepNotValidError } from '../../domain/errors/step-not-valid-error.js'
 import { HookNotFoundError } from '../../domain/errors/hook-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
+import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type TemplateExpander } from '../template-expander.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
@@ -32,6 +33,7 @@ export interface GetHookInstructionsResult {
  */
 export class GetHookInstructions {
   private readonly _changes: ChangeRepository
+  private readonly _archive: ArchiveRepository
   private readonly _schemaProvider: SchemaProvider
   private readonly _templates: TemplateExpander
 
@@ -39,15 +41,18 @@ export class GetHookInstructions {
    * Creates a new `GetHookInstructions` use case.
    *
    * @param changes - Repository for loading change entities
+   * @param archive - Repository for loading archived changes (fallback for post-archive instructions)
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param templates - Template expander for variable substitution
    */
   constructor(
     changes: ChangeRepository,
+    archive: ArchiveRepository,
     schemaProvider: SchemaProvider,
     templates: TemplateExpander,
   ) {
     this._changes = changes
+    this._archive = archive
     this._schemaProvider = schemaProvider
     this._templates = templates
   }
@@ -60,13 +65,40 @@ export class GetHookInstructions {
    */
   async execute(input: GetHookInstructionsInput): Promise<GetHookInstructionsResult> {
     const change = await this._changes.get(input.name)
-    if (change === null) throw new ChangeNotFoundError(input.name)
+
+    // Fallback to archive for post-archive instructions
+    let contextVars: { change: { name: string; workspace: string; path: string } }
+    let schemaName: string
+
+    if (change === null) {
+      if (input.step === 'archiving' && input.phase === 'post') {
+        const archived = await this._archive.get(input.name)
+        if (archived === null) throw new ChangeNotFoundError(input.name)
+
+        schemaName = archived.schemaName
+        contextVars = {
+          change: {
+            name: archived.name,
+            workspace: archived.workspace.toString(),
+            path: this._archive.archivePath(archived),
+          },
+        }
+      } else {
+        throw new ChangeNotFoundError(input.name)
+      }
+    } else {
+      schemaName = change.schemaName
+      const workspace = change.workspaces[0] ?? 'default'
+      contextVars = {
+        change: { name: change.name, workspace, path: this._changes.changePath(change) },
+      }
+    }
 
     const schema = await this._schemaProvider.get()
     if (schema === null) throw new SchemaNotFoundError('(provider)')
 
-    if (schema.name() !== change.schemaName) {
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
+    if (schema.name() !== schemaName) {
+      throw new SchemaMismatchError(input.name, schemaName, schema.name())
     }
 
     if (!(CHANGE_STATES as string[]).includes(input.step)) {
@@ -97,12 +129,6 @@ export class GetHookInstructions {
 
     if (instrHooks.length === 0) {
       return { phase: input.phase, instructions: [] }
-    }
-
-    // Build contextual variables for template expansion
-    const workspace = change.workspaces[0] ?? 'default'
-    const contextVars = {
-      change: { name: change.name, workspace, path: this._changes.changePath(change) },
     }
 
     const instructions = instrHooks.map((h) => ({

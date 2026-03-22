@@ -85,4 +85,14 @@ export abstract class ArchiveRepository extends Repository {
    * git diff shows only missing or spurious lines — no reorderings.
    */
   abstract reindex(): Promise<void>
+
+  /**
+   * Returns the absolute filesystem path for an archived change's directory.
+   *
+   * Mirrors {@link ChangeRepository.changePath} for active changes.
+   *
+   * @param archivedChange - The archived change to resolve the path for
+   * @returns The absolute path to the archived change's directory
+   */
+  abstract archivePath(archivedChange: ArchivedChange): string
 }

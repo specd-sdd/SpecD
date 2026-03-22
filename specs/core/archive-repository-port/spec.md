@@ -34,6 +34,12 @@ When a change is not in `archivable` state and `options.force` is not `true`, `a
 
 `get(name)` MUST accept a change name string and return the `ArchivedChange` with that name, or `null` if not found. The implementation MUST search `index.jsonl` from the end (most recent entries first) for efficient lookup. If the entry is not found in the index, the implementation MUST fall back to a filesystem scan (e.g. glob `**/*-<name>`) and append the recovered entry to `index.jsonl` for future lookups.
 
+### Requirement: archivePath returns the absolute path for an archived change
+
+`archivePath(archivedChange)` MUST accept an `ArchivedChange` and return the absolute filesystem path to its archived directory. This mirrors `ChangeRepository.changePath(change)` for active changes. The path MUST be resolved from the archive pattern and root directory configured at construction time — the caller does not need to know the archive directory structure.
+
+This method is used by `RunStepHooks` and `GetHookInstructions` to build the `change.path` template variable when operating on archived changes.
+
 ### Requirement: reindex rebuilds the archive index
 
 `reindex()` MUST rebuild `index.jsonl` by scanning the archive directory for all manifest files, sorting entries by `archivedAt` in chronological order, and writing a clean index. The resulting file MUST be in chronological order (oldest first) so that git diffs show only added or removed lines — never reorderings.

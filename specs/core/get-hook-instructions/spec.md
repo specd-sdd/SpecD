@@ -8,11 +8,16 @@ Workflow steps declare `instruction:` hooks — text blocks that guide agent beh
 
 ### Requirement: Ports and constructor
 
-`GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaProvider`, and `TemplateExpander`.
+`GetHookInstructions` receives at construction time: `ChangeRepository`, `ArchiveRepository`, `SchemaProvider`, and `TemplateExpander`.
 
 ```typescript
 class GetHookInstructions {
-  constructor(changes: ChangeRepository, schemaProvider: SchemaProvider, expander: TemplateExpander)
+  constructor(
+    changes: ChangeRepository,
+    archive: ArchiveRepository,
+    schemaProvider: SchemaProvider,
+    expander: TemplateExpander,
+  )
 }
 ```
 
@@ -29,7 +34,9 @@ class GetHookInstructions {
 
 ### Requirement: Change lookup
 
-`GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
+`GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name`, `ArchivedChange.workspace`, and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.
+
+For all other step/phase combinations, if `ChangeRepository.get(name)` returns null, `GetHookInstructions` MUST throw `ChangeNotFoundError` immediately — the archive fallback does not apply.
 
 ### Requirement: Schema name guard
 
@@ -78,3 +85,4 @@ When no `instruction:` hooks exist for the step+phase, the result is `{ phase, i
 - [`specs/core/config/spec.md`](../config/spec.md) — project-level hooks via `schemaOverrides`
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `schemaName`
 - [`specs/core/template-variables/spec.md`](../template-variables/spec.md) — `TemplateExpander`, `TemplateVariables`, expansion semantics
+- [`specs/core/archive-repository-port/spec.md`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`

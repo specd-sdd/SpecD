@@ -287,6 +287,33 @@ describe('FsArchiveRepository', () => {
     })
   })
 
+  // ---- archivePath ----
+
+  describe('archivePath', () => {
+    it('returns the correct absolute path for an archived change', async () => {
+      const change = await makeArchivableChange(ctx, 'add-auth')
+
+      const { archivedChange, archiveDirPath } = await ctx.archive.archive(change)
+      const result = ctx.archive.archivePath(archivedChange)
+
+      expect(result).toBe(archiveDirPath)
+    })
+
+    it('returns a path consistent with archive() when using a custom pattern', async () => {
+      const localCtx = await setupRepo('{{year}}/{{change.archivedName}}')
+      try {
+        const change = await makeArchivableChange(localCtx, 'custom-pattern')
+
+        const { archivedChange, archiveDirPath } = await localCtx.archive.archive(change)
+        const result = localCtx.archive.archivePath(archivedChange)
+
+        expect(result).toBe(archiveDirPath)
+      } finally {
+        await cleanupRepo(localCtx)
+      }
+    })
+  })
+
   // ---- list ----
 
   describe('list', () => {

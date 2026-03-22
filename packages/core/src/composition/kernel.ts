@@ -168,7 +168,7 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
   const schemaProvider = new LazySchemaProvider(resolveSchema)
 
   // Shared RunStepHooks instance — used by TransitionChange, ArchiveChange, and exposed directly
-  const runStepHooks = new RunStepHooks(i.changes, i.hooks, schemaProvider)
+  const runStepHooks = new RunStepHooks(i.changes, i.archive, i.hooks, schemaProvider)
 
   return {
     changes: {
@@ -212,7 +212,12 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       listArchived: new ListArchived(i.archive),
       getArchived: new GetArchivedChange(i.archive),
       runStepHooks,
-      getHookInstructions: new GetHookInstructions(i.changes, schemaProvider, i.expander),
+      getHookInstructions: new GetHookInstructions(
+        i.changes,
+        i.archive,
+        schemaProvider,
+        i.expander,
+      ),
       getArtifactInstruction: new GetArtifactInstruction(
         i.changes,
         i.specs,

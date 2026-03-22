@@ -187,7 +187,7 @@ export function createArchiveChange(
     hasher,
   )
   const saveMetadata = new SaveSpecMetadata(opts.specRepositories, yaml)
-  const runStepHooks = new RunStepHooks(changeRepo, hooks, schemaProvider)
+  const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, schemaProvider)
   return new ArchiveChange(
     changeRepo,
     opts.specRepositories,
