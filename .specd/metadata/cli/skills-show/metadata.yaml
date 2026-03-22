@@ -1,0 +1,73 @@
+title: Skills Show
+description: Before installing a skill, users may want to review its full content to understand what it does. The `specd skills show <name>` command prints the full markdown content of a named skill bundled in `@specd/skills`.
+dependsOn:
+  - cli:cli/entrypoint
+  - cli:cli/skills-list
+context:
+  - Before installing a skill, users may want to review its full content to understand what it does. The `specd skills show <name>` command prints the full markdown content of a named skill bundled in `@specd/skills`.
+rules:
+  - requirement: Command signature
+    rules:
+      - |-
+        ```
+        specd skills show <name> [--format text|json|toon]
+        ```
+
+        - `<name>` — required positional; the name of the skill to display.
+        - `--format text|json|toon` — optional; output format, defaults to `text`.
+  - requirement: Output format
+    rules:
+      - |-
+        In `text` mode (default), the command prints the raw markdown content of the skill file to stdout, preceded by a header line:
+
+        ```
+        --- <name> ---
+        <markdown content>
+        ```
+
+        In `json` or `toon` mode, the output is:
+
+        ```json
+        { "name": "...", "description": "...", "content": "..." }
+        ```
+
+        Where `content` is the full markdown text of the skill.
+  - requirement: Skill not found
+    rules:
+      - If no skill with the given name exists in `@specd/skills`, the command exits with code 1 and prints an `error:` message to stderr.
+constraints:
+  - The command is read-only — it never modifies any files
+  - content in JSON/toon output is the verbatim file content, not parsed or transformed
+scenarios:
+  - requirement: Command signature
+    name: Missing name argument exits with usage error
+    when:
+      - specd skills show is run with no positional argument
+    then:
+      - the command exits with code 1
+      - AND stderr contains a usage error message
+  - requirement: Output format
+    name: Text output includes header and content
+    when:
+      - specd skills show my-skill is run
+    then:
+      - stdout begins with --- my-skill ---
+      - AND the full markdown content of the skill follows
+  - requirement: Output format
+    name: JSON output contains name, description, and content
+    when:
+      - specd skills show my-skill --format json is run
+    then:
+      - stdout is valid JSON with name, description, and content fields
+      - AND content is the verbatim markdown text
+  - requirement: Skill not found
+    name: Unknown skill name exits with error
+    when:
+      - specd skills show nonexistent-skill is run
+    then:
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+contentHashes:
+  spec.md: sha256:86ac9b1d179f22c508db5cf9c2055696a93bb095b96661dd5f4adcc5bdf6e58a
+  verify.md: sha256:6de0f085e9780603e82a683482dd7219af3e1c5bb7e64db0bc826d63e760a392
+generatedBy: core

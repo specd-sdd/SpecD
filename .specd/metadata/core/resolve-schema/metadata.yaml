@@ -1,0 +1,167 @@
+title: ResolveSchema
+description: Schema resolution involves multiple steps (base lookup, extends chain, plugin merging, overrides) that must execute in a precise order, and scattering this logic across callers would lead to duplication and inconsistency. `ResolveSchema` is the application use case that orchestrates the full resolution pipeline — base schema file, recursive `extends` chain, schema plugins, merge layers via `mergeSchemaLayers`, and final `Schema` construction via `buildSchema` — providing a single entry point for obtaining a fully-resolved, customised schema. `GetActiveSchema` delegates to `ResolveSchema` rather than resolving schemas directly.
+dependsOn:
+  - core:core/schema-format
+  - core:core/schema-merge
+  - core:core/build-schema
+  - core:core/schema-registry-port
+  - core:core/config
+  - default:_global/architecture
+context:
+  - Schema resolution involves multiple steps (base lookup, extends chain, plugin merging, overrides) that must execute in a precise order, and scattering this logic across callers would lead to duplication and inconsistency. `ResolveSchema` is the application use case that orchestrates the full resolution pipeline — base schema file, recursive `extends` chain, schema plugins, merge layers via `mergeSchemaLayers`, and final `Schema` construction via `buildSchema` — providing a single entry point for obtaining a fully-resolved, customised schema. `GetActiveSchema` delegates to `ResolveSchema` rather than resolving schemas directly.
+rules:
+  - requirement: Construction dependencies
+    rules:
+      - |-
+        `ResolveSchema` MUST be constructed with:
+
+        - `schemas` (`SchemaRegistry`) — the registry port for resolving schema and plugin references
+        - `schemaRef` (`string`) — the base schema reference from `specd.yaml`
+        - `workspaceSchemasPaths` (`ReadonlyMap<string, string>`) — workspace-to-schemas-path map
+        - `schemaPlugins` (`readonly string[]`) — plugin references from `specd.yaml`, in declaration order
+        - `schemaOverrides` (`SchemaOperations | undefined`) — inline overrides from `specd.yaml`
+  - requirement: Execute takes no arguments
+    rules:
+      - '`execute()` MUST take no arguments. All configuration is provided at construction time.'
+  - requirement: Resolution pipeline
+    rules:
+      - |-
+        `execute` MUST perform the following steps in order:
+
+        1. **Resolve base** — call `SchemaRegistry.resolve(schemaRef, workspaceSchemasPaths)` to obtain the base schema's raw YAML data. If `null`, throw `SchemaNotFoundError`.
+        2. **Resolve extends chain** — if the base schema declares `extends`, resolve the parent schema recursively until a schema with no `extends` is reached. Each resolved schema becomes an `extends` layer. Detect cycles by tracking resolved file paths; throw `SchemaValidationError` if a cycle is found.
+        3. **Build extends layers** — construct `SchemaLayer[]` from the extends chain, ordered from root ancestor to immediate parent. Each layer has `source: 'extends'`.
+        4. **Resolve plugins** — for each reference in `schemaPlugins`, call `SchemaRegistry.resolve(ref, workspaceSchemasPaths)`. If `null`, throw `SchemaNotFoundError`. If the resolved file has `kind: schema` instead of `kind: schema-plugin`, throw `SchemaValidationError`. Each plugin's operations become a `SchemaLayer` with `source: 'plugin'`.
+        5. **Build override layer** — if `schemaOverrides` is defined, normalize its workflow hook entries from YAML format to domain format before constructing the layer. Hook entries using `{ id, run }` MUST be transformed to `{ id, type: 'run', command }`, and entries using `{ id, instruction }` MUST be transformed to `{ id, type: 'instruction', text }`. This normalization MUST be applied recursively to all workflow entries in every operation key (`append`, `prepend`, `create`, `set`). Then construct a single `SchemaLayer` with `source: 'override'`.
+        6. **Merge** — call `mergeSchemaLayers(base, [...extendsLayers, ...pluginLayers, ...overrideLayers])` to produce a merged `SchemaYamlData`.
+        7. **Build** — call `buildSchema(schemaRef, mergedData, templates)` to construct the final `Schema` entity. Template loading happens during base resolution (step 1) — templates from the extends chain are merged (child templates override parent templates with the same path).
+  - requirement: Returns the resolved Schema
+    rules:
+      - '`execute` MUST return `Promise<Schema>` — the fully-resolved, customised schema.'
+  - requirement: Template merging across extends chain
+    rules:
+      - When resolving the extends chain, templates from each schema in the chain are accumulated. A child schema's template overrides a parent's template when both declare the same relative path. The final template map passed to `buildSchema` reflects this merge.
+  - requirement: SchemaRegistry returns raw data
+    rules:
+      - |-
+        `SchemaRegistry.resolve()` must return enough information for `ResolveSchema` to:
+
+        - Access the parsed `SchemaYamlData` (for the merge engine)
+        - Access loaded templates (for `buildSchema`)
+        - Know the resolved file path (for cycle detection in extends)
+
+        This may require extending `SchemaRegistry.resolve()` to return a richer result type, or `ResolveSchema` may call a lower-level method that returns intermediate data before domain construction.
+constraints:
+  - ResolveSchema is an application use case — it lives in application/use-cases/
+  - It imports domain services (mergeSchemaLayers, buildSchema) and the SchemaRegistry port
+  - It MUST NOT import infrastructure modules directly
+  - The resolution pipeline is deterministic — same inputs always produce the same schema
+  - Plugin resolution failures are hard errors, not warnings
+  - The extends chain has no depth limit, but cycles are detected
+scenarios:
+  - requirement: Resolution pipeline
+    name: Base schema with no extends, no plugins, no overrides
+    given:
+      - 'a base schema with kind: schema and no extends'
+      - AND schemaPlugins is empty and schemaOverrides is undefined
+    when:
+      - execute() is called
+    then:
+      - the resolved schema is identical to the base schema (no merge layers applied)
+  - requirement: Resolution pipeline
+    name: Base schema with extends chain
+    given:
+      - "schema A declares extends: '#b', schema B declares extends: '#c', schema C has no extends"
+    when:
+      - execute() is called with schemaRef pointing to A
+    then:
+      - 'merge layers are applied in order: C → B → A (root to leaf)'
+      - AND the final schema reflects all merged changes
+  - requirement: Resolution pipeline
+    name: Base schema with plugins
+    given:
+      - "a base schema and schemaPlugins: ['@specd/plugin-rfc']"
+      - 'AND the plugin has kind: schema-plugin with append operations'
+    when:
+      - execute() is called
+    then:
+      - the plugin's operations are applied after the base schema
+  - requirement: Resolution pipeline
+    name: Base schema with overrides
+    given:
+      - "a base schema and schemaOverrides with set.description: 'Custom'"
+    when:
+      - execute() is called
+    then:
+      - the resolved schema's description is 'Custom'
+  - requirement: Resolution pipeline
+    name: Override workflow hooks are normalized from YAML format
+    given:
+      - "a base schema with workflow step implementing and schemaOverrides appending a hook { id: 'test', run: 'echo ok' } in YAML format"
+    when:
+      - execute() is called
+    then:
+      - "the resolved schema's implementing workflow step contains a hook with { id: 'test', type: 'run', command: 'echo ok' }"
+      - AND the hook is usable by RunStepHooks (matches h.type === 'run')
+  - requirement: Resolution pipeline
+    name: Full pipeline — extends + plugins + overrides
+    given:
+      - schema A extends schema B, one plugin, and overrides
+    when:
+      - execute() is called
+    then:
+      - 'layers are applied in order: B (extends) → plugin → overrides'
+  - requirement: Resolution pipeline
+    name: Extends cycle detected
+    given:
+      - schema A extends B, B extends A
+    when:
+      - execute() is called
+    then:
+      - SchemaValidationError is thrown identifying the cycle
+  - requirement: Resolution pipeline
+    name: Plugin not found
+    given:
+      - "schemaPlugins: ['@specd/nonexistent'] and the package is not installed"
+    when:
+      - execute() is called
+    then:
+      - SchemaNotFoundError is thrown
+  - requirement: Resolution pipeline
+    name: Plugin has wrong kind
+    given:
+      - 'schemaPlugins references a file with kind: schema'
+    when:
+      - execute() is called
+    then:
+      - SchemaValidationError is thrown
+  - requirement: Template merging across extends chain
+    name: Child template overrides parent template
+    given:
+      - parent schema has templates/spec.md with content A
+      - AND child schema has templates/spec.md with content B
+    when:
+      - execute() is called
+    then:
+      - the resolved schema uses content B for templates/spec.md
+  - requirement: Template merging across extends chain
+    name: Parent-only templates are inherited
+    given:
+      - parent schema has templates/proposal.md
+      - AND child schema does not declare templates/proposal.md
+    when:
+      - execute() is called
+    then:
+      - the resolved schema includes templates/proposal.md from the parent
+  - requirement: Execute takes no arguments
+    name: Multiple executions resolve the same schema
+    given:
+      - ResolveSchema was constructed with specific config
+    when:
+      - execute() is called twice
+    then:
+      - both calls produce an equivalent Schema object
+contentHashes:
+  spec.md: sha256:7245d0edd29f007ed0108df537caab8c97fc1af40431ab3de701170da7b553db
+  verify.md: sha256:d17c66345c871094dcb88df855b1abaa82a7ff79c96bed6cab2d45e8475dee00
+generatedBy: core

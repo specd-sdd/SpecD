@@ -1,0 +1,152 @@
+title: Spec Generate-Metadata
+description: Metadata files must be regenerated whenever spec content changes, and doing it manually is error-prone. The `specd spec generate-metadata` command generates metadata content deterministically from schema extraction rules, delegating to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence.
+dependsOn:
+  - core:core/generate-metadata
+  - core:core/spec-metadata
+  - default:_global/architecture
+context:
+  - Metadata files must be regenerated whenever spec content changes, and doing it manually is error-prone. The `specd spec generate-metadata` command generates metadata content deterministically from schema extraction rules, delegating to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence.
+rules:
+  - requirement: Command signature
+    rules:
+      - |-
+        The command is registered as `generate-metadata <specPath>` on the `spec` parent command. It accepts:
+
+        - `--write` — persist the generated metadata to the spec directory
+        - `--force` — skip conflict detection when writing (requires `--write`)
+        - `--format <fmt>` — output format: `text|json|toon` (default `text`)
+        - `--config <path>` — path to `specd.yaml`
+
+        The `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands.
+  - requirement: Default output (no --write)
+    rules:
+      - |-
+        Without `--write`, the command generates metadata and outputs it to stdout without persisting:
+
+        - **Text format:** outputs the generated YAML content, trimmed of trailing whitespace
+        - **JSON/toon format:** outputs `{ spec: "<workspace:path>", metadata: <object> }`
+  - requirement: Write mode
+    rules:
+      - |-
+        With `--write`, the command generates metadata, persists it via `SaveSpecMetadata`, and outputs a confirmation:
+
+        - **Text format:** `wrote metadata for <workspace:path>`
+        - **JSON/toon format:** `{ result: "ok", spec: "<workspace:path>", written: true }`
+  - requirement: Force flag
+    rules:
+      - '`--force` requires `--write`. Without `--write`, the command writes `error: --force requires --write` to stderr and exits with code 1. With `--write`, the command passes `force: true` to `SaveSpecMetadata` to skip conflict detection.'
+  - requirement: Error — spec not found
+    rules:
+      - 'If the spec or workspace does not exist, the core use case throws `SpecNotFoundError` or `WorkspaceNotFoundError`. The error propagates through `handleError` which writes `error: ...` to stderr and exits with code 1.'
+  - requirement: Error — no metadataExtraction
+    rules:
+      - 'If the core use case returns `hasExtraction: false` (schema has no `metadataExtraction` declarations), the command writes `error: schema has no metadataExtraction declarations` to stderr and exits with code 1.'
+  - requirement: Error — dependsOn overwrite (write mode)
+    rules:
+      - |-
+        When `--write` is used and `--force` is not set, if the generated metadata would change existing `dependsOn` entries, `SaveSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` which writes `error: dependsOn would change (...)` to stderr and exits with code 1. Stdout remains empty on error.
+
+        When `--write --force` is used, the overwrite check is skipped entirely.
+constraints:
+  - The command contains no business logic — all generation is delegated to GenerateSpecMetadata and all writing to SaveSpecMetadata
+  - 'YAML serialization uses lineWidth: 0 for literal scalars'
+  - The command never reads or writes the filesystem directly for spec content — it uses the kernel
+scenarios:
+  - requirement: Command signature
+    name: Missing path argument
+    when:
+      - specd spec generate-metadata is invoked without a <specPath> argument
+    then:
+      - the command exits with an error
+  - requirement: Error — spec not found
+    name: Unknown spec exits 1
+    when:
+      - specd spec generate-metadata core:core/nonexistent --write is invoked
+    then:
+      - "stderr contains error: Spec 'core:core/nonexistent' not found"
+      - AND exits with code 1
+  - requirement: Error — spec not found
+    name: Unknown workspace exits 1
+    when:
+      - specd spec generate-metadata fake:auth/login --write is invoked
+    then:
+      - 'stderr contains an error: message about the unknown workspace'
+      - AND exits with code 1
+  - requirement: Error — no metadataExtraction
+    name: Schema has no metadataExtraction
+    when:
+      - 'the core use case returns hasExtraction: false'
+    then:
+      - 'the command writes error: schema has no metadataExtraction declarations to stderr'
+      - AND exits with code 1
+  - requirement: Default output (no --write)
+    name: Text format outputs YAML to stdout
+    given:
+      - "the core use case returns metadata with title: 'Login' and generatedBy: 'core'"
+    when:
+      - specd spec generate-metadata auth/login is invoked without --write
+    then:
+      - 'stdout contains the YAML representation including title: Login and generatedBy: core'
+  - requirement: Default output (no --write)
+    name: JSON format outputs spec and metadata
+    given:
+      - "the core use case returns metadata with title: 'Login'"
+    when:
+      - specd spec generate-metadata auth/login --format json is invoked
+    then:
+      - 'stdout contains a JSON object with spec: "default:auth/login" and metadata containing the extracted fields'
+  - requirement: Write mode
+    name: Write persists metadata and confirms
+    when:
+      - specd spec generate-metadata auth/login --write is invoked
+    then:
+      - SaveSpecMetadata is called with the generated YAML content
+      - AND stdout contains wrote metadata for default:auth/login
+  - requirement: Force flag
+    name: Write with force passes force flag
+    when:
+      - specd spec generate-metadata auth/login --write --force is invoked
+    then:
+      - 'SaveSpecMetadata is called with force: true'
+  - requirement: Force flag
+    name: Force without write exits with error
+    when:
+      - specd spec generate-metadata auth/login --force is invoked without --write
+    then:
+      - 'the command writes error: --force requires --write to stderr'
+      - AND exits with code 1
+  - requirement: Error — dependsOn overwrite (write mode)
+    name: dependsOn change in write mode exits 1
+    given:
+      - 'existing metadata has dependsOn: [core:config, core:schema-format]'
+      - 'AND the generated metadata has dependsOn: [core:change]'
+    when:
+      - specd spec generate-metadata auth/login --write is invoked without --force
+    then:
+      - 'the command writes error: dependsOn would change to stderr'
+      - AND exits with code 1
+      - AND stdout is empty
+  - requirement: Error — dependsOn overwrite (write mode)
+    name: Write mode JSON output on dependsOn error
+    given:
+      - 'existing metadata has dependsOn: [core:config]'
+      - 'AND the generated metadata has dependsOn: [core:change]'
+    when:
+      - specd spec generate-metadata auth/login --write --format json is invoked without --force
+    then:
+      - the command exits with code 1
+      - 'AND stderr contains error: dependsOn would change'
+      - AND stdout is empty
+  - requirement: Error — dependsOn overwrite (write mode)
+    name: --write --force bypasses dependsOn check
+    given:
+      - 'existing metadata has dependsOn: [core:config]'
+      - 'AND the generated metadata has dependsOn: [core:change]'
+    when:
+      - specd spec generate-metadata auth/login --write --force is invoked
+    then:
+      - the write succeeds
+contentHashes:
+  spec.md: sha256:9a9306831bcf1e0433ef1daa1f2486869735edbc85f12bfe6f4108eb63a48e79
+  verify.md: sha256:d4f716e870110077fbebd3a5178d49e0d0e46d62b4e1478c479c7d2a0db5a70d
+generatedBy: core

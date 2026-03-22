@@ -1,0 +1,171 @@
+title: Project Init
+description: Getting a specd project off the ground requires creating a config file, storage directories, and optionally installing agent skills -- doing this manually is tedious and error-prone. The `specd project init` command bootstraps a new specd project, presenting a guided wizard in interactive mode or proceeding silently with flags in non-interactive mode. All file creation is delegated to the `InitProject` use case in `@specd/core`.
+dependsOn:
+  - cli:cli/entrypoint
+  - cli:cli/skills-install
+  - core:core/config
+context:
+  - Getting a specd project off the ground requires creating a config file, storage directories, and optionally installing agent skills -- doing this manually is tedious and error-prone. The `specd project init` command bootstraps a new specd project, presenting a guided wizard in interactive mode or proceeding silently with flags in non-interactive mode. All file creation is delegated to the `InitProject` use case in `@specd/core`.
+rules:
+  - requirement: Command signature
+    rules:
+      - |-
+        ```
+        specd project init [--schema <ref>] [--workspace <id>] [--workspace-path <path>] [--agent <id>...] [--force] [--format text|json|toon]
+        ```
+
+        - `--schema <ref>` — optional; the schema reference to activate (e.g. `@specd/schema-std`, `./schemas/custom/schema.yaml`). Defaults to `@specd/schema-std`.
+        - `--workspace <id>` — optional; the ID of the default workspace. Defaults to `default`.
+        - `--workspace-path <path>` — optional; the specs path for the default workspace, relative to the config file. Defaults to `specs/`.
+        - `--agent <id>` — optional, repeatable; agents to install skills for immediately after initialisation (e.g. `--agent claude`). When not provided in interactive mode, the wizard asks.
+        - `--force` — optional; overwrite an existing config without prompting.
+        - `--format text|json|toon` — optional; forces non-interactive mode; defaults to `text`.
+  - requirement: Interactive mode
+    rules:
+      - |-
+        The command enters interactive mode when **all** of the following are true:
+
+        - stdout is a TTY
+        - `--format` is not `json` or `toon`
+        - No configuration flags (`--schema`, `--workspace`, `--workspace-path`, `--agent`) are provided
+
+        In interactive mode the command presents a guided wizard:
+
+        1. **Welcome header** — an ASCII banner and a short description of specd, shown once at startup.
+        2. **Project settings prompts** — prompts for each setting with its default value pre-filled:
+           - Schema reference (default: `@specd/schema-std`)
+           - Default workspace ID (default: `default`)
+           - Specs path (default: `specs/`)
+        3. **Agent selection** — a multi-select listing all known agents. The user selects which agents to install skills for. Selecting none is valid (skills can be installed later with `specd skills install`).
+        4. **Confirmation summary** — shows the resolved settings and asks for confirmation before writing any files. If the user cancels, the command exits with code 0 and no files are written.
+        5. **Progress** — a spinner is shown while `InitProject` runs and skills are installed.
+        6. **Completion** — a success message with the project root path and next-step hints.
+  - requirement: Non-interactive mode
+    rules:
+      - |-
+        When not in interactive mode, the command uses the flag values (or defaults) directly, calls `InitProject`, optionally installs skills for agents specified via `--agent`, and prints output according to `--format`.
+
+        - `text`: prints `initialized specd in <absolute-project-root-path>` followed by any skills installed.
+        - `json` or `toon`: outputs `{"result":"ok","configPath":"...","schema":"...","workspaces":[...],"skillsInstalled":{}}` where `skillsInstalled` maps agent ids to arrays of installed skill names.
+  - requirement: Config file placement
+    rules:
+      - The target directory is the **git root** when inside a git repository, or the **current working directory** otherwise. This resolution happens in the CLI before entering the wizard or calling `InitProject`.
+  - requirement: Delegation to InitProject
+    rules:
+      - The CLI passes the resolved project root, schema reference, workspace id, workspace specs path, and force flag to `InitProject`. All file creation — `specd.yaml`, storage directories, `.gitignore` entry — is handled by `InitProject` via `ConfigWriter`. The CLI never touches `specd.yaml` directly.
+  - requirement: Skills installation after init
+    rules:
+      - After `InitProject` succeeds, if any agents were selected (interactively or via `--agent`), the CLI installs all skills for each selected agent using the same logic as `specd skills install all --agent <id>`, and records the installations in `specd.yaml` via `RecordSkillInstall`.
+  - requirement: Already initialised
+    rules:
+      - |-
+        If `specd.yaml` already exists and `--force` is not provided:
+
+        - **Interactive mode**: the wizard informs the user and asks whether to overwrite or cancel.
+        - **Non-interactive mode**: exits with code 1 and prints an `error:` message to stderr.
+constraints:
+  - specd project init does not require an existing specd.yaml to run; standard config discovery is not invoked
+  - The CLI never reads or writes YAML — all config format knowledge lives in @specd/core
+  - --schema accepts any string; validation is deferred to first use
+  - Interactive mode is never entered when --format json or --format toon is set, even if stdout is a TTY — these formats imply scripted use
+scenarios:
+  - requirement: Command signature
+    name: Unknown schema ref does not error at init time
+    when:
+      - specd project init --schema ./custom/schema.yaml is run
+    then:
+      - the command exits with code 0
+      - AND specd.yaml is written with the given schema reference
+  - requirement: Interactive mode
+    name: Interactive mode is skipped when --format json is set
+    given:
+      - stdout is a TTY
+    when:
+      - specd project init --format json is run with no other flags
+    then:
+      - no wizard prompts are shown
+      - AND the command runs non-interactively with defaults
+      - AND stdout is valid JSON
+  - requirement: Interactive mode
+    name: Interactive mode is skipped when any config flag is provided
+    given:
+      - stdout is a TTY
+    when:
+      - specd project init --schema @specd/schema-std is run
+    then:
+      - no wizard prompts are shown
+  - requirement: Non-interactive mode
+    name: Default values produce a valid minimal config
+    when:
+      - specd project init --workspace default --workspace-path specs/ is run
+    then:
+      - "specd.yaml is written with schema: '@specd/schema-std', workspace default at specs/"
+      - AND the process exits with code 0
+  - requirement: Non-interactive mode
+    name: JSON output contains all fields including skillsInstalled
+    when:
+      - specd project init --format json --agent claude is run
+    then:
+      - stdout is valid JSON with result, configPath, schema, workspaces, and skillsInstalled fields
+  - requirement: Config file placement
+    name: Config written to git root when inside a subdirectory
+    given:
+      - a git repository with root at /repo and the CWD is /repo/packages/foo
+    when:
+      - specd project init --workspace default is run
+    then:
+      - specd.yaml is written to /repo/specd.yaml
+  - requirement: Config file placement
+    name: Config written to CWD when not inside a git repository
+    given:
+      - a directory that is not inside any git repository
+    when:
+      - specd project init --workspace default is run
+    then:
+      - specd.yaml is written in the current working directory
+  - requirement: Delegation to InitProject
+    name: Standard directories are created
+    given:
+      - a project root with no pre-existing change directories
+    when:
+      - specd project init --workspace default completes successfully
+    then:
+      - changes/, drafts/, discarded/, and archive/ directories exist under the project root
+  - requirement: Delegation to InitProject
+    name: .gitignore entry is added
+    given:
+      - no .gitignore exists in the project root
+    when:
+      - specd project init --workspace default completes successfully
+    then:
+      - a .gitignore is created containing specd.local.yaml
+  - requirement: Skills installation after init
+    name: Skills are installed for selected agents after init
+    when:
+      - specd project init --workspace default --agent claude is run
+    then:
+      - skill files are written to <git-root>/.claude/commands/
+      - AND specd.yaml records the installed skills under skills.claude
+  - requirement: Already initialised
+    name: Non-interactive mode fails without --force
+    given:
+      - a specd.yaml already exists at the target path
+    when:
+      - specd project init --workspace default is run
+    then:
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+      - AND the existing specd.yaml is unchanged
+  - requirement: Already initialised
+    name: --force overwrites existing config
+    given:
+      - "a specd.yaml with schema: '@specd/schema-old' exists"
+    when:
+      - specd project init --force --schema @specd/schema-std --workspace default is run
+    then:
+      - the command exits with code 0
+      - AND specd.yaml now contains the new schema reference
+contentHashes:
+  spec.md: sha256:ec0d1369333a10addbcd952667b992cd328d2e6036b0f577a5776a73ee1255b1
+  verify.md: sha256:7ade80d114c3c229088640b78866fed9c5f5e7f0505637209731d56320398269
+generatedBy: core

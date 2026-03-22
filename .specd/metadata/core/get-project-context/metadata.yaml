@@ -1,0 +1,243 @@
+title: GetProjectContext
+description: "Tooling sometimes needs the project's compiled spec context without an active change — for example, when generating agent instructions or answering project-wide queries. `GetProjectContext` provides this by compiling the project-level context block (steps 1-4 of the compilation pipeline: `context:` entries, project-level include/exclude patterns) with all configured workspaces treated as active. It is the change-independent counterpart to `CompileContext`."
+dependsOn:
+  - core:core/config
+  - core:core/compile-context
+  - core:core/spec-metadata
+  - core:core/schema-format
+  - default:_global/architecture
+context:
+  - "Tooling sometimes needs the project's compiled spec context without an active change — for example, when generating agent instructions or answering project-wide queries. `GetProjectContext` provides this by compiling the project-level context block (steps 1-4 of the compilation pipeline: `context:` entries, project-level include/exclude patterns) with all configured workspaces treated as active. It is the change-independent counterpart to `CompileContext`."
+rules:
+  - requirement: Accepts GetProjectContextInput as input
+    rules:
+      - |-
+        `execute(input)` MUST accept a `GetProjectContextInput` object with the following fields:
+
+        - `config` (`CompileContextConfig`, required) — the resolved project configuration containing `context` entries, `contextIncludeSpecs`, and `contextExcludeSpecs`.
+        - `followDeps` (boolean, optional) — when `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. When `false` or absent, traversal is not performed.
+        - `depth` (number, optional) — limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`. `1` means direct dependencies only; absent means unlimited.
+        - `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per spec (`"rules"`, `"constraints"`, `"scenarios"`). When absent, all sections are rendered including the description.
+  - requirement: Returns GetProjectContextResult on success
+    rules:
+      - |-
+        `execute` MUST return a `GetProjectContextResult` containing:
+
+        - `contextEntries` (string\[]) — rendered project-level context entries (instruction text or file content).
+        - `specs` (`GetProjectContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `workspace`, `path`, and `content` fields.
+        - `warnings` (`ContextWarning[]`) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.
+  - requirement: Resolves schema before processing
+    rules:
+      - The use case MUST obtain the project's schema via `SchemaProvider.get()` before processing any specs. If the schema cannot be resolved (returns `null`), the use case MUST throw `SchemaNotFoundError`.
+  - requirement: Renders project-level context entries
+    rules:
+      - |-
+        For each entry in `config.context`:
+
+        - If the entry has an `instruction` key, the instruction text MUST be rendered with the label `**Source: instruction**`.
+        - If the entry has a `file` key, the file content MUST be read via the `FileReader` port. If the file exists, its content is rendered with the label `**Source: <path>**` and headings shifted down by one level. If the file does not exist, a `missing-file` warning MUST be emitted and the entry skipped.
+
+        Context entries MUST appear in declaration order and before any spec content.
+  - requirement: Applies project-level include/exclude patterns
+    rules:
+      - The use case MUST apply `config.contextIncludeSpecs` patterns to collect specs across all workspaces, then apply `config.contextExcludeSpecs` patterns to remove specs from the collected set. Pattern matching MUST use the same `listMatchingSpecs` logic as `CompileContext`, treating all workspaces as active.
+  - requirement: Does not apply workspace-level patterns
+    rules:
+      - The use case MUST NOT apply workspace-level `contextIncludeSpecs` or `contextExcludeSpecs` patterns. Those are conditional on a specific change having that workspace active and are the responsibility of `CompileContext`.
+  - requirement: Supports dependsOn traversal when followDeps is true
+    rules:
+      - When `input.followDeps` is `true`, the use case MUST traverse `dependsOn` links starting from each included spec, using the schema's `metadataExtraction` declarations as a fallback when `.specd-metadata.yaml` is absent. Newly discovered specs MUST be added to the included set. Traversal MUST respect `input.depth` when provided.
+  - requirement: Renders spec content from metadata when fresh
+    rules:
+      - For each included spec, if `.specd-metadata.yaml` exists and its content hashes match the current artifacts (verified via `ContentHasher`), the use case MUST render from the parsed metadata. The rendered output MUST include description, rules, constraints, and scenarios as applicable, filtered by `input.sections` when provided.
+  - requirement: Falls back to extraction when metadata is stale or absent
+    rules:
+      - |-
+        When metadata is stale or absent, the use case MUST:
+
+        1. Emit a `stale-metadata` warning identifying the spec.
+        2. Attempt live extraction using the schema's `metadataExtraction` engine and `ArtifactParserRegistry`.
+        3. If extraction yields content, render it with the same section filtering as fresh metadata.
+        4. If the schema has no `metadataExtraction` declarations, render an empty spec heading.
+  - requirement: Construction dependencies
+    rules:
+      - |-
+        `GetProjectContext` depends on the following ports injected via constructor:
+
+        - `specs` (`ReadonlyMap<string, SpecRepository>`) — per-workspace spec repositories
+        - `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema (replaces `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths`)
+        - `files` (`FileReader`) — for reading context entry files from disk
+        - `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale
+        - `hasher` (`ContentHasher`) — for comparing content hashes against metadata
+
+        All dependencies are injected at construction time. The schema is resolved lazily on first access.
+constraints:
+  - The use case operates without a change context — it treats all workspaces as active.
+  - Workspace-level context patterns are never applied — only project-level patterns.
+  - Specs matched by multiple include patterns appear only once.
+  - Context entries are always rendered before spec content.
+  - The use case is async — it returns Promise<GetProjectContextResult>.
+  - Spec rendering uses the same formatting logic as CompileContext (heading levels, section labels).
+  - 'dependsOn traversal is only performed when explicitly requested via followDeps: true.'
+scenarios:
+  - requirement: Accepts GetProjectContextInput as input
+    name: Minimal input with config only
+    when:
+      - 'execute is called with { config: { context: [], contextIncludeSpecs: [] } }'
+    then:
+      - the call succeeds and returns a result with empty contextEntries, specs, and warnings
+  - requirement: Accepts GetProjectContextInput as input
+    name: All optional fields provided
+    when:
+      - 'execute is called with followDeps: true, depth: 2, and sections: ["rules"]'
+    then:
+      - the call succeeds and respects all optional parameters
+  - requirement: Returns GetProjectContextResult on success
+    name: Result contains all three fields
+    when:
+      - execute completes successfully
+    then:
+      - the result contains contextEntries (string array), specs (array of spec entries), and warnings (array of context warnings)
+  - requirement: Resolves schema before processing
+    name: Schema not found
+    given:
+      - SchemaProvider.get() returns null for the configured schema reference
+    when:
+      - execute is called
+    then:
+      - a SchemaNotFoundError is thrown with the schema reference string
+  - requirement: Renders project-level context entries
+    name: Instruction entry rendered
+    given:
+      - 'config.context contains { instruction: "Always use TypeScript" }'
+    when:
+      - execute is called
+    then:
+      - 'contextEntries contains a string starting with **Source: instruction** followed by the instruction text'
+  - requirement: Renders project-level context entries
+    name: File entry rendered
+    given:
+      - 'config.context contains { file: "AGENTS.md" } and the file exists with content'
+    when:
+      - execute is called
+    then:
+      - 'contextEntries contains a string starting with **Source: AGENTS.md** followed by the file content with headings shifted'
+  - requirement: Renders project-level context entries
+    name: Missing file emits warning
+    given:
+      - 'config.context contains { file: "missing.md" } and the file does not exist'
+    when:
+      - execute is called
+    then:
+      - warnings contains a missing-file warning for missing.md
+      - AND contextEntries does not include an entry for the missing file
+  - requirement: Renders project-level context entries
+    name: Context entries appear in declaration order
+    given:
+      - 'config.context contains [{ instruction: "first" }, { file: "second.md" }] and second.md exists'
+    when:
+      - execute is called
+    then:
+      - contextEntries[0] contains "first" and contextEntries[1] contains "second.md"
+  - requirement: Applies project-level include/exclude patterns
+    name: Include pattern matches specs
+    given:
+      - config.contextIncludeSpecs is ["default:*"] and the default workspace has specs
+    when:
+      - execute is called
+    then:
+      - specs contains entries for all specs in the default workspace
+  - requirement: Applies project-level include/exclude patterns
+    name: Exclude pattern removes specs
+    given:
+      - config.contextIncludeSpecs is ["default:*"] and config.contextExcludeSpecs is ["default:drafts/*"]
+    when:
+      - execute is called
+    then:
+      - specs does not contain any spec under drafts/
+  - requirement: Applies project-level include/exclude patterns
+    name: Specs deduplicated across patterns
+    given:
+      - config.contextIncludeSpecs is ["default:architecture", "default:*"]
+    when:
+      - execute is called
+    then:
+      - the architecture spec appears exactly once in specs
+  - requirement: Does not apply workspace-level patterns
+    name: Workspace-level patterns ignored
+    given:
+      - 'a workspace declares contextIncludeSpecs: ["extra/*"] at workspace level'
+    when:
+      - execute is called
+    then:
+      - specs matched only by the workspace-level pattern are not included
+  - requirement: Supports dependsOn traversal when followDeps is true
+    name: DependsOn traversal discovers additional specs
+    given:
+      - 'spec A''s metadata has dependsOn: ["default:B"] and spec B exists'
+    when:
+      - 'execute is called with followDeps: true and spec A is in the include set'
+    then:
+      - specs contains both spec A and spec B
+  - requirement: Supports dependsOn traversal when followDeps is true
+    name: DependsOn traversal respects depth limit
+    given:
+      - spec A depends on B, B depends on C
+    when:
+      - 'execute is called with followDeps: true and depth: 1'
+    then:
+      - specs contains A and B but not C
+  - requirement: Supports dependsOn traversal when followDeps is true
+    name: DependsOn traversal skipped when followDeps is false
+    given:
+      - 'spec A''s metadata has dependsOn: ["default:B"]'
+    when:
+      - execute is called with followDeps absent
+    then:
+      - spec B is not included unless it matches an include pattern independently
+  - requirement: Renders spec content from metadata when fresh
+    name: Fresh metadata rendered with all sections
+    given:
+      - a spec has fresh .specd-metadata.yaml with description, rules, constraints, and scenarios
+    when:
+      - execute is called without sections filter
+    then:
+      - the spec's content includes all four sections
+  - requirement: Renders spec content from metadata when fresh
+    name: Sections filter restricts output
+    given:
+      - a spec has fresh metadata with rules and scenarios
+    when:
+      - 'execute is called with sections: ["rules"]'
+    then:
+      - the spec's content includes rules but not scenarios or description
+  - requirement: Falls back to extraction when metadata is stale or absent
+    name: Stale metadata emits warning and falls back
+    given:
+      - a spec has .specd-metadata.yaml but content hashes do not match current artifacts
+    when:
+      - execute is called
+    then:
+      - warnings contains a stale-metadata warning for that spec
+      - AND the spec's content is rendered via live extraction
+  - requirement: Falls back to extraction when metadata is stale or absent
+    name: No metadata emits warning and falls back
+    given:
+      - a spec has no .specd-metadata.yaml
+    when:
+      - execute is called
+    then:
+      - warnings contains a stale-metadata warning indicating no metadata exists
+      - AND the spec's content is rendered via live extraction if the schema supports it
+  - requirement: Falls back to extraction when metadata is stale or absent
+    name: No metadataExtraction in schema yields empty content
+    given:
+      - a spec has no metadata and the schema has no metadataExtraction declarations
+    when:
+      - execute is called
+    then:
+      - the spec's content contains only the spec heading with no body
+contentHashes:
+  spec.md: sha256:0bf0c004f479b8bd12f5457d08706584f243832177d65ee9f9bbd880bd32f058
+  verify.md: sha256:d4196bd20a0c9dde50220df1485f8a9202931226c91c936381487d399b272fa2
+generatedBy: core

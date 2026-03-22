@@ -1,0 +1,91 @@
+title: Actor Resolver Factory
+description: specd needs to identify the current user (for approvals, sign-offs, and audit trails) using whichever VCS is active, without callers coupling to a specific VCS implementation. `createVcsActorResolver` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `ActorResolver` implementation, serving as the single entry point so that callers never construct concrete resolvers directly.
+dependsOn:
+  - core:core/vcs-adapter
+  - core:core/composition
+  - default:_global/architecture
+context:
+  - specd needs to identify the current user (for approvals, sign-offs, and audit trails) using whichever VCS is active, without callers coupling to a specific VCS implementation. `createVcsActorResolver` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `ActorResolver` implementation, serving as the single entry point so that callers never construct concrete resolvers directly.
+rules:
+  - requirement: Detection probes in priority order
+    rules:
+      - '`createVcsActorResolver` MUST probe for VCS presence in the following order: git, hg, svn. The first probe that succeeds determines the returned resolver. Subsequent probes MUST NOT execute once a match is found.'
+  - requirement: Fallback to NullActorResolver
+    rules:
+      - When no VCS is detected (all probes fail), `createVcsActorResolver` MUST return a `NullActorResolver`. It SHALL NOT throw.
+  - requirement: Optional cwd parameter
+    rules:
+      - '`createVcsActorResolver` MUST accept an optional `cwd` parameter specifying the directory to probe. When `cwd` is omitted or `undefined`, it MUST default to `process.cwd()`.'
+  - requirement: Returns the ActorResolver port interface
+    rules:
+      - '`createVcsActorResolver` MUST return a `Promise<ActorResolver>` — the application port interface defined in `application/ports/actor-resolver.ts`. The concrete resolver type is an implementation detail not exposed to callers.'
+constraints:
+  - The factory is async — VCS detection requires spawning external processes
+  - Concrete resolver classes (GitActorResolver, HgActorResolver, SvnActorResolver, NullActorResolver) MUST NOT appear in any public export; they are internal to the composition layer
+  - Detection relies on running VCS CLI commands; a probe failure (non-zero exit) means that VCS is not present
+scenarios:
+  - requirement: Detection probes in priority order
+    name: Git repository detected
+    given:
+      - the target directory is inside a git repository
+    when:
+      - createVcsActorResolver(cwd) is called
+    then:
+      - it returns a GitActorResolver
+      - AND hg and svn probes are never executed
+  - requirement: Detection probes in priority order
+    name: Mercurial repository detected
+    given:
+      - the target directory is inside an hg repository but not a git repository
+    when:
+      - createVcsActorResolver(cwd) is called
+    then:
+      - it returns an HgActorResolver
+      - AND the svn probe is never executed
+  - requirement: Detection probes in priority order
+    name: SVN working copy detected
+    given:
+      - the target directory is inside an svn working copy but not a git or hg repository
+    when:
+      - createVcsActorResolver(cwd) is called
+    then:
+      - it returns an SvnActorResolver
+  - requirement: Detection probes in priority order
+    name: Git takes priority over hg
+    given:
+      - the target directory is inside both a git and hg repository
+    when:
+      - createVcsActorResolver(cwd) is called
+    then:
+      - it returns a GitActorResolver
+  - requirement: Fallback to NullActorResolver
+    name: No VCS detected
+    given:
+      - the target directory is not inside any VCS repository
+    when:
+      - createVcsActorResolver(cwd) is called
+    then:
+      - it returns a NullActorResolver
+      - AND the call does not throw
+  - requirement: Optional cwd parameter
+    name: Explicit cwd is used for probing
+    when:
+      - createVcsActorResolver("/some/path") is called
+    then:
+      - VCS probes run against /some/path, not process.cwd()
+  - requirement: Optional cwd parameter
+    name: Omitted cwd defaults to process.cwd()
+    when:
+      - createVcsActorResolver() is called without arguments
+    then:
+      - VCS probes run against process.cwd()
+  - requirement: Returns the ActorResolver port interface
+    name: Return type satisfies ActorResolver
+    when:
+      - createVcsActorResolver(cwd) resolves
+    then:
+      - the returned object satisfies the ActorResolver interface
+contentHashes:
+  spec.md: sha256:387eebed5c4839f419741c051d675fd823f113aaaa0c7b651e23749c4ac4a052
+  verify.md: sha256:420873478065199c01bab497c9d554431afed355706a0115613544e20e6cf558
+generatedBy: core
