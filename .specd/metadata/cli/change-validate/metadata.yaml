@@ -11,12 +11,13 @@ rules:
     rules:
       - |-
         ```
-        specd change validate <name> <workspace:capability-path> [--artifact <artifactId>] [--format text|json|toon]
+        specd change validate <name> [workspace:capability-path] [--all] [--artifact <artifactId>] [--format text|json|toon]
         ```
 
         - `<name>` — required positional; the name of the change to validate
-        - `<workspace:capability-path>` — required positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`.
-        - `--artifact <artifactId>` — optional; when provided, only the specified artifact is validated instead of all artifacts for the spec. The artifact ID must exist in the active schema.
+        - `[workspace:capability-path]` — optional positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`. Required unless `--all` is used.
+        - `--all` — validate all `specIds` declared in the change. Mutually exclusive with `<workspace:capability-path>`.
+        - `--artifact <artifactId>` — optional; when provided, only the specified artifact is validated instead of all artifacts for the spec. Works with both single-spec and `--all` modes.
         - `--format text|json|toon` — optional; output format, defaults to `text`
   - requirement: Behaviour
     rules:
@@ -74,9 +75,24 @@ rules:
   - requirement: Unknown artifact ID
     rules:
       - If `--artifact` is provided with an artifact ID that does not exist in the active schema, the command exits with code 1 and prints the validation failure from the use case to stdout (not stderr — it is a validation result, not a CLI error).
+  - requirement: Batch mode (--all)
+    rules:
+      - |-
+        With `--all`, the command loads the change's `specIds` and validates each one in order. `--all` is mutually exclusive with the `<workspace:capability-path>` positional — providing both exits with `error: --all and <specPath> are mutually exclusive`. Omitting both exits with `error: either <specPath> or --all is required`.
+
+        `--artifact` works with `--all` — it validates only that artifact type for every spec in the change.
+
+        For each spec, the command invokes `ValidateArtifacts` and collects results. Individual spec failures do not abort the batch — all specs are validated.
+
+        **Text output:** each spec's result is printed as in single-spec mode (success or failure block), followed by a summary line: `validated N/M specs`.
+
+        **JSON output:** `{ passed: <bool>, total: M, results: [{ spec: "<id>", passed: <bool>, failures: [...], warnings: [...] }] }`
+
+        The process exits with code 1 if any spec has failures, 0 if all pass.
 constraints:
   - Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr
   - The command marks artifacts as complete in the manifest when they pass
+  - Batch mode uses the change's specIds list — no custom spec resolution in the CLI layer
 scenarios:
   - requirement: Command signature
     name: Missing arguments
@@ -157,6 +173,54 @@ scenarios:
       - stdout is valid JSON with passed equal to false
       - AND failures contains an entry describing the unknown artifact ID
       - AND the process exits with code 1
+  - requirement: Batch mode (--all)
+    name: --all without specPath validates all specIds
+    given:
+      - a change with specIds ["default:auth/login", "default:auth/logout"] and valid artifacts for both
+    when:
+      - specd change validate my-change --all is run
+    then:
+      - both specs are validated
+      - AND text output shows success for each spec
+      - AND summary shows validated 2/2 specs
+  - requirement: Batch mode (--all)
+    name: --all with specPath is rejected
+    when:
+      - specd change validate my-change default:auth/login --all is run
+    then:
+      - 'stderr contains error: --all and <specPath> are mutually exclusive and exit code is 1'
+  - requirement: Batch mode (--all)
+    name: neither specPath nor --all is rejected
+    when:
+      - specd change validate my-change is run without specPath or --all
+    then:
+      - 'stderr contains error: either <specPath> or --all is required and exit code is 1'
+  - requirement: Batch mode (--all)
+    name: --all with --artifact validates one artifact across all specs
+    given:
+      - a change with 2 specIds
+    when:
+      - specd change validate my-change --all --artifact proposal is run
+    then:
+      - only the proposal artifact is validated for each spec
+  - requirement: Batch mode (--all)
+    name: --all with partial failures exits 1
+    given:
+      - a change with 2 specIds, one passes and one fails validation
+    when:
+      - specd change validate my-change --all is run
+    then:
+      - both specs are validated (batch continues)
+      - AND exit code is 1
+      - AND summary shows validated 1/2 specs
+  - requirement: Batch mode (--all)
+    name: --all JSON output
+    given:
+      - a change with 2 specIds, both pass
+    when:
+      - specd change validate my-change --all --format json is run
+    then:
+      - 'output is { passed: true, total: 2, results: [...] } with per-spec entries'
   - requirement: Output on success
     name: JSON output on pass
     given:
@@ -176,6 +240,6 @@ scenarios:
       - stdout is valid JSON with passed equal to false and failures containing at least one entry with artifactId and description
       - AND the process exits with code 1
 contentHashes:
-  spec.md: sha256:ef0d83717dfe6f8482894849a60cd04061da33a8e404f601c3cbd9f237cbae8c
-  verify.md: sha256:d9228f533ea299d6b36e4b892632fed1d09581e24caa2df037c72cab4610cc9b
+  spec.md: sha256:041622869530f1b436c8ffc861313623919a969bb99130075bc0fa643ac6dc39
+  verify.md: sha256:143b77ab4630e8d60eb5e991075e83cca9e2e476af7765299b4263b8d1e794f0
 generatedBy: core

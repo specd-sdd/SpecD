@@ -9,12 +9,13 @@ Before a change can advance, its artifacts must be verified against the schema t
 ### Requirement: Command signature
 
 ```
-specd change validate <name> <workspace:capability-path> [--artifact <artifactId>] [--format text|json|toon]
+specd change validate <name> [workspace:capability-path] [--all] [--artifact <artifactId>] [--format text|json|toon]
 ```
 
 - `<name>` — required positional; the name of the change to validate
-- `<workspace:capability-path>` — required positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`.
-- `--artifact <artifactId>` — optional; when provided, only the specified artifact is validated instead of all artifacts for the spec. The artifact ID must exist in the active schema.
+- `[workspace:capability-path]` — optional positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`. Required unless `--all` is used.
+- `--all` — validate all `specIds` declared in the change. Mutually exclusive with `<workspace:capability-path>`.
+- `--artifact <artifactId>` — optional; when provided, only the specified artifact is validated instead of all artifacts for the spec. Works with both single-spec and `--all` modes.
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 ### Requirement: Behaviour
@@ -76,10 +77,25 @@ If the given `<workspace:capability-path>` is not declared in the change's `spec
 
 If `--artifact` is provided with an artifact ID that does not exist in the active schema, the command exits with code 1 and prints the validation failure from the use case to stdout (not stderr — it is a validation result, not a CLI error).
 
+### Requirement: Batch mode (--all)
+
+With `--all`, the command loads the change's `specIds` and validates each one in order. `--all` is mutually exclusive with the `<workspace:capability-path>` positional — providing both exits with `error: --all and <specPath> are mutually exclusive`. Omitting both exits with `error: either <specPath> or --all is required`.
+
+`--artifact` works with `--all` — it validates only that artifact type for every spec in the change.
+
+For each spec, the command invokes `ValidateArtifacts` and collects results. Individual spec failures do not abort the batch — all specs are validated.
+
+**Text output:** each spec's result is printed as in single-spec mode (success or failure block), followed by a summary line: `validated N/M specs`.
+
+**JSON output:** `{ passed: <bool>, total: M, results: [{ spec: "<id>", passed: <bool>, failures: [...], warnings: [...] }] }`
+
+The process exits with code 1 if any spec has failures, 0 if all pass.
+
 ## Constraints
 
 - Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr
 - The command marks artifacts as complete in the manifest when they pass
+- Batch mode uses the change's `specIds` list — no custom spec resolution in the CLI layer
 
 ## Examples
 
