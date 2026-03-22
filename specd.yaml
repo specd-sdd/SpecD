@@ -1,4 +1,4 @@
-retomschema: '@specd/schema-std'
+schema: '@specd/schema-std'
 
 workspaces:
   default:
