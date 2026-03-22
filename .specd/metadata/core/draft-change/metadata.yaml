@@ -1,0 +1,85 @@
+title: DraftChange
+description: Users need to pause work on a change without losing its state or history — for example, to context-switch or wait on a dependency. The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history, and the repository implementation moves the change directory from `changes/` to `drafts/` when persisted.
+dependsOn:
+  - core:core/change
+  - default:_global/architecture
+context:
+  - Users need to pause work on a change without losing its state or history — for example, to context-switch or wait on a dependency. The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history, and the repository implementation moves the change directory from `changes/` to `drafts/` when persisted.
+rules:
+  - requirement: Input contract
+    rules:
+      - |-
+        `DraftChange.execute` SHALL accept a `DraftChangeInput` with the following fields:
+
+        - `name` (string, required) — the change to shelve
+        - `reason` (string, optional) — explanation for shelving the change
+  - requirement: Change must exist
+    rules:
+      - The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
+  - requirement: Actor resolution
+    rules:
+      - The use case MUST resolve the current actor identity via the `ActorResolver` port. The resolved actor is recorded in the `drafted` event.
+  - requirement: Drafted event appended to history
+    rules:
+      - |-
+        The use case MUST call `change.draft(actor, reason)` to append a `drafted` event to the change's history. The event records:
+
+        - `type`: `'drafted'`
+        - `at`: the current timestamp
+        - `by`: the resolved actor identity
+        - `reason`: included only when provided in the input
+  - requirement: Persistence
+    rules:
+      - After appending the drafted event, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` instance. The repository implementation is responsible for relocating the change directory to `drafts/`.
+  - requirement: Dependencies
+    rules:
+      - |-
+        `DraftChange` depends on two ports injected via constructor:
+
+        - `ChangeRepository` — for loading and persistence
+        - `ActorResolver` — for resolving the current actor identity
+constraints:
+  - The use case MUST NOT perform any state transitions — drafting is orthogonal to lifecycle state
+  - The use case delegates directory relocation entirely to the repository layer
+  - The isDrafted property on the Change entity is derived from the most recent drafted or restored event in history
+scenarios:
+  - requirement: Change must exist
+    name: Non-existent change is rejected
+    when:
+      - DraftChange.execute is called with a name that does not exist in the repository
+    then:
+      - it throws ChangeNotFoundError
+  - requirement: Actor resolution
+    name: Actor identity is recorded in the drafted event
+    when:
+      - DraftChange.execute is called
+    then:
+      - the drafted event's by field matches the identity returned by ActorResolver.identity()
+  - requirement: Drafted event appended to history
+    name: Reason is included when provided
+    when:
+      - "DraftChange.execute is called with reason: 'blocked on dependency'"
+    then:
+      - the last event in the change's history is a drafted event with reason === 'blocked on dependency'
+  - requirement: Drafted event appended to history
+    name: Reason is omitted when not provided
+    when:
+      - DraftChange.execute is called without a reason field
+    then:
+      - the last event in the change's history is a drafted event without a reason property
+  - requirement: Drafted event appended to history
+    name: Change becomes drafted after execution
+    when:
+      - DraftChange.execute returns a change
+    then:
+      - change.isDrafted === true
+  - requirement: Persistence
+    name: Change is saved to repository
+    when:
+      - DraftChange.execute completes successfully
+    then:
+      - ChangeRepository.save was called with the updated Change instance
+contentHashes:
+  spec.md: sha256:73a5e6930ee44e0b7089f7c6dcb42d2400693494ebad0a4b12822449db3b2f7f
+  verify.md: sha256:8cd6751e58d1e2961758223307496eb2b9a487673186800f856edd73cff68c45
+generatedBy: core

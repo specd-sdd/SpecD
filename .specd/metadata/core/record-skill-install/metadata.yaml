@@ -1,0 +1,81 @@
+title: RecordSkillInstall
+description: When skills are installed for an agent, the project's `specd.yaml` must be updated to track which skills are active so that future installs can deduplicate and updates can detect drift. `RecordSkillInstall` handles this by delegating to the `ConfigWriter` port to update the `skills` section, performing no business logic beyond passing the input through.
+dependsOn:
+  - core:core/config
+  - default:_global/architecture
+context:
+  - When skills are installed for an agent, the project's `specd.yaml` must be updated to track which skills are active so that future installs can deduplicate and updates can detect drift. `RecordSkillInstall` handles this by delegating to the `ConfigWriter` port to update the `skills` section, performing no business logic beyond passing the input through.
+rules:
+  - requirement: Accepts RecordSkillInstallInput as input
+    rules:
+      - |-
+        `execute(input)` MUST accept a `RecordSkillInstallInput` object with the following fields:
+
+        - `configPath` (string, required) — absolute path to the `specd.yaml` to update.
+        - `agent` (string, required) — the agent name (e.g. `"claude"`).
+        - `skillNames` (readonly string\[], required) — the skill names to record.
+  - requirement: Delegates to ConfigWriter.recordSkillInstall
+    rules:
+      - The use case MUST call `ConfigWriter.recordSkillInstall(configPath, agent, skillNames)` with the values from the input object. It SHALL NOT perform any filesystem I/O directly.
+  - requirement: Returns void on success
+    rules:
+      - '`execute` MUST return `Promise<void>`. There is no result object — success is indicated by the promise resolving without error.'
+  - requirement: Skill names are deduplicated by the port
+    rules:
+      - The `ConfigWriter.recordSkillInstall` implementation MUST merge the provided skill names into the existing `skills.<agent>` array, deduplicating entries. If skills already recorded for the agent overlap with the new list, no duplicates SHALL appear in the result.
+  - requirement: Preserves existing config structure
+    rules:
+      - The `ConfigWriter` adapter MUST preserve comments and key order in `specd.yaml` as much as the YAML library permits when writing the updated skills section.
+constraints:
+  - The use case is a thin pass-through to the ConfigWriter port.
+  - 'RecordSkillInstall is constructed with a single dependency: a ConfigWriter instance.'
+  - The use case is async — it returns Promise<void>.
+  - '@specd/core owns all YAML serialisation — adapters never write specd.yaml directly.'
+scenarios:
+  - requirement: Accepts RecordSkillInstallInput as input
+    name: All required fields provided
+    when:
+      - execute is called with configPath, agent, and skillNames
+    then:
+      - the call succeeds and the values are forwarded to ConfigWriter.recordSkillInstall
+  - requirement: Delegates to ConfigWriter.recordSkillInstall
+    name: Port receives decomposed input
+    when:
+      - 'execute is called with { configPath: "/p/specd.yaml", agent: "claude", skillNames: ["specd-bootstrap"] }'
+    then:
+      - ConfigWriter.recordSkillInstall is called with ("/p/specd.yaml", "claude", ["specd-bootstrap"])
+      - AND the use case performs no other I/O
+  - requirement: Returns void on success
+    name: Successful recording resolves without value
+    when:
+      - execute completes successfully
+    then:
+      - the returned promise resolves to undefined
+  - requirement: Skill names are deduplicated by the port
+    name: Recording already-installed skills
+    given:
+      - 'specd.yaml has skills.claude: ["specd-bootstrap"]'
+    when:
+      - 'execute is called with agent: "claude" and skillNames: ["specd-bootstrap", "specd-spec-metadata"]'
+    then:
+      - the resulting skills.claude array contains ["specd-bootstrap", "specd-spec-metadata"] with no duplicates
+  - requirement: Skill names are deduplicated by the port
+    name: Recording skills for a new agent
+    given:
+      - specd.yaml has no skills section
+    when:
+      - 'execute is called with agent: "copilot" and skillNames: ["specd-bootstrap"]'
+    then:
+      - the resulting skills.copilot array contains ["specd-bootstrap"]
+  - requirement: Preserves existing config structure
+    name: Comments and key order preserved
+    given:
+      - specd.yaml contains comments and a specific key ordering
+    when:
+      - execute updates the skills section
+    then:
+      - comments and key order outside the skills section are preserved
+contentHashes:
+  spec.md: sha256:49754f153d7d6ca46675b39f534109291e19958254ec1019493f60d1ad2f62e5
+  verify.md: sha256:ba8f44f56379ca3c58d8687ee5b34f9a76f4f99fd5277876a7ce10afea8a87f5
+generatedBy: core

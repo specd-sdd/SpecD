@@ -1,0 +1,116 @@
+title: Change Skip Artifact
+description: Optional artifacts that won't be produced must be explicitly skipped — simply omitting the file would leave the change stuck with a `missing` artifact that blocks transitions. `specd change skip-artifact <name> <artifact-id> [--reason <text>]` marks an optional artifact as skipped so the lifecycle can proceed.
+dependsOn:
+  - cli:cli/entrypoint
+  - core:core/change
+context:
+  - Optional artifacts that won't be produced must be explicitly skipped — simply omitting the file would leave the change stuck with a `missing` artifact that blocks transitions. `specd change skip-artifact <name> <artifact-id> [--reason <text>]` marks an optional artifact as skipped so the lifecycle can proceed.
+rules:
+  - requirement: Command signature
+    rules:
+      - |-
+        ```
+        specd change skip-artifact <name> <artifact-id> [--reason <text>] [--format text|json|toon]
+        ```
+
+        - `<name>` — required positional; the name of the change
+        - `<artifact-id>` — required positional; the artifact type ID to mark as skipped (e.g. `proposal`)
+        - `--reason <text>` — optional; a human-readable explanation for skipping the artifact
+        - `--format text|json|toon` — optional; output format, defaults to `text`
+  - requirement: Behaviour
+    rules:
+      - |-
+        The command invokes the `SkipArtifact` use case, which calls `Artifact.markSkipped()` on the named artifact and appends an `artifact-skipped` event to the change history. The `validatedHash` is set to the sentinel `"__skipped__"`, transitioning the artifact's effective status to `skipped`.
+
+        This command is the only permitted path through which an artifact reaches `skipped` status. An agent must call this command explicitly when it decides not to produce an optional artifact — it cannot simply omit the file.
+  - requirement: Optional artifacts only
+    rules:
+      - 'Only artifacts declared as `optional: true` in the schema may be skipped. Attempting to skip a non-optional artifact exits with code 1 and prints an `error:` message to stderr.'
+  - requirement: Output on success
+    rules:
+      - |-
+        On success, output depends on `--format`:
+
+        - `text` (default): prints to stdout:
+        - `json` or `toon`: outputs (encoded in the respective format):
+  - requirement: Error cases
+    rules:
+      - |-
+        - If the change does not exist, exits with code 1.
+        - If the artifact ID is not declared in the active schema, exits with code 1.
+        - If the artifact is not `optional: true`, exits with code 1.
+constraints:
+  - Artifact.markSkipped() may only be called from this use case — no other code path may set validatedHash to the sentinel
+  - Skipping satisfies the artifact's dependency in requires chains — downstream artifacts treat it as resolved
+  - If the artifact was previously complete, skipping it clears validatedHash and sets the sentinel; if an approval was active, the change is invalidated per the standard invalidation rules
+scenarios:
+  - requirement: Command signature
+    name: Missing artifact-id argument
+    when:
+      - specd change skip-artifact my-change is run without an artifact ID
+    then:
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Behaviour
+    name: Artifact marked as skipped
+    given:
+      - a change with an optional artifact proposal in missing or in-progress status
+    when:
+      - specd change skip-artifact my-change proposal is run
+    then:
+      - the artifact's effective status becomes skipped
+      - AND an artifact-skipped event is appended to the change history
+      - AND the process exits with code 0
+  - requirement: Behaviour
+    name: Reason stored in history
+    when:
+      - specd change skip-artifact my-change proposal --reason "not needed" is run
+    then:
+      - 'the artifact-skipped event in history has reason: "not needed"'
+  - requirement: Behaviour
+    name: Skipped artifact satisfies downstream requires
+    given:
+      - 'artifact spec has requires: ["proposal"] and proposal is skipped'
+    when:
+      - specd change status my-change is run after skipping
+    then:
+      - spec's effective status is not blocked by proposal
+  - requirement: Optional artifacts only
+    name: Non-optional artifact rejected
+    given:
+      - 'the schema declares artifact spec as optional: false'
+    when:
+      - specd change skip-artifact my-change spec is run
+    then:
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+  - requirement: Output on success
+    name: Text output
+    when:
+      - specd change skip-artifact my-change proposal succeeds
+    then:
+      - stdout contains skipped artifact proposal on my-change
+      - AND the process exits with code 0
+  - requirement: Output on success
+    name: JSON output
+    when:
+      - specd change skip-artifact my-change proposal --format json succeeds
+    then:
+      - stdout is valid JSON with result equal to "ok", name equal to "my-change", and artifactId equal to "proposal"
+  - requirement: Error cases
+    name: Change not found
+    when:
+      - specd change skip-artifact nonexistent proposal is run
+    then:
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+  - requirement: Error cases
+    name: Unknown artifact ID
+    when:
+      - specd change skip-artifact my-change unknown-artifact is run
+    then:
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+contentHashes:
+  spec.md: sha256:3fd71baeda362c276062c8291453746e34074570d75acbe7778bf2d3e9255fa4
+  verify.md: sha256:75dcc774e681f5bf9095ceb6c4fb78efdf1a3bfec5f67385ad016eed09b72651
+generatedBy: core

@@ -1,0 +1,162 @@
+title: Project Overview
+description: Users joining a project or returning after time away need a quick snapshot of what exists and what is in flight. The `specd project overview` command displays a visual dashboard summarising the current state of a SpecD project -- project metadata, spec counts per workspace, and change counts by state -- as an ASCII box layout in text mode or a structured data object in `json`/`toon` mode.
+dependsOn:
+  - cli:cli/entrypoint
+  - core:core/config
+context:
+  - Users joining a project or returning after time away need a quick snapshot of what exists and what is in flight. The `specd project overview` command displays a visual dashboard summarising the current state of a SpecD project -- project metadata, spec counts per workspace, and change counts by state -- as an ASCII box layout in text mode or a structured data object in `json`/`toon` mode.
+rules:
+  - requirement: Command signature
+    rules:
+      - |-
+        ```
+        specd project overview [--format text|json|toon] [--config <path>]
+        ```
+
+        - `--format text|json|toon` — optional; output format. Defaults to `text`.
+        - `--config <path>` — optional; path to `specd.yaml`. Uses standard config discovery when omitted.
+  - requirement: Text dashboard
+    rules:
+      - |-
+        In `text` mode the command outputs:
+
+        1. **Banner** — the SpecD ASCII logo rendered above the dashboard.
+        2. **Outer container** — a rounded `boxen` box with the title `SpecD project overview` centred at the top and a cyan border.
+        3. **Project box** — an inner box labelled `Project` showing:
+           - `root:` — absolute path to the project root.
+           - `schema:` — the schema reference from `specd.yaml`.
+           - `workspaces:` — comma-separated list of workspace names.
+        4. **Specs box** — an inner box labelled `Specs` showing total spec count and a per-workspace breakdown.
+        5. **Changes box** — an inner box labelled `Changes` showing active count, draft count, discarded count, and a per-state breakdown of active changes.
+        6. **Layout** — the Project box occupies the full width on its own row; the Specs and Changes boxes are rendered side by side on the row below.
+  - requirement: JSON and toon output
+    rules:
+      - |-
+        In `json` or `toon` mode the command outputs a single object:
+
+        ```json
+        {
+          "projectRoot": "<absolute-path>",
+          "schemaRef": "<schema-ref>",
+          "workspaces": ["<id>", ...],
+          "specs": {
+            "total": <number>,
+            "byWorkspace": { "<workspace-id>": <number>, ... }
+          },
+          "changes": {
+            "active": <number>,
+            "drafts": <number>,
+            "discarded": <number>
+          }
+        }
+        ```
+
+        No banner or box decoration is included in non-text output.
+  - requirement: Data sources
+    rules:
+      - |-
+        All data is fetched via the kernel:
+
+        - `kernel.specs.list` — list all specs across all workspaces.
+        - `kernel.changes.list` — list active changes.
+        - `kernel.changes.listDrafts` — list draft changes.
+        - `kernel.changes.listDiscarded` — list discarded changes.
+
+        All four queries run in parallel.
+  - requirement: Config dependency
+    rules:
+      - The command requires a valid `specd.yaml`. If config discovery fails the command exits with code 1 and prints an `error:` message to stderr.
+constraints:
+  - The text dashboard must not hard-code column widths that assume a fixed terminal width; inner box widths may be fixed constants.
+  - ANSI escape codes must be stripped before measuring string lengths for column alignment.
+  - The command is read-only; it never modifies any files.
+scenarios:
+  - requirement: Command signature
+    name: Command exits successfully with no flags
+    given:
+      - a valid specd.yaml exists and is discoverable
+    when:
+      - specd project overview is run
+    then:
+      - the process exits with code 0
+  - requirement: Command signature
+    name: --config flag overrides discovery
+    given:
+      - a specd.yaml at /custom/path/specd.yaml
+    when:
+      - specd project overview --config /custom/path/specd.yaml is run
+    then:
+      - the command reads config from that path and exits with code 0
+  - requirement: Text dashboard
+    name: Dashboard includes banner above the box
+    given:
+      - a valid project
+    when:
+      - specd project overview is run in text mode
+    then:
+      - stdout begins with the SpecD ASCII art logo before the boxen border
+  - requirement: Text dashboard
+    name: Dashboard contains project metadata
+    given:
+      - "a project with schemaRef: '@specd/schema-std' and workspace default"
+    when:
+      - specd project overview is run
+    then:
+      - stdout contains the project root path, @specd/schema-std, and default
+  - requirement: Text dashboard
+    name: Specs box shows per-workspace counts
+    given:
+      - a project with 2 specs in workspace default and 1 in workspace billing
+    when:
+      - specd project overview is run
+    then:
+      - stdout contains 3 as total and per-workspace lines for default (2) and billing (1)
+  - requirement: Text dashboard
+    name: Changes box shows active, drafts, and discarded
+    given:
+      - a project with 2 active changes, 1 draft, and 1 discarded change
+    when:
+      - specd project overview is run
+    then:
+      - 'stdout contains 2 active, drafts: 1, and discarded: 1'
+  - requirement: JSON and toon output
+    name: JSON output is valid JSON with expected fields
+    when:
+      - specd project overview --format json is run
+    then:
+      - stdout is valid JSON containing projectRoot, schemaRef, workspaces, specs, and changes keys
+  - requirement: JSON and toon output
+    name: JSON output contains no banner or box characters
+    when:
+      - specd project overview --format json is run
+    then:
+      - stdout does not contain box-drawing characters or ANSI escape codes
+  - requirement: JSON and toon output
+    name: JSON specs.byWorkspace reflects actual spec distribution
+    given:
+      - a project with 1 spec in default and 2 specs in api
+    when:
+      - specd project overview --format json is run
+    then:
+      - specs.byWorkspace is {"default":1,"api":2} and specs.total is 3
+  - requirement: Data sources
+    name: All four data queries run before output is produced
+    given:
+      - a valid project
+    when:
+      - specd project overview is run
+    then:
+      - the output reflects specs, active changes, drafts, and discarded counts simultaneously
+  - requirement: Config dependency
+    name: Missing config exits with code 1
+    given:
+      - no specd.yaml exists or is discoverable
+    when:
+      - specd project overview is run
+    then:
+      - the process exits with code 1
+      - 'AND stderr contains an error: message'
+contentHashes:
+  spec.md: sha256:3d65ca6b22861758d8ab35ad0ce77c69f61bc00b6f27dc69c10820dad8195b4f
+  verify.md: sha256:5203a234c44f306ddfbe7c3c6520ca82208f312c39f898513e26a416f54ef4cf
+generatedBy: core

@@ -1,0 +1,93 @@
+title: Change Discard
+description: When a change is no longer viable, it should be explicitly abandoned rather than left rotting in the active list. `specd change discard <name> --reason <text>` permanently moves a change to `discarded/`, requiring a reason so the decision is auditable.
+dependsOn:
+  - cli:cli/entrypoint
+  - core:core/change
+context:
+  - When a change is no longer viable, it should be explicitly abandoned rather than left rotting in the active list. `specd change discard <name> --reason <text>` permanently moves a change to `discarded/`, requiring a reason so the decision is auditable.
+rules:
+  - requirement: Command signature
+    rules:
+      - |-
+        ```
+        specd change discard <name> --reason <text> [--format text|json|toon]
+        ```
+
+        - `<name>` — required positional; the name of the change to discard
+        - `--reason <text>` — required; a human-readable explanation for discarding the change
+        - `--format text|json|toon` — optional; output format, defaults to `text`
+  - requirement: Behaviour
+    rules:
+      - The command moves the change from `changes/` or `drafts/` to `discarded/` and appends a `discarded` event to history. This operation is irreversible.
+  - requirement: Output on success
+    rules:
+      - |-
+        On success, output depends on `--format`:
+
+        - `text` (default): prints a single line to stdout:
+        - `json` or `toon`: outputs the following to stdout (encoded in the respective format):
+  - requirement: Error cases
+    rules:
+      - |-
+        - If the change does not exist, the command exits with code 1 and prints an `error:` message.
+        - `--reason` is mandatory; omitting it is a CLI usage error (exit code 1).
+constraints:
+  - Discarding is irreversible — there is no undo command
+  - A change may be discarded from changes/ or drafts/; it cannot be discarded from discarded/ (already there) or from the archive
+  - The reason is stored in the discarded event and must be a non-empty string
+scenarios:
+  - requirement: Command signature
+    name: Missing reason flag
+    when:
+      - specd change discard my-change is run without --reason
+    then:
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Command signature
+    name: Empty reason rejected
+    when:
+      - specd change discard my-change --reason "" is run
+    then:
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Behaviour
+    name: Active change discarded
+    given:
+      - an active change old-experiment in changes/
+    when:
+      - specd change discard old-experiment --reason "superseded" is run
+    then:
+      - the change is moved to discarded/
+      - AND a discarded event with the given reason is appended to history
+  - requirement: Behaviour
+    name: Drafted change discarded
+    given:
+      - a drafted change old-experiment in drafts/
+    when:
+      - specd change discard old-experiment --reason "abandoned" is run
+    then:
+      - the change is moved to discarded/
+      - AND a discarded event is appended to history
+  - requirement: Output on success
+    name: Success message
+    when:
+      - specd change discard old-experiment --reason "done" succeeds
+    then:
+      - stdout contains discarded change old-experiment
+      - AND the process exits with code 0
+  - requirement: Error cases
+    name: Change not found
+    when:
+      - specd change discard nonexistent --reason "done" is run
+    then:
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+  - requirement: Output on success
+    name: JSON output on success
+    when:
+      - specd change discard old-experiment --reason "done" --format json succeeds
+    then:
+      - stdout is valid JSON with result equal to "ok" and name equal to "old-experiment"
+      - AND the process exits with code 0
+contentHashes:
+  spec.md: sha256:fce2ef3f126084f4ef09b2128340d557d86cb9b1858be55794dccb0f640758ca
+  verify.md: sha256:389304936ed477b87d36c5c22450f605dd20f9e6b775ace4650b9e200b8f3a3d
+generatedBy: core
