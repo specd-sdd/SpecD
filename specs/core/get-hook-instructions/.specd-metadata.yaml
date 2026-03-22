@@ -6,17 +6,23 @@ dependsOn:
   - core:core/config
   - core:core/change
   - core:core/template-variables
+  - core:core/archive-repository-port
 context:
   - 'Workflow steps declare `instruction:` hooks — text blocks that guide agent behaviour at step boundaries. These instructions are distinct from context (specs, metadata, artifact rules) and must be retrieved separately. `GetHookInstructions` is the sole consumer of `instruction:` hooks: it returns instruction text for a given step and phase, optionally filtered by hook ID. Both native specd skills and external agent tools (e.g. Claude Code hooks) use this to retrieve step instructions independently from context compilation.'
 rules:
   - requirement: Ports and constructor
     rules:
       - |-
-        `GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaProvider`, and `TemplateExpander`.
+        `GetHookInstructions` receives at construction time: `ChangeRepository`, `ArchiveRepository`, `SchemaProvider`, and `TemplateExpander`.
 
         ```typescript
         class GetHookInstructions {
-          constructor(changes: ChangeRepository, schemaProvider: SchemaProvider, expander: TemplateExpander)
+          constructor(
+            changes: ChangeRepository,
+            archive: ArchiveRepository,
+            schemaProvider: SchemaProvider,
+            expander: TemplateExpander,
+          )
         }
         ```
 
@@ -32,7 +38,10 @@ rules:
         - `only` (string, optional) — when provided, filters to a single hook by its `id`
   - requirement: Change lookup
     rules:
-      - '`GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.'
+      - |-
+        `GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name`, `ArchivedChange.workspace`, and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.
+
+        For all other step/phase combinations, if `ChangeRepository.get(name)` returns null, `GetHookInstructions` MUST throw `ChangeNotFoundError` immediately — the archive fallback does not apply.
   - requirement: Schema name guard
     rules:
       - After resolving the schema, `GetHookInstructions` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`.
@@ -146,7 +155,45 @@ scenarios:
       - 'GetHookInstructions.execute is called with phase: "pre"'
     then:
       - 'the result is { phase: "pre", instructions: [] }'
+  - requirement: Change lookup — archive fallback
+    name: Post-archiving fallback — change found in archive
+    given:
+      - a change named my-change does not exist in ChangeRepository
+      - AND ArchiveRepository.get("my-change") returns an ArchivedChange
+    when:
+      - 'GetHookInstructions.execute is called with name: "my-change", step: "archiving", phase: "post"'
+    then:
+      - the use case proceeds normally using the archived change
+      - AND change.path template variable resolves to ArchiveRepository.archivePath(archivedChange)
+  - requirement: Change lookup — archive fallback
+    name: Post-archiving fallback — change not in either repository
+    given:
+      - a change named nonexistent does not exist in ChangeRepository
+      - AND ArchiveRepository.get("nonexistent") returns null
+    when:
+      - 'GetHookInstructions.execute is called with name: "nonexistent", step: "archiving", phase: "post"'
+    then:
+      - ChangeNotFoundError is thrown
+  - requirement: Change lookup — archive fallback
+    name: Active change takes precedence over archived
+    given:
+      - a change named my-change exists in both ChangeRepository and ArchiveRepository
+    when:
+      - 'GetHookInstructions.execute is called with name: "my-change", step: "archiving", phase: "post"'
+    then:
+      - the active change from ChangeRepository is used
+      - AND ArchiveRepository.get() is not called
+  - requirement: Change lookup — archive fallback
+    name: Non-archiving step does not fall back to archive
+    given:
+      - a change named my-change does not exist in ChangeRepository
+      - AND ArchiveRepository.get("my-change") would return an ArchivedChange
+    when:
+      - 'GetHookInstructions.execute is called with name: "my-change", step: "implementing", phase: "post"'
+    then:
+      - ChangeNotFoundError is thrown immediately
+      - AND ArchiveRepository.get() is not called
 contentHashes:
-  spec.md: sha256:20121d2102a8e29f1ee435afa87977e2eaf040567a1426a9348bce93b8e83db2
-  verify.md: sha256:d145bfba13cff85358fab2cd44b77a933845cacc5694992ef26de1e77fd529d7
+  spec.md: sha256:964a3e3f10dd665b2c1c3185291a698d45ddf6bbe7f73803610b6c9a172e1508
+  verify.md: sha256:94d38d4120f19dfea9d042ff955236ff126556d5fc0d046e77ddeba91e8cde72
 generatedBy: core

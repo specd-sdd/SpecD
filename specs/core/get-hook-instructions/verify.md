@@ -69,3 +69,35 @@
 - **GIVEN** a step with only `run:` hooks in the pre phase
 - **WHEN** `GetHookInstructions.execute` is called with `phase: "pre"`
 - **THEN** the result is `{ phase: "pre", instructions: [] }`
+
+### Requirement: Change lookup — archive fallback
+
+#### Scenario: Post-archiving fallback — change found in archive
+
+- **GIVEN** a change named `my-change` does not exist in `ChangeRepository`
+- **AND** `ArchiveRepository.get("my-change")` returns an `ArchivedChange`
+- **WHEN** `GetHookInstructions.execute` is called with `name: "my-change"`, `step: "archiving"`, `phase: "post"`
+- **THEN** the use case proceeds normally using the archived change
+- **AND** `change.path` template variable resolves to `ArchiveRepository.archivePath(archivedChange)`
+
+#### Scenario: Post-archiving fallback — change not in either repository
+
+- **GIVEN** a change named `nonexistent` does not exist in `ChangeRepository`
+- **AND** `ArchiveRepository.get("nonexistent")` returns `null`
+- **WHEN** `GetHookInstructions.execute` is called with `name: "nonexistent"`, `step: "archiving"`, `phase: "post"`
+- **THEN** `ChangeNotFoundError` is thrown
+
+#### Scenario: Active change takes precedence over archived
+
+- **GIVEN** a change named `my-change` exists in both `ChangeRepository` and `ArchiveRepository`
+- **WHEN** `GetHookInstructions.execute` is called with `name: "my-change"`, `step: "archiving"`, `phase: "post"`
+- **THEN** the active change from `ChangeRepository` is used
+- **AND** `ArchiveRepository.get()` is not called
+
+#### Scenario: Non-archiving step does not fall back to archive
+
+- **GIVEN** a change named `my-change` does not exist in `ChangeRepository`
+- **AND** `ArchiveRepository.get("my-change")` would return an `ArchivedChange`
+- **WHEN** `GetHookInstructions.execute` is called with `name: "my-change"`, `step: "implementing"`, `phase: "post"`
+- **THEN** `ChangeNotFoundError` is thrown immediately
+- **AND** `ArchiveRepository.get()` is not called

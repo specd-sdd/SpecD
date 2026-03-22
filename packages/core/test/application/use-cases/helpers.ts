@@ -1,6 +1,7 @@
 import { Change, type ActorIdentity } from '../../../src/domain/entities/change.js'
+import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { type Spec } from '../../../src/domain/entities/spec.js'
-import { type SpecPath } from '../../../src/domain/value-objects/spec-path.js'
+import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import {
   ArtifactType,
   type ArtifactTypeProps,
@@ -13,6 +14,7 @@ import {
   SpecRepository,
   type ResolveFromPathResult,
 } from '../../../src/application/ports/spec-repository.js'
+import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
 import { type SchemaRegistry } from '../../../src/application/ports/schema-registry.js'
 import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import {
@@ -397,6 +399,69 @@ export function makeParsers(
     ['markdown', markdown],
     ['yaml', yaml],
   ])
+}
+
+/**
+ * In-memory `ArchiveRepository` subclass for unit tests.
+ *
+ * `get` looks up by name; `archivePath` returns a deterministic test path.
+ * `archive`, `list`, and `reindex` throw — override in tests that need them.
+ */
+class StubArchiveRepository extends ArchiveRepository {
+  readonly store: Map<string, ArchivedChange>
+
+  constructor(archived: ArchivedChange[] = []) {
+    super({ workspace: 'default', ownership: 'owned', isExternal: false })
+    this.store = new Map(archived.map((a) => [a.name, a]))
+  }
+
+  override async archive(): Promise<{ archivedChange: ArchivedChange; archiveDirPath: string }> {
+    throw new Error('not implemented')
+  }
+
+  override async list(): Promise<ArchivedChange[]> {
+    return [...this.store.values()]
+  }
+
+  override async get(name: string): Promise<ArchivedChange | null> {
+    return this.store.get(name) ?? null
+  }
+
+  override async reindex(): Promise<void> {}
+
+  override archivePath(archivedChange: ArchivedChange): string {
+    return `/test/archive/${archivedChange.archivedName}`
+  }
+}
+
+/**
+ * Creates a fully-typed `ArchiveRepository` backed by an in-memory map.
+ */
+export function makeArchiveRepository(
+  initial: ArchivedChange[] = [],
+): ArchiveRepository & { store: Map<string, ArchivedChange> } {
+  return new StubArchiveRepository(initial)
+}
+
+/**
+ * Builds a minimal `ArchivedChange` for use in tests.
+ */
+export function makeArchivedChange(
+  name: string,
+  opts: { workspace?: string; schemaName?: string } = {},
+): ArchivedChange {
+  const createdAt = new Date('2024-01-01T00:00:00Z')
+  const archivedName = `20240101-000000-${name}`
+  return new ArchivedChange({
+    name,
+    archivedName,
+    workspace: SpecPath.parse(opts.workspace ?? 'default'),
+    archivedAt: new Date('2024-01-02T00:00:00Z'),
+    artifacts: [],
+    specIds: [],
+    schemaName: opts.schemaName ?? 'test-schema',
+    schemaVersion: 1,
+  })
 }
 
 /**

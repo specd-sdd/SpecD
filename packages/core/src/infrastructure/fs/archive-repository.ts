@@ -292,6 +292,25 @@ export class FsArchiveRepository extends ArchiveRepository {
     await writeFileAtomic(indexPath, content)
   }
 
+  /**
+   * Returns the absolute filesystem path for an archived change's directory.
+   *
+   * Reconstructs the path deterministically from the archived change's
+   * properties and the configured archive pattern.
+   *
+   * @param archivedChange - The archived change to resolve the path for
+   * @returns The absolute path to the archived change's directory
+   */
+  override archivePath(archivedChange: ArchivedChange): string {
+    const relPath = this._expandPattern(
+      archivedChange.name,
+      archivedChange.archivedName,
+      archivedChange.archivedAt,
+      archivedChange.workspace.toString(),
+    )
+    return path.join(this._archivePath, ...relPath.split('/'))
+  }
+
   // ---- Private helpers ----
 
   /**

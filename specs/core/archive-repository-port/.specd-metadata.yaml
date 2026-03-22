@@ -33,6 +33,12 @@ rules:
   - requirement: get returns an archived change or null
     rules:
       - '`get(name)` MUST accept a change name string and return the `ArchivedChange` with that name, or `null` if not found. The implementation MUST search `index.jsonl` from the end (most recent entries first) for efficient lookup. If the entry is not found in the index, the implementation MUST fall back to a filesystem scan (e.g. glob `**/*-<name>`) and append the recovered entry to `index.jsonl` for future lookups.'
+  - requirement: archivePath returns the absolute path for an archived change
+    rules:
+      - |-
+        `archivePath(archivedChange)` MUST accept an `ArchivedChange` and return the absolute filesystem path to its archived directory. This mirrors `ChangeRepository.changePath(change)` for active changes. The path MUST be resolved from the archive pattern and root directory configured at construction time — the caller does not need to know the archive directory structure.
+
+        This method is used by `RunStepHooks` and `GetHookInstructions` to build the `change.path` template variable when operating on archived changes.
   - requirement: reindex rebuilds the archive index
     rules:
       - '`reindex()` MUST rebuild `index.jsonl` by scanning the archive directory for all manifest files, sorting entries by `archivedAt` in chronological order, and writing a clean index. The resulting file MUST be in chronological order (oldest first) so that git diffs show only added or removed lines — never reorderings.'
@@ -140,6 +146,23 @@ scenarios:
       - get("nonexistent") is called and no matching change exists anywhere
     then:
       - null is returned
+  - requirement: archivePath returns the absolute path for an archived change
+    name: Path resolved from archive pattern
+    given:
+      - an archive pattern {{year}}/{{change.archivedName}} and archive root /project/.specd/archive
+      - 'AND an ArchivedChange with archivedName: "20260322-120000-my-change"'
+    when:
+      - archivePath(archivedChange) is called
+    then:
+      - it returns the absolute path to the archived change directory (e.g. /project/.specd/archive/20260322-120000-my-change)
+  - requirement: archivePath returns the absolute path for an archived change
+    name: Path is consistent with archive() result
+    given:
+      - an ArchivedChange returned by archive(change)
+    when:
+      - archivePath(archivedChange) is called with the same ArchivedChange
+    then:
+      - the returned path matches the archiveDirPath that was returned by archive()
   - requirement: reindex rebuilds the archive index
     name: Corrupted index is rebuilt
     given:
@@ -158,6 +181,6 @@ scenarios:
     then:
       - the archived change's directory contents and manifest remain unchanged
 contentHashes:
-  spec.md: sha256:6068f9dd693eacea7f9be91aff643ca0c76b02361e09a6dc7aa874cafcd18880
-  verify.md: sha256:f6d803ebf4bb695f08f891896c3c10038daab095c5f4bf85a4825ed5ca7d1856
+  spec.md: sha256:3e07ab5806578c0337f3aa82f8e239c3ee67249de103d486a0e608463e8b5097
+  verify.md: sha256:d78bd41677d9cc8e414802680827f25b5103c5e9d661dd3de0384d1d781e3140
 generatedBy: core

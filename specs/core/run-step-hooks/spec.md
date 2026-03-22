@@ -8,11 +8,16 @@ Agent-driven workflow steps declare `run:` hooks that need to be executed at ste
 
 ### Requirement: Ports and constructor
 
-`RunStepHooks` receives at construction time: `ChangeRepository`, `HookRunner`, and `SchemaProvider`.
+`RunStepHooks` receives at construction time: `ChangeRepository`, `ArchiveRepository`, `HookRunner`, and `SchemaProvider`.
 
 ```typescript
 class RunStepHooks {
-  constructor(changes: ChangeRepository, hooks: HookRunner, schemaProvider: SchemaProvider)
+  constructor(
+    changes: ChangeRepository,
+    archive: ArchiveRepository,
+    hooks: HookRunner,
+    schemaProvider: SchemaProvider,
+  )
 }
 ```
 
@@ -38,7 +43,9 @@ class RunStepHooks {
 
 ### Requirement: Change lookup
 
-`RunStepHooks` loads the change by name via `ChangeRepository`. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
+`RunStepHooks` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name`, `ArchivedChange.workspace`, and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.
+
+For all other step/phase combinations, if `ChangeRepository.get(name)` returns null, `RunStepHooks` MUST throw `ChangeNotFoundError` immediately — the archive fallback does not apply.
 
 ### Requirement: Schema name guard
 
@@ -64,11 +71,11 @@ When `only` is provided, `RunStepHooks` MUST filter the collected hook list to t
 
 ### Requirement: HookVariables construction
 
-`RunStepHooks` MUST build the contextual `TemplateVariables` from the resolved change and `ChangeRepository.changePath()`:
+`RunStepHooks` MUST build the contextual `TemplateVariables` from the resolved change and the appropriate repository path:
 
-- `change.name` — the change name
-- `change.workspace` — the primary workspace (first entry in `change.workspaces`)
-- `change.path` — the absolute path to the change directory (via `ChangeRepository.changePath()`)
+- `change.name` — the change name (from `Change.name` or `ArchivedChange.name`)
+- `change.workspace` — the primary workspace (from `Change.workspaces[0]` or `ArchivedChange.workspace`)
+- `change.path` — the absolute path to the change directory (via `ChangeRepository.changePath()` for active changes, or `ArchiveRepository.archivePath()` for archived changes)
 
 Built-in variables (e.g. `project.root`) are already present in the `TemplateExpander` — the use case only builds the contextual `change` namespace.
 
@@ -117,3 +124,4 @@ When no hooks match (empty `run:` hook list for the step+phase, or the step has 
 - [`specs/core/config/spec.md`](../config/spec.md) — project-level workflow hooks from `specd.yaml`
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `schemaName`, `workspaces`
 - [`specs/core/template-variables/spec.md`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
+- [`specs/core/archive-repository-port/spec.md`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`

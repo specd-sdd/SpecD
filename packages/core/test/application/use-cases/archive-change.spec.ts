@@ -101,6 +101,10 @@ class StubArchiveRepository extends ArchiveRepository {
   }
 
   override async reindex(): Promise<void> {}
+
+  override archivePath(archivedChange: ArchivedChange): string {
+    return `/archive/${archivedChange.archivedName}`
+  }
 }
 
 function makeArchiveRepository(override?: (change: Change) => ArchivedChange): ArchiveRepository {
