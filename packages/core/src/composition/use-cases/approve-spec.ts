@@ -3,6 +3,8 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
+import { type SchemaRepository } from '../../application/ports/schema-repository.js'
+import { createSchemaRepository } from '../schema-repository.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
@@ -33,7 +35,7 @@ export interface FsApproveSpecOptions {
   /** Absolute path to the project root (for schema resolution). */
   readonly projectRoot: string
   readonly schemaRef: string
-  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
+  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
 }
 
 /**
@@ -68,12 +70,18 @@ export function createApproveSpec(
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
-    const workspaceSchemasPaths = new Map<string, string>()
-    for (const ws2 of config.workspaces) {
-      if (ws2.schemasPath !== null) {
-        workspaceSchemasPaths.set(ws2.name, ws2.schemasPath)
-      }
-    }
+    const schemaRepos = new Map(
+      config.workspaces
+        .filter((ws2) => ws2.schemasPath !== null)
+        .map((ws2) => [
+          ws2.name,
+          createSchemaRepository(
+            'fs',
+            { workspace: ws2.name, ownership: ws2.ownership, isExternal: ws2.isExternal },
+            { schemasPath: ws2.schemasPath! },
+          ),
+        ]),
+    ) as ReadonlyMap<string, SchemaRepository>
     return createApproveSpec(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {
@@ -82,7 +90,7 @@ export function createApproveSpec(
         discardedPath: config.storage.discardedPath,
         projectRoot: config.projectRoot,
         schemaRef: config.schemaRef,
-        workspaceSchemasPaths,
+        schemaRepositories: schemaRepos,
       },
     )
   }
@@ -91,14 +99,9 @@ export function createApproveSpec(
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: [options!.projectRoot + '/node_modules'],
     configDir: options!.projectRoot,
+    schemaRepositories: options!.schemaRepositories,
   })
-  const resolveSchema = new ResolveSchema(
-    schemas,
-    options!.schemaRef,
-    options!.workspaceSchemasPaths,
-    [],
-    undefined,
-  )
+  const resolveSchema = new ResolveSchema(schemas, options!.schemaRef, [], undefined)
   const schemaProvider = new LazySchemaProvider(resolveSchema)
   const hasher = new NodeContentHasher()
   return new ApproveSpec(changeRepo, actor, schemaProvider, hasher)

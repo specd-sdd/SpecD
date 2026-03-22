@@ -4,6 +4,8 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
+import { type SchemaRepository } from '../../application/ports/schema-repository.js'
+import { createSchemaRepository } from '../schema-repository.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
 
@@ -35,8 +37,8 @@ export interface FsGetStatusOptions {
   readonly configDir: string
   /** Schema reference string from config. */
   readonly schemaRef: string
-  /** Map of workspace name → absolute schemas directory path. */
-  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
+  /** Map of workspace name → schema repository instance. */
+  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
   /** Whether approval gates are active. */
   readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
 }
@@ -76,12 +78,18 @@ export function createGetStatus(
     const config = configOrContext
     const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
     const ws = getDefaultWorkspace(config)
-    const workspaceSchemasPaths = new Map<string, string>()
-    for (const w of config.workspaces) {
-      if (w.schemasPath !== null) {
-        workspaceSchemasPaths.set(w.name, w.schemasPath)
-      }
-    }
+    const schemaRepos = new Map(
+      config.workspaces
+        .filter((w) => w.schemasPath !== null)
+        .map((w) => [
+          w.name,
+          createSchemaRepository(
+            'fs',
+            { workspace: w.name, ownership: w.ownership, isExternal: w.isExternal },
+            { schemasPath: w.schemasPath! },
+          ),
+        ]),
+    ) as ReadonlyMap<string, SchemaRepository>
     return createGetStatus(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {
@@ -94,7 +102,7 @@ export function createGetStatus(
         ],
         configDir: config.projectRoot,
         schemaRef: config.schemaRef,
-        workspaceSchemasPaths,
+        schemaRepositories: schemaRepos,
         approvals: config.approvals,
       },
     )
@@ -108,14 +116,9 @@ export function createGetStatus(
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: opts.nodeModulesPaths,
     configDir: opts.configDir,
+    schemaRepositories: opts.schemaRepositories,
   })
-  const resolveSchema = new ResolveSchema(
-    schemas,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
-    [],
-    undefined,
-  )
+  const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
   const schemaProvider = new LazySchemaProvider(resolveSchema)
   return new GetStatus(changeRepo, schemaProvider, opts.approvals)
 }

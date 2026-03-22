@@ -45,7 +45,7 @@ import { LazySchemaProvider } from './lazy-schema-provider.js'
  * Delivery mechanisms (`@specd/cli`, `@specd/mcp`) receive a `Kernel` from
  * `createKernel()` and invoke individual use cases via `kernel.changes.*`,
  * `kernel.specs.*`, or `kernel.project.*`. Config-derived inputs (e.g.
- * `schemaRef`, `workspaceSchemasPaths`) are injected at construction time.
+ * `schemaRef`, `schemaRepositories`) are injected at construction time.
  */
 export interface Kernel {
   /** Use cases that operate on changes. */
@@ -161,7 +161,6 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const resolveSchema = new ResolveSchema(
     i.schemas,
     i.schemaRef,
-    i.workspaceSchemasPaths,
     i.schemaPlugins,
     i.schemaOverrides,
   )
