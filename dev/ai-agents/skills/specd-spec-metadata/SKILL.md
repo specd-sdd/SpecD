@@ -1,4 +1,5 @@
 ---
+name: specd-spec-metadata
 description: 'Skill: Spec Metadata Generator'
 allowed-tools: Bash(node *), Bash(cat *), Bash(rm *), Bash(shasum *), Read, Agent
 ---
