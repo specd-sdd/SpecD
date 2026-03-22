@@ -107,3 +107,17 @@
 
 - **WHEN** `resolveFromPath("not-a-spec-link")` is called and the path does not resolve to any spec
 - **THEN** `null` is returned
+
+### Requirement: metadata returns parsed metadata or null
+
+#### Scenario: Metadata exists
+
+- **GIVEN** a spec with metadata on disk
+- **WHEN** `metadata(spec)` is called
+- **THEN** a parsed `SpecMetadata` object is returned with `originalHash` set
+
+#### Scenario: Metadata does not exist
+
+- **GIVEN** a spec with no metadata on disk
+- **WHEN** `metadata(spec)` is called
+- **THEN** `null` is returned

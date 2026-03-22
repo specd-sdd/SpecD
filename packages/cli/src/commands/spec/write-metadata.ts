@@ -16,7 +16,7 @@ export function registerSpecWriteMetadata(parent: Command): void {
   parent
     .command('write-metadata <specPath>')
     .allowExcessArguments(false)
-    .description('Write .specd-metadata.yaml for a spec')
+    .description('Write metadata for a spec')
     .option('--input <file>', 'read YAML content from a file instead of stdin')
     .option('--force', 'skip conflict detection and overwrite unconditionally')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
@@ -59,7 +59,7 @@ export function registerSpecWriteMetadata(parent: Command): void {
 
           const fmt = parseFormat(opts.format)
           if (fmt === 'text') {
-            output(`wrote .specd-metadata.yaml for ${result.spec}`, 'text')
+            output(`wrote metadata for ${result.spec}`, 'text')
           } else {
             output({ result: 'ok', spec: result.spec }, fmt)
           }

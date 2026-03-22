@@ -33,7 +33,7 @@ function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockReturnValue(kernel)
+  vi.mocked(createCliKernel).mockResolvedValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -723,7 +723,7 @@ describe('spec list', () => {
   it('shows "no workspaces configured" when no workspaces', async () => {
     const config = makeMockConfig({ workspaces: [] })
     vi.mocked(loadConfig).mockResolvedValue(config)
-    vi.mocked(createCliKernel).mockReturnValue(makeMockKernel())
+    vi.mocked(createCliKernel).mockResolvedValue(makeMockKernel())
     const stdout = captureStdout()
     captureStderr()
     mockProcessExit()

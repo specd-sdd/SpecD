@@ -24,6 +24,8 @@ export interface FsSpecRepositoryOptions {
   readonly specsPath: string
   /** Optional logical path prefix for all specs in this workspace. */
   readonly prefix?: string
+  /** Absolute path to the metadata root directory for this workspace. */
+  readonly metadataPath: string
 }
 
 /**
@@ -49,6 +51,7 @@ export function createSpecRepository(
         ownership: context.ownership,
         isExternal: context.isExternal,
         specsPath: options.specsPath,
+        metadataPath: options.metadataPath,
         ...(options.prefix !== undefined ? { prefix: options.prefix } : {}),
       })
   }

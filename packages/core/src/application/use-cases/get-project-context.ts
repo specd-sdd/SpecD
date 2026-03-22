@@ -1,5 +1,4 @@
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
-import { parseMetadata } from './_shared/parse-metadata.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
@@ -204,12 +203,10 @@ export class GetProjectContext {
       }
 
       const spec = new Spec(workspace, specPathObj, [])
-      const metadataArtifact = await specRepo.artifact(spec, '.specd-metadata.yaml')
+      const metadata = await specRepo.metadata(spec)
       let isFresh = false
-      let metadata: SpecMetadata | null = null
 
-      if (metadataArtifact !== null) {
-        metadata = parseMetadata(metadataArtifact.content)
+      if (metadata !== null) {
         isFresh = await this._isMetadataFresh(specRepo, spec, metadata)
       }
 
@@ -249,7 +246,7 @@ export class GetProjectContext {
         }
         content = `### Spec: ${specLabel}\n\n${metaParts.join('\n\n')}`
       } else {
-        if (metadataArtifact !== null) {
+        if (metadata !== null) {
           warnings.push({
             type: 'stale-metadata',
             path: specLabel,

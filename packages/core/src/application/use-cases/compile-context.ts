@@ -1,5 +1,4 @@
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
-import { parseMetadata } from './_shared/parse-metadata.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
@@ -235,20 +234,15 @@ export class CompileContext {
         if (manifestDeps !== undefined && manifestDeps.length > 0) {
           dependsOnList = [...manifestDeps]
         } else {
-          const metaArtifact = await repo.artifact(spec, '.specd-metadata.yaml')
+          const meta = await repo.metadata(spec)
 
-          if (metaArtifact !== null) {
-            try {
-              const meta = parseMetadata(metaArtifact.content)
-              dependsOnList = meta.dependsOn
-            } catch {
-              // Skip specs with unparseable metadata
-            }
+          if (meta !== null) {
+            dependsOnList = meta.dependsOn
           } else {
             warnings.push({
               type: 'missing-metadata',
               path: specId,
-              message: `No .specd-metadata.yaml for '${specId}' — dependency traversal may be incomplete. Run metadata generation to fix.`,
+              message: `No metadata for '${specId}' — dependency traversal may be incomplete. Run metadata generation to fix.`,
             })
 
             // Attempt fallback extraction from spec content
@@ -335,13 +329,11 @@ export class CompileContext {
       }
 
       const spec = new Spec(workspace, specPathObj, [])
-      const metadataArtifact = await specRepo.artifact(spec, '.specd-metadata.yaml')
+      const metadata = await specRepo.metadata(spec)
 
       let isFresh = false
-      let metadata: SpecMetadata | null = null
 
-      if (metadataArtifact !== null) {
-        metadata = parseMetadata(metadataArtifact.content)
+      if (metadata !== null) {
         isFresh = await this._isMetadataFresh(specRepo, spec, metadata)
       }
 
@@ -384,7 +376,7 @@ export class CompileContext {
         specContentParts.push(`### Spec: ${specLabel}\n\n${metaParts.join('\n\n')}`)
       } else {
         // Stale/absent metadata: fall back to metadataExtraction engine
-        if (metadataArtifact !== null) {
+        if (metadata !== null) {
           warnings.push({
             type: 'stale-metadata',
             path: specLabel,

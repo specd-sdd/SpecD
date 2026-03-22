@@ -14,7 +14,7 @@ export function registerSpecInvalidateMetadata(parent: Command): void {
   parent
     .command('invalidate-metadata <specPath>')
     .allowExcessArguments(false)
-    .description('Invalidate .specd-metadata.yaml by removing contentHashes (marks as stale)')
+    .description('Invalidate metadata by removing contentHashes (marks as stale)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .action(async (specPath: string, opts: { format: string; config?: string }) => {
@@ -33,7 +33,7 @@ export function registerSpecInvalidateMetadata(parent: Command): void {
 
         const fmt = parseFormat(opts.format)
         if (fmt === 'text') {
-          output(`invalidated .specd-metadata.yaml for ${result.spec}`, 'text')
+          output(`invalidated metadata for ${result.spec}`, 'text')
         } else {
           output({ result: 'ok', spec: result.spec }, fmt)
         }

@@ -15,8 +15,8 @@ export function registerSpecGenerateMetadata(parent: Command): void {
   parent
     .command('generate-metadata <specPath>')
     .allowExcessArguments(false)
-    .description('Generate .specd-metadata.yaml deterministically from schema extraction rules')
-    .option('--write', 'write the generated metadata to the spec directory')
+    .description('Generate metadata deterministically from schema extraction rules')
+    .option('--write', 'write the generated metadata')
     .option('--force', 'overwrite existing metadata without conflict detection (requires --write)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -52,7 +52,7 @@ export function registerSpecGenerateMetadata(parent: Command): void {
 
             const fmt = parseFormat(opts.format)
             if (fmt === 'text') {
-              output(`wrote .specd-metadata.yaml for ${specId}`, 'text')
+              output(`wrote metadata for ${specId}`, 'text')
             } else {
               output({ result: 'ok', spec: specId, written: true }, fmt)
             }

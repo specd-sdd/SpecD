@@ -19,7 +19,7 @@
 
 #### Scenario: Fresh metadata produces full entry
 
-- **GIVEN** a spec with fresh `.specd-metadata.yaml` containing title, description, rules, constraints, and scenarios
+- **GIVEN** a spec with fresh metadata containing title, description, rules, constraints, and scenarios
 - **WHEN** `execute(input)` is called without section filters
 - **THEN** the entry has `stale: false` and includes `title`, `description`, `rules`, `constraints`, and `scenarios`
 
@@ -31,9 +31,9 @@
 
 ### Requirement: Stale or absent metadata produces minimal entry
 
-#### Scenario: No metadata file yields stale entry
+#### Scenario: No metadata yields stale entry
 
-- **GIVEN** a spec with no `.specd-metadata.yaml`
+- **GIVEN** a spec with no metadata
 - **WHEN** `execute(input)` is called
 - **THEN** the entry has `stale: true` and only `spec` and `stale` fields
 
@@ -108,6 +108,6 @@
 
 #### Scenario: Missing metadata during traversal emits warning
 
-- **GIVEN** a dependency spec with no `.specd-metadata.yaml`
+- **GIVEN** a dependency spec with no metadata
 - **WHEN** dependency traversal reaches that spec
 - **THEN** `warnings` contains an entry with `type: 'missing-metadata'`

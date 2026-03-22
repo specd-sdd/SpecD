@@ -154,8 +154,8 @@ export interface KernelOptions {
  * @param options - Optional kernel construction options
  * @returns A fully-wired kernel with all use cases
  */
-export function createKernel(config: SpecdConfig, options?: KernelOptions): Kernel {
-  const i = createKernelInternals(config, options)
+export async function createKernel(config: SpecdConfig, options?: KernelOptions): Promise<Kernel> {
+  const i = await createKernelInternals(config, options)
 
   // Shared ResolveSchema + LazySchemaProvider — resolves once with plugins and overrides
   const resolveSchema = new ResolveSchema(

@@ -51,7 +51,7 @@
 
 - **WHEN** `specd spec generate-metadata auth/login --write` is invoked
 - **THEN** `SaveSpecMetadata` is called with the generated YAML content
-- **AND** stdout contains `wrote .specd-metadata.yaml for default:auth/login`
+- **AND** stdout contains `wrote metadata for default:auth/login`
 
 ### Requirement: Force flag
 
