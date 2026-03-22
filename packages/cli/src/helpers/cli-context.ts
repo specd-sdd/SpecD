@@ -26,6 +26,6 @@ export async function resolveCliContext(options?: {
   configPath?: string | undefined
 }): Promise<CliContext> {
   const config = await loadConfig({ configPath: options?.configPath })
-  const kernel = createCliKernel(config)
+  const kernel = await createCliKernel(config)
   return { config, kernel }
 }

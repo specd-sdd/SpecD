@@ -46,7 +46,9 @@ The loader MUST verify that `workspaces.default` exists in the parsed config. If
 
 ### Requirement: Path resolution relative to config directory
 
-All relative paths in the parsed config — `specs.fs.path`, `schemas.fs.path`, `codeRoot`, and all `storage.*.fs.path` values — MUST be resolved relative to the directory containing the active config file. The resolved `SpecdConfig.projectRoot` MUST be set to the config file's parent directory.
+All relative paths in the parsed config — `specs.fs.path`, `specs.fs.metadataPath`, `schemas.fs.path`, `codeRoot`, and all `storage.*.fs.path` values — MUST be resolved relative to the directory containing the active config file. The resolved `SpecdConfig.projectRoot` MUST be set to the config file's parent directory.
+
+When `specs.fs.metadataPath` is absent for a workspace, the loader MUST auto-derive it by resolving the VCS root of the workspace's `specs.fs.path` via `createVcsAdapter(specsPath).rootDir()` and joining `.specd/metadata/`. When the VCS adapter returns `NullVcsAdapter` (specs path is not inside any VCS), the loader MUST fall back to `.specd/metadata/` relative to the specs path parent directory.
 
 ### Requirement: Storage path containment
 

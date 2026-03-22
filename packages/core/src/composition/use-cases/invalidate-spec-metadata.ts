@@ -1,3 +1,4 @@
+import * as path from 'node:path'
 import { InvalidateSpecMetadata } from '../../application/use-cases/invalidate-spec-metadata.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
@@ -42,7 +43,11 @@ export function createInvalidateSpecMetadata(
         createSpecRepository(
           'fs',
           { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
-          { specsPath: ws.specsPath, ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}) },
+          {
+            specsPath: ws.specsPath,
+            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
+            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
+          },
         ),
       ]),
     )

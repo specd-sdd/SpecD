@@ -1,3 +1,4 @@
+import { parse as parseYaml } from 'yaml'
 import { Change, type ActorIdentity } from '../../../src/domain/entities/change.js'
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { type Spec } from '../../../src/domain/entities/spec.js'
@@ -14,6 +15,7 @@ import {
   SpecRepository,
   type ResolveFromPathResult,
 } from '../../../src/application/ports/spec-repository.js'
+import { type SpecMetadata } from '../../../src/domain/services/parse-metadata.js'
 import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
 import { type SchemaRegistry } from '../../../src/application/ports/schema-registry.js'
 import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
@@ -228,6 +230,23 @@ class StubSpecRepository extends SpecRepository {
 
   override async delete(spec: Spec): Promise<void> {
     if (this._deleteFn) return this._deleteFn(spec)
+  }
+
+  override async metadata(spec: Spec): Promise<SpecMetadata | null> {
+    const key = `${spec.name.toString()}/.specd-metadata.yaml`
+    const content = this._artifacts[key]
+    if (content === undefined || content === null) return null
+    const parsed = parseYaml(content)
+    if (parsed === null || parsed === undefined || typeof parsed !== 'object') return null
+    return parsed as SpecMetadata
+  }
+
+  override async saveMetadata(
+    spec: Spec,
+    content: string,
+    _options?: { force?: boolean; originalHash?: string },
+  ): Promise<void> {
+    this.saved.set('.specd-metadata.yaml', content)
   }
 
   override async resolveFromPath(

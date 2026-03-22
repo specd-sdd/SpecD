@@ -1,5 +1,4 @@
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
-import { parseMetadata } from './_shared/parse-metadata.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
@@ -101,22 +100,15 @@ export class GetSpecContext {
       throw new SpecNotFoundError(`${input.workspace}:${input.specPath.toString()}`)
     }
 
-    const artifacts = new Map<string, { content: string }>()
-    for (const filename of spec.filenames) {
-      const artifact = await repo.artifact(spec, filename)
-      if (artifact !== null) {
-        artifacts.set(filename, { content: artifact.content })
-      }
-    }
-
     const rootLabel = `${input.workspace}:${input.specPath.toString()}`
-    entries.push(await this._buildEntry(rootLabel, artifacts, input.sections, warnings))
+    const metadata = await repo.metadata(spec)
+    entries.push(await this._buildEntry(rootLabel, repo, spec, metadata, input.sections, warnings))
 
     if (input.followDeps) {
       const maxDepth = input.depth
       const seen = new Set<string>([rootLabel])
       await this._traverseDeps(
-        artifacts,
+        metadata,
         input.workspace,
         entries,
         seen,
@@ -131,28 +123,33 @@ export class GetSpecContext {
   }
 
   /**
-   * Builds a context entry from a spec's artifacts and metadata.
+   * Builds a context entry from a spec's metadata.
    *
    * @param specLabel - Display label for the spec
-   * @param artifacts - Map of filename to artifact content
+   * @param repo - Repository for artifact content resolution
+   * @param spec - The spec entity
+   * @param metadata - Parsed metadata, or `null` if absent
    * @param sections - Optional section filter flags
    * @param warnings - Mutable array to collect warnings
    * @returns The constructed context entry
    */
   private async _buildEntry(
     specLabel: string,
-    artifacts: ReadonlyMap<string, { readonly content: string }>,
+    repo: SpecRepository,
+    spec: import('../../domain/entities/spec.js').Spec,
+    metadata: SpecMetadata | null,
     sections: ReadonlyArray<SpecContextSectionFlag> | undefined,
     warnings: ContextWarning[],
   ): Promise<SpecContextEntry> {
-    const metadataContent = artifacts.get('.specd-metadata.yaml')?.content
     const showAll = sections === undefined || sections.length === 0
 
-    if (metadataContent !== undefined) {
-      const metadata = this._parseMetadata(metadataContent)
+    if (metadata !== null) {
       const freshnessResult = await checkMetadataFreshness(
         metadata.contentHashes,
-        (filename) => Promise.resolve(artifacts.get(filename)?.content ?? null),
+        async (filename) => {
+          const artifact = await repo.artifact(spec, filename)
+          return artifact?.content ?? null
+        },
         (c) => this._hasher.hash(c),
       )
 
@@ -195,19 +192,9 @@ export class GetSpecContext {
   }
 
   /**
-   * Parses a `.specd-metadata.yaml` string into a SpecMetadata object.
-   *
-   * @param content - Raw YAML string to parse
-   * @returns The parsed metadata object, or empty object on parse failure
-   */
-  private _parseMetadata(content: string): SpecMetadata {
-    return parseMetadata(content)
-  }
-
-  /**
    * Recursively traverses `dependsOn` links from a spec's metadata.
    *
-   * @param artifacts - Artifacts of the current spec
+   * @param metadata - Parsed metadata of the current spec, or `null` if absent
    * @param defaultWorkspace - Workspace to assume when deps omit one
    * @param entries - Mutable array collecting resolved entries
    * @param seen - Set of already-visited spec labels for cycle detection
@@ -217,7 +204,7 @@ export class GetSpecContext {
    * @param currentDepth - Current recursion depth
    */
   private async _traverseDeps(
-    artifacts: ReadonlyMap<string, { readonly content: string }>,
+    metadata: SpecMetadata | null,
     defaultWorkspace: string,
     entries: SpecContextEntry[],
     seen: Set<string>,
@@ -226,17 +213,15 @@ export class GetSpecContext {
     maxDepth: number | undefined,
     currentDepth: number,
   ): Promise<void> {
-    const metadataContent = artifacts.get('.specd-metadata.yaml')?.content
-    if (metadataContent === undefined) {
+    if (metadata === null) {
       warnings.push({
         type: 'missing-metadata',
         path: `${defaultWorkspace}:unknown`,
-        message: `No .specd-metadata.yaml found — dependency traversal may be incomplete. Run metadata generation to fix.`,
+        message: `No metadata found — dependency traversal may be incomplete. Run metadata generation to fix.`,
       })
       return
     }
 
-    const metadata = this._parseMetadata(metadataContent)
     if (metadata.dependsOn === undefined || metadata.dependsOn.length === 0) return
 
     if (maxDepth !== undefined && currentDepth >= maxDepth) return
@@ -267,18 +252,11 @@ export class GetSpecContext {
         continue
       }
 
-      const depArtifacts = new Map<string, { content: string }>()
-      for (const filename of depSpec.filenames) {
-        const artifact = await repo.artifact(depSpec, filename)
-        if (artifact !== null) {
-          depArtifacts.set(filename, { content: artifact.content })
-        }
-      }
-
-      entries.push(await this._buildEntry(depLabel, depArtifacts, sections, warnings))
+      const depMetadata = await repo.metadata(depSpec)
+      entries.push(await this._buildEntry(depLabel, repo, depSpec, depMetadata, sections, warnings))
 
       await this._traverseDeps(
-        depArtifacts,
+        depMetadata,
         depWorkspace,
         entries,
         seen,

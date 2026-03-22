@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Agents and scripts that produce metadata externally need a safe way to persist it without bypassing validation or conflict detection. The `specd spec write-metadata` command writes a `.specd-metadata.yaml` file for a given spec, accepting YAML content from stdin or a file and persisting it through the `SaveSpecMetadata` use case for conflict detection and atomic writes.
+Agents and scripts that produce metadata externally need a safe way to persist it without bypassing validation or conflict detection. The `specd spec write-metadata` command writes metadata for a given spec, accepting YAML content from stdin or a file and persisting it through the `SaveSpecMetadata` use case for conflict detection and atomic writes.
 
 ## Requirements
 
@@ -27,7 +27,7 @@ Before calling the use case, the command parses the content with `yaml.parse()` 
 
 ### Requirement: Text output
 
-On success, text format outputs: `wrote .specd-metadata.yaml for <workspace:path>`
+On success, text format outputs: `wrote metadata for <workspace:path>`
 
 ### Requirement: JSON output
 

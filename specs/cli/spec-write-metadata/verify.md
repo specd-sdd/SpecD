@@ -26,7 +26,7 @@
 #### Scenario: Successful write in text format
 
 - **WHEN** the write succeeds and format is `text`
-- **THEN** the command outputs `wrote .specd-metadata.yaml for default:auth/login`
+- **THEN** the command outputs `wrote metadata for default:auth/login`
 
 ### Requirement: JSON output
 
@@ -54,13 +54,13 @@
 
 #### Scenario: Conflict without --force exits 1
 
-- **GIVEN** the `.specd-metadata.yaml` file was modified since it was last read
+- **GIVEN** the metadata file was modified since it was last read
 - **WHEN** `specd spec write-metadata auth/login` is invoked without `--force`
 - **THEN** the command exits with code 1 and reports the conflict
 
 #### Scenario: Force flag bypasses conflict
 
-- **GIVEN** the `.specd-metadata.yaml` file was modified since it was last read
+- **GIVEN** the metadata file was modified since it was last read
 - **WHEN** `specd spec write-metadata auth/login --force` is invoked
 - **THEN** the write succeeds and the conflict is ignored
 

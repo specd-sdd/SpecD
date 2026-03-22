@@ -25,6 +25,7 @@ import { createChangeRepository } from './change-repository.js'
 import { createArchiveRepository } from './archive-repository.js'
 import { createSpecRepository } from './spec-repository.js'
 import { createSchemaRegistry } from './schema-registry.js'
+import { createVcsAdapter } from './vcs-adapter.js'
 import { getDefaultWorkspace } from './get-default-workspace.js'
 import { type KernelOptions } from './kernel.js'
 
@@ -84,10 +85,10 @@ export interface KernelInternals {
  * @param options - Optional kernel-level overrides
  * @returns Pre-built adapter instances for all use cases
  */
-export function createKernelInternals(
+export async function createKernelInternals(
   config: SpecdConfig,
   options?: KernelOptions,
-): KernelInternals {
+): Promise<KernelInternals> {
   const defaultWs = getDefaultWorkspace(config)
   const wsContext = {
     workspace: defaultWs.name,
@@ -122,16 +123,30 @@ export function createKernelInternals(
       : {}),
   })
 
-  const specs = new Map(
-    config.workspaces.map((ws) => [
+  const specs = new Map<string, import('../application/ports/spec-repository.js').SpecRepository>()
+  for (const ws of config.workspaces) {
+    let metadataPath: string
+    const vcsAdapter = await createVcsAdapter(ws.specsPath)
+    try {
+      const vcsRoot = await vcsAdapter.rootDir()
+      metadataPath = path.join(vcsRoot, '.specd', 'metadata')
+    } catch {
+      // NullVcsAdapter or rootDir failure — fallback to specs parent
+      metadataPath = path.join(ws.specsPath, '..', '.specd', 'metadata')
+    }
+    specs.set(
       ws.name,
       createSpecRepository(
         'fs',
         { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
-        { specsPath: ws.specsPath, ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}) },
+        {
+          specsPath: ws.specsPath,
+          metadataPath,
+          ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
+        },
       ),
-    ]),
-  )
+    )
+  }
 
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths,

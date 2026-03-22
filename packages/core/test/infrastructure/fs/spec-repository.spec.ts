@@ -28,6 +28,7 @@ async function setupRepo(): Promise<RepoContext> {
     ownership: 'owned',
     isExternal: false,
     specsPath,
+    metadataPath: path.join(tmpDir, '.specd', 'metadata'),
   })
 
   return { repo, specsPath, tmpDir }
@@ -322,6 +323,7 @@ describe('FsSpecRepository', () => {
         ownership: 'owned',
         isExternal: false,
         specsPath,
+        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
         prefix: '_global',
       })
 
@@ -405,6 +407,7 @@ describe('FsSpecRepository', () => {
         ownership: 'readOnly',
         isExternal: false,
         specsPath,
+        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
         prefix: 'team_1/shared',
       })
 
@@ -478,6 +481,7 @@ describe('FsSpecRepository', () => {
         ownership: 'owned',
         isExternal: false,
         specsPath,
+        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
         prefix: 'core',
       })
 
@@ -545,6 +549,7 @@ describe('FsSpecRepository', () => {
         ownership: 'owned',
         isExternal: false,
         specsPath,
+        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
         prefix: 'core',
       })
 

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { createHash } from 'node:crypto'
+import type { SpecRepository } from '@specd/core'
 import {
   makeMockConfig,
   makeMockKernel,
@@ -20,11 +21,28 @@ function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockReturnValue(kernel)
+  vi.mocked(createCliKernel).mockResolvedValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
-  return { config, kernel, stdout, stderr }
+
+  // Get the default mock repo and add stub methods
+  const mockRepo = kernel.specs.repos.get('default') as SpecRepository & {
+    get: ReturnType<typeof vi.fn>
+    metadata: ReturnType<typeof vi.fn>
+    artifact: ReturnType<typeof vi.fn>
+    saveMetadata: ReturnType<typeof vi.fn>
+  }
+  ;(mockRepo as unknown as Record<string, unknown>).get = vi
+    .fn()
+    .mockResolvedValue({ path: 'auth/login' })
+  ;(mockRepo as unknown as Record<string, unknown>).metadata = vi.fn().mockResolvedValue(null)
+  ;(mockRepo as unknown as Record<string, unknown>).artifact = vi.fn().mockResolvedValue(null)
+  ;(mockRepo as unknown as Record<string, unknown>).saveMetadata = vi
+    .fn()
+    .mockResolvedValue(undefined)
+
+  return { config, kernel, stdout, stderr, mockRepo }
 }
 
 afterEach(() => vi.restoreAllMocks())
@@ -32,23 +50,15 @@ afterEach(() => vi.restoreAllMocks())
 const specContent = '# Auth Spec\n\nContent here.'
 const specHash = `sha256:${createHash('sha256').update(specContent).digest('hex')}`
 
-const metadataYaml = [
-  'title: Login',
-  'description: Handles user authentication',
-  'contentHashes:',
-  `  spec.md: ${specHash}`,
-  'dependsOn:',
-  '  - default:auth/shared-errors',
-  'rules:',
-  '  - requirement: Must validate email',
-  '    rules:',
-  '      - email must contain @',
-  'constraints:',
-  '  - Must use HTTPS',
-  'scenarios:',
-  '  - requirement: Must validate email',
-  '    name: valid email accepted',
-].join('\n')
+const metadataObj = {
+  title: 'Login',
+  description: 'Handles user authentication',
+  contentHashes: { 'spec.md': specHash } as Record<string, string>,
+  dependsOn: ['default:auth/shared-errors'],
+  rules: [{ requirement: 'Must validate email', rules: ['email must contain @'] }],
+  constraints: ['Must use HTTPS'],
+  scenarios: [{ requirement: 'Must validate email', name: 'valid email accepted' }],
+}
 
 describe('spec metadata', () => {
   it('exits with error when path argument is missing', async () => {
@@ -60,13 +70,9 @@ describe('spec metadata', () => {
   })
 
   it('prints structured text with spec label and title', async () => {
-    const { kernel, stdout } = setup()
-    kernel.specs.get.execute.mockResolvedValue({
-      artifacts: new Map([
-        ['spec.md', { content: specContent }],
-        ['.specd-metadata.yaml', { content: metadataYaml }],
-      ]),
-    })
+    const { mockRepo, stdout } = setup()
+    mockRepo.metadata.mockResolvedValue(metadataObj)
+    mockRepo.artifact.mockResolvedValue({ content: specContent })
 
     const program = makeProgram()
     registerSpecMetadata(program.command('spec'))
@@ -79,13 +85,9 @@ describe('spec metadata', () => {
   })
 
   it('shows content hash freshness in text mode', async () => {
-    const { kernel, stdout } = setup()
-    kernel.specs.get.execute.mockResolvedValue({
-      artifacts: new Map([
-        ['spec.md', { content: specContent }],
-        ['.specd-metadata.yaml', { content: metadataYaml }],
-      ]),
-    })
+    const { mockRepo, stdout } = setup()
+    mockRepo.metadata.mockResolvedValue(metadataObj)
+    mockRepo.artifact.mockResolvedValue({ content: specContent })
 
     const program = makeProgram()
     registerSpecMetadata(program.command('spec'))
@@ -97,13 +99,9 @@ describe('spec metadata', () => {
   })
 
   it('shows STALE when hash does not match', async () => {
-    const { kernel, stdout } = setup()
-    kernel.specs.get.execute.mockResolvedValue({
-      artifacts: new Map([
-        ['spec.md', { content: 'changed content' }],
-        ['.specd-metadata.yaml', { content: metadataYaml }],
-      ]),
-    })
+    const { mockRepo, stdout } = setup()
+    mockRepo.metadata.mockResolvedValue(metadataObj)
+    mockRepo.artifact.mockResolvedValue({ content: 'changed content' })
 
     const program = makeProgram()
     registerSpecMetadata(program.command('spec'))
@@ -114,8 +112,9 @@ describe('spec metadata', () => {
   })
 
   it('exits 1 with error when metadata file is absent', async () => {
-    const { kernel, stderr } = setup()
-    kernel.specs.get.execute.mockResolvedValue({ artifacts: new Map() })
+    const { mockRepo, stderr } = setup()
+    mockRepo.get.mockResolvedValue({ path: 'auth/login' })
+    mockRepo.metadata.mockResolvedValue(null)
 
     const program = makeProgram()
     registerSpecMetadata(program.command('spec'))
@@ -139,13 +138,9 @@ describe('spec metadata', () => {
   })
 
   it('outputs JSON with fresh flag and contentHashes array', async () => {
-    const { kernel, stdout } = setup()
-    kernel.specs.get.execute.mockResolvedValue({
-      artifacts: new Map([
-        ['spec.md', { content: specContent }],
-        ['.specd-metadata.yaml', { content: metadataYaml }],
-      ]),
-    })
+    const { mockRepo, stdout } = setup()
+    mockRepo.metadata.mockResolvedValue(metadataObj)
+    mockRepo.artifact.mockResolvedValue({ content: specContent })
 
     const program = makeProgram()
     registerSpecMetadata(program.command('spec'))
@@ -170,13 +165,9 @@ describe('spec metadata', () => {
   })
 
   it('shows section counts in text mode', async () => {
-    const { kernel, stdout } = setup()
-    kernel.specs.get.execute.mockResolvedValue({
-      artifacts: new Map([
-        ['spec.md', { content: specContent }],
-        ['.specd-metadata.yaml', { content: metadataYaml }],
-      ]),
-    })
+    const { mockRepo, stdout } = setup()
+    mockRepo.metadata.mockResolvedValue(metadataObj)
+    mockRepo.artifact.mockResolvedValue({ content: specContent })
 
     const program = makeProgram()
     registerSpecMetadata(program.command('spec'))

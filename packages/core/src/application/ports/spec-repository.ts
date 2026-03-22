@@ -1,6 +1,7 @@
 import { type Spec } from '../../domain/entities/spec.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
+import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { Repository, type RepositoryConfig } from './repository.js'
 
 export { type RepositoryConfig as SpecRepositoryConfig }
@@ -77,6 +78,38 @@ export abstract class SpecRepository extends Repository {
    * @param spec - The spec to delete
    */
   abstract delete(spec: Spec): Promise<void>
+
+  /**
+   * Returns the parsed metadata for the given spec, or `null` if no metadata
+   * file exists.
+   *
+   * The returned object includes an `originalHash` field (SHA-256 of the raw
+   * file content) for use in conflict detection when saving.
+   *
+   * @param spec - The spec whose metadata to load
+   * @returns Parsed metadata with `originalHash`, or `null` if absent
+   */
+  abstract metadata(spec: Spec): Promise<SpecMetadata | null>
+
+  /**
+   * Persists raw YAML metadata content for a spec.
+   *
+   * Creates the metadata directory if it does not exist. When `originalHash`
+   * is provided and `force` is not `true`, the current file on disk is hashed
+   * and compared — a mismatch causes `ArtifactConflictError`.
+   *
+   * @param spec - The spec to write metadata for
+   * @param content - Raw YAML string to persist
+   * @param options - Save options
+   * @param options.force - Skip conflict detection when `true`
+   * @param options.originalHash - Expected hash of the current file on disk
+   * @throws {ArtifactConflictError} On hash mismatch when `force` is not set
+   */
+  abstract saveMetadata(
+    spec: Spec,
+    content: string,
+    options?: { force?: boolean; originalHash?: string },
+  ): Promise<void>
 
   /**
    * Resolves a storage path to a spec identity within this workspace.

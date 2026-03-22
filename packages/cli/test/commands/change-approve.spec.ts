@@ -23,7 +23,7 @@ function setup() {
   const config = makeMockConfig({ approvals: { spec: true, signoff: true } })
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockReturnValue(kernel)
+  vi.mocked(createCliKernel).mockResolvedValue(kernel)
   kernel.changes.status.execute.mockResolvedValue({
     change: makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
     artifactStatuses: [],

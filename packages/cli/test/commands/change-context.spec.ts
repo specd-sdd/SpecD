@@ -40,7 +40,7 @@ function setup() {
   })
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockReturnValue(kernel)
+  vi.mocked(createCliKernel).mockResolvedValue(kernel)
   kernel.changes.compile.execute.mockResolvedValue({ ...mockResult })
   const stdout = captureStdout()
   const stderr = captureStderr()

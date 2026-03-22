@@ -2,7 +2,7 @@
 
 ## Purpose
 
-AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata from each spec's `.specd-metadata.yaml`, evaluates step availability, and combines project context entries, spec content, and available steps into a single structured output. Artifact instructions and step hooks are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively.
+AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata via `SpecRepository.metadata()`, evaluates step availability, and combines project context entries, spec content, and available steps into a single structured output. Artifact instructions and step hooks are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively.
 
 ## Requirements
 
@@ -47,7 +47,7 @@ Every spec ID handled by `CompileContext` carries an explicit or implicit worksp
 - **No qualifier** (e.g. `auth/login`) — the workspace is inferred from context:
   - In include/exclude patterns at project level, an unqualified path resolves to `default`.
   - In include/exclude patterns at workspace level, an unqualified path resolves to that workspace.
-  - In `dependsOn` entries from `.specd-metadata.yaml`, an unqualified path resolves to the same workspace as the spec that declared it.
+  - In `dependsOn` entries from metadata, an unqualified path resolves to the same workspace as the spec that declared it.
 
 If a pattern or `dependsOn` entry references a workspace name that has no entry in the `specs` map, `CompileContext` must emit a warning and skip that path. It must not throw.
 
@@ -59,9 +59,9 @@ If a pattern or `dependsOn` entry references a workspace name that has no entry 
 2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set.
 3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec IDs appears in `change.specIds`).
 4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set.
-5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's `.specd-metadata.yaml` `dependsOn` entries, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.
+5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's metadata `dependsOn` entries via `SpecRepository.metadata()`, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.
 
-When a spec in the traversal has no `.specd-metadata.yaml`, `CompileContext` emits a `missing-metadata` warning identifying the spec and suggesting metadata generation. Traversal continues with any `dependsOn` information available from the change manifest's `specDependsOn` or from content extraction via the schema's `metadataExtraction` declarations.
+When a spec in the traversal has no metadata, `CompileContext` emits a `missing-metadata` warning identifying the spec and suggesting metadata generation. Traversal continues with any `dependsOn` information available from the change manifest's `specDependsOn` or from content extraction via the schema's `metadataExtraction` declarations.
 
 A spec matched by multiple include patterns appears exactly once, at the position of the first matching include pattern. Specs added via `dependsOn` traversal that were already included in steps 1–4 also appear once (at their earlier position).
 
@@ -70,7 +70,7 @@ A spec matched by multiple include patterns appears exactly once, at the positio
 For each spec in Step 5, `dependsOn` is resolved using a three-tier fallback:
 
 1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority)
-2. `.specd-metadata.yaml` `dependsOn` field — the persisted metadata
+2. Metadata `dependsOn` field — the persisted metadata loaded via `SpecRepository.metadata()`
 3. Schema `metadataExtraction` engine — extracts `dependsOn` from spec content when metadata is absent
 
 The first tier that returns a non-empty result is used. If all tiers return empty, the spec is treated as having no dependencies.
@@ -81,9 +81,9 @@ During step 5, if `CompileContext` detects a cycle in the `dependsOn` graph (spe
 
 ### Requirement: Staleness detection and content fallback
 
-For every spec in the collected context set, `CompileContext` must check whether the spec's `.specd-metadata.yaml` exists and whether its `contentHashes` are fresh (all required artifact file hashes match the recorded values).
+For every spec in the collected context set, `CompileContext` must check whether the spec's metadata exists (via `SpecRepository.metadata()`) and whether its `contentHashes` are fresh (all required artifact file hashes match the recorded values).
 
-- **Fresh metadata** — use the structured content from `.specd-metadata.yaml` (`rules`, `constraints`, `scenarios`, `description`).
+- **Fresh metadata** — use the structured content from metadata (`rules`, `constraints`, `scenarios`, `description`).
 - **Stale or absent metadata** — fall back to the full raw content of the spec's artifact files. Emit a warning identifying the spec path so the caller knows metadata should be regenerated.
 
 Staleness is advisory — it never blocks context compilation. The fallback ensures the context is always assembled, even for specs whose metadata has not yet been generated.
@@ -100,7 +100,7 @@ If the step is not available (one or more required artifacts are neither `comple
 
 1. **Project context entries** — for each entry in `config.context` (in declaration order): resolve `instruction` values verbatim; resolve `file` values by reading the file at the given path relative to the `specd.yaml` directory and injecting its content verbatim. Missing files emit a warning and are skipped. This block appears before all other content.
 2. **Spec content** — for each spec in the collected context set, include its content using the following strategy. When `sections` is present, only the listed sections are rendered; when absent, all available sections are included (description + rules + constraints + scenarios).
-   - If `.specd-metadata.yaml` exists and is fresh: include the requested sections from the metadata. This is the compact, machine-optimised representation.
+   - If metadata exists and is fresh (via `SpecRepository.metadata()`): include the requested sections from the metadata. This is the compact, machine-optimised representation.
    - If metadata is absent or stale: fall back to the schema's `metadataExtraction` declarations. For each declared metadata field (rules, constraints, scenarios, etc.), the extraction engine loads the referenced artifact from `SpecRepository`, parses it via `ArtifactParser.parse()`, runs the declared extractors against the AST, and produces the same structured output as fresh metadata would. Only sections matching the `sections` filter are included when present. Extractors whose selectors match no nodes are silently skipped. Emit a staleness warning for this spec.
 3. **Available steps** — list all steps declared in the schema's `workflow[]`, each annotated with whether it is currently available. Unavailable steps must name the blocking artifacts.
 
@@ -130,7 +130,7 @@ If a pattern or `dependsOn` entry references a workspace name that has no corres
 - Steps 1–4 (include/exclude patterns) are applied before `dependsOn` traversal (step 5)
 - Specs added via `dependsOn` traversal are never removed by exclude rules
 - A spec always appears at most once in the context output, at the position of the first include
-- `CompileContext` must not perform direct filesystem reads — all file access goes through `SpecRepository` (for spec files) or `FileReader` (for `config.context` file entries)
+- `CompileContext` must not perform direct filesystem reads — all file access goes through `SpecRepository` (for spec files and metadata) or `FileReader` (for `config.context` file entries)
 - The caller resolves the config and constructs all `SpecRepository` and `FileReader` instances before calling the constructor
 - The `specs` map must contain one entry per workspace declared in `specd.yaml`; workspaces missing from the map produce a warning, not an error
 - Artifact instructions, rules, and delta context are NOT part of the context block — they are retrieved via `GetArtifactInstruction`
@@ -139,7 +139,7 @@ If a pattern or `dependsOn` entry references a workspace name that has no corres
 - `depth` is only meaningful when `followDeps: true`; it limits traversal levels (1 = direct deps only)
 - `sections` applies only to spec content rendering; project context entries and available steps are unaffected
 - Cycle detection is mandatory — cycles in `dependsOn` must not cause infinite loops
-- Metadata-based content (fresh `.specd-metadata.yaml`) is always preferred; the `metadataExtraction` fallback is only used when metadata is absent or stale
+- Fresh metadata (via `SpecRepository.metadata()`) is always preferred; the `metadataExtraction` fallback is only used when metadata is absent or stale
 
 ## Examples
 

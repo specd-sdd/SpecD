@@ -20,7 +20,7 @@ function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockReturnValue(kernel)
+  vi.mocked(createCliKernel).mockResolvedValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -127,7 +127,7 @@ describe('spec generate-metadata', () => {
         workspace: 'default',
       }),
     )
-    expect(stdout()).toContain('wrote .specd-metadata.yaml')
+    expect(stdout()).toContain('wrote metadata for')
   })
 
   it('passes force flag when --write --force is used', async () => {

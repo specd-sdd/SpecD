@@ -8,7 +8,7 @@ When a spec's content changes outside the normal archive flow, its metadata beco
 
 ### Requirement: Removes contentHashes
 
-When executed, the use case reads the existing `.specd-metadata.yaml`, removes the `contentHashes` key from the parsed YAML, and writes the result back. The write uses `force: true` to skip conflict detection — invalidation is always unconditional.
+When executed, the use case reads the existing metadata via `SpecRepository.metadata()`, removes the `contentHashes` key from the parsed YAML, and writes the result back via `SpecRepository.saveMetadata()`. The write uses `force: true` to skip conflict detection — invalidation is always unconditional.
 
 ### Requirement: Preserves other fields
 
@@ -22,20 +22,21 @@ If the workspace does not exist in the configured repositories, the use case thr
 
 The use case returns `null` (no-op) when:
 
-- The spec has no `.specd-metadata.yaml` file
+- The spec has no metadata file
 - The file content is not a YAML mapping (e.g. scalar, null)
 
 In all other cases it returns `{ spec: '<workspace>:<path>' }`.
 
 ### Requirement: No strict validation on write
 
-Because the use case intentionally removes `contentHashes` (a required field in `strictSpecMetadataSchema`), it bypasses `SaveSpecMetadata` and writes directly through `SpecRepository.save()`. This is the only use case that writes `.specd-metadata.yaml` without strict validation.
+Because the use case intentionally removes `contentHashes` (a required field in `strictSpecMetadataSchema`), it bypasses `SaveSpecMetadata` and writes directly through `SpecRepository.saveMetadata()`. This is the only use case that writes metadata without strict validation.
 
 ## Constraints
 
 - The use case contains no CLI or delivery logic — it operates purely through the `SpecRepository` port
 - The write is always forced (`force: true`) — there is no conflict detection for invalidation
 - The use case never deletes the metadata file — it only strips `contentHashes`
+- Metadata is read via `SpecRepository.metadata()` and written via `SpecRepository.saveMetadata()`
 
 ## Spec Dependencies
 

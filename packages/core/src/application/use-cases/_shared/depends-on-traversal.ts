@@ -8,7 +8,6 @@ import { parseSpecId } from '../../../domain/services/parse-spec-id.js'
 import { inferFormat } from '../../../domain/services/format-inference.js'
 import { extractMetadata, type SubtreeRenderer } from '../../../domain/services/extract-metadata.js'
 import { type SelectorNode } from '../../../domain/services/selector-matching.js'
-import { parseMetadata } from './parse-metadata.js'
 import { type ContextWarning } from './context-warning.js'
 import { type ResolvedSpec } from './spec-pattern-matching.js'
 
@@ -93,18 +92,17 @@ export async function traverseDependsOn(
   }
 
   const spec = new Spec(workspace, specPathObj, [])
-  const metadataArtifact = await specRepo.artifact(spec, '.specd-metadata.yaml')
+  const metadata = await specRepo.metadata(spec)
 
   let dependsOn: string[] | undefined
 
-  if (metadataArtifact !== null) {
-    const metadata = parseMetadata(metadataArtifact.content)
+  if (metadata !== null) {
     dependsOn = metadata.dependsOn
   } else {
     warnings.push({
       type: 'missing-metadata',
       path: key,
-      message: `No .specd-metadata.yaml for '${key}' — dependency traversal may be incomplete. Run metadata generation to fix.`,
+      message: `No metadata for '${key}' — dependency traversal may be incomplete. Run metadata generation to fix.`,
     })
 
     // Attempt fallback extraction from spec content

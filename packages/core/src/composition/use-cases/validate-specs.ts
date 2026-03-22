@@ -56,7 +56,11 @@ export function createValidateSpecs(
         createSpecRepository(
           'fs',
           { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
-          { specsPath: ws.specsPath, ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}) },
+          {
+            specsPath: ws.specsPath,
+            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
+            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
+          },
         ),
       ]),
     )

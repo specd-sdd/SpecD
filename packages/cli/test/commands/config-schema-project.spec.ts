@@ -36,7 +36,7 @@ function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockReturnValue(kernel)
+  vi.mocked(createCliKernel).mockResolvedValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -75,7 +75,7 @@ describe('config show', () => {
   it('shows approval settings', async () => {
     const config = makeMockConfig({ approvals: { spec: true, signoff: false } })
     vi.mocked(loadConfig).mockResolvedValue(config)
-    vi.mocked(createCliKernel).mockReturnValue(makeMockKernel())
+    vi.mocked(createCliKernel).mockResolvedValue(makeMockKernel())
     const stdout = captureStdout()
     captureStderr()
 
@@ -124,7 +124,7 @@ describe('config show', () => {
       ],
     })
     vi.mocked(loadConfig).mockResolvedValue(config)
-    vi.mocked(createCliKernel).mockReturnValue(makeMockKernel())
+    vi.mocked(createCliKernel).mockResolvedValue(makeMockKernel())
     const stdout = captureStdout()
     captureStderr()
     mockProcessExit()
