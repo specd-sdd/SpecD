@@ -6,6 +6,8 @@ import { createSpecRepository } from '../spec-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
+import { type SchemaRepository } from '../../application/ports/schema-repository.js'
+import { createSchemaRepository } from '../schema-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 
 /** Filesystem adapter options for `createValidateSpecs(options)`. */
@@ -14,7 +16,7 @@ export interface FsValidateSpecsOptions {
   readonly nodeModulesPaths: readonly string[]
   readonly configDir: string
   readonly schemaRef: string
-  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
+  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
 }
 
 /**
@@ -64,12 +66,18 @@ export function createValidateSpecs(
         ),
       ]),
     )
-    const workspaceSchemasPaths = new Map<string, string>()
-    for (const ws of config.workspaces) {
-      if (ws.schemasPath !== null) {
-        workspaceSchemasPaths.set(ws.name, ws.schemasPath)
-      }
-    }
+    const schemaRepos = new Map(
+      config.workspaces
+        .filter((ws) => ws.schemasPath !== null)
+        .map((ws) => [
+          ws.name,
+          createSchemaRepository(
+            'fs',
+            { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+            { schemasPath: ws.schemasPath! },
+          ),
+        ]),
+    ) as ReadonlyMap<string, SchemaRepository>
     return createValidateSpecs({
       specRepositories: specRepos,
       nodeModulesPaths: [
@@ -78,20 +86,15 @@ export function createValidateSpecs(
       ],
       configDir: config.projectRoot,
       schemaRef: config.schemaRef,
-      workspaceSchemasPaths,
+      schemaRepositories: schemaRepos,
     })
   }
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: configOrOptions.nodeModulesPaths,
     configDir: configOrOptions.configDir,
+    schemaRepositories: configOrOptions.schemaRepositories,
   })
-  const resolveSchema = new ResolveSchema(
-    schemas,
-    configOrOptions.schemaRef,
-    configOrOptions.workspaceSchemasPaths,
-    [],
-    undefined,
-  )
+  const resolveSchema = new ResolveSchema(schemas, configOrOptions.schemaRef, [], undefined)
   const schemaProvider = new LazySchemaProvider(resolveSchema)
   const parsers = createArtifactParserRegistry()
   return new ValidateSpecs(configOrOptions.specRepositories, schemaProvider, parsers)

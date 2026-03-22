@@ -17,7 +17,6 @@ import { SchemaValidationError } from '../../domain/errors/schema-validation-err
 export class ResolveSchema {
   private readonly _schemas: SchemaRegistry
   private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
   private readonly _schemaPlugins: readonly string[]
   private readonly _schemaOverrides: SchemaOperations | undefined
 
@@ -25,20 +24,17 @@ export class ResolveSchema {
    * Creates a new ResolveSchema use case.
    * @param schemas - Registry used to look up raw schema data
    * @param schemaRef - Reference identifier for the base schema to resolve
-   * @param workspaceSchemasPaths - Map of workspace names to their schema directories
    * @param schemaPlugins - Ordered list of plugin references to apply
    * @param schemaOverrides - Optional override operations to apply last
    */
   constructor(
     schemas: SchemaRegistry,
     schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
     schemaPlugins: readonly string[],
     schemaOverrides: SchemaOperations | undefined,
   ) {
     this._schemas = schemas
     this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
     this._schemaPlugins = schemaPlugins
     this._schemaOverrides = schemaOverrides
   }
@@ -49,7 +45,7 @@ export class ResolveSchema {
    */
   async execute(): Promise<Schema> {
     // 1. Resolve base schema
-    const baseRaw = await this._schemas.resolveRaw(this._schemaRef, this._workspaceSchemasPaths)
+    const baseRaw = await this._schemas.resolveRaw(this._schemaRef)
     if (baseRaw === null) {
       throw new SchemaNotFoundError(this._schemaRef)
     }
@@ -110,7 +106,7 @@ export class ResolveSchema {
     let currentData = baseRaw.data
     while (currentData.extends !== undefined) {
       const parentRef = currentData.extends
-      const parentRaw = await this._schemas.resolveRaw(parentRef, this._workspaceSchemasPaths)
+      const parentRaw = await this._schemas.resolveRaw(parentRef)
       if (parentRaw === null) {
         throw new SchemaNotFoundError(parentRef)
       }
@@ -217,7 +213,7 @@ export class ResolveSchema {
     const layers: SchemaLayer[] = []
 
     for (const pluginRef of this._schemaPlugins) {
-      const raw = await this._schemas.resolveRaw(pluginRef, this._workspaceSchemasPaths)
+      const raw = await this._schemas.resolveRaw(pluginRef)
       if (raw === null) {
         throw new SchemaNotFoundError(pluginRef)
       }

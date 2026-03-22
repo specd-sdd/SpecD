@@ -5,6 +5,8 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
+import { type SchemaRepository } from '../../application/ports/schema-repository.js'
+import { createSchemaRepository } from '../schema-repository.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
@@ -44,8 +46,8 @@ export interface FsTransitionChangeOptions {
   readonly configDir: string
   /** Schema reference string from config. */
   readonly schemaRef: string
-  /** Map of workspace name → absolute schemas directory path. */
-  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
+  /** Map of workspace name → schema repository instance. */
+  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
   /** Absolute path to the project root. */
   readonly projectRoot: string
 }
@@ -88,12 +90,18 @@ export function createTransitionChange(
     const config = configOrContext
     const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
     const ws = getDefaultWorkspace(config)
-    const workspaceSchemasPaths = new Map<string, string>()
-    for (const w of config.workspaces) {
-      if (w.schemasPath !== null) {
-        workspaceSchemasPaths.set(w.name, w.schemasPath)
-      }
-    }
+    const schemaRepos = new Map(
+      config.workspaces
+        .filter((w) => w.schemasPath !== null)
+        .map((w) => [
+          w.name,
+          createSchemaRepository(
+            'fs',
+            { workspace: w.name, ownership: w.ownership, isExternal: w.isExternal },
+            { schemasPath: w.schemasPath! },
+          ),
+        ]),
+    ) as ReadonlyMap<string, SchemaRepository>
     return createTransitionChange(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {
@@ -110,7 +118,7 @@ export function createTransitionChange(
         ],
         configDir: config.projectRoot,
         schemaRef: config.schemaRef,
-        workspaceSchemasPaths,
+        schemaRepositories: schemaRepos,
         projectRoot: config.projectRoot,
       },
     )
@@ -130,14 +138,9 @@ export function createTransitionChange(
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: opts.nodeModulesPaths,
     configDir: opts.configDir,
+    schemaRepositories: opts.schemaRepositories,
   })
-  const resolveSchema = new ResolveSchema(
-    schemas,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
-    [],
-    undefined,
-  )
+  const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
   const schemaProvider = new LazySchemaProvider(resolveSchema)
   const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
   const hooks = new NodeHookRunner(expander)

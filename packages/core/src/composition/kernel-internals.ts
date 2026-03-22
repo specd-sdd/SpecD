@@ -25,6 +25,8 @@ import { createChangeRepository } from './change-repository.js'
 import { createArchiveRepository } from './archive-repository.js'
 import { createSpecRepository } from './spec-repository.js'
 import { createSchemaRegistry } from './schema-registry.js'
+import { createSchemaRepository } from './schema-repository.js'
+import { type SchemaRepository } from '../application/ports/schema-repository.js'
 import { createVcsAdapter } from './vcs-adapter.js'
 import { getDefaultWorkspace } from './get-default-workspace.js'
 import { type KernelOptions } from './kernel.js'
@@ -65,8 +67,6 @@ export interface KernelInternals {
   readonly yaml: YamlSerializer
   /** Schema reference string from config. */
   readonly schemaRef: string
-  /** Map of workspace name → absolute schemas directory path. */
-  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
   /** Schema plugin references from config, in declaration order. */
   readonly schemaPlugins: readonly string[]
   /** Inline schema override operations from config. */
@@ -110,7 +110,7 @@ export async function createKernelInternals(
   const changes = createChangeRepository('fs', wsContext, {
     ...storagePaths,
     resolveArtifactTypes: async () => {
-      const schema = await schemas.resolve(config.schemaRef, workspaceSchemasPaths)
+      const schema = await schemas.resolve(config.schemaRef)
       return schema !== null ? schema.artifacts() : []
     },
   })
@@ -148,17 +148,25 @@ export async function createKernelInternals(
     )
   }
 
+  const schemaRepositories = new Map<string, SchemaRepository>()
+  for (const ws of config.workspaces) {
+    if (ws.schemasPath !== null) {
+      schemaRepositories.set(
+        ws.name,
+        createSchemaRepository(
+          'fs',
+          { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+          { schemasPath: ws.schemasPath },
+        ),
+      )
+    }
+  }
+
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths,
     configDir: config.projectRoot,
+    schemaRepositories,
   })
-
-  const workspaceSchemasPaths = new Map<string, string>()
-  for (const ws of config.workspaces) {
-    if (ws.schemasPath !== null) {
-      workspaceSchemasPaths.set(ws.name, ws.schemasPath)
-    }
-  }
 
   const expander = new TemplateExpander({ project: { root: config.projectRoot } })
 
@@ -177,7 +185,6 @@ export async function createKernelInternals(
     yaml: new NodeYamlSerializer(),
     expander,
     schemaRef: config.schemaRef,
-    workspaceSchemasPaths,
     schemaPlugins: config.schemaPlugins ?? [],
     schemaOverrides: config.schemaOverrides,
   }

@@ -1,7 +1,12 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { type Command } from 'commander'
-import { type SpecdConfig, createSchemaRegistry, type SchemaRawResult } from '@specd/core'
+import {
+  type SpecdConfig,
+  createSchemaRegistry,
+  createSchemaRepository,
+  type SchemaRawResult,
+} from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { cliError, handleError } from '../../handle-error.js'
 
@@ -11,22 +16,31 @@ import { cliError, handleError } from '../../handle-error.js'
  * @returns A schema registry instance configured for filesystem access
  */
 function buildSchemaRegistry(config: SpecdConfig) {
+  const schemaRepositories = buildSchemaRepositories(config)
   return createSchemaRegistry('fs', {
     nodeModulesPaths: [path.join(config.projectRoot, 'node_modules')],
     configDir: config.projectRoot,
+    schemaRepositories,
   })
 }
 
 /**
- * Builds a map of workspace names to their schema directory paths.
+ * Builds a map of workspace names to their SchemaRepository instances.
  * @param config - The specd configuration containing workspace definitions
- * @returns A map from workspace name to schemas path
+ * @returns A map from workspace name to SchemaRepository
  */
-function buildWorkspaceSchemasPaths(config: SpecdConfig): Map<string, string> {
-  const map = new Map<string, string>()
+function buildSchemaRepositories(config: SpecdConfig) {
+  const map = new Map<string, ReturnType<typeof createSchemaRepository>>()
   for (const ws of config.workspaces) {
     if (ws.schemasPath !== null) {
-      map.set(ws.name, ws.schemasPath)
+      map.set(
+        ws.name,
+        createSchemaRepository(
+          'fs',
+          { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+          { schemasPath: ws.schemasPath },
+        ),
+      )
     }
   }
   return map
@@ -48,16 +62,16 @@ export function registerSchemaFork(parent: Command): void {
       try {
         const { config } = await resolveCliContext({ configPath: opts.config })
         const registry = buildSchemaRegistry(config)
-        const wsPaths = buildWorkspaceSchemasPaths(config)
 
         // Resolve source schema
-        const raw: SchemaRawResult | null = await registry.resolveRaw(ref, wsPaths)
+        const raw: SchemaRawResult | null = await registry.resolveRaw(ref)
         if (raw === null) {
           cliError(`schema '${ref}' not found`, undefined, 3, 'SCHEMA_NOT_FOUND')
         }
 
         // Determine target
-        const targetSchemasPath = wsPaths.get(opts.workspace)
+        const targetWs = config.workspaces.find((ws) => ws.name === opts.workspace)
+        const targetSchemasPath = targetWs?.schemasPath ?? undefined
         if (targetSchemasPath === undefined) {
           cliError(
             `workspace '${opts.workspace}' has no schemas directory configured`,

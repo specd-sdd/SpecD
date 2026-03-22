@@ -3,6 +3,8 @@ import { GetActiveSchema } from '../../application/use-cases/get-active-schema.j
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
+import { type SchemaRepository } from '../../application/ports/schema-repository.js'
+import { createSchemaRepository } from '../schema-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 
 /** Filesystem adapter options for `createGetActiveSchema(options)`. */
@@ -10,7 +12,7 @@ export interface FsGetActiveSchemaOptions {
   readonly nodeModulesPaths: readonly string[]
   readonly configDir: string
   readonly schemaRef: string
-  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
+  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
   readonly schemaPlugins?: readonly string[]
   readonly schemaOverrides?: SchemaOperations
 }
@@ -50,24 +52,30 @@ export function createGetActiveSchema(
   kernelOpts?: GetActiveSchemaKernelOptions,
 ): GetActiveSchema {
   if (isSpecdConfig(configOrOptions)) {
+    const schemaRepos = new Map(
+      configOrOptions.workspaces
+        .filter((ws) => ws.schemasPath !== null)
+        .map((ws) => [
+          ws.name,
+          createSchemaRepository(
+            'fs',
+            { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+            { schemasPath: ws.schemasPath! },
+          ),
+        ]),
+    ) as ReadonlyMap<string, SchemaRepository>
     const schemas = createSchemaRegistry('fs', {
       nodeModulesPaths: [
         path.join(configOrOptions.projectRoot, 'node_modules'),
         ...(kernelOpts?.extraNodeModulesPaths ?? []),
       ],
       configDir: configOrOptions.projectRoot,
+      schemaRepositories: schemaRepos,
     })
     const schemaRef = configOrOptions.schemaRef
-    const workspaceSchemasPaths = new Map<string, string>()
-    for (const ws of configOrOptions.workspaces) {
-      if (ws.schemasPath !== null) {
-        workspaceSchemasPaths.set(ws.name, ws.schemasPath)
-      }
-    }
     const resolveSchema = new ResolveSchema(
       schemas,
       schemaRef,
-      workspaceSchemasPaths,
       configOrOptions.schemaPlugins ?? [],
       configOrOptions.schemaOverrides,
     )
@@ -76,11 +84,11 @@ export function createGetActiveSchema(
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: configOrOptions.nodeModulesPaths,
     configDir: configOrOptions.configDir,
+    schemaRepositories: configOrOptions.schemaRepositories,
   })
   const resolveSchema = new ResolveSchema(
     schemas,
     configOrOptions.schemaRef,
-    configOrOptions.workspaceSchemasPaths,
     configOrOptions.schemaPlugins ?? [],
     configOrOptions.schemaOverrides,
   )

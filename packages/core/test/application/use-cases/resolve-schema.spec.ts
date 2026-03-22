@@ -54,7 +54,7 @@ async function resolve(
   plugins: string[] = [],
   overrides?: SchemaOperations,
 ) {
-  const sut = new ResolveSchema(registry, ref, new Map(), plugins, overrides)
+  const sut = new ResolveSchema(registry, ref, plugins, overrides)
   return sut.execute()
 }
 
@@ -1417,7 +1417,7 @@ describe('ResolveSchema — idempotency', () => {
   it('produces equivalent schema on repeated calls', async () => {
     const data = minimalData({ name: 'stable' })
     const registry = makeRegistry({ '#stable': rawResult(data) })
-    const sut = new ResolveSchema(registry, '#stable', new Map(), [], undefined)
+    const sut = new ResolveSchema(registry, '#stable', [], undefined)
 
     const first = await sut.execute()
     const second = await sut.execute()

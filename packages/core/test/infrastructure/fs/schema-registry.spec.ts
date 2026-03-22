@@ -3,6 +3,8 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { FsSchemaRegistry } from '../../../src/infrastructure/fs/schema-registry.js'
+import { FsSchemaRepository } from '../../../src/infrastructure/fs/schema-repository.js'
+import { type SchemaRepository } from '../../../src/application/ports/schema-repository.js'
 import { SchemaValidationError } from '../../../src/domain/errors/schema-validation-error.js'
 
 // ---- Setup / teardown helpers ----
@@ -12,7 +14,6 @@ interface RegistryContext {
   tmpDir: string
   nodeModulesPath: string
   defaultSchemasPath: string
-  workspaceSchemasPaths: Map<string, string>
 }
 
 async function setupRegistry(): Promise<RegistryContext> {
@@ -21,9 +22,23 @@ async function setupRegistry(): Promise<RegistryContext> {
   const defaultSchemasPath = path.join(tmpDir, 'schemas', 'default')
   await fs.mkdir(nodeModulesPath, { recursive: true })
   await fs.mkdir(defaultSchemasPath, { recursive: true })
-  const registry = new FsSchemaRegistry({ nodeModulesPaths: [nodeModulesPath], configDir: tmpDir })
-  const workspaceSchemasPaths = new Map([['default', defaultSchemasPath]])
-  return { registry, tmpDir, nodeModulesPath, defaultSchemasPath, workspaceSchemasPaths }
+  const schemaRepositories: Map<string, SchemaRepository> = new Map([
+    [
+      'default',
+      new FsSchemaRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        schemasPath: defaultSchemasPath,
+      }),
+    ],
+  ])
+  const registry = new FsSchemaRegistry({
+    nodeModulesPaths: [nodeModulesPath],
+    configDir: tmpDir,
+    schemaRepositories,
+  })
+  return { registry, tmpDir, nodeModulesPath, defaultSchemasPath }
 }
 
 async function writeSchemaFile(dir: string, name: string, content: string): Promise<string> {
@@ -111,7 +126,7 @@ afterEach(async () => {
 describe('Schema resolution — bare name resolved from default workspace', () => {
   it('resolves bare name to default workspace schemas path', async () => {
     await writeSchemaFile(ctx.defaultSchemasPath, 'my-schema', MINIMAL_SCHEMA)
-    const schema = await ctx.registry.resolve('my-schema', ctx.workspaceSchemasPaths)
+    const schema = await ctx.registry.resolve('my-schema')
     expect(schema).not.toBeNull()
     expect(schema?.name()).toBe('minimal')
     expect(schema?.version()).toBe(1)
@@ -121,7 +136,7 @@ describe('Schema resolution — bare name resolved from default workspace', () =
 describe('Schema resolution — #name resolved from default workspace', () => {
   it('resolves #name to default workspace schemas path', async () => {
     await writeSchemaFile(ctx.defaultSchemasPath, 'spec-driven', MINIMAL_SCHEMA)
-    const schema = await ctx.registry.resolve('#spec-driven', ctx.workspaceSchemasPaths)
+    const schema = await ctx.registry.resolve('#spec-driven')
     expect(schema).not.toBeNull()
     expect(schema?.name()).toBe('minimal')
   })
@@ -132,11 +147,32 @@ describe('Schema resolution — #workspace:name', () => {
     const billingPath = path.join(ctx.tmpDir, 'schemas', 'billing')
     await fs.mkdir(billingPath, { recursive: true })
     await writeSchemaFile(billingPath, 'billing-schema', MINIMAL_SCHEMA)
-    const paths = new Map([
-      ['default', ctx.defaultSchemasPath],
-      ['billing', billingPath],
+    const schemaRepositories: Map<string, SchemaRepository> = new Map([
+      [
+        'default',
+        new FsSchemaRepository({
+          workspace: 'default',
+          ownership: 'owned',
+          isExternal: false,
+          schemasPath: ctx.defaultSchemasPath,
+        }),
+      ],
+      [
+        'billing',
+        new FsSchemaRepository({
+          workspace: 'billing',
+          ownership: 'owned',
+          isExternal: false,
+          schemasPath: billingPath,
+        }),
+      ],
     ])
-    const schema = await ctx.registry.resolve('#billing:billing-schema', paths)
+    const registry = new FsSchemaRegistry({
+      nodeModulesPaths: [ctx.nodeModulesPath],
+      configDir: ctx.tmpDir,
+      schemaRepositories,
+    })
+    const schema = await registry.resolve('#billing:billing-schema')
     expect(schema).not.toBeNull()
     expect(schema?.name()).toBe('minimal')
   })
@@ -147,7 +183,7 @@ describe('Schema resolution — npm package resolved', () => {
     const pkgDir = path.join(ctx.nodeModulesPath, '@specd', 'schema-std')
     await fs.mkdir(pkgDir, { recursive: true })
     await fs.writeFile(path.join(pkgDir, 'schema.yaml'), MINIMAL_SCHEMA, 'utf-8')
-    const schema = await ctx.registry.resolve('@specd/schema-std', ctx.workspaceSchemasPaths)
+    const schema = await ctx.registry.resolve('@specd/schema-std')
     expect(schema).not.toBeNull()
     expect(schema?.name()).toBe('minimal')
   })
@@ -157,7 +193,7 @@ describe('Schema resolution — direct path resolved', () => {
   it('resolves an absolute path directly', async () => {
     const schemaFile = path.join(ctx.tmpDir, 'custom-schema.yaml')
     await fs.writeFile(schemaFile, MINIMAL_SCHEMA, 'utf-8')
-    const schema = await ctx.registry.resolve(schemaFile, ctx.workspaceSchemasPaths)
+    const schema = await ctx.registry.resolve(schemaFile)
     expect(schema).not.toBeNull()
     expect(schema?.name()).toBe('minimal')
   })
@@ -165,7 +201,7 @@ describe('Schema resolution — direct path resolved', () => {
 
 describe('Schema resolution — schema not found', () => {
   it('returns null when the schema file does not exist', async () => {
-    const schema = await ctx.registry.resolve('nonexistent', ctx.workspaceSchemasPaths)
+    const schema = await ctx.registry.resolve('nonexistent')
     expect(schema).toBeNull()
   })
 })
@@ -177,7 +213,7 @@ describe('Schema resolution — schema not found', () => {
 describe('Schema validation on load — minimal valid schema', () => {
   it('loads a minimal schema with name, version, and artifacts', async () => {
     await writeSchemaFile(ctx.defaultSchemasPath, 'minimal', MINIMAL_SCHEMA)
-    const schema = await ctx.registry.resolve('minimal', ctx.workspaceSchemasPaths)
+    const schema = await ctx.registry.resolve('minimal')
     expect(schema).not.toBeNull()
     expect(schema?.artifacts()).toHaveLength(1)
     expect(schema?.artifacts()[0]!.id).toBe('spec')
@@ -188,7 +224,7 @@ describe('Schema validation on load — minimal valid schema', () => {
 describe('Schema validation on load — full schema', () => {
   it('loads a full schema with artifacts and workflow', async () => {
     await writeSchemaFile(ctx.defaultSchemasPath, 'full', FULL_SCHEMA)
-    const schema = await ctx.registry.resolve('full', ctx.workspaceSchemasPaths)
+    const schema = await ctx.registry.resolve('full')
     expect(schema).not.toBeNull()
     expect(schema?.name()).toBe('full-schema')
     expect(schema?.version()).toBe(2)
@@ -210,7 +246,7 @@ artifacts:
 futureField: ignored
 `
     await writeSchemaFile(ctx.defaultSchemasPath, 'compat', content)
-    const schema = await ctx.registry.resolve('compat', ctx.workspaceSchemasPaths)
+    const schema = await ctx.registry.resolve('compat')
     expect(schema).not.toBeNull()
     expect(schema?.name()).toBe('compat')
   })
@@ -227,9 +263,7 @@ artifacts:
     output: spec.md
 `
     await writeSchemaFile(ctx.defaultSchemasPath, 'no-name', content)
-    await expect(ctx.registry.resolve('no-name', ctx.workspaceSchemasPaths)).rejects.toThrow(
-      SchemaValidationError,
-    )
+    await expect(ctx.registry.resolve('no-name')).rejects.toThrow(SchemaValidationError)
   })
 
   it('throws SchemaValidationError when artifacts is missing', async () => {
@@ -239,9 +273,7 @@ name: no-artifacts
 version: 1
 `
     await writeSchemaFile(ctx.defaultSchemasPath, 'no-artifacts', content)
-    await expect(ctx.registry.resolve('no-artifacts', ctx.workspaceSchemasPaths)).rejects.toThrow(
-      SchemaValidationError,
-    )
+    await expect(ctx.registry.resolve('no-artifacts')).rejects.toThrow(SchemaValidationError)
   })
 })
 
@@ -260,9 +292,7 @@ artifacts:
     output: spec2.md
 `
     await writeSchemaFile(ctx.defaultSchemasPath, 'dup-id', content)
-    await expect(ctx.registry.resolve('dup-id', ctx.workspaceSchemasPaths)).rejects.toThrow(
-      SchemaValidationError,
-    )
+    await expect(ctx.registry.resolve('dup-id')).rejects.toThrow(SchemaValidationError)
   })
 })
 
@@ -281,9 +311,7 @@ workflow:
   - step: designing
 `
     await writeSchemaFile(ctx.defaultSchemasPath, 'dup-step', content)
-    await expect(ctx.registry.resolve('dup-step', ctx.workspaceSchemasPaths)).rejects.toThrow(
-      SchemaValidationError,
-    )
+    await expect(ctx.registry.resolve('dup-step')).rejects.toThrow(SchemaValidationError)
   })
 })
 
@@ -301,9 +329,7 @@ artifacts:
       - nonexistent
 `
     await writeSchemaFile(ctx.defaultSchemasPath, 'bad-requires', content)
-    await expect(ctx.registry.resolve('bad-requires', ctx.workspaceSchemasPaths)).rejects.toThrow(
-      SchemaValidationError,
-    )
+    await expect(ctx.registry.resolve('bad-requires')).rejects.toThrow(SchemaValidationError)
   })
 })
 
@@ -326,9 +352,7 @@ artifacts:
     requires: [a]
 `
     await writeSchemaFile(ctx.defaultSchemasPath, 'cycle', content)
-    await expect(ctx.registry.resolve('cycle', ctx.workspaceSchemasPaths)).rejects.toThrow(
-      SchemaValidationError,
-    )
+    await expect(ctx.registry.resolve('cycle')).rejects.toThrow(SchemaValidationError)
   })
 })
 
@@ -349,9 +373,7 @@ artifacts:
     requires: [a]
 `
     await writeSchemaFile(ctx.defaultSchemasPath, 'opt-violation', content)
-    await expect(ctx.registry.resolve('opt-violation', ctx.workspaceSchemasPaths)).rejects.toThrow(
-      SchemaValidationError,
-    )
+    await expect(ctx.registry.resolve('opt-violation')).rejects.toThrow(SchemaValidationError)
   })
 })
 
@@ -373,9 +395,9 @@ artifacts:
         required: true
 `
     await writeSchemaFile(ctx.defaultSchemasPath, 'bad-delta-validations', content)
-    await expect(
-      ctx.registry.resolve('bad-delta-validations', ctx.workspaceSchemasPaths),
-    ).rejects.toThrow(SchemaValidationError)
+    await expect(ctx.registry.resolve('bad-delta-validations')).rejects.toThrow(
+      SchemaValidationError,
+    )
   })
 })
 
@@ -403,7 +425,7 @@ artifacts:
       'utf-8',
     )
 
-    const schema = await ctx.registry.resolve('with-template', ctx.workspaceSchemasPaths)
+    const schema = await ctx.registry.resolve('with-template')
     expect(schema).not.toBeNull()
     const artifact = schema?.artifact('spec')
     expect(artifact?.template).toBe('# Spec Template\n<!-- Fill this in -->')
@@ -426,16 +448,14 @@ artifacts:
     template: templates/nonexistent.md
 `,
     )
-    await expect(
-      ctx.registry.resolve('missing-template', ctx.workspaceSchemasPaths),
-    ).rejects.toThrow(SchemaValidationError)
+    await expect(ctx.registry.resolve('missing-template')).rejects.toThrow(SchemaValidationError)
   })
 })
 
 describe('Template resolution — no template declared', () => {
   it('leaves template undefined when no template field is declared', async () => {
     await writeSchemaFile(ctx.defaultSchemasPath, 'no-template', MINIMAL_SCHEMA)
-    const schema = await ctx.registry.resolve('no-template', ctx.workspaceSchemasPaths)
+    const schema = await ctx.registry.resolve('no-template')
     expect(schema?.artifact('spec')?.template).toBeUndefined()
   })
 })
@@ -451,7 +471,7 @@ describe('list — workspace schemas listed first, npm schemas last', () => {
     await fs.mkdir(pkgDir, { recursive: true })
     await fs.writeFile(path.join(pkgDir, 'schema.yaml'), MINIMAL_SCHEMA, 'utf-8')
 
-    const entries = await ctx.registry.list(ctx.workspaceSchemasPaths)
+    const entries = await ctx.registry.list()
     expect(entries.length).toBe(2)
     expect(entries[0]!.source).toBe('workspace')
     expect(entries[1]!.source).toBe('npm')
@@ -461,7 +481,7 @@ describe('list — workspace schemas listed first, npm schemas last', () => {
 describe('list — workspace entry has correct ref and name', () => {
   it('generates #name ref for default workspace schemas', async () => {
     await writeSchemaFile(ctx.defaultSchemasPath, 'my-schema', MINIMAL_SCHEMA)
-    const entries = await ctx.registry.list(ctx.workspaceSchemasPaths)
+    const entries = await ctx.registry.list()
     expect(entries).toHaveLength(1)
     expect(entries[0]!.ref).toBe('#my-schema')
     expect(entries[0]!.name).toBe('my-schema')
@@ -474,11 +494,32 @@ describe('list — non-default workspace has qualified ref', () => {
     const billingPath = path.join(ctx.tmpDir, 'schemas', 'billing')
     await fs.mkdir(billingPath, { recursive: true })
     await writeSchemaFile(billingPath, 'billing-schema', MINIMAL_SCHEMA)
-    const paths = new Map([
-      ['default', ctx.defaultSchemasPath],
-      ['billing', billingPath],
+    const schemaRepositories: Map<string, SchemaRepository> = new Map([
+      [
+        'default',
+        new FsSchemaRepository({
+          workspace: 'default',
+          ownership: 'owned',
+          isExternal: false,
+          schemasPath: ctx.defaultSchemasPath,
+        }),
+      ],
+      [
+        'billing',
+        new FsSchemaRepository({
+          workspace: 'billing',
+          ownership: 'owned',
+          isExternal: false,
+          schemasPath: billingPath,
+        }),
+      ],
     ])
-    const entries = await ctx.registry.list(paths)
+    const registry = new FsSchemaRegistry({
+      nodeModulesPaths: [ctx.nodeModulesPath],
+      configDir: ctx.tmpDir,
+      schemaRepositories,
+    })
+    const entries = await registry.list()
     const billing = entries.find((e) => e.workspace === 'billing')
     expect(billing?.ref).toBe('#billing:billing-schema')
     expect(billing?.name).toBe('billing-schema')
@@ -491,7 +532,7 @@ describe('list — npm schema entry has correct ref', () => {
     await fs.mkdir(pkgDir, { recursive: true })
     await fs.writeFile(path.join(pkgDir, 'schema.yaml'), MINIMAL_SCHEMA, 'utf-8')
 
-    const entries = await ctx.registry.list(ctx.workspaceSchemasPaths)
+    const entries = await ctx.registry.list()
     expect(entries).toHaveLength(1)
     expect(entries[0]!.ref).toBe('@specd/schema-enterprise')
     expect(entries[0]!.source).toBe('npm')
@@ -503,24 +544,39 @@ describe('list — directory without schema.yaml is skipped', () => {
   it('ignores workspace subdirectories that have no schema.yaml', async () => {
     const emptyDir = path.join(ctx.defaultSchemasPath, 'empty')
     await fs.mkdir(emptyDir, { recursive: true })
-    const entries = await ctx.registry.list(ctx.workspaceSchemasPaths)
+    const entries = await ctx.registry.list()
     expect(entries).toHaveLength(0)
   })
 })
 
 describe('list — missing schemas path returns empty', () => {
   it('returns no entries when the schemas path does not exist', async () => {
-    const paths = new Map([['default', path.join(ctx.tmpDir, 'nonexistent')]])
-    const entries = await ctx.registry.list(paths)
+    const nonexistentPath = path.join(ctx.tmpDir, 'nonexistent')
+    const schemaRepositories: Map<string, SchemaRepository> = new Map([
+      [
+        'default',
+        new FsSchemaRepository({
+          workspace: 'default',
+          ownership: 'owned',
+          isExternal: false,
+          schemasPath: nonexistentPath,
+        }),
+      ],
+    ])
+    const registry = new FsSchemaRegistry({
+      nodeModulesPaths: [ctx.nodeModulesPath],
+      configDir: ctx.tmpDir,
+      schemaRepositories,
+    })
+    const entries = await registry.list()
     expect(entries).toHaveLength(0)
   })
 })
 
 describe('resolve — workspace-qualified ref with unknown workspace', () => {
-  it('throws SchemaValidationError for unknown workspace in # ref', async () => {
-    await expect(
-      ctx.registry.resolve('#nonexistent:my-schema', ctx.workspaceSchemasPaths),
-    ).rejects.toThrow(/workspace 'nonexistent' not found/)
+  it('returns null for unknown workspace in # ref', async () => {
+    const schema = await ctx.registry.resolve('#nonexistent:my-schema')
+    expect(schema).toBeNull()
   })
 })
 
@@ -535,7 +591,7 @@ artifacts: []
     await fs.mkdir(path.join(ctx.tmpDir, 'custom'), { recursive: true })
     await fs.writeFile(path.join(ctx.tmpDir, 'custom', 'schema.yaml'), schemaContent, 'utf-8')
 
-    const result = await ctx.registry.resolve('./custom/schema.yaml', ctx.workspaceSchemasPaths)
+    const result = await ctx.registry.resolve('./custom/schema.yaml')
     expect(result).not.toBeNull()
     expect(result!.name()).toBe('relative-schema')
   })
