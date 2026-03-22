@@ -14,6 +14,9 @@ dist/
 # Codex
 .codex/
 
+# OpenCode
+.opencode/
+
 # Environment
 .env
 .env.local
