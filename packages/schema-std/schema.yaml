@@ -118,6 +118,14 @@ artifacts:
       that section. List each dependency as `- <workspace>:<capability-path>` with a
       brief reason.
 
+      If a spec listed in the proposal does not need changes to its spec.md (e.g. only
+      other artifacts change), create a no-op delta instead of skipping the file:
+        `deltas/<workspace>/<capability-path>/spec.md.delta.yaml`:
+        ```yaml
+        - op: no-op
+          description: "<reason why no spec changes are needed>"
+        ```
+
       Common pitfalls:
       - Forgetting to read the existing spec before writing a MODIFIED delta — the
         selector must match the exact heading text.
@@ -193,6 +201,14 @@ artifacts:
         The selector must target the `### Requirement: <name>` section by its exact heading text.
 
       Every `#### Scenario:` heading in `content` must use exactly four hashtags.
+
+      If a spec listed in the proposal does not need changes to its verify.md (e.g.
+      existing scenarios remain valid), create a no-op delta instead of skipping the file:
+        `deltas/<workspace>/<capability-path>/verify.md.delta.yaml`:
+        ```yaml
+        - op: no-op
+          description: "<reason why no verify changes are needed>"
+        ```
     rules:
       post:
         - id: specs-verify-coverage

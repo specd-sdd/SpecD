@@ -132,6 +132,15 @@
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** the rule passes without error regardless of `required`
 
+#### Scenario: no-op delta bypasses deltaValidations entirely
+
+- **GIVEN** an artifact with `deltaValidations` rules including a `required: true` rule
+- **AND** the delta file contains only `[{ op: "no-op" }]`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `deltaValidations` are not evaluated
+- **AND** `result.passed` is `true`
+- **AND** `markComplete` is called with the hash of the raw delta file content
+
 ### Requirement: Delta application preview and conflict detection
 
 #### Scenario: DeltaApplicationError blocks validation
@@ -158,6 +167,14 @@
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** `validations[]` run against the artifact file content directly, with no application preview step
 
+#### Scenario: no-op delta skips application preview
+
+- **GIVEN** an artifact with `delta: true` and a delta file containing only `[{ op: "no-op" }]`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** no base spec is loaded from `SpecRepository`
+- **AND** `parser.apply()` is not called
+- **AND** `markComplete` is called with the hash of the raw delta file content
+
 ### Requirement: Structural validation
 
 #### Scenario: Required section absent — failure
@@ -178,6 +195,13 @@
 - **GIVEN** two `required: true` validation rules both fail for the same artifact
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** `result.failures` contains both failures — validation does not stop at the first
+
+#### Scenario: no-op delta skips structural validation
+
+- **GIVEN** an artifact with `validations` rules and a delta file containing only `[{ op: "no-op" }]`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `validations[]` rules are not evaluated against the base content
+- **AND** `markComplete` is called with the hash of the raw delta file content
 
 ### Requirement: Hash computation and markComplete
 

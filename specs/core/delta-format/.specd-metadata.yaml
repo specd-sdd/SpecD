@@ -81,8 +81,8 @@ rules:
 
         Each delta entry must include:
 
-        - `op` (string, required) — one of `added`, `modified`, `removed`
-        - `selector` (selector, required for `modified` and `removed`, not valid for `added`) — identifies the existing node to modify or remove; for `added` entries, use `position.parent` to scope the insertion; see Requirement: Selector model
+        - `op` (string, required) — one of `added`, `modified`, `removed`, `no-op`
+        - `selector` (selector, required for `modified` and `removed`, not valid for `added` or `no-op`) — identifies the existing node to modify or remove; for `added` entries, use `position.parent` to scope the insertion; see Requirement: Selector model
         - `position` (object, optional, `added` only) — declares where the new node is inserted. Contains:
           - `parent` (selector, optional) — scopes the insertion to the children of the matched node; if omitted, insertion happens at document root level
           - `after` (selector, optional) — inserts immediately after the matched sibling within the parent scope; if the selector resolves to no node, falls back to appending at the end of the parent scope with a warning
@@ -93,10 +93,15 @@ rules:
           - If only `parent` is specified (no placement hint), the new node is appended as the last child of the matched parent
           - If `position` is omitted entirely, the new node is appended at the end of the document
         - `rename` (string, optional, `modified` only) — new value for the node's identifying property (e.g. new heading text for a `section`, new key for a `property` or `pair`); the selector still uses the current name to locate the node; if the rename target already exists as a sibling node, `apply` must reject with `DeltaApplicationError`
-        - `content` (string, optional) — the full new node content in the artifact's native format (e.g. markdown for `.md` files); for `added`, includes the identifying line (e.g. `### Heading` for markdown, key name for YAML/JSON) as the first line; for `modified`, contains only the body — the identifying line is preserved or replaced via `rename`; `apply` parses this string using `ArtifactParser.parse()` before inserting into the AST; mutually exclusive with `value`
-        - `value` (any, optional) — the node's value as a structured YAML value; used for structured nodes (e.g. JSON properties, YAML pairs); mutually exclusive with `content`
-        - `strategy` (`replace` | `append` | `merge-by`, optional, default `replace`) — array merge strategy; only valid when the selector targets an array or sequence node; see Requirement: Selector model
-        - `mergeKey` (string, optional) — key field for `merge-by` strategy; required when `strategy: merge-by`
+        - `content` (string, optional) — the full new node content in the artifact's native format (e.g. markdown for `.md` files); for `added`, includes the identifying line (e.g. `### Heading` for markdown, key name for YAML/JSON) as the first line; for `modified`, contains only the body — the identifying line is preserved or replaced via `rename`; `apply` parses this string using `ArtifactParser.parse()` before inserting into the AST; mutually exclusive with `value`; not valid for `no-op`
+        - `value` (any, optional) — the node's value as a structured YAML value; used for structured nodes (e.g. JSON properties, YAML pairs); mutually exclusive with `content`; not valid for `no-op`
+        - `strategy` (`replace` | `append` | `merge-by`, optional, default `replace`) — array merge strategy; only valid when the selector targets an array or sequence node; see Requirement: Selector model; not valid for `no-op`
+        - `mergeKey` (string, optional) — key field for `merge-by` strategy; required when `strategy: merge-by`; not valid for `no-op`
+        - `description` (string, optional) — free-text description of what this delta entry does or why; ignored during application; valid on all operation types
+
+        **`no-op` operation:**
+
+        `no-op` explicitly declares that the artifact requires no changes for this spec. It is used when a change touches a spec but a particular artifact (e.g. `verify.md`) does not need updates — the existing content is already valid. The `no-op` entry MUST be the only entry in the delta array. If a `no-op` entry coexists with any other entry, `parseDelta` MUST throw a `SchemaValidationError` explaining that `no-op` cannot be mixed with other operations. A `no-op` entry MUST NOT contain `selector`, `position`, `rename`, `content`, `value`, `strategy`, or `mergeKey` — only `op` and optionally `description` are valid.
 
         Example (`spec.md.delta.yaml`):
 
@@ -182,6 +187,14 @@ rules:
             name: 'Run tests'
             run: 'pnpm test --coverage'
         ```
+
+        Example (`verify.md.delta.yaml` — no-op):
+
+        ```yaml
+        # Existing verify scenarios remain valid — no changes needed
+        - op: no-op
+          description: "Constructor signature changed but all existing scenarios still apply"
+        ```
   - requirement: Delta application
     rules:
       - |-
@@ -190,8 +203,9 @@ rules:
         - `modified`: replace the targeted node body (`content`) and/or rename the identifying field (`rename`)
         - `removed`: remove the targeted node
         - `added`: insert new node(s) according to `position` semantics
+          `apply` first resolves selectors against the original AST to guarantee atomicity. If any selector is invalid or ambiguous, `apply` fails with `DeltaApplicationError` and applies nothing.
 
-        `apply` first resolves selectors against the original AST to guarantee atomicity. If any selector is invalid or ambiguous, `apply` fails with `DeltaApplicationError` and applies nothing.
+        `no-op` entries are never passed to `apply` — they are handled entirely by the caller (e.g. `ValidateArtifacts`). When the caller detects that all parsed delta entries are `no-op`, it MUST skip loading the base artifact, skip calling `apply`, skip `deltaValidations`, and skip structural `validations`. The caller proceeds directly to hash computation on the raw delta file content and calls `markComplete`. The `no-op` operation declares that the existing artifact content is already valid — there is nothing to parse, apply, or validate.
 
         During `modified` operations on markdown artifacts, replacing node body content must not destroy inline formatting metadata for unaffected sibling/ancestor nodes. Implementations must preserve representable inline structure so serialization does not strip backticks or rewrite emphasis/strong markers in untouched nodes.
 
@@ -207,18 +221,21 @@ rules:
         - An `added` entry with more than one of `position.after`, `position.before`, `position.first`, `position.last` — error
         - An `added` entry with `position.parent` that resolves to no node — error
         - `content` and `value` both present in the same entry — error
-        - `selector` on an `added` entry — error; use `position.parent` to scope insertion
-        - `rename` on an `added` or `removed` entry — error
+        - `selector` on an `added` or `no-op` entry — error; use `position.parent` to scope insertion for `added`
+        - `rename` on an `added`, `removed`, or `no-op` entry — error
         - `strategy: merge-by` without `mergeKey` — error
         - `mergeKey` present without `strategy: merge-by` — error
         - `strategy` on an entry whose selector targets a non-array node — error
+        - `position` on a `no-op` entry — error
+        - `content` or `value` on a `no-op` entry — error
+        - `strategy` or `mergeKey` on a `no-op` entry — error
   - requirement: Delta structural validation
     rules:
       - "The `deltaValidations` field on a schema artifact allows schema authors to define JSONPath-based structural constraints checked against the normalized YAML AST of the delta file before application. The delta file is parsed by the YAML adapter to produce a normalized AST; `ValidateArtifacts` then evaluates each rule's `selector` JSONPath expression against that AST — the same mechanism used for `validations` against the artifact AST. The full rule format is specified in [`specs/core/schema-format/spec.md` — Requirement: Delta validation rules](../schema-format/spec.md)."
 constraints:
   - selector.index and selector.where are mutually exclusive
   - position.after, position.before, position.first, and position.last are mutually exclusive in an added entry
-  - rename is only valid on modified entries; using it on added or removed is an error
+  - rename is only valid on modified entries; using it on added, removed, or no-op is an error
   - A rename value that collides with an existing sibling node or another rename in the same scope is a hard error checked during validation before any operation is applied
   - Unresolved after/before selectors are warnings, not errors — the node is appended at the end of the parent scope; unresolved selector in modified/removed is always a hard error
   - 'For modified, content is the node body only — the identifying line (heading, key name) is excluded and preserved or replaced via rename; for added, content must start with the identifying line (e.g. ### Heading for markdown sections) followed by the body'
@@ -228,6 +245,9 @@ constraints:
   - Delta files live at deltas/<workspace>/<capability-path>/<filename>.delta.yaml within the change directory and are never synced to permanent spec directories
   - A DeltaApplicationError on any entry must abort the entire delta — no partial application
   - Declaration order in the delta file is the execution order; no reordering is performed
+  - A no-op entry MUST be the sole entry in the delta array — parseDelta rejects mixed arrays with a SchemaValidationError
+  - A no-op entry accepts only op and description; all other fields (selector, position, rename, content, value, strategy, mergeKey) are invalid on no-op
+  - description is valid on all operation types and is ignored during application
 scenarios:
   - requirement: ArtifactParser port
     name: nodeTypes returns format-specific vocabulary
@@ -439,6 +459,64 @@ scenarios:
       - a file named spec.md.delta.yaml is present in the change directory
     then:
       - the system associates it with the artifact whose output filename is spec.md
+  - requirement: Delta file format
+    name: no-op is never passed to apply
+    given:
+      - 'a delta file containing [{ op: "no-op" }]'
+    when:
+      - ValidateArtifacts processes this delta
+    then:
+      - apply is never called — the caller skips loading the base artifact, delta application, and structural validation
+      - AND markComplete is called with the hash of the raw delta file content
+  - requirement: Delta file format
+    name: no-op with description
+    given:
+      - 'a delta file containing [{ op: "no-op", description: "Existing scenarios still valid" }]'
+    when:
+      - ValidateArtifacts processes this delta
+    then:
+      - apply is never called and description has no effect on processing
+      - AND markComplete is called with the hash of the raw delta file content
+  - requirement: Delta file format
+    name: no-op mixed with other entries — parseDelta rejects
+    given:
+      - 'a delta file containing [{ op: "no-op" }, { op: "modified", selector: { type: section, matches: "Foo" }, content: "bar" }]'
+    when:
+      - parseDelta is called
+    then:
+      - it throws SchemaValidationError with a message explaining that no-op cannot be mixed with other operations
+  - requirement: Delta file format
+    name: no-op with selector — parseDelta rejects
+    given:
+      - 'a delta file containing [{ op: "no-op", selector: { type: section, matches: "Foo" } }]'
+    when:
+      - parseDelta is called
+    then:
+      - it throws SchemaValidationError because selector is not valid on no-op
+  - requirement: Delta file format
+    name: no-op with content — parseDelta rejects
+    given:
+      - 'a delta file containing [{ op: "no-op", content: "some content" }]'
+    when:
+      - parseDelta is called
+    then:
+      - it throws SchemaValidationError because content is not valid on no-op
+  - requirement: Delta file format
+    name: no-op with value — parseDelta rejects
+    given:
+      - 'a delta file containing [{ op: "no-op", value: 42 }]'
+    when:
+      - parseDelta is called
+    then:
+      - it throws SchemaValidationError because value is not valid on no-op
+  - requirement: Delta file format
+    name: description on regular delta entry — ignored during application
+    given:
+      - 'a delta file containing [{ op: "modified", selector: { type: section, matches: "Foo" }, content: "new body", description: "Updating Foo" }]'
+    when:
+      - apply is called
+    then:
+      - the modification is applied normally and the description field has no effect on the result
   - requirement: Delta application
     name: entries applied in declaration order
     when:
@@ -474,6 +552,14 @@ scenarios:
       - a delta is applied and the markdown result is serialized
     then:
       - ambiguous constructs are emitted using deterministic project markdown conventions
+  - requirement: Delta application
+    name: no-op delta is never passed to apply
+    given:
+      - 'a delta containing only [{ op: "no-op" }]'
+    when:
+      - the caller (e.g. ValidateArtifacts) processes this delta
+    then:
+      - apply is never called — the base artifact is not loaded or parsed
   - requirement: Delta conflict detection
     name: Two entries targeting the same node
     when:
@@ -492,6 +578,30 @@ scenarios:
       - 'an added entry declares both position.first: true and position.last: true (or any two of first, last, after, before)'
     then:
       - apply must throw DeltaApplicationError
+  - requirement: Delta conflict detection
+    name: selector on no-op entry — error
+    when:
+      - 'a delta entry has op: no-op and includes selector'
+    then:
+      - parseDelta must throw SchemaValidationError
+  - requirement: Delta conflict detection
+    name: position on no-op entry — error
+    when:
+      - 'a delta entry has op: no-op and includes position'
+    then:
+      - parseDelta must throw SchemaValidationError
+  - requirement: Delta conflict detection
+    name: rename on no-op entry — error
+    when:
+      - 'a delta entry has op: no-op and includes rename'
+    then:
+      - parseDelta must throw SchemaValidationError
+  - requirement: Delta conflict detection
+    name: strategy on no-op entry — error
+    when:
+      - 'a delta entry has op: no-op and includes strategy'
+    then:
+      - parseDelta must throw SchemaValidationError
   - requirement: Delta structural validation
     name: deltaValidations rules enforced on delta entries
     given:
@@ -501,6 +611,6 @@ scenarios:
     then:
       - validation fails with the appropriate error
 contentHashes:
-  spec.md: sha256:8fcbebfae4b7457113c03a40dd610c110c0aad7c78c4565b508eca3276d36521
-  verify.md: sha256:944a1a3c9760956130afe021b555057c00f5a34caa5798fc87d802666e26f9c4
+  spec.md: sha256:c16628d1dfc1b6b67644b3d4e390257d0c5c6803092e2c9391c65f794acb7512
+  verify.md: sha256:f2aa99441096b5169138463db8644a18e8613c89521d1bada916d853c5aba380
 generatedBy: core

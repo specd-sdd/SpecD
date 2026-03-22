@@ -70,6 +70,31 @@ function pairWithChildren(label: string, children: ArtifactNode[]): ArtifactNode
 // ---------------------------------------------------------------------------
 
 describe('applyDelta', () => {
+  describe('no-op defensive guard', () => {
+    it('returns deep clone of input AST when all entries are no-op', () => {
+      const ast = makeAST([pair('name', 'specd'), pair('version', '1.0.0')])
+      const delta: DeltaEntry[] = [{ op: 'no-op' }]
+
+      const result = applyDelta(ast, delta, parseContent, valueToNode)
+
+      expect(result.root.children).toHaveLength(2)
+      expect(result.root.children![0]!.label).toBe('name')
+      expect(result.root.children![1]!.label).toBe('version')
+      // Must be a separate object (deep clone)
+      expect(result.root).not.toBe(ast.root)
+    })
+
+    it('returns deep clone for empty delta array', () => {
+      const ast = makeAST([pair('name', 'specd')])
+      const delta: DeltaEntry[] = []
+
+      const result = applyDelta(ast, delta, parseContent, valueToNode)
+
+      expect(result.root.children).toHaveLength(1)
+      expect(result.root).not.toBe(ast.root)
+    })
+  })
+
   describe('added operation', () => {
     it('appends a new node at document root level', () => {
       const ast = makeAST([pair('name', 'specd')])
@@ -149,6 +174,29 @@ describe('applyDelta', () => {
       const delta: DeltaEntry[] = [{ op: 'added' }]
 
       expect(() => applyDelta(ast, delta, parseContent, valueToNode)).toThrow(DeltaApplicationError)
+    })
+  })
+
+  describe('description field', () => {
+    it('is ignored during application on a modified entry', () => {
+      const ast = makeAST([pair('name', 'old')])
+      const withDesc: DeltaEntry[] = [
+        {
+          op: 'modified',
+          selector: { type: 'pair', matches: '^name$' },
+          value: 'new',
+          description: 'Update name',
+        },
+      ]
+      const withoutDesc: DeltaEntry[] = [
+        { op: 'modified', selector: { type: 'pair', matches: '^name$' }, value: 'new' },
+      ]
+
+      const resultWith = applyDelta(ast, withDesc, parseContent, valueToNode)
+      const resultWithout = applyDelta(ast, withoutDesc, parseContent, valueToNode)
+
+      expect(resultWith.root.children![0]!.value).toBe('new')
+      expect(resultWithout.root.children![0]!.value).toBe('new')
     })
   })
 

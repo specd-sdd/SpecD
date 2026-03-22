@@ -188,22 +188,22 @@ rules:
 
         The following variables are available in **`archivePattern`**:
 
-        | Variable                             | Value                                                                                                   |
-        | ------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-        | `{{change.name}}`                    | The change's slug name                                                                                  |
-        | `{{change.archivedName}}`            | The change's full archived directory name (e.g. `2024-01-15-add-auth-flow`) — the default pattern value |
-        | `{{change.workspace}}`               | The primary workspace of the change                                                                     |
-        | `{{year}}`                           | Four-digit current year (e.g. `2024`)                                                                   |
-        | `{{date}}`                           | ISO date at archive time (e.g. `2024-01-15`)                                                            |
+        | Variable                  | Value                                                                                                   |
+        | ------------------------- | ------------------------------------------------------------------------------------------------------- |
+        | `{{change.name}}`         | The change's slug name                                                                                  |
+        | `{{change.archivedName}}` | The change's full archived directory name (e.g. `2024-01-15-add-auth-flow`) — the default pattern value |
+        | `{{change.workspace}}`    | The primary workspace of the change                                                                     |
+        | `{{year}}`                | Four-digit current year (e.g. `2024`)                                                                   |
+        | `{{date}}`                | ISO date at archive time (e.g. `2024-01-15`)                                                            |
 
         The following variables are available in **`schemaOverrides` workflow hook `run` commands** and in **schema-level workflow hook `run` commands**:
 
-        | Variable               | Value                                                           |
-        | ---------------------- | --------------------------------------------------------------- |
-        | `{{change.name}}`      | The change's slug name                                          |
-        | `{{change.workspace}}` | The primary workspace of the change                             |
-        | `{{change.path}}`      | Absolute path to the change directory                           |
-        | `{{project.root}}`     | Absolute path to the project root (where `specd.yaml` lives)   |
+        | Variable               | Value                                                        |
+        | ---------------------- | ------------------------------------------------------------ |
+        | `{{change.name}}`      | The change's slug name                                       |
+        | `{{change.workspace}}` | The primary workspace of the change                          |
+        | `{{change.path}}`      | Absolute path to the change directory                        |
+        | `{{project.root}}`     | Absolute path to the project root (where `specd.yaml` lives) |
   - requirement: Schema plugins
     rules:
       - |-
@@ -969,6 +969,6 @@ scenarios:
     then:
       - it reads /shared/instructions.md directly, without resolving relative to the specd.yaml directory
 contentHashes:
-  spec.md: sha256:a1b45cb119f51d55fc243e810e1587fafea5e421ff93f50e06afe46be98d3633
+  spec.md: sha256:61148890f5dcaa339faa9e12f447f3ebe29f7267a59aceaddca634b0c553d5e0
   verify.md: sha256:6107c3bc644834e8c94190c3cfc7f40e7844170087b8174e92c81b5ef96d3117
 generatedBy: core

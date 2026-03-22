@@ -992,6 +992,241 @@ describe('ValidateArtifacts', () => {
     })
   })
 
+  describe('no-op delta bypass', () => {
+    const noopParseDelta = (content: string) => {
+      // Minimal parseDelta that recognizes no-op
+      const lines = content.trim().split('\n')
+      const entries: import('../../../src/application/ports/artifact-parser.js').DeltaEntry[] = []
+      for (const line of lines) {
+        const m = line.match(/^\s*-\s*op:\s*(.+)/)
+        if (m) entries.push({ op: m[1]!.trim() as 'no-op' })
+      }
+      return entries
+    }
+
+    function makeNoopParsers() {
+      const yamlParser = makeParser({ parseDelta: noopParseDelta })
+      return makeParsers(makeParser(), yamlParser)
+    }
+
+    it('bypasses deltaValidations and marks complete for no-op delta', async () => {
+      const specsType = makeArtifactType('specs', {
+        scope: 'spec',
+        format: 'markdown',
+        delta: true,
+        deltaValidations: [
+          {
+            selector: { type: 'sequence-item', where: { op: 'added' } },
+            required: true,
+          },
+        ],
+      })
+      const schema = makeSchema([specsType])
+
+      const noopContent = '- op: no-op\n'
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth',
+            new ArtifactFile({
+              key: 'default:auth',
+              filename: 'deltas/default/auth/spec.md.delta.yaml',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename === 'deltas/default/auth/spec.md.delta.yaml') {
+            return new SpecArtifact(filename, noopContent)
+          }
+          return null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeNoopParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({ name: 'c', specPath: 'default:auth' })
+
+      expect(result.passed).toBe(true)
+      expect(result.failures).toHaveLength(0)
+      const artifact = repo.store.get('c')?.getArtifact('specs')
+      expect(artifact?.status).toBe('complete')
+    })
+
+    it('skips application preview for no-op delta', async () => {
+      const specsType = makeArtifactType('specs', {
+        scope: 'spec',
+        format: 'markdown',
+        delta: true,
+      })
+      const schema = makeSchema([specsType])
+
+      const noopContent = '- op: no-op\n'
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth',
+            new ArtifactFile({
+              key: 'default:auth',
+              filename: 'deltas/default/auth/spec.md.delta.yaml',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename === 'deltas/default/auth/spec.md.delta.yaml') {
+            return new SpecArtifact(filename, noopContent)
+          }
+          return null
+        },
+      })
+
+      // Create a spec repo that would fail if accessed (proving no base spec is loaded)
+      const specRepo = makeSpecRepository()
+      const specRepoSpy = vi.spyOn(specRepo, 'get')
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map([['default', specRepo]]),
+        makeSchemaProvider(schema),
+        makeNoopParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({ name: 'c', specPath: 'default:auth' })
+
+      expect(result.passed).toBe(true)
+      expect(specRepoSpy).not.toHaveBeenCalled()
+    })
+
+    it('skips structural validations for no-op delta', async () => {
+      const specsType = makeArtifactType('specs', {
+        scope: 'spec',
+        format: 'markdown',
+        delta: true,
+        validations: [
+          {
+            selector: { type: 'section', matches: '^Purpose$' },
+            required: true,
+          },
+        ],
+      })
+      const schema = makeSchema([specsType])
+
+      const noopContent = '- op: no-op\n'
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth',
+            new ArtifactFile({
+              key: 'default:auth',
+              filename: 'deltas/default/auth/spec.md.delta.yaml',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename === 'deltas/default/auth/spec.md.delta.yaml') {
+            return new SpecArtifact(filename, noopContent)
+          }
+          return null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeNoopParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({ name: 'c', specPath: 'default:auth' })
+
+      // Would fail if validations ran (no Purpose section in no-op delta content)
+      expect(result.passed).toBe(true)
+      const artifact = repo.store.get('c')?.getArtifact('specs')
+      expect(artifact?.status).toBe('complete')
+    })
+
+    it('calls markComplete with hash of raw delta file content', async () => {
+      const specsType = makeArtifactType('specs', {
+        scope: 'spec',
+        format: 'markdown',
+        delta: true,
+      })
+      const schema = makeSchema([specsType])
+
+      const noopContent = '- op: no-op\n'
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth',
+            new ArtifactFile({
+              key: 'default:auth',
+              filename: 'deltas/default/auth/spec.md.delta.yaml',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename === 'deltas/default/auth/spec.md.delta.yaml') {
+            return new SpecArtifact(filename, noopContent)
+          }
+          return null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeNoopParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      await uc.execute({ name: 'c', specPath: 'default:auth' })
+
+      const artifact = repo.store.get('c')?.getArtifact('specs')
+      const file = artifact?.getFile('default:auth')
+      expect(file?.validatedHash).toBe(sha256(noopContent))
+    })
+  })
+
   describe('Save after validation', () => {
     it('calls save even when some artifacts fail', async () => {
       const type1 = makeArtifactType('proposal')

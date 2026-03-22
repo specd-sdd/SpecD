@@ -17,11 +17,7 @@ rules:
 
         ```typescript
         class RunStepHooks {
-          constructor(
-            changes: ChangeRepository,
-            hooks: HookRunner,
-            schemaProvider: SchemaProvider,
-          )
+          constructor(changes: ChangeRepository, hooks: HookRunner, schemaProvider: SchemaProvider)
         }
         ```
 
@@ -233,6 +229,6 @@ scenarios:
       - pnpm test is executed via HookRunner
       - AND the result includes the hook outcome
 contentHashes:
-  spec.md: sha256:8d6ba61b7984b8787270aa464f659d576cdb9f41395da7c4488fb0e7bae14140
+  spec.md: sha256:c81ad17a5b4f8dd367a11dc90673c264d27d8140cc7d277d778a349d0a19a2ae
   verify.md: sha256:5e7af7f567ccd5b7cde729989d6e84b71f2343f819e6869f1587072dd3ee220f
 generatedBy: core

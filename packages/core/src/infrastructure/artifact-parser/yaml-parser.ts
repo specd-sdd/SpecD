@@ -22,18 +22,50 @@ const deltaPositionSchema = z.object({
   last: z.boolean().optional(),
 })
 
-const deltaEntrySchema = z.object({
-  op: z.enum(['added', 'modified', 'removed']),
-  selector: SelectorZodSchema.optional(),
-  position: deltaPositionSchema.optional(),
-  rename: z.string().optional(),
-  content: z.string().optional(),
-  value: z.unknown().optional(),
-  strategy: z.enum(['replace', 'append', 'merge-by']).optional(),
-  mergeKey: z.string().optional(),
-})
+const deltaEntrySchema = z
+  .object({
+    op: z.enum(['added', 'modified', 'removed', 'no-op']),
+    selector: SelectorZodSchema.optional(),
+    position: deltaPositionSchema.optional(),
+    rename: z.string().optional(),
+    content: z.string().optional(),
+    value: z.unknown().optional(),
+    strategy: z.enum(['replace', 'append', 'merge-by']).optional(),
+    mergeKey: z.string().optional(),
+    description: z.string().optional(),
+  })
+  .superRefine((entry, ctx) => {
+    if (entry.op !== 'no-op') return
+    const forbidden = [
+      'selector',
+      'position',
+      'rename',
+      'content',
+      'value',
+      'strategy',
+      'mergeKey',
+    ] as const
+    for (const field of forbidden) {
+      if (entry[field] !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `'${field}' is not valid on a no-op entry`,
+          path: [field],
+        })
+      }
+    }
+  })
 
-const deltaArraySchema = z.array(deltaEntrySchema)
+const deltaArraySchema = z.array(deltaEntrySchema).superRefine((arr, ctx) => {
+  const hasNoOp = arr.some((e) => e.op === 'no-op')
+  if (hasNoOp && arr.length > 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'no-op cannot be mixed with other operations — it must be the only entry',
+      path: [],
+    })
+  }
+})
 
 /** A YAML-compatible scalar value type. */
 type ScalarValue = string | number | boolean | null
@@ -482,6 +514,31 @@ YAML files are parsed into a normalized AST with \`mapping\`, \`pair\`, \`sequen
       type: document
   value:
     newKey: newValue
+\`\`\`
+
+### Description Field
+
+All delta entries accept an optional \`description\` field (string) to document what the entry does or why. It is ignored during application.
+
+\`\`\`yaml
+- op: modified
+  description: "Switch model to opus"
+  selector:
+    type: pair
+    matches: model
+    parent:
+      type: pair
+      matches: llm
+  value: 'claude-opus-4-6'
+\`\`\`
+
+### No-op Operation
+
+Use \`op: no-op\` when the artifact requires no changes for this spec. A \`no-op\` entry must be the only entry in the delta array. It accepts only \`op\` and optionally \`description\` — no other fields are valid.
+
+\`\`\`yaml
+- op: no-op
+  description: "Existing scenarios remain valid — no changes needed"
 \`\`\``
   }
 
