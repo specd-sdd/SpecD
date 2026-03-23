@@ -75,9 +75,7 @@ rules:
               "mode": "summary"
             }
           ],
-          "availableSteps": [
-            { "step": "designing", "available": true, "blockingArtifacts": [] }
-          ],
+          "availableSteps": [{ "step": "designing", "available": true, "blockingArtifacts": [] }],
           "warnings": []
         }
         ```
@@ -234,14 +232,6 @@ scenarios:
       - the command exits with code 1
       - 'AND stderr contains an error: message'
 contentHashes:
-  spec.md: sha256:38c1ad8fd0c41683727c61fb34cb1515f326d9c2b85a9c194fb2aa7a6f74aa21
+  spec.md: sha256:746e2f244dab49f4abd1e32a260b5d73a15378f60e28b6797d96f8d68458e796
   verify.md: sha256:aff9d7b75046386b9cac69aa20f90148ab95a54da9a4e188bfa2db14344ad445
-keywords:
-  - change-context
-  - compile-context
-  - lifecycle-step
-  - context-mode
-  - dependency-traversal
-  - section-filtering
-  - agent-context
-generatedBy: agent
+generatedBy: core

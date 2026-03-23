@@ -333,9 +333,12 @@ export class CompileContext {
         }
       }
 
-      // Tag dependsOn discoveries that aren't already tagged with a higher-priority source
+      // Tag dependsOn discoveries — dependsOnTraversal has higher priority than includePattern
       for (const [key] of dependsOnAdded) {
-        if (!sourceMap.has(key)) sourceMap.set(key, 'dependsOnTraversal')
+        const existing = sourceMap.get(key)
+        if (existing === undefined || existing === 'includePattern') {
+          sourceMap.set(key, 'dependsOnTraversal')
+        }
       }
     }
 
