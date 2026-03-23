@@ -1,0 +1,206 @@
+title: Composition
+description: Consumers of `@specd/code-graph` should not need to know how the store, indexer, adapters, and traversal functions are wired together. The composition layer provides a single facade and factory function that assembles all internal components, manages lifecycle, and defines the package's public API surface.
+dependsOn:
+  - code-graph:code-graph/symbol-model
+  - code-graph:code-graph/graph-store
+  - code-graph:code-graph/language-adapter
+  - code-graph:code-graph/indexer
+  - code-graph:code-graph/traversal
+  - default:_global/architecture
+context:
+  - Consumers of `@specd/code-graph` should not need to know how the store, indexer, adapters, and traversal functions are wired together. The composition layer provides a single facade and factory function that assembles all internal components, manages lifecycle, and defines the package's public API surface.
+rules:
+  - requirement: CodeGraphProvider facade
+    rules:
+      - |-
+        `CodeGraphProvider` SHALL be the top-level API object that wraps all code graph functionality. It exposes:
+
+        - **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`
+        - **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getStatistics()` — delegates to `GraphStore`
+        - **Search**: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)` — full-text search with BM25 ranking and store-level filtering, delegates to `GraphStore`
+        - **Maintenance**: `clear(): Promise<void>` — removes all data from the store (for full re-index)
+        - **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
+        - **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `detectChanges(changedFiles)` — delegates to impact functions
+        - **Lifecycle**: `open(): Promise<void>`, `close(): Promise<void>` — manages the store connection
+
+        `CodeGraphProvider` is a thin orchestration layer — it holds no domain logic. All methods delegate to the appropriate domain service or use case.
+  - requirement: Factory function
+    rules:
+      - |-
+        Two factory signatures are provided:
+
+        **Primary (workspace-aware):**
+
+        `createCodeGraphProvider(config: SpecdConfig): CodeGraphProvider` accepts a `SpecdConfig` from `@specd/core` and:
+
+        1. Derives `storagePath` from `config.projectRoot` (locates `.specd/code-graph.lbug`)
+        2. Creates `LadybugGraphStore` with the storage path
+        3. Creates `AdapterRegistry` and registers the built-in adapters (TypeScript, Python, Go, PHP)
+        4. Creates `IndexCodeGraph` with the store and registry
+        5. Returns a `CodeGraphProvider` wired to all components
+
+        **Legacy (standalone):**
+
+        `createCodeGraphProvider(options: CodeGraphOptions): CodeGraphProvider` accepts:
+
+        - **`storagePath`** (`string`, required) — workspace root path, used to locate the `.specd/code-graph.lbug` file
+        - **`adapters`** (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the 4 built-in adapters
+
+        The factory detects which overload is being used by checking for the `projectRoot` property (present on `SpecdConfig`) vs the `storagePath` property (present on `CodeGraphOptions`).
+
+        Callers MUST NOT construct `CodeGraphProvider` directly — the constructor is not part of the public API.
+  - requirement: Package exports
+    rules:
+      - |-
+        The `@specd/code-graph` package SHALL export only:
+
+        - `createCodeGraphProvider` — factory function
+        - `CodeGraphProvider` — type only (for type annotations, not construction)
+        - `CodeGraphOptions` — options type for the factory
+        - `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, `DiscoveredSpec` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).
+        - `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult` — traversal/impact types
+        - `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType` — model types
+        - `SymbolQuery`, `GraphStatistics` — query types
+        - `LanguageAdapter` — interface for custom adapters
+        - `CodeGraphError` and subclasses — error types
+
+        Internal components (`LadybugGraphStore`, `AdapterRegistry`, `TypeScriptLanguageAdapter`, `IndexCodeGraph`, traversal functions) MUST NOT be exported from the package entry point.
+  - requirement: Lifecycle management
+    rules:
+      - |-
+        Callers MUST call `open()` before using any query, traversal, or indexing method, and `close()` when done. The `CodeGraphProvider` delegates these calls to the underlying `GraphStore`. Methods called before `open()` or after `close()` throw `StoreNotOpenError`.
+
+        The provider does not auto-open or auto-close — callers manage the lifecycle explicitly. This follows the same pattern as database connections and avoids hidden state transitions.
+  - requirement: Dependency on @specd/core
+    rules:
+      - '`@specd/code-graph` depends on `@specd/core` as a runtime dependency. It uses types (`SpecdConfig`, `SpecdWorkspaceConfig`) and may use domain services (e.g. `parseMetadata`, `SpecRepository`) for spec resolution. The primary factory function accepts `SpecdConfig` to derive `storagePath` only — the provider is stateless and does not cache the config. Workspace targets and spec sources are built by the caller and passed via `IndexOptions` at each `index()` call.'
+constraints:
+  - createCodeGraphProvider is the only construction path — CodeGraphProvider constructor is not exported
+  - Internal components are not re-exported from the package
+  - The LanguageAdapter interface is exported so consumers can write custom adapters
+  - CodeGraphProvider holds no domain logic — it only delegates
+  - Lifecycle is explicit — no auto-open, no auto-close
+  - Depends on @specd/core for SpecdConfig type
+scenarios:
+  - requirement: CodeGraphProvider facade
+    name: All operations delegate correctly
+    given:
+      - a CodeGraphProvider created via the factory and opened
+    when:
+      - findSymbols() is called
+    then:
+      - it delegates to GraphStore.findSymbols() and returns the result
+  - requirement: CodeGraphProvider facade
+    name: Index delegates to IndexCodeGraph
+    given:
+      - an opened CodeGraphProvider
+    when:
+      - "index({ workspaces: [...], projectRoot: '/project' }) is called"
+    then:
+      - IndexCodeGraph.execute() is invoked with the workspace targets and the result is returned
+  - requirement: CodeGraphProvider facade
+    name: Clear removes all data for full re-index
+    given:
+      - an opened CodeGraphProvider with indexed data
+    when:
+      - clear() is called followed by index()
+    then:
+      - all files and symbols are re-processed (none skipped)
+  - requirement: Factory function
+    name: Primary factory with SpecdConfig
+    when:
+      - createCodeGraphProvider(config) is called with a SpecdConfig
+    then:
+      - the storage path is derived from config.projectRoot
+      - AND the returned provider can be opened, used for indexing and queries, and closed without error
+  - requirement: Factory function
+    name: Legacy factory with CodeGraphOptions
+    when:
+      - "createCodeGraphProvider({ storagePath: '/project' }) is called"
+    then:
+      - the returned provider can be opened, used for indexing and queries, and closed without error
+  - requirement: Factory function
+    name: Factory detects overload by property
+    given:
+      - an object with projectRoot property
+      - an object with storagePath property
+    when:
+      - passed to createCodeGraphProvider
+      - passed to createCodeGraphProvider
+    then:
+      - it is treated as SpecdConfig
+      - it is treated as CodeGraphOptions
+  - requirement: Factory function
+    name: Custom adapters registered (legacy)
+    given:
+      - a custom adapter for Python
+    when:
+      - "createCodeGraphProvider({ storagePath: '/project', adapters: [pythonAdapter] }) is called"
+    then:
+      - the provider can index .py files using the custom adapter
+      - AND the built-in TypeScript adapter is still available
+  - requirement: Factory function
+    name: Direct construction not supported
+    when:
+      - a caller attempts to construct CodeGraphProvider via new CodeGraphProvider()
+    then:
+      - the constructor is not available in the public API (not exported or marked internal)
+  - requirement: Package exports
+    name: Internal components not exported
+    when:
+      - a consumer imports from @specd/code-graph
+    then:
+      - LadybugGraphStore, AdapterRegistry, TypeScriptLanguageAdapter, and IndexCodeGraph are not available as imports
+  - requirement: Package exports
+    name: LanguageAdapter interface is exported
+    when:
+      - a consumer wants to write a custom language adapter
+    then:
+      - they can import the LanguageAdapter interface from @specd/code-graph
+  - requirement: Package exports
+    name: Model types are exported
+    when:
+      - a consumer needs to type-annotate results
+    then:
+      - FileNode, SymbolNode, SpecNode, Relation, SymbolKind, and RelationType are available as imports
+  - requirement: Package exports
+    name: Workspace integration types are exported
+    when:
+      - a consumer needs to build workspace targets
+    then:
+      - WorkspaceIndexTarget, WorkspaceIndexBreakdown, and DiscoveredSpec are available as imports
+  - requirement: Lifecycle management
+    name: Method before open throws
+    given:
+      - a CodeGraphProvider created but not opened
+    when:
+      - findSymbols() is called
+    then:
+      - StoreNotOpenError is thrown
+  - requirement: Lifecycle management
+    name: Method after close throws
+    given:
+      - a CodeGraphProvider that was opened and then closed
+    when:
+      - analyzeImpact() is called
+    then:
+      - StoreNotOpenError is thrown
+  - requirement: Lifecycle management
+    name: Open and close are idempotent-safe
+    given:
+      - an opened CodeGraphProvider
+    when:
+      - close() is called twice
+    then:
+      - the second call completes without error
+  - requirement: Dependency on @specd/core
+    name: Package depends on @specd/core
+    when:
+      - the @specd/code-graph package is inspected
+    then:
+      - its package.json has a dependency on @specd/core
+      - AND the primary factory accepts SpecdConfig from @specd/core
+contentHashes:
+  spec.md: sha256:c02becfb1f182a2a5de1bccc78990d244798a6049701b543aa73f8a76cdedf5d
+  verify.md: sha256:231ddedff29ba7b306d23cf054327cceb1facca60fb419f0c48d71fdee0e760f
+generatedBy: core

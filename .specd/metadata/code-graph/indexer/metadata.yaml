@@ -1,0 +1,467 @@
+title: Indexer
+description: Source files change constantly and the code graph must be kept in sync without re-parsing the entire workspace every time. The indexer orchestrates the pipeline from file discovery through parsing to graph storage, using content hashing for incremental updates and language adapters for extraction. It is the primary write path into the code graph.
+dependsOn:
+  - code-graph:code-graph/symbol-model
+  - code-graph:code-graph/graph-store
+  - code-graph:code-graph/language-adapter
+context:
+  - Source files change constantly and the code graph must be kept in sync without re-parsing the entire workspace every time. The indexer orchestrates the pipeline from file discovery through parsing to graph storage, using content hashing for incremental updates and language adapters for extraction. It is the primary write path into the code graph.
+rules:
+  - requirement: IndexCodeGraph use case
+    rules:
+      - |-
+        `IndexCodeGraph` SHALL be the primary entry point for building and updating the code graph. It is an application-layer use case that orchestrates:
+
+        1. **Discover** — walk the workspace to find source files
+        2. **Diff** — compare content hashes with the store to identify new, changed, and deleted files
+        3. **Extract** — run the appropriate language adapter on each new/changed file
+        4. **Store** — upsert extracted data into the `GraphStore`
+        5. **Clean** — remove deleted files from the store
+
+        The use case accepts a `GraphStore` (already opened) and an `AdapterRegistry` via constructor injection.
+  - requirement: Incremental indexing
+    rules:
+      - |-
+        The indexer SHALL compute a content hash for each discovered file and compare it against the hash stored in the `GraphStore`. Only three categories of files are processed:
+
+        - **New** — file exists on disk but not in the store → extract and upsert
+        - **Changed** — file exists in both but hashes differ → extract and upsert (replaces previous data)
+        - **Deleted** — file exists in the store but not on disk → remove from store. Only files belonging to workspaces being indexed are considered for deletion — files from other workspaces are left untouched. This allows `--workspace <name>` to index a single workspace without destroying data from others.
+
+        Files whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison.
+
+        Changed files are removed from the store before bulk load, because CSV `COPY FROM` cannot upsert — it can only insert. Removing changed files first ensures the bulk load inserts fresh data without conflicts.
+
+        To force a full re-index, callers MUST call `GraphStore.clear()` before `execute()`. This removes all stored data, causing every file to be treated as new.
+  - requirement: Multi-workspace file discovery
+    rules:
+      - |-
+        The indexer SHALL discover files from each workspace's `codeRoot` independently. For each `WorkspaceIndexTarget`:
+
+        1. Call `discoverFiles(codeRoot, hasAdapter)` to get paths relative to `codeRoot`
+        2. Prefix each path with `{workspaceName}:` to form the globally unique `FileNode.path`
+        3. Diff against the store (filtered by workspace prefix)
+
+        `discoverFiles` itself has no workspace knowledge — it accepts a root directory and:
+
+        - Respects `.gitignore` rules hierarchically (finds git root by walking up from root)
+        - Excludes the following directories regardless of `.gitignore`: `node_modules`, `.git`, `.specd`, `dist`, `build`, `coverage`, `.next`, `.nuxt`
+        - Skips symbolic links — only regular files are indexed
+        - Skips files with no registered language adapter (determined by extension)
+        - Returns root-relative file paths with forward-slash normalization
+  - requirement: Two-pass extraction with in-memory index
+    rules:
+      - |-
+        Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:
+
+        - **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter implements `extractNamespace` and `buildQualifiedName`, build a qualified name map for that language. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.
+        - **Pass 2 (Resolve imports + CALLS, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations. Accumulate all relations.
+        - **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.
+        - **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.
+        - **Rebuild FTS indexes** — After bulk load, call `GraphStore.rebuildFtsIndexes()` to drop and recreate full-text search indexes. This is required because LadybugDB FTS indexes are not automatically updated on insert.
+
+        This two-pass approach ensures all symbols exist in the index before import/call resolution, while avoiding any store queries during extraction.
+  - requirement: Chunked processing
+    rules:
+      - |-
+        Files are grouped into chunks where each chunk's total source size does not exceed a configurable byte budget (default: 20 MB). Each chunk is processed sequentially — file content strings from completed chunks are eligible for garbage collection, bounding peak memory usage.
+
+        The chunk budget is configurable via `IndexOptions.chunkBytes`.
+  - requirement: Progress reporting
+    rules:
+      - |-
+        `IndexOptions` accepts an optional `onProgress` callback `(percent: number, phase: string) => void`. The indexer reports granular progress:
+
+        - 0-5%: File discovery and content hashing
+        - 5-7%: Diff computation and cleanup of deleted/changed files
+        - 7-50%: Pass 1 — symbol extraction (updates per file)
+        - 50-80%: Pass 2 — import resolution and CALLS extraction (updates per file)
+        - 80-83%: Spec discovery
+        - 83-95%: Bulk loading (updates per table and relation batch)
+        - 100%: Done
+
+        Progress updates include a detail string (e.g. `"150/460 files"`) for phases that process individual items.
+  - requirement: Cross-workspace package resolution
+    rules:
+      - |-
+        Before Pass 2, the indexer builds a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over all registered adapters and the first one to return a non-`undefined` identity wins. This is language-agnostic — each adapter reads its own manifest format (`package.json`, `go.mod`, `pyproject.toml`, `composer.json`).
+
+        For non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the in-memory `SymbolIndex` for symbols with the imported name within the matching workspace's path prefix (`workspaceName + ':'`).
+
+        This works for both monorepo (workspaces in the same repo) and multirepo (workspaces in separate repos configured in `specd.yaml`) because the resolution depends only on the adapter reading each workspace's manifest — not on `pnpm-workspace.yaml` or any monorepo-specific tooling.
+  - requirement: Error isolation
+    rules:
+      - |-
+        Errors during extraction or storage for a single file MUST NOT abort the entire indexing run. The indexer SHALL:
+
+        - Catch errors per file
+        - Record the file path and error message in the index result
+        - Continue processing remaining files
+        - Include the error count and details in the final result
+
+        Only infrastructure-level errors (e.g. store connection lost, disk full) may abort the entire run.
+  - requirement: Index result
+    rules:
+      - |-
+        `IndexCodeGraph` SHALL return an `IndexResult` value object containing:
+
+        - **`filesDiscovered`** — total files found during discovery (across all workspaces)
+        - **`filesIndexed`** — files that were new or changed and successfully processed
+        - **`filesRemoved`** — files removed from the store (deleted from disk)
+        - **`filesSkipped`** — files skipped because their hash matched
+        - **`specsDiscovered`** — total spec directories found
+        - **`specsIndexed`** — specs that were new or changed and successfully processed
+        - **`errors`** — array of `{ filePath: string; message: string }` for files or specs that failed
+        - **`duration`** — elapsed time in milliseconds
+        - **`workspaces`** — per-workspace breakdown array of `{ name, filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }`
+  - requirement: Spec dependency indexing
+    rules:
+      - |-
+        The indexer SHALL build `SpecNode` entries with `DEPENDS_ON` relations. Specs are resolved via the workspace's `specs()` callback (backed by `SpecRepository`), NOT by reading the filesystem directly. For each spec provided by the repository:
+
+        1. Read `.specd-metadata.yaml` via `SpecRepository.artifact()` — extract `title`, `description`, and `dependsOn`
+        2. If no `.specd-metadata.yaml` exists, use defaults: `title` = specId, `description` = `''`, `dependsOn` = `[]`. There is no fallback parsing of `spec.md` — metadata should be regenerated via `spec generate-metadata` before indexing.
+        3. Compute a `contentHash` (SHA-256 of all artifacts EXCEPT `.specd-metadata.yaml`) — this includes `spec.md`, `verify.md`, and any other spec artifacts
+        4. Create a `SpecNode` and upsert it into the store
+        5. Create a `DEPENDS_ON` relation for each entry in `dependsOn`
+
+        Metadata changes alone do NOT trigger re-indexing — only changes to spec content artifacts (`spec.md`, `verify.md`, etc.) affect the `contentHash`. Metadata freshness is tracked independently by `@specd/core`.
+
+        Spec discovery follows the same incremental model as source files: the `contentHash` is compared against the stored hash, and only specs with changed hashes are re-processed. Unchanged specs are skipped entirely.
+
+        Spec indexing runs as an additional phase after source file indexing (Phase 1 and Phase 2). It does not depend on source file data and could run in parallel, but sequencing after source indexing simplifies the implementation.
+constraints:
+  - The GraphStore must be opened before calling the use case — the indexer does not manage store lifecycle
+  - Discovery always uses forward-slash-normalized workspace-relative paths
+  - Hardcoded exclusion directories cannot be overridden (they are always excluded)
+  - Pass 2 depends on Pass 1 completing for all files — they are not interleaved per file
+  - Per-file errors are collected, not thrown — only infrastructure errors abort the run
+  - Spec indexing uses the workspace's specs() callback exclusively — no filesystem fallback
+  - Pass 2 depends on Pass 1 completing for ALL workspaces — they are not interleaved per workspace
+scenarios:
+  - requirement: IndexCodeGraph use case
+    name: Full pipeline on empty store
+    given:
+      - an empty GraphStore and two workspaces with 10 TypeScript files total
+    when:
+      - IndexCodeGraph.execute() is called with both workspaces
+    then:
+      - all 10 files are discovered, extracted, and upserted
+      - AND IndexResult.filesIndexed is 10 and filesSkipped is 0
+  - requirement: Incremental indexing
+    name: Unchanged files skipped
+    given:
+      - a store containing 10 files with current hashes
+      - AND none of the files on disk have changed
+    when:
+      - IndexCodeGraph.execute() is called
+    then:
+      - filesSkipped is 10 and filesIndexed is 0
+      - AND no language adapter extraction is invoked
+  - requirement: Incremental indexing
+    name: Changed file re-indexed
+    given:
+      - a store containing core:src/utils.ts with hash abc
+      - AND src/utils.ts on disk in workspace core now has hash def
+    when:
+      - IndexCodeGraph.execute() is called
+    then:
+      - the file is re-extracted and upserted with the new data
+      - AND filesIndexed includes this file
+  - requirement: Incremental indexing
+    name: Deleted file removed from store
+    given:
+      - a store containing core:src/old.ts
+      - AND src/old.ts no longer exists on disk in workspace core
+    when:
+      - IndexCodeGraph.execute() is called
+    then:
+      - removeFile('core:src/old.ts') is called on the store
+      - AND filesRemoved is 1
+  - requirement: Incremental indexing
+    name: Deletion scoped to indexed workspaces
+    given:
+      - a store containing files from workspaces core, cli, and code-graph
+    when:
+      - IndexCodeGraph.execute() is called with only workspace core
+    then:
+      - only files with workspace core are considered for deletion
+      - AND files from cli and code-graph remain untouched in the store
+  - requirement: Incremental indexing
+    name: New file added to store
+    given:
+      - a store with no entry for core:src/new.ts
+      - AND src/new.ts exists on disk in workspace core
+    when:
+      - IndexCodeGraph.execute() is called
+    then:
+      - the file is extracted and upserted with path core:src/new.ts
+  - requirement: Incremental indexing
+    name: Changed files removed from store before bulk load
+    given:
+      - a store containing core:src/utils.ts with hash abc
+      - AND src/utils.ts on disk now has hash def
+    when:
+      - IndexCodeGraph.execute() is called
+    then:
+      - core:src/utils.ts is removed from the store before bulk load
+      - AND the re-extracted data is inserted via bulkLoad()
+  - requirement: Multi-workspace file discovery
+    name: node_modules excluded
+    given:
+      - a workspace with node_modules/lodash/index.js
+    when:
+      - file discovery runs
+    then:
+      - node_modules/lodash/index.js is not in the discovered files
+  - requirement: Multi-workspace file discovery
+    name: .gitignore respected
+    given:
+      - a .gitignore containing *.generated.ts
+      - AND a file src/schema.generated.ts exists
+    when:
+      - file discovery runs
+    then:
+      - src/schema.generated.ts is not in the discovered files
+  - requirement: Multi-workspace file discovery
+    name: .gitignore loaded from git root
+    given:
+      - a codeRoot at /project/packages/core within a git repo rooted at /project
+      - AND /project/.gitignore contains *.log
+    when:
+      - file discovery runs for this codeRoot
+    then:
+      - .log files are excluded even though the .gitignore is above the codeRoot
+  - requirement: Multi-workspace file discovery
+    name: Symlinks skipped
+    given:
+      - a symbolic link src/link.ts pointing to ../other/file.ts
+    when:
+      - file discovery runs
+    then:
+      - src/link.ts is not in the discovered files
+  - requirement: Multi-workspace file discovery
+    name: Files with no adapter skipped
+    given:
+      - a file docs/readme.md with no registered adapter for .md
+    when:
+      - file discovery runs
+    then:
+      - docs/readme.md is not in the discovered files
+  - requirement: Multi-workspace file discovery
+    name: Paths prefixed with workspace name
+    given:
+      - a workspace named core with codeRoot /project/packages/core
+      - AND a file at /project/packages/core/src/index.ts
+    when:
+      - the indexer processes this workspace
+    then:
+      - FileNode.path is core:src/index.ts
+      - AND FileNode.workspace is core
+  - requirement: Single-pass extraction with in-memory index
+    name: Pass 2 can resolve cross-file calls
+    given:
+      - file A defines createUser and file B calls createUser via import
+    when:
+      - indexing runs with two passes
+    then:
+      - Pass 1 registers createUser in the in-memory SymbolIndex
+      - AND Pass 2 resolves the call from file B to the createUser symbol and creates a CALLS relation
+  - requirement: Single-pass extraction with in-memory index
+    name: Pass 1 completes for ALL workspaces before Pass 2
+    given:
+      - workspaces core and cli with files where cli imports from core
+    when:
+      - indexing runs
+    then:
+      - all files from both workspaces have their symbols registered in the SymbolIndex (Pass 1) before any CALLS/IMPORTS resolution (Pass 2) begins
+  - requirement: Single-pass extraction with in-memory index
+    name: Cross-workspace import resolution in Pass 2
+    given:
+      - workspace cli has a file importing createKernel from @specd/core
+      - AND workspace core has a file defining createKernel
+      - AND the monorepo map resolves @specd/core to the core workspace prefix
+    when:
+      - Pass 2 resolves imports
+    then:
+      - the import resolves to the createKernel symbol in workspace core
+  - requirement: Single-pass extraction with in-memory index
+    name: Bulk load writes all data at once
+    given:
+      - two workspaces with 10 files total
+    when:
+      - both passes complete
+    then:
+      - GraphStore.bulkLoad() is called once with all accumulated files, symbols, and relations from both workspaces
+  - requirement: Chunked processing
+    name: Files grouped by byte budget
+    given:
+      - workspaces with files totaling 50 MB and a chunk budget of 20 MB
+    when:
+      - Pass 1 runs
+    then:
+      - files are processed in at least 3 chunks
+      - AND file content strings from completed chunks are eligible for garbage collection
+  - requirement: Chunked processing
+    name: Custom chunk budget respected
+    given:
+      - IndexOptions.chunkBytes is set to 5 MB
+    when:
+      - indexing runs
+    then:
+      - chunks do not exceed 5 MB of source content
+  - requirement: Progress reporting
+    name: Progress callback receives granular updates
+    given:
+      - an onProgress callback is provided in IndexOptions
+    when:
+      - indexing runs
+    then:
+      - the callback is called with increasing percent values from 0 to 100
+      - AND phase strings describe the current activity (e.g. "Parsing symbols", "Resolving imports", "Bulk loading")
+      - AND detail strings are included for per-file phases (e.g. "150/460")
+  - requirement: Cross-workspace package resolution
+    name: Package identity built from adapter
+    given:
+      - "workspace core with codeRoot containing package.json with name: '@specd/core'"
+      - AND the TypeScript adapter implements getPackageIdentity
+    when:
+      - the indexer builds the packageName → workspaceName map
+    then:
+      - "'@specd/core' maps to workspace 'core'"
+  - requirement: Cross-workspace package resolution
+    name: Cross-workspace import resolved via package identity
+    given:
+      - workspace core with package identity @specd/core defining createUser
+      - AND workspace cli has a file importing createUser from @specd/core
+    when:
+      - Pass 2 resolves imports
+    then:
+      - an IMPORTS relation is created from the cli file to the core file
+      - AND a CALLS relation is created from the calling symbol to createUser
+  - requirement: Cross-workspace package resolution
+    name: Multirepo cross-workspace resolution
+    given:
+      - two workspaces from separate repos configured in specd.yaml
+      - AND each has a package.json with distinct package names
+      - AND workspace B imports a symbol from workspace A's package
+    when:
+      - Pass 2 resolves imports
+    then:
+      - the import resolves across repos via the packageName → workspaceName map
+  - requirement: Cross-workspace package resolution
+    name: Adapter without getPackageIdentity skips resolution
+    given:
+      - an adapter that does not implement getPackageIdentity
+    when:
+      - the indexer queries it for a workspace's package identity
+    then:
+      - non-relative imports for that language remain unresolved
+  - requirement: Spec dependency indexing
+    name: Specs resolved via callback
+    given:
+      - a workspace with a specs() callback that returns DiscoveredSpec[]
+    when:
+      - spec indexing runs
+    then:
+      - the indexer calls the callback instead of walking the filesystem
+      - AND the returned specs are stored with the workspace name
+  - requirement: Spec dependency indexing
+    name: Spec contentHash from content artifacts only
+    given:
+      - a spec with artifacts spec.md, verify.md, and .specd-metadata.yaml
+    when:
+      - the specs() callback builds the DiscoveredSpec
+    then:
+      - contentHash is computed from all artifacts EXCEPT .specd-metadata.yaml
+      - AND spec.md is ordered first, then the remaining artifacts in alphabetical order
+  - requirement: Spec dependency indexing
+    name: Spec with .specd-metadata.yaml indexed
+    given:
+      - 'a spec in workspace core with .specd-metadata.yaml containing dependsOn: [core:core/config, core:core/storage]'
+    when:
+      - spec indexing runs
+    then:
+      - "a SpecNode with specId: 'core:core/change' and workspace: 'core' is upserted"
+      - AND two DEPENDS_ON relations are created to core:core/config and core:core/storage
+  - requirement: Spec dependency indexing
+    name: Spec without metadata uses defaults
+    given:
+      - a spec in workspace code-graph with no .specd-metadata.yaml
+    when:
+      - spec indexing runs
+    then:
+      - title defaults to the specId, description defaults to '', and dependsOn defaults to []
+      - AND no fallback parsing of spec.md is performed
+  - requirement: Spec dependency indexing
+    name: Spec title defaults to specId when metadata is absent
+    given:
+      - "a spec with specId: 'code-graph:code-graph/change' and no .specd-metadata.yaml"
+    when:
+      - spec indexing runs
+    then:
+      - "the SpecNode has title: 'code-graph:code-graph/change'"
+  - requirement: Spec dependency indexing
+    name: Incremental spec indexing skips unchanged specs
+    given:
+      - a spec was indexed with contentHash abc computed from all its artifacts
+      - AND no artifact has changed
+    when:
+      - spec indexing runs again
+    then:
+      - the spec is skipped because its contentHash matches the stored hash
+  - requirement: Spec dependency indexing
+    name: SpecIds unique across workspaces
+    given:
+      - workspaces core and cli both have a spec named spec-metadata
+    when:
+      - spec indexing runs
+    then:
+      - specIds are core:core/spec-metadata and cli:cli/spec-metadata respectively
+      - AND no primary key collision occurs
+  - requirement: Error isolation
+    name: Parse error in one file does not abort others
+    given:
+      - a workspace with files A (valid) and B (contains syntax error)
+    when:
+      - IndexCodeGraph.execute() is called
+    then:
+      - file A is successfully indexed
+      - AND the result contains an error entry for file B
+      - AND filesIndexed counts only A
+  - requirement: Error isolation
+    name: Infrastructure error aborts the run
+    given:
+      - the GraphStore connection is lost mid-indexing
+    when:
+      - upsertFile() throws a connection error
+    then:
+      - the entire indexing run aborts with that error (not collected per-file)
+  - requirement: Index result
+    name: Duration measured
+    when:
+      - IndexCodeGraph.execute() completes
+    then:
+      - IndexResult.duration reflects the elapsed wall-clock time in milliseconds
+  - requirement: Index result
+    name: All counts sum correctly
+    given:
+      - a run across two workspaces that discovers 100 files, indexes 10, skips 85, removes 3, and has 2 errors
+    when:
+      - the IndexResult is returned
+    then:
+      - filesDiscovered is 100, filesIndexed is 10, filesSkipped is 85, filesRemoved is 3, and errors.length is 2
+  - requirement: Index result
+    name: Per-workspace breakdown
+    given:
+      - indexing completes for workspaces core (80 files) and cli (20 files)
+    when:
+      - the IndexResult is returned
+    then:
+      - IndexResult.workspaces contains two entries
+      - AND each entry reports its own filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed
+      - AND the aggregate filesDiscovered equals the sum of per-workspace filesDiscovered
+contentHashes:
+  spec.md: sha256:4772bf57028c2a26e9bebf5a6b2fd9fa0e319ef6fcabfafa519a5d798fbfe8b6
+  verify.md: sha256:a05130665f9620bba040606313f290829a1fed74b27934c3523c6b7a57521f38
+generatedBy: core
