@@ -1079,5 +1079,63 @@ describe('FsChangeRepository', () => {
       await expect(fs.access(specsDir)).rejects.toThrow()
       await expect(fs.access(path.join(specsDir, 'spec.md'))).rejects.toThrow()
     })
+
+    it('removes empty parent directories up to the change root', async () => {
+      const change = makeChange('remove-test')
+      await ctx.repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-remove-test')
+      await fs.mkdir(path.join(dir, 'specs', 'default', 'core', 'compile-context'), {
+        recursive: true,
+      })
+      await fs.mkdir(path.join(dir, 'deltas', 'default', 'core', 'compile-context'), {
+        recursive: true,
+      })
+
+      await ctx.repo.unscaffold(change, ['default:core/compile-context'])
+
+      await expect(
+        fs.access(path.join(dir, 'specs', 'default', 'core', 'compile-context')),
+      ).rejects.toThrow()
+      await expect(fs.access(path.join(dir, 'specs', 'default', 'core'))).rejects.toThrow()
+      await expect(fs.access(path.join(dir, 'specs', 'default'))).rejects.toThrow()
+      await expect(fs.access(path.join(dir, 'deltas', 'default', 'core'))).rejects.toThrow()
+      await expect(fs.access(path.join(dir, 'deltas', 'default'))).rejects.toThrow()
+    })
+
+    it('preserves non-empty parent directories', async () => {
+      const change = makeChange('remove-test')
+      await ctx.repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-remove-test')
+      await fs.mkdir(path.join(dir, 'specs', 'default', 'core', 'compile-context'), {
+        recursive: true,
+      })
+      await fs.mkdir(path.join(dir, 'specs', 'default', 'core', 'other-spec'), {
+        recursive: true,
+      })
+
+      await ctx.repo.unscaffold(change, ['default:core/compile-context'])
+
+      await expect(
+        fs.access(path.join(dir, 'specs', 'default', 'core', 'compile-context')),
+      ).rejects.toThrow()
+      await expect(
+        fs.access(path.join(dir, 'specs', 'default', 'core', 'other-spec')),
+      ).resolves.toBeUndefined()
+      await expect(fs.access(path.join(dir, 'specs', 'default', 'core'))).resolves.toBeUndefined()
+    })
+
+    it('never removes the change directory itself', async () => {
+      const change = makeChange('remove-test')
+      await ctx.repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-remove-test')
+      await fs.mkdir(path.join(dir, 'specs', 'default'), { recursive: true })
+
+      await ctx.repo.unscaffold(change, ['default:'])
+
+      await expect(fs.access(dir)).resolves.toBeUndefined()
+    })
   })
 })
