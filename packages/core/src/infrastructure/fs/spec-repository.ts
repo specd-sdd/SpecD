@@ -1,6 +1,5 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { parse as parseYaml } from 'yaml'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
@@ -235,7 +234,7 @@ export class FsSpecRepository extends SpecRepository {
     const hash = sha256(content)
 
     try {
-      const parsed = parseYaml(content) as unknown
+      const parsed = JSON.parse(content) as unknown
       const result = specMetadataSchema.safeParse(parsed)
       const metadata = result.success ? (result.data as SpecMetadata) : {}
       return { ...metadata, originalHash: hash }
@@ -419,7 +418,7 @@ export class FsSpecRepository extends SpecRepository {
    * @returns Absolute path to `<metadataPath>/<specFsPath>/metadata.yaml`
    */
   private _metadataFilePath(name: SpecPath): string {
-    return path.join(this._metadataPath, name.toFsPath(path.sep), 'metadata.yaml')
+    return path.join(this._metadataPath, name.toFsPath(path.sep), 'metadata.json')
   }
 
   /**

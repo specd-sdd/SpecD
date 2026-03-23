@@ -1,5 +1,4 @@
 import { type Command } from 'commander'
-import { stringify } from 'yaml'
 import { SpecPath, type SpecMetadataStatus } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
@@ -100,13 +99,13 @@ async function executeSingle(
     cliError('schema has no metadataExtraction declarations', opts.format)
   }
 
-  const yamlContent = stringify(result.metadata, { lineWidth: 0 })
+  const jsonContent = JSON.stringify(result.metadata, null, 2) + '\n'
 
   if (opts.write === true) {
     await kernel.specs.saveMetadata.execute({
       workspace: parsed.workspace,
       specPath: SpecPath.parse(parsed.capabilityPath),
-      content: yamlContent,
+      content: jsonContent,
       ...(opts.force === true ? { force: true } : {}),
     })
 
@@ -119,7 +118,7 @@ async function executeSingle(
   } else {
     const fmt = parseFormat(opts.format)
     if (fmt === 'text') {
-      output(yamlContent.trimEnd(), 'text')
+      output(jsonContent.trimEnd(), 'text')
     } else {
       output({ spec: specId, metadata: result.metadata }, fmt)
     }
@@ -193,11 +192,11 @@ async function executeBatch(
         }
       }
 
-      const yamlContent = stringify(genResult.metadata, { lineWidth: 0 })
+      const jsonContent = JSON.stringify(genResult.metadata, null, 2) + '\n'
       await kernel.specs.saveMetadata.execute({
         workspace: entry.workspace,
         specPath: SpecPath.parse(entry.path),
-        content: yamlContent,
+        content: jsonContent,
         ...(opts.force === true ? { force: true } : {}),
       })
       results.push({ spec: specId, status: 'ok' })

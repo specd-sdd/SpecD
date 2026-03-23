@@ -107,7 +107,7 @@ function sha256Hex(content: string): string {
   return `sha256:${createHash('sha256').update(content).digest('hex')}`
 }
 
-/** Builds a valid `.specd-metadata.yaml` with correct hashes for `spec.md`. */
+/** Builds a valid metadata JSON string with correct hashes for `spec.md`. */
 function freshMetadata(
   specContent: string,
   opts: {
@@ -119,44 +119,24 @@ function freshMetadata(
   } = {},
 ): string {
   const hash = sha256Hex(specContent)
-  const parts = [
-    `title: 'Test'`,
-    `description: '${opts.description ?? 'Test spec description.'}'`,
-    `contentHashes:`,
-    `  'spec.md': '${hash}'`,
-  ]
+  const obj: Record<string, unknown> = {
+    title: 'Test',
+    description: opts.description ?? 'Test spec description.',
+    contentHashes: { 'spec.md': hash },
+  }
   if (opts.dependsOn && opts.dependsOn.length > 0) {
-    parts.push(`dependsOn:`)
-    for (const dep of opts.dependsOn) parts.push(`  - '${dep}'`)
+    obj.dependsOn = opts.dependsOn
   }
   if (opts.rules && opts.rules.length > 0) {
-    parts.push(`rules:`)
-    for (const r of opts.rules) {
-      parts.push(`  - requirement: '${r.requirement}'`)
-      parts.push(`    rules:`)
-      for (const rule of r.rules) parts.push(`      - '${rule}'`)
-    }
+    obj.rules = opts.rules
   }
   if (opts.constraints && opts.constraints.length > 0) {
-    parts.push(`constraints:`)
-    for (const c of opts.constraints) parts.push(`  - '${c}'`)
+    obj.constraints = opts.constraints
   }
   if (opts.scenarios && opts.scenarios.length > 0) {
-    parts.push(`scenarios:`)
-    for (const s of opts.scenarios) {
-      parts.push(`  - requirement: '${s.requirement}'`)
-      parts.push(`    name: '${s.name}'`)
-      if (s.when?.length) {
-        parts.push(`    when:`)
-        for (const w of s.when) parts.push(`      - '${w}'`)
-      }
-      if (s.then?.length) {
-        parts.push(`    then:`)
-        for (const t of s.then) parts.push(`      - '${t}'`)
-      }
-    }
+    obj.scenarios = opts.scenarios
   }
-  return parts.join('\n')
+  return JSON.stringify(obj)
 }
 
 /** A stubbed parser that does nothing meaningful. */
@@ -606,7 +586,11 @@ describe('CompileContext', () => {
       const jwtContent = '# JWT\n'
       const loginMetadata = freshMetadata(loginContent, { dependsOn: ['auth/jwt'] })
       // Deliberately wrong hash → stale metadata
-      const staleMetadata = `title: 'JWT'\ndescription: 'Old JWT spec.'\ncontentHashes:\n  'spec.md': 'sha256:deadbeef'`
+      const staleMetadata = JSON.stringify({
+        title: 'JWT',
+        description: 'Old JWT spec.',
+        contentHashes: { 'spec.md': 'sha256:deadbeef' },
+      })
 
       const specRepo = makeSpecRepo([loginSpec, jwtSpec], {
         'auth/login/.specd-metadata.yaml': loginMetadata,

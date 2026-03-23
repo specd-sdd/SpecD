@@ -58,7 +58,7 @@ describe('spec generate-metadata', () => {
     expect(process.exit).toHaveBeenCalledWith(1)
   })
 
-  it('outputs generated YAML to stdout in text mode', async () => {
+  it('outputs generated JSON to stdout in text mode', async () => {
     const { kernel, stdout } = setup()
     vi.mocked(kernel.specs.generateMetadata.execute).mockResolvedValue({
       metadata: {
@@ -74,8 +74,8 @@ describe('spec generate-metadata', () => {
     await program.parseAsync(['node', 'specd', 'spec', 'generate-metadata', 'auth/login'])
 
     const out = stdout()
-    expect(out).toContain('title: Login')
-    expect(out).toContain('generatedBy: core')
+    expect(out).toContain('"title": "Login"')
+    expect(out).toContain('"generatedBy": "core"')
   })
 
   it('outputs JSON in json mode', async () => {

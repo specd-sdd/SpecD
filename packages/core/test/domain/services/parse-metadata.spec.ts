@@ -10,23 +10,21 @@ const VALID_BASE = {
 }
 
 describe('parseMetadata (lenient read path)', () => {
-  it('returns {} on invalid YAML', () => {
+  it('returns {} on invalid JSON', () => {
     expect(parseMetadata('{{{bad')).toEqual({})
   })
 
   it('returns {} on structurally invalid content', () => {
-    expect(parseMetadata('keywords: 123')).toEqual({})
+    expect(parseMetadata(JSON.stringify({ keywords: 123 }))).toEqual({})
   })
 
   it('parses valid metadata', () => {
-    const yaml = `
-title: Config
-keywords:
-  - lifecycle
-dependsOn:
-  - core/storage
-`
-    const result = parseMetadata(yaml)
+    const json = JSON.stringify({
+      title: 'Config',
+      keywords: ['lifecycle'],
+      dependsOn: ['core/storage'],
+    })
+    const result = parseMetadata(json)
     expect(result.title).toBe('Config')
     expect(result.keywords).toEqual(['lifecycle'])
     expect(result.dependsOn).toEqual(['core/storage'])

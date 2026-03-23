@@ -3,28 +3,27 @@ import { InvalidateSpecMetadata } from '../../../src/application/use-cases/inval
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { makeSpecRepository } from './helpers.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
-import { NodeYamlSerializer } from '../../../src/infrastructure/node/yaml-serializer.js'
 import { WorkspaceNotFoundError } from '../../../src/application/errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../../../src/application/errors/spec-not-found-error.js'
 
 const specPath = SpecPath.parse('auth/login')
 const spec = new Spec('default', specPath, ['spec.md'])
 
-const METADATA_WITH_HASHES = [
-  'title: Auth Login',
-  "description: 'Handles login'",
-  'contentHashes:',
-  "  spec.md: 'sha256:" + 'a'.repeat(64) + "'",
-  'keywords:',
-  '  - auth',
-  '',
-].join('\n')
+const METADATA_WITH_HASHES = JSON.stringify({
+  title: 'Auth Login',
+  description: 'Handles login',
+  contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+  keywords: ['auth'],
+})
 
-const METADATA_WITHOUT_HASHES = ['title: Auth Login', "description: 'Handles login'", ''].join('\n')
+const METADATA_WITHOUT_HASHES = JSON.stringify({
+  title: 'Auth Login',
+  description: 'Handles login',
+})
 
 function makeUseCase(opts: { specs?: Spec[]; artifacts?: Record<string, string | null> } = {}) {
   const repo = makeSpecRepository(opts)
-  const uc = new InvalidateSpecMetadata(new Map([['default', repo]]), new NodeYamlSerializer())
+  const uc = new InvalidateSpecMetadata(new Map([['default', repo]]))
   return { uc, repo }
 }
 
@@ -43,8 +42,8 @@ describe('InvalidateSpecMetadata', () => {
     const written = repo.saved.get('.specd-metadata.yaml')
     expect(written).toBeDefined()
     expect(written).not.toContain('contentHashes')
-    expect(written).toContain('title:')
-    expect(written).toContain('keywords:')
+    expect(written).toContain('title')
+    expect(written).toContain('keywords')
   })
 
   it('preserves other fields when removing contentHashes', async () => {

@@ -19,11 +19,13 @@ The `<specPath>` argument uses the same `workspace:capability-path` syntax as ot
 
 ### Requirement: Content source
 
-Without `--input`, the command reads all of stdin until EOF. With `--input <file>`, it reads the file at the given path. In both cases the result is a raw YAML string passed to the use case.
+Content is read from `--input <file>` when provided, otherwise from stdin. The content must be a valid JSON string representing a metadata object.
 
 ### Requirement: YAML validation
 
-Before calling the use case, the command parses the content with `yaml.parse()` to verify it is valid YAML. If parsing fails, the command writes an error to stderr and exits with code 1.
+### Requirement: JSON validation
+
+The command reads content from `--input` file or stdin. Before passing to `SaveSpecMetadata`, it validates the content is valid JSON by calling `JSON.parse()`. If parsing fails, the command writes `error: invalid JSON: <message>` to stderr and exits with code 1.
 
 ### Requirement: Text output
 
@@ -39,7 +41,9 @@ If the spec does not exist in the given workspace, the command writes `error: sp
 
 ### Requirement: Error — invalid YAML
 
-If the content is not valid YAML, the command writes `error: invalid YAML: <parse error message>` to stderr and exits with code 1.
+### Requirement: Error — invalid JSON
+
+If the input content is not valid JSON (syntax error), the command writes `error: invalid JSON: <parse error message>` to stderr and exits with code 1.
 
 ### Requirement: Error — invalid metadata structure
 
