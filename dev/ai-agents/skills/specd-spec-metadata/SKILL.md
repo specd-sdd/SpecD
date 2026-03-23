@@ -6,7 +6,7 @@ allowed-tools: Bash(node *), Bash(cat *), Bash(rm *), Bash(shasum *), Read, Agen
 
 # Skill: Spec Metadata Generator
 
-Generates or updates `.specd-metadata.yaml` files in two steps:
+Generates or updates `metadata.json` files in two steps:
 
 1. **Deterministic extraction** — `spec generate-metadata` extracts raw metadata from artifact ASTs via schema-declared `metadataExtraction` rules. Produces `title`, `description`, `dependsOn`, `rules`, `constraints`, `scenarios`, `context`, and `contentHashes`. No LLM.
 2. **LLM optimization** — subagents read the generated metadata and optimize `rules`, `constraints`, `scenarios`, `description` for quality (clean formatting artifacts, deduplicate, convert tables to sentences) without losing content. They also add `keywords`, which cannot be extracted deterministically.
@@ -18,9 +18,9 @@ The deterministic path runs `spec generate-metadata --write` which:
 - Parses artifacts into ASTs via the schema's artifact parsers
 - Runs extractors declared in `metadataExtraction` (selectors, captures, groupBy, transforms)
 - Computes SHA-256 content hashes and resolves dependency paths
-- Writes `.specd-metadata.yaml` with `generatedBy: core`
+- Writes `metadata.json` with `generatedBy: core`
 
-Subagents **only optimize** — they read the generated metadata (not the raw spec files), clean up semantic fields, and return the full YAML as their result string. They **never write files**. The main orchestrator receives the YAML from each subagent and writes it via `spec write-metadata`.
+Subagents **only optimize** — they read the generated metadata (not the raw spec files), clean up semantic fields, and return the full JSON as their result string. They **never write files**. The main orchestrator receives the JSON from each subagent and writes it via `spec write-metadata`.
 
 After optimization, the final written metadata must have `generatedBy: agent` (not `core`), since the LLM optimization step has enhanced it beyond pure deterministic extraction.
 
@@ -91,15 +91,16 @@ When this skill is invoked:
    ```
 
    Save each spec's current `dependsOn` array (if any).
-   d. For each spec, run deterministic generation (without `--force`):
+   d. Run deterministic generation for all stale/missing/invalid specs at once:
 
    ```bash
-   node packages/cli/dist/index.js spec generate-metadata <spec-id> --write
+   node packages/cli/dist/index.js spec generate-metadata --all --write --status stale,missing,invalid
    ```
 
-   If any spec fails, collect the error and continue with the rest. After all specs are
-   processed, report all failures to the user with the error details and ask how to proceed
-   for each (skip, retry with `--force`, or abort).
+   The `--all` flag processes every matching spec in a single invocation. If any spec
+   fails, the command reports per-spec errors but continues with the rest. After it
+   completes, review the output for failures and report them to the user with error
+   details — ask how to proceed for each (skip, retry with `--force`, or abort).
    e. **Reconcile `dependsOn` for each spec** — compare new vs existing. Collect all
    discrepancies and present them to the user in a single summary before proceeding
    to optimization (see "dependsOn preservation" below).
@@ -130,7 +131,7 @@ When this skill is invoked:
      > `dependsOn` for `<spec-id>`: the extractor found new dependency `<dep>`. Add it?
    - **No changes**: Proceed silently.
      d. After user confirmation, write the reconciled `dependsOn` back to the metadata file
-     before launching the optimizer subagent. Use `spec write-metadata` with a YAML that has
+     before launching the optimizer subagent. Use `spec write-metadata` with a JSON string that has
      the corrected `dependsOn`.
      e. In **batch mode** (all specs), collect all discrepancies first, then present them to
      the user in a single grouped summary to avoid question fatigue.
@@ -146,15 +147,15 @@ When a subagent returns:
 
 - If its result is `FRESH` — skip, the spec is already up to date.
 - If its result starts with `ERROR:` — log the error and continue.
-- Otherwise, the result is the full YAML content. Before writing, enforce a quality gate:
+- Otherwise, the result is the full JSON content. Before writing, enforce a quality gate:
   - Run this gate on every non-`FRESH` result, including stale specs.
 
-  - Must be YAML mapping syntax (no top-level JSON `{ ... }` wrapper)
-  - Must include `generatedBy: agent`, `title`, `description`, `keywords`, `contentHashes`, `rules`
-  - `generatedBy` must be `agent` (not `core`)
-  - `keywords` must be a non-empty YAML list
+  - Must be valid JSON (parseable with `JSON.parse`)
+  - Must include `generatedBy: "agent"`, `title`, `description`, `keywords`, `contentHashes`, `rules`
+  - `generatedBy` must be `"agent"` (not `"core"`)
+  - `keywords` must be a non-empty array
   - `keywords` must contain 4-8 concrete domain tags; reject obvious generic filler terms (`each`, `may`, `project`, `contain`, `thing`, `misc`)
-  - `rules[*].rules` must not contain formatting artifacts or example scaffolding (tree glyphs like `├──`/`└──`, Markdown table rows, raw YAML example keys like `title:`/`dependsOn:`/`contentHashes:`, or field docs like `**\`title\`\*\*`)
+  - `rules[*].rules` must not contain formatting artifacts or example scaffolding (tree glyphs like `├──`/`└──`, Markdown table rows, raw example keys like `title:`/`dependsOn:`/`contentHashes:`, or field docs like `**\`title\`\*\*`)
   - `dependsOn` must match the reconciled list from the preservation step — if the subagent dropped or changed any entries, restore them from the reconciled list before writing
 
   If any check fails, regenerate once with a forced prompt prefix:
@@ -164,12 +165,12 @@ When a subagent returns:
   If checks pass, write it:
 
 ```bash
-cat > /tmp/specd-metadata-<safe-name>.yaml << 'YAMLEOF'
-<yaml content from subagent>
-YAMLEOF
-node packages/cli/dist/index.js spec write-metadata <spec-id> --input /tmp/specd-metadata-<safe-name>.yaml
+cat > /tmp/specd-metadata-<safe-name>.json << 'JSONEOF'
+<json content from subagent>
+JSONEOF
+node packages/cli/dist/index.js spec write-metadata <spec-id> --input /tmp/specd-metadata-<safe-name>.json
 node packages/cli/dist/index.js spec metadata <spec-id> --format json
-rm /tmp/specd-metadata-<safe-name>.yaml
+rm /tmp/specd-metadata-<safe-name>.json
 ```
 
 Where `<safe-name>` is the spec ID with colons and slashes replaced by hyphens.
@@ -183,7 +184,7 @@ If it does not, log `ERROR:` for that spec.
 ````
 You are optimizing metadata for spec <spec-id>. The deterministic extractor has already produced
 a baseline from the spec's AST. Your job is to read the generated metadata, optimize the semantic
-fields for quality without losing content, add keywords, and return the complete YAML as your
+fields for quality without losing content, add keywords, and return the complete JSON as your
 final message. Do NOT write any files.
 
 IMPORTANT: Use `node packages/cli/dist/index.js` instead of `specd` for all CLI commands.
@@ -204,7 +205,7 @@ node packages/cli/dist/index.js spec metadata <spec-id> --format json
 
 If `fresh` is `true`, evaluate existing metadata quality from command output:
 - `keywords` has 4-8 items, no generic filler tags
-- `rules[*].rules` has no formatting artifacts (tree glyphs, table rows, YAML example keys, field-doc lines)
+- `rules[*].rules` has no formatting artifacts (tree glyphs, table rows, example keys, field-doc lines)
 - rules are requirement statements, not snippets copied from examples
 - `description` is 2-3 sentences, not a dictionary-style definition
 
@@ -270,54 +271,57 @@ Copy these fields exactly from the metadata — do NOT modify them:
 - `dependsOn` (keep all resolved paths — NEVER drop, add, or reorder entries)
 - `contentHashes` (keep all computed hashes — never recompute)
 
-Set `generatedBy: agent` (replacing `core` from the deterministic step).
+**Note on `contentHashes` format:** The CLI `spec metadata --format json` displays `contentHashes`
+as an expanded array with freshness info (`[{ filename, recorded, current, fresh }]`). However,
+the stored format is a simple map (`{ "spec.md": "sha256:..." }`). Your output must use the
+**map format**. To get the original map, use `spec generate-metadata <spec-id> --format json`
+which returns `{ metadata: { contentHashes: { "spec.md": "sha256:..." } } }` — copy the
+`contentHashes` from there.
 
-### Step 5 — Return the YAML
+Set `generatedBy` to `"agent"` (replacing `"core"` from the deterministic step).
 
-Compose the complete YAML and return it as your final message. The YAML must be the ONLY content
-in your final message — no explanation, no markdown fences, just raw YAML.
+### Step 5 — Return the JSON
 
-## YAML quoting rules
+Compose the complete JSON and return it as your final message. The JSON must be the ONLY content
+in your final message — no explanation, no markdown fences, just raw JSON.
 
-Always quote every string value with single quotes. Use double quotes only when the value contains
-a single quote.
-Use canonical YAML list style (`- item`) and mapping style (`key: value`) only.
-Do NOT return JSON-compatible inline structures (`[ ... ]`, `{ ... }`) as the document format.
+Use `JSON.stringify`-compatible format: 2-space indentation, double-quoted keys and strings.
 
 ## Output format
 
-```yaml
-generatedBy: 'agent'
-title: '<short name>'
-description: >
-  <2–3 sentences>
-keywords:
-  - '<keyword>'
-dependsOn:
-  - '<workspace:spec/path>'
-contentHashes:
-  'spec.md': 'sha256:<hex>'
-  'verify.md': 'sha256:<hex>'
-rules:
-  - requirement: '<requirement name>'
-    rules:
-      - '<normative statement>'
-constraints:
-  - '<constraint statement>'
-scenarios:
-  - requirement: '<requirement name>'
-    name: '<scenario name>'
-    given:
-      - '<precondition>'
-    when:
-      - '<condition>'
-    then:
-      - '<expected outcome>'
+```json
+{
+  "generatedBy": "agent",
+  "title": "<short name>",
+  "description": "<2-3 sentences>",
+  "keywords": ["<keyword>"],
+  "dependsOn": ["<workspace:spec/path>"],
+  "contentHashes": {
+    "spec.md": "sha256:<hex>",
+    "verify.md": "sha256:<hex>"
+  },
+  "rules": [
+    {
+      "requirement": "<requirement name>",
+      "rules": ["<normative statement>"]
+    }
+  ],
+  "constraints": ["<constraint statement>"],
+  "scenarios": [
+    {
+      "requirement": "<requirement name>",
+      "name": "<scenario name>",
+      "given": ["<precondition>"],
+      "when": ["<condition>"],
+      "then": ["<expected outcome>"]
+    }
+  ]
+}
 ```
 
 ## Notes
 
-- `generatedBy` must be `agent` in the output — this marks the metadata as LLM-optimized
+- `generatedBy` must be `"agent"` in the output — this marks the metadata as LLM-optimized
 - `contentHashes` come from the deterministic extractor — never modify them
 - `dependsOn` are curated — copy them exactly as provided, never drop, reorder, or add entries
 - If a statement comes from `## Constraints`, it MUST go to `constraints`, never to `rules`
