@@ -77,9 +77,21 @@
 
 #### Scenario: No duplicate adapter construction
 
+- **GIVEN** a valid `SpecdConfig` with one workspace
 - **WHEN** `createKernel(config)` is called
-- **THEN** `createKernelInternals` is called exactly once
-- **AND** the returned adapter instances (repositories, VCS adapter, hook runner, hasher, etc.) are shared across all use case instantiations
+- **THEN** only one `ChangeRepository` instance is created
+- **AND** only one `SchemaRegistry` instance is created
+- **AND** only one `SchemaProvider` instance is created and shared across all use cases
+- **AND** only one `RunStepHooks` instance is created
+
+#### Scenario: SchemaProvider replaces direct SchemaRegistry usage
+
+- **GIVEN** a valid `SpecdConfig` with `schemaOverrides` declared
+- **WHEN** `createKernel(config)` is called
+- **THEN** no use case constructor receives `SchemaRegistry` directly
+- **AND** all use cases that need the schema receive `SchemaProvider`
+- **AND** `SchemaProvider.get()` returns the schema with overrides applied
+- **AND** `RunStepHooks` and `GetHookInstructions` do not receive project-level workflow hooks
 
 ### Requirement: Kernel exposes repository instances for adapter access
 

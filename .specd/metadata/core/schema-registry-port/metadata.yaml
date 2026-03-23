@@ -1,0 +1,214 @@
+title: SchemaRegistry Port
+description: Schemas can originate from npm packages, workspace directories, or arbitrary filesystem paths, so use cases need a single resolution interface to avoid coupling to any one source. `SchemaRegistry` is the application-layer port that defines the contract for routing schema references and resolving schemas, delegating workspace schema access to `SchemaRepository` instances. npm resolution and direct path resolution remain within the registry.
+dependsOn:
+  - default:_global/architecture
+  - core:core/parse-schema-yaml
+  - core:core/resolve-schema
+  - core:core/schema-repository-port
+context:
+  - Schemas can originate from npm packages, workspace directories, or arbitrary filesystem paths, so use cases need a single resolution interface to avoid coupling to any one source. `SchemaRegistry` is the application-layer port that defines the contract for routing schema references and resolving schemas, delegating workspace schema access to `SchemaRepository` instances. npm resolution and direct path resolution remain within the registry.
+rules:
+  - requirement: Interface shape
+    rules:
+      - 'The port MUST be declared as a TypeScript `interface` named `SchemaRegistry` with three methods: `resolve`, `resolveRaw`, and `list`. It SHALL NOT be an abstract class, because there are no invariant constructor arguments shared across all implementations. Implementations MUST receive a `ReadonlyMap<string, SchemaRepository>` at construction time, mapping workspace names to their corresponding `SchemaRepository` instances.'
+  - requirement: Resolve method signature
+    rules:
+      - |-
+        The `resolve` method MUST accept one parameter:
+
+        1. `ref: string` — the schema reference as declared in `specd.yaml`
+
+        It MUST return `Promise<Schema | null>`. A `null` return indicates the resolved file does not exist; the caller is responsible for converting `null` to `SchemaNotFoundError`.
+
+        Workspace schema resolution MUST be delegated to the `SchemaRepository` instance for the target workspace.
+  - requirement: Resolve prefix routing
+    rules:
+      - |-
+        The `resolve` method MUST route references by prefix:
+
+        - `@scope/name` — npm package; loaded from `node_modules/@scope/name/schema.yaml`. This resolution remains within the registry implementation.
+        - `#workspace:name` — workspace-qualified; delegated to `SchemaRepository` for the given workspace
+        - `#name` or bare name (no prefix) — equivalent to `#default:name`; delegated to `SchemaRepository` for the `default` workspace
+        - Relative or absolute filesystem path — loaded directly from that path. This resolution remains within the registry implementation.
+
+        There SHALL be no implicit multi-level fallback between these resolution strategies.
+
+        When a workspace-qualified reference targets a workspace with no corresponding `SchemaRepository` (not present in the constructor map), the registry MUST return `null`.
+  - requirement: ResolveRaw method signature
+    rules:
+      - |-
+        The `resolveRaw` method MUST accept one parameter:
+
+        1. `ref: string` — the schema reference
+
+        It MUST return `Promise<SchemaRawResult | null>`. `SchemaRawResult` is an object containing:
+
+        - `data: SchemaYamlData` — the parsed and Zod-validated intermediate data (before domain construction)
+        - `templates: ReadonlyMap<string, string>` — loaded template content keyed by relative path
+        - `resolvedPath: string` — the absolute path of the resolved schema file (used for extends cycle detection)
+
+        This method is used by `ResolveSchema` to obtain the intermediate representation needed for the merge pipeline. The existing `resolve` method continues to return the fully-built `Schema` entity for consumers that do not need the merge pipeline.
+
+        A `null` return indicates the resolved file does not exist.
+
+        Workspace schema resolution MUST be delegated to the corresponding `SchemaRepository` instance, using the same prefix routing as `resolve`.
+  - requirement: List method signature
+    rules:
+      - |-
+        The `list` method MUST accept no parameters.
+
+        It MUST return `Promise<SchemaEntry[]>`. The method SHALL NOT load or validate schema file contents — only discover available schemas and return their metadata.
+
+        Workspace schema entries MUST be obtained by calling `list()` on each `SchemaRepository` instance provided at construction time.
+  - requirement: List result ordering
+    rules:
+      - 'Results from `list` MUST be grouped by source: workspace entries first (in workspace declaration order), npm entries last.'
+  - requirement: SchemaEntry shape
+    rules:
+      - |-
+        Each `SchemaEntry` returned by `list` MUST contain:
+
+        - `ref: string` — the full reference string that can be passed to `resolve()` (e.g. `"@specd/schema-std"`, `"#spec-driven"`, `"#billing:my-schema"`)
+        - `name: string` — the schema name suitable for display, without prefix or workspace qualifier
+        - `source: 'npm' | 'workspace'` — where the schema was discovered
+        - `workspace?: string` — the workspace name; present only when `source` is `"workspace"`
+  - requirement: Schema re-export
+    rules:
+      - The port module MUST re-export the `Schema` type from `domain/value-objects/schema.ts` so that consumers can import both the port and the value object from a single location.
+constraints:
+  - The port lives in application/ports/ per the hexagonal architecture rule
+  - No direct dependency on node_modules resolution, filesystem APIs, or any I/O at the port level
+  - The Schema type is defined in the domain layer and only re-exported by this port module
+scenarios:
+  - requirement: Interface shape
+    name: Implementation satisfies the contract
+    given:
+      - a concrete class implementing SchemaRegistry
+    when:
+      - the class implements resolve, resolveRaw, and list
+    then:
+      - it compiles and can be instantiated
+  - requirement: Resolve method signature
+    name: Resolve returns Schema on success
+    given:
+      - a SchemaRegistry implementation with workspace repositories configured
+      - AND a valid schema reference
+    when:
+      - resolve is called with the ref
+    then:
+      - it returns a Promise<Schema> containing the parsed schema
+  - requirement: Resolve method signature
+    name: Resolve returns null for missing schema
+    given:
+      - a SchemaRegistry implementation and a reference to a non-existent schema file
+    when:
+      - resolve is called
+    then:
+      - it returns null
+  - requirement: Resolve prefix routing
+    name: npm-scoped reference routes to node_modules
+    when:
+      - resolve is called with "@specd/schema-std"
+    then:
+      - the implementation loads from node_modules/@specd/schema-std/schema.yaml
+  - requirement: Resolve prefix routing
+    name: Workspace-qualified reference delegates to SchemaRepository
+    given:
+      - a SchemaRepository for workspace "billing" is in the registry's map
+    when:
+      - resolve is called with "#billing:my-schema"
+    then:
+      - the registry delegates to the "billing" repository's resolve("my-schema")
+  - requirement: Resolve prefix routing
+    name: Bare name delegates to default workspace repository
+    when:
+      - resolve is called with "spec-driven" (no prefix)
+    then:
+      - the registry delegates to the "default" repository's resolve("spec-driven")
+  - requirement: Resolve prefix routing
+    name: Hash-only reference delegates to default workspace repository
+    when:
+      - resolve is called with "#my-schema"
+    then:
+      - the registry delegates to the "default" repository's resolve("my-schema")
+  - requirement: Resolve prefix routing
+    name: Filesystem path is loaded directly
+    when:
+      - resolve is called with "./custom/schema.yaml"
+    then:
+      - the implementation loads from that path directly without delegating to any repository
+  - requirement: Resolve prefix routing
+    name: Unknown workspace returns null
+    given:
+      - no SchemaRepository exists for workspace "unknown" in the registry's map
+    when:
+      - resolve is called with "#unknown:my-schema"
+    then:
+      - it returns null
+  - requirement: ResolveRaw method signature
+    name: ResolveRaw returns intermediate data on success
+    given:
+      - a valid schema reference
+    when:
+      - resolveRaw is called
+    then:
+      - it returns a SchemaRawResult with data (SchemaYamlData), templates (Map), and resolvedPath (string)
+  - requirement: ResolveRaw method signature
+    name: ResolveRaw returns null for missing schema
+    given:
+      - a reference to a non-existent schema file
+    when:
+      - resolveRaw is called
+    then:
+      - it returns null
+  - requirement: ResolveRaw method signature
+    name: ResolveRaw uses same prefix routing as resolve
+    when:
+      - resolveRaw is called with "@specd/schema-std"
+    then:
+      - it resolves from the same location as resolve would
+  - requirement: ResolveRaw method signature
+    name: ResolveRaw delegates workspace schemas to repository
+    given:
+      - a SchemaRepository for workspace "billing" is in the registry's map
+    when:
+      - resolveRaw is called with "#billing:my-schema"
+    then:
+      - the registry delegates to the "billing" repository's resolveRaw("my-schema")
+  - requirement: List result ordering
+    name: Workspace entries appear before npm entries
+    given:
+      - schemas exist in workspace repositories and in npm packages
+    when:
+      - list is called (no parameters)
+    then:
+      - all workspace SchemaEntry items appear before npm SchemaEntry items
+  - requirement: List result ordering
+    name: List aggregates from all workspace repositories
+    given:
+      - SchemaRepository instances for "default" and "billing" are in the registry's map
+      - AND each has schemas
+    when:
+      - list is called
+    then:
+      - entries from both repositories are included in the result
+  - requirement: SchemaEntry shape
+    name: Workspace entry has workspace field
+    given:
+      - a schema discovered in workspace "billing"
+    when:
+      - list returns the entry
+    then:
+      - source is "workspace" and workspace is "billing"
+  - requirement: SchemaEntry shape
+    name: npm entry omits workspace field
+    given:
+      - a schema discovered as an npm package
+    when:
+      - list returns the entry
+    then:
+      - source is "npm" and workspace is undefined
+contentHashes:
+  spec.md: sha256:347761ec5407038296b89876b15c74708f3d5b7e1d80f93eefdae92b585bd81f
+  verify.md: sha256:f214b2ace7fbb5cb517d7244ca3567e6175edb24f020cc7eb35ee9463b1ccf37
+generatedBy: core

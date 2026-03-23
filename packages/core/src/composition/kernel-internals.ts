@@ -25,6 +25,9 @@ import { createChangeRepository } from './change-repository.js'
 import { createArchiveRepository } from './archive-repository.js'
 import { createSpecRepository } from './spec-repository.js'
 import { createSchemaRegistry } from './schema-registry.js'
+import { createSchemaRepository } from './schema-repository.js'
+import { type SchemaRepository } from '../application/ports/schema-repository.js'
+import { createVcsAdapter } from './vcs-adapter.js'
 import { getDefaultWorkspace } from './get-default-workspace.js'
 import { type KernelOptions } from './kernel.js'
 
@@ -64,8 +67,6 @@ export interface KernelInternals {
   readonly yaml: YamlSerializer
   /** Schema reference string from config. */
   readonly schemaRef: string
-  /** Map of workspace name → absolute schemas directory path. */
-  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
   /** Schema plugin references from config, in declaration order. */
   readonly schemaPlugins: readonly string[]
   /** Inline schema override operations from config. */
@@ -84,10 +85,10 @@ export interface KernelInternals {
  * @param options - Optional kernel-level overrides
  * @returns Pre-built adapter instances for all use cases
  */
-export function createKernelInternals(
+export async function createKernelInternals(
   config: SpecdConfig,
   options?: KernelOptions,
-): KernelInternals {
+): Promise<KernelInternals> {
   const defaultWs = getDefaultWorkspace(config)
   const wsContext = {
     workspace: defaultWs.name,
@@ -109,7 +110,7 @@ export function createKernelInternals(
   const changes = createChangeRepository('fs', wsContext, {
     ...storagePaths,
     resolveArtifactTypes: async () => {
-      const schema = await schemas.resolve(config.schemaRef, workspaceSchemasPaths)
+      const schema = await schemas.resolve(config.schemaRef)
       return schema !== null ? schema.artifacts() : []
     },
   })
@@ -122,28 +123,50 @@ export function createKernelInternals(
       : {}),
   })
 
-  const specs = new Map(
-    config.workspaces.map((ws) => [
+  const specs = new Map<string, import('../application/ports/spec-repository.js').SpecRepository>()
+  for (const ws of config.workspaces) {
+    let metadataPath: string
+    const vcsAdapter = await createVcsAdapter(ws.specsPath)
+    try {
+      const vcsRoot = await vcsAdapter.rootDir()
+      metadataPath = path.join(vcsRoot, '.specd', 'metadata')
+    } catch {
+      // NullVcsAdapter or rootDir failure — fallback to specs parent
+      metadataPath = path.join(ws.specsPath, '..', '.specd', 'metadata')
+    }
+    specs.set(
       ws.name,
       createSpecRepository(
         'fs',
         { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
-        { specsPath: ws.specsPath, ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}) },
+        {
+          specsPath: ws.specsPath,
+          metadataPath,
+          ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
+        },
       ),
-    ]),
-  )
+    )
+  }
+
+  const schemaRepositories = new Map<string, SchemaRepository>()
+  for (const ws of config.workspaces) {
+    if (ws.schemasPath !== null) {
+      schemaRepositories.set(
+        ws.name,
+        createSchemaRepository(
+          'fs',
+          { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+          { schemasPath: ws.schemasPath },
+        ),
+      )
+    }
+  }
 
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths,
     configDir: config.projectRoot,
+    schemaRepositories,
   })
-
-  const workspaceSchemasPaths = new Map<string, string>()
-  for (const ws of config.workspaces) {
-    if (ws.schemasPath !== null) {
-      workspaceSchemasPaths.set(ws.name, ws.schemasPath)
-    }
-  }
 
   const expander = new TemplateExpander({ project: { root: config.projectRoot } })
 
@@ -162,7 +185,6 @@ export function createKernelInternals(
     yaml: new NodeYamlSerializer(),
     expander,
     schemaRef: config.schemaRef,
-    workspaceSchemasPaths,
     schemaPlugins: config.schemaPlugins ?? [],
     schemaOverrides: config.schemaOverrides,
   }

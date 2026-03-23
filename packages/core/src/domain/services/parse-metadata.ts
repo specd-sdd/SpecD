@@ -121,4 +121,5 @@ export interface SpecMetadata {
   }>
   readonly context?: string[]
   readonly generatedBy?: 'core' | 'agent'
+  readonly originalHash?: string
 }

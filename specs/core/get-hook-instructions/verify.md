@@ -7,9 +7,10 @@
 #### Scenario: Schema mismatch throws SchemaMismatchError
 
 - **GIVEN** a change created with schema `spec-driven`
-- **AND** the active schema in `specd.yaml` is `custom-schema`
-- **WHEN** `GetHookInstructions.execute` is called
+- **AND** `SchemaProvider.get()` returns a schema named `custom-schema`
+- **WHEN** `execute` is called
 - **THEN** `SchemaMismatchError` is thrown
+- **AND** no hooks are executed
 
 ### Requirement: Step resolution
 
@@ -36,17 +37,10 @@
 
 #### Scenario: Only instruction hooks are collected
 
-- **GIVEN** a step with `hooks.pre: [{ id: "guidance", instruction: "Read tasks" }, { id: "lint", run: "pnpm lint" }, { id: "review", instruction: "Review changes" }]`
+- **GIVEN** a step with `hooks.pre: [{ id: "guidance", type: "instruction", text: "Read tasks" }, { id: "lint", type: "run", command: "pnpm lint" }, { id: "review", type: "instruction", text: "Review changes" }]`
 - **WHEN** `GetHookInstructions` collects hooks for the pre phase
 - **THEN** the result contains `[{ id: "guidance", text: "Read tasks" }, { id: "review", text: "Review changes" }]`
 - **AND** `lint` is not included
-
-#### Scenario: Schema hooks precede project hooks
-
-- **GIVEN** schema pre instruction hooks `[{ id: "s-read", instruction: "Schema instruction" }]`
-- **AND** project pre instruction hooks `[{ id: "p-read", instruction: "Project instruction" }]`
-- **WHEN** `GetHookInstructions` collects hooks for the pre phase
-- **THEN** the result is `[s-read, p-read]` in that order
 
 ### Requirement: Hook filtering with --only
 
@@ -75,3 +69,35 @@
 - **GIVEN** a step with only `run:` hooks in the pre phase
 - **WHEN** `GetHookInstructions.execute` is called with `phase: "pre"`
 - **THEN** the result is `{ phase: "pre", instructions: [] }`
+
+### Requirement: Change lookup — archive fallback
+
+#### Scenario: Post-archiving fallback — change found in archive
+
+- **GIVEN** a change named `my-change` does not exist in `ChangeRepository`
+- **AND** `ArchiveRepository.get("my-change")` returns an `ArchivedChange`
+- **WHEN** `GetHookInstructions.execute` is called with `name: "my-change"`, `step: "archiving"`, `phase: "post"`
+- **THEN** the use case proceeds normally using the archived change
+- **AND** `change.path` template variable resolves to `ArchiveRepository.archivePath(archivedChange)`
+
+#### Scenario: Post-archiving fallback — change not in either repository
+
+- **GIVEN** a change named `nonexistent` does not exist in `ChangeRepository`
+- **AND** `ArchiveRepository.get("nonexistent")` returns `null`
+- **WHEN** `GetHookInstructions.execute` is called with `name: "nonexistent"`, `step: "archiving"`, `phase: "post"`
+- **THEN** `ChangeNotFoundError` is thrown
+
+#### Scenario: Active change takes precedence over archived
+
+- **GIVEN** a change named `my-change` exists in both `ChangeRepository` and `ArchiveRepository`
+- **WHEN** `GetHookInstructions.execute` is called with `name: "my-change"`, `step: "archiving"`, `phase: "post"`
+- **THEN** the active change from `ChangeRepository` is used
+- **AND** `ArchiveRepository.get()` is not called
+
+#### Scenario: Non-archiving step does not fall back to archive
+
+- **GIVEN** a change named `my-change` does not exist in `ChangeRepository`
+- **AND** `ArchiveRepository.get("my-change")` would return an `ArchivedChange`
+- **WHEN** `GetHookInstructions.execute` is called with `name: "my-change"`, `step: "implementing"`, `phase: "post"`
+- **THEN** `ChangeNotFoundError` is thrown immediately
+- **AND** `ArchiveRepository.get()` is not called

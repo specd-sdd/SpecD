@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import { SpecPath, checkMetadataFreshness, parseMetadata, NodeContentHasher } from '@specd/core'
+import { SpecPath, checkMetadataFreshness, NodeContentHasher } from '@specd/core'
 
 const hasher = new NodeContentHasher()
 import { resolveCliContext } from '../../helpers/cli-context.js'
@@ -44,29 +44,31 @@ JSON/TOON output schema:
         const { config, kernel } = await resolveCliContext({ configPath: opts.config })
         const parsed = parseSpecId(specPath, config)
 
-        const result = await kernel.specs.get.execute({
-          workspace: parsed.workspace,
-          specPath: SpecPath.parse(parsed.capabilityPath),
-        })
+        const repo = kernel.specs.repos.get(parsed.workspace)
+        if (repo === undefined) {
+          cliError(`workspace '${parsed.workspace}' not found`, opts.format)
+        }
 
-        if (result === null) {
+        const specPathObj = SpecPath.parse(parsed.capabilityPath)
+        const spec = await repo.get(specPathObj)
+        if (spec === null) {
           cliError(`spec '${specPath}' not found`, opts.format)
         }
 
-        const metadataArtifact = result.artifacts.get('.specd-metadata.yaml')
-
-        if (metadataArtifact === undefined) {
-          cliError(`no .specd-metadata.yaml for spec '${specPath}'`, opts.format)
+        const metadata = await repo.metadata(spec)
+        if (metadata === null) {
+          cliError(`no metadata for spec '${specPath}'`, opts.format)
         }
-
-        const metadata = parseMetadata(metadataArtifact.content)
 
         const specLabel = `${parsed.workspace}:${parsed.capabilityPath}`
 
         // Compute freshness for each content hash
         const freshnessResult = await checkMetadataFreshness(
           metadata.contentHashes,
-          (filename) => Promise.resolve(result.artifacts.get(filename)?.content ?? null),
+          async (filename) => {
+            const artifact = await repo.artifact(spec, filename)
+            return artifact?.content ?? null
+          },
           (c) => hasher.hash(c),
         )
         const hashEntries = freshnessResult.entries

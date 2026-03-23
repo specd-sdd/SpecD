@@ -6,10 +6,9 @@
 
 #### Scenario: Non-optional artifact missing — failure
 
-- **GIVEN** a schema with a non-optional artifact `specs`
-- **AND** the change has no file for `specs` and `validatedHash` is unset
-- **WHEN** `ValidateArtifacts.execute` is called without `artifactId`
-- **THEN** `result.passed` is `false` and `result.failures` lists `specs` as missing
+- **GIVEN** a change with a required (non-optional) artifact that has no files
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** the result includes a validation failure for the missing artifact
 
 #### Scenario: Skipped optional artifact does not cause failure
 
@@ -93,24 +92,24 @@
 
 ### Requirement: Approval invalidation on content change
 
-#### Scenario: Content changed since approval — invalidation triggered
+#### Scenario: Approval invalidation resets only drifted artifacts and downstream
 
-- **GIVEN** an active spec approval with `artifactHashes: { specs: "abc123" }`
-- **AND** the current cleaned hash of `specs` is `"xyz789"`
-- **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `change.invalidate('artifact-change', actor)` is called before validation proceeds
+- **GIVEN** a change with an active spec approval
+- **AND** the DAG is: proposal → specs → verify, proposal → design, specs + design → tasks
+- **AND** only `design.md` has changed since approval (hash mismatch)
+- **WHEN** `ValidateArtifacts.execute` detects the hash mismatch
+- **THEN** `change.invalidate('artifact-change', actor, ['design'])` is called
+- **AND** `design` and `tasks` are reset (design + its downstream)
+- **AND** `proposal`, `specs`, and `verify` remain `complete`
 
-#### Scenario: Invalidation called at most once per execution
+#### Scenario: Multiple artifacts drift — all drifted IDs collected in single call
 
-- **GIVEN** two artifacts whose hashes both differ from the active approval
-- **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `change.invalidate` is called exactly once — not once per artifact
-
-#### Scenario: No invalidation when hashes match
-
-- **GIVEN** an active spec approval whose `artifactHashes` match the current cleaned hashes
-- **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `change.invalidate` is not called
+- **GIVEN** a change with an active spec approval
+- **AND** both `specs` and `design` have changed since approval
+- **WHEN** `ValidateArtifacts.execute` detects the mismatches
+- **THEN** a single `change.invalidate('artifact-change', actor, ['specs', 'design'])` is called
+- **AND** `specs`, `verify`, `design`, and `tasks` are reset
+- **AND** `proposal` remains `complete`
 
 ### Requirement: Delta validation
 
@@ -132,6 +131,15 @@
 - **GIVEN** a `deltaValidations` rule whose selector matches zero nodes in the delta YAML AST
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** the rule passes without error regardless of `required`
+
+#### Scenario: no-op delta bypasses deltaValidations entirely
+
+- **GIVEN** an artifact with `deltaValidations` rules including a `required: true` rule
+- **AND** the delta file contains only `[{ op: "no-op" }]`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `deltaValidations` are not evaluated
+- **AND** `result.passed` is `true`
+- **AND** `markComplete` is called with the hash of the raw delta file content
 
 ### Requirement: Delta application preview and conflict detection
 
@@ -159,6 +167,14 @@
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** `validations[]` run against the artifact file content directly, with no application preview step
 
+#### Scenario: no-op delta skips application preview
+
+- **GIVEN** an artifact with `delta: true` and a delta file containing only `[{ op: "no-op" }]`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** no base spec is loaded from `SpecRepository`
+- **AND** `parser.apply()` is not called
+- **AND** `markComplete` is called with the hash of the raw delta file content
+
 ### Requirement: Structural validation
 
 #### Scenario: Required section absent — failure
@@ -179,6 +195,13 @@
 - **GIVEN** two `required: true` validation rules both fail for the same artifact
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** `result.failures` contains both failures — validation does not stop at the first
+
+#### Scenario: no-op delta skips structural validation
+
+- **GIVEN** an artifact with `validations` rules and a delta file containing only `[{ op: "no-op" }]`
+- **WHEN** `ValidateArtifacts.execute` is called
+- **THEN** `validations[]` rules are not evaluated against the base content
+- **AND** `markComplete` is called with the hash of the raw delta file content
 
 ### Requirement: Hash computation and markComplete
 

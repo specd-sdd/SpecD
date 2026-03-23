@@ -2,7 +2,7 @@
 
 ## Purpose
 
-When debugging context issues or verifying metadata freshness, users need to inspect what is actually recorded in a spec's metadata file. The `specd spec metadata <workspace:capability-path>` command displays the parsed contents of a spec's `.specd-metadata.yaml` in a structured form, including freshness status for each recorded content hash.
+When debugging context issues or verifying metadata freshness, users need to inspect what is actually recorded in a spec's metadata file. The `specd spec metadata <workspace:capability-path>` command displays the parsed contents of a spec's metadata in a structured form, including freshness status for each recorded content hash.
 
 ## Requirements
 
@@ -17,9 +17,9 @@ specd spec metadata <workspace:capability-path> [--format text|json|toon]
 
 ### Requirement: Behaviour
 
-The command reads `.specd-metadata.yaml` for the given spec and renders its contents in a structured form. For each file listed in `contentHashes`, it computes the current SHA-256 hash of the file on disk and compares it against the recorded hash, reporting whether the metadata is fresh or stale per file.
+The command reads metadata for the given spec (via the core use case, which delegates to `SpecRepository.metadata()`) and renders its contents in a structured form. For each file listed in `contentHashes`, it computes the current SHA-256 hash of the file on disk and compares it against the recorded hash, reporting whether the metadata is fresh or stale per file.
 
-If `.specd-metadata.yaml` does not exist, the command exits with code 1.
+If no metadata exists for the spec, the command exits with code 1.
 
 ### Requirement: Output format
 
@@ -70,7 +70,7 @@ In `json` or `toon` mode, the full parsed metadata is output including all rules
 ### Requirement: Error cases
 
 - If the workspace is not configured, exits with code 1.
-- If `.specd-metadata.yaml` does not exist, exits with code 1 and prints an `error:` message to stderr.
+- If no metadata exists for the spec, exits with code 1 and prints an `error:` message to stderr.
 
 ## Constraints
 

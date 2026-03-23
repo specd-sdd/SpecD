@@ -22,7 +22,7 @@ function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockReturnValue(kernel)
+  vi.mocked(createCliKernel).mockResolvedValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -116,14 +116,15 @@ describe('change validate', () => {
     expect(stderr()).toMatch(/error:/)
   })
 
-  it('exits 1 when spec path argument is missing', async () => {
-    setup()
+  it('exits 1 when neither specPath nor --all is provided', async () => {
+    const { stderr } = setup()
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
-    await expect(
-      program.parseAsync(['node', 'specd', 'change', 'validate', 'feat']),
-    ).rejects.toThrow()
+    await program.parseAsync(['node', 'specd', 'change', 'validate', 'feat']).catch(() => {})
+
+    expect(stderr()).toContain('either <specPath> or --all is required')
+    expect(process.exit).toHaveBeenCalledWith(1)
   })
 
   it('exits 1 when spec path is not in the change', async () => {
@@ -160,5 +161,127 @@ describe('change validate', () => {
     expect(parsed.failures.length).toBeGreaterThan(0)
     expect(parsed.failures[0].artifactId).toBe('spec')
     expect(process.exitCode).toBe(1)
+  })
+
+  // --- Batch mode tests ---
+
+  it('rejects --all with specPath', async () => {
+    const { stderr } = setup()
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'validate', 'feat', 'auth/login', '--all'])
+      .catch(() => {})
+
+    expect(stderr()).toContain('--all and <specPath> are mutually exclusive')
+    expect(process.exit).toHaveBeenCalledWith(1)
+  })
+
+  it('--all validates all specIds in the change', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: { specIds: ['default:auth/login', 'default:auth/logout'] },
+      artifactStatuses: [],
+      lifecycle: {},
+    })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [] })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'validate', 'feat', '--all'])
+
+    expect(kernel.changes.validate.execute).toHaveBeenCalledTimes(2)
+    const out = stdout()
+    expect(out).toContain('validated feat/default:auth/login: all artifacts pass')
+    expect(out).toContain('validated feat/default:auth/logout: all artifacts pass')
+    expect(out).toContain('validated 2/2 specs')
+  })
+
+  it('--all with partial failures exits 1', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: { specIds: ['default:auth/login', 'default:auth/logout'] },
+      artifactStatuses: [],
+      lifecycle: {},
+    })
+    kernel.changes.validate.execute
+      .mockResolvedValueOnce({ failures: [], warnings: [] })
+      .mockResolvedValueOnce({
+        failures: [{ artifactId: 'specs', description: 'missing delta' }],
+        warnings: [],
+      })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'validate', 'feat', '--all'])
+      .catch(() => {})
+
+    const out = stdout()
+    expect(out).toContain('validated feat/default:auth/login: all artifacts pass')
+    expect(out).toContain('validation failed feat/default:auth/logout')
+    expect(out).toContain('validated 1/2 specs')
+    expect(process.exitCode).toBe(1)
+  })
+
+  it('--all passes --artifact to each spec', async () => {
+    const { kernel } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: { specIds: ['default:auth/login', 'default:auth/logout'] },
+      artifactStatuses: [],
+      lifecycle: {},
+    })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [] })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'validate',
+      'feat',
+      '--all',
+      '--artifact',
+      'proposal',
+    ])
+
+    expect(kernel.changes.validate.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ artifactId: 'proposal', specPath: 'default:auth/login' }),
+    )
+    expect(kernel.changes.validate.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ artifactId: 'proposal', specPath: 'default:auth/logout' }),
+    )
+  })
+
+  it('--all JSON output has batch structure', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: { specIds: ['default:auth/login'] },
+      artifactStatuses: [],
+      lifecycle: {},
+    })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [] })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'validate',
+      'feat',
+      '--all',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.passed).toBe(true)
+    expect(parsed.total).toBe(1)
+    expect(parsed.results).toHaveLength(1)
+    expect(parsed.results[0].spec).toBe('default:auth/login')
+    expect(parsed.results[0].passed).toBe(true)
   })
 })

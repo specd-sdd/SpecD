@@ -77,11 +77,9 @@ Each entry in `artifacts` must include:
   - `post` (array, optional) — entries injected **after** the instruction. Each entry: `{ id: string, text: string }`.
     `id` follows the standard array entry identity format. `text` is injected verbatim as a constraint block.
 - `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has `id` (string, required — standard array entry identity format), `pattern` (regex string), and `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
-- `taskCompletionCheck` (object, optional) — declares how to detect task completion within this artifact's file content. Used to gate the `implementing → verifying` transition: if the artifact is listed in the `implementing` step's `requires`, all items matching `incompletePattern` must be absent (zero matches) before the transition is allowed. Both fields are optional and default to markdown checkbox syntax:
+- `taskCompletionCheck` (object, optional) — declares how to detect task completion within this artifact's file content. Used to gate the `implementing → verifying` transition: if the artifact is listed in the `implementing` step's `requires`, all items matching `incompletePattern` must be absent (zero matches) before the transition is allowed. Both fields are optional and default to markdown checkbox syntax: When both patterns are present, the CLI can report progress (e.g. `3/5 tasks complete`) by counting matches of each. If `taskCompletionCheck` is omitted entirely, the defaults apply.
   - `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item
   - `completePattern` (string, regex, default `^\s*-\s+\[x\]`, case-insensitive) — matches a complete task item
-
-  When both patterns are present, the CLI can report progress (e.g. `3/5 tasks complete`) by counting matches of each. If `taskCompletionCheck` is omitted entirely, the defaults apply.
 
 ### Requirement: Template resolution
 
@@ -212,7 +210,9 @@ Supported metadata fields: `title`, `description`, `dependsOn`, `keywords` (sing
 
 Steps are not limited to AI agent invocations. They may represent human review phases, automated checks, artifact generation, or any recurring activity in the change lifecycle. `CompileContext` uses step definitions to gate context compilation and evaluate step availability.
 
-> The semantic model of workflow steps — canonical step semantics, requires-based gating, execution modes, and step-to-state mapping — is defined in [`specs/core/workflow-model/spec.md`](../workflow-model/spec.md). The hook execution model — who executes which hook type, when, and with what failure semantics — is defined in [`specs/core/hook-execution-model/spec.md`](../hook-execution-model/spec.md). The schema format only defines the structure of step entries — step naming conventions and execution semantics are out of scope here.
+A step's `requires` array serves as a defensive gate: `CompileContext` evaluates whether all required artifacts are `complete` (or `skipped`) to determine step availability. If any required artifact is missing or incomplete, the step is blocked. This prevents the agent from entering a phase when prerequisites have been deleted or corrupted. Steps that need all artifacts intact (e.g. implementing, archiving) SHOULD require all artifacts. Steps that focus on a specific concern (e.g. verifying) MAY require only the relevant artifacts.
+
+Note: `CompileContext` does NOT include change artifact content (proposal.md, design.md, tasks.md) in the compiled context block — it only includes spec content and project context. The agent reads change artifacts directly from disk, guided by hook instructions.
 
 Entries must include:
 

@@ -7,7 +7,7 @@
 #### Scenario: Non-existent change is rejected
 
 - **WHEN** `TransitionChange.execute` is called with a name that does not exist in the repository
-- **THEN** it throws `ChangeNotFoundError`
+- **THEN** a `ChangeNotFoundError` is thrown
 
 ### Requirement: Approval-gate routing for spec approval
 
@@ -117,6 +117,72 @@
 - **GIVEN** a change in `drafting` state
 - **WHEN** `execute` is called with `to: 'designing'`
 - **THEN** the change transitions to `designing` via the normal transition path (no approval invalidation logic)
+
+### Requirement: Post-hook execution
+
+#### Scenario: Post hooks run for the source state, not the target
+
+- **GIVEN** a change in `implementing` state
+- **AND** the schema declares `implementing.hooks.post: [{ id: run-tests, run: pnpm test }]`
+- **WHEN** `execute` is called with `to: 'verifying'`
+- **THEN** `RunStepHooks.execute` is called with `{ step: 'implementing', phase: 'post' }`
+
+#### Scenario: Post hooks do not run for the target state on entry
+
+- **GIVEN** a change in `ready` state
+- **AND** the schema declares `implementing.hooks.post: [{ id: run-tests, run: pnpm test }]`
+- **AND** the schema declares no hooks for `ready`
+- **WHEN** `execute` is called with `to: 'implementing'`
+- **THEN** no post hooks are executed
+
+#### Scenario: Post hooks skipped when source state has no workflow step
+
+- **GIVEN** a change in `drafting` state
+- **AND** the schema declares no workflow step for `drafting`
+- **WHEN** `execute` is called with `to: 'designing'`
+- **THEN** no post hooks are executed
+
+#### Scenario: Source post hooks run before target pre hooks
+
+- **GIVEN** a change in `implementing` state
+- **AND** the schema declares `implementing.hooks.post` and `verifying.hooks.pre`
+- **WHEN** `execute` is called with `to: 'verifying'`
+- **THEN** `implementing.post` hooks execute first
+- **AND** `verifying.pre` hooks execute second
+- **AND** the state transition occurs third
+
+#### Scenario: Post hook failure aborts transition
+
+- **GIVEN** a change in `implementing` state
+- **AND** the schema declares `implementing.hooks.post: [{ id: run-tests, run: pnpm test }]`
+- **AND** `pnpm test` exits with code 1
+- **WHEN** `execute` is called with `to: 'verifying'`
+- **THEN** `HookFailedError` is thrown
+- **AND** no state transition occurs
+
+#### Scenario: skipHookPhases source.post skips only post hooks
+
+- **GIVEN** a change in `implementing` state
+- **AND** the schema declares `implementing.hooks.post` and `verifying.hooks.pre`
+- **WHEN** `execute` is called with `to: 'verifying'` and `skipHookPhases: new Set(['source.post'])`
+- **THEN** `implementing.post` hooks are skipped
+- **AND** `verifying.pre` hooks still execute
+
+#### Scenario: skipHookPhases target.pre skips only pre hooks
+
+- **GIVEN** a change in `implementing` state
+- **AND** the schema declares `implementing.hooks.post` and `verifying.hooks.pre`
+- **WHEN** `execute` is called with `to: 'verifying'` and `skipHookPhases: new Set(['target.pre'])`
+- **THEN** `verifying.pre` hooks are skipped
+- **AND** `implementing.post` hooks still execute
+
+#### Scenario: skipHookPhases all skips everything
+
+- **GIVEN** a change in `implementing` state
+- **AND** the schema declares `implementing.hooks.post` and `verifying.hooks.pre`
+- **WHEN** `execute` is called with `to: 'verifying'` and `skipHookPhases: new Set(['all'])`
+- **THEN** no hooks are executed
+- **AND** the state transition occurs
 
 ### Requirement: Transition delegation
 

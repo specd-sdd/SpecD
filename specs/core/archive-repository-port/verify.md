@@ -79,6 +79,21 @@
 - **WHEN** `get("nonexistent")` is called and no matching change exists anywhere
 - **THEN** `null` is returned
 
+### Requirement: archivePath returns the absolute path for an archived change
+
+#### Scenario: Path resolved from archive pattern
+
+- **GIVEN** an archive pattern `{{year}}/{{change.archivedName}}` and archive root `/project/.specd/archive`
+- **AND** an `ArchivedChange` with `archivedName: "20260322-120000-my-change"`
+- **WHEN** `archivePath(archivedChange)` is called
+- **THEN** it returns the absolute path to the archived change directory (e.g. `/project/.specd/archive/20260322-120000-my-change`)
+
+#### Scenario: Path is consistent with archive() result
+
+- **GIVEN** an `ArchivedChange` returned by `archive(change)`
+- **WHEN** `archivePath(archivedChange)` is called with the same `ArchivedChange`
+- **THEN** the returned path matches the `archiveDirPath` that was returned by `archive()`
+
 ### Requirement: reindex rebuilds the archive index
 
 #### Scenario: Corrupted index is rebuilt

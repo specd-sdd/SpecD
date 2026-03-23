@@ -17,7 +17,9 @@ import {
 import {
   makeChange,
   makeChangeRepository,
-  makeSchemaRegistry,
+  makeArchiveRepository,
+  makeArchivedChange,
+  makeSchemaProvider,
   makeSchema,
   makeHookRunner,
 } from './helpers.js'
@@ -25,25 +27,15 @@ import {
 /** Shorthand: creates a `RunStepHooks` with sensible defaults. */
 function makeUseCase(opts: {
   changes?: ReturnType<typeof makeChangeRepository>
+  archive?: ReturnType<typeof makeArchiveRepository>
   hookRunner?: HookRunner
   schema?: ReturnType<typeof makeSchema> | null
-  schemaRef?: string
-  workspaceSchemasPaths?: ReadonlyMap<string, string>
-  projectWorkflowHooks?: readonly {
-    readonly step: string
-    readonly hooks: {
-      readonly pre: readonly HookEntry[]
-      readonly post: readonly HookEntry[]
-    }
-  }[]
 }): RunStepHooks {
   return new RunStepHooks(
     opts.changes ?? makeChangeRepository(),
+    opts.archive ?? makeArchiveRepository(),
     opts.hookRunner ?? makeHookRunner(),
-    makeSchemaRegistry(opts.schema === undefined ? makeSchema() : opts.schema),
-    opts.schemaRef ?? 'test-ref',
-    opts.workspaceSchemasPaths ?? new Map(),
-    opts.projectWorkflowHooks,
+    makeSchemaProvider(opts.schema === undefined ? makeSchema() : opts.schema),
   )
 }
 
@@ -146,36 +138,6 @@ describe('RunStepHooks', () => {
   // ── Hook Collection & Filtering ──────────────────────────────────
 
   describe('hook collection & filtering', () => {
-    it('collects schema hooks then project hooks in order', async () => {
-      const change = makeChange('my-change')
-      const schemaHook: HookEntry = { id: 'schema-lint', type: 'run', command: 'pnpm lint' }
-      const projectHook: HookEntry = { id: 'proj-test', type: 'run', command: 'pnpm test' }
-
-      const commands: string[] = []
-      const hookRunner = {
-        async run(command: string, _variables: TemplateVariables): Promise<HookResult> {
-          commands.push(command)
-          return new HookResult(0, '', '')
-        },
-      }
-
-      const uc = makeUseCase({
-        changes: makeChangeRepository([change]),
-        schema: makeSchemaWithHooks([schemaHook]),
-        hookRunner,
-        projectWorkflowHooks: [
-          {
-            step: 'implementing',
-            hooks: { pre: [projectHook], post: [] },
-          },
-        ],
-      })
-
-      await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' })
-
-      expect(commands).toEqual(['pnpm lint', 'pnpm test'])
-    })
-
     it('filters out instruction hooks and only executes run hooks', async () => {
       const change = makeChange('my-change')
       const instrHook: HookEntry = { id: 'review', type: 'instruction', text: 'Review the code' }
@@ -564,6 +526,125 @@ describe('RunStepHooks', () => {
 
       // The change created by makeChange has no workspaces, so it falls back to 'default'
       expect((capturedVars as { change: { workspace: string } }).change.workspace).toBe('default')
+    })
+  })
+
+  // ── Archive Fallback ───────────────────────────────────────────
+
+  describe('archive fallback', () => {
+    /** Schema with post hooks on 'archiving' step. */
+    function makeArchivingSchema(
+      postHooks: HookEntry[] = [{ id: 'post-hook', type: 'run', command: 'echo done' }],
+    ): ReturnType<typeof makeSchema> {
+      return makeSchema({
+        workflow: [
+          {
+            step: 'archiving',
+            requires: [],
+            hooks: { pre: [], post: postHooks },
+          },
+        ],
+      })
+    }
+
+    it('falls back to archive when change not in ChangeRepository for archiving+post', async () => {
+      const archived = makeArchivedChange('my-change')
+      const commands: string[] = []
+      const hookRunner = {
+        async run(command: string): Promise<HookResult> {
+          commands.push(command)
+          return new HookResult(0, '', '')
+        },
+      }
+
+      const uc = makeUseCase({
+        changes: makeChangeRepository([]),
+        archive: makeArchiveRepository([archived]),
+        schema: makeArchivingSchema(),
+        hookRunner,
+      })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        step: 'archiving',
+        phase: 'post',
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.hooks).toHaveLength(1)
+      expect(commands).toEqual(['echo done'])
+    })
+
+    it('throws ChangeNotFoundError when change not in either repository', async () => {
+      const uc = makeUseCase({
+        changes: makeChangeRepository([]),
+        archive: makeArchiveRepository([]),
+        schema: makeArchivingSchema(),
+      })
+
+      await expect(
+        uc.execute({ name: 'missing', step: 'archiving', phase: 'post' }),
+      ).rejects.toThrow(ChangeNotFoundError)
+    })
+
+    it('uses active change when found, does not query archive', async () => {
+      const change = makeChange('my-change')
+      const archived = makeArchivedChange('my-change')
+      const archive = makeArchiveRepository([archived])
+      const getSpy = vi.spyOn(archive, 'get')
+
+      const uc = makeUseCase({
+        changes: makeChangeRepository([change]),
+        archive,
+        schema: makeArchivingSchema(),
+        hookRunner: makeHookRunner(0),
+      })
+
+      await uc.execute({ name: 'my-change', step: 'archiving', phase: 'post' })
+
+      expect(getSpy).not.toHaveBeenCalled()
+    })
+
+    it('throws ChangeNotFoundError for non-archiving step even if archived', async () => {
+      const archived = makeArchivedChange('my-change')
+
+      const uc = makeUseCase({
+        changes: makeChangeRepository([]),
+        archive: makeArchiveRepository([archived]),
+        schema: makeSchema(),
+      })
+
+      await expect(
+        uc.execute({ name: 'my-change', step: 'implementing', phase: 'post' }),
+      ).rejects.toThrow(ChangeNotFoundError)
+    })
+
+    it('builds template variables from ArchivedChange properties', async () => {
+      const archived = makeArchivedChange('my-change', { workspace: 'core' })
+      let capturedVars: unknown = null
+      const hookRunner = {
+        async run(_command: string, variables: unknown): Promise<HookResult> {
+          capturedVars = variables
+          return new HookResult(0, '', '')
+        },
+      }
+
+      const uc = makeUseCase({
+        changes: makeChangeRepository([]),
+        archive: makeArchiveRepository([archived]),
+        schema: makeArchivingSchema(),
+        hookRunner,
+      })
+
+      await uc.execute({ name: 'my-change', step: 'archiving', phase: 'post' })
+
+      expect(capturedVars).toEqual({
+        change: {
+          name: 'my-change',
+          workspace: 'core',
+          path: `/test/archive/${archived.archivedName}`,
+        },
+      })
     })
   })
 })

@@ -1,4 +1,5 @@
 import { type SchemaRegistry } from '../application/ports/schema-registry.js'
+import { type SchemaRepository } from '../application/ports/schema-repository.js'
 import { FsSchemaRegistry } from '../infrastructure/fs/schema-registry.js'
 
 /**
@@ -18,6 +19,12 @@ export interface FsSchemaRegistryOptions {
    * Relative schema paths are resolved against this.
    */
   readonly configDir: string
+
+  /**
+   * Map of workspace name to its `SchemaRepository` instance.
+   * Used for resolving workspace-qualified and bare-name schema references.
+   */
+  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
 }
 
 /**
@@ -36,6 +43,7 @@ export function createSchemaRegistry(type: 'fs', options: FsSchemaRegistryOption
       return new FsSchemaRegistry({
         nodeModulesPaths: options.nodeModulesPaths,
         configDir: options.configDir,
+        schemaRepositories: options.schemaRepositories,
       })
   }
 }

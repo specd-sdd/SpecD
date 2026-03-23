@@ -29,7 +29,7 @@ const _cliSiblingNodeModules = path.resolve(_cliDir, '../../..')
  * @param config - The loaded specd configuration.
  * @returns A fully-configured Kernel instance.
  */
-export function createCliKernel(config: SpecdConfig): Kernel {
+export async function createCliKernel(config: SpecdConfig): Promise<Kernel> {
   return createKernel(config, {
     extraNodeModulesPaths: [_cliPackageNodeModules, _cliSiblingNodeModules],
   })

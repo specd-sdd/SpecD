@@ -51,7 +51,7 @@
 
 - **WHEN** `specd spec generate-metadata auth/login --write` is invoked
 - **THEN** `SaveSpecMetadata` is called with the generated YAML content
-- **AND** stdout contains `wrote .specd-metadata.yaml for default:auth/login`
+- **AND** stdout contains `wrote metadata for default:auth/login`
 
 ### Requirement: Force flag
 
@@ -92,3 +92,61 @@
 - **AND** the generated metadata has `dependsOn: [core:change]`
 - **WHEN** `specd spec generate-metadata auth/login --write --force` is invoked
 - **THEN** the write succeeds
+
+### Requirement: Batch mode (--all)
+
+#### Scenario: --all without --write
+
+- **WHEN** `specd spec generate-metadata --all` is run without `--write`
+- **THEN** stderr contains `error: --all requires --write` and exit code is 1
+
+#### Scenario: --all with specPath
+
+- **WHEN** `specd spec generate-metadata core:config --all --write` is run
+- **THEN** stderr contains `error: --all and <specPath> are mutually exclusive` and exit code is 1
+
+#### Scenario: --status without --all
+
+- **WHEN** `specd spec generate-metadata --status stale --write` is run without `--all`
+- **THEN** stderr contains `error: --status requires --all` and exit code is 1
+
+#### Scenario: --all with default status filter
+
+- **GIVEN** 3 specs exist: one with `stale` metadata, one with `missing` metadata, one with `fresh` metadata
+- **WHEN** `specd spec generate-metadata --all --write` is run
+- **THEN** metadata is generated and written for the `stale` and `missing` specs only
+- **AND** the `fresh` spec is skipped
+- **AND** text output shows `wrote metadata for ...` for each processed spec
+- **AND** a summary line shows `generated metadata for 2/2 specs`
+
+#### Scenario: --all --status all
+
+- **GIVEN** 3 specs exist with varying metadata status
+- **WHEN** `specd spec generate-metadata --all --write --status all` is run
+- **THEN** metadata is generated for all 3 specs regardless of status
+
+#### Scenario: --all with individual failures continues batch
+
+- **GIVEN** 2 specs have stale metadata, one will fail with `DependsOnOverwriteError`
+- **WHEN** `specd spec generate-metadata --all --write` is run without `--force`
+- **THEN** the failing spec is reported as an error
+- **AND** the other spec succeeds
+- **AND** exit code is 1
+- **AND** summary shows `generated metadata for 1/2 specs`
+
+#### Scenario: --all --force skips conflict detection
+
+- **GIVEN** specs with stale metadata and existing `dependsOn`
+- **WHEN** `specd spec generate-metadata --all --write --force` is run
+- **THEN** all specs are regenerated without conflict errors
+
+#### Scenario: --all JSON output
+
+- **GIVEN** 2 specs with stale metadata
+- **WHEN** `specd spec generate-metadata --all --write --format json` is run
+- **THEN** output is `{ result: "ok", total: 2, succeeded: 2, failed: 0, specs: [...] }`
+
+#### Scenario: invalid --status value
+
+- **WHEN** `specd spec generate-metadata --all --write --status bogus` is run
+- **THEN** stderr contains an error about invalid status value and exit code is 1

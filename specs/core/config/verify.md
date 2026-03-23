@@ -368,7 +368,7 @@
 
 #### Scenario: Warning does not block startup
 
-- **WHEN** `specd.yaml` has a deprecated field like `artifactRules` or `workflow`
+- **WHEN** `specd.yaml` has a deprecated field like `artifactRules`
 - **THEN** a migration warning is printed but the command proceeds normally
 
 #### Scenario: specd init requires no existing config

@@ -5,7 +5,7 @@ import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import {
   makeSpecRepository,
-  makeSchemaRegistry,
+  makeSchemaProvider,
   makeArtifactType,
   makeSchema,
   makeFileReader,
@@ -27,12 +27,10 @@ describe('GetProjectContext', () => {
 
     const uc = new GetProjectContext(
       specRepos,
-      makeSchemaRegistry(schema),
+      makeSchemaProvider(schema),
       fileReader,
       makeParsers(),
       makeContentHasher(),
-      'test',
-      new Map(),
     )
 
     const result = await uc.execute({
@@ -54,12 +52,10 @@ describe('GetProjectContext', () => {
 
     const uc = new GetProjectContext(
       specRepos,
-      makeSchemaRegistry(null),
+      makeSchemaProvider(null),
       makeFileReader(),
       makeParsers(),
       makeContentHasher(),
-      'test',
-      new Map(),
     )
 
     await expect(
@@ -86,12 +82,10 @@ describe('GetProjectContext', () => {
 
     const uc = new GetProjectContext(
       specRepos,
-      makeSchemaRegistry(schema),
+      makeSchemaProvider(schema),
       makeFileReader(),
       makeParsers(),
       makeContentHasher(),
-      'test',
-      new Map(),
     )
 
     const result = await uc.execute({
@@ -126,12 +120,10 @@ describe('GetProjectContext', () => {
 
     const uc = new GetProjectContext(
       specRepos,
-      makeSchemaRegistry(schema),
+      makeSchemaProvider(schema),
       makeFileReader(),
       makeParsers(),
       makeContentHasher(),
-      'test',
-      new Map(),
     )
 
     const result = await uc.execute({

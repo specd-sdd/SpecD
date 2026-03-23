@@ -53,6 +53,7 @@ JSON/TOON output schema:
             const hasContent =
               result.rulesPre.length > 0 ||
               result.instruction !== null ||
+              result.template !== null ||
               result.delta !== null ||
               result.rulesPost.length > 0
 
@@ -69,6 +70,10 @@ JSON/TOON output schema:
 
             if (result.instruction !== null) {
               sections.push(`[instruction]\n${result.instruction}`)
+            }
+
+            if (result.template !== null) {
+              sections.push(`[template]\n${result.template}`)
             }
 
             if (result.delta !== null) {
@@ -97,6 +102,7 @@ JSON/TOON output schema:
                 artifactId: result.artifactId,
                 rulesPre: result.rulesPre,
                 instruction: result.instruction,
+                template: result.template,
                 delta: result.delta,
                 rulesPost: result.rulesPost,
               },

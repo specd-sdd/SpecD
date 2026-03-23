@@ -44,6 +44,9 @@ describe('Output format', () => {
           requires: [],
           format: 'markdown',
           delta: false,
+          description: undefined,
+          output: 'spec.md',
+          taskCompletionCheck: undefined,
         },
       ],
       workflow: () => [{ step: 'designing', requires: [] }],
@@ -73,6 +76,9 @@ describe('Output format', () => {
           requires: [],
           format: 'markdown',
           delta: false,
+          description: undefined,
+          output: 'proposal.md',
+          taskCompletionCheck: undefined,
         },
         {
           id: 'spec',
@@ -81,6 +87,9 @@ describe('Output format', () => {
           requires: [],
           format: 'markdown',
           delta: false,
+          description: undefined,
+          output: 'spec.md',
+          taskCompletionCheck: undefined,
         },
       ],
       workflow: () => [],
@@ -108,6 +117,9 @@ describe('Output format', () => {
           requires: ['proposal'],
           format: 'markdown',
           delta: false,
+          description: undefined,
+          output: 'spec.md',
+          taskCompletionCheck: undefined,
         },
       ],
       workflow: () => [],
@@ -134,6 +146,9 @@ describe('Output format', () => {
           requires: [],
           format: 'markdown',
           delta: false,
+          description: undefined,
+          output: 'proposal.md',
+          taskCompletionCheck: undefined,
         },
       ],
       workflow: () => [],
@@ -163,6 +178,9 @@ describe('Output format', () => {
           requires: ['proposal'],
           format: 'markdown',
           delta: false,
+          description: undefined,
+          output: 'spec.md',
+          taskCompletionCheck: undefined,
         },
       ],
       workflow: () => [{ step: 'designing', requires: ['spec'] }],
@@ -190,6 +208,86 @@ describe('Output format', () => {
     // Each workflow entry has step and requires
     expect(parsed.workflow[0].step).toBe('designing')
     expect(Array.isArray(parsed.workflow[0].requires)).toBe(true)
+  })
+
+  it('JSON output includes description, output, and hasTaskCompletionCheck', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.getActiveSchema.execute.mockResolvedValue({
+      name: () => 'specd-std',
+      version: () => 1,
+      artifacts: () => [
+        {
+          id: 'tasks',
+          scope: 'change',
+          optional: false,
+          requires: [],
+          format: 'markdown',
+          delta: false,
+          description: 'Implementation checklist',
+          output: 'tasks.md',
+          taskCompletionCheck: {
+            incompletePattern: '- \\[ \\]',
+            completePattern: '- \\[x\\]',
+          },
+        },
+        {
+          id: 'proposal',
+          scope: 'change',
+          optional: true,
+          requires: [],
+          format: 'markdown',
+          delta: false,
+          description: undefined,
+          output: 'proposal.md',
+          taskCompletionCheck: undefined,
+        },
+      ],
+      workflow: () => [],
+    })
+
+    const program = makeProgram()
+    registerSchemaShow(program.command('schema'))
+    await program.parseAsync(['node', 'specd', 'schema', 'show', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout())
+    const tasks = parsed.artifacts.find((a: { id: string }) => a.id === 'tasks')
+    expect(tasks.description).toBe('Implementation checklist')
+    expect(tasks.output).toBe('tasks.md')
+    expect(tasks.hasTaskCompletionCheck).toBe(true)
+
+    const proposal = parsed.artifacts.find((a: { id: string }) => a.id === 'proposal')
+    expect(proposal.description).toBeNull()
+    expect(proposal.hasTaskCompletionCheck).toBe(false)
+  })
+
+  it('Text output includes output and description', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.getActiveSchema.execute.mockResolvedValue({
+      name: () => 'specd-std',
+      version: () => 1,
+      artifacts: () => [
+        {
+          id: 'tasks',
+          scope: 'change',
+          optional: false,
+          requires: [],
+          format: 'markdown',
+          delta: false,
+          description: 'Implementation checklist',
+          output: 'tasks.md',
+          taskCompletionCheck: undefined,
+        },
+      ],
+      workflow: () => [],
+    })
+
+    const program = makeProgram()
+    registerSchemaShow(program.command('schema'))
+    await program.parseAsync(['node', 'specd', 'schema', 'show'])
+
+    const out = stdout()
+    expect(out).toContain('output=tasks.md')
+    expect(out).toContain('[Implementation checklist]')
   })
 })
 

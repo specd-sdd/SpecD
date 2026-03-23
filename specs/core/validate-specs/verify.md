@@ -6,7 +6,7 @@
 
 #### Scenario: Schema not found throws SchemaNotFoundError
 
-- **WHEN** the schema registry returns `null` for the configured schema reference
+- **WHEN** `SchemaProvider.get()` returns `null` for the configured schema reference
 - **THEN** a `SchemaNotFoundError` is thrown
 
 ### Requirement: Filter to spec-scoped artifact types

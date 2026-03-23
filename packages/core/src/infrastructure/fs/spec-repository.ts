@@ -1,9 +1,11 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
+import { parse as parseYaml } from 'yaml'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
+import { specMetadataSchema, type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import {
   SpecRepository,
   type SpecRepositoryConfig,
@@ -35,6 +37,14 @@ export interface FsSpecRepositoryConfig extends SpecRepositoryConfig {
    * computing the filesystem path.
    */
   readonly prefix?: string
+  /**
+   * Absolute path to the metadata root directory for this workspace.
+   *
+   * Each spec's metadata lives at `<metadataPath>/<specFsPath>/metadata.yaml`.
+   * Resolved from workspace config `specs.fs.metadataPath` or auto-derived
+   * at composition time from the VCS root.
+   */
+  readonly metadataPath: string
 }
 
 /**
@@ -51,6 +61,7 @@ export interface FsSpecRepositoryConfig extends SpecRepositoryConfig {
  */
 export class FsSpecRepository extends SpecRepository {
   private readonly _specsPath: string
+  private readonly _metadataPath: string
   private readonly _prefixSegments: readonly string[]
 
   /**
@@ -61,6 +72,7 @@ export class FsSpecRepository extends SpecRepository {
   constructor(config: FsSpecRepositoryConfig) {
     super(config)
     this._specsPath = config.specsPath
+    this._metadataPath = config.metadataPath
     this._prefixSegments =
       config.prefix !== undefined ? config.prefix.split('/').filter((s) => s.length > 0) : []
   }
@@ -200,6 +212,82 @@ export class FsSpecRepository extends SpecRepository {
   }
 
   /**
+   * Returns the parsed metadata for the given spec, or `null` if no metadata
+   * file exists.
+   *
+   * Reads from `<metadataPath>/<specFsPath>/metadata.yaml`, parses via the
+   * lenient schema, and attaches `originalHash` (SHA-256 of raw content).
+   *
+   * @param spec - The spec whose metadata to load
+   * @returns Parsed metadata with `originalHash`, or `null` if absent
+   */
+  override async metadata(spec: Spec): Promise<SpecMetadata | null> {
+    const filePath = this._metadataFilePath(spec.name)
+
+    let content: string
+    try {
+      content = await fs.readFile(filePath, 'utf8')
+    } catch (err) {
+      if (isEnoent(err)) return null
+      throw err
+    }
+
+    const hash = sha256(content)
+
+    try {
+      const parsed = parseYaml(content) as unknown
+      const result = specMetadataSchema.safeParse(parsed)
+      const metadata = result.success ? (result.data as SpecMetadata) : {}
+      return { ...metadata, originalHash: hash }
+    } catch {
+      return { originalHash: hash }
+    }
+  }
+
+  /**
+   * Persists raw YAML metadata content for a spec.
+   *
+   * Writes to `<metadataPath>/<specFsPath>/metadata.yaml`. Creates the
+   * directory if needed. Supports conflict detection via `originalHash`.
+   *
+   * @param spec - The spec to write metadata for
+   * @param content - Raw YAML string to persist
+   * @param options - Save options with optional conflict detection
+   * @param options.force - Skip conflict detection when `true`
+   * @param options.originalHash - Expected hash of the current file on disk
+   * @throws {ArtifactConflictError} On hash mismatch when `force` is not set
+   */
+  override async saveMetadata(
+    spec: Spec,
+    content: string,
+    options?: { force?: boolean; originalHash?: string },
+  ): Promise<void> {
+    const filePath = this._metadataFilePath(spec.name)
+    const dir = path.dirname(filePath)
+    await fs.mkdir(dir, { recursive: true })
+
+    if (options?.originalHash !== undefined && options.force !== true) {
+      let currentContent: string
+      try {
+        currentContent = await fs.readFile(filePath, 'utf8')
+      } catch (err) {
+        if (isEnoent(err)) {
+          currentContent = ''
+        } else {
+          throw err
+        }
+      }
+
+      const currentHash = sha256(currentContent)
+      if (currentHash !== options.originalHash) {
+        throw new ArtifactConflictError('metadata.yaml', content, currentContent)
+      }
+    }
+
+    await writeFileAtomic(filePath, content)
+  }
+
+  /**
    * Resolves a storage path to a spec identity within this workspace.
    *
    * When `inputPath` is relative (does not start with `/`), strips any
@@ -322,6 +410,16 @@ export class FsSpecRepository extends SpecRepository {
       return path.join(this._specsPath, ...stripped)
     }
     return path.join(this._specsPath, name.toFsPath(path.sep))
+  }
+
+  /**
+   * Returns the absolute path to the metadata file for the given spec name.
+   *
+   * @param name - The spec identity path
+   * @returns Absolute path to `<metadataPath>/<specFsPath>/metadata.yaml`
+   */
+  private _metadataFilePath(name: SpecPath): string {
+    return path.join(this._metadataPath, name.toFsPath(path.sep), 'metadata.yaml')
   }
 
   /**

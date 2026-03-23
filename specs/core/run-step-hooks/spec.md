@@ -8,24 +8,22 @@ Agent-driven workflow steps declare `run:` hooks that need to be executed at ste
 
 ### Requirement: Ports and constructor
 
-`RunStepHooks` receives at construction time: `ChangeRepository`, `HookRunner`, `SchemaRegistry`, `schemaRef`, `workspaceSchemasPaths`, and `projectWorkflowHooks`.
+`RunStepHooks` receives at construction time: `ChangeRepository`, `ArchiveRepository`, `HookRunner`, and `SchemaProvider`.
 
 ```typescript
 class RunStepHooks {
   constructor(
     changes: ChangeRepository,
+    archive: ArchiveRepository,
     hooks: HookRunner,
-    schemas: SchemaRegistry,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
-    projectWorkflowHooks: ProjectWorkflowHooks,
+    schemaProvider: SchemaProvider,
   )
 }
 ```
 
 `HookRunner` uses `TemplateExpander.expandForShell()` internally — `RunStepHooks` does not call the expander directly. It builds the `TemplateVariables` map and passes it to `HookRunner.run()`.
 
-`schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. `projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml` — `RunStepHooks` filters internally for the requested step. If `undefined`, it defaults to `[]`. All are injected at kernel composition time, not passed per invocation.
+`SchemaProvider` returns the fully-resolved schema with plugins and overrides applied — all workflow hooks (including those added via `schemaOverrides`) are already present in the schema's workflow steps. All dependencies are injected at kernel composition time, not passed per invocation.
 
 ### Requirement: Input
 
@@ -45,11 +43,13 @@ class RunStepHooks {
 
 ### Requirement: Change lookup
 
-`RunStepHooks` loads the change by name via `ChangeRepository`. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
+`RunStepHooks` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name`, `ArchivedChange.workspace`, and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.
+
+For all other step/phase combinations, if `ChangeRepository.get(name)` returns null, `RunStepHooks` MUST throw `ChangeNotFoundError` immediately — the archive fallback does not apply.
 
 ### Requirement: Schema name guard
 
-After resolving the schema from config, `RunStepHooks` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`. This MUST happen before any hook resolution or execution.
+After obtaining the schema from `SchemaProvider`, `RunStepHooks` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`. This MUST happen before any hook resolution or execution.
 
 ### Requirement: Step resolution
 
@@ -59,12 +59,11 @@ If the step is a valid lifecycle state, `RunStepHooks` looks up the workflow ste
 
 ### Requirement: Hook collection
 
-For the matched step and phase, `RunStepHooks` MUST collect `run:` hooks in the following order:
+For the matched step and phase, `RunStepHooks` MUST collect `run:` hooks from `workflow[step].hooks[phase]` — only entries with `type: 'run'`, in declaration order.
 
-1. Schema-level hooks from `workflow[step].hooks[phase]` — only entries with a `run:` key, in declaration order
-2. Project-level hooks from `projectWorkflowHooks` targeting the same step and phase — only entries with a `run:` key, in declaration order
+`instruction:` entries (type `'instruction'`) MUST be skipped — they are not executable.
 
-`instruction:` entries MUST be skipped — they are not executable.
+All hooks — whether from the base schema, plugins, or overrides — are already merged into the schema's workflow steps by `ResolveSchema`. There is no separate project-level hook collection.
 
 ### Requirement: Hook filtering with --only
 
@@ -72,11 +71,11 @@ When `only` is provided, `RunStepHooks` MUST filter the collected hook list to t
 
 ### Requirement: HookVariables construction
 
-`RunStepHooks` MUST build the contextual `TemplateVariables` from the resolved change and `ChangeRepository.changePath()`:
+`RunStepHooks` MUST build the contextual `TemplateVariables` from the resolved change and the appropriate repository path:
 
-- `change.name` — the change name
-- `change.workspace` — the primary workspace (first entry in `change.workspaces`)
-- `change.path` — the absolute path to the change directory (via `ChangeRepository.changePath()`)
+- `change.name` — the change name (from `Change.name` or `ArchivedChange.name`)
+- `change.workspace` — the primary workspace (from `Change.workspaces[0]` or `ArchivedChange.workspace`)
+- `change.path` — the absolute path to the change directory (via `ChangeRepository.changePath()` for active changes, or `ArchiveRepository.archivePath()` for archived changes)
 
 Built-in variables (e.g. `project.root`) are already present in the `TemplateExpander` — the use case only builds the contextual `change` namespace.
 
@@ -125,3 +124,4 @@ When no hooks match (empty `run:` hook list for the step+phase, or the step has 
 - [`specs/core/config/spec.md`](../config/spec.md) — project-level workflow hooks from `specd.yaml`
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `schemaName`, `workspaces`
 - [`specs/core/template-variables/spec.md`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
+- [`specs/core/archive-repository-port/spec.md`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`

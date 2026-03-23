@@ -2,29 +2,33 @@
 
 ## Purpose
 
-Tooling and AI agents need a compact, machine-readable summary of each spec — its dependencies, content hashes, rules, and scenarios — without parsing the full artifact files every time. Each spec directory may contain a `.specd-metadata.yaml` file alongside its content artifacts, recording this metadata. It is generated deterministically by core at archive time using the schema's `metadataExtraction` engine and is not part of the schema artifact system; content hashes enable staleness detection so consumers know when to regenerate.
+Tooling and AI agents need a compact, machine-readable summary of each spec — its dependencies, content hashes, rules, and scenarios — without parsing the full artifact files every time. Each spec has a corresponding `metadata.yaml` file stored under `.specd/metadata/<specPath>/`, separate from the spec's content artifacts. It is generated deterministically by core at archive time using the schema's `metadataExtraction` engine and is not part of the schema artifact system; content hashes enable staleness detection so consumers know when to regenerate.
 
 ## Requirements
 
 ### Requirement: File location and naming
 
-`.specd-metadata.yaml` lives inside the spec directory, at the same level as the spec's content artifacts (e.g. `spec.md`, `verify.md`):
+`metadata.yaml` lives under the `.specd/metadata/` directory, mirroring the spec's capability path:
 
 ```
-specs/core/change/
-├── spec.md
-├── verify.md
-└── .specd-metadata.yaml
+.specd/metadata/core/config/
+└── metadata.yaml
+
+specs/core/config/
+├── spec.md          ← user content only
+└── verify.md
 ```
 
-The `.specd-` prefix namespaces the file as specd-managed, avoiding conflicts with other tooling. Its absence is not an error — a spec with no `.specd-metadata.yaml` is treated as having no declared dependencies and no recorded content hash.
+The metadata root path is configured per workspace via `specs.fs.metadataPath` in `specd.yaml`. When not set, the composition layer auto-derives it from the VCS root of the workspace's specs path: `createVcsAdapter(specs.path).rootDir()` + `/.specd/metadata/`. This works across heterogeneous VCS setups (git, hg, svn). When `NullVcsAdapter` is returned (specs path is not inside any VCS), the fallback is `.specd/metadata/` relative to the specs root parent directory. The `FsSpecRepository` adapter receives the resolved path as config — it does not perform VCS detection itself.
+
+The file's absence is not an error — a spec with no `metadata.yaml` is treated as having no declared dependencies and no recorded content hash.
 
 ### Requirement: File format
 
-`.specd-metadata.yaml` is a YAML file. All fields are optional — an empty file or absent file is valid:
+`metadata.yaml` is a YAML file. All fields are optional — an empty file or absent file is valid:
 
 ```yaml
-# specs/core/change/.specd-metadata.yaml
+# .specd/metadata/core/change/metadata.yaml
 title: Change
 description: >
   The central domain entity in specd. Read this spec when working on anything that
@@ -62,19 +66,12 @@ scenarios:
 ```
 
 - **`title`** (string, optional) — short human-readable name for the spec, suitable for display in lists and tooling (e.g. `"Change"`, `"Storage"`, `"Schema Format"`). If absent, tooling falls back to the spec's path.
-
 - **`description`** (string, optional) — 2–3 sentences written for discovery: what does this spec cover, why does it exist in the system, and when would you need to read it? Used by tooling and the LLM to assess relevance without reading the full spec content — for example when selecting which specs to include in a context or presenting a list of available specs. Should not read like a dictionary definition.
-
 - **`keywords`** (array of strings, optional) — topic tags for this spec, used by tooling to find related specs (e.g. `specd spec find --keyword auth`). Should capture domain concepts, patterns, and cross-cutting concerns present in the spec. Lowercase, hyphen-separated.
-
 - **`dependsOn`** (array of strings, optional) — spec IDs this spec depends on for context. Each ID is a capability path relative to the workspace and may include an optional workspace qualifier (e.g. `billing:payments/invoices`) for cross-workspace dependencies. An unqualified ID is resolved within the same workspace as the referencing spec. An empty array or absent field means no declared dependencies.
-
 - **`contentHashes`** (map of filename → hash string, optional) — a SHA-256 hash per `requiredSpecArtifacts` file at the time the metadata was last derived. Keys are the resolved filenames: specd reads `requiredSpecArtifacts` from the active schema, looks up each artifact's `output` field, and resolves the concrete filename for this spec directory — that resolved filename is the key (e.g. `spec.md`, `verify.md`). Used to detect when any artifact file has changed and the metadata may be stale. A missing entry or absent field is treated as stale for that file.
-
 - **`rules`** (array of objects, optional) — normative statements extracted from the spec, grouped by requirement name. Each entry has a `requirement` key (string) and a `rules` key (array of plain-text sentences). Preserves named functions, APIs, field names, state/enum values, and transition graphs. Omits explanation and rationale. Used by the LLM as a dense summary of requirements without loading the full spec.
-
 - **`constraints`** (array of strings, optional) — hard invariants extracted from the spec's `## Constraints` section. Each entry is a single plain-text sentence. Omitted if the spec has no `## Constraints` section.
-
 - **`scenarios`** (array of objects, optional) — BDD-style verification scenarios extracted from verify files. Flat array: one object per scenario, not one object per requirement. Each entry has:
   - `requirement` (string) — name of the requirement this scenario verifies; multiple scenarios may share the same `requirement` value
   - `name` (string) — the scenario title as it appears in the verify file (e.g. `"Config found — nearest file used"`)
@@ -104,7 +101,7 @@ Unknown top-level keys are allowed (`.passthrough()`) to support forward-compati
 
 Existing `dependsOn` entries are considered curated — they may have been manually added, verified by a human, or set via `change.specDependsOn`. `SaveSpecMetadata` must prevent silent overwrites:
 
-1. When `force` is not set: before writing, read the existing `.specd-metadata.yaml` from disk
+1. When `force` is not set: before writing, read the existing metadata via `SpecRepository.metadata()` and capture its `originalHash`. This hash is passed to `SpecRepository.saveMetadata()` so that the repository layer can detect concurrent modifications.
 2. Parse both existing and incoming metadata to extract their `dependsOn` arrays
 3. Compare the two arrays **ignoring order** (sorted comparison)
 4. If the existing metadata has `dependsOn` entries and the incoming `dependsOn` differs → throw `DependsOnOverwriteError`
@@ -121,7 +118,7 @@ A static helper `DependsOnOverwriteError.areSame(a, b)` compares two `dependsOn`
 
 ### Requirement: Deterministic generation at archive time
 
-`.specd-metadata.yaml` is generated deterministically by core as part of the `ArchiveChange` use case. After merging deltas and syncing specs, `ArchiveChange` generates metadata for each modified spec:
+`metadata.yaml` is generated deterministically by core as part of the `ArchiveChange` use case. After merging deltas and syncing specs, `ArchiveChange` generates metadata for each modified spec:
 
 1. Load the spec's `requiredSpecArtifacts` from the workspace's `SpecRepository`
 2. Parse each artifact via its `ArtifactParser` to obtain an AST
@@ -136,25 +133,24 @@ After generation, the metadata is stable until the spec is modified again by a s
 
 ### Requirement: Staleness detection
 
-When specd reads a spec's `.specd-metadata.yaml`, it iterates over the active schema's `requiredSpecArtifacts`, resolves the concrete filename for each artifact via its `output` field, computes the current SHA-256 hash of that file, and compares it against the entry in `contentHashes` keyed by that filename. If any file's hash differs, a resolved filename is missing from `contentHashes`, or `contentHashes` itself is absent, specd emits a warning indicating that the spec has changed since the metadata was last derived and that the agent should review and regenerate `.specd-metadata.yaml`.
+When specd reads a spec's metadata via `SpecRepository.metadata()`, it iterates over the active schema's `requiredSpecArtifacts`, resolves the concrete filename for each artifact via its `output` field, computes the current SHA-256 hash of that file, and compares it against the entry in `contentHashes` keyed by that filename. If any file's hash differs, a resolved filename is missing from `contentHashes`, or `contentHashes` itself is absent, specd emits a warning indicating that the spec has changed since the metadata was last derived and that the agent should review and regenerate metadata.
 
 A missing `contentHashes` field is treated as stale — specd emits the same warning.
 
-Staleness is advisory only. specd does not block any operation because `.specd-metadata.yaml` is stale.
+Staleness is advisory only. specd does not block any operation because metadata is stale.
 
 ### Requirement: Use by CompileContext
 
-`CompileContext` reads `.specd-metadata.yaml` for two purposes:
+`CompileContext` reads metadata via `SpecRepository.metadata()` for two purposes:
 
-1. **Spec collection** — `dependsOn` is followed transitively from `change.specIds` to discover which specs to include in the context. The full resolution order is defined in [`specs/core/config/spec.md`](../config/spec.md) — Requirement: Context spec selection. When `.specd-metadata.yaml` is absent for a spec during `dependsOn` traversal, a `missing-metadata` warning is emitted. `CompileContext` then attempts to extract `dependsOn` from the spec content using the schema's `metadataExtraction` declarations as a best-effort fallback.
-
+1. **Spec collection** — `dependsOn` is followed transitively from `change.specIds` to discover which specs to include in the context. The full resolution order is defined in [`specs/core/config/spec.md`](../config/spec.md) — Requirement: Context spec selection. When metadata is absent for a spec during `dependsOn` traversal, a `missing-metadata` warning is emitted. `CompileContext` then attempts to extract `dependsOn` from the spec content using the schema's `metadataExtraction` declarations as a best-effort fallback.
 2. **Spec content** — for each spec in the collected context set, if metadata is fresh, `CompileContext` uses `description`, `rules`, `constraints`, and `scenarios` as the compact, machine-optimised representation of that spec. If metadata is absent or stale, `CompileContext` falls back to the schema's `metadataExtraction` declarations to extract the same fields deterministically and emits a staleness warning.
 
 A spec that cannot be resolved (missing file, unknown workspace) is silently skipped with a warning.
 
 ### Requirement: Version control
 
-`.specd-metadata.yaml` must be committed to version control alongside the spec content. It is part of the spec's persistent record and must not be added to `.gitignore`.
+`metadata.yaml` files under `.specd/metadata/` must be committed to version control alongside the project. The `.specd/metadata/` directory must not be added to `.gitignore`.
 
 ## Pending
 
@@ -162,14 +158,15 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 
 ## Constraints
 
-- `.specd-metadata.yaml` is not a schema artifact — it is never listed in `requiredSpecArtifacts`, never validated by `ValidateArtifacts`, and never tracked in the change manifest's `artifacts` array
-- Its absence is not an error at any point — all reads of `.specd-metadata.yaml` treat a missing file as empty
+- `metadata.yaml` is not a schema artifact — it is never listed in `requiredSpecArtifacts`, never validated by `ValidateArtifacts`, and never tracked in the change manifest's `artifacts` array
+- Its absence is not an error at any point — all reads of metadata treat a missing file as empty
 - `dependsOn` paths must not form cycles; if a cycle is detected during traversal, specd breaks the cycle and emits a warning
 - Staleness warnings are advisory only — they do not block any operation
 - The LLM must not include the spec itself in its own `dependsOn` list
 - `SaveSpecMetadata` must validate content against `specMetadataSchema` before writing — structurally invalid content is rejected with `MetadataValidationError`
 - `SaveSpecMetadata` must check for `dependsOn` overwrite before writing — changed `dependsOn` without `force` is rejected with `DependsOnOverwriteError`
 - Reading metadata (`parseMetadata`) remains lenient — it returns `{}` on invalid input so that downstream operations are never blocked by a malformed file on disk
+- Metadata is accessed exclusively via `SpecRepository.metadata()` and `SpecRepository.saveMetadata()` — never via the generic `artifact()` / `save()` methods
 
 ## Spec Dependencies
 
@@ -177,3 +174,4 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 - [`specs/core/change/spec.md`](../change/spec.md) — `specDependsOn` in the change manifest, per-spec declared dependencies
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `requiredSpecArtifacts`, used to determine which files to hash for staleness detection
 - [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — the extraction engine used as CompileContext fallback when metadata is stale
+- [`specs/core/spec-repository-port/spec.md`](../spec-repository-port/spec.md) — `metadata()` and `saveMetadata()` methods used for all metadata access

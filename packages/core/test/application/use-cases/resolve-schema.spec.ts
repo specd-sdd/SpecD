@@ -54,7 +54,7 @@ async function resolve(
   plugins: string[] = [],
   overrides?: SchemaOperations,
 ) {
-  const sut = new ResolveSchema(registry, ref, new Map(), plugins, overrides)
+  const sut = new ResolveSchema(registry, ref, plugins, overrides)
   return sut.execute()
 }
 
@@ -1417,12 +1417,101 @@ describe('ResolveSchema — idempotency', () => {
   it('produces equivalent schema on repeated calls', async () => {
     const data = minimalData({ name: 'stable' })
     const registry = makeRegistry({ '#stable': rawResult(data) })
-    const sut = new ResolveSchema(registry, '#stable', new Map(), [], undefined)
+    const sut = new ResolveSchema(registry, '#stable', [], undefined)
 
     const first = await sut.execute()
     const second = await sut.execute()
 
     expect(first.name()).toBe(second.name())
     expect(first.artifacts().length).toBe(second.artifacts().length)
+  })
+})
+
+// ===========================================================================
+// 9. Override hook normalization — YAML format → domain format
+// ===========================================================================
+
+describe('ResolveSchema — override hook normalization', () => {
+  it('normalizes YAML-format run hooks in overrides to domain format', async () => {
+    const base = minimalData({
+      name: 'base',
+      workflow: [{ step: 'implementing', requires: [], hooks: { pre: [], post: [] } }],
+    })
+    const registry = makeRegistry({ '#base': rawResult(base) })
+
+    // Override uses YAML format: { id, run } instead of { id, type, command }
+    const schema = await resolve(registry, '#base', [], {
+      append: {
+        workflow: [
+          {
+            step: 'implementing',
+            hooks: {
+              post: [{ id: 'test', run: 'pnpm test' } as unknown as Record<string, unknown>],
+            },
+          },
+        ],
+      },
+    } as unknown as SchemaOperations)
+
+    const step = schema.workflowStep('implementing')!
+    const hook = step.hooks.post.find((h) => h.id === 'test')
+    expect(hook).toBeDefined()
+    expect(hook!.type).toBe('run')
+    expect((hook as { type: 'run'; command: string }).command).toBe('pnpm test')
+  })
+
+  it('normalizes YAML-format instruction hooks in overrides to domain format', async () => {
+    const base = minimalData({
+      name: 'base',
+      workflow: [{ step: 'implementing', requires: [], hooks: { pre: [], post: [] } }],
+    })
+    const registry = makeRegistry({ '#base': rawResult(base) })
+
+    const schema = await resolve(registry, '#base', [], {
+      append: {
+        workflow: [
+          {
+            step: 'implementing',
+            hooks: {
+              pre: [{ id: 'guide', instruction: 'Do X' } as unknown as Record<string, unknown>],
+            },
+          },
+        ],
+      },
+    } as unknown as SchemaOperations)
+
+    const step = schema.workflowStep('implementing')!
+    const hook = step.hooks.pre.find((h) => h.id === 'guide')
+    expect(hook).toBeDefined()
+    expect(hook!.type).toBe('instruction')
+    expect((hook as { type: 'instruction'; text: string }).text).toBe('Do X')
+  })
+
+  it('passes through hooks already in domain format', async () => {
+    const base = minimalData({
+      name: 'base',
+      workflow: [{ step: 'implementing', requires: [], hooks: { pre: [], post: [] } }],
+    })
+    const registry = makeRegistry({ '#base': rawResult(base) })
+
+    const schema = await resolve(registry, '#base', [], {
+      append: {
+        workflow: [
+          {
+            step: 'implementing',
+            hooks: {
+              pre: [],
+              post: [{ id: 'test', type: 'run' as const, command: 'pnpm test' }],
+            },
+          },
+        ],
+      },
+    })
+
+    const step = schema.workflowStep('implementing')!
+    const hook = step.hooks.post.find((h) => h.id === 'test')
+    expect(hook).toBeDefined()
+    expect(hook!.type).toBe('run')
+    expect((hook as { type: 'run'; command: string }).command).toBe('pnpm test')
   })
 })

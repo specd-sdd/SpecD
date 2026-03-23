@@ -94,6 +94,32 @@
 - **WHEN** `parseDelta` is called with any content
 - **THEN** it MAY return an empty array
 
+#### Scenario: no-op mixed with other entries — rejection
+
+- **GIVEN** the YAML adapter and delta content containing `[{ op: "no-op" }, { op: "added", content: "..." }]`
+- **WHEN** `parseDelta` is called
+- **THEN** it throws `SchemaValidationError` explaining that `no-op` cannot be mixed with other operations
+
+#### Scenario: no-op as sole entry — accepted
+
+- **GIVEN** the YAML adapter and delta content containing `[{ op: "no-op", description: "No changes needed" }]`
+- **WHEN** `parseDelta` is called
+- **THEN** it returns an array with one `DeltaEntry` where `op` is `"no-op"` and `description` is `"No changes needed"`
+
+### Requirement: DeltaEntry shape
+
+#### Scenario: DeltaEntry with no-op op
+
+- **GIVEN** a delta entry with `op: "no-op"`
+- **WHEN** `parseDelta` is called
+- **THEN** the returned `DeltaEntry` has `op` equal to `"no-op"`
+
+#### Scenario: DeltaEntry with description field
+
+- **GIVEN** a delta entry with `op: "modified"` and `description: "Update constructor"`
+- **WHEN** `parseDelta` is called
+- **THEN** the returned `DeltaEntry` has `description` equal to `"Update constructor"`
+
 ### Requirement: ArtifactNode shape
 
 #### Scenario: Markdown section node has level

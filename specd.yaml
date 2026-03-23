@@ -1,0 +1,83 @@
+schema: '@specd/schema-std'
+
+workspaces:
+  default:
+    prefix: _global
+    specs:
+      adapter: fs
+      fs:
+        path: specs/_global
+    ownership: owned
+
+  core:
+    prefix: core
+    specs:
+      adapter: fs
+      fs:
+        path: specs/core
+    codeRoot: packages/core
+    ownership: owned
+
+  cli:
+    prefix: cli
+    specs:
+      adapter: fs
+      fs:
+        path: specs/cli
+    codeRoot: packages/cli
+    ownership: owned
+
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+      pattern: '{{change.archivedName}}'
+
+approvals:
+  spec: false
+  signoff: false
+
+# Global constraints always in context regardless of change scope
+contextIncludeSpecs:
+  - 'default:*'
+
+contextExcludeSpecs:
+  - 'default:commits'
+
+# Agent instructions prepended before spec content
+context:
+  - file: AGENTS.md
+  - file: CLAUDE.md
+
+llmOptimizedContext: true
+
+schemaOverrides:
+  append:
+    workflow:
+      - step: implementing
+        hooks:
+          post:
+            - id: run-tests
+              run: 'pnpm test'
+            - id: run-lint
+              run: 'pnpm lint'
+      - step: archiving
+        hooks:
+          pre:
+            - id: run-tests
+              run: 'pnpm test'
+            - id: run-lint
+              run: 'pnpm lint'

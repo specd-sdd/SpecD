@@ -17,7 +17,7 @@ function makeResolveSchema(rawResult: SchemaRawResult | null): ResolveSchema {
       return []
     },
   }
-  return new ResolveSchema(registry, '@specd/schema-std', new Map(), [], undefined)
+  return new ResolveSchema(registry, '@specd/schema-std', [], undefined)
 }
 
 describe('GetActiveSchema', () => {

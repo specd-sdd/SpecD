@@ -122,13 +122,27 @@
 
 - **GIVEN** the config file is at `/repo/specd.yaml` and declares `storage.changes.fs.path: specd/changes`
 - **WHEN** `load()` is called
-- **THEN** `storage.changesPath` is `/repo/specd/changes`
+- **THEN** the resolved changes path is `/repo/specd/changes`
 
-#### Scenario: projectRoot is config file directory
+#### Scenario: Explicit metadataPath resolved from config directory
 
-- **GIVEN** the config file is at `/repo/specd.yaml`
+- **GIVEN** the config file is at `/repo/specd.yaml` and declares `specs.fs.metadataPath: .specd/metadata`
 - **WHEN** `load()` is called
-- **THEN** `projectRoot` is `/repo`
+- **THEN** the workspace's `metadataPath` is `/repo/.specd/metadata`
+
+#### Scenario: Absent metadataPath auto-derived from VCS root
+
+- **GIVEN** the config file is at `/repo/specd.yaml` with no `specs.fs.metadataPath`
+- **AND** the specs path is inside a git repo rooted at `/repo`
+- **WHEN** `load()` is called
+- **THEN** the workspace's `metadataPath` is `/repo/.specd/metadata`
+
+#### Scenario: Absent metadataPath with NullVcsAdapter fallback
+
+- **GIVEN** the config has `specs.fs.path: /external/specs` with no `specs.fs.metadataPath`
+- **AND** `/external/specs` is not inside any VCS
+- **WHEN** `load()` is called
+- **THEN** the workspace's `metadataPath` is `/external/.specd/metadata`
 
 ### Requirement: Storage path containment
 

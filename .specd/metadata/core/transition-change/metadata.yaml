@@ -1,0 +1,309 @@
+title: 'TransitionChange'
+description: 'Centralises change lifecycle state transitions by enforcing approval-gate routing, task completion checks, artifact validation clearing, workflow requires enforcement, and run-hook execution with progress callbacks. Callers provide transition intent and the use case resolves the effective target, runs pre/post hooks around the transition boundary, and delegates the actual state change to the Change entity.'
+generatedBy: 'agent'
+dependsOn:
+  - 'core:core/change'
+  - 'core:core/run-step-hooks'
+  - 'core:core/hook-execution-model'
+  - 'core:core/workflow-model'
+  - 'default:_global/architecture'
+contentHashes:
+  'spec.md': 'sha256:f1e2b19083bf6502e2000b90432edb80b11c75e65d879bac59f9ce8195fb362a'
+  'verify.md': 'sha256:620702061fb51bbc37eed642b383bffdd1c9b44790b4a7ce1d1ff237284eb4db'
+keywords:
+  - 'state-transition'
+  - 'approval-gate'
+  - 'lifecycle-hooks'
+  - 'task-completion'
+  - 'workflow-requires'
+  - 'artifact-validation'
+  - 'change-lifecycle'
+rules:
+  - requirement: 'Input contract'
+    rules:
+      - 'TransitionChange.execute SHALL accept a TransitionChangeInput with fields: name (string, required), to (ChangeState, required), approvalsSpec (boolean, required), approvalsSignoff (boolean, required), implementingRequires (readonly string[], optional), implementingTaskChecks (ReadonlyArray<TaskCompletionCheck>, optional), and skipHookPhases (ReadonlySet<HookPhaseSelector>, optional, default empty set) controlling which hook phases to skip with valid values source.pre, source.post, target.pre, target.post, and all.'
+  - requirement: 'Change must exist'
+    rules:
+      - 'The use case MUST load the change from ChangeRepository by name and throw ChangeNotFoundError if not found.'
+  - requirement: 'Approval-gate routing for spec approval'
+    rules:
+      - 'When the change is in ready state, the target is implementing, and approvalsSpec is true, the use case MUST route the transition to pending-spec-approval instead of implementing.'
+  - requirement: 'Approval-gate routing for signoff'
+    rules:
+      - 'When the change is in done state, the target is archivable, and approvalsSignoff is true, the use case MUST route the transition to pending-signoff instead of archivable.'
+  - requirement: 'Direct transition when gates are inactive'
+    rules:
+      - 'When neither approval-gate routing condition is met, the use case MUST transition to the exact target state requested.'
+  - requirement: 'Workflow requires enforcement'
+    rules:
+      - 'After resolving the effective target, the use case MUST obtain the active schema via SchemaProvider, look up the workflow step, and check change.effectiveStatus for each required artifact. If any required artifact status is not complete or skipped, it MUST throw InvalidStateTransitionError. A requires-check progress event MUST be emitted per artifact.'
+      - 'If no workflow step exists for the effective target or schema resolution fails, the requires check is skipped.'
+  - requirement: 'Task completion check on implementing to verifying'
+    rules:
+      - 'When transitioning from implementing to verifying, the use case MUST check each implementingTaskChecks entry by loading the artifact file, compiling the incompletePattern with safeRegex using the m flag, and throwing InvalidStateTransitionError if the pattern matches. Missing artifacts and invalid patterns are skipped.'
+  - requirement: 'Artifact validation clearing on verifying to implementing'
+    rules:
+      - 'When transitioning from verifying to implementing, the use case MUST call change.clearArtifactValidations with the implementingRequires list (defaulting to empty array) before performing the transition.'
+  - requirement: 'Transition to designing from any state'
+    rules:
+      - 'Every state except drafting SHALL allow transitioning to designing. When the target is designing, the use case MUST invalidate active approvals via change.invalidate before transitioning. If no approvals exist, the transition proceeds directly.'
+  - requirement: 'Hook execution order'
+    rules:
+      - 'Execution order is: source.post hooks, then target.pre hooks, then state transition. Both hook phases are fail-fast and throw HookFailedError on failure, aborting the transition.'
+      - 'Source post hooks run for the state the change is leaving, not the state it is entering. Target pre hooks run for the state being entered.'
+      - 'skipHookPhases controls which phases are skipped. When all is present, all hooks are skipped. Individual phase selectors (source.post, target.pre) skip only that phase.'
+  - requirement: 'Transition delegation'
+    rules:
+      - 'After routing, pre-transition checks, and successful hooks, the use case MUST delegate to change.transition(effectiveTarget, actor). The Change entity enforces transition validity.'
+  - requirement: 'Transition event'
+    rules:
+      - 'After a successful state transition, the use case MUST emit a transitioned progress event with from and to states.'
+  - requirement: 'Persistence'
+    rules:
+      - 'After a successful transition, the use case MUST persist the updated change via ChangeRepository.save.'
+  - requirement: 'Result type'
+    rules:
+      - 'TransitionChange.execute MUST return a TransitionChangeResult containing the updated Change instance. Hook failures throw rather than being collected in the result.'
+  - requirement: 'Progress callback'
+    rules:
+      - 'TransitionChange.execute SHALL accept an optional onProgress callback. Events are: requires-check (per artifact), hook-start and hook-done (per hook with phase), and transitioned (after state change).'
+  - requirement: 'Dependencies'
+    rules:
+      - 'TransitionChange depends on ChangeRepository, ActorResolver, SchemaProvider, and RunStepHooks, all injected via constructor.'
+constraints:
+  - 'The use case MUST NOT bypass the Change entity transition validation — it only resolves the effective target and delegates.'
+  - 'Task completion checks use safeRegex; patterns that fail compilation or contain nested quantifiers are treated as non-matching.'
+  - 'implementingTaskChecks and implementingRequires default to empty arrays when not provided.'
+  - 'Approval-gate routing is purely input-driven — the use case does not read configuration directly.'
+  - 'Both hook phases are fail-fast — failure in either aborts the transition with HookFailedError.'
+  - 'When schema resolution fails or no workflow step exists, requires and hooks are skipped gracefully.'
+scenarios:
+  - requirement: 'Change must exist'
+    name: 'Non-existent change is rejected'
+    when:
+      - 'TransitionChange.execute is called with a name that does not exist in the repository'
+    then:
+      - 'a ChangeNotFoundError is thrown'
+  - requirement: 'Approval-gate routing for spec approval'
+    name: 'Ready to implementing is rerouted when spec approval is active'
+    given:
+      - 'a change in ready state'
+    when:
+      - 'execute is called with to: implementing and approvalsSpec: true'
+    then:
+      - 'the change transitions to pending-spec-approval'
+  - requirement: 'Approval-gate routing for spec approval'
+    name: 'Ready to implementing is direct when spec approval is inactive'
+    given:
+      - 'a change in ready state'
+    when:
+      - 'execute is called with to: implementing and approvalsSpec: false'
+    then:
+      - 'the change transitions to implementing'
+  - requirement: 'Approval-gate routing for signoff'
+    name: 'Done to archivable is rerouted when signoff is active'
+    given:
+      - 'a change in done state'
+    when:
+      - 'execute is called with to: archivable and approvalsSignoff: true'
+    then:
+      - 'the change transitions to pending-signoff'
+  - requirement: 'Approval-gate routing for signoff'
+    name: 'Done to archivable is direct when signoff is inactive'
+    given:
+      - 'a change in done state'
+    when:
+      - 'execute is called with to: archivable and approvalsSignoff: false'
+    then:
+      - 'the change transitions to archivable'
+  - requirement: 'Task completion check on implementing to verifying'
+    name: 'Transition blocked by incomplete tasks'
+    given:
+      - 'a change in implementing state with an artifact file containing an unchecked checkbox line'
+    when:
+      - 'execute is called with to: verifying and a matching implementingTaskChecks entry'
+    then:
+      - 'it throws InvalidStateTransitionError'
+  - requirement: 'Task completion check on implementing to verifying'
+    name: 'Transition allowed when all tasks are complete'
+    given:
+      - 'a change in implementing state with an artifact file containing only checked checkboxes'
+    when:
+      - 'execute is called with to: verifying and implementingTaskChecks entries'
+    then:
+      - 'the change transitions to verifying'
+  - requirement: 'Task completion check on implementing to verifying'
+    name: 'Missing artifact file is skipped'
+    given:
+      - 'a change in implementing state'
+    when:
+      - 'execute is called with to: verifying and a task check referencing a non-existent artifact file'
+    then:
+      - 'the check is skipped and the transition proceeds'
+  - requirement: 'Task completion check on implementing to verifying'
+    name: 'Invalid regex pattern is treated as non-matching'
+    given:
+      - 'a change in implementing state'
+    when:
+      - 'execute is called with a task check whose incompletePattern is an invalid regex'
+    then:
+      - 'the check is skipped and the transition proceeds'
+  - requirement: 'Task completion check on implementing to verifying'
+    name: 'No task checks provided defaults to empty'
+    given:
+      - 'a change in implementing state'
+    when:
+      - 'execute is called with to: verifying and no implementingTaskChecks'
+    then:
+      - 'the transition proceeds without any task checks'
+  - requirement: 'Artifact validation clearing on verifying to implementing'
+    name: 'Artifact validations are cleared on verifying to implementing'
+    given:
+      - 'a change in verifying state with validated artifacts'
+    when:
+      - 'execute is called with to: implementing and implementingRequires: [spec, tasks]'
+    then:
+      - 'change.clearArtifactValidations is called with [spec, tasks] before the transition'
+  - requirement: 'Artifact validation clearing on verifying to implementing'
+    name: 'No implementingRequires defaults to empty'
+    given:
+      - 'a change in verifying state'
+    when:
+      - 'execute is called with to: implementing and no implementingRequires'
+    then:
+      - 'change.clearArtifactValidations is called with an empty array'
+  - requirement: 'Transition to designing from any state'
+    name: 'Transition from archivable to designing'
+    given:
+      - 'a change in archivable state'
+    when:
+      - 'execute is called with to: designing'
+    then:
+      - 'the change transitions to designing'
+  - requirement: 'Transition to designing from any state'
+    name: 'Transition from implementing to designing'
+    given:
+      - 'a change in implementing state'
+    when:
+      - 'execute is called with to: designing'
+    then:
+      - 'the change transitions to designing'
+  - requirement: 'Transition to designing from any state'
+    name: 'Transition to designing invalidates active approvals'
+    given:
+      - 'a change in implementing state with an active spec approval'
+    when:
+      - 'execute is called with to: designing'
+    then:
+      - 'change.invalidate is called before the transition'
+      - 'the spec approval is cleared'
+      - 'the change transitions to designing'
+  - requirement: 'Transition to designing from any state'
+    name: 'Transition to designing without active approvals skips invalidation'
+    given:
+      - 'a change in implementing state with no active approvals'
+    when:
+      - 'execute is called with to: designing'
+    then:
+      - 'change.invalidate is not called'
+      - 'the change transitions to designing'
+  - requirement: 'Transition to designing from any state'
+    name: 'Transition to designing from drafting is not a special case'
+    given:
+      - 'a change in drafting state'
+    when:
+      - 'execute is called with to: designing'
+    then:
+      - 'the change transitions to designing via the normal transition path'
+  - requirement: 'Post-hook execution'
+    name: 'Post hooks run for the source state, not the target'
+    given:
+      - 'a change in implementing state'
+      - 'the schema declares implementing.hooks.post with a run-tests hook'
+    when:
+      - 'execute is called with to: verifying'
+    then:
+      - 'RunStepHooks.execute is called with step: implementing, phase: post'
+  - requirement: 'Post-hook execution'
+    name: 'Post hooks do not run for the target state on entry'
+    given:
+      - 'a change in ready state'
+      - 'the schema declares implementing.hooks.post but no hooks for ready'
+    when:
+      - 'execute is called with to: implementing'
+    then:
+      - 'no post hooks are executed'
+  - requirement: 'Post-hook execution'
+    name: 'Post hooks skipped when source state has no workflow step'
+    given:
+      - 'a change in drafting state'
+      - 'the schema declares no workflow step for drafting'
+    when:
+      - 'execute is called with to: designing'
+    then:
+      - 'no post hooks are executed'
+  - requirement: 'Post-hook execution'
+    name: 'Source post hooks run before target pre hooks'
+    given:
+      - 'a change in implementing state'
+      - 'the schema declares implementing.hooks.post and verifying.hooks.pre'
+    when:
+      - 'execute is called with to: verifying'
+    then:
+      - 'implementing.post hooks execute first'
+      - 'verifying.pre hooks execute second'
+      - 'the state transition occurs third'
+  - requirement: 'Post-hook execution'
+    name: 'Post hook failure aborts transition'
+    given:
+      - 'a change in implementing state'
+      - 'the schema declares implementing.hooks.post with a failing hook'
+    when:
+      - 'execute is called with to: verifying'
+    then:
+      - 'HookFailedError is thrown'
+      - 'no state transition occurs'
+  - requirement: 'Post-hook execution'
+    name: 'skipHookPhases source.post skips only post hooks'
+    given:
+      - 'a change in implementing state'
+      - 'the schema declares implementing.hooks.post and verifying.hooks.pre'
+    when:
+      - 'execute is called with to: verifying and skipHookPhases: Set([source.post])'
+    then:
+      - 'implementing.post hooks are skipped'
+      - 'verifying.pre hooks still execute'
+  - requirement: 'Post-hook execution'
+    name: 'skipHookPhases target.pre skips only pre hooks'
+    given:
+      - 'a change in implementing state'
+      - 'the schema declares implementing.hooks.post and verifying.hooks.pre'
+    when:
+      - 'execute is called with to: verifying and skipHookPhases: Set([target.pre])'
+    then:
+      - 'verifying.pre hooks are skipped'
+      - 'implementing.post hooks still execute'
+  - requirement: 'Post-hook execution'
+    name: 'skipHookPhases all skips everything'
+    given:
+      - 'a change in implementing state'
+      - 'the schema declares implementing.hooks.post and verifying.hooks.pre'
+    when:
+      - 'execute is called with to: verifying and skipHookPhases: Set([all])'
+    then:
+      - 'no hooks are executed'
+      - 'the state transition occurs'
+  - requirement: 'Transition delegation'
+    name: 'Invalid transition is rejected by entity'
+    given:
+      - 'a change in drafting state'
+    when:
+      - 'execute is called with to: implementing'
+    then:
+      - 'change.transition throws InvalidStateTransitionError'
+  - requirement: 'Persistence'
+    name: 'Change is saved after successful transition'
+    when:
+      - 'TransitionChange.execute completes successfully'
+    then:
+      - 'ChangeRepository.save was called with the updated Change instance'

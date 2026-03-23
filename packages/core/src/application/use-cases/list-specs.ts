@@ -3,7 +3,6 @@ import { type YamlSerializer } from '../ports/yaml-serializer.js'
 import { type Spec } from '../../domain/entities/spec.js'
 import { extractSpecSummary } from '../../domain/services/spec-summary.js'
 import { strictSpecMetadataSchema } from '../../domain/services/parse-metadata.js'
-import { parseMetadata } from './_shared/parse-metadata.js'
 import { type SpecMetadataStatus, checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 
@@ -123,23 +122,18 @@ export class ListSpecs {
     let hasMetadata = false
     let metadataValid = true
 
-    // Read .specd-metadata.yaml for title, description, and contentHashes
+    // Read metadata for title, description, and contentHashes
     try {
-      const artifact = await repo.artifact(spec, '.specd-metadata.yaml')
-      if (artifact !== null) {
+      const meta = await repo.metadata(spec)
+      if (meta !== null) {
         hasMetadata = true
 
         // Check structural validity when status is requested
         if (includeMetadataStatus) {
-          try {
-            const raw = this._yaml.parse(artifact.content)
-            metadataValid = strictSpecMetadataSchema.safeParse(raw ?? {}).success
-          } catch {
-            metadataValid = false
-          }
+          // The metadata is already parsed via lenient schema; validate against strict
+          metadataValid = strictSpecMetadataSchema.safeParse(meta).success
         }
 
-        const meta = parseMetadata(artifact.content)
         if (meta.title !== undefined && meta.title.trim().length > 0) {
           title = meta.title.trim()
         }

@@ -281,6 +281,12 @@ export function applyDelta(
   parseContent: (content: string) => ArtifactAST,
   valueToNode: (value: unknown, ctx: { nodeType: string; parentType: string }) => ArtifactNode,
 ): ArtifactAST {
+  // Defensive guard: no-op entries should never reach apply (ValidateArtifacts
+  // bypasses), but if they do, return a deep clone with no modifications.
+  if (delta.length === 0 || delta.every((e) => e.op === 'no-op')) {
+    return { root: deepCloneNode(ast.root) }
+  }
+
   // Phase 1 — Validate structural rules and resolve selectors against ORIGINAL AST
   /** A delta entry with its resolved tree path. */
   type ResolvedEntry = { entry: DeltaEntry; path: number[] }

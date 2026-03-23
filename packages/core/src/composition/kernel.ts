@@ -37,6 +37,7 @@ import { type ChangeRepository } from '../application/ports/change-repository.js
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SpecdConfig } from '../application/specd-config.js'
 import { createKernelInternals } from './kernel-internals.js'
+import { LazySchemaProvider } from './lazy-schema-provider.js'
 
 /**
  * All use cases instantiated from a single `SpecdConfig`, grouped by domain area.
@@ -44,7 +45,7 @@ import { createKernelInternals } from './kernel-internals.js'
  * Delivery mechanisms (`@specd/cli`, `@specd/mcp`) receive a `Kernel` from
  * `createKernel()` and invoke individual use cases via `kernel.changes.*`,
  * `kernel.specs.*`, or `kernel.project.*`. Config-derived inputs (e.g.
- * `schemaRef`, `workspaceSchemasPaths`) are injected at construction time.
+ * `schemaRef`, `schemaRepositories`) are injected at construction time.
  */
 export interface Kernel {
   /** Use cases that operate on changes. */
@@ -153,35 +154,30 @@ export interface KernelOptions {
  * @param options - Optional kernel construction options
  * @returns A fully-wired kernel with all use cases
  */
-export function createKernel(config: SpecdConfig, options?: KernelOptions): Kernel {
-  const i = createKernelInternals(config, options)
+export async function createKernel(config: SpecdConfig, options?: KernelOptions): Promise<Kernel> {
+  const i = await createKernelInternals(config, options)
 
-  // Project-level workflow hooks from config
-  const projectWorkflowHooks = config.workflow
-
-  // Shared RunStepHooks instance — used by TransitionChange, ArchiveChange, and exposed directly
-  const runStepHooks = new RunStepHooks(
-    i.changes,
-    i.hooks,
+  // Shared ResolveSchema + LazySchemaProvider — resolves once with plugins and overrides
+  const resolveSchema = new ResolveSchema(
     i.schemas,
     i.schemaRef,
-    i.workspaceSchemasPaths,
-    projectWorkflowHooks,
+    i.schemaPlugins,
+    i.schemaOverrides,
   )
+  const schemaProvider = new LazySchemaProvider(resolveSchema)
+
+  // Shared RunStepHooks instance — used by TransitionChange, ArchiveChange, and exposed directly
+  const runStepHooks = new RunStepHooks(i.changes, i.archive, i.hooks, schemaProvider)
 
   return {
     changes: {
       repo: i.changes,
       create: new CreateChange(i.changes, i.specs, i.actor),
-      status: new GetStatus(i.changes),
-      transition: new TransitionChange(
-        i.changes,
-        i.actor,
-        i.schemas,
-        runStepHooks,
-        i.schemaRef,
-        i.workspaceSchemasPaths,
-      ),
+      status: new GetStatus(i.changes, schemaProvider, {
+        spec: config.approvals.spec,
+        signoff: config.approvals.signoff,
+      }),
+      transition: new TransitionChange(i.changes, i.actor, schemaProvider, runStepHooks),
       draft: new DraftChange(i.changes, i.actor),
       restore: new RestoreChange(i.changes, i.actor),
       discard: new DiscardChange(i.changes, i.actor),
@@ -192,40 +188,20 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
         runStepHooks,
         i.actor,
         i.parsers,
-        i.schemas,
-        new GenerateSpecMetadata(
-          i.specs,
-          i.schemas,
-          i.parsers,
-          i.hasher,
-          i.schemaRef,
-          i.workspaceSchemasPaths,
-        ),
+        schemaProvider,
+        new GenerateSpecMetadata(i.specs, schemaProvider, i.parsers, i.hasher),
         new SaveSpecMetadata(i.specs, i.yaml),
         i.yaml,
-        i.schemaRef,
-        i.workspaceSchemasPaths,
       ),
       validate: new ValidateArtifacts(
         i.changes,
         i.specs,
-        i.schemas,
+        schemaProvider,
         i.parsers,
         i.actor,
         i.hasher,
-        i.schemaRef,
-        i.workspaceSchemasPaths,
       ),
-      compile: new CompileContext(
-        i.changes,
-        i.specs,
-        i.schemas,
-        i.files,
-        i.parsers,
-        i.hasher,
-        i.schemaRef,
-        i.workspaceSchemasPaths,
-      ),
+      compile: new CompileContext(i.changes, i.specs, schemaProvider, i.files, i.parsers, i.hasher),
       list: new ListChanges(i.changes),
       listDrafts: new ListDrafts(i.changes),
       listDiscarded: new ListDiscarded(i.changes),
@@ -237,68 +213,29 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       runStepHooks,
       getHookInstructions: new GetHookInstructions(
         i.changes,
-        i.schemas,
+        i.archive,
+        schemaProvider,
         i.expander,
-        i.schemaRef,
-        i.workspaceSchemasPaths,
-        projectWorkflowHooks,
       ),
       getArtifactInstruction: new GetArtifactInstruction(
         i.changes,
         i.specs,
-        i.schemas,
+        schemaProvider,
         i.parsers,
         i.expander,
-        i.schemaRef,
-        i.workspaceSchemasPaths,
       ),
     },
     specs: {
       repos: i.specs,
-      approveSpec: new ApproveSpec(
-        i.changes,
-        i.actor,
-        i.schemas,
-        i.hasher,
-        i.schemaRef,
-        i.workspaceSchemasPaths,
-      ),
-      approveSignoff: new ApproveSignoff(
-        i.changes,
-        i.actor,
-        i.schemas,
-        i.hasher,
-        i.schemaRef,
-        i.workspaceSchemasPaths,
-      ),
+      approveSpec: new ApproveSpec(i.changes, i.actor, schemaProvider, i.hasher),
+      approveSignoff: new ApproveSignoff(i.changes, i.actor, schemaProvider, i.hasher),
       list: new ListSpecs(i.specs, i.hasher, i.yaml),
       get: new GetSpec(i.specs),
       saveMetadata: new SaveSpecMetadata(i.specs, i.yaml),
       invalidateMetadata: new InvalidateSpecMetadata(i.specs, i.yaml),
-      getActiveSchema: new GetActiveSchema(
-        new ResolveSchema(
-          i.schemas,
-          i.schemaRef,
-          i.workspaceSchemasPaths,
-          i.schemaPlugins,
-          i.schemaOverrides,
-        ),
-      ),
-      validate: new ValidateSpecs(
-        i.specs,
-        i.schemas,
-        i.parsers,
-        i.schemaRef,
-        i.workspaceSchemasPaths,
-      ),
-      generateMetadata: new GenerateSpecMetadata(
-        i.specs,
-        i.schemas,
-        i.parsers,
-        i.hasher,
-        i.schemaRef,
-        i.workspaceSchemasPaths,
-      ),
+      getActiveSchema: new GetActiveSchema(resolveSchema),
+      validate: new ValidateSpecs(i.specs, schemaProvider, i.parsers),
+      generateMetadata: new GenerateSpecMetadata(i.specs, schemaProvider, i.parsers, i.hasher),
       getContext: new GetSpecContext(i.specs, i.hasher),
     },
     project: {
@@ -307,12 +244,10 @@ export function createKernel(config: SpecdConfig, options?: KernelOptions): Kern
       getSkillsManifest: new GetSkillsManifest(i.configWriter),
       getProjectContext: new GetProjectContext(
         i.specs,
-        i.schemas,
+        schemaProvider,
         i.files,
         i.parsers,
         i.hasher,
-        i.schemaRef,
-        i.workspaceSchemasPaths,
       ),
     },
   }

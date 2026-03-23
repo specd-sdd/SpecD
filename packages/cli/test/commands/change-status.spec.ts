@@ -20,6 +20,16 @@ import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerChangeStatus } from '../../src/commands/change/status.js'
 import { ChangeNotFoundError } from '@specd/core'
 
+const defaultLifecycle = {
+  validTransitions: ['ready', 'designing'],
+  availableTransitions: [],
+  blockers: [],
+  approvals: { spec: false, signoff: false },
+  nextArtifact: null,
+  changePath: '.specd/changes/20260115-100000-my-change',
+  schemaInfo: { name: '@specd/schema-std', version: 1 },
+}
+
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
@@ -55,6 +65,7 @@ describe('Output format', () => {
     kernel.changes.status.execute.mockResolvedValue({
       change,
       artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
+      lifecycle: { ...defaultLifecycle, nextArtifact: 'specs' },
     })
 
     const program = makeProgram()
@@ -69,6 +80,9 @@ describe('Output format', () => {
     expect(out).toContain('specs:')
     expect(out).toContain('auth/login')
     expect(out).toContain('proposal')
+    expect(out).toContain('lifecycle:')
+    expect(out).toContain('approvals:')
+    expect(out).toContain('path:')
   })
 
   it('Effective status reflects dependency cascading', async () => {
@@ -80,6 +94,7 @@ describe('Output format', () => {
         { type: 'proposal', effectiveStatus: 'in-progress' },
         { type: 'spec', effectiveStatus: 'in-progress' },
       ],
+      lifecycle: defaultLifecycle,
     })
 
     const program = makeProgram()
@@ -90,6 +105,135 @@ describe('Output format', () => {
     const lines = out.split('\n')
     const specLine = lines.find((l: string) => l.includes('spec') && !l.includes('specs:'))
     expect(specLine).toContain('in-progress')
+  })
+
+  it('Text output shows available transitions', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'my-change', state: 'designing' })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [],
+      lifecycle: { ...defaultLifecycle, availableTransitions: ['ready', 'designing'] },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    const out = stdout()
+    expect(out).toContain('transitions:')
+    expect(out).toContain('ready, designing')
+  })
+
+  it('Text output omits transitions line when none available', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'my-change', state: 'designing' })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [],
+      lifecycle: { ...defaultLifecycle, availableTransitions: [] },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    const out = stdout()
+    expect(out).not.toContain('transitions:')
+  })
+
+  it('Text output shows blockers', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'my-change', state: 'designing' })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [],
+      lifecycle: {
+        ...defaultLifecycle,
+        blockers: [{ transition: 'ready', reason: 'requires', blocking: ['specs', 'verify'] }],
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    const out = stdout()
+    expect(out).toContain('blockers:')
+    expect(out).toContain('ready')
+    expect(out).toContain('requires')
+    expect(out).toContain('specs, verify')
+  })
+
+  it('Text output shows next artifact', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'my-change', state: 'designing' })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [],
+      lifecycle: { ...defaultLifecycle, nextArtifact: 'specs' },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    const out = stdout()
+    expect(out).toContain('next artifact: specs')
+  })
+
+  it('Text output omits next artifact when all done', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'my-change', state: 'designing' })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [],
+      lifecycle: { ...defaultLifecycle, nextArtifact: null },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    const out = stdout()
+    expect(out).not.toContain('next artifact:')
+  })
+
+  it('JSON output contains lifecycle object', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({
+      name: 'add-login',
+      state: 'designing',
+      specIds: ['auth/login'],
+      schemaName: 'std',
+      schemaVersion: 1,
+    })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
+      lifecycle: {
+        ...defaultLifecycle,
+        nextArtifact: 'specs',
+        blockers: [{ transition: 'ready', reason: 'requires', blocking: ['specs'] }],
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'add-login', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.name).toBe('add-login')
+    expect(parsed.state).toBe('designing')
+    expect(parsed.lifecycle).toBeDefined()
+    expect(parsed.lifecycle.validTransitions).toEqual(['ready', 'designing'])
+    expect(parsed.lifecycle.availableTransitions).toEqual([])
+    expect(parsed.lifecycle.blockers).toHaveLength(1)
+    expect(parsed.lifecycle.blockers[0].transition).toBe('ready')
+    expect(parsed.lifecycle.approvals).toEqual({ spec: false, signoff: false })
+    expect(parsed.lifecycle.nextArtifact).toBe('specs')
+    expect(parsed.lifecycle.changePath).toBeDefined()
+    expect(parsed.lifecycle.schemaInfo).toEqual({ name: '@specd/schema-std', version: 1 })
   })
 })
 
@@ -105,12 +249,10 @@ describe('Schema version warning', () => {
     kernel.changes.status.execute.mockResolvedValue({
       change,
       artifactStatuses: [],
-    })
-    kernel.specs.getActiveSchema.execute.mockResolvedValue({
-      name: () => '@specd/schema-std',
-      version: () => 2,
-      artifacts: () => [],
-      workflow: () => [],
+      lifecycle: {
+        ...defaultLifecycle,
+        schemaInfo: { name: '@specd/schema-std', version: 2 },
+      },
     })
 
     const program = makeProgram()
@@ -135,34 +277,5 @@ describe('Change not found', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
-  })
-
-  it('JSON output contains correct structure', async () => {
-    const { kernel, stdout } = setup()
-    const change = makeMockChange({
-      name: 'add-login',
-      state: 'designing',
-      specIds: ['auth/login'],
-      schemaName: 'std',
-      schemaVersion: 1,
-    })
-    kernel.changes.status.execute.mockResolvedValue({
-      change,
-      artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
-    })
-
-    const program = makeProgram()
-    registerChangeStatus(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'status', 'add-login', '--format', 'json'])
-
-    const parsed = JSON.parse(stdout())
-    expect(parsed.name).toBe('add-login')
-    expect(parsed.state).toBe('designing')
-    expect(parsed.specIds).toEqual(['auth/login'])
-    expect(parsed.schema.name).toBe('std')
-    expect(parsed.schema.version).toBe(1)
-    expect(parsed.artifacts).toHaveLength(1)
-    expect(parsed.artifacts[0].type).toBe('proposal')
-    expect(parsed.artifacts[0].effectiveStatus).toBe('complete')
   })
 })

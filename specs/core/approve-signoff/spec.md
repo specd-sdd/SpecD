@@ -8,7 +8,13 @@ After implementation, a final human signoff is needed to confirm the change is r
 
 ### Requirement: Gate guard
 
-The use case MUST reject the operation with an `ApprovalGateDisabledError` if the `approvalsSignoff` input flag is `false`. The gate check MUST occur before any repository access or side effects.
+Before recording the signoff, the use case MUST verify that the change is in a valid state for signoff approval. The gate guard sequence is:
+
+1. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.
+2. Assert the change is in `done` state. If not, throw `InvalidStateTransitionError`.
+3. Resolve the current actor identity via `ActorResolver`.
+4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved (returns `null`), throw `SchemaNotFoundError`.
+5. Compare `schema.name()` with `change.schemaName`. If they differ, throw `SchemaMismatchError`.
 
 ### Requirement: Change lookup
 

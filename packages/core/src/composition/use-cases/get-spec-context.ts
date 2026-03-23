@@ -1,3 +1,4 @@
+import * as path from 'node:path'
 import { GetSpecContext } from '../../application/use-cases/get-spec-context.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
@@ -46,7 +47,11 @@ export function createGetSpecContext(
           createSpecRepository(
             'fs',
             { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
-            { specsPath: ws.specsPath, ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}) },
+            {
+              specsPath: ws.specsPath,
+              metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
+              ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
+            },
           ),
         ]),
       ),
