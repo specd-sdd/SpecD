@@ -451,12 +451,14 @@ export class FsChangeRepository extends ChangeRepository {
           ? path.join(dir, 'specs', workspace, capPath)
           : path.join(dir, 'specs', workspace)
       await this._rmrf(specsDir)
+      await this._pruneEmptyParents(specsDir, dir)
 
       const deltasDir =
         capPath.length > 0
           ? path.join(dir, 'deltas', workspace, capPath)
           : path.join(dir, 'deltas', workspace)
       await this._rmrf(deltasDir)
+      await this._pruneEmptyParents(deltasDir, dir)
     }
   }
 
@@ -525,6 +527,74 @@ export class FsChangeRepository extends ChangeRepository {
       await fs.rm(dirPath, { recursive: true })
     } catch (err) {
       if (!isEnoent(err)) throw err
+    }
+  }
+
+  /**
+   * Removes empty parent directories from `child` up to (but not including) `root`.
+   * Stops at the first non-empty parent. Both paths are resolved to real absolute
+   * paths before comparison to prevent traversal via symlinks or `..` segments.
+   *
+   * A hard boundary check against `_changesPath` ensures this method never operates
+   * outside the changes storage, regardless of the `root` argument.
+   *
+   * @param child - The directory that was just removed
+   * @param root - The boundary directory (e.g. the change dir). Never removed.
+   */
+  private async _pruneEmptyParents(child: string, root: string): Promise<void> {
+    const realRoot = await fs.realpath(root).catch((err: unknown) => {
+      if (isEnoent(err)) return null
+      throw err
+    })
+    if (realRoot === null) return
+
+    const realBoundary = await fs.realpath(this._changesPath).catch((err: unknown) => {
+      if (isEnoent(err)) return null
+      throw err
+    })
+    if (realBoundary === null) return
+
+    if (!realRoot.startsWith(realBoundary + path.sep)) return
+
+    // Resolve child's parent via realpath (child itself was already removed).
+    // path.resolve alone won't resolve symlinks (e.g. /tmp → /private/tmp on macOS).
+    const childParent = path.dirname(path.resolve(child))
+    const realChildParent = await fs.realpath(childParent).catch((err: unknown) => {
+      if (isEnoent(err)) return null
+      throw err
+    })
+    if (realChildParent === null) return
+    if (realChildParent !== realRoot && !realChildParent.startsWith(realRoot + path.sep)) return
+
+    let current = childParent
+
+    while (true) {
+      const realCurrent = await fs.realpath(current).catch((err: unknown) => {
+        if (isEnoent(err)) return null
+        throw err
+      })
+      if (realCurrent === null) break
+      if (realCurrent === realRoot || !realCurrent.startsWith(realRoot + path.sep)) break
+      if (!realCurrent.startsWith(realBoundary + path.sep)) break
+
+      let entries: string[]
+      try {
+        entries = await fs.readdir(current)
+      } catch (err) {
+        if (isEnoent(err)) break
+        throw err
+      }
+      if (entries.length > 0) break
+
+      try {
+        await fs.rmdir(current)
+      } catch (err) {
+        if (isEnoent(err)) break
+        const code = (err as NodeJS.ErrnoException).code
+        if (code === 'ENOTEMPTY') break
+        throw err
+      }
+      current = path.dirname(current)
     }
   }
 
