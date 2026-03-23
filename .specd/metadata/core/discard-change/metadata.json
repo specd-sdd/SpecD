@@ -1,0 +1,98 @@
+{
+  "title": "DiscardChange",
+  "description": "Sometimes a change becomes obsolete or is superseded, and the team needs a way to permanently abandon it while preserving an audit trail of why. The `DiscardChange` use case appends a `discarded` event to the change's history and the repository moves its directory to `discarded/`. Discarding is a terminal operation — discarded changes cannot be restored.",
+  "dependsOn": ["core:core/change", "default:_global/architecture"],
+  "context": [
+    "Sometimes a change becomes obsolete or is superseded, and the team needs a way to permanently abandon it while preserving an audit trail of why. The `DiscardChange` use case appends a `discarded` event to the change's history and the repository moves its directory to `discarded/`. Discarding is a terminal operation — discarded changes cannot be restored."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`DiscardChange.execute` SHALL accept a `DiscardChangeInput` with the following fields:\n\n- `name` (string, required) — the change to permanently discard\n- `reason` (string, required) — mandatory explanation for discarding\n- `supersededBy` (string\\[], optional) — names of changes that supersede this one"
+      ]
+    },
+    {
+      "requirement": "Change must exist",
+      "rules": [
+        "The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Actor resolution",
+      "rules": [
+        "The use case MUST resolve the current actor identity via the `ActorResolver` port. The resolved actor is recorded in the `discarded` event."
+      ]
+    },
+    {
+      "requirement": "Discarded event appended to history",
+      "rules": [
+        "The use case MUST call `change.discard(reason, actor, supersededBy)` to append a `discarded` event to the change's history. The event records:\n\n- `type`: `'discarded'`\n- `at`: the current timestamp\n- `by`: the resolved actor identity\n- `reason`: the mandatory discard reason\n- `supersededBy`: included only when provided in the input"
+      ]
+    },
+    {
+      "requirement": "Persistence",
+      "rules": [
+        "After appending the discarded event, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` instance. The repository implementation is responsible for relocating the change directory to `discarded/`."
+      ]
+    },
+    {
+      "requirement": "Dependencies",
+      "rules": [
+        "`DiscardChange` depends on two ports injected via constructor:\n\n- `ChangeRepository` — for loading and persistence\n- `ActorResolver` — for resolving the current actor identity"
+      ]
+    }
+  ],
+  "constraints": [
+    "The use case MUST NOT perform any state transitions — discarding is orthogonal to lifecycle state",
+    "The reason field is mandatory — the use case input type enforces this at the type level",
+    "The use case delegates directory relocation entirely to the repository layer"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Change must exist",
+      "name": "Non-existent change is rejected",
+      "when": ["DiscardChange.execute is called with a name that does not exist in the repository"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Actor resolution",
+      "name": "Actor identity is recorded in the discarded event",
+      "when": ["DiscardChange.execute is called"],
+      "then": [
+        "the discarded event's by field matches the identity returned by ActorResolver.identity()"
+      ]
+    },
+    {
+      "requirement": "Discarded event appended to history",
+      "name": "Reason is recorded in the discarded event",
+      "when": ["DiscardChange.execute is called with reason: 'no longer needed'"],
+      "then": [
+        "the last event in the change's history is a discarded event with reason === 'no longer needed'"
+      ]
+    },
+    {
+      "requirement": "Discarded event appended to history",
+      "name": "SupersededBy is included when provided",
+      "when": ["DiscardChange.execute is called with supersededBy: ['new-auth-flow']"],
+      "then": ["the discarded event has supersededBy containing 'new-auth-flow'"]
+    },
+    {
+      "requirement": "Discarded event appended to history",
+      "name": "SupersededBy is omitted when not provided",
+      "when": ["DiscardChange.execute is called without a supersededBy field"],
+      "then": ["the discarded event does not have a supersededBy property"]
+    },
+    {
+      "requirement": "Persistence",
+      "name": "Change is saved to repository",
+      "when": ["DiscardChange.execute completes successfully"],
+      "then": ["ChangeRepository.save was called with the updated Change instance"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:0e8949fe122c0359afab06dccdaeadc6a45ba7975bff0dfebad675bac9709254",
+    "verify.md": "sha256:c73162b7734b352b993215b726e20b91ed107a41adc131d823a5f6a9692989d2"
+  },
+  "generatedBy": "core"
+}

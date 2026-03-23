@@ -1,0 +1,78 @@
+{
+  "title": "Schema Extend",
+  "description": "Teams that want to add or override a few artifacts without duplicating an entire schema need an inheritance mechanism. The `specd schema extend` command creates a new local schema that extends an existing one -- it inherits all definitions from the source and allows selective overrides or additions.",
+  "dependsOn": ["cli:cli/entrypoint", "core:core/schema-format", "core:core/schema-registry-port"],
+  "context": [
+    "Teams that want to add or override a few artifacts without duplicating an entire schema need an inheritance mechanism. The `specd schema extend` command creates a new local schema that extends an existing one -- it inherits all definitions from the source and allows selective overrides or additions."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd schema extend <ref> [--name <name>] [--workspace <workspace>]\n```\n\n- `<ref>` (required) — the schema reference to extend (npm package, workspace-qualified, bare name, or path).\n- `--name <name>` (optional) — the name for the new schema. Defaults to `<source-name>-custom`.\n- `--workspace <workspace>` (optional) — the workspace whose `schemas.fs.path` is used as the target directory. Defaults to `default`."
+      ]
+    },
+    {
+      "requirement": "Extend behaviour",
+      "rules": [
+        "The command must:\n\n1. Resolve the source schema via `SchemaRegistry.resolve(ref, workspaceSchemasPaths)` to verify it exists and has `kind: schema`.\n2. Create a new schema directory at `<target-schemas-path>/<name>/`.\n3. Write a minimal `schema.yaml` with:\n   - `kind: schema`\n   - `name: <name>`\n   - `version: 1`\n   - `extends: <ref>` — referencing the source schema\n   - `artifacts: []` — empty (all inherited from parent)\n4. Print the path to the new schema directory.\n\nIf the target directory already exists, the command must exit with an error and not overwrite."
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "rules": [
+        "- Source schema not found — exits with code 3\n- Source schema has `kind: schema-plugin` — exits with code 1, message explains that only schemas can be extended\n- Target directory already exists — exits with code 1\n- Target workspace has no `schemas` section — exits with code 1"
+      ]
+    }
+  ],
+  "constraints": [
+    "The new schema starts minimal — only extends and metadata; no artifacts, workflow, or templates are copied",
+    "The command does not modify specd.yaml — the user must update the schema field manually",
+    "Templates are not copied — the child schema inherits templates from the parent"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Extend behaviour",
+      "name": "Extend from npm package",
+      "given": ["@specd/schema-std is installed with kind: schema"],
+      "when": ["specd schema extend @specd/schema-std is run"],
+      "then": [
+        "a new directory specd/schemas/schema-std-custom/ is created",
+        "AND schema.yaml contains kind: schema, extends: '@specd/schema-std', and artifacts: []"
+      ]
+    },
+    {
+      "requirement": "Extend behaviour",
+      "name": "Extend with custom name",
+      "when": ["specd schema extend @specd/schema-std --name my-workflow is run"],
+      "then": ["the schema is created at specd/schemas/my-workflow/"]
+    },
+    {
+      "requirement": "Extend behaviour",
+      "name": "Target directory already exists",
+      "given": ["specd/schemas/schema-std-custom/ already exists"],
+      "when": ["specd schema extend @specd/schema-std is run"],
+      "then": ["the command exits with code 1 and does not overwrite"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Source schema not found",
+      "when": ["specd schema extend @specd/nonexistent is run"],
+      "then": ["the command exits with code 3"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Source is a plugin",
+      "given": ["my-plugin has kind: schema-plugin"],
+      "when": ["specd schema extend '#my-plugin' is run"],
+      "then": [
+        "the command exits with code 1 with a message explaining only schemas can be extended"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:4e4ec236d49bda25727172b5321f66b7d80cdf2bc76385d526b67531a95fa93c",
+    "verify.md": "sha256:8a399f7761206f4be3f86bf3ecc6bb090f54890d0adcfa996849019a241bdfc8"
+  },
+  "generatedBy": "core"
+}

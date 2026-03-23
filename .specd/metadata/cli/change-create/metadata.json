@@ -1,0 +1,120 @@
+{
+  "title": "Change Create",
+  "description": "Users need a way to start tracking a new unit of spec work before any artifacts exist. `specd change create <name> [--spec <id>...]` creates a new change and persists it to the repository, optionally scoping it to one or more specs upfront.",
+  "dependsOn": ["cli:cli/entrypoint", "core:core/change", "core:core/spec-id-format"],
+  "context": [
+    "Users need a way to start tracking a new unit of spec work before any artifacts exist. `specd change create <name> [--spec <id>...]` creates a new change and persists it to the repository, optionally scoping it to one or more specs upfront."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd change create <name> [--spec <id>...] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the unique slug name for the new change (e.g. `add-auth-flow`)\n- `--spec <id>` — optional repeatable flag; one or more spec IDs being created or modified. Each `<id>` is `[<workspace>:]<capability-path>` — the workspace qualifier is optional and defaults to `default` when omitted (e.g. `--spec auth/login` means `default:auth/login`, `--spec billing/invoices` with an explicit workspace would be `--spec billing-ws:billing/invoices`). When omitted, the change is created with an empty specIds list — specs can be added later via `change edit`.\n- `--description <text>` — optional; a short free-text description of the change's purpose, stored in the manifest\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+      ]
+    },
+    {
+      "requirement": "Workspace resolution",
+      "rules": [
+        "The workspace IDs for the new change are derived from the workspace prefix of each `--spec` value. If the workspace prefix is omitted, `default` is used. If a named workspace is not declared in `specd.yaml`, the command fails with exit code 1 and prints an `error:` message to stderr."
+      ]
+    },
+    {
+      "requirement": "Schema name and version",
+      "rules": [
+        "`schemaName` and `schemaVersion` are resolved from the active `SpecdConfig` at command time and passed to the `CreateChange` use case. The user does not specify these values."
+      ]
+    },
+    {
+      "requirement": "Output on success",
+      "rules": [
+        "On success, output depends on `--format`:\n\n- `text` (default): prints a single line to stdout:\n- `json` or `toon`: outputs the following to stdout (encoded in the respective format):\n\nNo further output is produced."
+      ]
+    },
+    {
+      "requirement": "Duplicate name error",
+      "rules": [
+        "If a change with the given name already exists (`ChangeAlreadyExistsError`), the command exits with code 1 and prints an `error:` message to stderr."
+      ]
+    }
+  ],
+  "constraints": [
+    "--spec is optional; when omitted, the change is created with an empty specIds list",
+    "The change name must be a valid kebab-case slug; the CLI validates the format before invoking the use case",
+    "The workspace prefix in --spec defaults to default when omitted; workspace IDs are never a separate flag"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Missing name argument",
+      "when": ["specd change create is run without a positional name"],
+      "then": ["the command exits with code 1 and prints a usage error to stderr"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "No --spec flag creates change with empty specIds",
+      "when": ["specd change create my-change is run with no --spec flag"],
+      "then": [
+        "the change is created with an empty specIds list",
+        "AND stdout contains created change my-change",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Workspace resolution",
+      "name": "Workspace prefix omitted defaults to default",
+      "when": ["specd change create my-change --spec auth/login is run with no workspace prefix"],
+      "then": [
+        "the spec is treated as default:auth/login",
+        "AND the change is created with workspace default"
+      ]
+    },
+    {
+      "requirement": "Workspace resolution",
+      "name": "Explicit workspace prefix used",
+      "given": ["specd.yaml declares a workspace named billing-ws"],
+      "when": ["specd change create my-change --spec billing-ws:invoices is run"],
+      "then": ["the change is created with workspace billing-ws and specId billing-ws:invoices"]
+    },
+    {
+      "requirement": "Workspace resolution",
+      "name": "Unknown workspace prefix",
+      "when": ["specd change create my-change --spec nonexistent-ws:some/path is run"],
+      "then": ["the command exits with code 1 and prints an error: message to stderr"]
+    },
+    {
+      "requirement": "Output on success",
+      "name": "Successful creation",
+      "when": ["specd change create add-login --spec auth/login succeeds"],
+      "then": [
+        "stdout contains exactly created change add-login",
+        "AND stderr is empty",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Duplicate name error",
+      "name": "Name already exists",
+      "given": ["a change named my-change already exists"],
+      "when": ["specd change create my-change --spec auth/login is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message mentioning the duplicate name"
+      ]
+    },
+    {
+      "requirement": "Output on success",
+      "name": "JSON output on success",
+      "when": ["specd change create add-login --spec auth/login --format json succeeds"],
+      "then": [
+        "stdout is valid JSON with result equal to \"ok\" and state equal to \"drafting\"",
+        "AND name is \"add-login\"",
+        "AND the process exits with code 0"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:613809cfa79f05cc850d6e03b0b5aa7ffaa4f9f6acc389c2ea31eabbbc1feff3",
+    "verify.md": "sha256:d9f0bf5ac247d4f81ba40cf6bdfa4f95771c4fedb4698a857722138458627eec"
+  },
+  "generatedBy": "core"
+}

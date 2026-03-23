@@ -1,0 +1,205 @@
+{
+  "title": "EditChange",
+  "description": "As a change evolves, its spec scope often needs to grow or shrink — but modifying the spec list has approval implications that must be enforced consistently. The `EditChange` use case adds or removes spec IDs on an existing change, derives workspaces from the resulting `specIds` via the `Change.workspaces` getter, and triggers approval invalidation whenever the spec list effectively changes.",
+  "dependsOn": ["core:core/change", "core:core/composition"],
+  "context": [
+    "As a change evolves, its spec scope often needs to grow or shrink — but modifying the spec list has approval implications that must be enforced consistently. The `EditChange` use case adds or removes spec IDs on an existing change, derives workspaces from the resulting `specIds` via the `Change.workspaces` getter, and triggers approval invalidation whenever the spec list effectively changes."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`EditChange.execute` SHALL accept an `EditChangeInput` with the following fields:\n\n- `name` (required, string) — the change slug to edit\n- `addSpecIds` (optional, string array) — spec IDs to add to the change's `specIds`\n- `removeSpecIds` (optional, string array) — spec IDs to remove from the change's `specIds`"
+      ]
+    },
+    {
+      "requirement": "Change lookup",
+      "rules": [
+        "The use case MUST load the change by `name` via `ChangeRepository.get`. If no change with the given name exists, it MUST throw `ChangeNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "No-op when no spec changes requested",
+      "rules": [
+        "If both `addSpecIds` and `removeSpecIds` are absent or empty, the use case MUST return the unchanged change with `invalidated: false` without persisting or resolving actor identity."
+      ]
+    },
+    {
+      "requirement": "Removal precedes addition",
+      "rules": [
+        "When both `removeSpecIds` and `addSpecIds` are provided, removals MUST be applied before additions. This allows a caller to replace a spec ID by removing the old one and adding the new one in a single call."
+      ]
+    },
+    {
+      "requirement": "Removal of absent spec throws",
+      "rules": [
+        "If any spec ID in `removeSpecIds` is not present in the change's current `specIds`, the use case MUST throw `SpecNotInChangeError` for that spec ID. Removal is atomic per ID — the first missing ID aborts the entire operation."
+      ]
+    },
+    {
+      "requirement": "Addition is idempotent",
+      "rules": [
+        "If a spec ID in `addSpecIds` already exists in the change's `specIds` (after removals), it MUST be silently skipped — no duplicate is added and no error is thrown."
+      ]
+    },
+    {
+      "requirement": "No-op when specIds unchanged after processing",
+      "rules": [
+        "If the resulting `specIds` list is identical (same length, same order) to the change's current `specIds`, the use case MUST return the unchanged change with `invalidated: false` without persisting."
+      ]
+    },
+    {
+      "requirement": "Approval invalidation on effective change",
+      "rules": ["### Requirement: Approval invalidation on effective change"]
+    },
+    {
+      "requirement": "Directory cleanup on removal",
+      "rules": [
+        "When the resulting `specIds` differ from the current set due to removals, the use\ncase MUST call `ChangeRepository.unscaffold(change, removedSpecIds)` to remove the\nscaffolded directories for each removed spec from the change directory. This call\nMUST happen after the change is persisted and before returning the result. If any\ndirectory contains files, they MUST be removed along with the directory.\n\nDirectories to remove follow the change directory layout:\n\n- `specs/<workspace>/<capability-path>/` — new-spec artifact directories\n- `deltas/<workspace>/<capability-path>/` — delta artifact directories\n\nThe `unscaffold` operation is idempotent — if a directory does not exist, it\nis silently skipped."
+      ]
+    },
+    {
+      "requirement": "Output contract",
+      "rules": [
+        "`EditChange.execute` MUST return an `EditChangeResult` with:\n\n- `change` — the `Change` entity (updated or unchanged)\n- `invalidated` — `true` if approvals were invalidated, `false` otherwise"
+      ]
+    },
+    {
+      "requirement": "Dependencies",
+      "rules": [
+        "### Requirement: Dependencies",
+        "`EditChange` depends on the following ports injected via constructor:\n\n- `ChangeRepository` — for loading, persisting, scaffolding, and unscaffolding changes\n- `ActorResolver` — for resolving the current actor identity\n- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding"
+      ]
+    }
+  ],
+  "constraints": [
+    "The use case MUST NOT modify workspaces directly — they are always derived from specIds",
+    "The use case MUST NOT validate spec IDs against the filesystem — specs may not yet exist",
+    "Actor identity is only resolved when a persistence-worthy change occurs"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Change lookup",
+      "name": "Change does not exist",
+      "when": ["execute is called with a name that does not exist in the repository"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "No-op when no spec changes requested",
+      "name": "Both add and remove are absent",
+      "when": ["execute is called with only name (no addSpecIds, no removeSpecIds)"],
+      "then": [
+        "it returns { change, invalidated: false }",
+        "AND ChangeRepository.save is not called"
+      ]
+    },
+    {
+      "requirement": "No-op when no spec changes requested",
+      "name": "Both add and remove are empty arrays",
+      "when": ["execute is called with addSpecIds: [] and removeSpecIds: []"],
+      "then": [
+        "it returns { change, invalidated: false }",
+        "AND ChangeRepository.save is not called"
+      ]
+    },
+    {
+      "requirement": "Removal precedes addition",
+      "name": "Remove and add in same call",
+      "given": ["a change with specIds: ['auth/login', 'billing/invoices']"],
+      "when": [
+        "execute is called with removeSpecIds: ['auth/login'] and addSpecIds: ['auth/signup']"
+      ],
+      "then": [
+        "the resulting specIds are ['billing/invoices', 'auth/signup']",
+        "AND invalidated is true"
+      ]
+    },
+    {
+      "requirement": "Removal of absent spec throws",
+      "name": "Removing a spec not in the change",
+      "given": ["a change with specIds: ['auth/login']"],
+      "when": ["execute is called with removeSpecIds: ['billing/invoices']"],
+      "then": ["it throws SpecNotInChangeError"]
+    },
+    {
+      "requirement": "Addition is idempotent",
+      "name": "Adding a spec already present",
+      "given": ["a change with specIds: ['auth/login']"],
+      "when": ["execute is called with addSpecIds: ['auth/login']"],
+      "then": ["specIds remains ['auth/login']", "AND invalidated is false"]
+    },
+    {
+      "requirement": "No-op when specIds unchanged after processing",
+      "name": "Remove and re-add the same spec",
+      "given": ["a change with specIds: ['auth/login', 'billing/invoices']"],
+      "when": [
+        "execute is called with removeSpecIds: ['billing/invoices'] and addSpecIds: ['billing/invoices']"
+      ],
+      "then": [
+        "the resulting specIds are ['auth/login', 'billing/invoices']",
+        "AND invalidated is false"
+      ]
+    },
+    {
+      "requirement": "Approval invalidation on effective change",
+      "name": "Adding a new spec triggers invalidation",
+      "given": ["a change with specIds: ['auth/login']"],
+      "when": ["execute is called with addSpecIds: ['billing/invoices']"],
+      "then": [
+        "change.updateSpecIds is called with the new spec list and the resolved actor",
+        "AND the change is persisted via ChangeRepository.save",
+        "AND invalidated is true"
+      ]
+    },
+    {
+      "requirement": "Approval invalidation on effective change",
+      "name": "Removing a spec triggers invalidation",
+      "given": ["a change with specIds: ['auth/login', 'billing/invoices']"],
+      "when": ["execute is called with removeSpecIds: ['billing/invoices']"],
+      "then": [
+        "change.updateSpecIds is called with ['auth/login'] and the resolved actor",
+        "AND the change is persisted",
+        "AND invalidated is true"
+      ]
+    },
+    {
+      "requirement": "Directory cleanup on removal",
+      "name": "Removing a spec cleans up its scaffolded directories",
+      "given": [
+        "a change with specIds: ['core:core/edit-change'] and scaffolded directories at specs/core/core/edit-change/ and deltas/core/core/edit-change/"
+      ],
+      "when": ["execute is called with removeSpecIds: ['core:core/edit-change']"],
+      "then": [
+        "ChangeRepository.unscaffold is called with the removed spec IDs",
+        "AND the directories specs/core/core/edit-change/ and deltas/core/core/edit-change/ are removed from the change directory"
+      ]
+    },
+    {
+      "requirement": "Directory cleanup on removal",
+      "name": "Removing multiple specs cleans up all their directories",
+      "given": [
+        "a change with specIds: ['core:core/edit-change', 'core:core/change-repository-port']",
+        "AND scaffolded directories for both specs exist"
+      ],
+      "when": [
+        "execute is called with removeSpecIds: ['core:core/edit-change', 'core:core/change-repository-port']"
+      ],
+      "then": [
+        "ChangeRepository.unscaffold is called with both removed spec IDs",
+        "AND all corresponding directories are removed"
+      ]
+    },
+    {
+      "requirement": "Directory cleanup on removal",
+      "name": "Adding a spec does not trigger unscaffold",
+      "given": ["a change with specIds: ['core:core/edit-change']"],
+      "when": ["execute is called with addSpecIds: ['core:core/change-repository-port']"],
+      "then": ["ChangeRepository.unscaffold is NOT called"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:21b51c580fe176040fccf3850dafd2824272d8efbc76d81e1d684d9af70cda1e",
+    "verify.md": "sha256:dc567acef5dd4a47598e73e8e4592f910da0410ed27ff11b07415f0769f9699f"
+  },
+  "generatedBy": "core"
+}

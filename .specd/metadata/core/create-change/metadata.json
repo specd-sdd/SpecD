@@ -1,0 +1,120 @@
+{
+  "title": "CreateChange",
+  "description": "Every spec workflow begins with a named change, so the system needs a single entry point that guarantees uniqueness and records provenance from the start. The `CreateChange` use case creates a new change entity, enforces name uniqueness, resolves the current actor, and records a single `created` event as the initial history entry.",
+  "dependsOn": ["core:core/change", "default:_global/architecture"],
+  "context": [
+    "Every spec workflow begins with a named change, so the system needs a single entry point that guarantees uniqueness and records provenance from the start. The `CreateChange` use case creates a new change entity, enforces name uniqueness, resolves the current actor, and records a single `created` event as the initial history entry."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`CreateChange.execute` SHALL accept a `CreateChangeInput` with the following fields:\n\n- `name` (string, required) — unique slug name for the change (kebab-case)\n- `description` (string, optional) — free-text description of the change's purpose\n- `specIds` (readonly string\\[], required) — spec paths being created or modified\n- `schemaName` (string, required) — the active schema name from configuration\n- `schemaVersion` (number, required) — the active schema version from configuration"
+      ]
+    },
+    {
+      "requirement": "Name uniqueness enforcement",
+      "rules": [
+        "The use case MUST query the `ChangeRepository` for an existing change with the given name before creating a new one. If a change with that name already exists, the use case MUST throw `ChangeAlreadyExistsError`."
+      ]
+    },
+    {
+      "requirement": "Actor resolution",
+      "rules": [
+        "The use case MUST resolve the current actor identity via the `ActorResolver` port before constructing the change. The resolved actor is recorded in the initial `created` event."
+      ]
+    },
+    {
+      "requirement": "Initial history contains a single created event",
+      "rules": [
+        "The newly constructed `Change` MUST have a history containing exactly one event of type `created`. This event SHALL record:\n\n- `type`: `'created'`\n- `at`: the current timestamp\n- `by`: the resolved actor identity\n- `specIds`: the input spec paths\n- `schemaName`: the input schema name\n- `schemaVersion`: the input schema version"
+      ]
+    },
+    {
+      "requirement": "Change construction",
+      "rules": [
+        "The `Change` entity MUST be constructed with `name`, `createdAt`, `specIds`, and `history` from the input and the created event. The `description` field MUST be included only when provided in the input."
+      ]
+    },
+    {
+      "requirement": "Persistence and scaffolding",
+      "rules": [
+        "After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks the `SpecRepository` map for each spec ID's workspace. Finally, the use case returns the newly created `Change` instance."
+      ]
+    },
+    {
+      "requirement": "Dependencies",
+      "rules": [
+        "`CreateChange` depends on the following ports injected via constructor:\n\n- `ChangeRepository` — for existence checks, persistence, and scaffolding\n- `ActorResolver` — for resolving the current actor identity\n- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding"
+      ]
+    }
+  ],
+  "constraints": [
+    "The use case MUST NOT perform any state transitions — the change starts in drafting state (the default when no transitioned event exists)",
+    "The use case MUST NOT modify or read any artifact files (scaffolding only creates directories)",
+    "The created event timestamp and the Change.createdAt field MUST use the same Date instance"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Name uniqueness enforcement",
+      "name": "Change with duplicate name is rejected",
+      "given": ["a change named 'add-login' already exists in the repository"],
+      "when": ["CreateChange.execute is called with name: 'add-login'"],
+      "then": ["it throws ChangeAlreadyExistsError", "AND no change is persisted to the repository"]
+    },
+    {
+      "requirement": "Name uniqueness enforcement",
+      "name": "Change with unique name succeeds",
+      "given": ["no change named 'add-login' exists in the repository"],
+      "when": ["CreateChange.execute is called with name: 'add-login'"],
+      "then": ["it returns a Change with name === 'add-login'"]
+    },
+    {
+      "requirement": "Actor resolution",
+      "name": "Actor identity is recorded in the created event",
+      "when": ["CreateChange.execute is called"],
+      "then": [
+        "the created event's by field matches the identity returned by ActorResolver.identity()"
+      ]
+    },
+    {
+      "requirement": "Initial history contains a single created event",
+      "name": "History contains exactly one created event",
+      "when": ["CreateChange.execute returns a change"],
+      "then": [
+        "change.history has length 1",
+        "AND change.history[0].type === 'created'",
+        "AND the event contains specIds, schemaName, and schemaVersion matching the input"
+      ]
+    },
+    {
+      "requirement": "Change construction",
+      "name": "Description is included when provided",
+      "when": ["CreateChange.execute is called with description: 'OAuth support'"],
+      "then": ["the returned change has description === 'OAuth support'"]
+    },
+    {
+      "requirement": "Change construction",
+      "name": "Description is omitted when not provided",
+      "when": ["CreateChange.execute is called without a description field"],
+      "then": ["the returned change has description === undefined"]
+    },
+    {
+      "requirement": "Change construction",
+      "name": "Initial state is drafting",
+      "when": ["CreateChange.execute returns a change"],
+      "then": ["change.state === 'drafting'"]
+    },
+    {
+      "requirement": "Persistence",
+      "name": "Change is saved to repository",
+      "when": ["CreateChange.execute completes successfully"],
+      "then": ["ChangeRepository.save was called with the returned Change instance"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:d685d0cc54354d5b183de7fd5f3db560a708b94e90016326c13326bcbd652c7b",
+    "verify.md": "sha256:8cef0ea9f2f8a5891939c851ace9f600f00a3b72cf1820e9fe50bbbca8b28ac2"
+  },
+  "generatedBy": "core"
+}

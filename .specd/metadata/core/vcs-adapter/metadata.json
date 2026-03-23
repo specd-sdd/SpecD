@@ -1,0 +1,101 @@
+{
+  "title": "VCS Adapter Factory",
+  "description": "specd must work across git, hg, and svn repositories (and outside VCS entirely) without callers knowing which system is active. `createVcsAdapter` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `VcsAdapter` implementation, serving as the single entry point so that callers never construct concrete adapters directly.",
+  "dependsOn": ["core:core/composition", "default:_global/architecture"],
+  "context": [
+    "specd must work across git, hg, and svn repositories (and outside VCS entirely) without callers knowing which system is active. `createVcsAdapter` is a composition factory that auto-detects the active version-control system in a directory and returns the corresponding `VcsAdapter` implementation, serving as the single entry point so that callers never construct concrete adapters directly."
+  ],
+  "rules": [
+    {
+      "requirement": "Detection probes in priority order",
+      "rules": [
+        "`createVcsAdapter` MUST probe for VCS presence in the following order: git, hg, svn. The first probe that succeeds determines the returned adapter. Subsequent probes MUST NOT execute once a match is found."
+      ]
+    },
+    {
+      "requirement": "Fallback to NullVcsAdapter",
+      "rules": [
+        "When no VCS is detected (all probes fail), `createVcsAdapter` MUST return a `NullVcsAdapter`. It SHALL NOT throw."
+      ]
+    },
+    {
+      "requirement": "Optional cwd parameter",
+      "rules": [
+        "`createVcsAdapter` MUST accept an optional `cwd` parameter specifying the directory to probe. When `cwd` is omitted or `undefined`, it MUST default to `process.cwd()`."
+      ]
+    },
+    {
+      "requirement": "Returns the VcsAdapter port interface",
+      "rules": [
+        "`createVcsAdapter` MUST return a `Promise<VcsAdapter>` — the application port interface defined in `application/ports/vcs-adapter.ts`. The concrete adapter type is an implementation detail not exposed to callers."
+      ]
+    }
+  ],
+  "constraints": [
+    "The factory is async — VCS detection requires spawning external processes",
+    "Concrete adapter classes (GitVcsAdapter, HgVcsAdapter, SvnVcsAdapter, NullVcsAdapter) MUST NOT appear in any public export; they are internal to the composition layer",
+    "Detection relies on running VCS CLI commands; a probe failure (non-zero exit) means that VCS is not present"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Detection probes in priority order",
+      "name": "Git repository detected",
+      "given": ["the target directory is inside a git repository"],
+      "when": ["createVcsAdapter(cwd) is called"],
+      "then": ["it returns a GitVcsAdapter", "AND hg and svn probes are never executed"]
+    },
+    {
+      "requirement": "Detection probes in priority order",
+      "name": "Mercurial repository detected",
+      "given": ["the target directory is inside an hg repository but not a git repository"],
+      "when": ["createVcsAdapter(cwd) is called"],
+      "then": ["it returns an HgVcsAdapter", "AND the svn probe is never executed"]
+    },
+    {
+      "requirement": "Detection probes in priority order",
+      "name": "SVN working copy detected",
+      "given": [
+        "the target directory is inside an svn working copy but not a git or hg repository"
+      ],
+      "when": ["createVcsAdapter(cwd) is called"],
+      "then": ["it returns an SvnVcsAdapter"]
+    },
+    {
+      "requirement": "Detection probes in priority order",
+      "name": "Git takes priority over hg",
+      "given": ["the target directory is inside both a git and hg repository"],
+      "when": ["createVcsAdapter(cwd) is called"],
+      "then": ["it returns a GitVcsAdapter"]
+    },
+    {
+      "requirement": "Fallback to NullVcsAdapter",
+      "name": "No VCS detected",
+      "given": ["the target directory is not inside any VCS repository"],
+      "when": ["createVcsAdapter(cwd) is called"],
+      "then": ["it returns a NullVcsAdapter", "AND the call does not throw"]
+    },
+    {
+      "requirement": "Optional cwd parameter",
+      "name": "Explicit cwd is used for probing",
+      "when": ["createVcsAdapter(\"/some/path\") is called"],
+      "then": ["VCS probes run against /some/path, not process.cwd()"]
+    },
+    {
+      "requirement": "Optional cwd parameter",
+      "name": "Omitted cwd defaults to process.cwd()",
+      "when": ["createVcsAdapter() is called without arguments"],
+      "then": ["VCS probes run against process.cwd()"]
+    },
+    {
+      "requirement": "Returns the VcsAdapter port interface",
+      "name": "Return type satisfies VcsAdapter",
+      "when": ["createVcsAdapter(cwd) resolves"],
+      "then": ["the returned object satisfies the VcsAdapter interface"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:df0a114d8cb38add1dff7ef78d77b252f6ca276e45ef5d91a9ae6174069dc4cd",
+    "verify.md": "sha256:d518bbbd98a309f89fce89446683d6c17a1e85b80c6d23ad2d9a9664366fbe4d"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,217 @@
+{
+  "title": "Template Variables",
+  "description": "Workflow hooks (`run:` commands, `instruction:` text) and artifact instructions contain `{{namespace.key}}` tokens that must be expanded with runtime values before the text is consumed or executed. Without a unified model, each use case would build its own variable map with inconsistent naming, and template expansion logic would be duplicated. This spec defines the template variable syntax, the variable registry (built-in and contextual namespaces), expansion semantics, and the shared `TemplateExpander` class that all consumers use.",
+  "dependsOn": [
+    "core:core/hook-runner-port",
+    "core:core/hook-execution-model",
+    "core:core/get-hook-instructions",
+    "core:core/get-artifact-instruction",
+    "core:core/run-step-hooks",
+    "core:core/archive-change"
+  ],
+  "context": [
+    "Workflow hooks (`run:` commands, `instruction:` text) and artifact instructions contain `{{namespace.key}}` tokens that must be expanded with runtime values before the text is consumed or executed. Without a unified model, each use case would build its own variable map with inconsistent naming, and template expansion logic would be duplicated. This spec defines the template variable syntax, the variable registry (built-in and contextual namespaces), expansion semantics, and the shared `TemplateExpander` class that all consumers use."
+  ],
+  "rules": [
+    {
+      "requirement": "Syntax",
+      "rules": [
+        "Template variables use the `{{namespace.key}}` syntax. A token is identified by the regex `\\{\\{([^}]+)\\}\\}`. The content between the braces is a dot-separated path (e.g. `project.root`, `change.name`).\n\nOnly string, number, and boolean values are substitutable. Object and array values are not expanded — the original token is preserved."
+      ]
+    },
+    {
+      "requirement": "Built-in namespace",
+      "rules": [
+        "The `project` namespace is always present in every expansion context. It contains:\n\n| Variable       | Type   | Description                                                               |\n| -------------- | ------ | ------------------------------------------------------------------------- |\n| `project.root` | string | Absolute path to the project root (the directory containing `specd.yaml`) |\n\nBuilt-in variables are injected by the composition layer at construction time. Use cases do not build them per invocation."
+      ]
+    },
+    {
+      "requirement": "Contextual namespaces",
+      "rules": [
+        "Contextual namespaces are added by the use case that performs the expansion, based on the runtime context. A namespace is a flat object of key-value pairs grouped under a name.\n\nThe `change` namespace is present when a change is active:\n\n| Variable           | Type   | Description                                                     |\n| ------------------ | ------ | --------------------------------------------------------------- |\n| `change.name`      | string | The change's kebab-case name                                    |\n| `change.workspace` | string | The primary workspace name (first entry in `change.workspaces`) |\n| `change.path`      | string | Absolute path to the change directory                           |\n\nFuture use cases may introduce additional namespaces (e.g. `spec`, `schema`). The expansion engine does not restrict which namespaces can exist — it traverses whatever object it receives."
+      ]
+    },
+    {
+      "requirement": "Variable map shape",
+      "rules": [
+        "The variable map is a plain object where each top-level key is a namespace name and each value is a flat record of string keys to primitive values:\n\n```typescript\ntype TemplateVariables = Record<string, Record<string, string | number | boolean>>\n```\n\nExample:\n\n```typescript\n{\n  project: { root: '/Users/dev/my-project' },\n  change: { name: 'add-auth', workspace: 'default', path: '/Users/dev/my-project/changes/add-auth' },\n}\n```\n\nThis replaces the current typed `HookVariables` interface with a generic structure that supports arbitrary namespaces without code changes."
+      ]
+    },
+    {
+      "requirement": "Expansion semantics",
+      "rules": [
+        "When expanding a template string:\n\n1. Each `{{namespace.key}}` token is resolved by traversing the variable map: first look up the namespace, then the key within it.\n2. If the namespace exists and the key resolves to a string, number, or boolean, the token is replaced with the value.\n3. If the namespace does not exist, the key does not exist, or the value is not a primitive, the original `{{namespace.key}}` token is preserved unchanged.\n4. Expansion is single-pass — expanded values are not re-scanned for further tokens."
+      ]
+    },
+    {
+      "requirement": "Shell escaping for run hooks",
+      "rules": [
+        "When expanding variables in `run:` hook commands, all substituted values MUST be shell-escaped to prevent injection attacks. Values are wrapped in single quotes with embedded single quotes escaped using the `'\\''` idiom.\n\nWhen expanding variables in `instruction:` text or artifact instructions, values are substituted verbatim without shell escaping — these are text blocks consumed by agents, not shell commands."
+      ]
+    },
+    {
+      "requirement": "TemplateExpander class",
+      "rules": [
+        "`TemplateExpander` is a class (not a port) that encapsulates template expansion logic. It receives the built-in variables at construction time:\n\n```typescript\nclass TemplateExpander {\n  constructor(builtins: TemplateVariables)\n\n  expand(template: string, variables?: TemplateVariables): string\n  expandForShell(template: string, variables?: TemplateVariables): string\n}\n```\n\n- The `builtins` provided at construction (e.g. `{ project: { root: '...' } }`) are always present in every expansion.\n- `expand(template, variables?)` — merges contextual `variables` with built-ins and substitutes values verbatim. Used by `GetHookInstructions` and `GetArtifactInstruction` for instruction text.\n- `expandForShell(template, variables?)` — merges contextual `variables` with built-ins and substitutes values with shell escaping. Used by `HookRunner` for `run:` commands.\n- Contextual variables MUST NOT override built-in variables. If a contextual namespace collides with a built-in namespace, the built-in keys take precedence.\n- Both methods share the same traversal and resolution logic — only the substitution step differs.\n\nThe composition layer constructs a single `TemplateExpander` instance with built-in variables and injects it into all use cases that need expansion."
+      ]
+    },
+    {
+      "requirement": "Variable map construction",
+      "rules": [
+        "Each use case that needs template expansion passes contextual variables to the expander methods. The expander merges them with its built-ins internally:\n\n1. **Built-in variables** — `project.root`, injected into the `TemplateExpander` at construction time\n2. **Contextual variables** — passed per invocation from the runtime context (e.g. the `change` namespace built from the resolved change)\n\nThe use case is responsible for building the contextual variables before calling the expander. The expander handles merging and precedence."
+      ]
+    },
+    {
+      "requirement": "Namespace naming rules",
+      "rules": [
+        "Namespace names and key names MUST be lowercase alphanumeric with hyphens allowed (`[a-z0-9-]+`). Dots are path separators, not part of names. A token like `{{change.spec-ids}}` is valid; `{{Change.Name}}` is not."
+      ]
+    }
+  ],
+  "constraints": [
+    "Template variables are single-pass — no recursive expansion",
+    "Unknown tokens are preserved unchanged, never removed or errored",
+    "Shell escaping is only applied via expandForShell(), never in expand()",
+    "The variable map is flat within each namespace — no nested objects beyond namespace.key",
+    "project namespace is always present; other namespaces are optional",
+    "The TemplateExpander holds built-in variables as immutable state; contextual variables are passed per call",
+    "The expander does not validate variable values — validation (e.g. ensuring paths are within the project root, preventing path traversal) is the responsibility of the caller that injects them into the map"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Syntax",
+      "name": "Standard token expansion",
+      "given": [
+        "a template \"Project at {{project.root}}\"",
+        "AND variables { project: { root: \"/home/dev/myapp\" } }"
+      ],
+      "when": ["expand() is called"],
+      "then": ["the result is \"Project at /home/dev/myapp\""]
+    },
+    {
+      "requirement": "Syntax",
+      "name": "Multiple tokens in one string",
+      "given": [
+        "a template \"{{change.name}} in {{change.workspace}}\"",
+        "AND variables { change: { name: \"add-auth\", workspace: \"default\" } }"
+      ],
+      "when": ["expand() is called"],
+      "then": ["the result is \"add-auth in default\""]
+    },
+    {
+      "requirement": "Expansion semantics",
+      "name": "Unknown namespace preserved",
+      "given": [
+        "a template \"{{unknown.key}} stays\"",
+        "AND variables { project: { root: \"/home\" } }"
+      ],
+      "when": ["expand() is called"],
+      "then": ["the result is \"{{unknown.key}} stays\""]
+    },
+    {
+      "requirement": "Expansion semantics",
+      "name": "Unknown key in existing namespace preserved",
+      "given": [
+        "a template \"{{project.missing}} stays\"",
+        "AND variables { project: { root: \"/home\" } }"
+      ],
+      "when": ["expand() is called"],
+      "then": ["the result is \"{{project.missing}} stays\""]
+    },
+    {
+      "requirement": "Expansion semantics",
+      "name": "Single-pass expansion (no recursion)",
+      "given": [
+        "a template \"{{change.name}}\"",
+        "AND variables { change: { name: \"{{project.root}}\" } }"
+      ],
+      "when": ["expand() is called"],
+      "then": ["the result is \"{{project.root}}\" — the expanded value is not re-scanned"]
+    },
+    {
+      "requirement": "Shell escaping for run hooks",
+      "name": "expandForShell escapes values",
+      "given": [
+        "a template \"echo {{change.name}}\"",
+        "AND variables { change: { name: \"it's-a-test\" } }"
+      ],
+      "when": ["expandForShell() is called"],
+      "then": ["the result is \"echo 'it'\\\\''s-a-test'\" (value is single-quote escaped)"]
+    },
+    {
+      "requirement": "Shell escaping for run hooks",
+      "name": "expand does not escape",
+      "given": [
+        "a template \"Read {{change.name}}\"",
+        "AND variables { change: { name: \"it's-a-test\" } }"
+      ],
+      "when": ["expand() is called"],
+      "then": ["the result is \"Read it's-a-test\" (value is verbatim)"]
+    },
+    {
+      "requirement": "Namespace naming rules",
+      "name": "Hyphenated names are valid",
+      "given": [
+        "a template \"{{change.spec-ids}}\"",
+        "AND variables { change: { \"spec-ids\": \"core:auth/login\" } }"
+      ],
+      "when": ["expand() is called"],
+      "then": ["the result is \"core:auth/login\""]
+    },
+    {
+      "requirement": "TemplateExpander class",
+      "name": "Built-in variables always present",
+      "given": [
+        "a TemplateExpander constructed with { project: { root: \"/home/dev/myapp\" } }",
+        "AND a template \"{{project.root}}\""
+      ],
+      "when": ["expand() is called with no contextual variables"],
+      "then": ["the result is \"/home/dev/myapp\""]
+    },
+    {
+      "requirement": "TemplateExpander class",
+      "name": "Contextual variables merged with built-ins",
+      "given": [
+        "a TemplateExpander constructed with { project: { root: \"/home/dev/myapp\" } }",
+        "AND a template \"{{project.root}} {{change.name}}\""
+      ],
+      "when": ["expand() is called with contextual variables { change: { name: \"add-auth\" } }"],
+      "then": ["the result is \"/home/dev/myapp add-auth\""]
+    },
+    {
+      "requirement": "TemplateExpander class",
+      "name": "Contextual variables cannot override built-ins",
+      "given": [
+        "a TemplateExpander constructed with { project: { root: \"/home/dev/myapp\" } }",
+        "AND a template \"{{project.root}}\""
+      ],
+      "when": [
+        "expand() is called with contextual variables { project: { root: \"/malicious/path\" } }"
+      ],
+      "then": ["the result is \"/home/dev/myapp\" — built-in takes precedence"]
+    },
+    {
+      "requirement": "Variable map construction",
+      "name": "Use cases build contextual variables per invocation",
+      "given": ["a use case that needs template expansion"],
+      "then": [
+        "it passes contextual namespaces (e.g. change) to the expander methods",
+        "AND built-in variables (e.g. project.root) are already in the TemplateExpander"
+      ]
+    },
+    {
+      "requirement": "Contextual namespaces",
+      "name": "Change namespace populated from change entity",
+      "given": ["a change named add-auth in workspace default at path /project/changes/add-auth"],
+      "when": ["the use case builds the variable map"],
+      "then": [
+        "the map contains { change: { name: \"add-auth\", workspace: \"default\", path: \"/project/changes/add-auth\" } }"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:d5fcc401ea778ae3a9e982d633ec12799e82422b76c8753aab187d93ef96d31e",
+    "verify.md": "sha256:8d3d3ffdb91d072d0fb75681cfb83ec7f417496489fd0688237f6c77aa227a2a"
+  },
+  "generatedBy": "core"
+}

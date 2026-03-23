@@ -1,0 +1,125 @@
+{
+  "title": "Archive List",
+  "description": "Teams need a way to review past work without digging through the archive directory by hand. The `specd archive list` command lists all archived changes from the directory configured by `storage.archivePath`, sorted by archive date descending (most recent first).",
+  "dependsOn": ["cli:cli/entrypoint", "core:core/change"],
+  "context": [
+    "Teams need a way to review past work without digging through the archive directory by hand. The `specd archive list` command lists all archived changes from the directory configured by `storage.archivePath`, sorted by archive date descending (most recent first)."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd archive list [--format text|json|toon]\n```\n\nNo positional arguments. The `--format` flag controls output encoding; defaults to `text`."
+      ]
+    },
+    {
+      "requirement": "Output format — text",
+      "rules": [
+        "The command prints a human-readable table to stdout. Changes are sorted by archive date descending (most recently archived first).\n\nThe output has an inverse-video column header row `NAME  DATE` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group)."
+      ]
+    },
+    {
+      "requirement": "Output format — JSON",
+      "rules": [
+        "When `--format json` is passed, the command writes a JSON array to stdout:\n\n```json\n[\n  {\n    \"name\": \"...\",\n    \"archivedName\": \"...\",\n    \"workspace\": \"...\",\n    \"archivedAt\": \"...\",\n    \"archivedBy\": { \"name\": \"...\", \"email\": \"...\" },\n    \"artifacts\": [\"...\"]\n  }\n]\n```\n\nOne object per archived change, sorted by archive date descending. `archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs."
+      ]
+    },
+    {
+      "requirement": "Output format — toon",
+      "rules": [
+        "When `--format toon` is passed, the command writes the same data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout."
+      ]
+    },
+    {
+      "requirement": "Empty archive",
+      "rules": [
+        "If there are no archived changes, the command prints `no archived changes` to stdout in text mode, or `[]` in JSON/toon mode, and exits with code 0."
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "rules": [
+        "- If an I/O error occurs while reading the archive directory, the command exits with code 3 and prints an `error:` message to stderr."
+      ]
+    }
+  ],
+  "constraints": [
+    "The archive path is determined by storage.archivePath in specd.yaml",
+    "Errors always go to stderr as plain text regardless of --format",
+    "--format only affects stdout"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Output format — text",
+      "name": "Archived changes listed with correct fields",
+      "given": [
+        "the archive directory contains two changes: add-oauth-login (workspace default, archived 2024-01-15, actor alice) and update-billing (workspace billing, archived 2024-01-10, no actor recorded)"
+      ],
+      "when": ["specd archive list is run"],
+      "then": [
+        "stdout contains one row for each change showing name, workspace, and date",
+        "AND the row for add-oauth-login includes by alice",
+        "AND the row for update-billing does not include a by segment",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "Rows sorted by archive date descending",
+      "given": ["the archive contains change older-change archived before newer-change"],
+      "when": ["specd archive list is run"],
+      "then": ["newer-change appears before older-change in the output"]
+    },
+    {
+      "requirement": "Output format — JSON",
+      "name": "JSON format output",
+      "given": [
+        "the archive directory contains one change named add-oauth-login with workspace default, archived at 2024-01-15T12:00:00.000Z, actor alice, and artifacts ['spec']"
+      ],
+      "when": ["specd archive list --format json is run"],
+      "then": [
+        "stdout is a JSON array with one object containing name, archivedName, workspace, archivedAt, archivedBy, and artifacts fields",
+        "AND the object does not contain state or specIds fields",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Output format — JSON",
+      "name": "JSON format output — no actor recorded",
+      "given": [
+        "the archive directory contains one change named update-billing with no archivedBy recorded"
+      ],
+      "when": ["specd archive list --format json is run"],
+      "then": [
+        "the JSON object for update-billing does not contain an archivedBy field",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Empty archive",
+      "name": "No archived changes — text",
+      "given": ["the archive directory is empty"],
+      "when": ["specd archive list is run"],
+      "then": ["stdout contains no archived changes", "AND the process exits with code 0"]
+    },
+    {
+      "requirement": "Empty archive",
+      "name": "No archived changes — JSON",
+      "given": ["the archive directory is empty"],
+      "when": ["specd archive list --format json is run"],
+      "then": ["stdout is []", "AND the process exits with code 0"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "I/O error reading archive directory",
+      "given": ["the archive directory cannot be read due to a permissions error"],
+      "when": ["specd archive list is run"],
+      "then": ["the command exits with code 3", "AND stderr contains an error: message"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:157652f52f395582c194b44354cf51bc92662cc72f940ff27cd26f9aae73d316",
+    "verify.md": "sha256:0b197577883bb58d311f7289890b48abf2a50eb1bc1d90263d5f6933519e72b7"
+  },
+  "generatedBy": "core"
+}

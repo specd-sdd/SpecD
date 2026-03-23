@@ -1,0 +1,163 @@
+{
+  "title": "Workflow Model",
+  "description": "The schema format defines the YAML structure of workflow step entries, but not what those steps mean semantically — when they are available, how they relate to change state, or how hooks and requires are enforced. Without a dedicated semantic model, every consumer (CompileContext, GetStatus, TransitionChange, CLI commands) would interpret step semantics independently, leading to inconsistent gating and unclear agent interaction contracts. This spec defines the semantic model of workflow steps: how step names relate to change states, how requires-based gating works, and how hooks are executed at step boundaries.",
+  "dependsOn": [
+    "core:core/change",
+    "core:core/schema-format",
+    "core:core/build-schema",
+    "core:core/compile-context",
+    "core:core/get-status",
+    "core:core/transition-change",
+    "core:core/archive-change",
+    "core:core/hook-execution-model"
+  ],
+  "context": [
+    "The schema format defines the YAML structure of workflow step entries, but not what those steps mean semantically — when they are available, how they relate to change state, or how hooks and requires are enforced. Without a dedicated semantic model, every consumer (CompileContext, GetStatus, TransitionChange, CLI commands) would interpret step semantics independently, leading to inconsistent gating and unclear agent interaction contracts. This spec defines the semantic model of workflow steps: how step names relate to change states, how requires-based gating works, and how hooks are executed at step boundaries."
+  ],
+  "rules": [
+    {
+      "requirement": "Step names reference domain lifecycle states",
+      "rules": [
+        "The Change entity defines a fixed set of lifecycle states (`drafting`, `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, plus approval gate states). The schema's `workflow[]` array references these states via the `step` field — it selects which states participate in the workflow and in what display order, but does not define new states.\n\nIf a schema declares a `step` value that does not correspond to a valid Change lifecycle state, `TransitionChange` rejects it with `InvalidStateTransitionError`. The domain enforces the state machine; the schema configures which states are workflow-visible and what gating and hooks apply to them."
+      ]
+    },
+    {
+      "requirement": "Step semantics",
+      "rules": [
+        "Each workflow step has a defined semantic role in the change lifecycle:\n\n- **Designing** (`designing`) — the agent creates or modifies spec artifacts (proposal, specs, verify, design, tasks). This step iterates over the artifact DAG: `CompileContext` is called once per artifact being authored. The step is typically always available (empty `requires`).\n- **Implementing** (`implementing`) — the agent writes code and completes tasks. All working artifacts (tasks, specs) must be complete. The step runs once (not per-artifact).\n- **Verifying** (`verifying`) — the agent confirms the implementation satisfies verify.md scenarios. The step runs once. May loop back to implementing if verification fails.\n- **Archiving** (`archiving`) — deterministic finalization: delta merge, spec sync, metadata generation, archive move. Executed atomically by the `ArchiveChange` use case, not by an agent interactively."
+      ]
+    },
+    {
+      "requirement": "Requires-based gating",
+      "rules": [
+        "Each workflow step declares a `requires` array of artifact IDs. `TransitionChange` enforces this at transition time: before allowing a transition to a state that has a workflow step, it checks `change.effectiveStatus(artifactId)` for each artifact ID in `requires`. If any required artifact has an effective status other than `complete` or `skipped`, the transition is rejected with `InvalidStateTransitionError`.\n\nAn empty or omitted `requires` means the step has no gating — the transition proceeds without artifact checks.\n\nA skipped optional artifact satisfies the requirement identically to a completed one."
+      ]
+    },
+    {
+      "requirement": "Step availability evaluation",
+      "rules": [
+        "Step availability MUST be evaluated consistently by all consumers that need it. `CompileContext` evaluates step availability during context assembly. `GetStatus` reports the current change state, which corresponds directly to the active workflow step (since step name = state name). The evaluation is:\n\n```\nstepAvailable(step, change) =\n  step.requires.every(id => change.effectiveStatus(id) ∈ { complete, skipped })\n```\n\nThis evaluation is performed dynamically on each invocation — it is not cached or snapshotted."
+      ]
+    },
+    {
+      "requirement": "Workflow array order is display order",
+      "rules": [
+        "The order of entries in the `workflow` array is the intended display order for tooling (e.g. `CompileContext` lists steps in this order, `GetStatus` shows the current step/state). It does NOT enforce sequential blocking between consecutive steps — each step is independently gated by its own `requires`. A step appearing later in the array may become available before an earlier one if its `requires` are satisfied first."
+      ]
+    },
+    {
+      "requirement": "Step-to-state mapping",
+      "rules": [
+        "Entering a workflow step corresponds to transitioning the Change entity to the lifecycle state with the same name. The `step` value from the schema is used directly as the target state for `TransitionChange`. There is no indirection or mapping table — the step name IS the state name."
+      ]
+    },
+    {
+      "requirement": "Hook execution at step boundaries",
+      "rules": [
+        "All workflow steps can declare `run:` and `instruction:` hooks in their `pre` and `post` phases. When transitioning to a state, `TransitionChange` executes `run:` hooks automatically by default (pre-hooks before the state change, post-hooks after). When `skipHooks` is true, the caller manages hook execution separately via `RunStepHooks`. The archiving step's hooks are executed by `ArchiveChange` via delegation to `RunStepHooks`."
+      ]
+    },
+    {
+      "requirement": "Step requires reference artifact IDs",
+      "rules": [
+        "A workflow step's `requires` array contains **artifact IDs** (e.g. `specs`, `tasks`, `verify`), not other step names. This means step-to-step circular dependencies are structurally impossible — a step cannot depend on another step, only on artifact completion status. The artifact dependency graph itself is validated as a directed acyclic graph (DAG) at schema build time by `buildSchema()`, which performs depth-first cycle detection and throws `SchemaValidationError` if a cycle is found. Since step gating delegates entirely to artifact status, and the artifact graph is guaranteed acyclic, the step availability evaluation is always well-defined and termination is guaranteed."
+      ]
+    }
+  ],
+  "constraints": [
+    "Lifecycle states are defined by the Change entity — the schema selects which states are workflow-visible, it does not create new ones",
+    "Step availability is always computed dynamically from change.effectiveStatus() — never cached",
+    "workflow array order is display order only; it does not create implicit sequential dependencies",
+    "A step with an empty requires is always available regardless of change state",
+    "Step requires contains artifact IDs, not step names — step-to-step cycles are structurally impossible",
+    "The artifact dependency graph is validated as a DAG by buildSchema() — cycles are rejected at schema load time",
+    "The archiving step is the only step that is both a workflow step and handled by a dedicated use case (ArchiveChange)"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Step names reference domain lifecycle states",
+      "name": "Invalid step name rejected",
+      "given": ["a schema with workflow: [{ step: \"designing\" }, { step: \"reviewing\" }]"],
+      "when": ["an agent attempts to transition a change to reviewing"],
+      "then": [
+        "TransitionChange throws InvalidStateTransitionError because reviewing is not a valid Change lifecycle state"
+      ]
+    },
+    {
+      "requirement": "Requires-based gating",
+      "name": "Step with all requires complete is available",
+      "given": [
+        "a workflow step with requires: [specs, tasks]",
+        "AND change.effectiveStatus('specs') returns complete",
+        "AND change.effectiveStatus('tasks') returns complete"
+      ],
+      "when": ["step availability is evaluated"],
+      "then": ["the step is available"]
+    },
+    {
+      "requirement": "Requires-based gating",
+      "name": "Step blocked by incomplete artifact",
+      "given": [
+        "a workflow step with requires: [specs, tasks]",
+        "AND change.effectiveStatus('specs') returns complete",
+        "AND change.effectiveStatus('tasks') returns in-progress"
+      ],
+      "when": ["step availability is evaluated"],
+      "then": ["the step is not available", "AND tasks is reported as a blocking artifact"]
+    },
+    {
+      "requirement": "Requires-based gating",
+      "name": "Skipped optional artifact satisfies requires",
+      "given": [
+        "a workflow step with requires: [design, tasks]",
+        "AND design is optional: true with effective status skipped",
+        "AND tasks has effective status complete"
+      ],
+      "when": ["step availability is evaluated"],
+      "then": ["the step is available"]
+    },
+    {
+      "requirement": "Requires-based gating",
+      "name": "Empty requires means always available",
+      "given": ["a workflow step with requires: []", "AND the change is in any state"],
+      "when": ["step availability is evaluated"],
+      "then": ["the step is available"]
+    },
+    {
+      "requirement": "Workflow array order is display order",
+      "name": "Later step available before earlier step",
+      "given": [
+        "a workflow with steps [designing (requires: []), implementing (requires: [tasks]), verifying (requires: [verify])]",
+        "AND verify is complete but tasks is in-progress"
+      ],
+      "when": ["step availability is evaluated for all steps"],
+      "then": [
+        "designing is available (empty requires)",
+        "AND implementing is not available (tasks incomplete)",
+        "AND verifying is available (verify complete)"
+      ]
+    },
+    {
+      "requirement": "Two execution modes",
+      "name": "Agent-driven step requires explicit hook invocation",
+      "given": ["an agent-driven step implementing with run: pre-hooks"],
+      "when": ["the agent enters the step"],
+      "then": [
+        "hooks are NOT automatically executed by the transition",
+        "AND the agent must call specd change run-hooks to execute them"
+      ]
+    },
+    {
+      "requirement": "Two execution modes",
+      "name": "Deterministic step executes hooks internally",
+      "given": ["the archiving step with run: pre-hooks"],
+      "when": ["specd change archive is executed"],
+      "then": ["ArchiveChange executes the pre-hooks internally before performing the archive"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:38d63abd0d7065d31eee0ec2349a3dd0d739cc5c7dc5260f54be61a6c46b6bd3",
+    "verify.md": "sha256:18b71b772cd4bd6c422de4869de0bbb8af5540d09f4bd6ad73468bb5385477af"
+  },
+  "generatedBy": "core"
+}
