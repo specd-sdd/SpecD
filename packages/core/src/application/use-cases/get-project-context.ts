@@ -11,6 +11,7 @@ import { inferFormat } from '../../domain/services/format-inference.js'
 import {
   type CompileContextConfig,
   type ContextWarning,
+  type ContextSpecEntry,
   type SpecSection,
 } from './compile-context.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
@@ -43,22 +44,12 @@ export interface GetProjectContextInput {
   readonly sections?: ReadonlyArray<SpecSection>
 }
 
-/** A single spec entry in the {@link GetProjectContextResult}. */
-export interface GetProjectContextSpecEntry {
-  /** Workspace name the spec belongs to. */
-  readonly workspace: string
-  /** Capability path of the spec within the workspace. */
-  readonly path: string
-  /** Rendered spec content (metadata or fallback). */
-  readonly content: string
-}
-
 /** Result returned by a successful {@link GetProjectContext} execution. */
 export interface GetProjectContextResult {
   /** Rendered project-level context entries (instruction text or file content). */
   readonly contextEntries: string[]
   /** Specs matched by include/exclude patterns across all configured workspaces. */
-  readonly specs: GetProjectContextSpecEntry[]
+  readonly specs: ContextSpecEntry[]
   /** Advisory warnings for missing files, stale metadata, unknown workspaces, etc. */
   readonly warnings: ContextWarning[]
 }
@@ -190,7 +181,7 @@ export class GetProjectContext {
     const sectionsFilter = input.sections
     const showAll = sectionsFilter === undefined
 
-    const specs: GetProjectContextSpecEntry[] = []
+    const specs: ContextSpecEntry[] = []
     for (const { workspace, capPath } of includedSpecs.values()) {
       const specRepo = this._specs.get(workspace)
       if (specRepo === undefined) continue
@@ -210,7 +201,9 @@ export class GetProjectContext {
         isFresh = await this._isMetadataFresh(specRepo, spec, metadata)
       }
 
-      const specLabel = `${workspace}:${capPath}`
+      const specId = `${workspace}:${capPath}`
+      const title = metadata?.title ?? ''
+      const description = metadata?.description ?? ''
       let content: string
 
       if (isFresh && metadata !== null) {
@@ -244,19 +237,19 @@ export class GetProjectContext {
             .join('\n\n')
           metaParts.push(`#### Scenarios\n\n${scenariosText}`)
         }
-        content = `### Spec: ${specLabel}\n\n${metaParts.join('\n\n')}`
+        content = metaParts.join('\n\n')
       } else {
         if (metadata !== null) {
           warnings.push({
             type: 'stale-metadata',
-            path: specLabel,
-            message: `Metadata for '${specLabel}' is stale — falling back to raw artifact content`,
+            path: specId,
+            message: `Metadata for '${specId}' is stale — falling back to raw artifact content`,
           })
         } else {
           warnings.push({
             type: 'stale-metadata',
-            path: specLabel,
-            message: `No metadata for '${specLabel}' — falling back to raw artifact content`,
+            path: specId,
+            message: `No metadata for '${specId}' — falling back to raw artifact content`,
           })
         }
 
@@ -274,13 +267,10 @@ export class GetProjectContext {
           )
         }
 
-        content =
-          fallbackParts.length > 0
-            ? `### Spec: ${specLabel}\n\n${fallbackParts.join('\n\n')}`
-            : `### Spec: ${specLabel}`
+        content = fallbackParts.join('\n\n')
       }
 
-      specs.push({ workspace, path: capPath, content })
+      specs.push({ specId, title, description, source: 'includePattern', mode: 'full', content })
     }
 
     return { contextEntries, specs, warnings }

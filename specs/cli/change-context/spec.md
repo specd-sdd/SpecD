@@ -32,15 +32,50 @@ The command invokes the `CompileContext` use case. The `CompileContextConfig`, `
 
 ### Requirement: Output
 
-In `text` or `toon` mode (default `text`), the compiled context block is printed to stdout verbatim. No framing or additional headers are added by the CLI.
+The CLI MUST assemble the final output from the structured `CompileContextResult` returned by the use case.
 
-In `json` mode, the output is:
+**In `text` or `toon` mode** (default `text`):
+
+1. Project context entries are rendered first, each preceded by its source label (e.g. `**Source: <path>**` for file entries, `**Source: instruction**` for instruction entries). Entries are separated by `---`.
+2. Spec content follows under a `## Spec content` header:
+   - **Full-mode specs** (`mode: 'full'`) are rendered with their content under a `### Spec: <specId>` heading, as today.
+   - **Summary-mode specs** (`mode: 'summary'`) are rendered in a separate section under a `## Available context specs` heading. Each summary spec is listed with its spec ID, title, and description. The section includes an instruction: `Use \`specd spec show <spec-id>\` to load the full content of any spec you need.\`
+   - Within each group, specs from `dependsOnTraversal` source MUST be visually distinguished from `includePattern` specs — rendered under a `### Via dependencies` sub-heading within the available context specs section.
+3. Available steps are rendered last, each annotated with availability status.
+
+No additional framing or headers are added beyond those listed above.
+
+**In `json` mode**, the output is the structured result directly:
 
 ```json
-{ "contextBlock": "...", "stepAvailable": true, "blockingArtifacts": [], "warnings": [] }
+{
+  "stepAvailable": true,
+  "blockingArtifacts": [],
+  "projectContext": [
+    { "source": "file", "path": "specd-bootstrap.md", "content": "..." },
+    { "source": "instruction", "content": "..." }
+  ],
+  "specs": [
+    {
+      "specId": "core:core/compile-context",
+      "title": "CompileContext",
+      "description": "...",
+      "source": "specIds",
+      "mode": "full",
+      "content": "..."
+    },
+    {
+      "specId": "default:_global/architecture",
+      "title": "Architecture",
+      "description": "...",
+      "source": "includePattern",
+      "mode": "summary"
+    }
+  ],
+  "availableSteps": [{ "step": "designing", "available": true, "blockingArtifacts": [] }],
+  "warnings": []
+}
 ```
-
-where `contextBlock` contains the full compiled context text, `stepAvailable` reflects whether the requested step is currently available, `blockingArtifacts` lists any blocking artifact IDs, and `warnings` lists any warning strings from the use case.
 
 ### Requirement: Step availability warning
 
@@ -57,11 +92,13 @@ Any warnings from the `CompileContext` use case (stale metadata, missing specs, 
 
 ## Constraints
 
-- The raw context block is the sole stdout output — no wrapping, no summary header
-- All warnings go to stderr; the context block goes to stdout
+- In text mode, project context entries appear first, then full-mode specs, then summary-mode specs, then available steps
+- Summary-mode specs in text output MUST include a note instructing the agent to use `specd spec show <spec-id>` for full content
+- Summary-mode specs from `dependsOnTraversal` MUST be rendered under a separate sub-heading from `includePattern` specs
+- All warnings go to stderr; the assembled output goes to stdout
 - `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed
 - `--depth` without `--follow-deps` is a CLI usage error (exit code 1)
-- Section flags (`--rules`, `--constraints`, `--scenarios`) only filter spec content; available steps are unaffected
+- Section flags (`--rules`, `--constraints`, `--scenarios`) only filter full-mode spec content; summary-mode specs and available steps are unaffected
 
 ## Examples
 
@@ -75,6 +112,7 @@ specd change context add-oauth-login implementing --follow-deps --depth 1
 ## Spec Dependencies
 
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/core/compile-context/spec.md`](../../core/compile-context/spec.md) — `CompileContext` use case, result shape
+- [`specs/core/compile-context/spec.md`](../../core/compile-context/spec.md) — `CompileContext` use case, `CompileContextResult` structured shape, `ContextSpecEntry` type
+- [`specs/core/config/spec.md`](../../core/config/spec.md) — `contextMode` field
 - [`specs/core/get-artifact-instruction/spec.md`](../../core/get-artifact-instruction/spec.md) — artifact instructions (separate concern)
 - [`specs/core/get-hook-instructions/spec.md`](../../core/get-hook-instructions/spec.md) — step hook instructions (separate concern)

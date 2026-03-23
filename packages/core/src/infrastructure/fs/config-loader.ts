@@ -182,15 +182,17 @@ const PrefixZodSchema = z.string().refine(
   },
 )
 
-const WorkspaceRawZodSchema = z.object({
-  prefix: PrefixZodSchema.optional(),
-  specs: FsAdapterZodSchema,
-  schemas: FsAdapterZodSchema.optional(),
-  codeRoot: z.string().optional(),
-  ownership: z.enum(['owned', 'shared', 'readOnly']).optional(),
-  contextIncludeSpecs: z.array(z.string()).optional(),
-  contextExcludeSpecs: z.array(z.string()).optional(),
-})
+const WorkspaceRawZodSchema = z
+  .object({
+    prefix: PrefixZodSchema.optional(),
+    specs: FsAdapterZodSchema,
+    schemas: FsAdapterZodSchema.optional(),
+    codeRoot: z.string().optional(),
+    ownership: z.enum(['owned', 'shared', 'readOnly']).optional(),
+    contextIncludeSpecs: z.array(z.string()).optional(),
+    contextExcludeSpecs: z.array(z.string()).optional(),
+  })
+  .strict()
 
 /** Permissive Zod schema for schemaOverrides — semantic validation happens at merge time. */
 const SchemaOverridesZodSchema = z
@@ -222,6 +224,7 @@ const SpecdYamlZodSchema = z.object({
   context: z.array(ContextEntryRawZodSchema).optional(),
   contextIncludeSpecs: z.array(z.string()).optional(),
   contextExcludeSpecs: z.array(z.string()).optional(),
+  contextMode: z.enum(['full', 'lazy']).optional(),
   llmOptimizedContext: z.boolean().optional(),
   schemaPlugins: z.array(z.string()).optional(),
   schemaOverrides: SchemaOverridesZodSchema.optional(),
@@ -498,6 +501,7 @@ export class FsConfigLoader implements ConfigLoader {
       ...(data.contextExcludeSpecs !== undefined
         ? { contextExcludeSpecs: data.contextExcludeSpecs }
         : {}),
+      ...(data.contextMode !== undefined ? { contextMode: data.contextMode } : {}),
       ...(data.llmOptimizedContext !== undefined
         ? { llmOptimizedContext: data.llmOptimizedContext }
         : {}),

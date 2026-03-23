@@ -89,6 +89,7 @@ JSON/TOON output schema:
             ...(config.contextExcludeSpecs !== undefined
               ? { contextExcludeSpecs: [...config.contextExcludeSpecs] }
               : {}),
+            ...(config.contextMode !== undefined ? { contextMode: config.contextMode } : {}),
             ...(Object.keys(workspacesConfig).length > 0 ? { workspaces: workspacesConfig } : {}),
           }
 
@@ -118,13 +119,80 @@ JSON/TOON output schema:
 
           const fmt = parseFormat(opts.format)
           if (fmt === 'text') {
-            output(result.contextBlock, 'text')
+            const parts: string[] = []
+
+            // Project context entries
+            for (const entry of result.projectContext) {
+              if (entry.source === 'file' && entry.path !== undefined) {
+                parts.push(`**Source: ${entry.path}**\n\n${entry.content}`)
+              } else {
+                parts.push(`**Source: instruction**\n\n${entry.content}`)
+              }
+            }
+
+            // Full-mode specs
+            const fullSpecs = result.specs.filter((s) => s.mode === 'full')
+            if (fullSpecs.length > 0) {
+              const specParts = fullSpecs.map((s) => `### Spec: ${s.specId}\n\n${s.content ?? ''}`)
+              parts.push(`## Spec content\n\n${specParts.join('\n\n---\n\n')}`)
+            }
+
+            // Summary-mode specs (catalogue)
+            const summarySpecs = result.specs.filter((s) => s.mode === 'summary')
+            if (summarySpecs.length > 0) {
+              const includePatternSpecs = summarySpecs.filter(
+                (s) => s.source !== 'dependsOnTraversal',
+              )
+              const depTraversalSpecs = summarySpecs.filter(
+                (s) => s.source === 'dependsOnTraversal',
+              )
+
+              const catalogueParts: string[] = [
+                'Use `specd spec show <spec-id>` to load the full content of any spec you need.',
+                '',
+              ]
+
+              if (includePatternSpecs.length > 0) {
+                catalogueParts.push('| Spec ID | Title | Description |')
+                catalogueParts.push('|---------|-------|-------------|')
+                for (const s of includePatternSpecs) {
+                  catalogueParts.push(`| ${s.specId} | ${s.title} | ${s.description} |`)
+                }
+              }
+
+              if (depTraversalSpecs.length > 0) {
+                catalogueParts.push('')
+                catalogueParts.push('### Via dependencies')
+                catalogueParts.push('')
+                catalogueParts.push('| Spec ID | Title | Description |')
+                catalogueParts.push('|---------|-------|-------------|')
+                for (const s of depTraversalSpecs) {
+                  catalogueParts.push(`| ${s.specId} | ${s.title} | ${s.description} |`)
+                }
+              }
+
+              parts.push(`## Available context specs\n\n${catalogueParts.join('\n')}`)
+            }
+
+            // Available steps
+            if (result.availableSteps.length > 0) {
+              const stepLines = result.availableSteps.map((s) =>
+                s.available
+                  ? `- ${s.step}: available`
+                  : `- ${s.step}: unavailable — requires: [${s.blockingArtifacts.join(', ')}]`,
+              )
+              parts.push(`## Available steps\n\n${stepLines.join('\n')}`)
+            }
+
+            output(parts.join('\n\n---\n\n'), 'text')
           } else {
             output(
               {
-                contextBlock: result.contextBlock,
                 stepAvailable: result.stepAvailable,
                 blockingArtifacts: result.blockingArtifacts,
+                projectContext: result.projectContext,
+                specs: result.specs,
+                availableSteps: result.availableSteps,
                 warnings: result.warnings.map((w) => w.message),
               },
               fmt,
