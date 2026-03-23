@@ -114,12 +114,11 @@ describe('GetProjectContext', () => {
       specs: [spec],
       artifacts: {
         'auth/login/spec.md': specContent,
-        'auth/login/.specd-metadata.yaml': [
-          "title: 'Auth Login'",
-          "description: 'Handles user authentication'",
-          'contentHashes:',
-          "  'spec.md': 'sha256:placeholder'",
-        ].join('\n'),
+        'auth/login/.specd-metadata.yaml': JSON.stringify({
+          title: 'Auth Login',
+          description: 'Handles user authentication',
+          contentHashes: { 'spec.md': 'sha256:placeholder' },
+        }),
       },
     })
     const specRepos = new Map([['default', repo]])

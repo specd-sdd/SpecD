@@ -15,12 +15,11 @@ describe('GetSpecContext', () => {
     const hasher = makeContentHasher()
     const specContent = '# Auth Login Spec'
     const contentHash = hasher.hash(specContent)
-    const metadataContent = [
-      'title: Login Flow',
-      'description: Handles user login',
-      `contentHashes:`,
-      `  spec.md: "${contentHash}"`,
-    ].join('\n')
+    const metadataContent = JSON.stringify({
+      title: 'Login Flow',
+      description: 'Handles user login',
+      contentHashes: { 'spec.md': contentHash },
+    })
 
     const spec = new Spec('default', SpecPath.parse('auth/login'), [
       'spec.md',
@@ -75,11 +74,10 @@ describe('GetSpecContext', () => {
   })
 
   it('returns warnings for stale metadata', async () => {
-    const metadataContent = [
-      'title: Login Flow',
-      'contentHashes:',
-      '  spec.md: "sha256:stale-hash-that-does-not-match"',
-    ].join('\n')
+    const metadataContent = JSON.stringify({
+      title: 'Login Flow',
+      contentHashes: { 'spec.md': 'sha256:stale-hash-that-does-not-match' },
+    })
 
     const spec = new Spec('default', SpecPath.parse('auth/login'), [
       'spec.md',

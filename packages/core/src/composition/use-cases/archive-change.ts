@@ -17,7 +17,6 @@ import { TemplateExpander } from '../../application/template-expander.js'
 import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
 import { RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
-import { NodeYamlSerializer } from '../../infrastructure/node/yaml-serializer.js'
 import { GenerateSpecMetadata } from '../../application/use-cases/generate-spec-metadata.js'
 import { SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata.js'
 
@@ -186,14 +185,13 @@ export function createArchiveChange(
   const hooks = new NodeHookRunner(expander)
   const actor = new GitActorResolver()
   const hasher = new NodeContentHasher()
-  const yaml = new NodeYamlSerializer()
   const generateMetadata = new GenerateSpecMetadata(
     opts.specRepositories,
     schemaProvider,
     parsers,
     hasher,
   )
-  const saveMetadata = new SaveSpecMetadata(opts.specRepositories, yaml)
+  const saveMetadata = new SaveSpecMetadata(opts.specRepositories)
   const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, schemaProvider)
   return new ArchiveChange(
     changeRepo,
@@ -205,6 +203,5 @@ export function createArchiveChange(
     schemaProvider,
     generateMetadata,
     saveMetadata,
-    yaml,
   )
 }

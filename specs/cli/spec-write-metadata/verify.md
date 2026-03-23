@@ -4,22 +4,24 @@
 
 ### Requirement: Content source
 
-#### Scenario: Reads YAML from stdin
+#### Scenario: Reads JSON from stdin
 
-- **WHEN** `specd spec write-metadata auth/login` is invoked without `--input`
-- **THEN** the command reads all of stdin until EOF and passes the content to the use case
+- **GIVEN** valid JSON metadata is piped to stdin
+- **WHEN** `specd spec write-metadata auth/login` is run
+- **THEN** the metadata is written successfully
 
-#### Scenario: Reads YAML from file
+#### Scenario: Reads JSON from file
 
-- **WHEN** `specd spec write-metadata auth/login --input /tmp/metadata.yaml` is invoked
-- **THEN** the command reads `/tmp/metadata.yaml` and passes its content to the use case
+- **GIVEN** a file `meta.json` with valid JSON metadata
+- **WHEN** `specd spec write-metadata auth/login --input meta.json` is run
+- **THEN** the metadata is written successfully
 
 ### Requirement: YAML validation
 
-#### Scenario: Rejects invalid YAML
+#### Scenario: Rejects invalid JSON
 
-- **WHEN** the content is not valid YAML (e.g. `{{{`)
-- **THEN** the command writes `error: invalid YAML: ...` to stderr and exits with code 1
+- **WHEN** `specd spec write-metadata auth/login --input bad.txt` is run with non-JSON content
+- **THEN** stderr contains `error: invalid JSON:` and exit code is 1
 
 ### Requirement: Text output
 

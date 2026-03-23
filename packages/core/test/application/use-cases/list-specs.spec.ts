@@ -95,7 +95,10 @@ describe('ListSpecs', () => {
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: {
-        'auth/login/.specd-metadata.yaml': 'title: Login Flow\ndescription: Handles user login',
+        'auth/login/.specd-metadata.yaml': JSON.stringify({
+          title: 'Login Flow',
+          description: 'Handles user login',
+        }),
       },
     })
     const specRepos = new Map([['default', repo]])

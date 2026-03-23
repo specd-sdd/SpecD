@@ -109,18 +109,7 @@ When `skipHooks` is `true`, post-archive hook execution is skipped entirely.
 
 ### Requirement: Spec metadata generation
 
-After post-archive hooks complete, `ArchiveChange` must generate `.specd-metadata.yaml` for each spec that was modified during the delta merge and spec sync step.
-
-For each modified spec:
-
-1. Resolve the schema for the spec's workspace
-2. Load the spec's `requiredSpecArtifacts` from `SpecRepository` and parse each via its `ArtifactParser` to obtain ASTs
-3. Call `extractMetadata()` with the schema's `metadataExtraction` declarations to extract `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, and `scenarios`
-4. If `change.specDependsOn` has an entry for this spec, use it as `dependsOn` (manifest dependencies take priority over extracted values)
-5. Compute `contentHashes` by hashing each `requiredSpecArtifacts` file
-6. Serialize the metadata as YAML and write via `SaveSpecMetadata`
-
-If metadata generation fails for a spec (e.g. extraction produces no required fields, or `SaveSpecMetadata` throws `MetadataValidationError`), the failure is collected but does not abort the archive — the spec was already synced successfully. Failures are included in `staleMetadataSpecPaths` so the caller can report them.
+After merging deltas and archiving the change, the archive process generates metadata for each spec in the change's `specIds`. For each spec, it runs `GenerateSpecMetadata` to extract metadata deterministically, merges manifest `specDependsOn` entries (highest priority), serializes the result as JSON via `JSON.stringify(metadata, null, 2)`, and writes via `SaveSpecMetadata` with `force: true`. Failures are recorded in `staleMetadataSpecPaths` but do not abort the archive.
 
 ### Requirement: Result shape
 

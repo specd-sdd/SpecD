@@ -8,11 +8,11 @@ Tooling and AI agents need a compact, machine-readable summary of each spec — 
 
 ### Requirement: File location and naming
 
-`metadata.yaml` lives under the `.specd/metadata/` directory, mirroring the spec's capability path:
+`metadata.json` lives under the `.specd/metadata/` directory, mirroring the spec's capability path:
 
 ```
 .specd/metadata/core/config/
-└── metadata.yaml
+└── metadata.json
 
 specs/core/config/
 ├── spec.md          ← user content only
@@ -21,64 +21,39 @@ specs/core/config/
 
 The metadata root path is configured per workspace via `specs.fs.metadataPath` in `specd.yaml`. When not set, the composition layer auto-derives it from the VCS root of the workspace's specs path: `createVcsAdapter(specs.path).rootDir()` + `/.specd/metadata/`. This works across heterogeneous VCS setups (git, hg, svn). When `NullVcsAdapter` is returned (specs path is not inside any VCS), the fallback is `.specd/metadata/` relative to the specs root parent directory. The `FsSpecRepository` adapter receives the resolved path as config — it does not perform VCS detection itself.
 
-The file's absence is not an error — a spec with no `metadata.yaml` is treated as having no declared dependencies and no recorded content hash.
+The file's absence is not an error — a spec with no `metadata.json` is treated as having no declared dependencies and no recorded content hash.
 
 ### Requirement: File format
 
-`metadata.yaml` is a YAML file. All fields are optional — an empty file or absent file is valid:
+`metadata.json` is a JSON file (per ADR-0019: machine-generated files use JSON). All fields are optional — an empty object or absent file is valid:
 
-```yaml
-# .specd/metadata/core/change/metadata.yaml
-title: Change
-description: >
-  The central domain entity in specd. Read this spec when working on anything that
-  creates, transitions, or archives a unit of spec work — it defines the lifecycle,
-  approval gates, and event history model that everything else depends on.
-dependsOn:
-  - core:core/storage
-  - core:core/delta-format
-  - core:core/config
-  - core:core/schema-format
-keywords:
-  - lifecycle
-  - approval
-  - event-sourcing
-contentHashes:
-  spec.md: 'sha256:a3f1c2...'
-  verify.md: 'sha256:b7e4d9...'
-rules:
-  - requirement: Lifecycle
-    rules:
-      - 'A Change progresses through states: open → ready → approved → merged.'
-      - 'Only an approved Change may be merged.'
-constraints:
-  - 'A Change must not reference itself in dependsOn.'
-scenarios:
-  - requirement: Lifecycle
-    name: 'Open change cannot be merged'
-    given:
-      - 'a Change in state open'
-    when:
-      - 'merge is attempted'
-    then:
-      - 'an error is returned'
-      - 'the Change remains in state open'
+```json
+{
+  "title": "Change",
+  "description": "The central domain entity in specd.",
+  "dependsOn": ["core:core/storage", "core:core/delta-format"],
+  "contentHashes": {
+    "spec.md": "sha256:abc123..."
+  },
+  "rules": [{ "requirement": "Lifecycle states", "rules": ["..."] }],
+  "constraints": ["..."],
+  "scenarios": [{ "requirement": "...", "name": "...", "given": [], "when": [], "then": [] }],
+  "generatedBy": "core"
+}
 ```
 
-- **`title`** (string, optional) — short human-readable name for the spec, suitable for display in lists and tooling (e.g. `"Change"`, `"Storage"`, `"Schema Format"`). If absent, tooling falls back to the spec's path.
-- **`description`** (string, optional) — 2–3 sentences written for discovery: what does this spec cover, why does it exist in the system, and when would you need to read it? Used by tooling and the LLM to assess relevance without reading the full spec content — for example when selecting which specs to include in a context or presenting a list of available specs. Should not read like a dictionary definition.
-- **`keywords`** (array of strings, optional) — topic tags for this spec, used by tooling to find related specs (e.g. `specd spec find --keyword auth`). Should capture domain concepts, patterns, and cross-cutting concerns present in the spec. Lowercase, hyphen-separated.
-- **`dependsOn`** (array of strings, optional) — spec IDs this spec depends on for context. Each ID is a capability path relative to the workspace and may include an optional workspace qualifier (e.g. `billing:payments/invoices`) for cross-workspace dependencies. An unqualified ID is resolved within the same workspace as the referencing spec. An empty array or absent field means no declared dependencies.
-- **`contentHashes`** (map of filename → hash string, optional) — a SHA-256 hash per `requiredSpecArtifacts` file at the time the metadata was last derived. Keys are the resolved filenames: specd reads `requiredSpecArtifacts` from the active schema, looks up each artifact's `output` field, and resolves the concrete filename for this spec directory — that resolved filename is the key (e.g. `spec.md`, `verify.md`). Used to detect when any artifact file has changed and the metadata may be stale. A missing entry or absent field is treated as stale for that file.
-- **`rules`** (array of objects, optional) — normative statements extracted from the spec, grouped by requirement name. Each entry has a `requirement` key (string) and a `rules` key (array of plain-text sentences). Preserves named functions, APIs, field names, state/enum values, and transition graphs. Omits explanation and rationale. Used by the LLM as a dense summary of requirements without loading the full spec.
-- **`constraints`** (array of strings, optional) — hard invariants extracted from the spec's `## Constraints` section. Each entry is a single plain-text sentence. Omitted if the spec has no `## Constraints` section.
-- **`scenarios`** (array of objects, optional) — BDD-style verification scenarios extracted from verify files. Flat array: one object per scenario, not one object per requirement. Each entry has:
-  - `requirement` (string) — name of the requirement this scenario verifies; multiple scenarios may share the same `requirement` value
-  - `name` (string) — the scenario title as it appears in the verify file (e.g. `"Config found — nearest file used"`)
-  - `given` (array of strings) — preconditions; may be empty
-  - `when` (array of strings) — the action or event being tested
-  - `then` (array of strings) — expected outcomes
-    Omitted if the spec has no verification scenarios.
+Fields:
+
+- `title` — human-readable display title
+- `description` — short summary of the spec's purpose
+- `keywords` — lowercase hyphen-separated discovery tokens
+- `dependsOn` — array of spec IDs this spec depends on
+- `contentHashes` — `{ filename: "sha256:<hex>" }` for staleness detection
+- `rules` — extracted requirements grouped by heading
+- `constraints` — extracted constraint bullets
+- `scenarios` — extracted verification scenarios
+- `context` — freeform context strings
+- `generatedBy` — `"core"` for deterministic extraction, `"agent"` for LLM-optimized
 
 ### Requirement: Write-time structural validation
 

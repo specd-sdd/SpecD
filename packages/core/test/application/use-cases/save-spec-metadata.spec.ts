@@ -6,14 +6,18 @@ import { WorkspaceNotFoundError } from '../../../src/application/errors/workspac
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { makeSpecRepository } from './helpers.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
-import { NodeYamlSerializer } from '../../../src/infrastructure/node/yaml-serializer.js'
 
 const VALID_HASH = 'sha256:' + 'a'.repeat(64)
-const VALID_BASE = `title: 'Auth Login'\ndescription: 'Handles login'\ncontentHashes:\n  spec.md: '${VALID_HASH}'\n`
+const VALID_BASE_OBJ = {
+  title: 'Auth Login',
+  description: 'Handles login',
+  contentHashes: { 'spec.md': VALID_HASH },
+}
+const VALID_BASE = JSON.stringify(VALID_BASE_OBJ)
 
 function makeUseCase(specs: Spec[] = [], artifacts: Record<string, string | null> = {}) {
   const repo = makeSpecRepository({ specs, artifacts })
-  const uc = new SaveSpecMetadata(new Map([['default', repo]]), new NodeYamlSerializer())
+  const uc = new SaveSpecMetadata(new Map([['default', repo]]))
   return { uc, repo }
 }
 
@@ -23,7 +27,7 @@ const spec = new Spec('default', specPath, ['spec.md'])
 describe('SaveSpecMetadata — write-time validation', () => {
   it('accepts valid metadata', async () => {
     const { uc } = makeUseCase([spec])
-    const content = VALID_BASE + "keywords:\n  - 'auth'\n"
+    const content = JSON.stringify({ ...VALID_BASE_OBJ, keywords: ['auth'] })
     const result = await uc.execute({ workspace: 'default', specPath, content, force: true })
     expect(result).not.toBeNull()
     expect(result!.spec).toBe('default:auth/login')
@@ -38,7 +42,7 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('rejects content missing title', async () => {
     const { uc } = makeUseCase([spec])
-    const content = "description: 'Some description'\n"
+    const content = JSON.stringify({ description: 'Some description' })
     await expect(
       uc.execute({ workspace: 'default', specPath, content, force: true }),
     ).rejects.toThrow(MetadataValidationError)
@@ -46,7 +50,7 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('rejects content missing description', async () => {
     const { uc } = makeUseCase([spec])
-    const content = "title: 'Test'\n"
+    const content = JSON.stringify({ title: 'Test' })
     await expect(
       uc.execute({ workspace: 'default', specPath, content, force: true }),
     ).rejects.toThrow(MetadataValidationError)
@@ -54,14 +58,14 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('accepts unknown top-level keys', async () => {
     const { uc } = makeUseCase([spec])
-    const content = VALID_BASE + "customField: 'value'\n"
+    const content = JSON.stringify({ ...VALID_BASE_OBJ, customField: 'value' })
     const result = await uc.execute({ workspace: 'default', specPath, content, force: true })
     expect(result).not.toBeNull()
   })
 
   it('rejects non-lowercase keywords', async () => {
     const { uc } = makeUseCase([spec])
-    const content = VALID_BASE + "keywords:\n  - 'Valid'\n"
+    const content = JSON.stringify({ ...VALID_BASE_OBJ, keywords: ['Valid'] })
     await expect(
       uc.execute({ workspace: 'default', specPath, content, force: true }),
     ).rejects.toThrow(MetadataValidationError)
@@ -69,7 +73,7 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('rejects invalid spec ID in dependsOn', async () => {
     const { uc } = makeUseCase([spec])
-    const content = VALID_BASE + "dependsOn:\n  - 'not a valid id!'\n"
+    const content = JSON.stringify({ ...VALID_BASE_OBJ, dependsOn: ['not a valid id!'] })
     await expect(
       uc.execute({ workspace: 'default', specPath, content, force: true }),
     ).rejects.toThrow(MetadataValidationError)
@@ -77,8 +81,11 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('rejects invalid contentHashes format', async () => {
     const { uc } = makeUseCase([spec])
-    const content =
-      "title: 'Auth Login'\ndescription: 'Handles login'\ncontentHashes:\n  spec.md: 'md5:abc'\n"
+    const content = JSON.stringify({
+      title: 'Auth Login',
+      description: 'Handles login',
+      contentHashes: { 'spec.md': 'md5:abc' },
+    })
     await expect(
       uc.execute({ workspace: 'default', specPath, content, force: true }),
     ).rejects.toThrow(MetadataValidationError)
@@ -86,7 +93,10 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('rejects rules with empty rules array', async () => {
     const { uc } = makeUseCase([spec])
-    const content = VALID_BASE + "rules:\n  - requirement: 'Name'\n    rules: []\n"
+    const content = JSON.stringify({
+      ...VALID_BASE_OBJ,
+      rules: [{ requirement: 'Name', rules: [] }],
+    })
     await expect(
       uc.execute({ workspace: 'default', specPath, content, force: true }),
     ).rejects.toThrow(MetadataValidationError)
@@ -94,7 +104,10 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('rejects scenarios missing when and then', async () => {
     const { uc } = makeUseCase([spec])
-    const content = VALID_BASE + "scenarios:\n  - requirement: 'X'\n    name: 'Y'\n"
+    const content = JSON.stringify({
+      ...VALID_BASE_OBJ,
+      scenarios: [{ requirement: 'X', name: 'Y' }],
+    })
     await expect(
       uc.execute({ workspace: 'default', specPath, content, force: true }),
     ).rejects.toThrow(MetadataValidationError)
@@ -102,7 +115,7 @@ describe('SaveSpecMetadata — write-time validation', () => {
 
   it('includes validation issues in error message', async () => {
     const { uc } = makeUseCase([spec])
-    const content = 'keywords:\n  - 123\n'
+    const content = JSON.stringify({ keywords: [123] })
     try {
       await uc.execute({ workspace: 'default', specPath, content, force: true })
       expect.fail('should have thrown')
@@ -126,16 +139,17 @@ describe('SaveSpecMetadata — write-time validation', () => {
 })
 
 describe('SaveSpecMetadata — dependsOn overwrite protection', () => {
-  const existingMetadata = [
-    VALID_BASE,
-    "dependsOn:\n  - 'core:config'\n  - 'core:schema-format'\n",
-  ].join('')
+  const existingMetadataObj = {
+    ...VALID_BASE_OBJ,
+    dependsOn: ['core:config', 'core:schema-format'],
+  }
+  const existingMetadata = JSON.stringify(existingMetadataObj)
 
   it('throws DependsOnOverwriteError when dependsOn entries are removed', async () => {
     const { uc } = makeUseCase([spec], {
       'auth/login/.specd-metadata.yaml': existingMetadata,
     })
-    const incoming = VALID_BASE + "dependsOn:\n  - 'core:config'\n"
+    const incoming = JSON.stringify({ ...VALID_BASE_OBJ, dependsOn: ['core:config'] })
     await expect(uc.execute({ workspace: 'default', specPath, content: incoming })).rejects.toThrow(
       DependsOnOverwriteError,
     )
@@ -145,8 +159,10 @@ describe('SaveSpecMetadata — dependsOn overwrite protection', () => {
     const { uc } = makeUseCase([spec], {
       'auth/login/.specd-metadata.yaml': existingMetadata,
     })
-    const incoming =
-      VALID_BASE + "dependsOn:\n  - 'core:config'\n  - 'core:schema-format'\n  - 'core:change'\n"
+    const incoming = JSON.stringify({
+      ...VALID_BASE_OBJ,
+      dependsOn: ['core:config', 'core:schema-format', 'core:change'],
+    })
     await expect(uc.execute({ workspace: 'default', specPath, content: incoming })).rejects.toThrow(
       DependsOnOverwriteError,
     )
@@ -156,7 +172,10 @@ describe('SaveSpecMetadata — dependsOn overwrite protection', () => {
     const { uc } = makeUseCase([spec], {
       'auth/login/.specd-metadata.yaml': existingMetadata,
     })
-    const incoming = VALID_BASE + "dependsOn:\n  - 'core:change'\n  - 'core:schema-format'\n"
+    const incoming = JSON.stringify({
+      ...VALID_BASE_OBJ,
+      dependsOn: ['core:change', 'core:schema-format'],
+    })
     await expect(uc.execute({ workspace: 'default', specPath, content: incoming })).rejects.toThrow(
       DependsOnOverwriteError,
     )
@@ -175,7 +194,10 @@ describe('SaveSpecMetadata — dependsOn overwrite protection', () => {
     const { uc } = makeUseCase([spec], {
       'auth/login/.specd-metadata.yaml': existingMetadata,
     })
-    const incoming = VALID_BASE + "dependsOn:\n  - 'core:schema-format'\n  - 'core:config'\n"
+    const incoming = JSON.stringify({
+      ...VALID_BASE_OBJ,
+      dependsOn: ['core:schema-format', 'core:config'],
+    })
     const result = await uc.execute({ workspace: 'default', specPath, content: incoming })
     expect(result).not.toBeNull()
     expect(result!.spec).toBe('default:auth/login')
@@ -185,7 +207,7 @@ describe('SaveSpecMetadata — dependsOn overwrite protection', () => {
     const { uc } = makeUseCase([spec], {
       'auth/login/.specd-metadata.yaml': existingMetadata,
     })
-    const incoming = VALID_BASE + "dependsOn:\n  - 'core:change'\n"
+    const incoming = JSON.stringify({ ...VALID_BASE_OBJ, dependsOn: ['core:change'] })
     const result = await uc.execute({
       workspace: 'default',
       specPath,
@@ -198,7 +220,7 @@ describe('SaveSpecMetadata — dependsOn overwrite protection', () => {
 
   it('allows save when no existing metadata exists', async () => {
     const { uc } = makeUseCase([spec])
-    const incoming = VALID_BASE + "dependsOn:\n  - 'core:config'\n"
+    const incoming = JSON.stringify({ ...VALID_BASE_OBJ, dependsOn: ['core:config'] })
     const result = await uc.execute({ workspace: 'default', specPath, content: incoming })
     expect(result).not.toBeNull()
   })
@@ -207,7 +229,7 @@ describe('SaveSpecMetadata — dependsOn overwrite protection', () => {
     const { uc } = makeUseCase([spec], {
       'auth/login/.specd-metadata.yaml': VALID_BASE,
     })
-    const incoming = VALID_BASE + "dependsOn:\n  - 'core:config'\n"
+    const incoming = JSON.stringify({ ...VALID_BASE_OBJ, dependsOn: ['core:config'] })
     const result = await uc.execute({ workspace: 'default', specPath, content: incoming })
     expect(result).not.toBeNull()
   })
@@ -216,7 +238,7 @@ describe('SaveSpecMetadata — dependsOn overwrite protection', () => {
     const { uc } = makeUseCase([spec], {
       'auth/login/.specd-metadata.yaml': existingMetadata,
     })
-    const incoming = VALID_BASE + "dependsOn:\n  - 'core:change'\n"
+    const incoming = JSON.stringify({ ...VALID_BASE_OBJ, dependsOn: ['core:change'] })
     try {
       await uc.execute({ workspace: 'default', specPath, content: incoming })
       expect.fail('should have thrown')

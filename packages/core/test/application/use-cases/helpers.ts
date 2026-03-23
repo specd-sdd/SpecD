@@ -1,4 +1,3 @@
-import { parse as parseYaml } from 'yaml'
 import { Change, type ActorIdentity } from '../../../src/domain/entities/change.js'
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { type Spec } from '../../../src/domain/entities/spec.js'
@@ -236,7 +235,7 @@ class StubSpecRepository extends SpecRepository {
     const key = `${spec.name.toString()}/.specd-metadata.yaml`
     const content = this._artifacts[key]
     if (content === undefined || content === null) return null
-    const parsed = parseYaml(content)
+    const parsed = JSON.parse(content)
     if (parsed === null || parsed === undefined || typeof parsed !== 'object') return null
     return parsed as SpecMetadata
   }

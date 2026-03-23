@@ -23,13 +23,7 @@ On success, `execute()` SHALL return a `SaveSpecMetadataResult` containing:
 
 ### Requirement: Content validation before write
 
-The use case MUST validate the incoming `content` before any other operation:
-
-1. Parse the YAML string via the injected `YamlSerializer`
-2. Reject the content with `MetadataValidationError` if the parsed result is `null`, `undefined`, or not an object (i.e. not a YAML mapping)
-3. Validate the parsed object against `strictSpecMetadataSchema` (the Zod schema defined in the domain layer)
-4. If validation fails, throw `MetadataValidationError` with the Zod issues formatted as a human-readable string
-5. The file MUST NOT be written when validation fails
+Before writing, the use case parses the input `content` string with `JSON.parse()`. If parsing fails or the result is not an object, a `MetadataValidationError` is thrown with `content must be a JSON object`. The parsed object is validated against `strictSpecMetadataSchema`. If validation fails, a `MetadataValidationError` is thrown listing the Zod issues. This validation uses the strict schema — the read path (`metadata()`) uses the lenient schema.
 
 ### Requirement: Workspace resolution
 
@@ -61,12 +55,11 @@ After all validations pass, the use case MUST delegate to `SpecRepository.saveMe
 
 ### Requirement: Constructor dependencies
 
-`SaveSpecMetadata` MUST be constructed with:
+The use case receives:
 
-- `specRepos` — a `ReadonlyMap<string, SpecRepository>` mapping workspace names to their repositories
-- `yaml` — a `YamlSerializer` for parsing YAML content
+- `specRepos: ReadonlyMap<string, SpecRepository>` — workspace-keyed spec repositories
 
-These are injected by the kernel at composition time. The use case MUST NOT construct its own infrastructure adapters.
+The `YamlSerializer` dependency is no longer needed — metadata content is JSON, parsed with `JSON.parse()`.
 
 ## Constraints
 
