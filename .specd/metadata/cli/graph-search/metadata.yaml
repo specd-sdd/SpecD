@@ -1,0 +1,189 @@
+title: Graph Search
+description: The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides full-text search across both, ranked by relevance using BM25 scoring.
+dependsOn:
+  - cli:cli/entrypoint
+  - code-graph:code-graph/composition
+  - code-graph:code-graph/database-schema
+context:
+  - The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides full-text search across both, ranked by relevance using BM25 scoring.
+rules:
+  - requirement: Command signature
+    rules:
+      - |-
+        ```text
+        specd graph search <query> [--symbols] [--specs] [--kind <kind>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--format text|json|toon]
+        ```
+
+        - `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)
+        - `--symbols` — optional; search only symbols
+        - `--specs` — optional; search only specs
+        - `--kind <kind>` — optional; filter symbols by kind (`function|class|method|variable|type|interface|enum`)
+        - `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)
+        - `--workspace <name>` — optional; filter both symbols and specs to a single workspace
+        - `--exclude-path <pattern>` — optional, repeatable; exclude symbols/specs whose file path matches glob pattern (supports `*` wildcards, case-insensitive)
+        - `--exclude-workspace <name>` — optional, repeatable; exclude results from the given workspace
+        - `--limit <n>` — optional; maximum results per category, defaults to `10`
+        - `--spec-content` — optional; include full spec content in output. Only valid with `--format json` or `--format toon` — exits with code 1 if used with text format
+        - `--format text|json|toon` — optional; output format, defaults to `text`
+
+        When neither `--symbols` nor `--specs` is provided, both categories are searched.
+
+        All filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-workspace`) are applied at the store level before LIMIT — not as post-query filters. The CLI passes them via `SearchOptions` to `CodeGraphProvider.searchSymbols` / `CodeGraphProvider.searchSpecs`.
+  - requirement: Search behaviour
+    rules:
+      - |-
+        The command uses `resolveCliContext()` to load config and creates a `CodeGraphProvider` via `withProvider`. It delegates to:
+
+        - `provider.searchSymbols(options)` — full-text search on `Symbol.name` and `Symbol.comment`, with filters applied at the store level
+        - `provider.searchSpecs(options)` — full-text search on `Spec.title`, `Spec.description`, and `Spec.content`, with filters applied at the store level
+
+        Both use LadybugDB's FTS extension with BM25 scoring. Results are returned ordered by score descending — highest relevance first.
+  - requirement: Output format
+    rules:
+      - |-
+        In `text` mode, results are grouped by category:
+
+        ```text
+        Symbols (5):
+           8.0  [core] method execute  src/use-cases/run-hooks.ts:108 — /** Executes run hooks... */
+           5.5  [core] type OnHookProgress  src/use-cases/run-hooks.ts:21 — /** Callback for hook... */
+
+        Specs (5):
+          75.1  [core] core:core/hook-execution-model — Workflow steps declare hooks via...
+          57.6  [core] core:core/run-step-hooks — Agent-driven workflow steps declare...
+        ```
+
+        Each line shows:
+
+        - **Workspace** — in brackets (e.g. `[core]`, `[cli]`)
+        - **Score** — BM25 relevance score, right-aligned
+        - **Symbols**: kind, name, workspace-relative filePath:line, and comment preview (first 50 chars)
+        - **Specs**: specId and description preview (first 60 chars)
+
+        When no results are found, outputs `No results found.`
+
+        In `json` or `toon` mode, outputs `{ symbols: [...], specs: [...] }`. Each entry includes a `workspace` field and a `score` field. Spec entries include `specId`, `path`, `title`, and `description`. Full spec `content` is omitted by default — pass `--spec-content` to include it.
+  - requirement: Error cases
+    rules:
+      - If the provider cannot be opened, the command exits with code 3 (same as other graph commands). The `process.exit(0)` pattern applies — LadybugDB native threads require explicit exit.
+constraints:
+  - The CLI does not contain search logic — it delegates to CodeGraphProvider.searchSymbols and CodeGraphProvider.searchSpecs
+  - FTS indexes must be built during indexing — search on an empty graph returns no results
+  - The process.exit(0) pattern is required after closing the provider
+scenarios:
+  - requirement: Command signature
+    name: Search both categories by default
+    when:
+      - specd graph search "hook execution" is run
+    then:
+      - both symbol and spec results are returned
+  - requirement: Command signature
+    name: Search symbols only
+    when:
+      - specd graph search "transition" --symbols is run
+    then:
+      - only symbol results are returned
+      - AND no spec results are shown
+  - requirement: Command signature
+    name: Search specs only
+    when:
+      - specd graph search "workspace" --specs is run
+    then:
+      - only spec results are returned
+      - AND no symbol results are shown
+  - requirement: Command signature
+    name: Custom limit
+    when:
+      - specd graph search "hook" --limit 3 is run
+    then:
+      - at most 3 symbols and 3 specs are returned
+  - requirement: Search behaviour
+    name: Results ranked by BM25 relevance
+    given:
+      - specs hook-execution-model (contains "hook execution" many times) and architecture (contains "hook" once)
+    when:
+      - specd graph search "hook execution" is run
+    then:
+      - hook-execution-model appears before architecture
+      - AND hook-execution-model has a higher score
+  - requirement: Search behaviour
+    name: Stemming matches word variants
+    given:
+      - a symbol with comment containing "executing"
+    when:
+      - specd graph search "execution" is run
+    then:
+      - the symbol is returned (porter stemmer matches "executing" to "execution")
+  - requirement: Search behaviour
+    name: Multi-word query matches across fields
+    given:
+      - a spec with title "Workspace Integration" and content containing "import resolution"
+    when:
+      - specd graph search "workspace import" is run
+    then:
+      - the spec is returned
+  - requirement: Search behaviour
+    name: No results
+    when:
+      - specd graph search "xyznonexistent" is run
+    then:
+      - No results found. is output
+  - requirement: Output format
+    name: Text output groups by category
+    when:
+      - results include both symbols and specs in text mode
+    then:
+      - 'symbols are listed under Symbols (N): header'
+      - 'AND specs are listed under Specs (N): header'
+      - AND each line shows score, identity, and preview
+  - requirement: Output format
+    name: JSON output includes workspace and scores
+    when:
+      - specd graph search "hook" --format json is run
+    then:
+      - output is {"symbols":[...],"specs":[...]}
+      - AND each entry includes a workspace field and a score field
+      - AND spec entries include specId, path, title, description but NOT content
+  - requirement: Output format
+    name: JSON with --spec-content includes full content
+    when:
+      - specd graph search "hook" --format json --spec-content is run
+    then:
+      - spec entries include a content field with the full spec text
+  - requirement: Output format
+    name: --spec-content with text format fails
+    when:
+      - specd graph search "hook" --spec-content is run (text format)
+    then:
+      - the command exits with code 1
+      - AND an error message explains that --spec-content requires --format json or --format toon
+  - requirement: Output format
+    name: Text output shows workspace in brackets
+    when:
+      - results are displayed in text mode
+    then:
+      - each line shows [workspace] before the symbol or spec identity
+  - requirement: Command signature (filters)
+    name: Filter by symbol kind
+    when:
+      - specd graph search "transition" --kind method is run
+    then:
+      - only symbols with kind method are returned
+      - AND symbols of other kinds are excluded
+  - requirement: Command signature (filters)
+    name: Filter by file path wildcard
+    when:
+      - specd graph search "create" --file "*/composition/*" is run
+    then:
+      - only symbols in files matching the pattern are returned
+  - requirement: Command signature (filters)
+    name: Filter by workspace
+    when:
+      - specd graph search "kernel" --workspace core is run
+    then:
+      - only symbols from workspace core are returned
+      - AND only specs from workspace core are returned
+contentHashes:
+  spec.md: sha256:8b5a07e6a29af6522be0d22e14c43fe25d715d994a888e8f8de17c34907d8546
+  verify.md: sha256:61fcd84a1d03d186f468bd409c16945a5d1689085dae8645b287399b836d1828
+generatedBy: core

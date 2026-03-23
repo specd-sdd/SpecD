@@ -321,6 +321,6 @@ scenarios:
     then:
       - 12 SpecNode entries are returned
 contentHashes:
-  spec.md: sha256:cb5c08392043104cfeb83fd17a9938a2019995dfcdfee0f0e8b2ba81592fd3d8
-  verify.md: sha256:22d4bf859dc5f4a4e5c43a374b3138b45d50e087bcc916a1e905495eb1b1c3d5
+  spec.md: sha256:b94ec20e33c26a59205183b488e70cd1e0b9ed0ae5369c38734b6426570bb087
+  verify.md: sha256:0249ae9bc0e0ca986f1c10824ede8161bc7538cceb2a034bc88e8923b23b8a97
 generatedBy: core
