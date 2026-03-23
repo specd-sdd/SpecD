@@ -1,0 +1,170 @@
+title: Hotspots
+description: Identify which symbols in the code graph have the highest impact — the most callers, importers, and cross-workspace dependents. This allows agents and users to focus review, testing, and spec coverage on the code that would cause the most breakage if changed.
+dependsOn:
+  - code-graph:code-graph/symbol-model
+  - code-graph:code-graph/graph-store
+  - code-graph:code-graph/traversal
+context:
+  - Identify which symbols in the code graph have the highest impact — the most callers, importers, and cross-workspace dependents. This allows agents and users to focus review, testing, and spec coverage on the code that would cause the most breakage if changed.
+rules:
+  - requirement: Batch hotspot scoring
+    rules:
+      - |-
+        `computeHotspots(store: GraphStore, options?: HotspotOptions): Promise<HotspotResult>` SHALL compute a hotspot score for every symbol in the graph using exactly two batch queries:
+
+        1. **Caller query** — returns one row per (symbol, caller) pair with both the symbol's `filePath` and the caller's `filePath`
+        2. **Importer count query** — returns the number of files that import each file
+
+        The score formula is:
+
+        ```text
+        score = (sameWorkspaceCallers * 3) + (crossWorkspaceCallers * 5) + fileImporters
+        ```
+
+        Where:
+
+        - **sameWorkspaceCallers** — callers whose filePath shares the same workspace prefix as the symbol
+        - **crossWorkspaceCallers** — callers whose filePath has a different workspace prefix (weighted higher because cross-workspace calls are implicit contracts with wider blast radius)
+        - **fileImporters** — number of files that IMPORT the file containing this symbol
+
+        Workspace is extracted from filePath as the prefix before the first `:` (e.g. `core` from `core:src/index.ts`).
+  - requirement: Risk level
+    rules:
+      - Each entry's `riskLevel` SHALL be computed using the existing `computeRiskLevel(directCallers, totalCallers + fileImporters, 0)` where `directCallers` = `sameWorkspaceCallers + crossWorkspaceCallers` and the second argument is the total callers plus file importers.
+  - requirement: Smart defaults with automatic removal
+    rules:
+      - |-
+        When invoked with **no filter flags**, the command applies safe defaults:
+
+        - **score > 0** — symbols with no callers and no importers are excluded
+        - **risk >= MEDIUM** — LOW-risk symbols are filtered out
+        - **limit 20** — only the top 20 results are returned
+
+        When **any** filter flag is provided (`--workspace`, `--kind`, `--file`, `--exclude-path`, `--exclude-workspace`, `--limit`, `--min-score`, `--min-risk`), **all** defaults are removed (minScore → 0, minRisk → LOW, limit → unlimited). Only explicitly provided constraints apply. This prevents defaults from silently hiding results that the user's filter was intended to surface.
+
+        Examples:
+
+        - `specd graph hotspots` → defaults apply (score > 0, risk >= MEDIUM, limit 20)
+        - `specd graph hotspots --min-risk HIGH` → only risk >= HIGH, no score or limit constraint
+        - `specd graph hotspots --workspace core` → all symbols in core, no score/risk/limit constraint
+        - `specd graph hotspots --min-risk HIGH --limit 5` → risk >= HIGH, limit 5, no score constraint
+  - requirement: Filtering
+    rules:
+      - |-
+        `HotspotOptions` supports these optional filters:
+
+        - **workspace** — only include symbols whose filePath starts with this workspace prefix
+        - **kind** — only include symbols of this SymbolKind
+        - **filePath** — only include symbols in this file
+        - **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive). Uses `matchesExclude` from `domain/services/matches-exclude.ts`
+        - **excludeWorkspaces** — array of workspace names to exclude. Uses `matchesExclude` from `domain/services/matches-exclude.ts`
+        - **limit** — maximum results to return (default 20)
+        - **minScore** — minimum score threshold (default 1, i.e. > 0)
+        - **minRisk** — minimum risk level threshold (default MEDIUM)
+
+        Excludes are applied alongside the existing include filters before the limit is applied.
+  - requirement: Output
+    rules:
+      - |-
+        `HotspotResult` contains:
+
+        - **entries** — array of `HotspotEntry`, sorted by score descending
+        - **totalSymbols** — total number of symbols in the graph (before filtering)
+
+        Each `HotspotEntry` contains:
+
+        - **symbol** — the `SymbolNode`
+        - **score** — the computed hotspot score
+        - **directCallers** — same-workspace caller count
+        - **crossWorkspaceCallers** — cross-workspace caller count
+        - **fileImporters** — file importer count
+        - **riskLevel** — the computed risk level
+  - requirement: Pure function
+    rules:
+      - '`computeHotspots` SHALL be a stateless pure function in `domain/services/`. It receives a `GraphStore` for reads only and returns value objects. It MUST NOT mutate the store.'
+constraints:
+  - Exactly 2 graph queries — no N+1 per-symbol queries
+  - 'Score formula weights are fixed: same-ws = 3, cross-ws = 5, importers = 1'
+  - Risk level thresholds reuse the existing computeRiskLevel function
+  - 'Workspace is the prefix before the first : in filePath'
+  - No spec coverage logic — deferred to issue 19
+scenarios:
+  - requirement: Batch hotspot scoring
+    name: Empty graph
+    when:
+      - computeHotspots is called on an empty graph
+    then:
+      - 'it returns { entries: [], totalSymbols: 0 }'
+  - requirement: Batch hotspot scoring
+    name: Cross-workspace scoring
+    when:
+      - symbol X in workspace A is called by 2 symbols in workspace A and 1 symbol in workspace B
+      - AND X's file has 3 importers
+    then:
+      - X's score = (2 * 3) + (1 * 5) + 3 = 14
+      - AND X's crossWorkspaceCallers = 1
+      - AND X's directCallers = 2
+  - requirement: Batch hotspot scoring
+    name: File importer contribution
+    when:
+      - a symbol has 0 callers but its file has 5 importers
+    then:
+      - score = 5 and the symbol is included (score > 0)
+  - requirement: Risk level
+    name: Default filters exclude LOW risk
+    when:
+      - a symbol has score > 0 but risk level LOW
+    then:
+      - it is excluded from the default result (minRisk default is MEDIUM)
+  - requirement: Smart defaults with automatic removal
+    name: Default filters exclude zero-score symbols
+    when:
+      - a symbol has no callers and its file has no importers
+    then:
+      - it is excluded from the default result (score = 0 < minScore default of 1)
+  - requirement: Smart defaults with automatic removal
+    name: --all removes all default filters
+    when:
+      - "computeHotspots is called with minScore: 0, minRisk: 'LOW', limit: Infinity"
+    then:
+      - all symbols are included regardless of score or risk
+  - requirement: Filtering
+    name: --min-risk filter
+    when:
+      - minRisk is set to HIGH
+    then:
+      - only symbols with risk HIGH or CRITICAL are returned
+  - requirement: Filtering
+    name: Workspace filter
+    when:
+      - workspace is set to "core"
+    then:
+      - only symbols whose filePath starts with "core:" are returned
+  - requirement: Filtering
+    name: Kind filter
+    when:
+      - kind is set to "function"
+    then:
+      - only symbols with kind "function" are returned
+  - requirement: Output
+    name: Ranking order
+    when:
+      - the graph contains symbols A (score 15), B (score 8), C (score 3)
+    then:
+      - entries are ordered [A, B, C] by score descending
+  - requirement: Output
+    name: Limit
+    when:
+      - limit is 5 and there are 20 eligible symbols
+    then:
+      - only the top 5 by score are returned
+  - requirement: Output
+    name: totalSymbols reflects full graph
+    when:
+      - the graph has 100 symbols but only 10 pass filters
+    then:
+      - totalSymbols is 100 and entries has length 10
+contentHashes:
+  spec.md: sha256:76c89d2ab25d8e0209af2d8886d1cb85d654cd87499852e02e5cc13f8d46ae47
+  verify.md: sha256:42653c31070fe568422ff4e70c6b23f5c034d3b9518ace283351fc0dd4999b8b
+generatedBy: core
