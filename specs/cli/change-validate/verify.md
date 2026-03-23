@@ -77,6 +77,46 @@
 - **AND** `failures` contains an entry describing the unknown artifact ID
 - **AND** the process exits with code 1
 
+### Requirement: Batch mode (--all)
+
+#### Scenario: --all without specPath validates all specIds
+
+- **GIVEN** a change with specIds `["default:auth/login", "default:auth/logout"]` and valid artifacts for both
+- **WHEN** `specd change validate my-change --all` is run
+- **THEN** both specs are validated
+- **AND** text output shows success for each spec
+- **AND** summary shows `validated 2/2 specs`
+
+#### Scenario: --all with specPath is rejected
+
+- **WHEN** `specd change validate my-change default:auth/login --all` is run
+- **THEN** stderr contains `error: --all and <specPath> are mutually exclusive` and exit code is 1
+
+#### Scenario: neither specPath nor --all is rejected
+
+- **WHEN** `specd change validate my-change` is run without specPath or --all
+- **THEN** stderr contains `error: either <specPath> or --all is required` and exit code is 1
+
+#### Scenario: --all with --artifact validates one artifact across all specs
+
+- **GIVEN** a change with 2 specIds
+- **WHEN** `specd change validate my-change --all --artifact proposal` is run
+- **THEN** only the `proposal` artifact is validated for each spec
+
+#### Scenario: --all with partial failures exits 1
+
+- **GIVEN** a change with 2 specIds, one passes and one fails validation
+- **WHEN** `specd change validate my-change --all` is run
+- **THEN** both specs are validated (batch continues)
+- **AND** exit code is 1
+- **AND** summary shows `validated 1/2 specs`
+
+#### Scenario: --all JSON output
+
+- **GIVEN** a change with 2 specIds, both pass
+- **WHEN** `specd change validate my-change --all --format json` is run
+- **THEN** output is `{ passed: true, total: 2, results: [...] }` with per-spec entries
+
 ### Requirement: Output on success
 
 #### Scenario: JSON output on pass

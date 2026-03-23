@@ -9,8 +9,10 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
+import { type Change } from '../../domain/entities/change.js'
+import { type ArtifactFile } from '../../domain/value-objects/artifact-file.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
@@ -64,12 +66,10 @@ export class ArchiveChange {
   private readonly _runStepHooks: RunStepHooks
   private readonly _actor: ActorResolver
   private readonly _parsers: ArtifactParserRegistry
-  private readonly _schemas: SchemaRegistry
+  private readonly _schemaProvider: SchemaProvider
   private readonly _generateMetadata: GenerateSpecMetadata
   private readonly _saveMetadata: SaveSpecMetadata
   private readonly _yaml: YamlSerializer
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new `ArchiveChange` use case instance.
@@ -80,12 +80,10 @@ export class ArchiveChange {
    * @param runStepHooks - Use case for executing workflow hooks
    * @param actor - Resolver for the actor identity
    * @param parsers - Registry of artifact format parsers
-   * @param schemas - Registry for resolving schema references
+   * @param schemaProvider - Provider for the fully-resolved schema
    * @param generateMetadata - Use case for deterministic metadata extraction
    * @param saveMetadata - Use case for writing `.specd-metadata.yaml`
    * @param yaml - YAML serializer for metadata content
-   * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
-   * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
    */
   constructor(
     changes: ChangeRepository,
@@ -94,12 +92,10 @@ export class ArchiveChange {
     runStepHooks: RunStepHooks,
     actor: ActorResolver,
     parsers: ArtifactParserRegistry,
-    schemas: SchemaRegistry,
+    schemaProvider: SchemaProvider,
     generateMetadata: GenerateSpecMetadata,
     saveMetadata: SaveSpecMetadata,
     yaml: YamlSerializer,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
   ) {
     this._changes = changes
     this._specs = specs
@@ -107,12 +103,10 @@ export class ArchiveChange {
     this._runStepHooks = runStepHooks
     this._actor = actor
     this._parsers = parsers
-    this._schemas = schemas
+    this._schemaProvider = schemaProvider
     this._generateMetadata = generateMetadata
     this._saveMetadata = saveMetadata
     this._yaml = yaml
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
@@ -130,8 +124,8 @@ export class ArchiveChange {
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+    const schema = await this._schemaProvider.get()
+    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     // --- Schema name guard ---
     if (schema.name() !== change.schemaName) {
@@ -193,43 +187,44 @@ export class ArchiveChange {
 
         if (artifactType.delta) {
           // Delta artifact: parse and apply delta file onto base spec
-          const format = artifactType.format ?? inferFormat(outputBasename) ?? 'plaintext'
-          const formatParser = this._parsers.get(format)
-          if (formatParser === undefined) {
-            throw new ParserNotRegisteredError(format, `artifact '${artifactType.id}'`)
-          }
-          if (yamlParser === undefined) {
-            throw new ParserNotRegisteredError('yaml', 'required for delta file parsing')
-          }
-
           const deltaFilename =
             capabilityPath.length > 0
               ? `deltas/${workspace}/${capabilityPath}/${outputBasename}.delta.yaml`
               : `deltas/${workspace}/${outputBasename}.delta.yaml`
           const deltaFile = await this._changes.artifact(change, deltaFilename)
-          if (deltaFile === null) continue
 
-          const deltaEntries = yamlParser.parseDelta(deltaFile.content)
-          const baseArtifact = await specRepo.artifact(spec, outputBasename)
-          const baseContent = baseArtifact?.content ?? ''
-          const baseAst = formatParser.parse(baseContent)
-          const mergedAst = formatParser.apply(baseAst, deltaEntries)
-          const mergedContent = formatParser.serialize(mergedAst)
+          if (deltaFile !== null) {
+            const format = artifactType.format ?? inferFormat(outputBasename) ?? 'plaintext'
+            const formatParser = this._parsers.get(format)
+            if (formatParser === undefined) {
+              throw new ParserNotRegisteredError(format, `artifact '${artifactType.id}'`)
+            }
+            if (yamlParser === undefined) {
+              throw new ParserNotRegisteredError('yaml', 'required for delta file parsing')
+            }
 
-          await specRepo.save(spec, new SpecArtifact(outputBasename, mergedContent), {
-            force: true,
-          })
-          synced = true
+            const deltaEntries = yamlParser.parseDelta(deltaFile.content)
+            const baseArtifact = await specRepo.artifact(spec, outputBasename)
+            const baseContent = baseArtifact?.content ?? ''
+            const baseAst = formatParser.parse(baseContent)
+            const mergedAst = formatParser.apply(baseAst, deltaEntries)
+            const mergedContent = formatParser.serialize(mergedAst)
+
+            await specRepo.save(spec, new SpecArtifact(outputBasename, mergedContent), {
+              force: true,
+            })
+            synced = true
+          } else {
+            // No delta file — new spec, copy primary file directly
+            if (await this._copyPrimaryFile(change, specFile, spec, outputBasename, specRepo)) {
+              synced = true
+            }
+          }
         } else {
           // Non-delta spec-scoped artifact: copy from change dir to spec
-          // specFile.filename is the full relative path (e.g. specs/core/retry-policy/spec.md)
-          const artifactFile = await this._changes.artifact(change, specFile.filename)
-          if (artifactFile === null) continue
-
-          await specRepo.save(spec, new SpecArtifact(outputBasename, artifactFile.content), {
-            force: true,
-          })
-          synced = true
+          if (await this._copyPrimaryFile(change, specFile, spec, outputBasename, specRepo)) {
+            synced = true
+          }
         }
       }
 
@@ -299,5 +294,30 @@ export class ArchiveChange {
       postHookFailures,
       staleMetadataSpecPaths: failedMetadataSpecPaths,
     }
+  }
+
+  /**
+   * Copies a primary artifact file from the change directory to the spec repository.
+   *
+   * @param change - The change containing the artifact
+   * @param specFile - The artifact file entry with the filename to load
+   * @param spec - The target spec entity
+   * @param outputBasename - The output filename (e.g. `spec.md`)
+   * @param specRepo - The spec repository to save to
+   * @returns `true` if the file was found and saved, `false` if missing
+   */
+  private async _copyPrimaryFile(
+    change: Change,
+    specFile: ArtifactFile,
+    spec: Spec,
+    outputBasename: string,
+    specRepo: SpecRepository,
+  ): Promise<boolean> {
+    const artifactFile = await this._changes.artifact(change, specFile.filename)
+    if (artifactFile === null) return false
+    await specRepo.save(spec, new SpecArtifact(outputBasename, artifactFile.content), {
+      force: true,
+    })
+    return true
   }
 }

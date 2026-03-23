@@ -12,7 +12,7 @@ The use case SHALL look up the `SpecRepository` for the given `workspace` name. 
 
 ### Requirement: Build context entry from metadata
 
-For each resolved spec, the use case SHALL load all artifact files and attempt to read `.specd-metadata.yaml`. When metadata exists and content hashes confirm freshness, the entry SHALL include:
+For each resolved spec, the use case SHALL load all artifact files and attempt to read metadata via `SpecRepository.metadata()`. When metadata exists and content hashes confirm freshness, the entry SHALL include:
 
 - `spec` — display label in `workspace:capabilityPath` format.
 - `stale` — `false`.
@@ -24,7 +24,7 @@ For each resolved spec, the use case SHALL load all artifact files and attempt t
 
 ### Requirement: Stale or absent metadata produces minimal entry
 
-When `.specd-metadata.yaml` is absent or content hashes indicate staleness, the use case SHALL return a minimal entry with only `spec` (the label) and `stale: true`. No title, description, rules, constraints, or scenarios SHALL be included.
+When `SpecRepository.metadata()` returns `null` or content hashes indicate staleness, the use case SHALL return a minimal entry with only `spec` (the label) and `stale: true`. No title, description, rules, constraints, or scenarios SHALL be included.
 
 ### Requirement: Section filtering
 
@@ -42,7 +42,7 @@ When `input.depth` is provided and `followDeps` is `true`, the use case MUST NOT
 
 During dependency traversal, the use case SHALL emit warnings (not throw) for:
 
-- Missing `.specd-metadata.yaml` on the current spec during traversal — `type: 'missing-metadata'`.
+- Missing metadata on the current spec during traversal — `type: 'missing-metadata'`.
 - Unknown workspace referenced in a dependency — `type: 'unknown-workspace'`.
 - Dependency spec not found in its workspace — `type: 'missing-spec'`.
 - Stale metadata on any resolved entry — `type: 'stale-metadata'`.

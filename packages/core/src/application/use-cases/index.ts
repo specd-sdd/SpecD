@@ -39,8 +39,11 @@ export {
   type GetStatusInput,
   type GetStatusResult,
   type ArtifactStatusEntry,
+  type LifecycleContext,
+  type TransitionBlocker,
 } from './get-status.js'
 export {
+  type HookPhaseSelector,
   type TransitionChange,
   type TransitionChangeInput,
   type TransitionChangeResult,

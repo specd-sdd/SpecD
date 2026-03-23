@@ -1,0 +1,187 @@
+title: List Specs
+description: Agents and CLI users need a single query to discover what specs exist across all workspaces without loading full spec content. The `ListSpecs` use case enumerates all specs across all configured workspaces, returning a title for each entry and optionally a short summary and metadata freshness status. It is the primary query for discovery UIs and CLI listing commands.
+dependsOn:
+  - core:core/spec-metadata
+  - core:core/content-extraction
+  - core:core/storage
+  - core:core/workspace
+context:
+  - Agents and CLI users need a single query to discover what specs exist across all workspaces without loading full spec content. The `ListSpecs` use case enumerates all specs across all configured workspaces, returning a title for each entry and optionally a short summary and metadata freshness status. It is the primary query for discovery UIs and CLI listing commands.
+rules:
+  - requirement: Enumerate specs across all workspaces
+    rules:
+      - '`ListSpecs.execute()` SHALL iterate every configured workspace in declaration order and call `SpecRepository.list()` on each. The returned `SpecListEntry[]` MUST preserve workspace declaration order, with specs within each workspace ordered by repository order.'
+  - requirement: Always resolve a title for each entry
+    rules:
+      - |-
+        Every `SpecListEntry` MUST include a `title` field. The title resolution order SHALL be:
+
+        1. The `title` field from the spec's metadata (via `SpecRepository.metadata()`), when metadata exists, parses successfully, and `title` is a non-empty string after trimming.
+        2. Fallback: the last segment of the spec's capability path (e.g. `auth/login` yields `login`).
+  - requirement: Optional summary resolution
+    rules:
+      - |-
+        When `options.includeSummary` is `true`, the use case SHALL resolve a `summary` field for each entry. Summary resolution order:
+
+        1. The `description` field from the spec's metadata (via `SpecRepository.metadata()`), when present and non-empty after trimming.
+        2. Extraction from `spec.md` content via `extractSpecSummary`, when the spec has a `spec.md` file and the extraction succeeds.
+        3. If neither source yields a value, `summary` MUST be omitted from the entry (not set to an empty string or `null`).
+
+        When `options.includeSummary` is `false` or omitted, the `summary` field MUST NOT appear on any entry.
+  - requirement: Optional metadata freshness status
+    rules:
+      - |-
+        When `options.includeMetadataStatus` is `true`, the use case SHALL resolve a `metadataStatus` field for each entry. The status values SHALL be:
+
+        - `'missing'` — no metadata exists for the spec (via `SpecRepository.metadata()` returning `null`).
+        - `'invalid'` — metadata exists but fails structural validation against `strictSpecMetadataSchema`.
+        - `'stale'` — metadata exists and is structurally valid, but content hashes are absent or do not match current file contents.
+        - `'fresh'` — metadata exists, is structurally valid, and all content hashes match current files.
+
+        When `options.includeMetadataStatus` is `false` or omitted, the `metadataStatus` field MUST NOT appear on any entry.
+  - requirement: Silent error handling for metadata and summary reads
+    rules:
+      - Errors encountered while reading metadata (via `SpecRepository.metadata()`) or `spec.md` for title/summary/status resolution MUST be silently caught. The spec entry MUST still appear in the results with the title fallback applied. The use case SHALL NOT propagate I/O errors from individual spec resolution to the caller.
+  - requirement: SpecListEntry shape
+    rules:
+      - |-
+        Each entry MUST include the following required fields:
+
+        - `workspace` — the workspace name the spec belongs to.
+        - `path` — the spec's capability path rendered with `/` separators.
+        - `title` — the resolved title string.
+
+        Optional fields (`summary`, `metadataStatus`) MUST only be present when explicitly requested and successfully resolved.
+constraints:
+  - The use case receives a ReadonlyMap<string, SpecRepository> — it MUST NOT modify the map or the repositories.
+  - The use case defaults includeSummary and includeMetadataStatus to false when the options object or individual flags are not provided.
+  - Title and description values from metadata MUST be trimmed before use; empty-after-trim values MUST be treated as absent.
+scenarios:
+  - requirement: Enumerate specs across all workspaces
+    name: Multiple workspaces returned in declaration order
+    given:
+      - two workspaces alpha and beta configured in that order, each containing specs
+    when:
+      - execute() is called with no options
+    then:
+      - all entries from alpha appear before all entries from beta
+  - requirement: Enumerate specs across all workspaces
+    name: Empty workspace included without error
+    given:
+      - a workspace with no specs
+    when:
+      - execute() is called
+    then:
+      - the result array contains no entries for that workspace and no error is thrown
+  - requirement: Always resolve a title for each entry
+    name: Title from metadata
+    given:
+      - 'a spec with metadata containing title: "OAuth Login"'
+    when:
+      - execute() is called
+    then:
+      - the entry's title is "OAuth Login"
+  - requirement: Always resolve a title for each entry
+    name: Title fallback to path segment
+    given:
+      - a spec at path auth/login with no metadata
+    when:
+      - execute() is called
+    then:
+      - the entry's title is "login"
+  - requirement: Always resolve a title for each entry
+    name: Empty metadata title triggers fallback
+    given:
+      - 'a spec at path auth/login with metadata containing title: "  "'
+    when:
+      - execute() is called
+    then:
+      - the entry's title is "login" (fallback applied)
+  - requirement: Optional summary resolution
+    name: Summary from metadata description
+    given:
+      - 'a spec with metadata containing description: "Handles OAuth flows"'
+    when:
+      - 'execute({ includeSummary: true }) is called'
+    then:
+      - the entry's summary is "Handles OAuth flows"
+  - requirement: Optional summary resolution
+    name: Summary extracted from spec.md when no description in metadata
+    given:
+      - a spec with no description in metadata but a spec.md with an extractable overview
+    when:
+      - 'execute({ includeSummary: true }) is called'
+    then:
+      - the entry's summary is the extracted overview text
+  - requirement: Optional summary resolution
+    name: Summary omitted when no source available
+    given:
+      - a spec with no metadata description and no spec.md
+    when:
+      - 'execute({ includeSummary: true }) is called'
+    then:
+      - the entry has no summary property
+  - requirement: Optional summary resolution
+    name: Summary not present when not requested
+    when:
+      - execute() is called without includeSummary
+    then:
+      - no entry has a summary property
+  - requirement: Optional metadata freshness status
+    name: Status is missing when no metadata
+    given:
+      - a spec with no metadata
+    when:
+      - 'execute({ includeMetadataStatus: true }) is called'
+    then:
+      - the entry's metadataStatus is 'missing'
+  - requirement: Optional metadata freshness status
+    name: Status is invalid when metadata fails structural validation
+    given:
+      - a spec with metadata that fails strictSpecMetadataSchema parsing
+    when:
+      - 'execute({ includeMetadataStatus: true }) is called'
+    then:
+      - the entry's metadataStatus is 'invalid'
+  - requirement: Optional metadata freshness status
+    name: Status is stale when hashes do not match
+    given:
+      - a spec with valid metadata whose contentHashes do not match current file contents
+    when:
+      - 'execute({ includeMetadataStatus: true }) is called'
+    then:
+      - the entry's metadataStatus is 'stale'
+  - requirement: Optional metadata freshness status
+    name: Status is fresh when all hashes match
+    given:
+      - a spec with valid metadata whose contentHashes all match current file contents
+    when:
+      - 'execute({ includeMetadataStatus: true }) is called'
+    then:
+      - the entry's metadataStatus is 'fresh'
+  - requirement: Optional metadata freshness status
+    name: Status not present when not requested
+    when:
+      - execute() is called without includeMetadataStatus
+    then:
+      - no entry has a metadataStatus property
+  - requirement: Silent error handling for metadata and summary reads
+    name: Metadata read error does not propagate
+    given:
+      - repo.metadata(spec) throws an I/O error
+    when:
+      - execute() is called
+    then:
+      - the entry still appears with the path-segment fallback title and no error is thrown
+  - requirement: Silent error handling for metadata and summary reads
+    name: spec.md read error does not propagate
+    given:
+      - repo.artifact(spec, 'spec.md') throws an I/O error during summary resolution
+    when:
+      - 'execute({ includeSummary: true }) is called'
+    then:
+      - the entry still appears without a summary and no error is thrown
+contentHashes:
+  spec.md: sha256:b142efffac5c7e4a22bf6c935228bd097d9e9fd10f0e814144504b1969b70c77
+  verify.md: sha256:0406c125abca78b12741c24acaca0c8bc2d2d2a477c415e9ae718bba7085213b
+generatedBy: core

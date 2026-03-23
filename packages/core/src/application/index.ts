@@ -6,8 +6,6 @@ export {
   type SpecdConfig,
   type SpecdWorkspaceConfig,
   type SpecdStorageConfig,
-  type SpecdWorkflowStep,
-  type SpecdWorkflowHook,
   type SpecdContextEntry,
   isSpecdConfig,
 } from './specd-config.js'

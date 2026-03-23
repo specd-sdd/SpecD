@@ -8,8 +8,6 @@ import {
   type SpecdConfig,
   type SpecdWorkspaceConfig,
   type SpecdStorageConfig,
-  type SpecdWorkflowStep,
-  type SpecdWorkflowHook,
   type SpecdContextEntry,
 } from '../../application/specd-config.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
@@ -48,23 +46,6 @@ const FsStorageZodSchema = z.object({
     pattern: z.string().optional(),
   }),
 })
-
-const HookEntryRawZodSchema = z.union([
-  z.object({ id: z.string(), run: z.string() }),
-  z.object({ id: z.string(), instruction: z.string() }),
-])
-
-const WorkflowStepRawZodSchema = z
-  .object({
-    step: z.string(),
-    hooks: z
-      .object({
-        pre: z.array(HookEntryRawZodSchema).optional(),
-        post: z.array(HookEntryRawZodSchema).optional(),
-      })
-      .optional(),
-  })
-  .strict()
 
 const ContextEntryRawZodSchema = z.union([
   z.object({ file: z.string() }),
@@ -237,7 +218,6 @@ const SpecdYamlZodSchema = z.object({
       signoff: z.boolean().optional(),
     })
     .optional(),
-  workflow: z.array(WorkflowStepRawZodSchema).optional(),
   artifactRules: z.record(z.array(z.string())).optional(),
   context: z.array(ContextEntryRawZodSchema).optional(),
   contextIncludeSpecs: z.array(z.string()).optional(),
@@ -343,23 +323,6 @@ function formatZodPath(issuePath: ReadonlyArray<string | number>): string {
   return issuePath
     .map((p, i) => (typeof p === 'number' ? `[${p}]` : i === 0 ? p : `.${p}`))
     .join('')
-}
-
-/**
- * Converts a raw hook entry from the YAML to a typed {@link SpecdWorkflowHook}.
- *
- * @param h - The raw hook entry (`{ run }` or `{ instruction }`)
- * @returns A typed `SpecdWorkflowHook`
- */
-function toWorkflowHook(
-  h: { id: string; run: string } | { id: string; instruction: string },
-): SpecdWorkflowHook {
-  if ('run' in h) return { id: h.id, type: 'run', command: h.run }
-  return {
-    id: h.id,
-    type: 'instruction',
-    text: (h as { id: string; instruction: string }).instruction,
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -516,14 +479,6 @@ export class FsConfigLoader implements ConfigLoader {
         : {}),
     }
 
-    const workflow: SpecdWorkflowStep[] | undefined = data.workflow?.map((step) => ({
-      step: step.step,
-      hooks: {
-        pre: step.hooks?.pre?.map(toWorkflowHook) ?? [],
-        post: step.hooks?.post?.map(toWorkflowHook) ?? [],
-      },
-    }))
-
     const context: SpecdContextEntry[] | undefined = data.context as SpecdContextEntry[] | undefined
 
     return {
@@ -535,7 +490,6 @@ export class FsConfigLoader implements ConfigLoader {
         spec: data.approvals?.spec ?? false,
         signoff: data.approvals?.signoff ?? false,
       },
-      ...(workflow !== undefined && workflow.length > 0 ? { workflow } : {}),
       ...(data.artifactRules !== undefined ? { artifactRules: data.artifactRules } : {}),
       ...(context !== undefined ? { context } : {}),
       ...(data.contextIncludeSpecs !== undefined

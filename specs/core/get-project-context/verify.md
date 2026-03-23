@@ -25,7 +25,7 @@
 
 #### Scenario: Schema not found
 
-- **GIVEN** `SchemaRegistry.resolve` returns `null` for the configured schema reference
+- **GIVEN** `SchemaProvider.get()` returns `null` for the configured schema reference
 - **WHEN** `execute` is called
 - **THEN** a `SchemaNotFoundError` is thrown with the schema reference string
 

@@ -8,7 +8,7 @@ import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js
 import {
   makeChangeRepository,
   makeActorResolver,
-  makeSchemaRegistry,
+  makeSchemaProvider,
   makeSchema,
   makeContentHasher,
   testActor,
@@ -47,10 +47,8 @@ describe('ApproveSpec', () => {
       const uc = new ApproveSpec(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -70,10 +68,8 @@ describe('ApproveSpec', () => {
       const uc = new ApproveSpec(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -93,10 +89,8 @@ describe('ApproveSpec', () => {
       const uc = new ApproveSpec(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         hasher,
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -116,10 +110,8 @@ describe('ApproveSpec', () => {
       const uc = new ApproveSpec(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -138,10 +130,8 @@ describe('ApproveSpec', () => {
       const uc = new ApproveSpec(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(),
+        makeSchemaProvider(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await expect(
@@ -158,10 +148,8 @@ describe('ApproveSpec', () => {
       const uc = new ApproveSpec(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(),
+        makeSchemaProvider(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await expect(
@@ -187,10 +175,8 @@ describe('ApproveSpec', () => {
       const uc = new ApproveSpec(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await expect(
@@ -209,10 +195,8 @@ describe('ApproveSpec', () => {
       const uc = new ApproveSpec(
         repo,
         makeActorResolver(),
-        makeSchemaRegistry(makeSchema()),
+        makeSchemaProvider(makeSchema()),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await expect(

@@ -8,7 +8,7 @@ Once a change has completed its full lifecycle, its spec modifications need to b
 
 ### Requirement: Ports and constructor
 
-`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaRegistry`, `SaveSpecMetadata`, `YamlSerializer`, `schemaRef`, `workspaceSchemasPaths`, and `ActorResolver`.
+`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaProvider`, `SaveSpecMetadata`, `YamlSerializer`, and `ActorResolver`.
 
 ```typescript
 class ArchiveChange {
@@ -19,19 +19,17 @@ class ArchiveChange {
     runStepHooks: RunStepHooks,
     actor: ActorResolver,
     parsers: ArtifactParserRegistry,
-    schemas: SchemaRegistry,
+    schemaProvider: SchemaProvider,
     generateMetadata: GenerateSpecMetadata,
     saveMetadata: SaveSpecMetadata,
     yaml: YamlSerializer,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
   )
 }
 ```
 
 Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not receive `HookRunner` or `projectWorkflowHooks` directly.
 
-`schemaRef` is the schema reference string from `specd.yaml`. `workspaceSchemasPaths` is the resolved workspace-to-schemas-path map, passed through to `SchemaRegistry.resolve()`. All are injected at kernel composition time, not passed per invocation.
+`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
 
 `specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec ID's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.
 
@@ -46,7 +44,7 @@ Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not recei
 
 ### Requirement: Schema name guard
 
-After resolving the schema from config, `ArchiveChange` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before the archivable guard, any hooks, or file modifications.
+After obtaining the schema from `SchemaProvider`, `ArchiveChange` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before the archivable guard, any hooks, or file modifications.
 
 ### Requirement: Archivable guard
 
@@ -69,22 +67,17 @@ After all pre-archive hooks succeed, `ArchiveChange` must merge each delta artif
 For each spec ID in `change.specIds`:
 
 1. Resolve the active schema for that spec's workspace.
-2. For each artifact in the schema that declares `delta: true`:
-   a. Look up the `ArtifactParser` for the artifact's `format` from `ArtifactParserRegistry`. If no adapter is registered for that format, throw — this is a configuration error.
-   b. Retrieve the file for this spec ID from the artifact via `artifact.getFile(specId)`. If the file is absent or its status is `skipped`, skip — nothing to sync.
-   c. Load the delta file content from `ChangeRepository` using the file's `filename`. Parse the delta file as YAML to obtain the array of delta entries.
-   d. Load the base artifact content from `SpecRepository`. If the base does not exist, treat it as an empty document (parse an empty string via `ArtifactParser.parse('')`).
-   e. Parse the base content via `ArtifactParser.parse(baseContent)` to obtain a base AST.
-   f. Call `ArtifactParser.apply(baseAST, deltaEntries)` to produce the merged AST. If `apply` throws `DeltaApplicationError`, re-throw it — this indicates a structural problem that should have been caught during `ValidateArtifacts`, or the delta was modified after validation.
-   g. Serialize the merged AST via `ArtifactParser.serialize(mergedAST)` and save the result to `SpecRepository`.
+2. For each artifact in the schema with `scope: spec`:
+   a. Retrieve the file for this spec ID from the artifact via `artifact.getFile(specId)`. If the file is absent or its status is `missing` or `skipped`, skip — nothing to sync.
+   b. Determine the output basename from `artifactType.output` (e.g. `spec.md`).
+   c. **If `delta: true`:** attempt to load the delta file (`.delta.yaml`) from the change directory.
+   - If the delta file exists: parse it as YAML to obtain delta entries. Look up the `ArtifactParser` for the artifact's `format` from `ArtifactParserRegistry`. If no adapter is registered, throw. Load the base artifact content from `SpecRepository`. If the base does not exist, treat it as an empty document (parse an empty string via `ArtifactParser.parse('')`). Parse the base content via `ArtifactParser.parse(baseContent)` to obtain a base AST. Call `ArtifactParser.apply(baseAST, deltaEntries)` to produce the merged AST. If `apply` throws `DeltaApplicationError`, re-throw. Serialize the merged AST via `ArtifactParser.serialize(mergedAST)` and save to `SpecRepository`.
+   - If the delta file does not exist: fall back to copying the primary file. Load the artifact file content from `ChangeRepository` using `specFile.filename`. If found, save it directly to `SpecRepository`. This handles the case where a new spec is created under a `delta: true` artifact type — the change directory contains a full file rather than a delta.
+     d. **If `delta: false`:** load the artifact file content from `ChangeRepository` using `specFile.filename`. Save directly to `SpecRepository`.
 
 For markdown artifacts, the merge output must preserve inline formatting and list/style conventions from the base artifact wherever possible. Implementations must avoid destructive normalization of untouched sections during archive-time serialization.
 
 When the base markdown uses mixed style markers for the same construct (for example both `-` and `*` bullets, or both `*` and `_` for emphasis/strong), archive-time serialization must be deterministic and follow project markdown conventions configured for lint consistency.
-
-3. For each artifact in the schema that declares `delta: false` (new file artifacts created in-change):
-   a. Retrieve the file for this spec ID from the artifact via `artifact.getFile(specId)`. If the file is absent or its status is `skipped`, skip — nothing to sync.
-   b. Load the artifact file content from `ChangeRepository` using the file's `filename`. Save the content directly to `SpecRepository` (creating the spec directory and file if they do not exist).
 
 ### Requirement: Archive repository call
 

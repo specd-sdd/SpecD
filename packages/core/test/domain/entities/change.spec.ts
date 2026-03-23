@@ -312,6 +312,135 @@ describe('Change', () => {
       c.invalidate('redesign', actor)
       expect(c.state).toBe('designing')
     })
+
+    it('with driftedArtifactIds resets only specified and downstream artifacts', () => {
+      // DAG: proposal → specs → verify, proposal → design, specs + design → tasks
+      const c = makeChange()
+      const proposal = new ChangeArtifact({
+        type: 'proposal',
+        requires: [],
+        files: new Map([
+          ['proposal', new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })],
+        ]),
+      })
+      proposal.markComplete('proposal', 'sha256:p')
+      const specs = new ChangeArtifact({
+        type: 'specs',
+        requires: ['proposal'],
+        files: new Map([['specs', new ArtifactFile({ key: 'specs', filename: 'specs.md' })]]),
+      })
+      specs.markComplete('specs', 'sha256:s')
+      const verify = new ChangeArtifact({
+        type: 'verify',
+        requires: ['specs'],
+        files: new Map([['verify', new ArtifactFile({ key: 'verify', filename: 'verify.md' })]]),
+      })
+      verify.markComplete('verify', 'sha256:v')
+      const design = new ChangeArtifact({
+        type: 'design',
+        requires: ['proposal'],
+        files: new Map([['design', new ArtifactFile({ key: 'design', filename: 'design.md' })]]),
+      })
+      design.markComplete('design', 'sha256:d')
+      const tasks = new ChangeArtifact({
+        type: 'tasks',
+        requires: ['specs', 'design'],
+        files: new Map([['tasks', new ArtifactFile({ key: 'tasks', filename: 'tasks.md' })]]),
+      })
+      tasks.markComplete('tasks', 'sha256:t')
+      c.setArtifact(proposal)
+      c.setArtifact(specs)
+      c.setArtifact(verify)
+      c.setArtifact(design)
+      c.setArtifact(tasks)
+
+      c.invalidate('artifact-change', actor, new Set(['tasks']))
+
+      // Only tasks should be reset — no downstream dependents
+      expect(tasks.getFile('tasks')?.validatedHash).toBeUndefined()
+      // Upstream artifacts remain complete
+      expect(proposal.getFile('proposal')?.validatedHash).toBe('sha256:p')
+      expect(specs.getFile('specs')?.validatedHash).toBe('sha256:s')
+      expect(verify.getFile('verify')?.validatedHash).toBe('sha256:v')
+      expect(design.getFile('design')?.validatedHash).toBe('sha256:d')
+    })
+
+    it('with driftedArtifactIds cascades downstream through the DAG', () => {
+      // DAG: proposal → specs → verify, proposal → design, specs + design → tasks
+      const c = makeChange()
+      const proposal = new ChangeArtifact({
+        type: 'proposal',
+        requires: [],
+        files: new Map([
+          ['proposal', new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })],
+        ]),
+      })
+      proposal.markComplete('proposal', 'sha256:p')
+      const specs = new ChangeArtifact({
+        type: 'specs',
+        requires: ['proposal'],
+        files: new Map([['specs', new ArtifactFile({ key: 'specs', filename: 'specs.md' })]]),
+      })
+      specs.markComplete('specs', 'sha256:s')
+      const verify = new ChangeArtifact({
+        type: 'verify',
+        requires: ['specs'],
+        files: new Map([['verify', new ArtifactFile({ key: 'verify', filename: 'verify.md' })]]),
+      })
+      verify.markComplete('verify', 'sha256:v')
+      const design = new ChangeArtifact({
+        type: 'design',
+        requires: ['proposal'],
+        files: new Map([['design', new ArtifactFile({ key: 'design', filename: 'design.md' })]]),
+      })
+      design.markComplete('design', 'sha256:d')
+      const tasks = new ChangeArtifact({
+        type: 'tasks',
+        requires: ['specs', 'design'],
+        files: new Map([['tasks', new ArtifactFile({ key: 'tasks', filename: 'tasks.md' })]]),
+      })
+      tasks.markComplete('tasks', 'sha256:t')
+      c.setArtifact(proposal)
+      c.setArtifact(specs)
+      c.setArtifact(verify)
+      c.setArtifact(design)
+      c.setArtifact(tasks)
+
+      c.invalidate('artifact-change', actor, new Set(['specs']))
+
+      // specs + downstream (verify, tasks) should be reset
+      expect(specs.getFile('specs')?.validatedHash).toBeUndefined()
+      expect(verify.getFile('verify')?.validatedHash).toBeUndefined()
+      expect(tasks.getFile('tasks')?.validatedHash).toBeUndefined()
+      // Upstream artifacts remain complete
+      expect(proposal.getFile('proposal')?.validatedHash).toBe('sha256:p')
+      expect(design.getFile('design')?.validatedHash).toBe('sha256:d')
+    })
+
+    it('without driftedArtifactIds resets all artifacts (backward compat)', () => {
+      const c = makeChange()
+      const proposal = new ChangeArtifact({
+        type: 'proposal',
+        requires: [],
+        files: new Map([
+          ['proposal', new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })],
+        ]),
+      })
+      proposal.markComplete('proposal', 'sha256:p')
+      const design = new ChangeArtifact({
+        type: 'design',
+        requires: ['proposal'],
+        files: new Map([['design', new ArtifactFile({ key: 'design', filename: 'design.md' })]]),
+      })
+      design.markComplete('design', 'sha256:d')
+      c.setArtifact(proposal)
+      c.setArtifact(design)
+
+      c.invalidate('artifact-change', actor)
+
+      expect(proposal.getFile('proposal')?.validatedHash).toBeUndefined()
+      expect(design.getFile('design')?.validatedHash).toBeUndefined()
+    })
   })
 
   describe('recordSpecApproval', () => {
@@ -782,6 +911,47 @@ describe('Change', () => {
       const deps = c.specDependsOn
       ;(deps as Map<string, readonly string[]>).delete('auth/login')
       expect(c.specDependsOn.has('auth/login')).toBe(true)
+    })
+
+    it('updateSpecIds removes orphaned specDependsOn entries', () => {
+      const c = new Change({
+        name: 'test-orphan',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth/login', 'auth/session'],
+        history: [],
+        specDependsOn: new Map([
+          ['auth/login', ['auth/shared']],
+          ['auth/session', ['auth/jwt']],
+        ]),
+      })
+      c.updateSpecIds(['auth/login'], actor)
+      expect(c.specDependsOn.has('auth/session')).toBe(false)
+      expect([...c.specDependsOn.get('auth/login')!]).toEqual(['auth/shared'])
+    })
+
+    it('updateSpecIds clears all specDependsOn when all specs with deps are removed', () => {
+      const c = new Change({
+        name: 'test-clear',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth/login'],
+        history: [],
+        specDependsOn: new Map([['auth/login', ['auth/shared']]]),
+      })
+      c.updateSpecIds(['billing/core'], actor)
+      expect(c.specDependsOn.size).toBe(0)
+    })
+
+    it('updateSpecIds preserves specDependsOn when no orphans', () => {
+      const c = new Change({
+        name: 'test-preserve',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth/login', 'auth/session'],
+        history: [],
+        specDependsOn: new Map([['auth/login', ['auth/shared']]]),
+      })
+      c.updateSpecIds(['auth/login', 'auth/session'], actor)
+      expect(c.specDependsOn.size).toBe(1)
+      expect([...c.specDependsOn.get('auth/login')!]).toEqual(['auth/shared'])
     })
   })
 })

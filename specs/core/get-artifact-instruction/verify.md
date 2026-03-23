@@ -15,8 +15,8 @@
 #### Scenario: Schema mismatch throws SchemaMismatchError
 
 - **GIVEN** a change created with schema `spec-driven`
-- **AND** the active schema in `specd.yaml` is `custom-schema`
-- **WHEN** `GetArtifactInstruction.execute` is called
+- **AND** `SchemaProvider.get()` returns a schema named `custom-schema`
+- **WHEN** `execute` is called
 - **THEN** `SchemaMismatchError` is thrown
 
 ### Requirement: Artifact resolution
@@ -80,6 +80,13 @@
 - **THEN** `rulesPre` is `["Use formal language"]`
 - **AND** `instruction` is `"Write specs"`
 
+#### Scenario: Template content resolved and returned
+
+- **GIVEN** an artifact with `template: "templates/design.md"` pointing to a file containing `# Design: {{change.name}}`
+- **AND** a change named `add-auth`
+- **WHEN** `GetArtifactInstruction.execute` is called for this artifact
+- **THEN** `template` is `"# Design: add-auth"` (variables expanded)
+
 ### Requirement: Result shape
 
 #### Scenario: Rules-only artifact has null instruction
@@ -88,3 +95,9 @@
 - **WHEN** `GetArtifactInstruction.execute` is called
 - **THEN** `instruction` is `null`
 - **AND** `rulesPost` is `["Check grammar"]`
+
+#### Scenario: Result includes template field
+
+- **GIVEN** an artifact with `template: "templates/tasks.md"`
+- **WHEN** `GetArtifactInstruction.execute` is called
+- **THEN** the result includes a `template` field with the resolved file content

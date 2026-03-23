@@ -1,7 +1,6 @@
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type YamlSerializer } from '../ports/yaml-serializer.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
-import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 
@@ -20,7 +19,7 @@ export interface InvalidateSpecMetadataResult {
 }
 
 /**
- * Invalidates a spec's `.specd-metadata.yaml` by removing its `contentHashes`.
+ * Invalidates a spec's metadata by removing its `contentHashes`.
  *
  * Without `contentHashes` the metadata is treated as stale, forcing regeneration
  * on the next metadata pass. All other fields (title, description, rules, etc.)
@@ -58,22 +57,17 @@ export class InvalidateSpecMetadata {
       throw new SpecNotFoundError(`${input.workspace}:${input.specPath.toFsPath('/')}`)
     }
 
-    const existing = await repo.artifact(spec, '.specd-metadata.yaml')
+    const existing = await repo.metadata(spec)
     if (existing === null) {
       return null
     }
 
-    const parsed = this._yaml.parse(existing.content) as Record<string, unknown> | null
-    if (parsed === null || typeof parsed !== 'object') {
-      return null
-    }
-
+    // Remove contentHashes and originalHash, re-serialize the rest
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { contentHashes: _discarded, ...withoutHashes } = parsed
+    const { contentHashes: _discarded, originalHash: _hash, ...withoutHashes } = existing
     const content = this._yaml.stringify(withoutHashes)
 
-    const artifact = new SpecArtifact('.specd-metadata.yaml', content)
-    await repo.save(spec, artifact, { force: true })
+    await repo.saveMetadata(spec, content, { force: true })
 
     const specLabel = `${input.workspace}:${spec.name.toString()}`
     return { spec: specLabel }

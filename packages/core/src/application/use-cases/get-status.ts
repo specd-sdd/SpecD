@@ -1,6 +1,8 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.js'
+import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 
 /** Input for the {@link GetStatus} use case. */
@@ -29,12 +31,42 @@ export interface ArtifactStatusEntry {
   readonly files: ArtifactFileStatus[]
 }
 
+/** Describes why a structurally valid transition is not currently available. */
+export interface TransitionBlocker {
+  /** The blocked target state. */
+  readonly transition: ChangeState
+  /** Why the transition is blocked. */
+  readonly reason: 'requires' | 'tasks-incomplete'
+  /** Artifact IDs whose effective status is neither complete nor skipped. */
+  readonly blocking: readonly string[]
+}
+
+/** Pre-computed lifecycle context for driving the change lifecycle. */
+export interface LifecycleContext {
+  /** All structurally valid transitions from the current state. */
+  readonly validTransitions: readonly ChangeState[]
+  /** Subset of validTransitions where workflow requires are satisfied. */
+  readonly availableTransitions: readonly ChangeState[]
+  /** For each valid-but-unavailable transition, what's blocking it. */
+  readonly blockers: readonly TransitionBlocker[]
+  /** Whether approval gates are active in the project config. */
+  readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
+  /** Next artifact in the DAG whose requires are satisfied but is not yet complete/skipped. */
+  readonly nextArtifact: string | null
+  /** Filesystem path to the change directory. */
+  readonly changePath: string
+  /** Active schema name and version, or null when schema resolution fails. */
+  readonly schemaInfo: { readonly name: string; readonly version: number } | null
+}
+
 /** Result returned by the {@link GetStatus} use case. */
 export interface GetStatusResult {
   /** The loaded change with its current artifact state. */
   readonly change: Change
   /** Effective status for each artifact attached to the change. */
   readonly artifactStatuses: ArtifactStatusEntry[]
+  /** Pre-computed lifecycle context. */
+  readonly lifecycle: LifecycleContext
 }
 
 /**
@@ -46,14 +78,26 @@ export interface GetStatusResult {
  */
 export class GetStatus {
   private readonly _changes: ChangeRepository
+  private readonly _schemaProvider: SchemaProvider
+  private readonly _approvals: { readonly spec: boolean; readonly signoff: boolean }
 
   /**
    * Creates a new `GetStatus` use case instance.
    *
    * @param changes - Repository for loading the change
+   * @param schemaProvider - Provider for the fully-resolved schema
+   * @param approvals - Whether approval gates are active
+   * @param approvals.spec - Whether the spec approval gate is enabled
+   * @param approvals.signoff - Whether the signoff gate is enabled
    */
-  constructor(changes: ChangeRepository) {
+  constructor(
+    changes: ChangeRepository,
+    schemaProvider: SchemaProvider,
+    approvals: { readonly spec: boolean; readonly signoff: boolean },
+  ) {
     this._changes = changes
+    this._schemaProvider = schemaProvider
+    this._approvals = approvals
   }
 
   /**
@@ -78,6 +122,81 @@ export class GetStatus {
       artifactStatuses.push({ type, effectiveStatus: change.effectiveStatus(type), files })
     }
 
-    return { change, artifactStatuses }
+    // --- Lifecycle computation ---
+
+    // 1. Valid transitions (static, always works)
+    const validTransitions = VALID_TRANSITIONS[change.state]
+
+    // 2. Resolve schema (may fail)
+    let schema: Awaited<ReturnType<SchemaProvider['get']>> = null
+    let schemaInfo: LifecycleContext['schemaInfo'] = null
+    try {
+      schema = await this._schemaProvider.get()
+      if (schema !== null) {
+        schemaInfo = { name: schema.name(), version: schema.version() }
+      }
+    } catch {
+      // Graceful degradation — schema-dependent fields will use defaults
+    }
+
+    // 3. Available transitions and blockers
+    const availableTransitions: ChangeState[] = []
+    const blockers: TransitionBlocker[] = []
+
+    if (schema !== null) {
+      for (const target of validTransitions) {
+        const workflowStep = schema.workflowStep(target)
+        if (workflowStep === null || workflowStep.requires.length === 0) {
+          availableTransitions.push(target)
+          continue
+        }
+        const blocking: string[] = []
+        for (const artifactId of workflowStep.requires) {
+          const status = change.effectiveStatus(artifactId)
+          if (status !== 'complete' && status !== 'skipped') {
+            blocking.push(artifactId)
+          }
+        }
+        if (blocking.length === 0) {
+          availableTransitions.push(target)
+        } else {
+          blockers.push({ transition: target, reason: 'requires', blocking })
+        }
+      }
+    }
+
+    // 4. Next artifact
+    let nextArtifact: string | null = null
+    if (schema !== null) {
+      for (const artifactType of schema.artifacts()) {
+        const ownStatus = change.effectiveStatus(artifactType.id)
+        if (ownStatus === 'complete' || ownStatus === 'skipped') {
+          continue
+        }
+        const requiresSatisfied = artifactType.requires.every((reqId) => {
+          const reqStatus = change.effectiveStatus(reqId)
+          return reqStatus === 'complete' || reqStatus === 'skipped'
+        })
+        if (requiresSatisfied) {
+          nextArtifact = artifactType.id
+          break
+        }
+      }
+    }
+
+    // 5. Change path
+    const changePath = this._changes.changePath(change)
+
+    const lifecycle: LifecycleContext = {
+      validTransitions,
+      availableTransitions,
+      blockers,
+      approvals: this._approvals,
+      nextArtifact,
+      changePath,
+      schemaInfo,
+    }
+
+    return { change, artifactStatuses, lifecycle }
   }
 }

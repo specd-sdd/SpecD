@@ -34,7 +34,7 @@ function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockReturnValue(kernel)
+  vi.mocked(createCliKernel).mockResolvedValue(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -67,7 +67,7 @@ describe('spec write-metadata', () => {
     expect(kernel.specs.saveMetadata.execute).toHaveBeenCalledWith(
       expect.objectContaining({ content: validYaml }),
     )
-    expect(stdout()).toContain('wrote .specd-metadata.yaml for default:auth/login')
+    expect(stdout()).toContain('wrote metadata for default:auth/login')
   })
 
   it('exits 1 on invalid YAML', async () => {

@@ -1,6 +1,7 @@
 import { type Command } from 'commander'
 import {
   type ChangeState,
+  type HookPhaseSelector,
   type TransitionProgressEvent,
   type OnTransitionProgress,
   VALID_TRANSITIONS,
@@ -9,6 +10,15 @@ import { createSpinner, type Spinner } from 'nanospinner'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
+import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
+
+const VALID_HOOK_PHASES = new Set<HookPhaseSelector>([
+  'source.pre',
+  'source.post',
+  'target.pre',
+  'target.post',
+  'all',
+])
 
 /** All valid `ChangeState` values. */
 const VALID_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
@@ -79,7 +89,10 @@ export function registerChangeTransition(parent: Command): void {
     .command('transition <name> <step>')
     .allowExcessArguments(false)
     .description('Transition a change to a new lifecycle state')
-    .option('--no-hooks', 'skip run: hook execution')
+    .option(
+      '--skip-hooks <phases>',
+      'skip hook phases (source.pre,source.post,target.pre,target.post,all)',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(
@@ -99,7 +112,7 @@ JSON/TOON output schema:
       async (
         name: string,
         step: string,
-        opts: { format: string; config?: string; hooks: boolean },
+        opts: { format: string; config?: string; skipHooks?: string },
       ) => {
         try {
           if (!(VALID_STATES as string[]).includes(step)) {
@@ -108,6 +121,11 @@ JSON/TOON output schema:
               opts.format,
             )
           }
+
+          const skipHookPhases =
+            opts.skipHooks !== undefined
+              ? parseCommaSeparatedValues(opts.skipHooks, VALID_HOOK_PHASES, '--skip-hooks')
+              : new Set<HookPhaseSelector>()
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
           const fmt = parseFormat(opts.format)
@@ -123,15 +141,10 @@ JSON/TOON output schema:
               to: step as ChangeState,
               approvalsSpec: config.approvals.spec,
               approvalsSignoff: config.approvals.signoff,
-              skipHooks: !opts.hooks,
+              skipHookPhases,
             },
             onProgress,
           )
-
-          if (result.postHookFailures.length > 0) {
-            const cmds = result.postHookFailures.join(', ')
-            cliError(`post-hook(s) failed: ${cmds}`, opts.format, 2)
-          }
 
           if (fmt === 'text') {
             output(`transitioned ${name}: ${fromState} → ${result.change.state}`, 'text')
@@ -142,7 +155,6 @@ JSON/TOON output schema:
                 name,
                 from: fromState,
                 to: result.change.state,
-                postHookFailures: result.postHookFailures,
               },
               fmt,
             )

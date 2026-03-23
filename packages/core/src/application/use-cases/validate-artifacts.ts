@@ -4,7 +4,7 @@ import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { DeltaApplicationError } from '../../domain/errors/delta-application-error.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
@@ -81,43 +81,35 @@ export interface ValidateArtifactsResult {
 export class ValidateArtifacts {
   private readonly _changes: ChangeRepository
   private readonly _specs: ReadonlyMap<string, SpecRepository>
-  private readonly _schemas: SchemaRegistry
+  private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
   private readonly _actor: ActorResolver
   private readonly _hasher: ContentHasher
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
 
   /**
    * Creates a new `ValidateArtifacts` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
    * @param specs - Spec repositories keyed by workspace name
-   * @param schemas - Registry for resolving schema references
+   * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact format parsers
    * @param actor - Resolver for the actor identity
    * @param hasher - Content hasher for computing artifact hashes
-   * @param schemaRef - Schema reference string (e.g. `"@specd/schema-std"`)
-   * @param workspaceSchemasPaths - Map of workspace name to absolute schemas directory path
    */
   constructor(
     changes: ChangeRepository,
     specs: ReadonlyMap<string, SpecRepository>,
-    schemas: SchemaRegistry,
+    schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
     actor: ActorResolver,
     hasher: ContentHasher,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
   ) {
     this._changes = changes
     this._specs = specs
-    this._schemas = schemas
+    this._schemaProvider = schemaProvider
     this._parsers = parsers
     this._actor = actor
     this._hasher = hasher
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
   }
 
   /**
@@ -136,8 +128,8 @@ export class ValidateArtifacts {
       throw new SpecNotInChangeError(input.specPath, input.name)
     }
 
-    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+    const schema = await this._schemaProvider.get()
+    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     // --- Schema name guard ---
     if (schema.name() !== change.schemaName) {
@@ -184,9 +176,8 @@ export class ValidateArtifacts {
     const approval: SpecApprovedEvent | undefined = change.activeSpecApproval
     const signoff: SignedOffEvent | undefined = change.activeSignoff
     if (approval !== undefined || signoff !== undefined) {
-      let invalidated = false
+      const driftedIds = new Set<string>()
       for (const artifactType of schema.artifacts()) {
-        if (invalidated) break
         const changeArtifact = change.getArtifact(artifactType.id)
         if (
           changeArtifact === null ||
@@ -196,7 +187,6 @@ export class ValidateArtifacts {
           continue
         }
         for (const [fileKey, file] of changeArtifact.files) {
-          if (invalidated) break
           if (file.status === 'missing' || file.status === 'skipped') continue
           const diskPath = this._resolveFilePath(file.filename)
           const artifactContent = await this._changes.artifact(change, diskPath)
@@ -213,10 +203,13 @@ export class ValidateArtifacts {
             (approvalHash !== undefined && approvalHash !== cleanedHash) ||
             (signoffHash !== undefined && signoffHash !== cleanedHash)
           ) {
-            change.invalidate('artifact-change', actor)
-            invalidated = true
+            driftedIds.add(artifactType.id)
+            break
           }
         }
+      }
+      if (driftedIds.size > 0) {
+        change.invalidate('artifact-change', actor, driftedIds)
       }
     }
 
@@ -275,6 +268,21 @@ export class ValidateArtifacts {
         }
 
         if (deltaFile !== null) {
+          // --- No-op bypass ---
+          // If the delta contains only no-op entries, skip deltaValidations,
+          // delta application, and structural validation. Go straight to markComplete.
+          if (yamlParser !== undefined) {
+            const deltaEntries = yamlParser.parseDelta(deltaFile.content)
+            if (deltaEntries.length > 0 && deltaEntries.every((e) => e.op === 'no-op')) {
+              const cleanedContent = this._applyCleanup(
+                deltaFile.content,
+                artifactType.preHashCleanup,
+              )
+              changeArtifact.markComplete(fileKey, this._sha256(cleanedContent))
+              continue
+            }
+          }
+
           if (artifactType.deltaValidations.length > 0 && yamlParser !== undefined) {
             const deltaAST = yamlParser.parse(deltaFile.content)
             const result = evaluateRules(

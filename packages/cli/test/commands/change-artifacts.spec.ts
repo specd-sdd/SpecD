@@ -12,18 +12,24 @@ import {
   captureStderr,
 } from './helpers.js'
 
-vi.mock('../../src/load-config.js', () => ({ loadConfig: vi.fn() }))
-vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
+vi.mock('../../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
+}))
 
-import { loadConfig } from '../../src/load-config.js'
-import { createCliKernel } from '../../src/kernel.js'
+import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerChangeArtifacts } from '../../src/commands/change/artifacts.js'
 
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockReturnValue(kernel)
+  vi.mocked(resolveCliContext).mockResolvedValue({ config, kernel })
+  // Default: schema resolution returns no artifacts (skip delta enrichment)
+  kernel.specs.getActiveSchema.execute.mockResolvedValue({
+    name: () => 'test',
+    version: () => 1,
+    artifacts: () => [],
+    workflow: () => [],
+  })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -36,16 +42,18 @@ describe('change artifacts', () => {
   it('prints text output with columns', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({
-        name: 'my-change',
-        artifacts: new Map([
-          ['proposal', { filename: 'proposal.md' }],
-          ['spec', { filename: 'spec.md' }],
-        ]),
-      }),
+      change: makeMockChange({ name: 'my-change' }),
       artifactStatuses: [
-        { type: 'proposal', effectiveStatus: 'complete' },
-        { type: 'spec', effectiveStatus: 'missing' },
+        {
+          type: 'proposal',
+          effectiveStatus: 'complete',
+          files: [{ key: 'proposal', filename: 'proposal.md', status: 'complete' }],
+        },
+        {
+          type: 'spec',
+          effectiveStatus: 'missing',
+          files: [{ key: 'spec', filename: 'spec.md', status: 'missing' }],
+        },
       ],
     })
     vi.mocked(kernel.changes.repo.artifactExists)
@@ -68,18 +76,23 @@ describe('change artifacts', () => {
   it('lists all artifacts regardless of disk existence', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({
-        name: 'my-change',
-        artifacts: new Map([
-          ['proposal', { filename: 'proposal.md' }],
-          ['spec', { filename: 'spec.md' }],
-          ['tasks', { filename: 'tasks.md' }],
-        ]),
-      }),
+      change: makeMockChange({ name: 'my-change' }),
       artifactStatuses: [
-        { type: 'proposal', effectiveStatus: 'missing' },
-        { type: 'spec', effectiveStatus: 'missing' },
-        { type: 'tasks', effectiveStatus: 'missing' },
+        {
+          type: 'proposal',
+          effectiveStatus: 'missing',
+          files: [{ key: 'proposal', filename: 'proposal.md', status: 'missing' }],
+        },
+        {
+          type: 'spec',
+          effectiveStatus: 'missing',
+          files: [{ key: 'spec', filename: 'spec.md', status: 'missing' }],
+        },
+        {
+          type: 'tasks',
+          effectiveStatus: 'missing',
+          files: [{ key: 'tasks', filename: 'tasks.md', status: 'missing' }],
+        },
       ],
     })
     vi.mocked(kernel.changes.repo.artifactExists).mockResolvedValue(false)
@@ -97,11 +110,14 @@ describe('change artifacts', () => {
   it('outputs JSON with name and artifacts array', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({
-        name: 'my-change',
-        artifacts: new Map([['proposal', { filename: 'proposal.md' }]]),
-      }),
-      artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
+      change: makeMockChange({ name: 'my-change' }),
+      artifactStatuses: [
+        {
+          type: 'proposal',
+          effectiveStatus: 'complete',
+          files: [{ key: 'proposal', filename: 'proposal.md', status: 'complete' }],
+        },
+      ],
     })
     vi.mocked(kernel.changes.repo.artifactExists).mockResolvedValue(true)
 
@@ -136,11 +152,14 @@ describe('change artifacts', () => {
   it('includes filename field in JSON artifact entries', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
-      change: makeMockChange({
-        name: 'my-change',
-        artifacts: new Map([['proposal', { filename: 'proposal.md' }]]),
-      }),
-      artifactStatuses: [{ type: 'proposal', effectiveStatus: 'complete' }],
+      change: makeMockChange({ name: 'my-change' }),
+      artifactStatuses: [
+        {
+          type: 'proposal',
+          effectiveStatus: 'complete',
+          files: [{ key: 'proposal', filename: 'proposal.md', status: 'complete' }],
+        },
+      ],
     })
     vi.mocked(kernel.changes.repo.artifactExists).mockResolvedValue(true)
 

@@ -40,13 +40,21 @@ If the resulting `specIds` list is identical (same length, same order) to the ch
 
 ### Requirement: Approval invalidation on effective change
 
-When the resulting `specIds` differ from the current set, the use case MUST:
+### Requirement: Directory cleanup on removal
 
-1. Resolve the current actor via `ActorResolver.identity()`
-2. Call `change.updateSpecIds(newSpecIds, actor)` — this records an `invalidated` event with cause `spec-change` and a `transitioned` event
-3. Persist the change via `ChangeRepository.save`
-4. Call `ChangeRepository.scaffold(change, specExists)` to create directories for any newly added spec-scoped artifacts, using the `specs` map for the `specExists` check
-5. Return `{ change, invalidated: true }`
+When the resulting `specIds` differ from the current set due to removals, the use
+case MUST call `ChangeRepository.unscaffold(change, removedSpecIds)` to remove the
+scaffolded directories for each removed spec from the change directory. This call
+MUST happen after the change is persisted and before returning the result. If any
+directory contains files, they MUST be removed along with the directory.
+
+Directories to remove follow the change directory layout:
+
+- `specs/<workspace>/<capability-path>/` — new-spec artifact directories
+- `deltas/<workspace>/<capability-path>/` — delta artifact directories
+
+The `unscaffold` operation is idempotent — if a directory does not exist, it
+is silently skipped.
 
 ### Requirement: Output contract
 
@@ -57,9 +65,11 @@ When the resulting `specIds` differ from the current set, the use case MUST:
 
 ### Requirement: Dependencies
 
+### Requirement: Dependencies
+
 `EditChange` depends on the following ports injected via constructor:
 
-- `ChangeRepository` — for loading, persisting, and scaffolding changes
+- `ChangeRepository` — for loading, persisting, scaffolding, and unscaffolding changes
 - `ActorResolver` — for resolving the current actor identity
 - `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding
 

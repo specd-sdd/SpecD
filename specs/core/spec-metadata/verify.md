@@ -6,34 +6,54 @@
 
 #### Scenario: Metadata file present
 
-- **WHEN** a spec directory contains a `.specd-metadata.yaml` file
+- **WHEN** a spec has a corresponding `metadata.yaml` under `.specd/metadata/<specPath>/`
 - **THEN** specd reads it to obtain `dependsOn` and `contentHashes` for that spec
 
 #### Scenario: Metadata file absent
 
-- **WHEN** a spec directory has no `.specd-metadata.yaml`
+- **WHEN** a spec has no corresponding metadata file under `.specd/metadata/`
 - **THEN** specd treats the spec as having no declared dependencies and no content hash — no error is emitted
+
+#### Scenario: Explicit metadataPath in workspace config
+
+- **GIVEN** a workspace config with `specs.fs.metadataPath: .specd/metadata`
+- **WHEN** metadata is requested for a spec in that workspace
+- **THEN** the adapter reads from the configured path at `<metadataPath>/<specPath>/metadata.yaml`
+
+#### Scenario: Auto-derived metadataPath from VCS root
+
+- **GIVEN** a workspace config with no explicit `specs.fs.metadataPath`
+- **AND** the specs path is inside a VCS repository
+- **WHEN** the kernel boots
+- **THEN** the composition layer resolves the VCS root of `specs.path` and derives `<vcsRoot>/.specd/metadata/` as the metadata path
+
+#### Scenario: NullVcsAdapter fallback for metadataPath
+
+- **GIVEN** a workspace config with no explicit `specs.fs.metadataPath`
+- **AND** the specs path is not inside any VCS (NullVcsAdapter returned)
+- **WHEN** the kernel boots
+- **THEN** the composition layer falls back to `.specd/metadata/` relative to the specs root parent
 
 ### Requirement: File format
 
 #### Scenario: Valid metadata file with all fields
 
-- **WHEN** `.specd-metadata.yaml` contains `title`, `description`, `keywords`, `dependsOn`, `contentHashes`, `rules`, `constraints`, and `scenarios`
+- **WHEN** `metadata.yaml` contains `title`, `description`, `keywords`, `dependsOn`, `contentHashes`, `rules`, `constraints`, and `scenarios`
 - **THEN** specd parses all fields; `title`, `description`, and `keywords` are available to tooling without reading the spec content
 
 #### Scenario: Title absent — fallback to path
 
-- **WHEN** `.specd-metadata.yaml` has no `title` field
+- **WHEN** `metadata.yaml` has no `title` field
 - **THEN** tooling displays the spec's path (e.g. `core/change`) instead of a title
 
 #### Scenario: Valid metadata file with only dependsOn
 
-- **WHEN** `.specd-metadata.yaml` contains `dependsOn: [core/storage]` and `contentHashes` with entries for each file
+- **WHEN** `metadata.yaml` contains `dependsOn: [core/storage]` and `contentHashes` with entries for each file
 - **THEN** specd parses `core/storage` as a dependency and uses the per-file hashes for staleness detection
 
 #### Scenario: Empty dependsOn
 
-- **WHEN** `.specd-metadata.yaml` contains `dependsOn: []`
+- **WHEN** `metadata.yaml` contains `dependsOn: []`
 - **THEN** the spec has no declared dependencies — no traversal occurs from this spec
 
 #### Scenario: Cross-workspace dependency
@@ -125,59 +145,59 @@
 
 #### Scenario: dependsOn entries removed — error thrown
 
-- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
 - **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:config']`
 - **THEN** a `DependsOnOverwriteError` is thrown with `existingDeps` and `incomingDeps`
 - **AND** the file is not written
 
 #### Scenario: dependsOn entries added — error thrown
 
-- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
 - **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:config', 'core:schema-format', 'core:change']`
 - **THEN** a `DependsOnOverwriteError` is thrown
 - **AND** the file is not written
 
 #### Scenario: dependsOn entries replaced — error thrown
 
-- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
 - **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:change', 'core:schema-format']`
 - **THEN** a `DependsOnOverwriteError` is thrown
 - **AND** the file is not written
 
 #### Scenario: dependsOn dropped entirely — error thrown
 
-- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
 - **WHEN** `SaveSpecMetadata` is executed with content that has no `dependsOn`
 - **THEN** a `DependsOnOverwriteError` is thrown
 - **AND** the file is not written
 
 #### Scenario: Same dependsOn in different order — allowed
 
-- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
 - **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:schema-format', 'core:config']`
 - **THEN** the file is written successfully — order is not significant
 
 #### Scenario: dependsOn change with force — allowed
 
-- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
 - **WHEN** `SaveSpecMetadata` is executed with `force: true` and content that has `dependsOn: ['core:change']`
 - **THEN** the file is written successfully — force bypasses the check
 
 #### Scenario: No existing metadata — new dependsOn allowed
 
-- **GIVEN** no existing `.specd-metadata.yaml` for the spec
+- **GIVEN** no existing metadata for the spec
 - **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:config']`
 - **THEN** the file is written successfully
 
 #### Scenario: Existing metadata without dependsOn — new dependsOn allowed
 
-- **GIVEN** existing `.specd-metadata.yaml` has no `dependsOn` field
+- **GIVEN** existing metadata has no `dependsOn` field
 - **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:config']`
 - **THEN** the file is written successfully — adding dependsOn to a spec that had none is allowed
 
 #### Scenario: Error message includes removed and added entries
 
-- **GIVEN** existing `.specd-metadata.yaml` has `dependsOn: ['core:config', 'core:schema-format']`
+- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
 - **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:change']`
 - **THEN** the error message includes the removed entries (`core:config`, `core:schema-format`) and the added entry (`core:change`)
 - **AND** the message includes a hint to use `--force`
@@ -188,7 +208,7 @@
 
 - **GIVEN** a change modifies the spec `core/change`
 - **WHEN** `ArchiveChange` completes the delta merge and spec sync
-- **THEN** core generates `.specd-metadata.yaml` for `core/change` using the schema's `metadataExtraction` engine
+- **THEN** core generates metadata for `core/change` using the schema's `metadataExtraction` engine
 - **AND** the file contains `title`, `description`, `dependsOn`, `contentHashes`, and any `rules`, `constraints`, `scenarios` extracted from the spec content
 
 #### Scenario: Manifest dependsOn takes priority over extracted
@@ -199,7 +219,7 @@
 
 #### Scenario: LLM may improve metadata after generation
 
-- **GIVEN** a spec has a deterministically generated `.specd-metadata.yaml`
+- **GIVEN** a spec has deterministically generated metadata
 - **WHEN** the LLM calls `SaveSpecMetadata` with an improved `description`
 - **THEN** the metadata is overwritten — the LLM is free to improve any field
 
@@ -213,7 +233,7 @@
 
 #### Scenario: Content unchanged — no warning
 
-- **WHEN** the current hash of the spec's requiredSpecArtifacts matches `contentHashes` in `.specd-metadata.yaml`
+- **WHEN** the current hash of the spec's requiredSpecArtifacts matches `contentHashes` in metadata
 - **THEN** no staleness warning is emitted
 
 #### Scenario: Content changed — warning emitted
@@ -223,7 +243,7 @@
 
 #### Scenario: Missing contentHashes — treated as stale
 
-- **WHEN** `.specd-metadata.yaml` exists but has no `contentHashes` field
+- **WHEN** metadata exists but has no `contentHashes` field
 - **THEN** specd emits the same staleness warning
 
 #### Scenario: requiredSpecArtifact missing from contentHashes — treated as stale
@@ -233,19 +253,19 @@
 
 #### Scenario: Stale metadata does not block operations
 
-- **WHEN** `.specd-metadata.yaml` is stale
+- **WHEN** metadata is stale
 - **THEN** specd emits a warning but does not block any command — the stale `dependsOn` is still used for context traversal
 
 ### Requirement: Use by CompileContext
 
 #### Scenario: dependsOn adds context beyond excludes
 
-- **WHEN** `specd.yaml` has `contextExcludeSpecs: ['core/storage']` and a spec's `.specd-metadata.yaml` lists `core/storage` in `dependsOn`
+- **WHEN** `specd.yaml` has `contextExcludeSpecs: ['core/storage']` and a spec's metadata lists `core/storage` in `dependsOn`
 - **THEN** `CompileContext` includes `core/storage` — `dependsOn` overrides project-level excludes
 
 #### Scenario: Transitive traversal
 
-- **WHEN** change has `specIds: ['default:auth/login']` and `auth/login/.specd-metadata.yaml` lists `auth/jwt` in `dependsOn`, and `auth/jwt/.specd-metadata.yaml` lists `crypto/keys`
+- **WHEN** change has `specIds: ['default:auth/login']` and `auth/login` metadata lists `auth/jwt` in `dependsOn`, and `auth/jwt` metadata lists `crypto/keys`
 - **THEN** `CompileContext` includes all three: `auth/login`, `auth/jwt`, and `crypto/keys`
 
 #### Scenario: Missing spec in dependsOn skipped with warning
@@ -260,7 +280,7 @@
 
 ### Requirement: Version control
 
-#### Scenario: Metadata committed with spec
+#### Scenario: Metadata committed with project
 
-- **WHEN** a spec is created or updated and `.specd-metadata.yaml` is written
-- **THEN** it appears in `git status` as a tracked file alongside the spec content artifacts
+- **WHEN** metadata is generated for a spec
+- **THEN** the `metadata.yaml` file under `.specd/metadata/` appears in `git status` as a tracked file

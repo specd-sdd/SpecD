@@ -324,6 +324,28 @@ JSON files are parsed into a normalized AST with \`object\`, \`property\`, \`arr
   selector:
     type: property
     matches: oldKey
+\`\`\`
+
+### Description Field
+
+All delta entries accept an optional \`description\` field (string) to document what the entry does or why. It is ignored during application.
+
+\`\`\`yaml
+- op: modified
+  description: "Bump version for release"
+  selector:
+    type: property
+    matches: version
+  value: '2.0.0'
+\`\`\`
+
+### No-op Operation
+
+Use \`op: no-op\` when the artifact requires no changes for this spec. A \`no-op\` entry must be the only entry in the delta array. It accepts only \`op\` and optionally \`description\` — no other fields are valid.
+
+\`\`\`yaml
+- op: no-op
+  description: "Existing scenarios remain valid — no changes needed"
 \`\`\``
   }
 

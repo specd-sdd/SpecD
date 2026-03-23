@@ -6,10 +6,9 @@
 
 #### Scenario: Project-level include applied regardless of active workspace
 
-- **GIVEN** `contextIncludeSpecs: ['_global/*']` at the project level
-- **AND** the current change has no spec from `_global`
-- **WHEN** `CompileContext.execute` is called
-- **THEN** all specs under `_global/` are included in the context
+- **GIVEN** a project-level `contextIncludeSpecs` pattern that matches specs in multiple workspaces
+- **WHEN** `CompileContext.execute` is called for a specific workspace
+- **THEN** all specs matching the project-level pattern are included regardless of the active workspace
 
 #### Scenario: Workspace-level include applied only for active workspace
 
@@ -35,7 +34,7 @@
 #### Scenario: dependsOn traversal adds specs beyond include set
 
 - **GIVEN** `change.specIds: ['default:auth/login']`
-- **AND** `auth/login/.specd-metadata.yaml` declares `dependsOn: ['auth/jwt']`
+- **AND** `auth/login` metadata declares `dependsOn: ['auth/jwt']`
 - **AND** `auth/jwt` was not matched by any include pattern
 - **WHEN** `CompileContext.execute` applies step 5 with `followDeps: true`
 - **THEN** `auth/jwt` is added to the context set
@@ -67,14 +66,14 @@
 
 #### Scenario: Stale metadata emits warning
 
-- **GIVEN** `auth/jwt/.specd-metadata.yaml` has `contentHashes.spec.md: 'sha256:old'`
+- **GIVEN** `auth/jwt` metadata has `contentHashes.spec.md: 'sha256:old'`
 - **AND** the current `spec.md` hashes to `sha256:new`
 - **WHEN** `CompileContext.execute` adds `auth/jwt` via `dependsOn` traversal
 - **THEN** the result `warnings` includes a staleness warning for `auth/jwt`
 
 #### Scenario: Fresh metadata emits no staleness warning
 
-- **GIVEN** all `contentHashes` in `.specd-metadata.yaml` match the current file hashes
+- **GIVEN** all `contentHashes` in metadata match the current file hashes
 - **WHEN** `CompileContext.execute` is called
 - **THEN** no staleness warnings are emitted
 
@@ -175,14 +174,14 @@
 #### Scenario: Missing metadata during dependsOn traversal emits warning
 
 - **GIVEN** `change.specIds` includes `auth/login`
-- **AND** `auth/login` has no `.specd-metadata.yaml`
+- **AND** `auth/login` has no metadata
 - **WHEN** `CompileContext.execute` is called with `followDeps: true`
 - **THEN** `result.warnings` includes a `missing-metadata` warning for `auth/login`
 
 #### Scenario: Fallback to content extraction when metadata absent in dependsOn traversal
 
 - **GIVEN** the schema declares `metadataExtraction.dependsOn`
-- **AND** a spec in the `dependsOn` traversal has no `.specd-metadata.yaml`
+- **AND** a spec in the `dependsOn` traversal has no metadata
 - **AND** the spec's artifact content contains extractable dependency references
 - **WHEN** `CompileContext.execute` is called with `followDeps: true`
 - **THEN** dependencies are extracted from the spec content via the `metadataExtraction` engine
@@ -191,7 +190,7 @@
 #### Scenario: Manifest specDependsOn used as primary source for dependencies
 
 - **GIVEN** `change.specDependsOn` has an entry for `auth/login` with `['auth/shared']`
-- **AND** `auth/login/.specd-metadata.yaml` declares `dependsOn: ['auth/jwt']`
+- **AND** `auth/login` metadata declares `dependsOn: ['auth/jwt']`
 - **WHEN** `CompileContext.execute` is called with `followDeps: true`
 - **THEN** `auth/shared` is used as the dependency (from manifest), not `auth/jwt` (from metadata)
 

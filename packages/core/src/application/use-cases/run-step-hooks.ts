@@ -3,8 +3,9 @@ import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
 import { StepNotValidError } from '../../domain/errors/step-not-valid-error.js'
 import { HookNotFoundError } from '../../domain/errors/hook-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
+import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type HookRunner, type TemplateVariables } from '../ports/hook-runner.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
@@ -48,54 +49,34 @@ export interface RunStepHooksResult {
 /**
  * Executes `run:` hooks for a given workflow step and phase.
  *
- * Resolves hooks from the schema and project configuration, builds
- * template variables from the active change, and executes them via
- * `HookRunner` with fail-fast (pre) or fail-soft (post) semantics.
+ * Resolves hooks from the schema, builds template variables from the
+ * active change, and executes them via `HookRunner` with fail-fast
+ * (pre) or fail-soft (post) semantics.
  */
 export class RunStepHooks {
   private readonly _changes: ChangeRepository
+  private readonly _archive: ArchiveRepository
   private readonly _hooks: HookRunner
-  private readonly _schemas: SchemaRegistry
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
-  private readonly _projectWorkflowHooks: readonly {
-    readonly step: string
-    readonly hooks: {
-      readonly pre: readonly HookEntry[]
-      readonly post: readonly HookEntry[]
-    }
-  }[]
+  private readonly _schemaProvider: SchemaProvider
 
   /**
    * Creates a new `RunStepHooks` use case.
    *
    * @param changes - Repository for loading change entities
+   * @param archive - Repository for loading archived changes (fallback for post-archive hooks)
    * @param hooks - Hook runner for executing shell commands
-   * @param schemas - Registry for resolving the active schema
-   * @param schemaRef - Schema reference string from config
-   * @param workspaceSchemasPaths - Map of workspace names to schema directory paths
-   * @param projectWorkflowHooks - Project-level workflow hook overrides
+   * @param schemaProvider - Provider for the fully-resolved schema
    */
   constructor(
     changes: ChangeRepository,
+    archive: ArchiveRepository,
     hooks: HookRunner,
-    schemas: SchemaRegistry,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
-    projectWorkflowHooks?: readonly {
-      readonly step: string
-      readonly hooks: {
-        readonly pre: readonly HookEntry[]
-        readonly post: readonly HookEntry[]
-      }
-    }[],
+    schemaProvider: SchemaProvider,
   ) {
     this._changes = changes
+    this._archive = archive
     this._hooks = hooks
-    this._schemas = schemas
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
-    this._projectWorkflowHooks = projectWorkflowHooks ?? []
+    this._schemaProvider = schemaProvider
   }
 
   /**
@@ -110,10 +91,66 @@ export class RunStepHooks {
     onProgress?: OnHookProgress,
   ): Promise<RunStepHooksResult> {
     const change = await this._changes.get(input.name)
-    if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+    // Fallback to archive for post-archive hooks
+    if (change === null) {
+      if (input.step === 'archiving' && input.phase === 'post') {
+        const archived = await this._archive.get(input.name)
+        if (archived === null) throw new ChangeNotFoundError(input.name)
+
+        const schema = await this._schemaProvider.get()
+        if (schema === null) throw new SchemaNotFoundError('(provider)')
+
+        if (schema.name() !== archived.schemaName) {
+          throw new SchemaMismatchError(input.name, archived.schemaName, schema.name())
+        }
+
+        if (!(CHANGE_STATES as string[]).includes(input.step)) {
+          throw new StepNotValidError(input.step)
+        }
+
+        const workflowStep = schema.workflowStep(input.step)
+        if (workflowStep === null) {
+          return { hooks: [], success: true, failedHook: null }
+        }
+
+        let runHooks = this._collectHooks(workflowStep.hooks[input.phase])
+
+        if (input.only !== undefined) {
+          const match = runHooks.find((h) => h.id === input.only)
+          if (match === undefined) {
+            const instrMatch = workflowStep.hooks[input.phase].find(
+              (h) => h.id === input.only && h.type === 'instruction',
+            )
+            if (instrMatch !== undefined) {
+              throw new HookNotFoundError(input.only, 'wrong-type')
+            }
+            throw new HookNotFoundError(input.only, 'not-found')
+          }
+          runHooks = [match]
+        }
+
+        if (runHooks.length === 0) {
+          return { hooks: [], success: true, failedHook: null }
+        }
+
+        const workspace = archived.workspace.toString()
+        const variables: TemplateVariables = {
+          change: {
+            name: archived.name,
+            workspace,
+            path: this._archive.archivePath(archived),
+          },
+        }
+
+        return this._executeHooks(runHooks, variables, input.phase, onProgress)
+      }
+
+      throw new ChangeNotFoundError(input.name)
+    }
+
+    const schema = await this._schemaProvider.get()
+    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     if (schema.name() !== change.schemaName) {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
@@ -129,18 +166,17 @@ export class RunStepHooks {
       return { hooks: [], success: true, failedHook: null }
     }
 
-    // Collect run: hooks (schema first, then project)
-    const allHooks = this._collectHooks(input.step, input.phase, workflowStep.hooks[input.phase])
-
-    // Filter for run: hooks only
-    let runHooks = allHooks.filter((h) => h.type === 'run')
+    // Collect run: hooks from schema
+    let runHooks = this._collectHooks(workflowStep.hooks[input.phase])
 
     // --only filter
     if (input.only !== undefined) {
       const match = runHooks.find((h) => h.id === input.only)
       if (match === undefined) {
         // Check if it's an instruction hook
-        const instrMatch = allHooks.find((h) => h.id === input.only && h.type === 'instruction')
+        const instrMatch = workflowStep.hooks[input.phase].find(
+          (h) => h.id === input.only && h.type === 'instruction',
+        )
         if (instrMatch !== undefined) {
           throw new HookNotFoundError(input.only, 'wrong-type')
         }
@@ -159,7 +195,36 @@ export class RunStepHooks {
       change: { name: change.name, workspace, path: this._changes.changePath(change) },
     }
 
-    // Execute hooks
+    return this._executeHooks(runHooks, variables, input.phase, onProgress)
+  }
+
+  /**
+   * Collects `run:` hooks from schema for the given phase.
+   *
+   * @param schemaHooks - Schema-level hooks for this step and phase
+   * @returns Schema hooks filtered to `type === 'run'`
+   */
+  private _collectHooks(
+    schemaHooks: readonly HookEntry[],
+  ): readonly Extract<HookEntry, { type: 'run' }>[] {
+    return schemaHooks.filter((h): h is Extract<HookEntry, { type: 'run' }> => h.type === 'run')
+  }
+
+  /**
+   * Executes a list of hooks with the given template variables.
+   *
+   * @param runHooks - The hooks to execute
+   * @param variables - Template variables for command expansion
+   * @param phase - The phase ('pre' for fail-fast, 'post' for fail-soft)
+   * @param onProgress - Optional callback for hook execution progress events
+   * @returns Per-hook execution results with overall success status
+   */
+  private async _executeHooks(
+    runHooks: readonly Extract<HookEntry, { type: 'run' }>[],
+    variables: TemplateVariables,
+    phase: 'pre' | 'post',
+    onProgress?: OnHookProgress,
+  ): Promise<RunStepHooksResult> {
     const results: RunStepHookEntry[] = []
     let failedHook: RunStepHookEntry | null = null
 
@@ -183,8 +248,7 @@ export class RunStepHooks {
       })
 
       if (!result.isSuccess()) {
-        if (input.phase === 'pre') {
-          // Fail-fast: stop on first failure
+        if (phase === 'pre') {
           return { hooks: results, success: false, failedHook: entry }
         }
         if (failedHook === null) failedHook = entry
@@ -196,26 +260,5 @@ export class RunStepHooks {
       success: results.every((r) => r.success),
       failedHook,
     }
-  }
-
-  /**
-   * Collects hooks from schema and project configuration in declaration order.
-   *
-   * @param step - The workflow step name
-   * @param phase - The hook phase (pre or post)
-   * @param schemaHooks - Schema-level hooks for this step and phase
-   * @returns Combined list of hooks (schema first, then project)
-   */
-  private _collectHooks(
-    step: string,
-    phase: 'pre' | 'post',
-    schemaHooks: readonly HookEntry[],
-  ): readonly HookEntry[] {
-    const hooks: HookEntry[] = [...schemaHooks]
-    const projectStep = this._projectWorkflowHooks.find((s) => s.step === step)
-    if (projectStep !== undefined) {
-      hooks.push(...projectStep.hooks[phase])
-    }
-    return hooks
   }
 }

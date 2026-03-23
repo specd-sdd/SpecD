@@ -19,7 +19,7 @@ import { DeltaApplicationError } from '../../../src/domain/errors/delta-applicat
 import {
   makeChangeRepository,
   makeActorResolver,
-  makeSchemaRegistry,
+  makeSchemaProvider,
   makeSpecRepository,
   makeArtifactType,
   makeSchema,
@@ -77,12 +77,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository(),
         new Map(),
-        makeSchemaRegistry(makeSchema([])),
+        makeSchemaProvider(makeSchema([])),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
       await expect(
         uc.execute({
@@ -99,12 +97,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
         new Map(),
-        makeSchemaRegistry(makeSchema([])),
+        makeSchemaProvider(makeSchema([])),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
       await expect(
         uc.execute({
@@ -121,12 +117,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
         new Map(),
-        makeSchemaRegistry(null),
+        makeSchemaProvider(null),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
       await expect(
         uc.execute({
@@ -143,12 +137,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
         new Map(),
-        makeSchemaRegistry(makeSchema({ name: 'schema-b' })),
+        makeSchemaProvider(makeSchema({ name: 'schema-b' })),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
       await expect(
         uc.execute({
@@ -168,12 +160,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -208,12 +198,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -232,12 +220,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -286,12 +272,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -347,12 +331,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -409,12 +391,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -463,12 +443,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -527,12 +505,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -543,6 +519,83 @@ describe('ValidateArtifacts', () => {
       const saved = repo.store.get('c')
       const invalidatedCount = saved?.history.filter((e) => e.type === 'invalidated').length ?? 0
       expect(invalidatedCount).toBe(1)
+    })
+
+    it('passes drifted artifact IDs to invalidate when single artifact changed', async () => {
+      const proposalType = makeArtifactType('proposal')
+      const designType = makeArtifactType('design', { requires: ['proposal'] })
+      const schema = makeSchema([proposalType, designType])
+
+      const proposalContent = 'proposal content'
+      const designContent = 'design content'
+      const proposalHash = sha256(proposalContent)
+
+      const proposalArt = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({ key: 'proposal', filename: 'proposal.md', status: 'in-progress' }),
+          ],
+        ]),
+      })
+      const designArt = new ChangeArtifact({
+        type: 'design',
+        requires: ['proposal'],
+        files: new Map([
+          [
+            'design',
+            new ArtifactFile({ key: 'design', filename: 'design.md', status: 'in-progress' }),
+          ],
+        ]),
+      })
+
+      const history: import('../../../src/domain/entities/change.js').ChangeEvent[] = [
+        {
+          type: 'spec-approved',
+          at: new Date(),
+          by: testActor,
+          reason: 'approved',
+          artifactHashes: {
+            'proposal:proposal': proposalHash,
+            'design:design': 'sha256:oldDesignHash',
+          },
+        },
+      ]
+      const change = makeChangeWithArtifacts('c', [proposalArt, designArt], { history })
+      const invalidateSpy = vi.spyOn(change, 'invalidate')
+
+      const files = new Map([
+        ['proposal.md', proposalContent],
+        ['design.md', designContent],
+      ])
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          const c = files.get(filename)
+          return c !== undefined ? new SpecArtifact(filename, c) : null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+      })
+
+      expect(invalidateSpy).toHaveBeenCalledOnce()
+      const [cause, , driftedIds] = invalidateSpy.mock.calls[0]!
+      expect(cause).toBe('artifact-change')
+      expect(driftedIds).toBeInstanceOf(Set)
+      expect(driftedIds).toEqual(new Set(['design']))
     })
 
     it('does not call invalidate when hashes match', async () => {
@@ -580,12 +633,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -624,12 +675,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -672,12 +721,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -724,12 +771,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(parser),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -779,12 +824,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(parser),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -827,12 +870,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(parser),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -890,12 +931,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map([['default', specsRepo]]),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(parser, yamlParser),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -936,12 +975,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -952,6 +989,241 @@ describe('ValidateArtifacts', () => {
       expect(result.passed).toBe(true)
       const artifact = repo.store.get('c')?.getArtifact('specs')
       expect(artifact?.status).toBe('complete')
+    })
+  })
+
+  describe('no-op delta bypass', () => {
+    const noopParseDelta = (content: string) => {
+      // Minimal parseDelta that recognizes no-op
+      const lines = content.trim().split('\n')
+      const entries: import('../../../src/application/ports/artifact-parser.js').DeltaEntry[] = []
+      for (const line of lines) {
+        const m = line.match(/^\s*-\s*op:\s*(.+)/)
+        if (m) entries.push({ op: m[1]!.trim() as 'no-op' })
+      }
+      return entries
+    }
+
+    function makeNoopParsers() {
+      const yamlParser = makeParser({ parseDelta: noopParseDelta })
+      return makeParsers(makeParser(), yamlParser)
+    }
+
+    it('bypasses deltaValidations and marks complete for no-op delta', async () => {
+      const specsType = makeArtifactType('specs', {
+        scope: 'spec',
+        format: 'markdown',
+        delta: true,
+        deltaValidations: [
+          {
+            selector: { type: 'sequence-item', where: { op: 'added' } },
+            required: true,
+          },
+        ],
+      })
+      const schema = makeSchema([specsType])
+
+      const noopContent = '- op: no-op\n'
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth',
+            new ArtifactFile({
+              key: 'default:auth',
+              filename: 'deltas/default/auth/spec.md.delta.yaml',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename === 'deltas/default/auth/spec.md.delta.yaml') {
+            return new SpecArtifact(filename, noopContent)
+          }
+          return null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeNoopParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({ name: 'c', specPath: 'default:auth' })
+
+      expect(result.passed).toBe(true)
+      expect(result.failures).toHaveLength(0)
+      const artifact = repo.store.get('c')?.getArtifact('specs')
+      expect(artifact?.status).toBe('complete')
+    })
+
+    it('skips application preview for no-op delta', async () => {
+      const specsType = makeArtifactType('specs', {
+        scope: 'spec',
+        format: 'markdown',
+        delta: true,
+      })
+      const schema = makeSchema([specsType])
+
+      const noopContent = '- op: no-op\n'
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth',
+            new ArtifactFile({
+              key: 'default:auth',
+              filename: 'deltas/default/auth/spec.md.delta.yaml',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename === 'deltas/default/auth/spec.md.delta.yaml') {
+            return new SpecArtifact(filename, noopContent)
+          }
+          return null
+        },
+      })
+
+      // Create a spec repo that would fail if accessed (proving no base spec is loaded)
+      const specRepo = makeSpecRepository()
+      const specRepoSpy = vi.spyOn(specRepo, 'get')
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map([['default', specRepo]]),
+        makeSchemaProvider(schema),
+        makeNoopParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({ name: 'c', specPath: 'default:auth' })
+
+      expect(result.passed).toBe(true)
+      expect(specRepoSpy).not.toHaveBeenCalled()
+    })
+
+    it('skips structural validations for no-op delta', async () => {
+      const specsType = makeArtifactType('specs', {
+        scope: 'spec',
+        format: 'markdown',
+        delta: true,
+        validations: [
+          {
+            selector: { type: 'section', matches: '^Purpose$' },
+            required: true,
+          },
+        ],
+      })
+      const schema = makeSchema([specsType])
+
+      const noopContent = '- op: no-op\n'
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth',
+            new ArtifactFile({
+              key: 'default:auth',
+              filename: 'deltas/default/auth/spec.md.delta.yaml',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename === 'deltas/default/auth/spec.md.delta.yaml') {
+            return new SpecArtifact(filename, noopContent)
+          }
+          return null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeNoopParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({ name: 'c', specPath: 'default:auth' })
+
+      // Would fail if validations ran (no Purpose section in no-op delta content)
+      expect(result.passed).toBe(true)
+      const artifact = repo.store.get('c')?.getArtifact('specs')
+      expect(artifact?.status).toBe('complete')
+    })
+
+    it('calls markComplete with hash of raw delta file content', async () => {
+      const specsType = makeArtifactType('specs', {
+        scope: 'spec',
+        format: 'markdown',
+        delta: true,
+      })
+      const schema = makeSchema([specsType])
+
+      const noopContent = '- op: no-op\n'
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth',
+            new ArtifactFile({
+              key: 'default:auth',
+              filename: 'deltas/default/auth/spec.md.delta.yaml',
+              status: 'in-progress',
+            }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+
+      const repo = makeChangeRepository([change])
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          if (filename === 'deltas/default/auth/spec.md.delta.yaml') {
+            return new SpecArtifact(filename, noopContent)
+          }
+          return null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeNoopParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      await uc.execute({ name: 'c', specPath: 'default:auth' })
+
+      const artifact = repo.store.get('c')?.getArtifact('specs')
+      const file = artifact?.getFile('default:auth')
+      expect(file?.validatedHash).toBe(sha256(noopContent))
     })
   })
 
@@ -996,12 +1268,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       await uc.execute({
@@ -1039,12 +1309,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1063,12 +1331,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1088,12 +1354,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         makeChangeRepository([change]),
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1138,12 +1402,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1184,12 +1446,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1248,12 +1508,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({
@@ -1298,12 +1556,10 @@ describe('ValidateArtifacts', () => {
       const uc = new ValidateArtifacts(
         repo,
         new Map(),
-        makeSchemaRegistry(schema),
+        makeSchemaProvider(schema),
         makeParsers(),
         makeActorResolver(),
         makeContentHasher(),
-        'test',
-        new Map(),
       )
 
       const result = await uc.execute({

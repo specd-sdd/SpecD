@@ -1,0 +1,303 @@
+title: Kernel
+description: 'Consumers of `@specd/core` need a single, stable entry point that exposes every use case without requiring knowledge of internal wiring or adapter construction. The kernel serves this role: it assembles all use cases from a resolved `SpecdConfig` and exposes them as a typed object grouped by domain area. Delivery mechanisms (CLI, MCP, plugins) consume use cases exclusively through the kernel interface, which defines the contract between `@specd/core` and its consumers.'
+dependsOn:
+  - default:_global/architecture
+  - core:core/composition
+  - core:core/create-change
+  - core:core/get-status
+  - core:core/transition-change
+  - core:core/draft-change
+  - core:core/restore-change
+  - core:core/discard-change
+  - core:core/archive-change
+  - core:core/validate-artifacts
+  - core:core/compile-context
+  - core:core/list-changes
+  - core:core/list-drafts
+  - core:core/list-discarded
+  - core:core/edit-change
+  - core:core/skip-artifact
+  - core:core/update-spec-deps
+  - core:core/list-archived
+  - core:core/get-archived-change
+  - core:core/run-step-hooks
+  - core:core/get-hook-instructions
+  - core:core/get-artifact-instruction
+  - core:core/approve-spec
+  - core:core/approve-signoff
+  - core:core/list-specs
+  - core:core/get-spec
+  - core:core/save-spec-metadata
+  - core:core/invalidate-spec-metadata
+  - core:core/get-active-schema
+  - core:core/validate-specs
+  - core:core/generate-metadata
+  - core:core/get-spec-context
+  - core:core/init-project
+  - core:core/record-skill-install
+  - core:core/get-skills-manifest
+  - core:core/get-project-context
+  - core:core/resolve-schema
+context:
+  - 'Consumers of `@specd/core` need a single, stable entry point that exposes every use case without requiring knowledge of internal wiring or adapter construction. The kernel serves this role: it assembles all use cases from a resolved `SpecdConfig` and exposes them as a typed object grouped by domain area. Delivery mechanisms (CLI, MCP, plugins) consume use cases exclusively through the kernel interface, which defines the contract between `@specd/core` and its consumers.'
+rules:
+  - requirement: Kernel interface groups use cases by domain area
+    rules:
+      - |-
+        The `Kernel` interface organises use cases into three groups that mirror the domain areas of the platform:
+
+        - `changes` — use cases that operate on change lifecycle (create, transition, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status)
+        - `specs` — use cases that operate on specs and approval gates (approve spec, approve signoff, list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context)
+        - `project` — use cases that operate on the project configuration (init, record skill install, get skills manifest, get project context)
+
+        Use cases must not appear at the top level of the kernel object — they must be nested under their domain-area group.
+  - requirement: Every exported use case must have a kernel entry
+    rules:
+      - |-
+        Every use case class exported from `application/use-cases/` must have a corresponding entry in the `Kernel` interface. If a new use case is added to the application layer and exported, it must also be wired into `createKernel` and exposed via the `Kernel` interface.
+
+        Shared utilities in `application/use-cases/_shared/` are exempt — they are internal building blocks, not standalone use cases.
+  - requirement: Kernel entries must match use case types
+    rules:
+      - Each entry in the `Kernel` interface must be typed as the concrete use case class it wraps. The kernel does not define its own method signatures — it delegates to the use case instances directly. Callers invoke use cases as `kernel.changes.create.execute(...)`, not through a kernel-level abstraction.
+  - requirement: createKernel constructs shared adapters once
+    rules:
+      - |-
+        `createKernel(config)` MUST construct all shared adapters, ports, and use cases exactly once and wire them together. Constructing the same adapter or use case twice would waste resources and risk inconsistent state.
+
+        Shared infrastructure includes:
+
+        - One `ChangeRepository` instance (shared by all change use cases)
+        - One `SpecRepository` per workspace
+        - One `SchemaRegistry` instance
+        - One `SchemaProvider` instance — a lazy, caching provider that resolves the schema (with plugins and overrides) on first access via `ResolveSchema`, then returns the cached result. All use cases that need the schema MUST receive this provider instead of the raw `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple.
+        - One `HookRunner` instance
+        - One `RunStepHooks` instance (shared by `TransitionChange`, `ArchiveChange`, and exposed directly)
+        - One `ContentHasher` instance
+        - One `ArtifactParserRegistry` instance
+
+        No use case constructor may call `SchemaRegistry.resolve()` directly. Schema access is exclusively through `SchemaProvider.get()`, which returns the fully-resolved schema with extends chains, plugins, and `schemaOverrides` applied.
+
+        `RunStepHooks` and `GetHookInstructions` do not receive project-level workflow hooks — all hooks are merged into the schema by `ResolveSchema` via `schemaOverrides`. The kernel does not read `config.workflow`.
+  - requirement: Auto-invalidation on get when artifact files drift
+    rules:
+      - |-
+        When `ChangeRepository.get()` loads a change, the `FsChangeRepository` implementation must check whether any previously-validated artifact file has drifted — i.e. the file had a `validatedHash` set but now has a derived status of `missing` or `in-progress`. If drift is detected AND either of the following conditions holds, the repository must call `change.invalidate('artifact-change', SYSTEM_ACTOR)` to roll the change back to `designing` and persist the updated state:
+
+        1. The change is beyond `designing` state (has progressed past the initial design phase), OR
+        2. The change has an active approval (spec approval or signoff) not superseded by a subsequent `invalidated` event.
+
+        This ensures that both state-inconsistent artifact changes and approval drift are detected eagerly on any change load, not only during explicit validation. See [`specs/core/change-repository-port/spec.md`](../change-repository-port/spec.md) for the full port-level contract.
+  - requirement: Kernel exposes repository instances for adapter access
+    rules:
+      - The kernel must expose the underlying `ChangeRepository` as `changes.repo` and the `SpecRepository` map as `specs.repos`. These allow delivery mechanisms to perform adapter-level queries (path resolution, existence checks) that do not warrant a full use case.
+  - requirement: createKernel accepts optional KernelOptions
+    rules:
+      - '`createKernel(config, options?)` accepts an optional `KernelOptions` object. The `extraNodeModulesPaths` option appends additional `node_modules` directories to the schema search path, so that globally-installed schema packages are found even when the project has no local copy.'
+  - requirement: Kernel entry mapping
+    rules:
+      - |-
+        The following table is the exhaustive mapping between kernel paths and use case classes. Each entry is a binding contract — consumers access use cases exclusively through these paths.
+
+        #### kernel.changes
+
+        | Kernel path                      | Use case class           | Spec                                                            | Description                                             |
+        | -------------------------------- | ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------- |
+        | `changes.repo`                   | `ChangeRepository`       | —                                                               | Underlying repository for adapter-level queries         |
+        | `changes.create`                 | `CreateChange`           | [create-change](../create-change/spec.md)                       | Creates a new change                                    |
+        | `changes.status`                 | `GetStatus`              | [get-status](../get-status/spec.md)                             | Reports lifecycle state and artifact statuses           |
+        | `changes.transition`             | `TransitionChange`       | [transition-change](../transition-change/spec.md)               | Performs a lifecycle state transition                   |
+        | `changes.draft`                  | `DraftChange`            | [draft-change](../draft-change/spec.md)                         | Shelves a change to drafts                              |
+        | `changes.restore`                | `RestoreChange`          | [restore-change](../restore-change/spec.md)                     | Recovers a drafted change                               |
+        | `changes.discard`                | `DiscardChange`          | [discard-change](../discard-change/spec.md)                     | Permanently abandons a change                           |
+        | `changes.archive`                | `ArchiveChange`          | [archive-change](../archive-change/spec.md)                     | Finalises a change: merges deltas, moves to archive     |
+        | `changes.validate`               | `ValidateArtifacts`      | [validate-artifacts](../validate-artifacts/spec.md)             | Validates artifact files against the active schema      |
+        | `changes.compile`                | `CompileContext`         | [compile-context](../compile-context/spec.md)                   | Assembles the context block for a lifecycle step        |
+        | `changes.list`                   | `ListChanges`            | [list-changes](../list-changes/spec.md)                         | Lists all active changes                                |
+        | `changes.listDrafts`             | `ListDrafts`             | [list-drafts](../list-drafts/spec.md)                           | Lists all drafted changes                               |
+        | `changes.listDiscarded`          | `ListDiscarded`          | [list-discarded](../list-discarded/spec.md)                     | Lists all discarded changes                             |
+        | `changes.edit`                   | `EditChange`             | [edit-change](../edit-change/spec.md)                           | Edits the spec scope of a change                        |
+        | `changes.skipArtifact`           | `SkipArtifact`           | [skip-artifact](../skip-artifact/spec.md)                       | Explicitly skips an optional artifact                   |
+        | `changes.updateSpecDeps`         | `UpdateSpecDeps`         | [update-spec-deps](../update-spec-deps/spec.md)                 | Updates declared dependencies for a spec                |
+        | `changes.listArchived`           | `ListArchived`           | [list-archived](../list-archived/spec.md)                       | Lists all archived changes                              |
+        | `changes.getArchived`            | `GetArchivedChange`      | [get-archived-change](../get-archived-change/spec.md)           | Retrieves a single archived change by name              |
+        | `changes.runStepHooks`           | `RunStepHooks`           | [run-step-hooks](../run-step-hooks/spec.md)                     | Executes run: hooks for a step and phase                |
+        | `changes.getHookInstructions`    | `GetHookInstructions`    | [get-hook-instructions](../get-hook-instructions/spec.md)       | Returns instruction: hook text for a step and phase     |
+        | `changes.getArtifactInstruction` | `GetArtifactInstruction` | [get-artifact-instruction](../get-artifact-instruction/spec.md) | Returns artifact instruction block with rules and delta |
+
+        #### kernel.specs
+
+        | Kernel path                | Use case class                        | Spec                                                            | Description                                                 |
+        | -------------------------- | ------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
+        | `specs.repos`              | `ReadonlyMap<string, SpecRepository>` | —                                                               | Spec repositories keyed by workspace name                   |
+        | `specs.approveSpec`        | `ApproveSpec`                         | [approve-spec](../approve-spec/spec.md)                         | Records a spec approval and transitions state               |
+        | `specs.approveSignoff`     | `ApproveSignoff`                      | [approve-signoff](../approve-signoff/spec.md)                   | Records a sign-off and transitions state                    |
+        | `specs.list`               | `ListSpecs`                           | [list-specs](../list-specs/spec.md)                             | Lists all specs across all workspaces                       |
+        | `specs.get`                | `GetSpec`                             | [get-spec](../get-spec/spec.md)                                 | Loads a spec and all artifact files                         |
+        | `specs.saveMetadata`       | `SaveSpecMetadata`                    | [save-spec-metadata](../save-spec-metadata/spec.md)             | Writes a `.specd-metadata.yaml` file                        |
+        | `specs.invalidateMetadata` | `InvalidateSpecMetadata`              | [invalidate-spec-metadata](../invalidate-spec-metadata/spec.md) | Invalidates a spec's metadata                               |
+        | `specs.getActiveSchema`    | `GetActiveSchema`                     | [get-active-schema](../get-active-schema/spec.md)               | Resolves and returns the active schema                      |
+        | `specs.validate`           | `ValidateSpecs`                       | [validate-specs](../validate-specs/spec.md)                     | Validates spec artifacts against schema rules               |
+        | `specs.generateMetadata`   | `GenerateSpecMetadata`                | [generate-metadata](../generate-metadata/spec.md)               | Generates deterministic metadata from extraction rules      |
+        | `specs.getContext`         | `GetSpecContext`                      | [get-spec-context](../get-spec-context/spec.md)                 | Builds structured context entries with dependency traversal |
+        | `specs.resolveSchema`      | `ResolveSchema`                       | [resolve-schema](../resolve-schema/spec.md)                     | Resolves base schema with extends, plugins, and overrides   |
+
+        #### kernel.project
+
+        | Kernel path                  | Use case class       | Spec                                                    | Description                                     |
+        | ---------------------------- | -------------------- | ------------------------------------------------------- | ----------------------------------------------- |
+        | `project.init`               | `InitProject`        | [init-project](../init-project/spec.md)                 | Initialises a new specd project                 |
+        | `project.recordSkillInstall` | `RecordSkillInstall` | [record-skill-install](../record-skill-install/spec.md) | Records that skills were installed for an agent |
+        | `project.getSkillsManifest`  | `GetSkillsManifest`  | [get-skills-manifest](../get-skills-manifest/spec.md)   | Reads the installed skills manifest             |
+        | `project.getProjectContext`  | `GetProjectContext`  | [get-project-context](../get-project-context/spec.md)   | Compiles the project-level context block        |
+
+        Adding, removing, or renaming an entry in this table is a contract change and must be reflected in both the `Kernel` interface and `createKernel`.
+constraints:
+  - The Kernel interface is the only way delivery mechanisms should access use cases — direct use case construction is reserved for tests and the composition layer's own factories
+  - Adding a use case to application/use-cases/ without adding it to the Kernel interface is a spec violation
+  - Removing a use case from the Kernel interface is a breaking change and must follow the breaking change commit convention
+  - The kernel must not contain business logic — it is purely a wiring and grouping mechanism
+  - createKernelInternals is not exported from @specd/core — it is internal to the composition layer
+  - The Kernel interface and createKernel function are public exports of @specd/core
+scenarios:
+  - requirement: Kernel interface groups use cases by domain area
+    name: Use cases are nested under domain groups
+    when:
+      - createKernel(config) is called with a valid SpecdConfig
+    then:
+      - 'the returned object has exactly three top-level keys: changes, specs, project'
+      - AND each key contains an object with use case entries — not use cases at the root level
+  - requirement: Kernel interface groups use cases by domain area
+    name: Changes group contains all change use cases
+    when:
+      - kernel.changes is inspected
+    then:
+      - 'it contains entries for: create, status, transition, draft, restore, discard, archive, validate, compile, list, listDrafts, listDiscarded, edit, skipArtifact, updateSpecDeps, listArchived, getArchived'
+      - AND it contains repo as the underlying ChangeRepository
+  - requirement: Kernel interface groups use cases by domain area
+    name: Specs group contains all spec use cases
+    when:
+      - kernel.specs is inspected
+    then:
+      - 'it contains entries for: approveSpec, approveSignoff, list, get, saveMetadata, invalidateMetadata, getActiveSchema, validate, generateMetadata, getContext'
+      - AND it contains repos as the ReadonlyMap<string, SpecRepository>
+  - requirement: Kernel interface groups use cases by domain area
+    name: Project group contains all project use cases
+    when:
+      - kernel.project is inspected
+    then:
+      - 'it contains entries for: init, recordSkillInstall, getSkillsManifest, getProjectContext'
+  - requirement: Every exported use case must have a kernel entry
+    name: New use case added without kernel entry
+    given:
+      - a new use case class is added to application/use-cases/ and exported from the use cases index
+    when:
+      - createKernel is inspected
+    then:
+      - the new use case must have a corresponding entry in the Kernel interface and be wired in createKernel
+      - AND omitting it is a spec violation
+  - requirement: Every exported use case must have a kernel entry
+    name: Shared utilities are exempt
+    when:
+      - application/use-cases/_shared/ exports checkMetadataFreshness, computeArtifactHash, or parseMetadata
+    then:
+      - these do not require kernel entries — they are internal building blocks
+  - requirement: Kernel entry mapping
+    name: Every mapped entry exists at the documented path
+    when:
+      - createKernel(config) is called with a valid SpecdConfig
+    then:
+      - every kernel path listed in the entry mapping table resolves to a non-undefined value
+      - AND each value is an instance of the use case class documented in the table
+  - requirement: Kernel entry mapping
+    name: No undocumented entries in the kernel
+    when:
+      - the keys of kernel.changes, kernel.specs, and kernel.project are enumerated
+    then:
+      - every key appears in the entry mapping table — there are no undocumented entries
+  - requirement: Kernel entry mapping
+    name: Entry added to kernel without updating the mapping table
+    given:
+      - a new use case is wired into createKernel under kernel.changes.newUseCase
+    when:
+      - the kernel spec is reviewed
+    then:
+      - the entry mapping table must include the new path — omitting it is a spec violation
+  - requirement: Kernel entries must match use case types
+    name: Kernel entry type matches use case class
+    when:
+      - kernel.changes.create is inspected
+    then:
+      - it is an instance of CreateChange
+      - AND calling kernel.changes.create.execute(...) invokes the use case directly
+  - requirement: Kernel entries must match use case types
+    name: Kernel does not wrap use cases in abstractions
+    when:
+      - any kernel entry is inspected
+    then:
+      - its type is the concrete use case class, not a wrapper, proxy, or simplified interface
+  - requirement: createKernel constructs shared adapters once
+    name: No duplicate adapter construction
+    given:
+      - a valid SpecdConfig with one workspace
+    when:
+      - createKernel(config) is called
+    then:
+      - only one ChangeRepository instance is created
+      - AND only one SchemaRegistry instance is created
+      - AND only one SchemaProvider instance is created and shared across all use cases
+      - AND only one RunStepHooks instance is created
+  - requirement: createKernel constructs shared adapters once
+    name: SchemaProvider replaces direct SchemaRegistry usage
+    given:
+      - a valid SpecdConfig with schemaOverrides declared
+    when:
+      - createKernel(config) is called
+    then:
+      - no use case constructor receives SchemaRegistry directly
+      - AND all use cases that need the schema receive SchemaProvider
+      - AND SchemaProvider.get() returns the schema with overrides applied
+      - AND RunStepHooks and GetHookInstructions do not receive project-level workflow hooks
+  - requirement: Kernel exposes repository instances for adapter access
+    name: ChangeRepository accessible via kernel
+    when:
+      - kernel.changes.repo is accessed
+    then:
+      - it returns the ChangeRepository instance used by all change use cases
+  - requirement: Kernel exposes repository instances for adapter access
+    name: SpecRepository map accessible via kernel
+    when:
+      - kernel.specs.repos is accessed
+    then:
+      - it returns a ReadonlyMap<string, SpecRepository> with one entry per configured workspace
+  - requirement: createKernel accepts optional KernelOptions
+    name: Extra node_modules paths appended to schema search
+    given:
+      - "a KernelOptions with extraNodeModulesPaths: ['/usr/lib/node_modules']"
+    when:
+      - createKernel(config, options) is called
+    then:
+      - the schema registry searches the project's own node_modules first, then /usr/lib/node_modules
+  - requirement: createKernel accepts optional KernelOptions
+    name: No options provided
+    when:
+      - createKernel(config) is called without options
+    then:
+      - the schema registry searches only the project's own node_modules
+  - requirement: Kernel is a plain object, not a class
+    name: Kernel has no methods or lifecycle
+    when:
+      - the kernel object is inspected
+    then:
+      - it has no dispose(), shutdown(), initialize(), or similar lifecycle methods
+      - AND it has no event emitter or observable properties
+  - requirement: Kernel is a plain object, not a class
+    name: Kernel is immutable after creation
+    when:
+      - createKernel(config) returns
+    then:
+      - the kernel object and its nested groups are not expected to change — there is no addUseCase() or removeUseCase() mechanism
+contentHashes:
+  spec.md: sha256:e97ef152ac0a46beb5717c7af8d51e5722418b54ddf560e18cb9c2c81095ea4e
+  verify.md: sha256:0fc05e9d04345029957648b9420e5453b4cca23f5363ad63e2e404f490d1a9d1
+generatedBy: core

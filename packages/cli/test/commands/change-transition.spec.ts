@@ -55,7 +55,6 @@ describe('Approval-gate routing', () => {
     })
     kernel.changes.transition.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
-      postHookFailures: [],
     })
 
     const program = makeProgram()
@@ -77,7 +76,6 @@ describe('Approval-gate routing', () => {
     })
     kernel.changes.transition.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'pending-signoff' }),
-      postHookFailures: [],
     })
 
     const program = makeProgram()
@@ -120,7 +118,6 @@ describe('Output on success', () => {
     })
     kernel.changes.transition.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'designing' }),
-      postHookFailures: [],
     })
 
     const program = makeProgram()
@@ -140,7 +137,6 @@ describe('Output on success', () => {
     })
     kernel.changes.transition.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'designing' }),
-      postHookFailures: [],
     })
 
     const program = makeProgram()
@@ -186,8 +182,8 @@ describe('Invalid transition error', () => {
   })
 })
 
-describe('--no-hooks flag', () => {
-  it('passes skipHooks: true to the use case when --no-hooks is set', async () => {
+describe('--skip-hooks flag', () => {
+  it('passes skipHookPhases with all to the use case when --skip-hooks all is set', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
@@ -195,7 +191,6 @@ describe('--no-hooks flag', () => {
     })
     kernel.changes.transition.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'designing' }),
-      postHookFailures: [],
     })
 
     const program = makeProgram()
@@ -207,15 +202,16 @@ describe('--no-hooks flag', () => {
       'transition',
       'my-change',
       'designing',
-      '--no-hooks',
+      '--skip-hooks',
+      'all',
     ])
 
     const call = kernel.changes.transition.execute.mock.calls[0]![0]
-    expect(call.skipHooks).toBe(true)
+    expect(call.skipHookPhases).toEqual(new Set(['all']))
     expect(stdout()).toContain('transitioned')
   })
 
-  it('passes skipHooks: false by default (no --no-hooks flag)', async () => {
+  it('passes empty skipHookPhases by default (no --skip-hooks flag)', async () => {
     const { kernel } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
@@ -223,7 +219,6 @@ describe('--no-hooks flag', () => {
     })
     kernel.changes.transition.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'designing' }),
-      postHookFailures: [],
     })
 
     const program = makeProgram()
@@ -231,35 +226,37 @@ describe('--no-hooks flag', () => {
     await program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'designing'])
 
     const call = kernel.changes.transition.execute.mock.calls[0]![0]
-    expect(call.skipHooks).toBe(false)
+    expect(call.skipHookPhases).toEqual(new Set())
   })
-})
 
-describe('Post-hook failure warning', () => {
-  it('exits with code 2 when post-hooks fail', async () => {
-    const { kernel, stderr } = setup()
+  it('parses comma-separated phases', async () => {
+    const { kernel } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       artifactStatuses: [],
     })
     kernel.changes.transition.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'designing' }),
-      postHookFailures: ['git push', 'notify'],
     })
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
-    await program
-      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'designing'])
-      .catch(() => {})
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'transition',
+      'my-change',
+      'designing',
+      '--skip-hooks',
+      'target.pre,source.post',
+    ])
 
-    expect(process.exit).toHaveBeenCalledWith(2)
-    const err = stderr()
-    expect(err).toContain('post-hook')
-    expect(err).toContain('git push')
+    const call = kernel.changes.transition.execute.mock.calls[0]![0]
+    expect(call.skipHookPhases).toEqual(new Set(['target.pre', 'source.post']))
   })
 
-  it('JSON output includes postHookFailures on success', async () => {
+  it('JSON output does not include postHookFailures', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
@@ -267,7 +264,6 @@ describe('Post-hook failure warning', () => {
     })
     kernel.changes.transition.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'designing' }),
-      postHookFailures: [],
     })
 
     const program = makeProgram()
@@ -284,7 +280,8 @@ describe('Post-hook failure warning', () => {
     ])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed.postHookFailures).toEqual([])
+    expect(parsed.result).toBe('ok')
+    expect(parsed.postHookFailures).toBeUndefined()
   })
 })
 

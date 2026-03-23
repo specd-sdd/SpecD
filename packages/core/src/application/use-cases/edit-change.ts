@@ -109,10 +109,17 @@ export class EditChange {
 
     const actor = await this._actor.identity()
 
+    const removedSpecIds = input.removeSpecIds ?? []
+
     // Update spec IDs — this also appends an invalidated + transitioned event
     change.updateSpecIds(specIds, actor)
 
     await this._changes.save(change)
+
+    if (removedSpecIds.length > 0) {
+      await this._changes.unscaffold(change, removedSpecIds)
+    }
+
     await this._changes.scaffold(change, (specId) => this._specExists(specId))
     return { change, invalidated: true }
   }

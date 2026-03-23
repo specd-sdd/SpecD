@@ -1,9 +1,9 @@
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
-import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
 import { StepNotValidError } from '../../domain/errors/step-not-valid-error.js'
 import { HookNotFoundError } from '../../domain/errors/hook-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type SchemaRegistry } from '../ports/schema-registry.js'
+import { type ArchiveRepository } from '../ports/archive-repository.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type TemplateExpander } from '../template-expander.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
@@ -33,48 +33,28 @@ export interface GetHookInstructionsResult {
  */
 export class GetHookInstructions {
   private readonly _changes: ChangeRepository
-  private readonly _schemas: SchemaRegistry
+  private readonly _archive: ArchiveRepository
+  private readonly _schemaProvider: SchemaProvider
   private readonly _templates: TemplateExpander
-  private readonly _schemaRef: string
-  private readonly _workspaceSchemasPaths: ReadonlyMap<string, string>
-  private readonly _projectWorkflowHooks: readonly {
-    readonly step: string
-    readonly hooks: {
-      readonly pre: readonly HookEntry[]
-      readonly post: readonly HookEntry[]
-    }
-  }[]
 
   /**
    * Creates a new `GetHookInstructions` use case.
    *
    * @param changes - Repository for loading change entities
-   * @param schemas - Registry for resolving the active schema
+   * @param archive - Repository for loading archived changes (fallback for post-archive instructions)
+   * @param schemaProvider - Provider for the fully-resolved schema
    * @param templates - Template expander for variable substitution
-   * @param schemaRef - Schema reference string from config
-   * @param workspaceSchemasPaths - Map of workspace names to schema directory paths
-   * @param projectWorkflowHooks - Project-level workflow hook overrides
    */
   constructor(
     changes: ChangeRepository,
-    schemas: SchemaRegistry,
+    archive: ArchiveRepository,
+    schemaProvider: SchemaProvider,
     templates: TemplateExpander,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
-    projectWorkflowHooks?: readonly {
-      readonly step: string
-      readonly hooks: {
-        readonly pre: readonly HookEntry[]
-        readonly post: readonly HookEntry[]
-      }
-    }[],
   ) {
     this._changes = changes
-    this._schemas = schemas
+    this._archive = archive
+    this._schemaProvider = schemaProvider
     this._templates = templates
-    this._schemaRef = schemaRef
-    this._workspaceSchemasPaths = workspaceSchemasPaths
-    this._projectWorkflowHooks = projectWorkflowHooks ?? []
   }
 
   /**
@@ -85,13 +65,40 @@ export class GetHookInstructions {
    */
   async execute(input: GetHookInstructionsInput): Promise<GetHookInstructionsResult> {
     const change = await this._changes.get(input.name)
-    if (change === null) throw new ChangeNotFoundError(input.name)
 
-    const schema = await this._schemas.resolve(this._schemaRef, this._workspaceSchemasPaths)
-    if (schema === null) throw new SchemaNotFoundError(this._schemaRef)
+    // Fallback to archive for post-archive instructions
+    let contextVars: { change: { name: string; workspace: string; path: string } }
+    let schemaName: string
 
-    if (schema.name() !== change.schemaName) {
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
+    if (change === null) {
+      if (input.step === 'archiving' && input.phase === 'post') {
+        const archived = await this._archive.get(input.name)
+        if (archived === null) throw new ChangeNotFoundError(input.name)
+
+        schemaName = archived.schemaName
+        contextVars = {
+          change: {
+            name: archived.name,
+            workspace: archived.workspace.toString(),
+            path: this._archive.archivePath(archived),
+          },
+        }
+      } else {
+        throw new ChangeNotFoundError(input.name)
+      }
+    } else {
+      schemaName = change.schemaName
+      const workspace = change.workspaces[0] ?? 'default'
+      contextVars = {
+        change: { name: change.name, workspace, path: this._changes.changePath(change) },
+      }
+    }
+
+    const schema = await this._schemaProvider.get()
+    if (schema === null) throw new SchemaNotFoundError('(provider)')
+
+    if (schema.name() !== schemaName) {
+      throw new SchemaMismatchError(input.name, schemaName, schema.name())
     }
 
     if (!(CHANGE_STATES as string[]).includes(input.step)) {
@@ -103,21 +110,15 @@ export class GetHookInstructions {
       return { phase: input.phase, instructions: [] }
     }
 
-    // Collect all hooks (schema first, then project)
-    const allHooks: HookEntry[] = [...workflowStep.hooks[input.phase]]
-    const projectStep = this._projectWorkflowHooks.find((s) => s.step === input.step)
-    if (projectStep !== undefined) {
-      allHooks.push(...projectStep.hooks[input.phase])
-    }
-
-    // Filter for instruction: hooks only
-    let instrHooks = allHooks.filter((h) => h.type === 'instruction')
+    // Collect schema hooks filtered to instruction: type
+    const schemaHooks = workflowStep.hooks[input.phase]
+    let instrHooks = schemaHooks.filter((h) => h.type === 'instruction')
 
     // --only filter
     if (input.only !== undefined) {
       const match = instrHooks.find((h) => h.id === input.only)
       if (match === undefined) {
-        const runMatch = allHooks.find((h) => h.id === input.only && h.type === 'run')
+        const runMatch = schemaHooks.find((h) => h.id === input.only && h.type === 'run')
         if (runMatch !== undefined) {
           throw new HookNotFoundError(input.only, 'wrong-type')
         }
@@ -128,12 +129,6 @@ export class GetHookInstructions {
 
     if (instrHooks.length === 0) {
       return { phase: input.phase, instructions: [] }
-    }
-
-    // Build contextual variables for template expansion
-    const workspace = change.workspaces[0] ?? 'default'
-    const contextVars = {
-      change: { name: change.name, workspace, path: this._changes.changePath(change) },
     }
 
     const instructions = instrHooks.map((h) => ({

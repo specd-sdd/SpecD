@@ -50,23 +50,22 @@
 
 ### Requirement: Conflict detection via originalHash
 
-#### Scenario: Existing artifact hash is captured for conflict detection
+#### Scenario: Existing metadata hash is captured for conflict detection
 
-- **GIVEN** a spec with an existing `.specd-metadata.yaml` on disk
+- **GIVEN** a spec with existing metadata on disk
 - **WHEN** `execute()` is called without `force`
-- **THEN** the existing artifact's `originalHash` is passed to the new `SpecArtifact` constructor
+- **THEN** the existing metadata's `originalHash` is captured via `SpecRepository.metadata()`
 - **AND** if the repository detects a hash mismatch, `ArtifactConflictError` propagates to the caller
 
-#### Scenario: Force skips existing artifact loading
+#### Scenario: Force skips existing metadata loading
 
 - **WHEN** `execute()` is called with `force: true`
-- **THEN** the existing artifact is not loaded
-- **AND** the `SpecArtifact` is constructed without an `originalHash`
-- **AND** `SpecRepository.save()` is called with `{ force: true }`
+- **THEN** existing metadata is not loaded
+- **AND** `SpecRepository.saveMetadata()` is called with `{ force: true }`
 
-#### Scenario: No existing artifact on disk
+#### Scenario: No existing metadata on disk
 
-- **GIVEN** a spec with no existing `.specd-metadata.yaml`
+- **GIVEN** a spec with no existing metadata
 - **WHEN** `execute()` is called without `force`
 - **THEN** `originalHash` is `undefined`
 - **AND** the write proceeds normally
@@ -116,10 +115,10 @@
 - **WHEN** `execute()` is called
 - **THEN** the result is `{ spec: 'default:auth/oauth' }`
 
-#### Scenario: Artifact is saved with correct filename
+#### Scenario: Metadata is saved via saveMetadata
 
 - **WHEN** `execute()` succeeds
-- **THEN** `SpecRepository.save()` is called with a `SpecArtifact` whose filename is `.specd-metadata.yaml`
+- **THEN** `SpecRepository.saveMetadata()` is called with the raw YAML content
 
 ### Requirement: Constructor dependencies
 

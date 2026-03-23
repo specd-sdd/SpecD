@@ -5,7 +5,12 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
+import { type SchemaRepository } from '../../application/ports/schema-repository.js'
+import { createSchemaRepository } from '../schema-repository.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
+import { createArchiveRepository } from '../archive-repository.js'
 import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
 import { TemplateExpander } from '../../application/template-expander.js'
 
@@ -31,24 +36,20 @@ export interface FsTransitionChangeOptions {
   readonly draftsPath: string
   /** Absolute path to the `discarded/` directory. */
   readonly discardedPath: string
+  /** Absolute path to the archive root directory. */
+  readonly archivePath: string
+  /** Optional archive directory pattern (e.g. `'{{year}}/{{change.archivedName}}'`). */
+  readonly archivePattern?: string
   /** Additional `node_modules` directories for schema resolution. */
   readonly nodeModulesPaths: readonly string[]
   /** Project root directory for resolving relative schema paths. */
   readonly configDir: string
   /** Schema reference string from config. */
   readonly schemaRef: string
-  /** Map of workspace name → absolute schemas directory path. */
-  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
+  /** Map of workspace name → schema repository instance. */
+  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
   /** Absolute path to the project root. */
   readonly projectRoot: string
-  /** Project-level workflow hook definitions from `specd.yaml`. */
-  readonly projectWorkflowHooks?: readonly {
-    readonly step: string
-    readonly hooks: {
-      readonly pre: readonly import('../../domain/value-objects/workflow-step.js').HookEntry[]
-      readonly post: readonly import('../../domain/value-objects/workflow-step.js').HookEntry[]
-    }
-  }[]
 }
 
 /**
@@ -89,27 +90,36 @@ export function createTransitionChange(
     const config = configOrContext
     const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
     const ws = getDefaultWorkspace(config)
-    const workspaceSchemasPaths = new Map<string, string>()
-    for (const w of config.workspaces) {
-      if (w.schemasPath !== null) {
-        workspaceSchemasPaths.set(w.name, w.schemasPath)
-      }
-    }
+    const schemaRepos = new Map(
+      config.workspaces
+        .filter((w) => w.schemasPath !== null)
+        .map((w) => [
+          w.name,
+          createSchemaRepository(
+            'fs',
+            { workspace: w.name, ownership: w.ownership, isExternal: w.isExternal },
+            { schemasPath: w.schemasPath! },
+          ),
+        ]),
+    ) as ReadonlyMap<string, SchemaRepository>
     return createTransitionChange(
       { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
       {
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,
         discardedPath: config.storage.discardedPath,
+        archivePath: config.storage.archivePath,
+        ...(config.storage.archivePattern !== undefined
+          ? { archivePattern: config.storage.archivePattern }
+          : {}),
         nodeModulesPaths: [
           path.join(config.projectRoot, 'node_modules'),
           ...(kernelOpts?.extraNodeModulesPaths ?? []),
         ],
         configDir: config.projectRoot,
         schemaRef: config.schemaRef,
-        workspaceSchemasPaths,
+        schemaRepositories: schemaRepos,
         projectRoot: config.projectRoot,
-        ...(config.workflow !== undefined ? { projectWorkflowHooks: config.workflow } : {}),
       },
     )
   }
@@ -119,27 +129,22 @@ export function createTransitionChange(
     draftsPath: opts.draftsPath,
     discardedPath: opts.discardedPath,
   })
+  const archiveRepo = createArchiveRepository('fs', configOrContext, {
+    changesPath: opts.changesPath,
+    draftsPath: opts.draftsPath,
+    archivePath: opts.archivePath,
+    ...(opts.archivePattern !== undefined ? { pattern: opts.archivePattern } : {}),
+  })
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: opts.nodeModulesPaths,
     configDir: opts.configDir,
+    schemaRepositories: opts.schemaRepositories,
   })
+  const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
+  const schemaProvider = new LazySchemaProvider(resolveSchema)
   const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
   const hooks = new NodeHookRunner(expander)
   const actor = new GitActorResolver()
-  const runStepHooks = new RunStepHooks(
-    changeRepo,
-    hooks,
-    schemas,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
-    opts.projectWorkflowHooks,
-  )
-  return new TransitionChange(
-    changeRepo,
-    actor,
-    schemas,
-    runStepHooks,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
-  )
+  const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, schemaProvider)
+  return new TransitionChange(changeRepo, actor, schemaProvider, runStepHooks)
 }

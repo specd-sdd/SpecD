@@ -1,0 +1,245 @@
+title: Change Validate
+description: Before a change can advance, its artifacts must be verified against the schema to catch structural errors and missing content early. `specd change validate <name> <workspace:capability-path>` validates a change's artifact files against the active schema for a specific spec and marks passing artifacts as complete.
+dependsOn:
+  - cli:cli/entrypoint
+  - core:core/change
+  - core:core/spec-id-format
+context:
+  - Before a change can advance, its artifacts must be verified against the schema to catch structural errors and missing content early. `specd change validate <name> <workspace:capability-path>` validates a change's artifact files against the active schema for a specific spec and marks passing artifacts as complete.
+rules:
+  - requirement: Command signature
+    rules:
+      - |-
+        ```
+        specd change validate <name> [workspace:capability-path] [--all] [--artifact <artifactId>] [--format text|json|toon]
+        ```
+
+        - `<name>` — required positional; the name of the change to validate
+        - `[workspace:capability-path]` — optional positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`. Required unless `--all` is used.
+        - `--all` — validate all `specIds` declared in the change. Mutually exclusive with `<workspace:capability-path>`.
+        - `--artifact <artifactId>` — optional; when provided, only the specified artifact is validated instead of all artifacts for the spec. Works with both single-spec and `--all` modes.
+        - `--format text|json|toon` — optional; output format, defaults to `text`
+  - requirement: Behaviour
+    rules:
+      - The command invokes the `ValidateArtifacts` use case, passing the change name, spec ID, and optionally the artifact ID from `--artifact`.
+  - requirement: Output on success
+    rules:
+      - |-
+        In `text` mode (default), when all artifacts pass:
+
+        ```
+        validated <name>/<workspace:capability-path>: all artifacts pass
+        ```
+
+        In `text` mode, when there are warnings but no failures:
+
+        ```
+        validated <name>/<workspace:capability-path>: pass (N warning(s))
+        warning: <artifactId> — <description>
+        ...
+        ```
+
+        In `json` or `toon` mode, the output is (encoded in the respective format):
+
+        ```json
+        { "passed": true, "failures": [], "warnings": [{ "artifactId": "...", "description": "..." }] }
+        ```
+  - requirement: Output on failure
+    rules:
+      - |-
+        In `text` mode, the command prints each failure to stdout, exits with code 1:
+
+        ```
+        validation failed <name>/<workspace:capability-path>:
+          error: <artifactId> — <description>
+          ...
+          warning: <artifactId> — <description>
+          ...
+        ```
+
+        In `json` or `toon` mode, the output is (encoded in the respective format):
+
+        ```json
+        {"passed": false, "failures": [{"artifactId": "...", "description": "..."}], "warnings": [...]}
+        ```
+
+        The process exits with code 1 when `passed` is `false`, regardless of format.
+  - requirement: Spec ID not in change
+    rules:
+      - If the given `<workspace:capability-path>` is not declared in the change's `specIds`, the command exits with code 1 and prints an `error:` message to stderr.
+  - requirement: Error cases
+    rules:
+      - |-
+        - If the change does not exist, exits with code 1.
+        - If the schema cannot be resolved, exits with code 3.
+  - requirement: Unknown artifact ID
+    rules:
+      - If `--artifact` is provided with an artifact ID that does not exist in the active schema, the command exits with code 1 and prints the validation failure from the use case to stdout (not stderr — it is a validation result, not a CLI error).
+  - requirement: Batch mode (--all)
+    rules:
+      - |-
+        With `--all`, the command loads the change's `specIds` and validates each one in order. `--all` is mutually exclusive with the `<workspace:capability-path>` positional — providing both exits with `error: --all and <specPath> are mutually exclusive`. Omitting both exits with `error: either <specPath> or --all is required`.
+
+        `--artifact` works with `--all` — it validates only that artifact type for every spec in the change.
+
+        For each spec, the command invokes `ValidateArtifacts` and collects results. Individual spec failures do not abort the batch — all specs are validated.
+
+        **Text output:** each spec's result is printed as in single-spec mode (success or failure block), followed by a summary line: `validated N/M specs`.
+
+        **JSON output:** `{ passed: <bool>, total: M, results: [{ spec: "<id>", passed: <bool>, failures: [...], warnings: [...] }] }`
+
+        The process exits with code 1 if any spec has failures, 0 if all pass.
+constraints:
+  - Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr
+  - The command marks artifacts as complete in the manifest when they pass
+  - Batch mode uses the change's specIds list — no custom spec resolution in the CLI layer
+scenarios:
+  - requirement: Command signature
+    name: Missing arguments
+    when:
+      - specd change validate my-change is run without the spec ID
+    then:
+      - the command exits with code 1 and prints a usage error to stderr
+  - requirement: Command signature
+    name: Artifact flag accepted
+    given:
+      - a valid change my-change with spec default:auth/login
+    when:
+      - specd change validate my-change default:auth/login --artifact proposal is run
+    then:
+      - the command invokes validation for only the proposal artifact
+      - AND the process exits with code 0 if proposal passes validation
+  - requirement: Output on success
+    name: All artifacts pass, no warnings
+    given:
+      - a change where all artifacts pass validation
+    when:
+      - specd change validate my-change default:auth/login is run
+    then:
+      - 'stdout contains validated my-change/default:auth/login: all artifacts pass'
+      - AND the process exits with code 0
+  - requirement: Output on success
+    name: Pass with warnings
+    given:
+      - a change where artifacts pass but there are optional rule mismatches
+    when:
+      - specd change validate my-change default:auth/login is run
+    then:
+      - 'stdout contains a pass message and warning: lines for each warning'
+      - AND the process exits with code 0
+  - requirement: Output on failure
+    name: Validation failures
+    given:
+      - a change where a required artifact fails validation
+    when:
+      - specd change validate my-change default:auth/login is run
+    then:
+      - 'stdout contains validation failed and error: lines for each failure'
+      - AND the process exits with code 1
+  - requirement: Spec ID not in change
+    name: Unknown spec ID
+    given:
+      - a change with specId default:auth/login
+    when:
+      - specd change validate my-change default:billing/invoices is run
+    then:
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+  - requirement: Error cases
+    name: Change not found
+    when:
+      - specd change validate nonexistent default:auth/login is run
+    then:
+      - the command exits with code 1
+      - 'AND stderr contains an error: message'
+  - requirement: Unknown artifact ID
+    name: Unknown artifact ID exits with failure
+    given:
+      - a valid change my-change with spec default:auth/login
+      - AND the active schema has no artifact with ID nonexistent
+    when:
+      - specd change validate my-change default:auth/login --artifact nonexistent is run
+    then:
+      - the command exits with code 1
+      - AND stdout contains the validation failure describing the unknown artifact ID
+  - requirement: Unknown artifact ID
+    name: Unknown artifact ID with JSON format
+    given:
+      - a valid change my-change with spec default:auth/login
+      - AND the active schema has no artifact with ID nonexistent
+    when:
+      - specd change validate my-change default:auth/login --artifact nonexistent --format json is run
+    then:
+      - stdout is valid JSON with passed equal to false
+      - AND failures contains an entry describing the unknown artifact ID
+      - AND the process exits with code 1
+  - requirement: Batch mode (--all)
+    name: --all without specPath validates all specIds
+    given:
+      - a change with specIds ["default:auth/login", "default:auth/logout"] and valid artifacts for both
+    when:
+      - specd change validate my-change --all is run
+    then:
+      - both specs are validated
+      - AND text output shows success for each spec
+      - AND summary shows validated 2/2 specs
+  - requirement: Batch mode (--all)
+    name: --all with specPath is rejected
+    when:
+      - specd change validate my-change default:auth/login --all is run
+    then:
+      - 'stderr contains error: --all and <specPath> are mutually exclusive and exit code is 1'
+  - requirement: Batch mode (--all)
+    name: neither specPath nor --all is rejected
+    when:
+      - specd change validate my-change is run without specPath or --all
+    then:
+      - 'stderr contains error: either <specPath> or --all is required and exit code is 1'
+  - requirement: Batch mode (--all)
+    name: --all with --artifact validates one artifact across all specs
+    given:
+      - a change with 2 specIds
+    when:
+      - specd change validate my-change --all --artifact proposal is run
+    then:
+      - only the proposal artifact is validated for each spec
+  - requirement: Batch mode (--all)
+    name: --all with partial failures exits 1
+    given:
+      - a change with 2 specIds, one passes and one fails validation
+    when:
+      - specd change validate my-change --all is run
+    then:
+      - both specs are validated (batch continues)
+      - AND exit code is 1
+      - AND summary shows validated 1/2 specs
+  - requirement: Batch mode (--all)
+    name: --all JSON output
+    given:
+      - a change with 2 specIds, both pass
+    when:
+      - specd change validate my-change --all --format json is run
+    then:
+      - 'output is { passed: true, total: 2, results: [...] } with per-spec entries'
+  - requirement: Output on success
+    name: JSON output on pass
+    given:
+      - a change where all artifacts pass validation with no warnings
+    when:
+      - specd change validate my-change default:auth/login --format json is run
+    then:
+      - stdout is valid JSON with passed equal to true, failures equal to [], and warnings equal to []
+      - AND the process exits with code 0
+  - requirement: Output on failure
+    name: JSON output on failure
+    given:
+      - a change where a required artifact fails validation
+    when:
+      - specd change validate my-change default:auth/login --format json is run
+    then:
+      - stdout is valid JSON with passed equal to false and failures containing at least one entry with artifactId and description
+      - AND the process exits with code 1
+contentHashes:
+  spec.md: sha256:041622869530f1b436c8ffc861313623919a969bb99130075bc0fa643ac6dc39
+  verify.md: sha256:143b77ab4630e8d60eb5e991075e83cca9e2e476af7765299b4263b8d1e794f0
+generatedBy: core

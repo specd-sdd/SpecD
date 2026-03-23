@@ -8,6 +8,10 @@ import { createSpecRepository } from '../spec-repository.js'
 import { createArchiveRepository } from '../archive-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
+import { type SchemaRepository } from '../../application/ports/schema-repository.js'
+import { createSchemaRepository } from '../schema-repository.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
 import { TemplateExpander } from '../../application/template-expander.js'
 import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
@@ -16,7 +20,6 @@ import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { NodeYamlSerializer } from '../../infrastructure/node/yaml-serializer.js'
 import { GenerateSpecMetadata } from '../../application/use-cases/generate-spec-metadata.js'
 import { SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata.js'
-import { type HookEntry } from '../../domain/value-objects/workflow-step.js'
 
 /**
  * Domain context for the primary (default) workspace used by `ArchiveChange`.
@@ -57,17 +60,9 @@ export interface FsArchiveChangeOptions {
   /** Project root directory for resolving relative schema paths. */
   readonly configDir: string
   readonly schemaRef: string
-  readonly workspaceSchemasPaths: ReadonlyMap<string, string>
+  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
   /** Absolute path to the project root. */
   readonly projectRoot: string
-  /** Project-level workflow hook definitions from `specd.yaml`. */
-  readonly projectWorkflowHooks?: readonly {
-    readonly step: string
-    readonly hooks: {
-      readonly pre: readonly HookEntry[]
-      readonly post: readonly HookEntry[]
-    }
-  }[]
 }
 
 /**
@@ -121,16 +116,26 @@ export function createArchiveChange(
         createSpecRepository(
           'fs',
           { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
-          { specsPath: ws.specsPath, ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}) },
+          {
+            specsPath: ws.specsPath,
+            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
+            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
+          },
         ),
       ]),
     )
-    const workspaceSchemasPaths = new Map<string, string>()
-    for (const ws of config.workspaces) {
-      if (ws.schemasPath !== null) {
-        workspaceSchemasPaths.set(ws.name, ws.schemasPath)
-      }
-    }
+    const schemaRepos = new Map(
+      config.workspaces
+        .filter((ws) => ws.schemasPath !== null)
+        .map((ws) => [
+          ws.name,
+          createSchemaRepository(
+            'fs',
+            { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
+            { schemasPath: ws.schemasPath! },
+          ),
+        ]),
+    ) as ReadonlyMap<string, SchemaRepository>
     return createArchiveChange(
       {
         workspace: defaultWs.name,
@@ -152,9 +157,8 @@ export function createArchiveChange(
         ],
         configDir: config.projectRoot,
         schemaRef: config.schemaRef,
-        workspaceSchemasPaths,
+        schemaRepositories: schemaRepos,
         projectRoot: config.projectRoot,
-        ...(config.workflow !== undefined ? { projectWorkflowHooks: config.workflow } : {}),
       },
     )
   }
@@ -173,7 +177,10 @@ export function createArchiveChange(
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: opts.nodeModulesPaths,
     configDir: opts.configDir,
+    schemaRepositories: opts.schemaRepositories,
   })
+  const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
+  const schemaProvider = new LazySchemaProvider(resolveSchema)
   const parsers = createArtifactParserRegistry()
   const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
   const hooks = new NodeHookRunner(expander)
@@ -182,21 +189,12 @@ export function createArchiveChange(
   const yaml = new NodeYamlSerializer()
   const generateMetadata = new GenerateSpecMetadata(
     opts.specRepositories,
-    schemas,
+    schemaProvider,
     parsers,
     hasher,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
   )
   const saveMetadata = new SaveSpecMetadata(opts.specRepositories, yaml)
-  const runStepHooks = new RunStepHooks(
-    changeRepo,
-    hooks,
-    schemas,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
-    opts.projectWorkflowHooks,
-  )
+  const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, schemaProvider)
   return new ArchiveChange(
     changeRepo,
     opts.specRepositories,
@@ -204,11 +202,9 @@ export function createArchiveChange(
     runStepHooks,
     actor,
     parsers,
-    schemas,
+    schemaProvider,
     generateMetadata,
     saveMetadata,
     yaml,
-    opts.schemaRef,
-    opts.workspaceSchemasPaths,
   )
 }

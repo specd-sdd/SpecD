@@ -8,26 +8,20 @@ Workflow steps declare `instruction:` hooks — text blocks that guide agent beh
 
 ### Requirement: Ports and constructor
 
-`GetHookInstructions` receives at construction time: `ChangeRepository`, `SchemaRegistry`, `TemplateExpander`, `schemaRef`, `workspaceSchemasPaths`, and `projectWorkflowHooks`.
+`GetHookInstructions` receives at construction time: `ChangeRepository`, `ArchiveRepository`, `SchemaProvider`, and `TemplateExpander`.
 
 ```typescript
 class GetHookInstructions {
   constructor(
     changes: ChangeRepository,
-    schemas: SchemaRegistry,
-    templates: TemplateExpander,
-    schemaRef: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
-    projectWorkflowHooks: ProjectWorkflowHooks,
+    archive: ArchiveRepository,
+    schemaProvider: SchemaProvider,
+    expander: TemplateExpander,
   )
 }
 ```
 
-`projectWorkflowHooks` is the full array of project-level workflow step definitions from `specd.yaml`. `GetHookInstructions` filters internally for the requested step. If `undefined`, it defaults to `[]`.
-
-`TemplateExpander.expand()` is called on each instruction text before returning it (verbatim expansion, no shell escaping). The use case builds contextual variables (`change` namespace) from the resolved change and `ChangeRepository.changePath()`, passing them to the expander.
-
-This use case does not need `HookRunner` — it only reads and expands instruction text, it never executes commands.
+`SchemaProvider` returns the fully-resolved schema with plugins and overrides applied — all workflow hooks (including those added via `schemaOverrides`) are already present in the schema's workflow steps. All dependencies are injected at kernel composition time.
 
 ### Requirement: Input
 
@@ -40,7 +34,9 @@ This use case does not need `HookRunner` — it only reads and expands instructi
 
 ### Requirement: Change lookup
 
-`GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
+`GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name`, `ArchivedChange.workspace`, and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.
+
+For all other step/phase combinations, if `ChangeRepository.get(name)` returns null, `GetHookInstructions` MUST throw `ChangeNotFoundError` immediately — the archive fallback does not apply.
 
 ### Requirement: Schema name guard
 
@@ -54,12 +50,11 @@ If the step is a valid lifecycle state, `GetHookInstructions` looks up the workf
 
 ### Requirement: Instruction collection
 
-For the matched step and phase, `GetHookInstructions` MUST collect `instruction:` hooks in the following order:
+For the matched step and phase, `GetHookInstructions` MUST collect `instruction:` hooks from `workflow[step].hooks[phase]` — only entries with `type: 'instruction'`, in declaration order.
 
-1. Schema-level hooks from `workflow[step].hooks[phase]` — only entries with an `instruction:` key, in declaration order
-2. Project-level hooks from `projectWorkflowHooks` targeting the same step and phase — only entries with an `instruction:` key, in declaration order
+`run:` entries (type `'run'`) MUST be skipped — they are not instruction text.
 
-`run:` entries MUST be skipped — they are not instruction text.
+All hooks — whether from the base schema, plugins, or overrides — are already merged into the schema's workflow steps by `ResolveSchema`. There is no separate project-level hook collection.
 
 ### Requirement: Hook filtering with --only
 
@@ -90,3 +85,4 @@ When no `instruction:` hooks exist for the step+phase, the result is `{ phase, i
 - [`specs/core/config/spec.md`](../config/spec.md) — project-level hooks via `schemaOverrides`
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `schemaName`
 - [`specs/core/template-variables/spec.md`](../template-variables/spec.md) — `TemplateExpander`, `TemplateVariables`, expansion semantics
+- [`specs/core/archive-repository-port/spec.md`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`

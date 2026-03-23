@@ -1,3 +1,4 @@
+import * as path from 'node:path'
 import { ListSpecs } from '../../application/use-cases/list-specs.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
@@ -39,7 +40,11 @@ export function createListSpecs(configOrOptions: SpecdConfig | FsListSpecsOption
         createSpecRepository(
           'fs',
           { workspace: ws.name, ownership: ws.ownership, isExternal: ws.isExternal },
-          { specsPath: ws.specsPath, ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}) },
+          {
+            specsPath: ws.specsPath,
+            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
+            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
+          },
         ),
       ]),
     )

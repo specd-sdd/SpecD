@@ -1,6 +1,8 @@
+import { parse as parseYaml } from 'yaml'
 import { Change, type ActorIdentity } from '../../../src/domain/entities/change.js'
+import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { type Spec } from '../../../src/domain/entities/spec.js'
-import { type SpecPath } from '../../../src/domain/value-objects/spec-path.js'
+import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import {
   ArtifactType,
   type ArtifactTypeProps,
@@ -13,7 +15,10 @@ import {
   SpecRepository,
   type ResolveFromPathResult,
 } from '../../../src/application/ports/spec-repository.js'
+import { type SpecMetadata } from '../../../src/domain/services/parse-metadata.js'
+import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
 import { type SchemaRegistry } from '../../../src/application/ports/schema-registry.js'
+import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import {
   type ArtifactParser,
   type ArtifactParserRegistry,
@@ -109,6 +114,10 @@ class StubChangeRepository extends ChangeRepository {
     _change: Change,
     _specExists: (specId: string) => Promise<boolean>,
   ): Promise<void> {
+    // no-op in tests
+  }
+
+  override async unscaffold(_change: Change, _specIds: readonly string[]): Promise<void> {
     // no-op in tests
   }
 }
@@ -223,6 +232,23 @@ class StubSpecRepository extends SpecRepository {
     if (this._deleteFn) return this._deleteFn(spec)
   }
 
+  override async metadata(spec: Spec): Promise<SpecMetadata | null> {
+    const key = `${spec.name.toString()}/.specd-metadata.yaml`
+    const content = this._artifacts[key]
+    if (content === undefined || content === null) return null
+    const parsed = parseYaml(content)
+    if (parsed === null || parsed === undefined || typeof parsed !== 'object') return null
+    return parsed as SpecMetadata
+  }
+
+  override async saveMetadata(
+    spec: Spec,
+    content: string,
+    _options?: { force?: boolean; originalHash?: string },
+  ): Promise<void> {
+    this.saved.set('.specd-metadata.yaml', content)
+  }
+
   override async resolveFromPath(
     _inputPath: string,
     _from?: SpecPath,
@@ -258,6 +284,17 @@ export function makeSchemaRegistry(schema: Schema | null = null): SchemaRegistry
     },
     async list() {
       return []
+    },
+  }
+}
+
+/**
+ * Creates a mock `SchemaProvider` that returns a fixed schema on `get()`.
+ */
+export function makeSchemaProvider(schema: Schema | null = null): SchemaProvider {
+  return {
+    async get(): Promise<Schema | null> {
+      return schema
     },
   }
 }
@@ -381,6 +418,69 @@ export function makeParsers(
     ['markdown', markdown],
     ['yaml', yaml],
   ])
+}
+
+/**
+ * In-memory `ArchiveRepository` subclass for unit tests.
+ *
+ * `get` looks up by name; `archivePath` returns a deterministic test path.
+ * `archive`, `list`, and `reindex` throw — override in tests that need them.
+ */
+class StubArchiveRepository extends ArchiveRepository {
+  readonly store: Map<string, ArchivedChange>
+
+  constructor(archived: ArchivedChange[] = []) {
+    super({ workspace: 'default', ownership: 'owned', isExternal: false })
+    this.store = new Map(archived.map((a) => [a.name, a]))
+  }
+
+  override async archive(): Promise<{ archivedChange: ArchivedChange; archiveDirPath: string }> {
+    throw new Error('not implemented')
+  }
+
+  override async list(): Promise<ArchivedChange[]> {
+    return [...this.store.values()]
+  }
+
+  override async get(name: string): Promise<ArchivedChange | null> {
+    return this.store.get(name) ?? null
+  }
+
+  override async reindex(): Promise<void> {}
+
+  override archivePath(archivedChange: ArchivedChange): string {
+    return `/test/archive/${archivedChange.archivedName}`
+  }
+}
+
+/**
+ * Creates a fully-typed `ArchiveRepository` backed by an in-memory map.
+ */
+export function makeArchiveRepository(
+  initial: ArchivedChange[] = [],
+): ArchiveRepository & { store: Map<string, ArchivedChange> } {
+  return new StubArchiveRepository(initial)
+}
+
+/**
+ * Builds a minimal `ArchivedChange` for use in tests.
+ */
+export function makeArchivedChange(
+  name: string,
+  opts: { workspace?: string; schemaName?: string } = {},
+): ArchivedChange {
+  const createdAt = new Date('2024-01-01T00:00:00Z')
+  const archivedName = `20240101-000000-${name}`
+  return new ArchivedChange({
+    name,
+    archivedName,
+    workspace: SpecPath.parse(opts.workspace ?? 'default'),
+    archivedAt: new Date('2024-01-02T00:00:00Z'),
+    artifacts: [],
+    specIds: [],
+    schemaName: opts.schemaName ?? 'test-schema',
+    schemaVersion: 1,
+  })
 }
 
 /**

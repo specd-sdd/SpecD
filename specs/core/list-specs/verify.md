@@ -20,19 +20,19 @@
 
 #### Scenario: Title from metadata
 
-- **GIVEN** a spec with `.specd-metadata.yaml` containing `title: "OAuth Login"`
+- **GIVEN** a spec with metadata containing `title: "OAuth Login"`
 - **WHEN** `execute()` is called
 - **THEN** the entry's `title` is `"OAuth Login"`
 
 #### Scenario: Title fallback to path segment
 
-- **GIVEN** a spec at path `auth/login` with no `.specd-metadata.yaml`
+- **GIVEN** a spec at path `auth/login` with no metadata
 - **WHEN** `execute()` is called
 - **THEN** the entry's `title` is `"login"`
 
 #### Scenario: Empty metadata title triggers fallback
 
-- **GIVEN** a spec at path `auth/login` with `.specd-metadata.yaml` containing `title: "  "`
+- **GIVEN** a spec at path `auth/login` with metadata containing `title: "  "`
 - **WHEN** `execute()` is called
 - **THEN** the entry's `title` is `"login"` (fallback applied)
 
@@ -40,7 +40,7 @@
 
 #### Scenario: Summary from metadata description
 
-- **GIVEN** a spec with `.specd-metadata.yaml` containing `description: "Handles OAuth flows"`
+- **GIVEN** a spec with metadata containing `description: "Handles OAuth flows"`
 - **WHEN** `execute({ includeSummary: true })` is called
 - **THEN** the entry's `summary` is `"Handles OAuth flows"`
 
@@ -63,15 +63,15 @@
 
 ### Requirement: Optional metadata freshness status
 
-#### Scenario: Status is missing when no metadata file
+#### Scenario: Status is missing when no metadata
 
-- **GIVEN** a spec with no `.specd-metadata.yaml`
+- **GIVEN** a spec with no metadata
 - **WHEN** `execute({ includeMetadataStatus: true })` is called
 - **THEN** the entry's `metadataStatus` is `'missing'`
 
 #### Scenario: Status is invalid when metadata fails structural validation
 
-- **GIVEN** a spec with a `.specd-metadata.yaml` that fails `strictSpecMetadataSchema` parsing
+- **GIVEN** a spec with metadata that fails `strictSpecMetadataSchema` parsing
 - **WHEN** `execute({ includeMetadataStatus: true })` is called
 - **THEN** the entry's `metadataStatus` is `'invalid'`
 
@@ -96,7 +96,7 @@
 
 #### Scenario: Metadata read error does not propagate
 
-- **GIVEN** `repo.artifact(spec, '.specd-metadata.yaml')` throws an I/O error
+- **GIVEN** `repo.metadata(spec)` throws an I/O error
 - **WHEN** `execute()` is called
 - **THEN** the entry still appears with the path-segment fallback title and no error is thrown
 

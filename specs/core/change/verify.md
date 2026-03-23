@@ -41,6 +41,14 @@
 - **WHEN** a new spec ID is added to the Change's `specIds`
 - **THEN** an `invalidated` event with `cause: 'spec-change'` is appended and a `transitioned` event rolling back to `designing` is appended
 
+#### Scenario: Orphaned specDependsOn removed when spec removed from specIds
+
+- **GIVEN** a Change with `specIds: ['auth/login', 'auth/session']`
+- **AND** `specDependsOn` has entries for both `'auth/login'` and `'auth/session'`
+- **WHEN** `updateSpecIds(['auth/login'], actor)` is called
+- **THEN** `specDependsOn` no longer has an entry for `'auth/session'`
+- **AND** `specDependsOn` still has the entry for `'auth/login'`
+
 ### Requirement: Lifecycle
 
 #### Scenario: Valid transition succeeds
@@ -200,10 +208,26 @@
 - **WHEN** an attempt is made to skip an artifact with `optional: false`
 - **THEN** the operation fails with an error and `validatedHash` is not modified
 
-#### Scenario: invalidated event clears all validatedHash values
+#### Scenario: invalidated event with driftedArtifactIds clears only downstream
 
-- **GIVEN** a change with one `complete` artifact (hash set) and one `skipped` artifact (sentinel set)
-- **WHEN** an `invalidated` event is appended
+- **GIVEN** a DAG: proposal → specs → verify, proposal → design, specs + design → tasks
+- **AND** all artifacts are `complete`
+- **WHEN** `invalidate('artifact-change', actor, ['tasks'])` is called
+- **THEN** only `tasks.validatedHash` is cleared (no downstream dependents)
+- **AND** `proposal`, `specs`, `verify`, and `design` remain `complete`
+
+#### Scenario: invalidated event with driftedArtifactIds cascades downstream
+
+- **GIVEN** a DAG: proposal → specs → verify, proposal → design, specs + design → tasks
+- **AND** all artifacts are `complete`
+- **WHEN** `invalidate('artifact-change', actor, ['specs'])` is called
+- **THEN** `specs`, `verify`, and `tasks` are cleared (specs + its downstream)
+- **AND** `proposal` and `design` remain `complete`
+
+#### Scenario: invalidated event without driftedArtifactIds clears all
+
+- **GIVEN** a change with one `complete` artifact and one `skipped` artifact
+- **WHEN** `invalidate('artifact-change', actor)` is called without `driftedArtifactIds`
 - **THEN** all `validatedHash` values are cleared — the `complete` artifact becomes `in-progress` and the `skipped` artifact becomes `missing`
 
 #### Scenario: verifying → implementing clears only implementing.requires artifacts

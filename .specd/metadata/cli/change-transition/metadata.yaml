@@ -1,0 +1,154 @@
+title: 'Change Transition'
+description: 'The change transition command advances a change through its governed lifecycle by running validations, enforcing workflow requires, executing run: hooks at step boundaries, and routing through approval gates when enabled. Users specify the logical target state while the CLI transparently handles approval-gate routing and provides step-by-step progress feedback.'
+generatedBy: 'agent'
+dependsOn:
+  - 'cli:cli/entrypoint'
+  - 'core:core/change'
+  - 'core:core/transition-change'
+  - 'core:core/hook-execution-model'
+contentHashes:
+  'spec.md': 'sha256:3fa2df1be5cb05e7e074878c3faf384c0896627a8c08d00b005926f01598ac63'
+  'verify.md': 'sha256:4718275987e0867feaaa4af995d6551851c190d6281268ef83227ba70485a238'
+keywords:
+  - 'change-transition'
+  - 'lifecycle-state'
+  - 'approval-gate'
+  - 'hook-execution'
+  - 'skip-hooks'
+  - 'workflow-requires'
+  - 'progress-callback'
+  - 'fail-fast'
+rules:
+  - requirement: 'Command signature'
+    rules:
+      - 'Accepts two required positionals: <name> (change name) and <step> (target lifecycle state).'
+      - 'Accepts --skip-hooks <phases> with comma-separated values: source.pre, source.post, target.pre, target.post, or all.'
+      - 'Accepts --format text|json|toon, defaulting to text.'
+      - 'The previous --no-hooks flag is removed; use --skip-hooks all instead.'
+  - requirement: 'Approval-gate routing'
+    rules:
+      - 'The CLI passes approvalsSpec and approvalsSignoff flags from SpecdConfig to the TransitionChange use case.'
+      - 'When in ready state with approvalsSpec enabled, requesting implementing silently routes to pending-spec-approval.'
+      - 'When in done state with approvalsSignoff enabled, requesting archivable silently routes to pending-signoff.'
+      - 'Routing is transparent; the user always specifies the logical target state.'
+  - requirement: 'Hook execution'
+    rules:
+      - 'By default, source.post hooks execute first, then target.pre hooks, then the state transition occurs.'
+      - 'Both hook phases are fail-fast; a failure in either aborts the transition.'
+      - 'The CLI maps --skip-hooks to a skipHookPhases set on TransitionChangeInput.'
+      - 'When --skip-hooks all is passed, no hooks execute and the caller must invoke hooks manually via specd change run-hooks.'
+  - requirement: 'Progress output'
+    rules:
+      - 'The CLI passes an onProgress callback rendering requires-check, hook-start, hook-done, and transitioned events to stdout.'
+      - 'Progress output renders only in text format; json and toon formats include progress data in structured output.'
+  - requirement: 'Output on success'
+    rules:
+      - 'Text format prints a single summary line to stdout.'
+      - 'JSON and toon formats output structured data including the effective target state after routing.'
+  - requirement: 'Post-hook failure warning'
+    rules:
+      - 'Hook failures cause exit code 1 with an error: message to stderr.'
+      - 'The previous postHookFailures warning with exit code 2 is removed.'
+  - requirement: 'Invalid transition error'
+    rules:
+      - 'If the transition is not valid from the current state, the command exits with code 1 and prints an error: message to stderr.'
+  - requirement: 'Incomplete tasks error'
+    rules:
+      - 'Transitioning implementing to verifying with incomplete task items exits with code 1, naming the blocking artifact in stderr.'
+  - requirement: 'Unsatisfied requires error'
+    rules:
+      - 'If the target step has requires and any required artifact is not complete or skipped, the command exits with code 1.'
+constraints:
+  - 'The CLI never exposes approval-gate routing logic in its help text.'
+scenarios:
+  - requirement: 'Command signature'
+    name: 'Missing arguments'
+    when:
+      - 'specd change transition my-change is run without the target state'
+    then:
+      - 'the command exits with code 1 and prints a usage error to stderr'
+  - requirement: 'Approval-gate routing'
+    name: 'Spec approval gate active'
+    given:
+      - 'approvals.spec: true and the change is in ready state'
+    when:
+      - 'specd change transition my-change implementing is run'
+    then:
+      - 'the change transitions to pending-spec-approval'
+      - 'stdout shows transitioned my-change: ready to pending-spec-approval'
+  - requirement: 'Approval-gate routing'
+    name: 'Signoff gate active'
+    given:
+      - 'approvals.signoff: true and the change is in done state'
+    when:
+      - 'specd change transition my-change archivable is run'
+    then:
+      - 'the change transitions to pending-signoff'
+      - 'stdout shows transitioned my-change: done to pending-signoff'
+  - requirement: 'Output on success'
+    name: 'Successful direct transition'
+    when:
+      - 'specd change transition my-change designing succeeds'
+    then:
+      - 'stdout contains transitioned my-change: drafting to designing'
+      - 'the process exits with code 0'
+  - requirement: 'Invalid transition error'
+    name: 'Illegal state transition'
+    given:
+      - 'the change is in drafting state'
+    when:
+      - 'specd change transition my-change done is run'
+    then:
+      - 'the command exits with code 1'
+      - 'stderr contains an error: message'
+  - requirement: 'Incomplete tasks error'
+    name: 'Unchecked checkboxes block verifying'
+    given:
+      - 'the change is in implementing and a task artifact has unchecked checkboxes'
+    when:
+      - 'specd change transition my-change verifying is run'
+    then:
+      - 'the command exits with code 1'
+      - 'stderr contains an error: message naming the blocking artifact'
+  - requirement: 'Incomplete tasks error'
+    name: 'JSON output on successful transition'
+    when:
+      - 'specd change transition my-change designing --format json succeeds and the change was in drafting state'
+    then:
+      - 'stdout is valid JSON with result ok, name my-change, from drafting, and to designing'
+      - 'the process exits with code 0'
+  - requirement: 'Hook execution'
+    name: '--skip-hooks all skips all hooks'
+    given:
+      - 'the change is in implementing state and implementing.post has hooks configured'
+    when:
+      - 'specd change transition my-change verifying --skip-hooks all is run'
+    then:
+      - 'no hooks are executed'
+      - 'the transition succeeds'
+  - requirement: 'Hook execution'
+    name: '--skip-hooks target.pre skips only pre hooks'
+    given:
+      - 'the schema declares verifying.pre and implementing.post hooks'
+      - 'the change is in implementing state'
+    when:
+      - 'specd change transition my-change verifying --skip-hooks target.pre is run'
+    then:
+      - 'verifying.pre hooks are skipped'
+      - 'implementing.post hooks still execute'
+  - requirement: 'Hook execution'
+    name: '--skip-hooks source.post skips only post hooks'
+    given:
+      - 'the schema declares verifying.pre and implementing.post hooks'
+      - 'the change is in implementing state'
+    when:
+      - 'specd change transition my-change verifying --skip-hooks source.post is run'
+    then:
+      - 'implementing.post hooks are skipped'
+      - 'verifying.pre hooks still execute'
+  - requirement: 'Hook execution'
+    name: '--skip-hooks accepts comma-separated values'
+    when:
+      - 'specd change transition my-change verifying --skip-hooks target.pre,source.post is run'
+    then:
+      - 'both target pre and source post hooks are skipped'

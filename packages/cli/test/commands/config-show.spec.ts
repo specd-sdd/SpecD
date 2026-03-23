@@ -63,7 +63,15 @@ describe('Output format', () => {
   })
 
   it('JSON output is full SpecdConfig', async () => {
-    const { stdout } = setup()
+    const config = makeMockConfig({
+      contextIncludeSpecs: ['default:*'],
+      context: [{ file: 'AGENTS.md' }],
+      llmOptimizedContext: true,
+    })
+    vi.mocked(loadConfig).mockResolvedValue(config)
+    const stdout = captureStdout()
+    captureStderr()
+    mockProcessExit()
 
     const program = makeProgram()
     registerConfigShow(program.command('config'))
@@ -75,12 +83,56 @@ describe('Output format', () => {
     expect(Array.isArray(parsed.workspaces)).toBe(true)
     expect(parsed.storage).toBeDefined()
     expect(parsed.approvals).toBeDefined()
+    expect(parsed.contextIncludeSpecs).toEqual(['default:*'])
+    expect(parsed.context).toEqual([{ file: 'AGENTS.md' }])
+    expect(parsed.llmOptimizedContext).toBe(true)
     // All path values are absolute strings
     expect(parsed.projectRoot).toMatch(/^\//)
     expect(parsed.storage.changesPath).toMatch(/^\//)
-    expect(parsed.storage.draftsPath).toMatch(/^\//)
-    expect(parsed.storage.discardedPath).toMatch(/^\//)
-    expect(parsed.storage.archivePath).toMatch(/^\//)
+  })
+
+  it('Optional fields omitted when not set', async () => {
+    const { stdout } = setup()
+
+    const program = makeProgram()
+    registerConfigShow(program.command('config'))
+    await program.parseAsync(['node', 'specd', 'config', 'show', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout())
+    // workflow was removed from SpecdConfig
+    expect(parsed.context).toBeUndefined()
+    expect(parsed.schemaOverrides).toBeUndefined()
+    expect(parsed.schemaPlugins).toBeUndefined()
+    expect(parsed.llmOptimizedContext).toBeUndefined()
+  })
+
+  it('Workspace entries include all fields', async () => {
+    const config = makeMockConfig({
+      workspaces: [
+        {
+          name: 'core',
+          specsPath: '/project/specs/core',
+          schemasPath: '/project/schemas',
+          codeRoot: '/project/packages/core',
+          ownership: 'owned' as const,
+          isExternal: false,
+          prefix: 'core',
+        },
+      ],
+    })
+    vi.mocked(loadConfig).mockResolvedValue(config)
+    const stdout = captureStdout()
+    captureStderr()
+    mockProcessExit()
+
+    const program = makeProgram()
+    registerConfigShow(program.command('config'))
+    await program.parseAsync(['node', 'specd', 'config', 'show', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.workspaces[0].schemasPath).toBe('/project/schemas')
+    expect(parsed.workspaces[0].codeRoot).toBe('/project/packages/core')
+    expect(parsed.workspaces[0].prefix).toBe('core')
   })
 
   it('Multiple workspaces listed', async () => {

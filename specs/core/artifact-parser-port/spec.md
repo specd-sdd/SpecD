@@ -62,6 +62,8 @@ The `deltaInstructions` method MUST return a format-specific static text block t
 
 The `parseDelta` method MUST accept a YAML delta file's raw content and return a typed array of `DeltaEntry` objects. Only the YAML adapter is expected to return a non-empty result; other adapters MAY return an empty array.
 
+If the parsed array contains a `no-op` entry alongside any other entry, `parseDelta` MUST throw a `SchemaValidationError` explaining that `no-op` cannot be mixed with other operations.
+
 ### Requirement: ArtifactAST shape
 
 The `ArtifactAST` interface MUST contain a single `root: ArtifactNode` property.
@@ -82,14 +84,15 @@ The `ArtifactNode` interface MUST contain:
 
 Each `DeltaEntry` MUST contain:
 
-- `op: 'added' | 'modified' | 'removed'` — the operation type
-- `selector?: Selector` — optional node selector
-- `position?: DeltaPosition` — optional positioning directive
-- `rename?: string` — optional new name for rename operations
-- `content?: string` — optional content payload
-- `value?: unknown` — optional value payload
-- `strategy?: 'replace' | 'append' | 'merge-by'` — optional merge strategy
-- `mergeKey?: string` — optional key for `merge-by` strategy
+- `op: 'added' | 'modified' | 'removed' | 'no-op'` — the operation type
+- `selector?: Selector` — optional node selector; not valid for `no-op`
+- `position?: DeltaPosition` — optional positioning directive; not valid for `no-op`
+- `rename?: string` — optional new name for rename operations; not valid for `no-op`
+- `content?: string` — optional content payload; not valid for `no-op`
+- `value?: unknown` — optional value payload; not valid for `no-op`
+- `strategy?: 'replace' | 'append' | 'merge-by'` — optional merge strategy; not valid for `no-op`
+- `mergeKey?: string` — optional key for `merge-by` strategy; not valid for `no-op`
+- `description?: string` — optional free-text description of what this entry does or why; valid on all operation types; ignored during application
 
 ### Requirement: Supporting type shapes
 

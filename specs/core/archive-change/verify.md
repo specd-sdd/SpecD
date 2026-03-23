@@ -6,10 +6,10 @@
 
 #### Scenario: Change not in archivable state
 
-- **WHEN** `ArchiveChange.execute` is called for a change in `done` state
-- **THEN** `change.assertArchivable()` throws `InvalidStateTransitionError`
-- **AND** no hooks are run
-- **AND** no files are modified
+- **GIVEN** a change that is not in `archivable` state
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** `InvalidStateTransitionError` is thrown
+- **AND** no hooks are executed and no files are modified
 
 #### Scenario: Change in archivable state transitions to archiving
 
@@ -56,6 +56,15 @@
 - **GIVEN** a change artifact with no `deltas[]` configuration (a new file)
 - **WHEN** `ArchiveChange.execute` is called
 - **THEN** the artifact content is saved as-is to `SpecRepository`
+
+#### Scenario: New spec with delta-capable artifact copied to project
+
+- **GIVEN** a change has a spec ID for a spec that does not yet exist in the project
+- **AND** the schema declares the artifact type with `delta: true`
+- **AND** the change directory contains a full primary file (e.g. `specs/<workspace>/<path>/spec.md`) instead of a `.delta.yaml`
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** the primary file content is copied directly to `SpecRepository`
+- **AND** the spec directory and file are created in the project
 
 #### Scenario: Optional artifact with missing status — not synced
 

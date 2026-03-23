@@ -51,35 +51,34 @@ export interface SchemaEntry {
 }
 
 /**
- * Port for discovering and resolving schemas.
+ * Port for routing schema references and resolving schemas.
  *
  * Resolution is prefix-driven — no implicit multi-level fallback:
  *
  * - `@scope/name` — npm package; loaded from `node_modules/@scope/name/schema.yaml`
- * - `#workspace:name` — workspace-qualified; loaded from `workspaceSchemasPaths.get(workspace)/<name>/schema.yaml`
- * - `#name` or bare name — equivalent to `#default:name`
+ * - `#workspace:name` — workspace-qualified; delegated to `SchemaRepository` for that workspace
+ * - `#name` or bare name — equivalent to `#default:name`; delegated to the `default` workspace's `SchemaRepository`
  * - relative or absolute path — loaded directly from that path
  *
- * Unlike the repository ports, `SchemaRegistry` has no invariant constructor
- * arguments shared across all implementations, so it is declared as an
- * interface rather than an abstract class.
+ * Implementations receive a `ReadonlyMap<string, SchemaRepository>` at construction
+ * time, mapping workspace names to their corresponding `SchemaRepository` instances.
  */
 export interface SchemaRegistry {
   /**
    * Resolves a schema reference and returns the fully-parsed {@link Schema}.
    *
    * The `ref` value is the `schema` field from `specd.yaml` verbatim.
-   * `workspaceSchemasPaths` is a map of workspace name → resolved `schemasPath`
-   * for that workspace, derived from config by the application layer. Returns
-   * `null` if the resolved file does not exist; the caller is responsible for
-   * converting a `null` result to `SchemaNotFoundError`.
+   * Returns `null` if the resolved file does not exist; the caller is
+   * responsible for converting a `null` result to `SchemaNotFoundError`.
+   *
+   * Workspace schema resolution is delegated to the corresponding
+   * `SchemaRepository` instance.
    *
    * @param ref - The schema reference as declared in `specd.yaml`
    *   (e.g. `"@specd/schema-std"`, `"#billing:my-schema"`, `"spec-driven"`, `"./custom/schema.yaml"`)
-   * @param workspaceSchemasPaths - Map of workspace name to its resolved `schemasPath`
    * @returns The resolved schema, or `null` if the file was not found
    */
-  resolve(ref: string, workspaceSchemasPaths: ReadonlyMap<string, string>): Promise<Schema | null>
+  resolve(ref: string): Promise<Schema | null>
 
   /**
    * Resolves a schema reference and returns the intermediate representation
@@ -87,26 +86,23 @@ export interface SchemaRegistry {
    * final domain `Schema`.
    *
    * Used by `ResolveSchema` for the merge pipeline where raw data is needed.
+   * Workspace schema resolution is delegated to the corresponding
+   * `SchemaRepository` instance.
    *
    * @param ref - The schema reference as declared in `specd.yaml`
-   * @param workspaceSchemasPaths - Map of workspace name to its resolved `schemasPath`
    * @returns The raw resolution result, or `null` if the file was not found
    */
-  resolveRaw(
-    ref: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
-  ): Promise<SchemaRawResult | null>
+  resolveRaw(ref: string): Promise<SchemaRawResult | null>
 
   /**
-   * Lists all schemas discoverable from the given workspace schema paths and
-   * installed npm packages. Does not load or validate schema file contents —
-   * use `resolve()` to get a fully-parsed {@link Schema}.
+   * Lists all schemas discoverable from workspace repositories and installed
+   * npm packages. Does not load or validate schema file contents — use
+   * `resolve()` to get a fully-parsed {@link Schema}.
    *
    * Results are grouped by source: workspace entries first (in workspace
    * declaration order), npm entries last.
    *
-   * @param workspaceSchemasPaths - Map of workspace name to its resolved `schemasPath`
    * @returns All discoverable schema entries
    */
-  list(workspaceSchemasPaths: ReadonlyMap<string, string>): Promise<SchemaEntry[]>
+  list(): Promise<SchemaEntry[]>
 }

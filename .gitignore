@@ -6,13 +6,17 @@ dist/
 .turbo/
 
 # Runtime state (specd tool — plans, plugins, hooks state)
-.specd/
+.specd/*
+!.specd/metadata/
 
 # Claude Code
 .claude/
 
 # Codex
 .codex/
+
+# OpenCode
+.opencode/
 
 # Environment
 .env

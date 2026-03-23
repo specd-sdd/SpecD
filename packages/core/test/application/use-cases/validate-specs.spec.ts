@@ -6,7 +6,7 @@ import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import {
   makeSpecRepository,
-  makeSchemaRegistry,
+  makeSchemaProvider,
   makeArtifactType,
   makeSchema,
   makeParsers,
@@ -38,13 +38,7 @@ describe('ValidateSpecs', () => {
       ['billing', repo2],
     ])
 
-    const uc = new ValidateSpecs(
-      specRepos,
-      makeSchemaRegistry(schema),
-      makeParsers(),
-      'test',
-      new Map(),
-    )
+    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     const result = await uc.execute({})
 
     expect(result.totalSpecs).toBe(2)
@@ -56,13 +50,7 @@ describe('ValidateSpecs', () => {
   it('throws SchemaNotFoundError when schema not resolved', async () => {
     const specRepos = new Map([['default', makeSpecRepository()]])
 
-    const uc = new ValidateSpecs(
-      specRepos,
-      makeSchemaRegistry(null),
-      makeParsers(),
-      'missing-schema',
-      new Map(),
-    )
+    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(null), makeParsers())
 
     await expect(uc.execute({})).rejects.toThrow(SchemaNotFoundError)
   })
@@ -78,13 +66,7 @@ describe('ValidateSpecs', () => {
     })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ValidateSpecs(
-      specRepos,
-      makeSchemaRegistry(schema),
-      makeParsers(),
-      'test',
-      new Map(),
-    )
+    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     const result = await uc.execute({})
 
     expect(result.entries[0]!.passed).toBe(true)
@@ -101,13 +83,7 @@ describe('ValidateSpecs', () => {
     const repo = makeSpecRepository({ specs: [spec] })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ValidateSpecs(
-      specRepos,
-      makeSchemaRegistry(schema),
-      makeParsers(),
-      'test',
-      new Map(),
-    )
+    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     const result = await uc.execute({})
 
     expect(result.entries[0]!.passed).toBe(false)
@@ -121,13 +97,7 @@ describe('ValidateSpecs', () => {
     const schema = makeSchema([specType])
     const specRepos = new Map([['default', makeSpecRepository()]])
 
-    const uc = new ValidateSpecs(
-      specRepos,
-      makeSchemaRegistry(schema),
-      makeParsers(),
-      'test',
-      new Map(),
-    )
+    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     await expect(
       uc.execute({
         workspace: 'nonexistent',

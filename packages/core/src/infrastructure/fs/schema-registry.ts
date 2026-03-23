@@ -7,11 +7,12 @@ import {
   type SchemaEntry,
   type SchemaRawResult,
 } from '../../application/ports/schema-registry.js'
-import { Schema } from '../../domain/value-objects/schema.js'
-import { SchemaValidationError } from '../../domain/errors/schema-validation-error.js'
-import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { type SchemaRepository } from '../../application/ports/schema-repository.js'
+import { type Schema } from '../../domain/value-objects/schema.js'
 import { parseSchemaYaml } from '../schema-yaml-parser.js'
 import { buildSchema } from '../../domain/services/build-schema.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { SchemaValidationError } from '../../domain/errors/schema-validation-error.js'
 
 /** Construction configuration for {@link FsSchemaRegistry}. */
 export interface FsSchemaRegistryConfig {
@@ -31,41 +32,46 @@ export interface FsSchemaRegistryConfig {
    * Relative schema paths (`./foo`, `../bar`) are resolved against this.
    */
   readonly configDir: string
+
+  /**
+   * Map of workspace name to its `SchemaRepository` instance.
+   * Used for resolving workspace-qualified and bare-name schema references.
+   */
+  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
 }
 
 /**
  * Filesystem implementation of the {@link SchemaRegistry} port.
  *
- * Resolves schema references from workspace directories and npm packages,
- * delegates YAML parsing to {@link parseSchemaYaml} and domain construction
- * to {@link buildSchema}, and handles template file I/O.
+ * Routes schema references by prefix: npm-scoped references are resolved from
+ * `node_modules`, workspace-qualified and bare-name references are delegated to
+ * the corresponding {@link SchemaRepository}, and direct paths are loaded from
+ * the filesystem.
  */
 export class FsSchemaRegistry implements SchemaRegistry {
   private readonly _nodeModulesPaths: readonly string[]
   private readonly _configDir: string
+  private readonly _schemaRepositories: ReadonlyMap<string, SchemaRepository>
 
   /**
    * Creates a new `FsSchemaRegistry`.
    *
-   * @param config - Registry configuration including the `node_modules` paths
+   * @param config - Registry configuration including `node_modules` paths and schema repositories
    */
   constructor(config: FsSchemaRegistryConfig) {
     this._nodeModulesPaths = config.nodeModulesPaths
     this._configDir = config.configDir
+    this._schemaRepositories = config.schemaRepositories
   }
 
   /**
    * Resolves a schema reference and returns the fully-parsed {@link Schema}.
    *
    * @param ref - The schema reference as declared in `specd.yaml`
-   * @param workspaceSchemasPaths - Map of workspace name to its resolved `schemasPath`
    * @returns The resolved schema, or `null` if the file was not found
    */
-  async resolve(
-    ref: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
-  ): Promise<Schema | null> {
-    const raw = await this.resolveRaw(ref, workspaceSchemasPaths)
+  async resolve(ref: string): Promise<Schema | null> {
+    const raw = await this.resolveRaw(ref)
     if (raw === null) return null
     return buildSchema(ref, raw.data, raw.templates)
   }
@@ -76,87 +82,49 @@ export class FsSchemaRegistry implements SchemaRegistry {
    * final domain `Schema`.
    *
    * @param ref - The schema reference as declared in `specd.yaml`
-   * @param workspaceSchemasPaths - Map of workspace name to its resolved `schemasPath`
    * @returns The raw resolution result, or `null` if the file was not found
    */
-  async resolveRaw(
-    ref: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
-  ): Promise<SchemaRawResult | null> {
-    let resolvedPath: string | null = null
-    let content: string | null = null
-
+  async resolveRaw(ref: string): Promise<SchemaRawResult | null> {
+    // npm-scoped references
     if (ref.startsWith('@')) {
-      for (const nmPath of this._nodeModulesPaths) {
-        const candidate = path.join(nmPath, ref, 'schema.yaml')
-        const result = await this._tryReadFile(candidate)
-        if (result !== null) {
-          resolvedPath = candidate
-          content = result
-          break
-        }
-      }
-      if (content === null) {
-        const fallbackPath = this._tryModuleResolve(ref)
-        if (fallbackPath !== null) {
-          const result = await this._tryReadFile(fallbackPath)
-          if (result !== null) {
-            resolvedPath = fallbackPath
-            content = result
-          }
-        }
-      }
-      if (content === null || resolvedPath === null) return null
-    } else {
-      resolvedPath = this._resolveFilePath(ref, workspaceSchemasPaths)
-      try {
-        content = await fs.readFile(resolvedPath, 'utf-8')
-      } catch (err) {
-        if (isEnoent(err)) return null
-        throw err
-      }
+      return this._resolveNpm(ref)
     }
 
-    const data = parseSchemaYaml(ref, content)
-    const schemaDir = path.dirname(resolvedPath)
-    const templates = await this._loadTemplates(ref, data.artifacts ?? [], schemaDir)
+    // Workspace-qualified references (#workspace:name or #name)
+    if (ref.startsWith('#')) {
+      const inner = ref.slice(1)
+      const { workspace, capPath: name } = parseSpecId(inner)
+      const repo = this._schemaRepositories.get(workspace)
+      if (repo === undefined) return null
+      return repo.resolveRaw(name)
+    }
 
-    return { data, templates, resolvedPath }
+    // Direct path references (absolute or relative)
+    if (path.isAbsolute(ref) || ref.startsWith('./') || ref.startsWith('../')) {
+      return this._resolvePath(ref)
+    }
+
+    // Bare name — delegate to default workspace
+    const repo = this._schemaRepositories.get('default')
+    if (repo === undefined) return null
+    return repo.resolveRaw(ref)
   }
 
   /**
-   * Lists all discoverable schemas from workspace paths and npm packages.
+   * Lists all discoverable schemas from workspace repositories and npm packages.
    *
-   * @param workspaceSchemasPaths - Map of workspace name to its resolved `schemasPath`
    * @returns All discoverable schema entries, workspace first then npm
    */
-  async list(workspaceSchemasPaths: ReadonlyMap<string, string>): Promise<SchemaEntry[]> {
+  async list(): Promise<SchemaEntry[]> {
     const entries: SchemaEntry[] = []
 
-    for (const [workspace, schemasPath] of workspaceSchemasPaths) {
-      let subdirs: string[]
-      try {
-        const items = await fs.readdir(schemasPath, { withFileTypes: true })
-        subdirs = items.filter((d) => d.isDirectory()).map((d) => d.name)
-      } catch {
-        continue
-      }
-      for (const name of subdirs) {
-        const schemaFile = path.join(schemasPath, name, 'schema.yaml')
-        try {
-          await fs.access(schemaFile)
-        } catch {
-          continue
-        }
-        entries.push({
-          ref: workspace === 'default' ? `#${name}` : `#${workspace}:${name}`,
-          name,
-          source: 'workspace',
-          workspace,
-        })
-      }
+    // Workspace entries from repositories
+    for (const [, repo] of this._schemaRepositories) {
+      const repoEntries = await repo.list()
+      entries.push(...repoEntries)
     }
 
+    // npm entries
     const seen = new Set<string>()
     for (const nmPath of this._nodeModulesPaths) {
       const specdScopeDir = path.join(nmPath, '@specd')
@@ -165,16 +133,16 @@ export class FsSchemaRegistry implements SchemaRegistry {
         for (const item of items) {
           if (!item.isDirectory()) continue
           if (!item.name.startsWith('schema-')) continue
-          const ref = `@specd/${item.name}`
-          if (seen.has(ref)) continue
+          const npmRef = `@specd/${item.name}`
+          if (seen.has(npmRef)) continue
           const schemaFile = path.join(specdScopeDir, item.name, 'schema.yaml')
           try {
             await fs.access(schemaFile)
           } catch {
             continue
           }
-          seen.add(ref)
-          entries.push({ ref, name: item.name, source: 'npm' })
+          seen.add(npmRef)
+          entries.push({ ref: npmRef, name: item.name, source: 'npm' })
         }
       } catch {
         // path not found — try next
@@ -187,6 +155,70 @@ export class FsSchemaRegistry implements SchemaRegistry {
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * Resolves an npm-scoped schema reference.
+   *
+   * @param ref - An npm-scoped reference (e.g. `"@specd/schema-std"`)
+   * @returns The raw resolution result, or `null` if not found
+   */
+  private async _resolveNpm(ref: string): Promise<SchemaRawResult | null> {
+    let resolvedPath: string | null = null
+    let content: string | null = null
+
+    for (const nmPath of this._nodeModulesPaths) {
+      const candidate = path.join(nmPath, ref, 'schema.yaml')
+      const result = await this._tryReadFile(candidate)
+      if (result !== null) {
+        resolvedPath = candidate
+        content = result
+        break
+      }
+    }
+
+    if (content === null) {
+      const fallbackPath = this._tryModuleResolve(ref)
+      if (fallbackPath !== null) {
+        const result = await this._tryReadFile(fallbackPath)
+        if (result !== null) {
+          resolvedPath = fallbackPath
+          content = result
+        }
+      }
+    }
+
+    if (content === null || resolvedPath === null) return null
+
+    const data = parseSchemaYaml(ref, content)
+    const schemaDir = path.dirname(resolvedPath)
+    const templates = await this._loadTemplates(ref, data.artifacts ?? [], schemaDir)
+
+    return { data, templates, resolvedPath }
+  }
+
+  /**
+   * Resolves a direct path reference (absolute or relative).
+   *
+   * @param ref - A direct path reference
+   * @returns The raw resolution result, or `null` if not found
+   */
+  private async _resolvePath(ref: string): Promise<SchemaRawResult | null> {
+    const resolvedPath = path.isAbsolute(ref) ? ref : path.resolve(this._configDir, ref)
+
+    let content: string
+    try {
+      content = await fs.readFile(resolvedPath, 'utf-8')
+    } catch (err) {
+      if (isEnoent(err)) return null
+      throw err
+    }
+
+    const data = parseSchemaYaml(ref, content)
+    const schemaDir = path.dirname(resolvedPath)
+    const templates = await this._loadTemplates(ref, data.artifacts ?? [], schemaDir)
+
+    return { data, templates, resolvedPath }
+  }
 
   /**
    * Reads a file and returns its content, or `null` on `ENOENT`.
@@ -220,47 +252,13 @@ export class FsSchemaRegistry implements SchemaRegistry {
   }
 
   /**
-   * Resolves a schema `ref` string to an absolute path to the `schema.yaml` file.
-   *
-   * @param ref - The schema reference string
-   * @param workspaceSchemasPaths - Map of workspace name to its resolved `schemasPath`
-   * @returns Absolute path to the schema YAML file
-   * @throws {SchemaValidationError} When a `#workspace:name` ref references an unknown workspace
-   */
-  private _resolveFilePath(
-    ref: string,
-    workspaceSchemasPaths: ReadonlyMap<string, string>,
-  ): string {
-    if (ref.startsWith('#')) {
-      const inner = ref.slice(1)
-      const { workspace, capPath: name } = parseSpecId(inner)
-      const schemasPath = workspaceSchemasPaths.get(workspace)
-      if (schemasPath === undefined) {
-        throw new SchemaValidationError(ref, `workspace '${workspace}' not found in schema paths`)
-      }
-      return path.join(schemasPath, name, 'schema.yaml')
-    }
-
-    if (path.isAbsolute(ref)) {
-      return ref
-    }
-
-    if (ref.startsWith('./') || ref.startsWith('../')) {
-      return path.resolve(this._configDir, ref)
-    }
-
-    const schemasPath = workspaceSchemasPaths.get('default') ?? ''
-    return path.join(schemasPath, ref, 'schema.yaml')
-  }
-
-  /**
    * Loads template file contents for artifacts that declare a `template` path.
    *
    * @param ref - The schema reference for error messages
    * @param artifacts - The raw artifact entries from the parsed YAML
    * @param schemaDir - The directory containing the schema file
    * @returns A map from template relative path to file content
-   * @throws {@link SchemaValidationError} When a template file is missing
+   * @throws {SchemaValidationError} When a template file is missing
    */
   private async _loadTemplates(
     ref: string,
