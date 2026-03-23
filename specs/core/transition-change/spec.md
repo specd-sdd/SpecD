@@ -16,7 +16,9 @@ Changes must advance through a strict lifecycle, and the rules for doing so — 
 - `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled
 - `implementingRequires` (readonly string\[], optional) — artifact IDs whose validation is cleared on `verifying` to `implementing`
 - `implementingTaskChecks` (ReadonlyArray\<TaskCompletionCheck>, optional) — task completion checks for `implementing` to `verifying`
-- `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
+- `skipHookPhases` (ReadonlySet\<HookPhaseSelector>, optional, default empty set) — which hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. When `'all'` is in the set, all hook phases are skipped. When the set is empty (default), all applicable hooks execute.
+
+The previous `skipHooks: boolean` field is removed. Callers that passed `skipHooks: true` should pass `skipHookPhases: new Set(['all'])` instead.
 
 ### Requirement: Change must exist
 
@@ -71,9 +73,9 @@ The `archivable` state is no longer terminal — it can transition to `designing
 
 ### Requirement: Pre-hook execution
 
-When `skipHooks` is `false` (default) and the target workflow step has `run:` pre-hooks, the use case MUST execute them via `RunStepHooks.execute({ name, step: effectiveTarget, phase: 'pre' })`. It MUST emit `hook-start` and `hook-done` progress events (with `phase: 'pre'`) for each hook. If any pre-hook fails, the use case MUST throw `HookFailedError` — no state transition occurs.
+After source.post hooks succeed (or are skipped), when `'all'` and `'target.pre'` are both absent from `skipHookPhases`, and the target workflow step has `run:` pre-hooks, the use case MUST execute them via `RunStepHooks.execute({ name, step: effectiveTarget, phase: 'pre' })`. It MUST emit `hook-start` and `hook-done` progress events (with `phase: 'pre'`) for each hook. If any pre-hook fails, the use case MUST throw `HookFailedError` — no state transition occurs.
 
-When `skipHooks` is `true`, pre-hook execution is skipped entirely.
+When `'all'` or `'target.pre'` is in `skipHookPhases`, pre-hook execution is skipped entirely.
 
 ### Requirement: Transition delegation
 
@@ -85,7 +87,13 @@ After a successful state transition, the use case MUST emit a `transitioned` pro
 
 ### Requirement: Post-hook execution
 
-After a successful transition, when `skipHooks` is `false` and the target workflow step has `run:` post-hooks, the use case MUST execute them via `RunStepHooks.execute({ name, step: effectiveTarget, phase: 'post' })`. It MUST emit `hook-start` and `hook-done` progress events (with `phase: 'post'`) for each hook. Post-hook failures are collected but do not roll back the transition.
+**Before** the state transition (and before pre-hooks), when `'all'` and `'source.post'` are both absent from `skipHookPhases`, the use case MUST look up the workflow step for the **source state** (`fromState`) via `schema.workflowStep(fromState)`. If the step has `run:` post-hooks, the use case MUST execute them via `RunStepHooks.execute({ name, step: fromState, phase: 'post' })`. It MUST emit `hook-start` and `hook-done` progress events (with `phase: 'post'`) for each hook. If any post-hook fails, the use case MUST throw `HookFailedError` — no state transition occurs.
+
+The source state is the state the change was in **before** the transition — post hooks represent "after finishing this step". This means hooks configured as `implementing.post` run when transitioning **out of** implementing (e.g. `implementing → verifying`), not when transitioning **into** implementing.
+
+The execution order is: source.post hooks → target.pre hooks → state transition. Both phases are fail-fast — a failure in either aborts the transition.
+
+If no workflow step exists for the source state, or the schema cannot be resolved, post-hook execution is skipped.
 
 ### Requirement: Persistence
 
@@ -96,7 +104,8 @@ After a successful transition, the use case MUST persist the updated change via 
 `TransitionChange.execute` MUST return a `TransitionChangeResult` containing:
 
 - `change` — the updated `Change` instance after the transition
-- `postHookFailures` — array of hook commands that failed during post-hook execution; empty when no post-hooks fail or when `skipHooks` is `true`
+
+The previous `postHookFailures` field is removed because both hook phases are now fail-fast — a hook failure throws `HookFailedError` and prevents the transition. There are no post-transition hook failures to collect.
 
 ### Requirement: Progress callback
 
