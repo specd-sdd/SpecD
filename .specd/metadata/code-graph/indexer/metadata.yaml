@@ -477,5 +477,5 @@ scenarios:
       - IndexResult.vcsRef SHALL be null
 contentHashes:
   spec.md: sha256:165ddf41b1a183f27a0e38a2471b0877471654cb26d7e7761cd132dc5d689ac5
-  verify.md: sha256:5b9c9a12cc998e84424da761b14bb22f65edd17dc4e7ccff13c6d62c1778872f
+  verify.md: sha256:61f01039b4fc0fec65083de085413f593a4560ea12a1b789359d26bd1fb69848
 generatedBy: core
