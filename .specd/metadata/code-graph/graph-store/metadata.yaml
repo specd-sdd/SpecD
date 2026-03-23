@@ -1,0 +1,316 @@
+title: Graph Store
+description: The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. The graph store defines the persistence port and its LadybugDB adapter, providing the storage backbone for indexing, querying, and traversal operations.
+dependsOn:
+  - code-graph:code-graph/symbol-model
+  - default:_global/architecture
+context:
+  - The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. The graph store defines the persistence port and its LadybugDB adapter, providing the storage backbone for indexing, querying, and traversal operations.
+rules:
+  - requirement: GraphStore port
+    rules:
+      - |-
+        `GraphStore` SHALL be an abstract class with a `storagePath` constructor parameter specifying where the graph database is stored on disk. It defines the contract for all graph persistence operations. Concrete implementations provide the storage engine.
+
+        The port follows the project's hexagonal architecture: it is defined in `domain/ports/` (or `application/ports/` if it requires async operations), and adapters live in `infrastructure/`.
+  - requirement: Connection lifecycle
+    rules:
+      - '`GraphStore` SHALL expose explicit `open(): Promise<void>` and `close(): Promise<void>` methods. All query and mutation methods MUST throw `StoreNotOpenError` (extending `CodeGraphError`) if called before `open()` or after `close()`. The `open()` method initializes the database connection and runs any pending schema migrations. The `close()` method flushes pending writes and releases resources.'
+  - requirement: Atomic file-level upsert
+    rules:
+      - '`GraphStore` SHALL provide `upsertFile(file: FileNode, symbols: SymbolNode[], relations: Relation[]): Promise<void>`. This operation MUST be atomic: it removes all existing symbols and relations for the given file path and replaces them with the provided data in a single transaction. If the transaction fails, the previous state for that file is preserved.'
+  - requirement: Additive relation insertion
+    rules:
+      - |-
+        `GraphStore` SHALL provide `addRelations(relations: Relation[]): Promise<void>`. This operation adds relations to the store without removing any existing data. It is used for cross-file relations (e.g. `CALLS` between symbols in different files) that must not be deleted when either file is re-upserted.
+
+        Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely additive.
+  - requirement: File removal
+    rules:
+      - '`GraphStore` SHALL provide `removeFile(filePath: string): Promise<void>`. This operation MUST atomically remove the `FileNode`, all `SymbolNode` entries with that `filePath`, and all `Relation` entries where the file or any of its symbols appear as `source` or `target`.'
+  - requirement: Query methods
+    rules:
+      - |-
+        `GraphStore` SHALL provide the following query methods:
+
+        - **`getFile(path: string): Promise<FileNode | undefined>`** — retrieve a file node by path
+        - **`getSymbol(id: string): Promise<SymbolNode | undefined>`** — retrieve a symbol by id
+        - **`getCallers(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `target` matches
+        - **`getCallees(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `source` matches
+        - **`getImporters(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `target` matches
+        - **`getImportees(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `source` matches
+        - **`getSpec(specId: string): Promise<SpecNode | undefined>`** — retrieve a spec node by id
+        - **`getSpecDependencies(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `source` matches
+        - **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches
+        - **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, or file path
+
+        `SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kind` (SymbolKind), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive).
+  - requirement: Graph statistics
+    rules:
+      - |-
+        `GraphStore` SHALL provide `getStatistics(): Promise<GraphStatistics>` returning:
+
+        - **`fileCount`** — total number of `FileNode` entries
+        - **`symbolCount`** — total number of `SymbolNode` entries
+        - **`specCount`** — total number of `SpecNode` entries
+        - **`relationCounts`** — a `Record<RelationType, number>` with counts per relation type
+        - **`languages`** — array of distinct language identifiers across all files
+        - **`lastIndexedAt`** — ISO 8601 timestamp of the most recent `upsertFile` call
+  - requirement: LadybugDB adapter
+    rules:
+      - |-
+        The concrete `LadybugGraphStore` adapter SHALL use LadybugDB as the storage engine. It stores the graph in a single file at `{storagePath}/.specd/code-graph.lbug`. LadybugDB provides a Cypher-compatible query interface over a local file-based graph database.
+
+        The adapter MUST:
+
+        - Create the `.specd/` directory and database file on first `open()` if they do not exist
+        - Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text and a `searchName STRING` column for FTS-optimized name search (computed from the symbol name using `expandSymbolName`).
+        - Use parameterized Cypher queries for all operations (no string interpolation of user data)
+        - Support schema migration: if the database schema version does not match the expected version, migrate on `open()`
+
+        The adapter uses CSV-based bulk loading (`COPY FROM`) for large datasets via the `bulkLoad()` method. Relations are loaded in batches of 500 to prevent LadybugDB from blocking. The `IGNORE_ERRORS=true` flag is used for relation COPY operations to silently skip rows referencing non-existent nodes (dangling imports to external files).
+  - requirement: Spec upsert and removal
+    rules:
+      - |-
+        `GraphStore` SHALL provide:
+
+        - **`upsertSpec(spec: SpecNode, relations: Relation[]): Promise<void>`** — atomically replaces all data for a spec node. Removes existing `DEPENDS_ON` relations where this spec is the source and replaces them with the provided relations.
+        - **`removeSpec(specId: string): Promise<void>`** — removes the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target.
+
+        These follow the same atomic pattern as `upsertFile` / `removeFile`.
+
+        The Spec node table includes:
+
+        - `specId STRING` — primary key
+        - `path STRING`
+        - `title STRING`
+        - `description STRING` — from `.specd-metadata.yaml`
+        - `contentHash STRING` — hash of concatenated artifacts (excluding `.specd-metadata.yaml`)
+        - `content STRING` — concatenated artifact text for full-text search
+        - `workspace STRING`
+  - requirement: Full-text search
+    rules:
+      - |-
+        `GraphStore` SHALL provide:
+
+        - **`searchSymbols(options: SearchOptions): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.searchName` and `Symbol.comment`. The `searchName` column contains the original symbol name plus camelCase/snake\_case/kebab-case tokenized parts (e.g. `handleError` is indexed as `"handleError handle error"`), so searches for individual words within compound names match correctly. Returns results ranked by BM25 score descending.
+        - **`searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>`** — full-text search across `Spec.title`, `Spec.description`, and `Spec.content`. Returns results ranked by BM25 score descending.
+        - **`rebuildFtsIndexes(): Promise<void>`** — drops and recreates FTS indexes. Must be called after bulk data changes because LadybugDB FTS indexes are not automatically updated on insert.
+
+        `SearchOptions` is a value object with:
+
+        - **query** — the search query string (required)
+        - **limit** — maximum results to return (default 20)
+        - **kind** — filter symbols by `SymbolKind` (symbols only)
+        - **filePattern** — filter symbols by file path glob (supports `*` wildcards, case-insensitive; symbols only)
+        - **workspace** — filter results to a single workspace
+        - **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)
+        - **excludeWorkspaces** — array of workspace names to exclude
+
+        All filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied **before** LIMIT in the query — not as post-query filters. The `LadybugGraphStore` implementation adds WHERE clauses between the FTS CALL and RETURN. The `InMemoryGraphStore` test helper applies filters before slicing to limit.
+  - requirement: Bulk operations
+    rules:
+      - '`GraphStore` SHALL provide `clear(): Promise<void>` to remove all nodes and relations (full re-index), `getAllFiles(): Promise<FileNode[]>` to retrieve all file nodes, and `getAllSpecs(): Promise<SpecNode[]>` to retrieve all spec nodes (both for incremental diff computation).'
+constraints:
+  - GraphStore is an abstract class, not an interface — following the project's port convention
+  - All mutations are atomic at the file level — no partial updates
+  - StoreNotOpenError is thrown on any operation when the store is not open
+  - The LadybugDB file path is always {storagePath}/.specd/code-graph.lbug — not configurable separately
+  - No dependency on @specd/core — error types extend CodeGraphError
+scenarios:
+  - requirement: Connection lifecycle
+    name: Operation before open throws
+    when:
+      - getFile() is called on a GraphStore that has not been opened
+    then:
+      - StoreNotOpenError is thrown
+  - requirement: Connection lifecycle
+    name: Operation after close throws
+    given:
+      - a GraphStore that was opened and then closed
+    when:
+      - upsertFile() is called
+    then:
+      - StoreNotOpenError is thrown
+  - requirement: Connection lifecycle
+    name: Open runs schema migration
+    given:
+      - an existing database file with schema version 1
+      - AND the adapter expects schema version 2
+    when:
+      - open() is called
+    then:
+      - the schema is migrated to version 2 before the method resolves
+  - requirement: Atomic file-level upsert
+    name: Upsert replaces all data for a file
+    given:
+      - a file src/utils.ts with 3 symbols and 2 relations in the store
+    when:
+      - upsertFile() is called for src/utils.ts with 2 symbols and 1 relation
+    then:
+      - the store contains exactly 2 symbols and 1 relation for that file
+  - requirement: Atomic file-level upsert
+    name: Failed upsert preserves previous state
+    given:
+      - a file src/utils.ts with existing data in the store
+    when:
+      - upsertFile() fails mid-transaction (e.g. invalid data)
+    then:
+      - the previous symbols and relations for that file remain intact
+  - requirement: Atomic file-level upsert
+    name: Upsert creates file node if not exists
+    when:
+      - upsertFile() is called for a file path not yet in the store
+    then:
+      - a new FileNode is created along with its symbols and relations
+  - requirement: Additive relation insertion
+    name: addRelations preserves existing data
+    given:
+      - a store with symbols A (in file1) and B (in file2) and no CALLS relations
+    when:
+      - "addRelations([{ source: A.id, target: B.id, type: 'CALLS' }]) is called"
+    then:
+      - the CALLS relation exists in the store
+      - AND all existing file, symbol, and relation data is preserved
+  - requirement: Additive relation insertion
+    name: addRelations survives file re-upsert
+    given:
+      - a CALLS relation from symbol A (file1) to symbol B (file2) added via addRelations
+    when:
+      - upsertFile is called for file2 (re-indexing it)
+    then:
+      - the CALLS relation from A to B is deleted (because B is removed and re-created)
+      - AND this is expected — the indexer re-adds CALLS in Phase 3 after all upserts
+  - requirement: File removal
+    name: Remove deletes file and all associated data
+    given:
+      - a file src/auth.ts with symbols A and B, and relations involving those symbols
+    when:
+      - removeFile('src/auth.ts') is called
+    then:
+      - the FileNode, both SymbolNode entries, and all relations referencing those symbols or that file path are removed
+  - requirement: File removal
+    name: Remove non-existent file is idempotent
+    when:
+      - removeFile('nonexistent.ts') is called
+    then:
+      - the operation completes without error
+  - requirement: Spec upsert and removal
+    name: Upsert replaces spec DEPENDS_ON relations
+    given:
+      - a spec core:core/change with 2 DEPENDS_ON relations in the store
+    when:
+      - upsertSpec() is called with 3 new DEPENDS_ON relations
+    then:
+      - the store contains exactly 3 DEPENDS_ON relations for that spec
+  - requirement: Spec upsert and removal
+    name: Remove spec cleans up all relations
+    given:
+      - a spec core:core/config that is both a source and target of DEPENDS_ON relations
+    when:
+      - removeSpec('core:core/config') is called
+    then:
+      - the SpecNode and all DEPENDS_ON relations where it appears as source or target are removed
+  - requirement: Query methods
+    name: getSpecDependencies returns outgoing DEPENDS_ON
+    given:
+      - spec A depends on specs B and C
+    when:
+      - getSpecDependencies(A.specId) is called
+    then:
+      - two DEPENDS_ON relations are returned with targets B and C
+  - requirement: Query methods
+    name: getSpecDependents returns incoming DEPENDS_ON
+    given:
+      - specs A and B both depend on spec C
+    when:
+      - getSpecDependents(C.specId) is called
+    then:
+      - two DEPENDS_ON relations are returned with sources A and B
+  - requirement: Query methods
+    name: getCallers returns only incoming CALLS relations
+    given:
+      - symbol B has two callers (A and C) and one callee (D)
+    when:
+      - getCallers(B.id) is called
+    then:
+      - two relations are returned with source being A and C
+  - requirement: Query methods
+    name: findSymbols filters by kind
+    given:
+      - the store contains functions, classes, and methods
+    when:
+      - 'findSymbols({ kind: SymbolKind.Class }) is called'
+    then:
+      - only class symbols are returned
+  - requirement: Query methods
+    name: findSymbols with name pattern
+    given:
+      - symbols named createUser, createOrder, deleteUser
+    when:
+      - "findSymbols({ name: 'create*' }) is called"
+    then:
+      - createUser and createOrder are returned
+  - requirement: Query methods
+    name: findSymbols filters by comment text
+    given:
+      - symbols with comments containing "validates user input" and "computes hash"
+    when:
+      - "findSymbols({ comment: 'validates' }) is called"
+    then:
+      - only the symbol with "validates user input" in its comment is returned
+  - requirement: Graph statistics
+    name: Statistics reflect current state
+    given:
+      - a store with 10 files, 50 symbols, and relations of various types
+    when:
+      - getStatistics() is called
+    then:
+      - fileCount is 10, symbolCount is 50, and relationCounts has accurate per-type counts
+  - requirement: Graph statistics
+    name: lastIndexedAt updates on upsert
+    when:
+      - upsertFile() completes successfully
+    then:
+      - getStatistics().lastIndexedAt reflects the time of that upsert
+  - requirement: LadybugDB adapter
+    name: Database created on first open
+    given:
+      - no .specd/ directory exists at storagePath
+    when:
+      - open() is called on LadybugGraphStore
+    then:
+      - the .specd/ directory and code-graph.lbug file are created
+  - requirement: LadybugDB adapter
+    name: Parameterized queries prevent injection
+    when:
+      - 'findSymbols({ name: "''; DROP TABLE symbols; --" }) is called'
+    then:
+      - the query executes safely and returns no results (no injection)
+  - requirement: Bulk operations
+    name: Clear removes all data
+    given:
+      - a store with files, symbols, and relations
+    when:
+      - clear() is called
+    then:
+      - getStatistics() returns zero for all counts
+  - requirement: Bulk operations
+    name: getAllFiles returns all indexed files
+    given:
+      - a store with 5 files
+    when:
+      - getAllFiles() is called
+    then:
+      - 5 FileNode entries are returned
+  - requirement: Bulk operations
+    name: getAllSpecs returns all indexed specs
+    given:
+      - a store with 12 specs
+    when:
+      - getAllSpecs() is called
+    then:
+      - 12 SpecNode entries are returned
+contentHashes:
+  spec.md: sha256:1bf8a0029fe55372a2b8daa852f6f03c95ab3901b552dbf65a0a860b66d9411e
+  verify.md: sha256:a54044aaef872c72e836bbbf8eb60f2b4b6bb74e16b8ed0be4f8b6a05b783746
+generatedBy: core
