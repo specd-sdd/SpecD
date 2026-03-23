@@ -124,16 +124,22 @@
 
 ### Requirement: Graph statistics
 
-#### Scenario: Statistics reflect current state
+#### Scenario: Statistics include all expected fields
 
-- **GIVEN** a store with 10 files, 50 symbols, and relations of various types
+- **WHEN** `getStatistics()` is called on a populated store
+- **THEN** the result SHALL include `fileCount`, `symbolCount`, `specCount`, `relationCounts`, `languages`, `lastIndexedAt`, and `lastIndexedRef`
+
+#### Scenario: lastIndexedRef defaults to null
+
+- **GIVEN** no VCS ref has been stored
 - **WHEN** `getStatistics()` is called
-- **THEN** `fileCount` is 10, `symbolCount` is 50, and `relationCounts` has accurate per-type counts
+- **THEN** `lastIndexedRef` SHALL be `null`
 
-#### Scenario: lastIndexedAt updates on upsert
+#### Scenario: lastIndexedRef reflects stored value
 
-- **WHEN** `upsertFile()` completes successfully
-- **THEN** `getStatistics().lastIndexedAt` reflects the time of that upsert
+- **GIVEN** the `lastIndexedRef` meta key has been set to `"abc1234"`
+- **WHEN** `getStatistics()` is called
+- **THEN** `lastIndexedRef` SHALL be `"abc1234"`
 
 ### Requirement: LadybugDB adapter
 

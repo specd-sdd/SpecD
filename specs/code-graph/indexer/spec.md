@@ -15,6 +15,7 @@ Source files change constantly and the code graph must be kept in sync without r
 3. **Extract** — run the appropriate language adapter on each new/changed file
 4. **Store** — upsert extracted data into the `GraphStore`
 5. **Clean** — remove deleted files from the store
+6. **Persist VCS ref** — if `IndexOptions.vcsRef` is provided, store it as the `lastIndexedRef` meta key after successful indexing
 
 The use case accepts a `GraphStore` (already opened) and an `AdapterRegistry` via constructor injection.
 
@@ -112,14 +113,15 @@ Only infrastructure-level errors (e.g. store connection lost, disk full) may abo
 - **`errors`** — array of `{ filePath: string; message: string }` for files or specs that failed
 - **`duration`** — elapsed time in milliseconds
 - **`workspaces`** — per-workspace breakdown array of `{ name, filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }`
+- **`vcsRef`** — the VCS ref that was persisted, or `null` if none was provided
 
 ### Requirement: Spec dependency indexing
 
 The indexer SHALL build `SpecNode` entries with `DEPENDS_ON` relations. Specs are resolved via the workspace's `specs()` callback (backed by `SpecRepository`), NOT by reading the filesystem directly. For each spec provided by the repository:
 
-1. Read `.specd-metadata.yaml` via `SpecRepository.artifact()` — extract `title`, `description`, and `dependsOn`
-2. If no `.specd-metadata.yaml` exists, use defaults: `title` = specId, `description` = `''`, `dependsOn` = `[]`. There is no fallback parsing of `spec.md` — metadata should be regenerated via `spec generate-metadata` before indexing.
-3. Compute a `contentHash` (SHA-256 of all artifacts EXCEPT `.specd-metadata.yaml`) — this includes `spec.md`, `verify.md`, and any other spec artifacts
+1. Load metadata via `SpecRepository.metadata()` — extract `title`, `description`, and `dependsOn`
+2. If metadata is absent (`null`), use defaults: `title` = specId, `description` = `''`, `dependsOn` = `[]`. There is no fallback parsing of `spec.md` — metadata should be regenerated via `spec generate-metadata` before indexing.
+3. Compute a `contentHash` (SHA-256 of all artifacts in `spec.filenames`) — this includes `spec.md`, `verify.md`, and any other spec artifacts
 4. Create a `SpecNode` and upsert it into the store
 5. Create a `DEPENDS_ON` relation for each entry in `dependsOn`
 
@@ -178,3 +180,4 @@ await store.close()
 - [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `FileNode`, `SymbolNode`, `Relation`
 - [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — `GraphStore` port, upsert/remove operations
 - [`specs/code-graph/language-adapter/spec.md`](../language-adapter/spec.md) — `LanguageAdapter`, `AdapterRegistry`
+- [`specs/code-graph/staleness-detection/spec.md`](../staleness-detection/spec.md) — `vcsRef` in `IndexOptions` and `IndexResult`

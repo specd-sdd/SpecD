@@ -193,6 +193,37 @@ export function graphStoreContractTests(
       expect(stats.fileCount).toBe(1)
       expect(stats.symbolCount).toBe(1)
       expect(stats.languages).toContain('typescript')
+      expect(stats.lastIndexedRef).toBeNull()
+    })
+
+    it('lastIndexedRef defaults to null', async () => {
+      const stats = await store.getStatistics()
+      expect(stats.lastIndexedRef).toBeNull()
+    })
+
+    it('lastIndexedRef is set after bulkLoad with vcsRef', async () => {
+      await store.bulkLoad({
+        files: [],
+        symbols: [],
+        specs: [],
+        relations: [],
+        vcsRef: 'abc1234def',
+      })
+      const stats = await store.getStatistics()
+      expect(stats.lastIndexedRef).toBe('abc1234def')
+    })
+
+    it('lastIndexedRef is cleared on clear()', async () => {
+      await store.bulkLoad({
+        files: [],
+        symbols: [],
+        specs: [],
+        relations: [],
+        vcsRef: 'abc1234def',
+      })
+      await store.clear()
+      const stats = await store.getStatistics()
+      expect(stats.lastIndexedRef).toBeNull()
     })
 
     it('clear removes everything', async () => {

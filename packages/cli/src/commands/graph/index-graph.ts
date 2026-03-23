@@ -2,6 +2,7 @@ import { Command } from 'commander'
 import { type IndexOptions } from '@specd/code-graph'
 import { rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { createVcsAdapter } from '@specd/core'
 import { output, parseFormat } from '../../formatter.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { withProvider } from './with-provider.js'
@@ -73,10 +74,19 @@ JSON/TOON output schema:
           return
         }
 
+        let vcsRef: string | undefined
+        try {
+          const vcs = await createVcsAdapter(config.projectRoot)
+          vcsRef = (await vcs.ref()) ?? undefined
+        } catch {
+          // No VCS or ref() failed — staleness detection unavailable
+        }
+
         const indexOpts: IndexOptions = {
           workspaces,
           projectRoot: config.projectRoot,
           ...(isTTY ? { onProgress: progressFn } : {}),
+          ...(vcsRef !== undefined ? { vcsRef } : {}),
         }
 
         const result = await provider.index(indexOpts)

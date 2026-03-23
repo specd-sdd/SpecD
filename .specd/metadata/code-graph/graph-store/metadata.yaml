@@ -3,6 +3,7 @@ description: The code graph needs durable persistence that supports atomic file-
 dependsOn:
   - code-graph:code-graph/symbol-model
   - default:_global/architecture
+  - code-graph:code-graph/staleness-detection
 context:
   - The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. The graph store defines the persistence port and its LadybugDB adapter, providing the storage backbone for indexing, querying, and traversal operations.
 rules:
@@ -55,6 +56,7 @@ rules:
         - **`relationCounts`** — a `Record<RelationType, number>` with counts per relation type
         - **`languages`** — array of distinct language identifiers across all files
         - **`lastIndexedAt`** — ISO 8601 timestamp of the most recent `upsertFile` call
+        - **`lastIndexedRef`** — VCS ref (commit hash, changeset ID) at the time of the last index, or `null` if no ref was stored. This value is persisted as a meta key alongside `lastIndexedAt` and is read-only from the statistics interface.
   - requirement: LadybugDB adapter
     rules:
       - |-
@@ -259,19 +261,27 @@ scenarios:
     then:
       - only the symbol with "validates user input" in its comment is returned
   - requirement: Graph statistics
-    name: Statistics reflect current state
+    name: Statistics include all expected fields
+    when:
+      - getStatistics() is called on a populated store
+    then:
+      - the result SHALL include fileCount, symbolCount, specCount, relationCounts, languages, lastIndexedAt, and lastIndexedRef
+  - requirement: Graph statistics
+    name: lastIndexedRef defaults to null
     given:
-      - a store with 10 files, 50 symbols, and relations of various types
+      - no VCS ref has been stored
     when:
       - getStatistics() is called
     then:
-      - fileCount is 10, symbolCount is 50, and relationCounts has accurate per-type counts
+      - lastIndexedRef SHALL be null
   - requirement: Graph statistics
-    name: lastIndexedAt updates on upsert
+    name: lastIndexedRef reflects stored value
+    given:
+      - the lastIndexedRef meta key has been set to "abc1234"
     when:
-      - upsertFile() completes successfully
+      - getStatistics() is called
     then:
-      - getStatistics().lastIndexedAt reflects the time of that upsert
+      - lastIndexedRef SHALL be "abc1234"
   - requirement: LadybugDB adapter
     name: Database created on first open
     given:
@@ -311,6 +321,6 @@ scenarios:
     then:
       - 12 SpecNode entries are returned
 contentHashes:
-  spec.md: sha256:1bf8a0029fe55372a2b8daa852f6f03c95ab3901b552dbf65a0a860b66d9411e
-  verify.md: sha256:a54044aaef872c72e836bbbf8eb60f2b4b6bb74e16b8ed0be4f8b6a05b783746
+  spec.md: sha256:cb5c08392043104cfeb83fd17a9938a2019995dfcdfee0f0e8b2ba81592fd3d8
+  verify.md: sha256:22d4bf859dc5f4a4e5c43a374b3138b45d50e087bcc916a1e905495eb1b1c3d5
 generatedBy: core

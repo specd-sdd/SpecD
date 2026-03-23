@@ -4,12 +4,22 @@
 
 ### Requirement: IndexCodeGraph use case
 
-#### Scenario: Full pipeline on empty store
+#### Scenario: Indexer orchestrates full pipeline
 
-- **GIVEN** an empty `GraphStore` and two workspaces with 10 TypeScript files total
-- **WHEN** `IndexCodeGraph.execute()` is called with both workspaces
-- **THEN** all 10 files are discovered, extracted, and upserted
-- **AND** `IndexResult.filesIndexed` is 10 and `filesSkipped` is 0
+- **WHEN** `execute()` is called with valid options
+- **THEN** the indexer SHALL discover files, diff, extract, store, clean, and persist VCS ref in order
+
+#### Scenario: VCS ref persisted after indexing
+
+- **GIVEN** `IndexOptions.vcsRef` is `"abc1234"`
+- **WHEN** indexing completes successfully
+- **THEN** `lastIndexedRef` SHALL be stored in the graph store metadata
+
+#### Scenario: No VCS ref in options
+
+- **GIVEN** `IndexOptions.vcsRef` is not provided
+- **WHEN** indexing completes successfully
+- **THEN** `lastIndexedRef` SHALL not be updated
 
 ### Requirement: Incremental indexing
 
@@ -254,21 +264,19 @@
 
 ### Requirement: Index result
 
-#### Scenario: Duration measured
+#### Scenario: Complete result object
 
-- **WHEN** `IndexCodeGraph.execute()` completes
-- **THEN** `IndexResult.duration` reflects the elapsed wall-clock time in milliseconds
+- **WHEN** indexing completes
+- **THEN** `IndexResult` SHALL contain `filesDiscovered`, `filesIndexed`, `filesRemoved`, `filesSkipped`, `specsDiscovered`, `specsIndexed`, `errors`, `duration`, `workspaces`, and `vcsRef`
 
-#### Scenario: All counts sum correctly
+#### Scenario: vcsRef in result
 
-- **GIVEN** a run across two workspaces that discovers 100 files, indexes 10, skips 85, removes 3, and has 2 errors
-- **WHEN** the `IndexResult` is returned
-- **THEN** `filesDiscovered` is 100, `filesIndexed` is 10, `filesSkipped` is 85, `filesRemoved` is 3, and `errors.length` is 2
+- **GIVEN** `IndexOptions.vcsRef` is `"abc1234"`
+- **WHEN** indexing completes
+- **THEN** `IndexResult.vcsRef` SHALL be `"abc1234"`
 
-#### Scenario: Per-workspace breakdown
+#### Scenario: No vcsRef in result
 
-- **GIVEN** indexing completes for workspaces `core` (80 files) and `cli` (20 files)
-- **WHEN** the `IndexResult` is returned
-- **THEN** `IndexResult.workspaces` contains two entries
-- **AND** each entry reports its own `filesDiscovered`, `filesIndexed`, `filesSkipped`, `filesRemoved`, `specsDiscovered`, `specsIndexed`
-- **AND** the aggregate `filesDiscovered` equals the sum of per-workspace `filesDiscovered`
+- **GIVEN** `IndexOptions.vcsRef` is not provided
+- **WHEN** indexing completes
+- **THEN** `IndexResult.vcsRef` SHALL be `null`

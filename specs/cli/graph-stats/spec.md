@@ -22,9 +22,11 @@ The command:
 1. Creates a `CodeGraphProvider` with the resolved path
 2. Opens the provider
 3. Calls `getStatistics()` to retrieve the `GraphStatistics` object
-4. Outputs the statistics
-5. Closes the provider
-6. Exits with `process.exit(0)` — required because the LadybugDB native addon keeps the Node process alive
+4. Resolves the current VCS ref via `createVcsAdapter(projectRoot)` and `vcs.ref()`. If VCS detection fails or `ref()` throws, `currentRef` is `null`.
+5. Compares `currentRef` against `statistics.lastIndexedRef` to determine staleness
+6. Outputs the statistics with staleness information
+7. Closes the provider
+8. Exits with `process.exit(0)` — required because the LadybugDB native addon keeps the Node process alive
 
 ### Requirement: Output format
 
@@ -46,7 +48,18 @@ Last indexed: 2026-03-14T10:38:30.178Z
 - `Relations` shows only non-zero relation counts from `relationCounts`, each on its own indented line
 - `Last indexed` shows `lastIndexedAt` as an ISO 8601 timestamp
 
-In `json` or `toon` mode, the full `GraphStatistics` object is output as-is.
+If the graph is stale, a warning line SHALL be appended after `Last indexed`:
+
+```
+⚠ Graph is stale (indexed at <short-ref>, current: <short-ref>)
+```
+
+Where `<short-ref>` is the first 7 characters of the ref. If `lastIndexedRef` is `null`, no staleness line is shown.
+
+In `json` or `toon` mode, the full `GraphStatistics` object is output as-is, with two additional fields:
+
+- `stale: boolean | null` — `true` if stale, `false` if fresh, `null` if unknown
+- `currentRef: string | null` — the current VCS ref, or `null` if unavailable
 
 ### Requirement: Error cases
 
@@ -89,3 +102,4 @@ Last indexed: 2026-03-13T09:00:00.000Z
 
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — CodeGraphProvider, GraphStatistics
+- [`specs/code-graph/staleness-detection/spec.md`](../../code-graph/staleness-detection/spec.md) — staleness semantics, warn-not-block policy
