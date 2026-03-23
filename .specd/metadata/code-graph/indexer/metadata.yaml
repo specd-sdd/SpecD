@@ -4,6 +4,7 @@ dependsOn:
   - code-graph:code-graph/symbol-model
   - code-graph:code-graph/graph-store
   - code-graph:code-graph/language-adapter
+  - code-graph:code-graph/staleness-detection
 context:
   - Source files change constantly and the code graph must be kept in sync without re-parsing the entire workspace every time. The indexer orchestrates the pipeline from file discovery through parsing to graph storage, using content hashing for incremental updates and language adapters for extraction. It is the primary write path into the code graph.
 rules:
@@ -17,6 +18,7 @@ rules:
         3. **Extract** — run the appropriate language adapter on each new/changed file
         4. **Store** — upsert extracted data into the `GraphStore`
         5. **Clean** — remove deleted files from the store
+        6. **Persist VCS ref** — if `IndexOptions.vcsRef` is provided, store it as the `lastIndexedRef` meta key after successful indexing
 
         The use case accepts a `GraphStore` (already opened) and an `AdapterRegistry` via constructor injection.
   - requirement: Incremental indexing
@@ -114,14 +116,15 @@ rules:
         - **`errors`** — array of `{ filePath: string; message: string }` for files or specs that failed
         - **`duration`** — elapsed time in milliseconds
         - **`workspaces`** — per-workspace breakdown array of `{ name, filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }`
+        - **`vcsRef`** — the VCS ref that was persisted, or `null` if none was provided
   - requirement: Spec dependency indexing
     rules:
       - |-
         The indexer SHALL build `SpecNode` entries with `DEPENDS_ON` relations. Specs are resolved via the workspace's `specs()` callback (backed by `SpecRepository`), NOT by reading the filesystem directly. For each spec provided by the repository:
 
-        1. Read `.specd-metadata.yaml` via `SpecRepository.artifact()` — extract `title`, `description`, and `dependsOn`
-        2. If no `.specd-metadata.yaml` exists, use defaults: `title` = specId, `description` = `''`, `dependsOn` = `[]`. There is no fallback parsing of `spec.md` — metadata should be regenerated via `spec generate-metadata` before indexing.
-        3. Compute a `contentHash` (SHA-256 of all artifacts EXCEPT `.specd-metadata.yaml`) — this includes `spec.md`, `verify.md`, and any other spec artifacts
+        1. Load metadata via `SpecRepository.metadata()` — extract `title`, `description`, and `dependsOn`
+        2. If metadata is absent (`null`), use defaults: `title` = specId, `description` = `''`, `dependsOn` = `[]`. There is no fallback parsing of `spec.md` — metadata should be regenerated via `spec generate-metadata` before indexing.
+        3. Compute a `contentHash` (SHA-256 of all artifacts in `spec.filenames`) — this includes `spec.md`, `verify.md`, and any other spec artifacts
         4. Create a `SpecNode` and upsert it into the store
         5. Create a `DEPENDS_ON` relation for each entry in `dependsOn`
 
@@ -140,14 +143,27 @@ constraints:
   - Pass 2 depends on Pass 1 completing for ALL workspaces — they are not interleaved per workspace
 scenarios:
   - requirement: IndexCodeGraph use case
-    name: Full pipeline on empty store
-    given:
-      - an empty GraphStore and two workspaces with 10 TypeScript files total
+    name: Indexer orchestrates full pipeline
     when:
-      - IndexCodeGraph.execute() is called with both workspaces
+      - execute() is called with valid options
     then:
-      - all 10 files are discovered, extracted, and upserted
-      - AND IndexResult.filesIndexed is 10 and filesSkipped is 0
+      - the indexer SHALL discover files, diff, extract, store, clean, and persist VCS ref in order
+  - requirement: IndexCodeGraph use case
+    name: VCS ref persisted after indexing
+    given:
+      - IndexOptions.vcsRef is "abc1234"
+    when:
+      - indexing completes successfully
+    then:
+      - lastIndexedRef SHALL be stored in the graph store metadata
+  - requirement: IndexCodeGraph use case
+    name: No VCS ref in options
+    given:
+      - IndexOptions.vcsRef is not provided
+    when:
+      - indexing completes successfully
+    then:
+      - lastIndexedRef SHALL not be updated
   - requirement: Incremental indexing
     name: Unchanged files skipped
     given:
@@ -438,30 +454,28 @@ scenarios:
     then:
       - the entire indexing run aborts with that error (not collected per-file)
   - requirement: Index result
-    name: Duration measured
+    name: Complete result object
     when:
-      - IndexCodeGraph.execute() completes
+      - indexing completes
     then:
-      - IndexResult.duration reflects the elapsed wall-clock time in milliseconds
+      - IndexResult SHALL contain filesDiscovered, filesIndexed, filesRemoved, filesSkipped, specsDiscovered, specsIndexed, errors, duration, workspaces, and vcsRef
   - requirement: Index result
-    name: All counts sum correctly
+    name: vcsRef in result
     given:
-      - a run across two workspaces that discovers 100 files, indexes 10, skips 85, removes 3, and has 2 errors
+      - IndexOptions.vcsRef is "abc1234"
     when:
-      - the IndexResult is returned
+      - indexing completes
     then:
-      - filesDiscovered is 100, filesIndexed is 10, filesSkipped is 85, filesRemoved is 3, and errors.length is 2
+      - IndexResult.vcsRef SHALL be "abc1234"
   - requirement: Index result
-    name: Per-workspace breakdown
+    name: No vcsRef in result
     given:
-      - indexing completes for workspaces core (80 files) and cli (20 files)
+      - IndexOptions.vcsRef is not provided
     when:
-      - the IndexResult is returned
+      - indexing completes
     then:
-      - IndexResult.workspaces contains two entries
-      - AND each entry reports its own filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed
-      - AND the aggregate filesDiscovered equals the sum of per-workspace filesDiscovered
+      - IndexResult.vcsRef SHALL be null
 contentHashes:
-  spec.md: sha256:4772bf57028c2a26e9bebf5a6b2fd9fa0e319ef6fcabfafa519a5d798fbfe8b6
-  verify.md: sha256:a05130665f9620bba040606313f290829a1fed74b27934c3523c6b7a57521f38
+  spec.md: sha256:165ddf41b1a183f27a0e38a2471b0877471654cb26d7e7761cd132dc5d689ac5
+  verify.md: sha256:5b9c9a12cc998e84424da761b14bb22f65edd17dc4e7ccff13c6d62c1778872f
 generatedBy: core

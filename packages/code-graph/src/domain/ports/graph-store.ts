@@ -97,6 +97,7 @@ export abstract class GraphStore {
     specs: SpecNode[]
     relations: Relation[]
     onProgress?: (step: string) => void
+    vcsRef?: string
   }): Promise<void>
 
   abstract getFile(path: string): Promise<FileNode | undefined>

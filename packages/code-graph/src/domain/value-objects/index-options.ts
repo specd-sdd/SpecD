@@ -41,4 +41,6 @@ export interface IndexOptions {
   readonly onProgress?: IndexProgressCallback
   /** Maximum source bytes per processing chunk. Defaults to 20MB. */
   readonly chunkBytes?: number
+  /** VCS ref (commit hash) to persist as lastIndexedRef after indexing. */
+  readonly vcsRef?: string
 }

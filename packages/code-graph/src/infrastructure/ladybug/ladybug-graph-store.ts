@@ -58,6 +58,7 @@ export class LadybugGraphStore extends GraphStore {
   private conn: Connection | undefined
   private _isOpen = false
   private _lastIndexedAt: string | undefined
+  private _lastIndexedRef: string | null = null
 
   /**
    * Asserts the store is open and the connection is available.
@@ -107,6 +108,14 @@ export class LadybugGraphStore extends GraphStore {
     )
     if (metaRows.length > 0 && metaRows[0]) {
       this._lastIndexedAt = metaRows[0]['v'] as string
+    }
+
+    const refRows = await exec(
+      this.conn,
+      `MATCH (m:Meta {key: 'lastIndexedRef'}) RETURN m.value AS v`,
+    )
+    if (refRows.length > 0 && refRows[0]) {
+      this._lastIndexedRef = refRows[0]['v'] as string
     }
 
     this._isOpen = true
@@ -315,6 +324,7 @@ export class LadybugGraphStore extends GraphStore {
    * @param data.specs - Spec nodes to load.
    * @param data.relations - Relations to load.
    * @param data.onProgress - Optional progress callback.
+   * @param data.vcsRef - Optional VCS ref to persist as `lastIndexedRef`.
    */
   async bulkLoad(data: {
     files: FileNode[]
@@ -322,6 +332,7 @@ export class LadybugGraphStore extends GraphStore {
     specs: SpecNode[]
     relations: Relation[]
     onProgress?: (step: string) => void
+    vcsRef?: string
   }): Promise<void> {
     this.ensureOpen()
     const conn = this.conn!
@@ -408,8 +419,14 @@ export class LadybugGraphStore extends GraphStore {
 
       const now = new Date().toISOString()
       await this.updateMeta(conn, 'lastIndexedAt', now)
+      if (data.vcsRef !== undefined) {
+        await this.updateMeta(conn, 'lastIndexedRef', data.vcsRef)
+      }
       await conn.query('COMMIT')
       this._lastIndexedAt = now
+      if (data.vcsRef !== undefined) {
+        this._lastIndexedRef = data.vcsRef
+      }
     } catch (err) {
       await conn.query('ROLLBACK').catch(() => {})
       throw err
@@ -759,6 +776,7 @@ export class LadybugGraphStore extends GraphStore {
       relationCounts: relationCounts as Record<RelationType, number>,
       languages,
       lastIndexedAt: this._lastIndexedAt,
+      lastIndexedRef: this._lastIndexedRef,
     }
   }
 
@@ -971,6 +989,7 @@ export class LadybugGraphStore extends GraphStore {
     await conn.query('MATCH (s:Spec) DELETE s')
     await conn.query('MATCH (m:Meta) DELETE m')
     this._lastIndexedAt = undefined
+    this._lastIndexedRef = null
   }
 
   /**

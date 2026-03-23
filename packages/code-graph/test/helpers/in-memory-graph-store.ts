@@ -18,6 +18,7 @@ export class InMemoryGraphStore extends GraphStore {
   private specs = new Map<string, SpecNode>()
   private relations: Relation[] = []
   private _lastIndexedAt: string | undefined
+  private _lastIndexedRef: string | null = null
 
   constructor() {
     super(':memory:')
@@ -80,6 +81,7 @@ export class InMemoryGraphStore extends GraphStore {
     specs: SpecNode[]
     relations: Relation[]
     onProgress?: (step: string) => void
+    vcsRef?: string
   }): Promise<void> {
     this.ensureOpen()
     for (const f of data.files) this.files.set(f.path, f)
@@ -87,6 +89,9 @@ export class InMemoryGraphStore extends GraphStore {
     for (const sp of data.specs) this.specs.set(sp.specId, sp)
     this.relations.push(...data.relations)
     this._lastIndexedAt = new Date().toISOString()
+    if (data.vcsRef !== undefined) {
+      this._lastIndexedRef = data.vcsRef
+    }
   }
 
   async upsertSpec(spec: SpecNode, relations: Relation[]): Promise<void> {
@@ -233,6 +238,7 @@ export class InMemoryGraphStore extends GraphStore {
       >,
       languages,
       lastIndexedAt: this._lastIndexedAt,
+      lastIndexedRef: this._lastIndexedRef,
     }
   }
 
@@ -323,5 +329,6 @@ export class InMemoryGraphStore extends GraphStore {
     this.specs.clear()
     this.relations = []
     this._lastIndexedAt = undefined
+    this._lastIndexedRef = null
   }
 }

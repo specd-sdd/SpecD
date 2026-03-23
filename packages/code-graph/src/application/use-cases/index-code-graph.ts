@@ -505,6 +505,7 @@ export class IndexCodeGraph {
           bulkStep++
           progress(83 + Math.min(Math.round(bulkStep * 2), 12), 'Bulk loading', step)
         },
+        ...(options.vcsRef !== undefined ? { vcsRef: options.vcsRef } : {}),
       })
     }
 
@@ -537,6 +538,7 @@ export class IndexCodeGraph {
       errors,
       duration: Date.now() - start,
       workspaces,
+      vcsRef: options.vcsRef ?? null,
     }
   }
 

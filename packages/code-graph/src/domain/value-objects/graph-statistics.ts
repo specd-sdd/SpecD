@@ -10,4 +10,5 @@ export interface GraphStatistics {
   readonly relationCounts: Readonly<Record<RelationType, number>>
   readonly languages: readonly string[]
   readonly lastIndexedAt: string | undefined
+  readonly lastIndexedRef: string | null
 }

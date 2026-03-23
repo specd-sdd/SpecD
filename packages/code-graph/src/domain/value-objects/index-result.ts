@@ -32,4 +32,5 @@ export interface IndexResult {
   readonly errors: readonly IndexError[]
   readonly duration: number
   readonly workspaces: readonly WorkspaceIndexBreakdown[]
+  readonly vcsRef: string | null
 }

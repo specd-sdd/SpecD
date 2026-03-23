@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { createVcsAdapter } from '@specd/core'
 import { output, parseFormat } from '../../formatter.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { withProvider } from './with-provider.js'
@@ -24,6 +25,9 @@ JSON/TOON output schema:
     relationCounts: Record<RelationType, number>
     languages: string[]
     lastIndexedAt?: string
+    lastIndexedRef?: string | null
+    stale: boolean | null
+    currentRef: string | null
   }
 `,
     )
@@ -33,6 +37,16 @@ JSON/TOON output schema:
 
       await withProvider(config, opts.format, async (provider) => {
         const stats = await provider.getStatistics()
+
+        let currentRef: string | null = null
+        try {
+          const vcs = await createVcsAdapter(config.projectRoot)
+          currentRef = await vcs.ref()
+        } catch {
+          // No VCS or ref() failed — staleness detection unavailable
+        }
+
+        const stale = computeStaleness(stats.lastIndexedRef, currentRef)
 
         if (fmt === 'text') {
           const lines = [
@@ -54,10 +68,30 @@ JSON/TOON output schema:
             lines.push(`Last indexed: ${stats.lastIndexedAt}`)
           }
 
+          if (stale === true && stats.lastIndexedRef !== null && currentRef !== null) {
+            lines.push(
+              `⚠ Graph is stale (indexed at ${stats.lastIndexedRef.slice(0, 7)}, current: ${currentRef.slice(0, 7)})`,
+            )
+          }
+
           output(lines.join('\n'), 'text')
         } else {
-          output(stats, fmt)
+          output({ ...stats, stale, currentRef }, fmt)
         }
       })
     })
+}
+
+/**
+ * Determines staleness from stored and current VCS refs.
+ * @param lastIndexedRef - The VCS ref stored at last index time, or `null`.
+ * @param currentRef - The current VCS ref, or `null`.
+ * @returns `true` if stale, `false` if fresh, `null` if unknown.
+ */
+function computeStaleness(
+  lastIndexedRef: string | null,
+  currentRef: string | null,
+): boolean | null {
+  if (lastIndexedRef === null || currentRef === null) return null
+  return lastIndexedRef !== currentRef
 }
