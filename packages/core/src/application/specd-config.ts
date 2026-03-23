@@ -107,6 +107,16 @@ export interface SpecdConfig {
    * Project-level context spec exclude patterns. Always applied regardless of active workspace.
    */
   readonly contextExcludeSpecs?: readonly string[]
+  /**
+   * Controls how `CompileContext` renders specs in the compiled context.
+   *
+   * - `'lazy'` (default) — tier 1 specs (specIds + specDependsOn) rendered in full;
+   *   tier 2 specs (include patterns + dependsOn traversal) rendered as summaries.
+   * - `'full'` — all collected specs rendered with full content.
+   *
+   * Project-level only — not valid inside workspace entries.
+   */
+  readonly contextMode?: 'full' | 'lazy'
   /** When `true`, specd may invoke an LLM for enriched output (default: `false`). */
   readonly llmOptimizedContext?: boolean
   /** Schema plugin references from `specd.yaml`, in declaration order. */

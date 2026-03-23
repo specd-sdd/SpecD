@@ -16,12 +16,45 @@
 
 ### Requirement: Output
 
-#### Scenario: Context block printed verbatim
+#### Scenario: Text output — full specs rendered with content
 
-- **WHEN** `specd change context my-change designing` is run
-- **THEN** stdout contains the compiled context block exactly as returned by CompileContext
-- **AND** no framing headers are added
-- **AND** the process exits with code 0
+- **GIVEN** `CompileContext` returns specs with `mode: 'full'`
+- **WHEN** `specd change context <name> <step>` is called with `--format text`
+- **THEN** full-mode specs are rendered under `### Spec: <specId>` headings with their content
+
+#### Scenario: Text output — summary specs rendered as catalogue
+
+- **GIVEN** `config.contextMode: 'lazy'`
+- **AND** `CompileContext` returns specs with `mode: 'summary'` from `includePattern` source
+- **WHEN** `specd change context <name> <step>` is called with `--format text`
+- **THEN** summary-mode specs appear under `## Available context specs` with spec ID, title, and description
+- **AND** the section includes the instruction `Use \`specd spec show <spec-id>\` to load the full content of any spec you need.\`
+
+#### Scenario: Text output — dependsOn traversal specs distinguished
+
+- **GIVEN** `config.contextMode: 'lazy'`
+- **AND** some summary specs have `source: 'dependsOnTraversal'`
+- **WHEN** `specd change context <name> <step>` is called with `--format text`
+- **THEN** `dependsOnTraversal` specs appear under a `### Via dependencies` sub-heading within `## Available context specs`
+
+#### Scenario: JSON output — structured result with mode and source
+
+- **GIVEN** `CompileContext` returns structured result
+- **WHEN** `specd change context <name> <step>` is called with `--format json`
+- **THEN** the JSON output includes `projectContext`, `specs` (with `specId`, `mode`, `source` fields), `availableSteps`, and `warnings`
+
+#### Scenario: JSON output — summary specs have no content field
+
+- **GIVEN** `config.contextMode: 'lazy'`
+- **AND** a spec has `mode: 'summary'`
+- **WHEN** `specd change context <name> <step>` is called with `--format json`
+- **THEN** the spec entry in JSON has `specId`, `title`, `description`, `source`, `mode` but no `content` field
+
+#### Scenario: Full mode — text output unchanged from previous behaviour
+
+- **GIVEN** `config.contextMode: 'full'` (or not set)
+- **WHEN** `specd change context <name> <step>` is called with `--format text`
+- **THEN** all specs are rendered with full content — no `## Available context specs` section appears
 
 #### Scenario: dependsOn not followed by default
 
@@ -33,7 +66,7 @@
 
 - **GIVEN** a spec in context has `dependsOn` entries pointing to other specs
 - **WHEN** `specd change context my-change implementing --follow-deps` is run
-- **THEN** the context block includes content from the dependent specs as well
+- **THEN** the output includes content from the dependent specs as well
 
 #### Scenario: --depth limits traversal
 
@@ -41,18 +74,18 @@
 - **WHEN** `specd change context my-change implementing --follow-deps --depth 1` is run
 - **THEN** the output includes content from spec B but not spec C
 
-#### Scenario: Section flags filter spec content
+#### Scenario: Section flags filter full-mode spec content only
 
 - **GIVEN** specs in context have description, rules, constraints, and scenarios in their metadata
 - **WHEN** `specd change context my-change implementing --rules --constraints` is run
-- **THEN** the context block contains rules and constraints sections from each spec
-- **AND** description and scenarios sections are not present
+- **THEN** only rules and constraints sections appear in full-mode spec content
+- **AND** summary-mode specs are unaffected by section flags
 
 #### Scenario: No section flags includes all sections
 
 - **GIVEN** specs in context have all metadata sections populated
 - **WHEN** `specd change context my-change implementing` is run without section flags
-- **THEN** the context block contains description, rules, constraints, and scenarios from each spec
+- **THEN** full-mode specs contain description, rules, constraints, and scenarios
 
 ### Requirement: Step availability warning
 
@@ -61,7 +94,7 @@
 - **GIVEN** the step `implementing` has blocking artifacts
 - **WHEN** `specd change context my-change implementing` is run
 - **THEN** stderr contains a `warning:` line listing the blocking artifacts
-- **AND** stdout still contains the context block
+- **AND** stdout still contains the context output
 - **AND** the process exits with code 0
 
 ### Requirement: Context warnings
@@ -71,7 +104,7 @@
 - **GIVEN** a spec included in context has stale metadata
 - **WHEN** `specd change context my-change designing` is run
 - **THEN** stderr contains a `warning:` line for the stale spec
-- **AND** the context block is still printed to stdout
+- **AND** the context output is still printed to stdout
 - **AND** the process exits with code 0
 
 ### Requirement: Error cases
@@ -81,12 +114,3 @@
 - **WHEN** `specd change context nonexistent designing` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
-
-### Requirement: Output
-
-#### Scenario: JSON output contains contextBlock and warnings
-
-- **WHEN** `specd change context my-change designing --format json` is run
-- **THEN** stdout is valid JSON with `contextBlock`, `stepAvailable`, `blockingArtifacts`, and `warnings`
-- **AND** `contextBlock` contains the compiled context text
-- **AND** the process exits with code 0

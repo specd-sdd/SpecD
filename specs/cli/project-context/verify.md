@@ -74,21 +74,29 @@
 
 ### Requirement: Output
 
-#### Scenario: Nothing configured
+#### Scenario: Text output — all specs rendered with full content
 
-- **GIVEN** `specd.yaml` has no `context:` entries and no `contextIncludeSpecs`
-- **WHEN** `specd project context` is run
-- **THEN** stdout contains `no project context configured`
-- **AND** the process exits with code 0
+- **GIVEN** `GetProjectContext` returns specs (always `mode: 'full'`)
+- **WHEN** `specd project context` is called with `--format text`
+- **THEN** output is unchanged from previous behaviour — all specs under `## Spec content` with full content
 
-#### Scenario: JSON output structure
+#### Scenario: JSON output — structured spec entries
 
-- **GIVEN** `specd.yaml` has `context:` with `instruction: "Follow conventions."` and one spec `default:auth/login` matched by include patterns
-- **WHEN** `specd project context --format json` is run
-- **THEN** stdout is valid JSON with `contextEntries`, `specs`, and `warnings`
-- **AND** `contextEntries` contains `"Follow conventions."`
-- **AND** `specs` contains one entry with `workspace`, `path`, and `content`
-- **AND** the process exits with code 0
+- **GIVEN** `GetProjectContext` returns structured `ContextSpecEntry` objects
+- **WHEN** `specd project context` is called with `--format json`
+- **THEN** the JSON output includes `contextEntries`, `specs` (with `specId`, `title`, `description`, `source`, `mode`, `content`), and `warnings`
+
+#### Scenario: JSON output — all specs have mode full and source includePattern
+
+- **GIVEN** `GetProjectContext` operates without a change
+- **WHEN** `specd project context` is called with `--format json`
+- **THEN** all spec entries have `mode: 'full'` and `source: 'includePattern'`
+
+#### Scenario: No project context configured
+
+- **GIVEN** no `context:` entries and no specs match include patterns
+- **WHEN** `specd project context` is called
+- **THEN** the command prints `no project context configured` and exits with code 0
 
 ### Requirement: Warnings
 

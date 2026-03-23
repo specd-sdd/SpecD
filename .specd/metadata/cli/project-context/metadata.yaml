@@ -2,7 +2,9 @@ title: Project Context
 description: 'Agents need a way to retrieve the baseline project context -- instructions and specs that apply regardless of which change they are working on. The `specd project context` command compiles and prints the full project-level context: the `context:` entries from `specd.yaml` followed by all specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns.'
 dependsOn:
   - cli:cli/entrypoint
-  - cli:cli/change-context
+  - core:core/get-project-context
+  - core:core/compile-context
+  - core:core/config
 context:
   - 'Agents need a way to retrieve the baseline project context -- instructions and specs that apply regardless of which change they are working on. The `specd project context` command compiles and prints the full project-level context: the `context:` entries from `specd.yaml` followed by all specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns.'
 rules:
@@ -38,19 +40,36 @@ rules:
   - requirement: Output
     rules:
       - |-
-        In `text` mode (default), the compiled context block is printed to stdout verbatim — the same text `CompileContext` would produce for the project entries and spec content sections, with no additional framing added by the CLI. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.
+        The CLI MUST assemble the final output from the structured `GetProjectContextResult` returned by the use case.
 
-        In `json` or `toon` mode, the output is (encoded in the respective format):
+        **In `text` mode** (default):
+
+        1. Project context entries are rendered first, each preceded by its source label. Entries are separated by `---`.
+        2. Spec content follows under a `## Spec content` header. Each spec is rendered under a `### Spec: <specId>` heading with its full content.
+        3. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.
+
+        Since `GetProjectContext` always returns all specs in `full` mode (no change context means no tier classification), the text output format is unchanged from the current behaviour — all specs are rendered with full content.
+
+        **In `json` or `toon` mode**, the output is:
 
         ```json
         {
           "contextEntries": ["...", "..."],
-          "specs": [{ "workspace": "...", "path": "...", "content": "..." }],
+          "specs": [
+            {
+              "specId": "default:_global/architecture",
+              "title": "Architecture",
+              "description": "...",
+              "source": "includePattern",
+              "mode": "full",
+              "content": "..."
+            }
+          ],
           "warnings": []
         }
         ```
 
-        where `contextEntries` are the rendered project `context:` entries, `specs` are the matched specs with their rendered metadata content, and `warnings` lists any advisory conditions (missing files, stale metadata, unknown workspaces, etc.).
+        where `contextEntries` are the rendered project `context:` entries, `specs` are the matched specs with their structured entry data (always `mode: 'full'`), and `warnings` lists any advisory conditions.
   - requirement: Warnings
     rules:
       - Any advisory conditions (missing `file:` entries, stale metadata, unknown workspace patterns, spec not found) are emitted as `warning:` lines to stderr in all formats. They are also included in the `warnings` array in `json`/`toon` output. The command exits with code 0 regardless.
@@ -154,25 +173,37 @@ scenarios:
     then:
       - stdout contains Hello world
   - requirement: Output
-    name: Nothing configured
+    name: Text output — all specs rendered with full content
     given:
-      - 'specd.yaml has no context: entries and no contextIncludeSpecs'
+      - "GetProjectContext returns specs (always mode: 'full')"
     when:
-      - specd project context is run
+      - specd project context is called with --format text
     then:
-      - stdout contains no project context configured
-      - AND the process exits with code 0
+      - 'output is unchanged from previous behaviour — all specs under ## Spec content with full content'
   - requirement: Output
-    name: JSON output structure
+    name: JSON output — structured spec entries
     given:
-      - 'specd.yaml has context: with instruction: "Follow conventions." and one spec default:auth/login matched by include patterns'
+      - GetProjectContext returns structured ContextSpecEntry objects
     when:
-      - specd project context --format json is run
+      - specd project context is called with --format json
     then:
-      - stdout is valid JSON with contextEntries, specs, and warnings
-      - AND contextEntries contains "Follow conventions."
-      - AND specs contains one entry with workspace, path, and content
-      - AND the process exits with code 0
+      - the JSON output includes contextEntries, specs (with specId, title, description, source, mode, content), and warnings
+  - requirement: Output
+    name: JSON output — all specs have mode full and source includePattern
+    given:
+      - GetProjectContext operates without a change
+    when:
+      - specd project context is called with --format json
+    then:
+      - "all spec entries have mode: 'full' and source: 'includePattern'"
+  - requirement: Output
+    name: No project context configured
+    given:
+      - 'no context: entries and no specs match include patterns'
+    when:
+      - specd project context is called
+    then:
+      - the command prints no project context configured and exits with code 0
   - requirement: Warnings
     name: Missing file entry emits warning
     given:
@@ -192,6 +223,13 @@ scenarios:
       - 'stderr contains a warning: line for the stale spec'
       - AND the spec content is still included using the metadataExtraction fallback
 contentHashes:
-  spec.md: sha256:210b4da4b21b965e1e16ff4471e46d97abbcde5fc65e1cb23738f32c851610fa
-  verify.md: sha256:845226c2f2195dee7d3341aa01ce15bdf609078cb1f932cc83df1d91ccc6cf7b
-generatedBy: core
+  spec.md: sha256:8c510298974492e73295f37893f92aad188fcd2c2d9243f0d255126dfdf581e8
+  verify.md: sha256:0a227c7b8620e6ca238446cc242208e8f3f7417f2fcccaeb78fc8dbc25d73051
+keywords:
+  - project-context-cli
+  - context-compilation
+  - include-patterns
+  - spec-rendering
+  - metadata-display
+  - baseline-context
+generatedBy: agent

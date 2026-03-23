@@ -20,8 +20,10 @@ Tooling sometimes needs the project's compiled spec context without an active ch
 `execute` MUST return a `GetProjectContextResult` containing:
 
 - `contextEntries` (string\[]) — rendered project-level context entries (instruction text or file content).
-- `specs` (`GetProjectContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `workspace`, `path`, and `content` fields.
+- `specs` (`ContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `specId`, `title`, `description`, `source`, `mode`, and optionally `content` fields. The `ContextSpecEntry` type is the same as defined in the `CompileContext` spec.
 - `warnings` (`ContextWarning[]`) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.
+
+Since `GetProjectContext` operates without a change, it has no `specIds` or `specDependsOn` to drive tier classification. All specs MUST have `source: 'includePattern'`. The `mode` field MUST always be `'full'` — lazy mode requires an active change to determine tier 1 membership.
 
 ### Requirement: Resolves schema before processing
 
@@ -85,8 +87,8 @@ All dependencies are injected at construction time. The schema is resolved lazil
 
 ## Spec Dependencies
 
-- [`specs/core/config/spec.md`](../config/spec.md) — context entry format, include/exclude pattern semantics, `CompileContextConfig` structure
-- [`specs/core/compile-context/spec.md`](../compile-context/spec.md) — shared pattern matching and rendering logic
+- [`specs/core/config/spec.md`](../config/spec.md) — context entry format, include/exclude pattern semantics, `CompileContextConfig` structure, `contextMode`
+- [`specs/core/compile-context/spec.md`](../compile-context/spec.md) — shared pattern matching, rendering logic, `ContextSpecEntry` type definition
 - [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format and content hash freshness model
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `metadataExtraction` declarations and schema artifacts
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port/adapter design constraints

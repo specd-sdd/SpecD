@@ -12,7 +12,6 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
-import { shiftHeadings } from '../../domain/services/shift-headings.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type ContextWarning } from './_shared/context-warning.js'
 import { extractMetadata, type SubtreeRenderer } from '../../domain/services/extract-metadata.js'
@@ -41,6 +40,13 @@ export interface CompileContextConfig {
   readonly contextIncludeSpecs?: string[]
   /** Project-level exclude patterns; always applied regardless of active workspace. */
   readonly contextExcludeSpecs?: string[]
+  /**
+   * Controls how specs are rendered in the result.
+   *
+   * - `'lazy'` (default) — tier 1 specs (specIds + specDependsOn) in full; tier 2 as summaries.
+   * - `'full'` — all specs rendered with full content.
+   */
+  readonly contextMode?: 'full' | 'lazy'
   /** Per-workspace context include/exclude patterns. */
   readonly workspaces?: Record<string, WorkspaceContextConfig>
 }
@@ -67,11 +73,54 @@ export interface CompileContextInput {
    */
   readonly depth?: number
   /**
-   * When present, restricts the metadata sections rendered per spec to the listed values.
+   * When present, restricts the metadata sections rendered per full-mode spec to the listed values.
    * When absent, all sections are rendered (description + rules + constraints + scenarios).
-   * Does not affect available steps.
+   * Does not affect summary-mode specs, project context entries, or available steps.
    */
   readonly sections?: ReadonlyArray<SpecSection>
+}
+
+/** A structured project context entry in the result. */
+export interface ProjectContextEntry {
+  /** The type of context entry. */
+  readonly source: 'instruction' | 'file'
+  /** The file path (only for `file` entries). */
+  readonly path?: string
+  /** The rendered text content. */
+  readonly content: string
+}
+
+/** How a spec was collected into the context. Priority: specIds > specDependsOn > dependsOnTraversal > includePattern. */
+export type ContextSpecSource =
+  | 'specIds'
+  | 'specDependsOn'
+  | 'includePattern'
+  | 'dependsOnTraversal'
+
+/** A spec entry in the compiled context result. */
+export interface ContextSpecEntry {
+  /** Fully-qualified spec ID (e.g. `core:core/compile-context`). */
+  readonly specId: string
+  /** The spec title from metadata or heading extraction. */
+  readonly title: string
+  /** The spec description from metadata (2-3 sentence summary). */
+  readonly description: string
+  /** How this spec was collected. */
+  readonly source: ContextSpecSource
+  /** Whether full content or just summary was rendered. */
+  readonly mode: 'full' | 'summary'
+  /** Rendered spec content (present only when `mode` is `'full'`). */
+  readonly content?: string
+}
+
+/** A workflow step with its availability status. */
+export interface AvailableStep {
+  /** The step name (e.g. `'designing'`, `'implementing'`). */
+  readonly step: string
+  /** Whether the step is currently available. */
+  readonly available: boolean
+  /** Artifact IDs blocking the step (empty if available). */
+  readonly blockingArtifacts: readonly string[]
 }
 
 /** Result returned by a successful {@link CompileContext} execution. */
@@ -79,21 +128,25 @@ export interface CompileContextResult {
   /** Whether the requested step is currently available. */
   readonly stepAvailable: boolean
   /** Artifact IDs blocking the step; empty when `stepAvailable` is `true`. */
-  readonly blockingArtifacts: string[]
-  /** The fully assembled context text (project context + spec content + available steps). */
-  readonly contextBlock: string
+  readonly blockingArtifacts: readonly string[]
+  /** Rendered project context entries. */
+  readonly projectContext: readonly ProjectContextEntry[]
+  /** Spec entries with tier classification, source, and content. */
+  readonly specs: readonly ContextSpecEntry[]
+  /** All workflow steps with availability status. */
+  readonly availableSteps: readonly AvailableStep[]
   /** Stale metadata warnings and other advisory conditions. */
-  readonly warnings: ContextWarning[]
+  readonly warnings: readonly ContextWarning[]
 }
 
 /**
- * Assembles the context block an AI agent receives when entering a lifecycle step.
+ * Assembles the structured context an AI agent receives when entering a lifecycle step.
  *
  * Collects context specs via five-step include/exclude/dependsOn resolution,
- * evaluates step availability, and combines project context entries, spec content,
- * and available steps into a single structured output. Artifact instructions and
- * step hook instructions are separate concerns handled by `GetArtifactInstruction`
- * and `GetHookInstructions` respectively.
+ * evaluates step availability, and returns structured project context entries,
+ * spec entries (with tier classification), and available steps. Artifact
+ * instructions and step hook instructions are separate concerns handled by
+ * `GetArtifactInstruction` and `GetHookInstructions` respectively.
  */
 export class CompileContext {
   private readonly _changes: ChangeRepository
@@ -130,10 +183,10 @@ export class CompileContext {
   }
 
   /**
-   * Compiles the context block for the given lifecycle step.
+   * Compiles the structured context for the given lifecycle step.
    *
    * @param input - Context compilation parameters
-   * @returns Assembled context result with context block and warnings
+   * @returns Structured context result with spec entries, project context, and warnings
    * @throws {ChangeNotFoundError} If no change with the given name exists
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    */
@@ -151,6 +204,20 @@ export class CompileContext {
 
     const warnings: ContextWarning[] = []
 
+    // --- Source tracking: build sets for tier classification ---
+    const specIdsSet = new Set(change.specIds)
+    const specDependsOnSet = new Set<string>()
+    for (const deps of change.specDependsOn.values()) {
+      for (const dep of deps) specDependsOnSet.add(dep)
+    }
+    const sourceMap = new Map<string, ContextSpecSource>()
+
+    // Pre-populate sources for specIds and specDependsOn
+    for (const id of specIdsSet) sourceMap.set(id, 'specIds')
+    for (const id of specDependsOnSet) {
+      if (!sourceMap.has(id)) sourceMap.set(id, 'specDependsOn')
+    }
+
     // --- 5-step context spec collection ---
     const includedSpecs = new Map<string, ResolvedSpec>()
 
@@ -160,6 +227,7 @@ export class CompileContext {
       for (const spec of matches) {
         const key = `${spec.workspace}:${spec.capPath}`
         if (!includedSpecs.has(key)) includedSpecs.set(key, spec)
+        if (!sourceMap.has(key)) sourceMap.set(key, 'includePattern')
       }
     }
 
@@ -174,18 +242,16 @@ export class CompileContext {
     for (const key of projectExcludedKeys) includedSpecs.delete(key)
 
     // Step 3: Workspace-level include patterns (active workspaces only)
-    // Per change spec: CompileContext reads workspaces from the change manifest;
-    // it does not infer active workspaces from spec paths at compile time.
     const activeWorkspaces = new Set(change.workspaces)
 
     for (const [wsName, wsConfig] of Object.entries(input.config.workspaces ?? {})) {
       if (!activeWorkspaces.has(wsName)) continue
       for (const pattern of wsConfig.contextIncludeSpecs ?? []) {
-        // At workspace level, unqualified path = that workspace; bare * = just that workspace
         const matches = await listMatchingSpecs(pattern, wsName, false, this._specs, warnings)
         for (const spec of matches) {
           const key = `${spec.workspace}:${spec.capPath}`
           if (!includedSpecs.has(key)) includedSpecs.set(key, spec)
+          if (!sourceMap.has(key)) sourceMap.set(key, 'includePattern')
         }
       }
     }
@@ -204,7 +270,6 @@ export class CompileContext {
     // Step 5: dependsOn traversal from change.specIds (only when followDeps is true)
     const dependsOnAdded = new Map<string, ResolvedSpec>()
     if (input.followDeps === true) {
-      // Build fallback for extracting dependsOn from spec content when metadata is absent
       const extraction = schema.metadataExtraction()
       const depFallback: DependsOnFallback | undefined =
         extraction !== undefined
@@ -224,10 +289,7 @@ export class CompileContext {
         }
         const spec = await repo.get(specPathObj)
         if (!spec) continue
-        // Three-tier dependsOn resolution:
-        // 1. change.specDependsOn (manifest) — highest priority
-        // 2. .specd-metadata.yaml dependsOn field
-        // 3. Content extraction via metadataExtraction — fallback
+
         let dependsOnList: string[] | undefined
 
         const manifestDeps = change.specDependsOn.get(specId)
@@ -245,7 +307,6 @@ export class CompileContext {
               message: `No metadata for '${specId}' — dependency traversal may be incomplete. Run metadata generation to fix.`,
             })
 
-            // Attempt fallback extraction from spec content
             if (depFallback !== undefined && depFallback.extraction.dependsOn !== undefined) {
               dependsOnList = await this._extractDependsOnFallback(repo, spec, depFallback)
             }
@@ -271,6 +332,11 @@ export class CompileContext {
           }
         }
       }
+
+      // Tag dependsOn discoveries that aren't already tagged with a higher-priority source
+      for (const [key] of dependsOnAdded) {
+        if (!sourceMap.has(key)) sourceMap.set(key, 'dependsOnTraversal')
+      }
     }
 
     // Merge: includedSpecs first (preserve order), then dependsOnAdded
@@ -278,6 +344,9 @@ export class CompileContext {
     for (const [key, spec] of dependsOnAdded) {
       if (!includedSpecs.has(key)) allSpecs.push(spec)
     }
+
+    // --- Tier classification ---
+    const contextMode = input.config.contextMode ?? 'lazy'
 
     // --- Step availability ---
     const schemaWorkflowStep = schema.workflowStep(input.step)
@@ -294,13 +363,11 @@ export class CompileContext {
       }
     }
 
-    // --- Assemble instruction block ---
-    const parts: string[] = []
-
-    // Part 1: Project context entries (labelled with source, headings shifted +1)
+    // --- Part 1: Project context entries ---
+    const projectContext: ProjectContextEntry[] = []
     for (const entry of input.config.context ?? []) {
       if ('instruction' in entry) {
-        parts.push(`**Source: instruction**\n\n${entry.instruction}`)
+        projectContext.push({ source: 'instruction', content: entry.instruction })
       } else {
         const content = await this._files.read(entry.file)
         if (content === null) {
@@ -310,13 +377,13 @@ export class CompileContext {
             message: `Context file '${entry.file}' not found`,
           })
         } else {
-          parts.push(`**Source: ${entry.file}**\n\n${shiftHeadings(content, 1)}`)
+          projectContext.push({ source: 'file', path: entry.file, content })
         }
       }
     }
 
-    // Part 2: Spec content
-    const specContentParts: string[] = []
+    // --- Part 2: Spec entries ---
+    const specs: ContextSpecEntry[] = []
     for (const { workspace, capPath } of allSpecs) {
       const specRepo = this._specs.get(workspace)
       if (specRepo === undefined) continue
@@ -330,63 +397,71 @@ export class CompileContext {
 
       const spec = new Spec(workspace, specPathObj, [])
       const metadata = await specRepo.metadata(spec)
+      const specId = `${workspace}:${capPath}`
+      const source = sourceMap.get(specId) ?? 'includePattern'
 
+      // Determine mode based on contextMode and source
+      const mode: 'full' | 'summary' =
+        contextMode === 'lazy' && source !== 'specIds' && source !== 'specDependsOn'
+          ? 'summary'
+          : 'full'
+
+      // Extract title and description from metadata (needed for both modes)
+      let title = ''
+      let description = ''
+
+      if (metadata !== null) {
+        title = metadata.title ?? ''
+        description = metadata.description ?? ''
+      }
+
+      // If no title from metadata, extract from spec heading
+      if (title === '') {
+        const specArtifact = await specRepo.artifact(spec, 'spec.md')
+        if (specArtifact !== null) {
+          const headingMatch = /^#\s+(.+)/m.exec(specArtifact.content)
+          if (headingMatch !== null && headingMatch[1] !== undefined) title = headingMatch[1]
+        }
+      }
+
+      if (mode === 'summary') {
+        // Tier 2: summary only — no content rendering
+        if (metadata === null) {
+          warnings.push({
+            type: 'stale-metadata',
+            path: specId,
+            message: `No metadata for '${specId}' — summary may lack description`,
+          })
+        }
+        specs.push({ specId, title, description, source, mode })
+        continue
+      }
+
+      // Tier 1: full content rendering
       let isFresh = false
-
       if (metadata !== null) {
         isFresh = await this._isMetadataFresh(specRepo, spec, metadata)
       }
 
-      const specLabel = `${workspace}:${capPath}`
-
       const sectionsFilter = input.sections
       const showAll = sectionsFilter === undefined
 
+      let content: string
+
       if (isFresh && metadata !== null) {
-        // Fresh metadata path
-        const metaParts: string[] = []
-        if (showAll && metadata.description !== undefined) {
-          metaParts.push(`**Description:** ${metadata.description}`)
-        }
-        if ((showAll || sectionsFilter.includes('rules')) && metadata.rules?.length) {
-          const rulesText = metadata.rules
-            .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
-            .join('\n\n')
-          metaParts.push(`#### Rules\n\n${rulesText}`)
-        }
-        if ((showAll || sectionsFilter.includes('constraints')) && metadata.constraints?.length) {
-          const constraintsText = metadata.constraints.map((c) => `- ${c}`).join('\n')
-          metaParts.push(`#### Constraints\n\n${constraintsText}`)
-        }
-        if ((showAll || sectionsFilter.includes('scenarios')) && metadata.scenarios?.length) {
-          const scenariosText = metadata.scenarios
-            .map((s) => {
-              const lines: string[] = [
-                `##### Scenario: ${s.name}`,
-                `*Requirement: ${s.requirement}*`,
-              ]
-              if (s.given?.length) lines.push(`**Given:** ${s.given.join('; ')}`)
-              if (s.when?.length) lines.push(`**When:** ${s.when.join('; ')}`)
-              if (s.then?.length) lines.push(`**Then:** ${s.then.join('; ')}`)
-              return lines.join('\n')
-            })
-            .join('\n\n')
-          metaParts.push(`#### Scenarios\n\n${scenariosText}`)
-        }
-        specContentParts.push(`### Spec: ${specLabel}\n\n${metaParts.join('\n\n')}`)
+        content = this._renderFromMetadata(metadata, sectionsFilter, showAll)
       } else {
-        // Stale/absent metadata: fall back to metadataExtraction engine
         if (metadata !== null) {
           warnings.push({
             type: 'stale-metadata',
-            path: specLabel,
-            message: `Metadata for '${specLabel}' is stale — falling back to raw artifact content`,
+            path: specId,
+            message: `Metadata for '${specId}' is stale — falling back to raw artifact content`,
           })
         } else {
           warnings.push({
             type: 'stale-metadata',
-            path: specLabel,
-            message: `No metadata for '${specLabel}' — falling back to raw artifact content`,
+            path: specId,
+            message: `No metadata for '${specId}' — falling back to raw artifact content`,
           })
         }
 
@@ -399,26 +474,20 @@ export class CompileContext {
             spec,
             schema,
             extraction,
-            specLabel,
+            specId,
             sectionsFilter,
             showAll,
           )
         }
 
-        if (fallbackParts.length > 0) {
-          specContentParts.push(`### Spec: ${specLabel}\n\n${fallbackParts.join('\n\n')}`)
-        } else {
-          specContentParts.push(`### Spec: ${specLabel}`)
-        }
+        content = fallbackParts.join('\n\n')
       }
+
+      specs.push({ specId, title, description, source, mode, content })
     }
 
-    if (specContentParts.length > 0) {
-      parts.push(`## Spec content\n\n${specContentParts.join('\n\n---\n\n')}`)
-    }
-
-    // Part 3: Available steps
-    const stepLines: string[] = []
+    // --- Part 3: Available steps ---
+    const availableSteps: AvailableStep[] = []
     for (const workflowStep of schema.workflow()) {
       const blocking: string[] = []
       for (const requiredId of workflowStep.requires) {
@@ -427,23 +496,63 @@ export class CompileContext {
           blocking.push(requiredId)
         }
       }
-      if (blocking.length === 0) {
-        stepLines.push(`- ${workflowStep.step}: available`)
-      } else {
-        stepLines.push(`- ${workflowStep.step}: unavailable — requires: [${blocking.join(', ')}]`)
-      }
-    }
-
-    if (stepLines.length > 0) {
-      parts.push(`## Available steps\n\n${stepLines.join('\n')}`)
+      availableSteps.push({
+        step: workflowStep.step,
+        available: blocking.length === 0,
+        blockingArtifacts: blocking,
+      })
     }
 
     return {
       stepAvailable,
       blockingArtifacts,
-      contextBlock: parts.join('\n\n---\n\n'),
+      projectContext,
+      specs,
+      availableSteps,
       warnings,
     }
+  }
+
+  /**
+   * Renders spec content from fresh metadata into a single string.
+   *
+   * @param metadata - The fresh parsed metadata
+   * @param sectionsFilter - Optional filter to include only specific sections
+   * @param showAll - Whether to include all sections regardless of filter
+   * @returns Rendered content string
+   */
+  private _renderFromMetadata(
+    metadata: SpecMetadata,
+    sectionsFilter: ReadonlyArray<SpecSection> | undefined,
+    showAll: boolean,
+  ): string {
+    const metaParts: string[] = []
+    if (showAll && metadata.description !== undefined) {
+      metaParts.push(`**Description:** ${metadata.description}`)
+    }
+    if ((showAll || sectionsFilter?.includes('rules')) && metadata.rules?.length) {
+      const rulesText = metadata.rules
+        .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
+        .join('\n\n')
+      metaParts.push(`#### Rules\n\n${rulesText}`)
+    }
+    if ((showAll || sectionsFilter?.includes('constraints')) && metadata.constraints?.length) {
+      const constraintsText = metadata.constraints.map((c) => `- ${c}`).join('\n')
+      metaParts.push(`#### Constraints\n\n${constraintsText}`)
+    }
+    if ((showAll || sectionsFilter?.includes('scenarios')) && metadata.scenarios?.length) {
+      const scenariosText = metadata.scenarios
+        .map((s) => {
+          const lines: string[] = [`##### Scenario: ${s.name}`, `*Requirement: ${s.requirement}*`]
+          if (s.given?.length) lines.push(`**Given:** ${s.given.join('; ')}`)
+          if (s.when?.length) lines.push(`**When:** ${s.when.join('; ')}`)
+          if (s.then?.length) lines.push(`**Then:** ${s.then.join('; ')}`)
+          return lines.join('\n')
+        })
+        .join('\n\n')
+      metaParts.push(`#### Scenarios\n\n${scenariosText}`)
+    }
+    return metaParts.join('\n\n')
   }
 
   /**
@@ -486,8 +595,6 @@ export class CompileContext {
 
   /**
    * Falls back to the metadataExtraction engine when metadata is stale/absent.
-   * Loads artifacts, parses ASTs, runs extractors, and renders the result as
-   * context parts in the same format as the fresh metadata path.
    *
    * @param specRepo - Repository for loading spec artifacts
    * @param spec - The spec entity to extract metadata from

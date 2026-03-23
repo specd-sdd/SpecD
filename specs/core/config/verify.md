@@ -349,32 +349,51 @@
 - **WHEN** `contextIncludeSpecs: ['auth/*/login']` is declared (`*` in the middle of a path segment)
 - **THEN** specd exits with a config validation error at startup
 
+### Requirement: Context mode
+
+#### Scenario: contextMode lazy is the default
+
+- **GIVEN** `specd.yaml` does not declare `contextMode`
+- **WHEN** config is loaded
+- **THEN** `config.contextMode` defaults to `'lazy'` at the use case level
+
+#### Scenario: contextMode lazy is accepted
+
+- **GIVEN** `specd.yaml` declares `contextMode: lazy`
+- **WHEN** config is loaded
+- **THEN** `config.contextMode` is `'lazy'`
+
+#### Scenario: Invalid contextMode rejected at startup
+
+- **GIVEN** `specd.yaml` declares `contextMode: partial`
+- **WHEN** config is loaded
+- **THEN** startup validation fails with an error identifying the invalid value
+
+#### Scenario: contextMode inside workspace is rejected
+
+- **GIVEN** `specd.yaml` declares `contextMode: lazy` inside a workspace entry
+- **WHEN** config is loaded
+- **THEN** startup validation fails with an error indicating `contextMode` is project-level only
+
 ### Requirement: Startup validation
 
-#### Scenario: Missing required field blocks startup
+#### Scenario: Valid minimal config passes validation
 
-- **WHEN** `specd.yaml` is missing any required field (e.g. `schema`, `storage`, `default` workspace, `adapter` in a specs section)
-- **THEN** specd exits immediately with a descriptive error before executing the requested command
+- **GIVEN** a `specd.yaml` with only `schema: schema-std@1`
+- **WHEN** config is validated at startup
+- **THEN** validation passes with defaults applied
 
-#### Scenario: Invalid pattern syntax blocks startup
+#### Scenario: Invalid contextMode value rejected
 
-- **WHEN** `contextIncludeSpecs` contains an invalid pattern such as `'auth/*/login'`
-- **THEN** specd exits with a config validation error at startup
+- **GIVEN** `specd.yaml` contains `contextMode: partial`
+- **WHEN** config is validated at startup
+- **THEN** validation fails with a `ConfigValidationError` identifying the invalid `contextMode` value
 
-#### Scenario: Storage path outside repo root blocks startup
+#### Scenario: contextMode in workspace entry rejected
 
-- **WHEN** `storage.changes.fs.path` resolves to a directory outside the project repo root
-- **THEN** specd exits with a config validation error at startup
-
-#### Scenario: Warning does not block startup
-
-- **WHEN** `specd.yaml` has a deprecated field like `artifactRules`
-- **THEN** a migration warning is printed but the command proceeds normally
-
-#### Scenario: specd init requires no existing config
-
-- **WHEN** `specd init` is run in a directory with no `specd.yaml`
-- **THEN** specd does not attempt to validate a config — it creates one from defaults and exits successfully
+- **GIVEN** `specd.yaml` contains a workspace with `contextMode: lazy`
+- **WHEN** config is validated at startup
+- **THEN** validation fails with a `ConfigValidationError` indicating `contextMode` is not valid inside a workspace
 
 ### Requirement: Project context instructions
 
