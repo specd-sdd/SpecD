@@ -55,7 +55,16 @@ describe('Behaviour', () => {
     })
     kernel.project.getProjectContext.execute.mockResolvedValue({
       contextEntries: ['Follow conventions.'],
-      specs: [{ workspace: 'default', path: 'auth/login', content: 'Spec content here' }],
+      specs: [
+        {
+          specId: 'default:auth/login',
+          title: 'Auth Login',
+          description: 'Login spec',
+          source: 'includePattern' as const,
+          mode: 'full' as const,
+          content: 'Spec content here',
+        },
+      ],
       warnings: [],
     })
 
@@ -78,8 +87,22 @@ describe('Behaviour', () => {
     kernel.project.getProjectContext.execute.mockResolvedValue({
       contextEntries: [],
       specs: [
-        { workspace: 'ws-a', path: 'foo/bar', content: 'Content from ws-a' },
-        { workspace: 'ws-b', path: 'baz/qux', content: 'Content from ws-b' },
+        {
+          specId: 'ws-a:foo/bar',
+          title: 'Foo Bar',
+          description: '',
+          source: 'includePattern' as const,
+          mode: 'full' as const,
+          content: 'Content from ws-a',
+        },
+        {
+          specId: 'ws-b:baz/qux',
+          title: 'Baz Qux',
+          description: '',
+          source: 'includePattern' as const,
+          mode: 'full' as const,
+          content: 'Content from ws-b',
+        },
       ],
       warnings: [],
     })
@@ -101,7 +124,16 @@ describe('Behaviour', () => {
     })
     kernel.project.getProjectContext.execute.mockResolvedValue({
       contextEntries: [],
-      specs: [{ workspace: 'default', path: 'billing/pay', content: 'Billing content' }],
+      specs: [
+        {
+          specId: 'default:billing/pay',
+          title: 'Billing Pay',
+          description: '',
+          source: 'includePattern' as const,
+          mode: 'full' as const,
+          content: 'Billing content',
+        },
+      ],
       warnings: [],
     })
 
@@ -147,7 +179,16 @@ describe('Behaviour', () => {
     const { kernel } = setup()
     kernel.project.getProjectContext.execute.mockResolvedValue({
       contextEntries: [],
-      specs: [{ workspace: 'default', path: 'auth/login', content: 'Login spec' }],
+      specs: [
+        {
+          specId: 'default:auth/login',
+          title: 'Auth Login',
+          description: '',
+          source: 'includePattern' as const,
+          mode: 'full' as const,
+          content: 'Login spec',
+        },
+      ],
       warnings: [],
     })
 
@@ -164,8 +205,22 @@ describe('Behaviour', () => {
     kernel.project.getProjectContext.execute.mockResolvedValue({
       contextEntries: [],
       specs: [
-        { workspace: 'default', path: 'auth/login', content: 'Login spec' },
-        { workspace: 'default', path: 'auth/session', content: 'Session spec' },
+        {
+          specId: 'default:auth/login',
+          title: 'Auth Login',
+          description: '',
+          source: 'includePattern' as const,
+          mode: 'full' as const,
+          content: 'Login spec',
+        },
+        {
+          specId: 'default:auth/session',
+          title: 'Auth Session',
+          description: '',
+          source: 'dependsOnTraversal' as const,
+          mode: 'summary' as const,
+          content: 'Session spec',
+        },
       ],
       warnings: [],
     })
@@ -208,7 +263,16 @@ describe('Behaviour', () => {
     const { kernel } = setup()
     kernel.project.getProjectContext.execute.mockResolvedValue({
       contextEntries: [],
-      specs: [{ workspace: 'default', path: 'auth/login', content: 'Rules only' }],
+      specs: [
+        {
+          specId: 'default:auth/login',
+          title: 'Auth Login',
+          description: '',
+          source: 'includePattern' as const,
+          mode: 'full' as const,
+          content: 'Rules only',
+        },
+      ],
       warnings: [],
     })
 
@@ -282,7 +346,16 @@ describe('Output', () => {
     })
     kernel.project.getProjectContext.execute.mockResolvedValue({
       contextEntries: ['Follow conventions.'],
-      specs: [{ workspace: 'default', path: 'auth/login', content: 'Login spec content' }],
+      specs: [
+        {
+          specId: 'default:auth/login',
+          title: 'Auth Login',
+          description: '',
+          source: 'includePattern' as const,
+          mode: 'full' as const,
+          content: 'Login spec content',
+        },
+      ],
       warnings: [],
     })
 
@@ -294,8 +367,11 @@ describe('Output', () => {
     expect(parsed.contextEntries).toContain('Follow conventions.')
     expect(Array.isArray(parsed.specs)).toBe(true)
     expect(parsed.specs).toHaveLength(1)
-    expect(parsed.specs[0]).toHaveProperty('workspace')
-    expect(parsed.specs[0]).toHaveProperty('path')
+    expect(parsed.specs[0]).toHaveProperty('specId')
+    expect(parsed.specs[0]).toHaveProperty('title')
+    expect(parsed.specs[0]).toHaveProperty('description')
+    expect(parsed.specs[0]).toHaveProperty('source')
+    expect(parsed.specs[0]).toHaveProperty('mode')
     expect(parsed.specs[0]).toHaveProperty('content')
     expect(parsed).toHaveProperty('warnings')
   })
@@ -325,7 +401,16 @@ describe('Warnings', () => {
     const { kernel, stderr, stdout } = setup()
     kernel.project.getProjectContext.execute.mockResolvedValue({
       contextEntries: [],
-      specs: [{ workspace: 'default', path: 'auth/login', content: 'Fallback content' }],
+      specs: [
+        {
+          specId: 'default:auth/login',
+          title: 'Auth Login',
+          description: '',
+          source: 'includePattern' as const,
+          mode: 'full' as const,
+          content: 'Fallback content',
+        },
+      ],
       warnings: [{ message: 'stale metadata for auth/login' }],
     })
 

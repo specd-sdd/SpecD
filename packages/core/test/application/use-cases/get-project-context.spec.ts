@@ -95,8 +95,52 @@ describe('GetProjectContext', () => {
     })
 
     expect(result.specs).toHaveLength(1)
-    expect(result.specs[0]!.workspace).toBe('default')
-    expect(result.specs[0]!.path).toBe('auth/login')
+    expect(result.specs[0]!.specId).toBe('default:auth/login')
+    expect(result.specs[0]!.source).toBe('includePattern')
+    expect(result.specs[0]!.mode).toBe('full')
+  })
+
+  it('populates title and description from metadata', async () => {
+    const specType = makeArtifactType('specs', {
+      scope: 'spec',
+      output: 'spec.md',
+      format: 'markdown',
+    })
+    const schema = makeSchema([specType])
+
+    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const specContent = '# Auth Login'
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: {
+        'auth/login/spec.md': specContent,
+        'auth/login/.specd-metadata.yaml': [
+          "title: 'Auth Login'",
+          "description: 'Handles user authentication'",
+          'contentHashes:',
+          "  'spec.md': 'sha256:placeholder'",
+        ].join('\n'),
+      },
+    })
+    const specRepos = new Map([['default', repo]])
+
+    const uc = new GetProjectContext(
+      specRepos,
+      makeSchemaProvider(schema),
+      makeFileReader(),
+      makeParsers(),
+      makeContentHasher(),
+    )
+
+    const result = await uc.execute({
+      config: {
+        contextIncludeSpecs: ['*'],
+      },
+    })
+
+    expect(result.specs).toHaveLength(1)
+    expect(result.specs[0]!.title).toBe('Auth Login')
+    expect(result.specs[0]!.description).toBe('Handles user authentication')
   })
 
   it('excludes specs matching exclude patterns', async () => {
@@ -134,6 +178,6 @@ describe('GetProjectContext', () => {
     })
 
     expect(result.specs).toHaveLength(1)
-    expect(result.specs[0]!.path).toBe('billing/payments')
+    expect(result.specs[0]!.specId).toBe('default:billing/payments')
   })
 })

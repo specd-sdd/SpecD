@@ -37,19 +37,36 @@ Concretely:
 
 ### Requirement: Output
 
-In `text` mode (default), the compiled context block is printed to stdout verbatim — the same text `CompileContext` would produce for the project entries and spec content sections, with no additional framing added by the CLI. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.
+The CLI MUST assemble the final output from the structured `GetProjectContextResult` returned by the use case.
 
-In `json` or `toon` mode, the output is (encoded in the respective format):
+**In `text` mode** (default):
+
+1. Project context entries are rendered first, each preceded by its source label. Entries are separated by `---`.
+2. Spec content follows under a `## Spec content` header. Each spec is rendered under a `### Spec: <specId>` heading with its full content.
+3. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.
+
+Since `GetProjectContext` always returns all specs in `full` mode (no change context means no tier classification), the text output format is unchanged from the current behaviour — all specs are rendered with full content.
+
+**In `json` or `toon` mode**, the output is:
 
 ```json
 {
   "contextEntries": ["...", "..."],
-  "specs": [{ "workspace": "...", "path": "...", "content": "..." }],
+  "specs": [
+    {
+      "specId": "default:_global/architecture",
+      "title": "Architecture",
+      "description": "...",
+      "source": "includePattern",
+      "mode": "full",
+      "content": "..."
+    }
+  ],
   "warnings": []
 }
 ```
 
-where `contextEntries` are the rendered project `context:` entries, `specs` are the matched specs with their rendered metadata content, and `warnings` lists any advisory conditions (missing files, stale metadata, unknown workspaces, etc.).
+where `contextEntries` are the rendered project `context:` entries, `specs` are the matched specs with their structured entry data (always `mode: 'full'`), and `warnings` lists any advisory conditions.
 
 ### Requirement: Warnings
 
@@ -106,4 +123,6 @@ $ specd project context --format json
 ## Spec Dependencies
 
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/cli/change-context/spec.md`](../change-context/spec.md) — CompileContext behaviour this command partially reuses
+- [`specs/core/get-project-context/spec.md`](../../core/get-project-context/spec.md) — `GetProjectContext` use case, `GetProjectContextResult` structured shape
+- [`specs/core/compile-context/spec.md`](../../core/compile-context/spec.md) — `ContextSpecEntry` type definition
+- [`specs/core/config/spec.md`](../../core/config/spec.md) — `contextMode` field

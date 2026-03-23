@@ -31,7 +31,6 @@ export {
   type GetProjectContext,
   type GetProjectContextInput,
   type GetProjectContextResult,
-  type GetProjectContextSpecEntry,
 } from './get-project-context.js'
 export { type CreateChange, type CreateChangeInput } from './create-change.js'
 export {
@@ -75,6 +74,10 @@ export {
   type ContextEntry,
   type WorkspaceContextConfig,
   type ContextWarning,
+  type ContextSpecEntry,
+  type ContextSpecSource,
+  type ProjectContextEntry,
+  type AvailableStep,
   type SpecSection,
 } from './compile-context.js'
 export {

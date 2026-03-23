@@ -52,6 +52,67 @@
 - **WHEN** `CompileContext.execute` is called
 - **THEN** `auth/login` appears exactly once in the context, at the position of the first matching pattern
 
+### Requirement: Tier classification
+
+#### Scenario: Lazy mode — specIds specs are tier 1 full
+
+- **GIVEN** `config.contextMode: 'lazy'`
+- **AND** `change.specIds: ['default:auth/login']`
+- **WHEN** `CompileContext.execute` is called
+- **THEN** the spec entry for `default:auth/login` has `mode: 'full'` and `source: 'specIds'`
+- **AND** its `content` field is present with full structured content
+
+#### Scenario: Lazy mode — specDependsOn specs are tier 1 full
+
+- **GIVEN** `config.contextMode: 'lazy'`
+- **AND** `change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }`
+- **WHEN** `CompileContext.execute` is called
+- **THEN** the spec entry for `default:auth/shared` has `mode: 'full'` and `source: 'specDependsOn'`
+- **AND** its `content` field is present with full structured content
+
+#### Scenario: Lazy mode — include pattern specs are tier 2 summary
+
+- **GIVEN** `config.contextMode: 'lazy'`
+- **AND** `contextIncludeSpecs: ['default:*']` matches `default:_global/architecture`
+- **AND** `default:_global/architecture` is NOT in `change.specIds` or `change.specDependsOn`
+- **WHEN** `CompileContext.execute` is called
+- **THEN** the spec entry for `default:_global/architecture` has `mode: 'summary'` and `source: 'includePattern'`
+- **AND** its `content` field is absent
+- **AND** `title` and `description` are present
+
+#### Scenario: Lazy mode — dependsOn traversal specs are tier 2 summary
+
+- **GIVEN** `config.contextMode: 'lazy'`
+- **AND** `followDeps: true`
+- **AND** a spec `default:auth/jwt` is discovered via dependsOn traversal
+- **AND** `default:auth/jwt` is NOT in `change.specIds` or `change.specDependsOn`
+- **WHEN** `CompileContext.execute` is called
+- **THEN** the spec entry for `default:auth/jwt` has `mode: 'summary'` and `source: 'dependsOnTraversal'`
+
+#### Scenario: Lazy mode — spec in both specIds and include pattern is tier 1
+
+- **GIVEN** `config.contextMode: 'lazy'`
+- **AND** `change.specIds: ['default:auth/login']`
+- **AND** `contextIncludeSpecs: ['default:*']` also matches `default:auth/login`
+- **WHEN** `CompileContext.execute` is called
+- **THEN** the spec entry for `default:auth/login` has `mode: 'full'` and `source: 'specIds'`
+- **AND** it appears exactly once in the `specs` array
+
+#### Scenario: Full mode — all specs are tier 1 full
+
+- **GIVEN** `config.contextMode: 'full'`
+- **AND** `contextIncludeSpecs: ['default:*']` matches multiple specs
+- **WHEN** `CompileContext.execute` is called
+- **THEN** all spec entries have `mode: 'full'`
+- **AND** all spec entries have `content` present
+
+#### Scenario: Default contextMode is lazy
+
+- **GIVEN** `config.contextMode` is not set
+- **AND** `change.specIds` contains some specs and `contextIncludeSpecs` matches others
+- **WHEN** `CompileContext.execute` is called
+- **THEN** specIds specs have `mode: 'full'` and other specs have `mode: 'summary'` — same as `contextMode: 'lazy'`
+
 ### Requirement: Cycle detection during dependsOn traversal
 
 #### Scenario: Cycle broken without infinite loop
@@ -101,65 +162,72 @@
 - **WHEN** `CompileContext.execute` is called
 - **THEN** the result is returned normally — no exception is thrown
 
-### Requirement: Assembled context block
+### Requirement: Structured result assembly
 
-#### Scenario: instruction entry injected into context block
+#### Scenario: instruction entry in projectContext array
 
 - **GIVEN** `config.context: [{ instruction: "Always prefer editing existing files." }]`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `result.contextBlock` contains `"Always prefer editing existing files."`
+- **THEN** `result.projectContext` contains an entry with `source: 'instruction'` and `content: "Always prefer editing existing files."`
 
-#### Scenario: file entry read via FileReader and injected into context block
+#### Scenario: file entry read via FileReader into projectContext
 
 - **GIVEN** `config.context: [{ file: "specd-bootstrap.md" }]`
 - **AND** `FileReader.read("specd-bootstrap.md")` returns `"# specd Bootstrap"`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `result.contextBlock` contains `"# specd Bootstrap"`
+- **THEN** `result.projectContext` contains an entry with `source: 'file'`, `path: "specd-bootstrap.md"`, and `content: "# specd Bootstrap"`
 
 #### Scenario: missing file entry emits a warning
 
 - **GIVEN** `config.context: [{ file: "does-not-exist.md" }]`
 - **AND** `FileReader.read("does-not-exist.md")` returns `null`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** a warning is emitted identifying the missing file, the entry is absent from the output, and no error is thrown
-
-#### Scenario: context absent — no effect on context block
-
-- **GIVEN** `config.context` is not declared
-- **WHEN** `CompileContext.execute` is called
-- **THEN** the context block is identical to one produced with `context: []`
+- **THEN** a warning is emitted identifying the missing file, the entry is absent from `projectContext`, and no error is thrown
 
 #### Scenario: multiple context entries preserve declaration order
 
 - **GIVEN** `config.context: [{ file: AGENTS.md }, { instruction: "Inline note." }, { file: specd-bootstrap.md }]`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `result.contextBlock` contains `AGENTS.md` content first, then `"Inline note."`, then `specd-bootstrap.md` content — in declaration order
+- **THEN** `result.projectContext` contains entries in order: AGENTS.md file, instruction, specd-bootstrap.md file
 
-#### Scenario: No artifact instructions in the context block
+#### Scenario: availableSteps includes all workflow steps
+
+- **GIVEN** the schema declares workflow steps `['designing', 'ready', 'implementing', 'verifying', 'archiving']`
+- **WHEN** `CompileContext.execute` is called
+- **THEN** `result.availableSteps` contains an entry for each step with `available` and `blockingArtifacts`
+
+#### Scenario: spec source priority — specIds wins over includePattern
+
+- **GIVEN** `change.specIds: ['default:auth/login']`
+- **AND** `contextIncludeSpecs: ['default:*']` also matches `default:auth/login`
+- **WHEN** `CompileContext.execute` is called
+- **THEN** the spec entry for `default:auth/login` has `source: 'specIds'`, not `'includePattern'`
+
+#### Scenario: spec source priority — specDependsOn wins over dependsOnTraversal
+
+- **GIVEN** `change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }`
+- **AND** `default:auth/shared` is also discovered via dependsOn metadata traversal
+- **WHEN** `CompileContext.execute` is called
+- **THEN** the spec entry for `default:auth/shared` has `source: 'specDependsOn'`, not `'dependsOnTraversal'`
+
+#### Scenario: No artifact instructions in the result
 
 - **GIVEN** the schema declares `artifacts[spec].instruction: 'Create specifications...'`
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `result.contextBlock` does not include the artifact instruction — artifact instructions are retrieved via `GetArtifactInstruction`
+- **THEN** the result does not include the artifact instruction — artifact instructions are retrieved via `GetArtifactInstruction`
 
-#### Scenario: No instruction hooks in the context block
+#### Scenario: No instruction hooks in the result
 
-- **GIVEN** `workflow.archiving.hooks.pre` contains `{ instruction: 'Review delta specs' }` and `{ run: 'pnpm test' }`
+- **GIVEN** `workflow.archiving.hooks.pre` contains `{ instruction: 'Review delta specs' }`
 - **WHEN** `CompileContext.execute` is called with `step: 'archiving'`
-- **THEN** `result.contextBlock` does not include `Review delta specs` or `pnpm test` — instruction hooks are retrieved via `GetHookInstructions`
+- **THEN** the result does not include `Review delta specs` — instruction hooks are retrieved via `GetHookInstructions`
 
 #### Scenario: metadataExtraction used as fallback for stale/absent metadata
 
-- **GIVEN** the schema declares `metadataExtraction.rules: [{ artifact: specs, extractor: { selector: { type: section, matches: '^Requirements$' }, groupBy: label, extract: content } }]`
-- **AND** `auth/jwt/spec.md` is in the context set and has a `## Requirements` section
-- **WHEN** `CompileContext.execute` is called with stale or absent metadata for `auth/jwt`
-- **THEN** `result.contextBlock` includes extracted rules content from `auth/jwt/spec.md`
-
-#### Scenario: metadataExtraction extractor matching no nodes silently skipped
-
-- **GIVEN** the schema declares a `metadataExtraction` extractor with a selector matching `'^Examples$'`
-- **AND** a context spec has no section matching `Examples`
+- **GIVEN** a spec is in the context set with stale or absent metadata
+- **AND** the schema declares `metadataExtraction` rules
 - **WHEN** `CompileContext.execute` is called
-- **THEN** no error is thrown and no content is produced for that field
+- **THEN** the spec entry's `content` is produced via extraction and a staleness warning is emitted
 
 ### Requirement: Missing spec IDs emit a warning
 
