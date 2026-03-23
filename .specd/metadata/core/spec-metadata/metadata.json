@@ -21,7 +21,7 @@
     {
       "requirement": "File format",
       "rules": [
-        "`metadata.json` is a JSON file (per ADR-0019: machine-generated files use JSON). All fields are optional — an empty object or absent file is valid:\n\n```json\n{\n  \"title\": \"Change\",\n  \"description\": \"The central domain entity in specd.\",\n  \"dependsOn\": [\"core:core/storage\", \"core:core/delta-format\"],\n  \"contentHashes\": {\n    \"spec.md\": \"sha256:abc123...\"\n  },\n  \"rules\": [\n    { \"requirement\": \"Lifecycle states\", \"rules\": [\"...\"] }\n  ],\n  \"constraints\": [\"...\"],\n  \"scenarios\": [\n    { \"requirement\": \"...\", \"name\": \"...\", \"given\": [], \"when\": [], \"then\": [] }\n  ],\n  \"generatedBy\": \"core\"\n}\n```\n\nFields:\n\n- `title` — human-readable display title\n- `description` — short summary of the spec's purpose\n- `keywords` — lowercase hyphen-separated discovery tokens\n- `dependsOn` — array of spec IDs this spec depends on\n- `contentHashes` — `{ filename: \"sha256:<hex>\" }` for staleness detection\n- `rules` — extracted requirements grouped by heading\n- `constraints` — extracted constraint bullets\n- `scenarios` — extracted verification scenarios\n- `context` — freeform context strings\n- `generatedBy` — `\"core\"` for deterministic extraction, `\"agent\"` for LLM-optimized"
+        "`metadata.json` is a JSON file (per ADR-0019: machine-generated files use JSON). All fields are optional — an empty object or absent file is valid:\n\n```json\n{\n  \"title\": \"Change\",\n  \"description\": \"The central domain entity in specd.\",\n  \"dependsOn\": [\"core:core/storage\", \"core:core/delta-format\"],\n  \"contentHashes\": {\n    \"spec.md\": \"sha256:abc123...\"\n  },\n  \"rules\": [{ \"requirement\": \"Lifecycle states\", \"rules\": [\"...\"] }],\n  \"constraints\": [\"...\"],\n  \"scenarios\": [{ \"requirement\": \"...\", \"name\": \"...\", \"given\": [], \"when\": [], \"then\": [] }],\n  \"generatedBy\": \"core\"\n}\n```\n\nFields:\n\n- `title` — human-readable display title\n- `description` — short summary of the spec's purpose\n- `keywords` — lowercase hyphen-separated discovery tokens\n- `dependsOn` — array of spec IDs this spec depends on\n- `contentHashes` — `{ filename: \"sha256:<hex>\" }` for staleness detection\n- `rules` — extracted requirements grouped by heading\n- `constraints` — extracted constraint bullets\n- `scenarios` — extracted verification scenarios\n- `context` — freeform context strings\n- `generatedBy` — `\"core\"` for deterministic extraction, `\"agent\"` for LLM-optimized"
       ]
     },
     {
@@ -451,7 +451,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:cbfd729a82b3105e27e5da37e74ed9798220d08fb3ad3af4fad3772165713d31",
+    "spec.md": "sha256:082f08496dac624d52ecb2806d37c5c06ee4e0d209f14f8b08d3ff09d52d7d2f",
     "verify.md": "sha256:047010c703e8863c512ca42f819ad9c8fee9ce29d6d3ea513f1226a5cd31f9df"
   },
   "generatedBy": "core"
