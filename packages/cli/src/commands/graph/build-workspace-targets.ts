@@ -3,7 +3,6 @@ import {
   type Kernel,
   type SpecRepository,
   createVcsAdapter,
-  parseMetadata,
   NodeContentHasher,
 } from '@specd/core'
 import { type WorkspaceIndexTarget, type DiscoveredSpec } from '@specd/code-graph'
@@ -68,8 +67,8 @@ export async function buildWorkspaceTargets(
  *
  * For each spec in the repository:
  * 1. Lists all specs
- * 2. Loads `.specd-metadata.yaml` for title, description, and dependencies
- * 3. Loads remaining artifacts for content and hashing (excluding metadata)
+ * 2. Loads metadata via `repo.metadata()` for title, description, and dependencies
+ * 3. Loads artifacts for content and hashing
  * 4. Builds DiscoveredSpec with all fields
  *
  * @param repo - The spec repository for this workspace, or undefined if not found.
@@ -92,23 +91,20 @@ async function resolveSpecsFromRepo(
     let title = specId
     let description = ''
     let dependsOn: string[] = []
-    const metadata = await repo.artifact(spec, '.specd-metadata.yaml')
+    const metadata = await repo.metadata(spec)
     if (metadata) {
-      const parsed = parseMetadata(metadata.content)
-      title = parsed.title ?? specId
-      description = parsed.description ?? ''
-      dependsOn = parsed.dependsOn ?? []
+      title = metadata.title ?? specId
+      description = metadata.description ?? ''
+      dependsOn = metadata.dependsOn ?? []
     }
 
-    // Build content: all artifacts EXCEPT .specd-metadata.yaml
-    // spec.md first if present, then rest alphabetically
-    const contentFilenames = spec.filenames.filter((f) => f !== '.specd-metadata.yaml')
+    // Build content: spec.md first if present, then rest alphabetically
     const ordered: string[] = []
-    const idx = contentFilenames.indexOf('spec.md')
+    const idx = spec.filenames.indexOf('spec.md')
     if (idx !== -1) {
       ordered.push('spec.md')
     }
-    ordered.push(...contentFilenames.filter((f) => f !== 'spec.md').sort())
+    ordered.push(...spec.filenames.filter((f) => f !== 'spec.md').sort())
 
     const parts: string[] = []
     for (const filename of ordered) {
@@ -119,7 +115,7 @@ async function resolveSpecsFromRepo(
     }
     const content = parts.join('\0')
 
-    if (content === '' && !metadata) continue
+    if (content === '' && metadata === null) continue
 
     const contentHash = hasher.hash(content)
 
