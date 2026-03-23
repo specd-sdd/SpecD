@@ -528,6 +528,10 @@ export class Change {
    */
   updateSpecIds(specIds: readonly string[], actor: ActorIdentity): void {
     this._specIds = [...new Set(specIds)]
+    const newIds = new Set(this._specIds)
+    for (const key of this._specDependsOn.keys()) {
+      if (!newIds.has(key)) this._specDependsOn.delete(key)
+    }
     this.invalidate('spec-change', actor)
   }
 

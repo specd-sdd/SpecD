@@ -41,6 +41,14 @@
 - **WHEN** a new spec ID is added to the Change's `specIds`
 - **THEN** an `invalidated` event with `cause: 'spec-change'` is appended and a `transitioned` event rolling back to `designing` is appended
 
+#### Scenario: Orphaned specDependsOn removed when spec removed from specIds
+
+- **GIVEN** a Change with `specIds: ['auth/login', 'auth/session']`
+- **AND** `specDependsOn` has entries for both `'auth/login'` and `'auth/session'`
+- **WHEN** `updateSpecIds(['auth/login'], actor)` is called
+- **THEN** `specDependsOn` no longer has an entry for `'auth/session'`
+- **AND** `specDependsOn` still has the entry for `'auth/login'`
+
 ### Requirement: Lifecycle
 
 #### Scenario: Valid transition succeeds
