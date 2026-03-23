@@ -56,3 +56,33 @@
 - **WHEN** `specd change transition my-change designing --format json` succeeds and the change was in `drafting` state
 - **THEN** stdout is valid JSON with `result` equal to `"ok"`, `name` equal to `"my-change"`, `from` equal to `"drafting"`, and `to` equal to `"designing"`
 - **AND** the process exits with code 0
+
+### Requirement: Hook execution
+
+#### Scenario: --skip-hooks all skips all hooks
+
+- **GIVEN** the change is in `implementing` state and `implementing.post` has hooks configured
+- **WHEN** `specd change transition my-change verifying --skip-hooks all` is run
+- **THEN** no hooks are executed
+- **AND** the transition succeeds
+
+#### Scenario: --skip-hooks target.pre skips only pre hooks
+
+- **GIVEN** the schema declares `verifying.pre` and `implementing.post` hooks
+- **AND** the change is in `implementing` state
+- **WHEN** `specd change transition my-change verifying --skip-hooks target.pre` is run
+- **THEN** `verifying.pre` hooks are skipped
+- **AND** `implementing.post` hooks still execute
+
+#### Scenario: --skip-hooks source.post skips only post hooks
+
+- **GIVEN** the schema declares `verifying.pre` and `implementing.post` hooks
+- **AND** the change is in `implementing` state
+- **WHEN** `specd change transition my-change verifying --skip-hooks source.post` is run
+- **THEN** `implementing.post` hooks are skipped
+- **AND** `verifying.pre` hooks still execute
+
+#### Scenario: --skip-hooks accepts comma-separated values
+
+- **WHEN** `specd change transition my-change verifying --skip-hooks target.pre,source.post` is run
+- **THEN** both target pre and source post hooks are skipped

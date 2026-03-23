@@ -9,13 +9,15 @@ Changes must progress through a governed lifecycle so that validations, approval
 ### Requirement: Command signature
 
 ```
-specd change transition <name> <step> [--no-hooks] [--format text|json|toon]
+specd change transition <name> <step> [--skip-hooks <phases>] [--format text|json|toon]
 ```
 
 - `<name>` — required positional; the name of the change to transition
 - `<step>` — required positional; the target lifecycle state (e.g. `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`)
-- `--no-hooks` — optional flag; skips `run:` hook execution, allowing the caller to manage hooks separately via `specd change run-hooks`
+- `--skip-hooks <phases>` — optional; comma-separated list of hook phases to skip. Valid values: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`. When `all` is specified, all hook phases are skipped. When omitted, all applicable hooks execute.
 - `--format text|json|toon` — optional; output format, defaults to `text`
+
+The previous `--no-hooks` flag is removed. Use `--skip-hooks all` for equivalent behaviour.
 
 ### Requirement: Approval-gate routing
 
@@ -28,7 +30,9 @@ The user always specifies the logical target state; routing is transparent.
 
 ### Requirement: Hook execution
 
-By default, the `TransitionChange` use case executes `run:` hooks for the target workflow step (pre-hooks before the state change, post-hooks after). When `--no-hooks` is passed, hook execution is skipped — the caller is responsible for invoking hooks via `specd change run-hooks`.
+By default, the `TransitionChange` use case executes `run:` hooks at step boundaries in this order: source.post hooks (finishing the previous step), then target.pre hooks (preparing the new step), then the state transition. Both phases are fail-fast — a failure in either aborts the transition. When `--skip-hooks` is passed with specific phases, those hook phases are skipped. When `--skip-hooks all` is passed, all hook execution is skipped — the caller is responsible for invoking hooks via `specd change run-hooks`.
+
+The CLI maps the `--skip-hooks` option to a `skipHookPhases` set on `TransitionChangeInput`.
 
 ### Requirement: Progress output
 
@@ -46,22 +50,13 @@ Progress output is only rendered in `text` format. JSON and toon formats include
 On success, output depends on `--format`:
 
 - `text` (default): prints a single line to stdout:
-
-  ```
-  transitioned <name>: <from> → <to>
-  ```
-
 - `json` or `toon`: outputs the following to stdout (encoded in the respective format):
-
-  ```json
-  { "result": "ok", "name": "<name>", "from": "<from>", "to": "<to>", "postHookFailures": [] }
-  ```
 
 where `<to>` is the effective target state after routing.
 
 ### Requirement: Post-hook failure warning
 
-If any post-hooks failed, the CLI reports them as warnings. In `text` format, prints `warning: post-hook(s) failed: <commands>`. In structured formats, includes `postHookFailures` in the output. The command exits with code 2 if post-hooks failed.
+Since both hook phases (source.post and target.pre) are fail-fast, a hook failure causes the command to exit with code 1 and print an `error:` message to stderr. The previous `postHookFailures` warning (exit code 2) is removed — there are no post-transition hook failures to report.
 
 ### Requirement: Invalid transition error
 
