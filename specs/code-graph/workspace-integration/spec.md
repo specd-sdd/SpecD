@@ -52,9 +52,9 @@ interface WorkspaceIndexTarget {
 The `specs` callback is implemented by the CLI/MCP integration layer using `SpecRepository` from `@specd/core`:
 
 1. Call `repo.list()` to get all `Spec` entities in the workspace
-2. For each spec, load all artifacts via `repo.artifact(spec, filename)`
+2. For each spec, load all artifacts via `repo.artifact(spec, filename)` — artifact filenames come from `spec.filenames` and no longer include metadata files
 3. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order
-4. Load `.specd-metadata.yaml` via `repo.artifact(spec, '.specd-metadata.yaml')` and parse it with `parseMetadata` to extract `title`, `description`, and `dependsOn`. If metadata is absent, `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.
+4. Load metadata via `repo.metadata(spec)` to extract `title`, `description`, and `dependsOn`. If metadata is absent (`null`), `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.
 5. Build the `specId` as `{workspace}:{specPath}` (e.g. `core:core/change`), matching the format produced by `SpecRepository.resolveFromPath`
 
 This decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`.

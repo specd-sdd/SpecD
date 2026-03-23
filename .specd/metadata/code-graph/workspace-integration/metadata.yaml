@@ -54,9 +54,9 @@ rules:
         The `specs` callback is implemented by the CLI/MCP integration layer using `SpecRepository` from `@specd/core`:
 
         1. Call `repo.list()` to get all `Spec` entities in the workspace
-        2. For each spec, load all artifacts via `repo.artifact(spec, filename)`
+        2. For each spec, load all artifacts via `repo.artifact(spec, filename)` — artifact filenames come from `spec.filenames` and no longer include metadata files
         3. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order
-        4. Load `.specd-metadata.yaml` via `repo.artifact(spec, '.specd-metadata.yaml')` and parse it with `parseMetadata` to extract `title`, `description`, and `dependsOn`. If metadata is absent, `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.
+        4. Load metadata via `repo.metadata(spec)` to extract `title`, `description`, and `dependsOn`. If metadata is absent (`null`), `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.
         5. Build the `specId` as `{workspace}:{specPath}` (e.g. `core:core/change`), matching the format produced by `SpecRepository.resolveFromPath`
 
         This decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`.
@@ -241,6 +241,6 @@ scenarios:
       - .gitignore from /project SHALL be loaded and applied
       - AND any .gitignore files in subdirectories SHALL also be applied
 contentHashes:
-  spec.md: sha256:729fd2848eaeef935ee855ebb4c16e18e755484b358141546d37447555308904
+  spec.md: sha256:d067263503c8926db85101f15e8de162a267d8c7ba3dbefb00f8d04337b041fb
   verify.md: sha256:b096c2de4fcb5da401b03b1dfb50a99f0c78078b14b422354aee6677a165fb29
 generatedBy: core
