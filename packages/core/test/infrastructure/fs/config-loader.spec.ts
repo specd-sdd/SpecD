@@ -546,6 +546,93 @@ context:
   })
 
   // ---------------------------------------------------------------------------
+  // Requirement: contextMode validation
+  // ---------------------------------------------------------------------------
+
+  describe('contextMode', () => {
+    it("accepts 'full'", async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextMode: 'full'
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.contextMode).toBe('full')
+    })
+
+    it("accepts 'lazy'", async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextMode: 'lazy'
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.contextMode).toBe('lazy')
+    })
+
+    it('omits contextMode from SpecdConfig when not declared', async () => {
+      const configPath = await writeConfig(minimalYaml())
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.contextMode).toBeUndefined()
+    })
+
+    it('rejects invalid contextMode value', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+contextMode: 'partial'
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow()
+    })
+
+    it('rejects contextMode placed inside a workspace entry', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    contextMode: 'lazy'
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow()
+    })
+  })
+
+  // ---------------------------------------------------------------------------
   // Requirement: contextIncludeSpecs / contextExcludeSpecs pattern validation
   // ---------------------------------------------------------------------------
 

@@ -19,7 +19,20 @@ import { createCliKernel } from '../../src/kernel.js'
 import { registerChangeContext } from '../../src/commands/change/context.js'
 
 const mockResult = {
-  contextBlock: '# Designing step instructions\n\nDo this.',
+  projectContext: [
+    { source: 'instruction' as const, content: '# Designing step instructions\n\nDo this.' },
+  ],
+  specs: [
+    {
+      specId: 'default:auth/login',
+      title: 'Auth Login',
+      description: 'Login spec',
+      source: 'includePattern' as const,
+      mode: 'full' as const,
+      content: '#### Rules\n\n##### Auth rule\n- Users must authenticate',
+    },
+  ],
+  availableSteps: [{ step: 'designing', available: true, blockingArtifacts: [] as string[] }],
   stepAvailable: true,
   blockingArtifacts: [] as string[],
   warnings: [] as { message: string }[],
@@ -51,7 +64,7 @@ function setup() {
 afterEach(() => vi.restoreAllMocks())
 
 describe('change context', () => {
-  it('prints instruction block verbatim in text format', async () => {
+  it('prints project context and spec content in text format', async () => {
     const { stdout } = setup()
 
     const program = makeProgram()
@@ -60,9 +73,10 @@ describe('change context', () => {
 
     expect(stdout()).toContain('# Designing step instructions')
     expect(stdout()).toContain('Do this.')
+    expect(stdout()).toContain('### Spec: default:auth/login')
   })
 
-  it('outputs JSON with contextBlock, stepAvailable, blockingArtifacts, warnings', async () => {
+  it('outputs JSON with structured result fields', async () => {
     const { stdout } = setup()
 
     const program = makeProgram()
@@ -79,10 +93,13 @@ describe('change context', () => {
     ])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed.contextBlock).toContain('Designing step instructions')
     expect(parsed.stepAvailable).toBe(true)
-    expect(Array.isArray(parsed.blockingArtifacts)).toBe(true)
+    expect(Array.isArray(parsed.projectContext)).toBe(true)
+    expect(Array.isArray(parsed.specs)).toBe(true)
+    expect(Array.isArray(parsed.availableSteps)).toBe(true)
     expect(Array.isArray(parsed.warnings)).toBe(true)
+    expect(parsed.specs[0].specId).toBe('default:auth/login')
+    expect(parsed.specs[0].mode).toBe('full')
   })
 
   it('passes --follow-deps flag to use case', async () => {
@@ -216,6 +233,105 @@ describe('change context', () => {
 
     const call = kernel.changes.compile.execute.mock.calls[0]![0]
     expect(call.sections).toBeUndefined()
+  })
+
+  it('renders summary specs as catalogue in lazy mode', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.compile.execute.mockResolvedValue({
+      ...mockResult,
+      specs: [
+        {
+          specId: 'default:auth/login',
+          title: 'Auth Login',
+          description: 'Login spec',
+          source: 'specIds' as const,
+          mode: 'full' as const,
+          content: 'Full content here',
+        },
+        {
+          specId: 'default:_global/architecture',
+          title: 'Architecture',
+          description: 'Hexagonal architecture',
+          source: 'includePattern' as const,
+          mode: 'summary' as const,
+        },
+      ],
+    })
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'context',
+      'my-change',
+      'designing',
+      '--format',
+      'text',
+    ])
+
+    expect(stdout()).toContain('## Available context specs')
+    expect(stdout()).toContain('specd spec show')
+    expect(stdout()).toContain('Architecture')
+    expect(stdout()).toContain('Hexagonal architecture')
+  })
+
+  it('renders dependsOnTraversal summary specs under Via dependencies heading', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.compile.execute.mockResolvedValue({
+      ...mockResult,
+      specs: [
+        {
+          specId: 'default:infra/database',
+          title: 'Database',
+          description: 'Database layer',
+          source: 'dependsOnTraversal' as const,
+          mode: 'summary' as const,
+        },
+      ],
+    })
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'context',
+      'my-change',
+      'designing',
+      '--format',
+      'text',
+    ])
+
+    expect(stdout()).toContain('### Via dependencies')
+    expect(stdout()).toContain('Database')
+    expect(stdout()).toContain('Database layer')
+  })
+
+  it('JSON output includes projectContext, specs, availableSteps with mode and source', async () => {
+    const { stdout } = setup()
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'context',
+      'my-change',
+      'designing',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.projectContext).toBeDefined()
+    expect(parsed.specs).toBeDefined()
+    expect(parsed.availableSteps).toBeDefined()
+    expect(parsed.specs[0].mode).toBe('full')
+    expect(parsed.specs[0].source).toBe('includePattern')
   })
 
   it('exits 1 when change not found', async () => {

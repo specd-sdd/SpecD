@@ -16,10 +16,23 @@
 
 ### Requirement: Returns GetProjectContextResult on success
 
-#### Scenario: Result contains all three fields
+#### Scenario: Result contains structured spec entries
 
-- **WHEN** `execute` completes successfully
-- **THEN** the result contains `contextEntries` (string array), `specs` (array of spec entries), and `warnings` (array of context warnings)
+- **GIVEN** project-level include patterns match specs
+- **WHEN** `GetProjectContext.execute` is called
+- **THEN** `result.specs` is an array of `ContextSpecEntry` objects with `specId`, `title`, `description`, `source`, `mode`, and `content`
+
+#### Scenario: All specs are full mode without a change
+
+- **GIVEN** no active change (project context only)
+- **WHEN** `GetProjectContext.execute` is called
+- **THEN** all entries in `result.specs` have `mode: 'full'` and `source: 'includePattern'`
+
+#### Scenario: Spec entries include title and description
+
+- **GIVEN** `default:_global/architecture` has metadata with `title: 'Architecture'` and `description: 'Defines the hexagonal architecture...'`
+- **WHEN** `GetProjectContext.execute` is called and includes this spec
+- **THEN** the spec entry has `title: 'Architecture'` and `description: 'Defines the hexagonal architecture...'`
 
 ### Requirement: Resolves schema before processing
 

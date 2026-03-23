@@ -24,8 +24,10 @@ rules:
         `execute` MUST return a `GetProjectContextResult` containing:
 
         - `contextEntries` (string\[]) — rendered project-level context entries (instruction text or file content).
-        - `specs` (`GetProjectContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `workspace`, `path`, and `content` fields.
+        - `specs` (`ContextSpecEntry[]`) — specs matched by include/exclude patterns, each with `specId`, `title`, `description`, `source`, `mode`, and optionally `content` fields. The `ContextSpecEntry` type is the same as defined in the `CompileContext` spec.
         - `warnings` (`ContextWarning[]`) — advisory warnings for missing files, stale metadata, unknown workspaces, etc.
+
+        Since `GetProjectContext` operates without a change, it has no `specIds` or `specDependsOn` to drive tier classification. All specs MUST have `source: 'includePattern'`. The `mode` field MUST always be `'full'` — lazy mode requires an active change to determine tier 1 membership.
   - requirement: Resolves schema before processing
     rules:
       - The use case MUST obtain the project's schema via `SchemaProvider.get()` before processing any specs. If the schema cannot be resolved (returns `null`), the use case MUST throw `SchemaNotFoundError`.
@@ -93,11 +95,29 @@ scenarios:
     then:
       - the call succeeds and respects all optional parameters
   - requirement: Returns GetProjectContextResult on success
-    name: Result contains all three fields
+    name: Result contains structured spec entries
+    given:
+      - project-level include patterns match specs
     when:
-      - execute completes successfully
+      - GetProjectContext.execute is called
     then:
-      - the result contains contextEntries (string array), specs (array of spec entries), and warnings (array of context warnings)
+      - result.specs is an array of ContextSpecEntry objects with specId, title, description, source, mode, and content
+  - requirement: Returns GetProjectContextResult on success
+    name: All specs are full mode without a change
+    given:
+      - no active change (project context only)
+    when:
+      - GetProjectContext.execute is called
+    then:
+      - "all entries in result.specs have mode: 'full' and source: 'includePattern'"
+  - requirement: Returns GetProjectContextResult on success
+    name: Spec entries include title and description
+    given:
+      - "default:_global/architecture has metadata with title: 'Architecture' and description: 'Defines the hexagonal architecture...'"
+    when:
+      - GetProjectContext.execute is called and includes this spec
+    then:
+      - "the spec entry has title: 'Architecture' and description: 'Defines the hexagonal architecture...'"
   - requirement: Resolves schema before processing
     name: Schema not found
     given:
@@ -238,6 +258,13 @@ scenarios:
     then:
       - the spec's content contains only the spec heading with no body
 contentHashes:
-  spec.md: sha256:0bf0c004f479b8bd12f5457d08706584f243832177d65ee9f9bbd880bd32f058
-  verify.md: sha256:d4196bd20a0c9dde50220df1485f8a9202931226c91c936381487d399b272fa2
-generatedBy: core
+  spec.md: sha256:e6e20616053f3cd71d50c61fd2e1b5832f039942b0b093fafe1d23d4c222f6df
+  verify.md: sha256:1ec6d1773f127f76a0121b87dcea0243697b858200b9a23995f99ed43c5eb444
+keywords:
+  - project-context
+  - context-compilation
+  - include-patterns
+  - spec-rendering
+  - metadata-extraction
+  - change-independent
+generatedBy: agent

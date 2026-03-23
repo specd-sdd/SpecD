@@ -291,6 +291,19 @@ rules:
         References to unknown workspace qualifiers produce a warning at startup but do not prevent startup — runtime is tolerant to allow working with partial workspace setups. However, `specd config validate` must fail with an error if any unknown workspace qualifier is found: a typo in a qualifier silently excludes specs from context, which is a dangerous silent failure in teams. References to non-existent spec IDs are silently skipped at context-compilation time — this avoids breaking when a spec is temporarily deleted or not yet created. Invalid pattern syntax is an error caught at startup.
 
         `specd config validate` additionally warns when a pattern (include or exclude, at any level) matches no specs on disk at validation time. This is not a runtime error — specs may not exist yet — but the warning helps catch typos early.
+  - requirement: Context mode
+    rules:
+      - |-
+        `specd.yaml` MUST accept an optional top-level `contextMode` field that controls how `CompileContext` renders specs in the compiled context.
+
+        Valid values:
+
+        - `'lazy'` (default) — specs are split into two tiers. Tier 1 specs (those in the change's `specIds` and `specDependsOn`) are rendered with full content. Tier 2 specs (those from include patterns and `dependsOn` traversal) are rendered as summaries (spec ID, title, description only).
+        - `'full'` — all collected specs are rendered with full structured content (rules, constraints, scenarios). This preserves the pre-change behaviour.
+
+        `contextMode` is project-level only — it MUST NOT appear inside workspace entries. If declared inside a workspace, startup validation MUST reject it as an unknown field.
+
+        When omitted, `contextMode` defaults to `'lazy'`.
   - requirement: Project context instructions
     rules:
       - |-
@@ -393,57 +406,42 @@ rules:
   - requirement: Startup validation
     rules:
       - |-
-        specd must validate `specd.yaml` before executing any command that requires a config (see Schema reference requirement for which commands skip this). `specd init` is exempt — it creates `specd.yaml` and therefore requires no existing config.
+        `specd.yaml` MUST be validated at startup. The following conditions are **errors** that prevent startup:
 
-        `FsConfigLoader` validates the parsed YAML against a Zod schema before constructing the `SpecdConfig` object. Any structural mismatch (missing required fields, wrong types, unknown adapter values) surfaces immediately as a `ConfigValidationError` — a domain error that extends `SpecdError` — before any path resolution or domain object construction takes place.
-
-        The following conditions are **errors** that abort startup immediately:
-
-        - `schema` field is missing
-        - `storage` section is missing, or either `changes` or `archive` sub-key is absent
-        - `workspaces` section is missing, or no `default` workspace is declared
-        - `specs` section is missing in any workspace
-        - `codeRoot` is missing in any non-`default` workspace
-        - `adapter` is missing in any `specs`, `schemas`, or storage section
+        - File does not exist at the discovered path (after traversal)
+        - YAML parse failure
+        - Missing required top-level field: `schema`
+        - `schema` value does not match `<name>@<version>` format (when string) or is not a valid object with `name` and `version`
+        - Duplicate workspace names (last-wins in YAML; reject if detected)
         - Unknown adapter value in any `specs`, `schemas`, or storage section
         - Required adapter-specific fields are absent (e.g. `fs.path` missing when `adapter: fs`)
         - Storage path (`changes.fs.path` or `archive.fs.path`) resolves outside the repo root
         - Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax (e.g. `*` in a disallowed position)
         - `schemaPlugins` entry is not a valid string reference
         - `schemaOverrides` has an invalid structure (unknown operation keys, wrong types)
+        - `contextMode` value is not `'full'` or `'lazy'`
+        - `contextMode` appears inside a workspace entry (it is project-level only)
 
         The following conditions emit **warnings** but allow startup to proceed:
 
         - Duplicate workspace names (YAML retains last-wins; warn about the pattern)
         - Unknown workspace qualifier in a `contextIncludeSpecs` or `contextExcludeSpecs` pattern (runtime only — `specd config validate` treats this as an error)
 constraints:
-  - schema is required — specd cannot start without a schema reference
-  - workspaces.default is required — every config must have a default workspace; specd init creates it
-  - specd.local.yaml is always .gitignored; specd init must add it automatically
-  - When specd.local.yaml is present it is the sole active config — specd.yaml is not read
-  - specd.local.yaml must be a complete, valid config on its own; partial overrides are not supported
-  - Workspace names must match /^[a-z][a-z0-9-]*$/; default is reserved for the local project workspace
-  - ownership values are limited to readOnly, shared, and owned
-  - isExternal is not declared — it is inferred by the application layer from whether the resolved specs.fs.path is outside the project repo root
-  - Every workspace must declare a specs section; codeRoot is required for non-default workspaces
-  - 'schemas is optional: for the default workspace it defaults to adapter: fs / fs.path: specd/schemas; for non-default workspaces, omitting it means no local schemas — schema references targeting that workspace produce SchemaNotFoundError'
+  - specd.yaml is the single source of truth for project configuration
+  - One schema reference per project — all workspaces share the same schema, with optional per-workspace schema overrides
   - adapter is required in every specs, schemas, and storage section; adapter-specific fields are nested under the adapter key
   - storage section is required and must contain both changes and archive sub-keys
   - All relative paths resolve from the specd.yaml directory; storage paths (fs.path in changes and archive) must remain within the repo root
   - Project-level contextIncludeSpecs defaults to ['default:*']; project-level contextExcludeSpecs defaults to []
   - Workspace-level contextIncludeSpecs defaults to ['*'] (all specs in that workspace); workspace-level contextExcludeSpecs defaults to []
+  - contextMode is optional; defaults to 'lazy'; must be 'full' or 'lazy' — any other value is a startup validation error
+  - contextMode is project-level only; it MUST NOT appear inside workspace entries
   - llmOptimizedContext is optional; defaults to false; must be a boolean — any other type is a startup validation error
   - 'context is optional; each entry is an object with exactly one key: either file or instruction — no other shapes are valid'
   - context file paths are resolved relative to the specd.yaml directory; absolute paths are accepted
-  - A missing context file is silently skipped at compile time — no warning, no error
-  - context file content is injected verbatim — no parsing or transformation is applied
-  - context entries are prepended to the compiled context in declaration order, before any spec content
-  - Project-level patterns are always applied; workspace-level patterns are applied only when that workspace is active in the current change
-  - At project level, omitting the workspace qualifier is equivalent to default:; at workspace level, omitting it means the declaring workspace
-  - Include pattern order (project-level first, then active workspace declaration order) determines context order and truncation priority
-  - A spec matched by multiple include patterns appears once, at the position of the first matching pattern
-  - '* in a pattern may only appear alone, as workspace:*, or as a path suffix prefix/* — any other position is a startup error'
-  - Unknown workspace qualifiers in patterns produce a warning, not an error; missing spec IDs are silently skipped at compile time
+  - approvals is optional; when present it must contain at least one of spec or signoff; each is an object with required enabled boolean and optional actor string
+  - skills is optional; when present it must be an object (the manifest body); specd does not validate skill content beyond YAML structure
+  - plugins is optional; each entry must contain a package string pointing to a resolvable npm package, with optional config of any shape; specd validates structure but not plugin-specific config semantics
 scenarios:
   - requirement: Config file location and format
     name: Config found — nearest file used
@@ -841,36 +839,62 @@ scenarios:
       - "contextIncludeSpecs: ['auth/*/login'] is declared (* in the middle of a path segment)"
     then:
       - specd exits with a config validation error at startup
-  - requirement: Startup validation
-    name: Missing required field blocks startup
+  - requirement: Context mode
+    name: contextMode lazy is the default
+    given:
+      - specd.yaml does not declare contextMode
     when:
-      - specd.yaml is missing any required field (e.g. schema, storage, default workspace, adapter in a specs section)
+      - config is loaded
     then:
-      - specd exits immediately with a descriptive error before executing the requested command
-  - requirement: Startup validation
-    name: Invalid pattern syntax blocks startup
+      - config.contextMode defaults to 'lazy' at the use case level
+  - requirement: Context mode
+    name: contextMode lazy is accepted
+    given:
+      - 'specd.yaml declares contextMode: lazy'
     when:
-      - contextIncludeSpecs contains an invalid pattern such as 'auth/*/login'
+      - config is loaded
     then:
-      - specd exits with a config validation error at startup
-  - requirement: Startup validation
-    name: Storage path outside repo root blocks startup
+      - config.contextMode is 'lazy'
+  - requirement: Context mode
+    name: Invalid contextMode rejected at startup
+    given:
+      - 'specd.yaml declares contextMode: partial'
     when:
-      - storage.changes.fs.path resolves to a directory outside the project repo root
+      - config is loaded
     then:
-      - specd exits with a config validation error at startup
-  - requirement: Startup validation
-    name: Warning does not block startup
+      - startup validation fails with an error identifying the invalid value
+  - requirement: Context mode
+    name: contextMode inside workspace is rejected
+    given:
+      - 'specd.yaml declares contextMode: lazy inside a workspace entry'
     when:
-      - specd.yaml has a deprecated field like artifactRules
+      - config is loaded
     then:
-      - a migration warning is printed but the command proceeds normally
+      - startup validation fails with an error indicating contextMode is project-level only
   - requirement: Startup validation
-    name: specd init requires no existing config
+    name: Valid minimal config passes validation
+    given:
+      - 'a specd.yaml with only schema: schema-std@1'
     when:
-      - specd init is run in a directory with no specd.yaml
+      - config is validated at startup
     then:
-      - specd does not attempt to validate a config — it creates one from defaults and exits successfully
+      - validation passes with defaults applied
+  - requirement: Startup validation
+    name: Invalid contextMode value rejected
+    given:
+      - 'specd.yaml contains contextMode: partial'
+    when:
+      - config is validated at startup
+    then:
+      - validation fails with a ConfigValidationError identifying the invalid contextMode value
+  - requirement: Startup validation
+    name: contextMode in workspace entry rejected
+    given:
+      - 'specd.yaml contains a workspace with contextMode: lazy'
+    when:
+      - config is validated at startup
+    then:
+      - validation fails with a ConfigValidationError indicating contextMode is not valid inside a workspace
   - requirement: Project context instructions
     name: Context entries injected before spec content
     given:
@@ -928,6 +952,6 @@ scenarios:
     then:
       - it reads /shared/instructions.md directly, without resolving relative to the specd.yaml directory
 contentHashes:
-  spec.md: sha256:aa940d2b07f745147030bdc06fd905ca3529cf7211a829cd6aa7d3f98d250471
-  verify.md: sha256:6107c3bc644834e8c94190c3cfc7f40e7844170087b8174e92c81b5ef96d3117
+  spec.md: sha256:9984fbded692b15006191cd0c3cfb061b454c3268b3b7c8280394a321af77d15
+  verify.md: sha256:472bfef95187471382427c10dd794a51d53f2948293d29ae972676560371ec05
 generatedBy: core

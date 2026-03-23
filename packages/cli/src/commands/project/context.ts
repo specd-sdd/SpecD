@@ -89,9 +89,10 @@ JSON/TOON output schema:
           if (fmt === 'text') {
             const parts: string[] = [...result.contextEntries]
             if (result.specs.length > 0) {
-              parts.push(
-                `## Spec content\n\n${result.specs.map((s) => s.content).join('\n\n---\n\n')}`,
+              const specParts = result.specs.map(
+                (s) => `### Spec: ${s.specId}\n\n${s.content ?? ''}`,
               )
+              parts.push(`## Spec content\n\n${specParts.join('\n\n---\n\n')}`)
             }
             if (parts.length === 0) {
               output('no project context configured', 'text')
@@ -102,11 +103,7 @@ JSON/TOON output schema:
             output(
               {
                 contextEntries: result.contextEntries,
-                specs: result.specs.map((s) => ({
-                  workspace: s.workspace,
-                  path: s.path,
-                  content: s.content,
-                })),
+                specs: result.specs,
                 warnings: result.warnings.map((w) => w.message),
               },
               fmt,
