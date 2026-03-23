@@ -11,6 +11,8 @@ import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
+import { type Change } from '../../domain/entities/change.js'
+import { type ArtifactFile } from '../../domain/value-objects/artifact-file.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
@@ -185,43 +187,44 @@ export class ArchiveChange {
 
         if (artifactType.delta) {
           // Delta artifact: parse and apply delta file onto base spec
-          const format = artifactType.format ?? inferFormat(outputBasename) ?? 'plaintext'
-          const formatParser = this._parsers.get(format)
-          if (formatParser === undefined) {
-            throw new ParserNotRegisteredError(format, `artifact '${artifactType.id}'`)
-          }
-          if (yamlParser === undefined) {
-            throw new ParserNotRegisteredError('yaml', 'required for delta file parsing')
-          }
-
           const deltaFilename =
             capabilityPath.length > 0
               ? `deltas/${workspace}/${capabilityPath}/${outputBasename}.delta.yaml`
               : `deltas/${workspace}/${outputBasename}.delta.yaml`
           const deltaFile = await this._changes.artifact(change, deltaFilename)
-          if (deltaFile === null) continue
 
-          const deltaEntries = yamlParser.parseDelta(deltaFile.content)
-          const baseArtifact = await specRepo.artifact(spec, outputBasename)
-          const baseContent = baseArtifact?.content ?? ''
-          const baseAst = formatParser.parse(baseContent)
-          const mergedAst = formatParser.apply(baseAst, deltaEntries)
-          const mergedContent = formatParser.serialize(mergedAst)
+          if (deltaFile !== null) {
+            const format = artifactType.format ?? inferFormat(outputBasename) ?? 'plaintext'
+            const formatParser = this._parsers.get(format)
+            if (formatParser === undefined) {
+              throw new ParserNotRegisteredError(format, `artifact '${artifactType.id}'`)
+            }
+            if (yamlParser === undefined) {
+              throw new ParserNotRegisteredError('yaml', 'required for delta file parsing')
+            }
 
-          await specRepo.save(spec, new SpecArtifact(outputBasename, mergedContent), {
-            force: true,
-          })
-          synced = true
+            const deltaEntries = yamlParser.parseDelta(deltaFile.content)
+            const baseArtifact = await specRepo.artifact(spec, outputBasename)
+            const baseContent = baseArtifact?.content ?? ''
+            const baseAst = formatParser.parse(baseContent)
+            const mergedAst = formatParser.apply(baseAst, deltaEntries)
+            const mergedContent = formatParser.serialize(mergedAst)
+
+            await specRepo.save(spec, new SpecArtifact(outputBasename, mergedContent), {
+              force: true,
+            })
+            synced = true
+          } else {
+            // No delta file — new spec, copy primary file directly
+            if (await this._copyPrimaryFile(change, specFile, spec, outputBasename, specRepo)) {
+              synced = true
+            }
+          }
         } else {
           // Non-delta spec-scoped artifact: copy from change dir to spec
-          // specFile.filename is the full relative path (e.g. specs/core/retry-policy/spec.md)
-          const artifactFile = await this._changes.artifact(change, specFile.filename)
-          if (artifactFile === null) continue
-
-          await specRepo.save(spec, new SpecArtifact(outputBasename, artifactFile.content), {
-            force: true,
-          })
-          synced = true
+          if (await this._copyPrimaryFile(change, specFile, spec, outputBasename, specRepo)) {
+            synced = true
+          }
         }
       }
 
@@ -291,5 +294,30 @@ export class ArchiveChange {
       postHookFailures,
       staleMetadataSpecPaths: failedMetadataSpecPaths,
     }
+  }
+
+  /**
+   * Copies a primary artifact file from the change directory to the spec repository.
+   *
+   * @param change - The change containing the artifact
+   * @param specFile - The artifact file entry with the filename to load
+   * @param spec - The target spec entity
+   * @param outputBasename - The output filename (e.g. `spec.md`)
+   * @param specRepo - The spec repository to save to
+   * @returns `true` if the file was found and saved, `false` if missing
+   */
+  private async _copyPrimaryFile(
+    change: Change,
+    specFile: ArtifactFile,
+    spec: Spec,
+    outputBasename: string,
+    specRepo: SpecRepository,
+  ): Promise<boolean> {
+    const artifactFile = await this._changes.artifact(change, specFile.filename)
+    if (artifactFile === null) return false
+    await specRepo.save(spec, new SpecArtifact(outputBasename, artifactFile.content), {
+      force: true,
+    })
+    return true
   }
 }
