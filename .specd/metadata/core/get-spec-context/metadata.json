@@ -1,0 +1,195 @@
+{
+  "title": "Get Spec Context",
+  "description": "AI agents and delivery mechanisms need to understand a spec together with everything it depends on, but dependency chains can be deep and metadata may be stale or missing. The `GetSpecContext` use case builds structured context entries for a single spec, optionally following `dependsOn` links transitively, to assemble the full context needed to understand a spec and its dependency chain. Metadata freshness is checked via SHA-256 content hashes; stale or absent metadata produces a minimal entry.",
+  "dependsOn": [
+    "core:core/spec-metadata",
+    "core:core/storage",
+    "core:core/workspace",
+    "core:core/spec-id-format"
+  ],
+  "context": [
+    "AI agents and delivery mechanisms need to understand a spec together with everything it depends on, but dependency chains can be deep and metadata may be stale or missing. The `GetSpecContext` use case builds structured context entries for a single spec, optionally following `dependsOn` links transitively, to assemble the full context needed to understand a spec and its dependency chain. Metadata freshness is checked via SHA-256 content hashes; stale or absent metadata produces a minimal entry."
+  ],
+  "rules": [
+    {
+      "requirement": "Resolve workspace and spec from input",
+      "rules": [
+        "The use case SHALL look up the `SpecRepository` for the given `workspace` name. If the workspace does not exist, it MUST throw a `WorkspaceNotFoundError`. It SHALL then load the spec via `repo.get(specPath)`. If the spec does not exist, it MUST throw a `SpecNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Build context entry from metadata",
+      "rules": [
+        "For each resolved spec, the use case SHALL load all artifact files and attempt to read metadata via `SpecRepository.metadata()`. When metadata exists and content hashes confirm freshness, the entry SHALL include:\n\n- `spec` — display label in `workspace:capabilityPath` format.\n- `stale` — `false`.\n- `title` — from metadata, when present (included only when no section filter is active or all sections requested).\n- `description` — from metadata, when present (same inclusion rule as `title`).\n- `rules` — from metadata, when present and non-empty (included when no section filter or `'rules'` is in `sections`).\n- `constraints` — from metadata, when present and non-empty (included when no section filter or `'constraints'` is in `sections`).\n- `scenarios` — from metadata, when present and non-empty (included when no section filter or `'scenarios'` is in `sections`)."
+      ]
+    },
+    {
+      "requirement": "Stale or absent metadata produces minimal entry",
+      "rules": [
+        "When `SpecRepository.metadata()` returns `null` or content hashes indicate staleness, the use case SHALL return a minimal entry with only `spec` (the label) and `stale: true`. No title, description, rules, constraints, or scenarios SHALL be included."
+      ]
+    },
+    {
+      "requirement": "Section filtering",
+      "rules": [
+        "When `input.sections` is provided and non-empty, the entry MUST include only the listed section types (`'rules'`, `'constraints'`, `'scenarios'`). The `title` and `description` fields SHALL only be included when no section filter is active (i.e. `sections` is `undefined` or empty)."
+      ]
+    },
+    {
+      "requirement": "Transitive dependency traversal",
+      "rules": [
+        "When `input.followDeps` is `true`, the use case SHALL read `dependsOn` from the root spec's metadata and recursively resolve each dependency. Dependency identifiers are parsed via `parseSpecId` using the current workspace as the default. Traversal SHALL use DFS with cycle detection — already-visited spec labels are skipped."
+      ]
+    },
+    {
+      "requirement": "Depth limiting",
+      "rules": [
+        "When `input.depth` is provided and `followDeps` is `true`, the use case MUST NOT traverse beyond the specified depth. Depth 0 means only the root spec is resolved (no dependencies). When `depth` is not provided, traversal is unlimited."
+      ]
+    },
+    {
+      "requirement": "Warnings for unresolvable dependencies",
+      "rules": [
+        "During dependency traversal, the use case SHALL emit warnings (not throw) for:\n\n- Missing metadata on the current spec during traversal — `type: 'missing-metadata'`.\n- Unknown workspace referenced in a dependency — `type: 'unknown-workspace'`.\n- Dependency spec not found in its workspace — `type: 'missing-spec'`.\n- Stale metadata on any resolved entry — `type: 'stale-metadata'`.\n\nWarnings MUST be collected in the result's `warnings` array and MUST NOT interrupt traversal."
+      ]
+    },
+    {
+      "requirement": "Result shape",
+      "rules": [
+        "`GetSpecContextResult` MUST include:\n\n- `entries` — ordered array of `SpecContextEntry` objects (root first, then dependencies in DFS order).\n- `warnings` — array of `ContextWarning` objects accumulated during resolution."
+      ]
+    }
+  ],
+  "constraints": [
+    "The use case receives a ReadonlyMap<string, SpecRepository> — it MUST NOT modify the map or the repositories.",
+    "Cycle detection uses the workspace:capabilityPath label as the identity key.",
+    "The root spec is always included as the first entry, even if its metadata is stale.",
+    "Empty sections array is treated the same as undefined (show all)."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Resolve workspace and spec from input",
+      "name": "Unknown workspace throws WorkspaceNotFoundError",
+      "when": ["execute({ workspace: 'nonexistent', specPath }) is called"],
+      "then": ["a WorkspaceNotFoundError is thrown"]
+    },
+    {
+      "requirement": "Resolve workspace and spec from input",
+      "name": "Spec not found throws SpecNotFoundError",
+      "given": ["a valid workspace with no spec at the requested path"],
+      "when": ["execute(input) is called"],
+      "then": ["a SpecNotFoundError is thrown"]
+    },
+    {
+      "requirement": "Build context entry from metadata",
+      "name": "Fresh metadata produces full entry",
+      "given": [
+        "a spec with fresh metadata containing title, description, rules, constraints, and scenarios"
+      ],
+      "when": ["execute(input) is called without section filters"],
+      "then": [
+        "the entry has stale: false and includes title, description, rules, constraints, and scenarios"
+      ]
+    },
+    {
+      "requirement": "Build context entry from metadata",
+      "name": "Empty rules/constraints/scenarios omitted from entry",
+      "given": ["a spec with fresh metadata where rules is an empty array"],
+      "when": ["execute(input) is called"],
+      "then": ["the entry does not include a rules field"]
+    },
+    {
+      "requirement": "Stale or absent metadata produces minimal entry",
+      "name": "No metadata yields stale entry",
+      "given": ["a spec with no metadata"],
+      "when": ["execute(input) is called"],
+      "then": ["the entry has stale: true and only spec and stale fields"]
+    },
+    {
+      "requirement": "Stale or absent metadata produces minimal entry",
+      "name": "Stale hashes yield stale entry",
+      "given": ["a spec with metadata whose content hashes do not match current files"],
+      "when": ["execute(input) is called"],
+      "then": ["the entry has stale: true", "AND a warning of type 'stale-metadata' is emitted"]
+    },
+    {
+      "requirement": "Section filtering",
+      "name": "Only requested sections included",
+      "given": ["a spec with fresh metadata containing rules, constraints, and scenarios"],
+      "when": ["execute({ ..., sections: ['rules'] }) is called"],
+      "then": ["the entry includes rules but not constraints, scenarios, title, or description"]
+    },
+    {
+      "requirement": "Section filtering",
+      "name": "Empty sections array shows all",
+      "when": ["execute({ ..., sections: [] }) is called"],
+      "then": ["the entry includes all available fields (same as no filter)"]
+    },
+    {
+      "requirement": "Transitive dependency traversal",
+      "name": "Dependencies resolved recursively",
+      "given": ["spec A depends on spec B, which depends on spec C, all with fresh metadata"],
+      "when": ["execute({ ..., followDeps: true }) is called on spec A"],
+      "then": ["entries contains A, B, and C in that order"]
+    },
+    {
+      "requirement": "Transitive dependency traversal",
+      "name": "Circular dependency does not cause infinite loop",
+      "given": ["spec A depends on spec B, and spec B depends on spec A"],
+      "when": ["execute({ ..., followDeps: true }) is called on spec A"],
+      "then": ["entries contains A and B (each visited once)"]
+    },
+    {
+      "requirement": "Transitive dependency traversal",
+      "name": "Dependencies not followed when followDeps is false",
+      "given": ["a spec with dependsOn links in its metadata"],
+      "when": ["execute(input) is called without followDeps"],
+      "then": ["entries contains only the root spec"]
+    },
+    {
+      "requirement": "Depth limiting",
+      "name": "Depth 0 returns only root",
+      "given": ["spec A depends on spec B"],
+      "when": ["execute({ ..., followDeps: true, depth: 0 }) is called"],
+      "then": ["entries contains only spec A"]
+    },
+    {
+      "requirement": "Depth limiting",
+      "name": "Depth 1 returns root and direct deps only",
+      "given": ["spec A depends on spec B, which depends on spec C"],
+      "when": ["execute({ ..., followDeps: true, depth: 1 }) is called"],
+      "then": ["entries contains A and B but not C"]
+    },
+    {
+      "requirement": "Warnings for unresolvable dependencies",
+      "name": "Unknown workspace in dependency emits warning",
+      "given": ["a spec whose metadata references dependsOn: ['unknown-ws:some/spec']"],
+      "when": ["execute({ ..., followDeps: true }) is called"],
+      "then": [
+        "warnings contains an entry with type: 'unknown-workspace'",
+        "AND traversal continues for remaining dependencies"
+      ]
+    },
+    {
+      "requirement": "Warnings for unresolvable dependencies",
+      "name": "Missing dependency spec emits warning",
+      "given": [
+        "a spec whose metadata references a dependency that does not exist in the target workspace"
+      ],
+      "when": ["execute({ ..., followDeps: true }) is called"],
+      "then": ["warnings contains an entry with type: 'missing-spec'"]
+    },
+    {
+      "requirement": "Warnings for unresolvable dependencies",
+      "name": "Missing metadata during traversal emits warning",
+      "given": ["a dependency spec with no metadata"],
+      "when": ["dependency traversal reaches that spec"],
+      "then": ["warnings contains an entry with type: 'missing-metadata'"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:a63426ccf6fce5d32816350fbb318e996634c07a106482f84dff289e0168ed03",
+    "verify.md": "sha256:50d9862aa3afe7af017529ae37ffc27b92ad4c8a8a48241f8216a28f1d753b66"
+  },
+  "generatedBy": "core"
+}

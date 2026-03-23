@@ -1,0 +1,103 @@
+{
+  "title": "Project Update",
+  "description": "After upgrading specd, installed skill files and other project artifacts can fall out of sync with the new package version. The `specd project update` command provides a single entry point for post-upgrade maintenance; in v1 it runs `specd skills update` for all agents declared in `specd.yaml`, and is designed so future tasks (plugin sync, config migration, etc.) can be added without changing the user's workflow.",
+  "dependsOn": ["cli:cli/entrypoint", "cli:cli/skills-update", "core:core/config"],
+  "context": [
+    "After upgrading specd, installed skill files and other project artifacts can fall out of sync with the new package version. The `specd project update` command provides a single entry point for post-upgrade maintenance; in v1 it runs `specd skills update` for all agents declared in `specd.yaml`, and is designed so future tasks (plugin sync, config migration, etc.) can be added without changing the user's workflow."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd project update [--format text|json|toon]\n```\n\n- `--format text|json|toon` — optional; output format, defaults to `text`."
+      ]
+    },
+    {
+      "requirement": "Skills update step",
+      "rules": [
+        "The command runs the skills update logic for all agents recorded in `specd.yaml`'s `skills` section (equivalent to `specd skills update` with no `--agent` filter). All behaviour defined in the `skills update` spec applies: missing-skill warnings, no-skills output, idempotent overwrites."
+      ]
+    },
+    {
+      "requirement": "Output on success",
+      "rules": [
+        "In `text` mode, the command prefixes each sub-step's output with a step label:\n\n```\nskills: updated my-skill → /path/to/.claude/commands/my-skill.md\nskills: updated my-other-skill → /path/to/.claude/commands/my-other-skill.md\n```\n\nIf there is nothing to update (no skills recorded, all steps are no-ops), the command prints `project is up to date` and exits with code 0.\n\nIn `json` or `toon` mode, the output is an object grouping results by step:\n\n```json\n{ \"skills\": [{ \"name\": \"...\", \"path\": \"...\", \"status\": \"updated|skipped\", \"warning\": \"...\" }] }\n```"
+      ]
+    },
+    {
+      "requirement": "Partial failure",
+      "rules": [
+        "If the skills update step produces warnings (skill no longer in bundle), those warnings are printed to stderr as they are in `specd skills update`. The command still exits with code 0. No step causes a non-zero exit in v1."
+      ]
+    }
+  ],
+  "constraints": [
+    "specd project update requires an existing specd.yaml; if none is found it exits with code 1 with an error: message",
+    "In v1 the only update step is skills; future versions may add plugin sync, config schema migration, etc.",
+    "The command does not modify specd.yaml itself — it only updates file-system artifacts (skill files) recorded in it"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Skills update step",
+      "name": "Recorded skills are reinstalled",
+      "given": ["specd.yaml records skills.claude: [my-skill]"],
+      "when": ["specd project update is run"],
+      "then": [
+        ".claude/commands/my-skill.md is overwritten with the current bundle content",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Skills update step",
+      "name": "Skill no longer in bundle generates warning but does not fail",
+      "given": [
+        "specd.yaml lists old-skill under skills.claude",
+        "AND old-skill is not present in the current @specd/skills bundle"
+      ],
+      "when": ["specd project update is run"],
+      "then": ["stderr contains a warning about old-skill", "AND the process exits with code 0"]
+    },
+    {
+      "requirement": "Output on success",
+      "name": "Text output is prefixed with step name",
+      "when": ["specd project update succeeds with one skill recorded"],
+      "then": ["stdout contains a line starting with skills: followed by the updated skill info"]
+    },
+    {
+      "requirement": "Output on success",
+      "name": "Nothing to update prints up-to-date message",
+      "given": ["specd.yaml has no skills section"],
+      "when": ["specd project update is run"],
+      "then": ["stdout contains project is up to date", "AND the process exits with code 0"]
+    },
+    {
+      "requirement": "Output on success",
+      "name": "JSON output groups results by step",
+      "when": ["specd project update --format json succeeds"],
+      "then": ["stdout is valid JSON with a skills array containing result objects"]
+    },
+    {
+      "requirement": "Partial failure",
+      "name": "Warnings from skills update do not change exit code",
+      "given": ["one skill is current and one is missing from the bundle"],
+      "when": ["specd project update is run"],
+      "then": [
+        "the current skill is updated",
+        "AND the missing skill warning is printed to stderr",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Partial failure",
+      "name": "Missing specd.yaml exits with error",
+      "given": ["there is no specd.yaml discoverable from the CWD"],
+      "when": ["specd project update is run"],
+      "then": ["the command exits with code 1", "AND stderr contains an error: message"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:2fa732a04f5dd21f049a723d11c6051f23785deb92e0c205ccfb0d3e0f86b8e7",
+    "verify.md": "sha256:5eca73ac38e4e1eeb855d02b0ad671ee37d8a4a48e9b9891d781aa72a4d29f70"
+  },
+  "generatedBy": "core"
+}

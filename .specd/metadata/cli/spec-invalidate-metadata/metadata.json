@@ -1,0 +1,76 @@
+{
+  "title": "Spec Invalidate-Metadata",
+  "description": "Sometimes metadata needs to be forcibly marked stale without deleting the file or losing fields like `dependsOn`. The `specd spec invalidate-metadata` command marks a spec's metadata as stale by removing its `contentHashes` field, forcing regeneration on the next pass.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "core:core/invalidate-spec-metadata"
+  ],
+  "context": [
+    "Sometimes metadata needs to be forcibly marked stale without deleting the file or losing fields like `dependsOn`. The `specd spec invalidate-metadata` command marks a spec's metadata as stale by removing its `contentHashes` field, forcing regeneration on the next pass."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "The command is registered as `invalidate-metadata <specPath>` on the `spec` parent command. It accepts:\n\n- `--format <fmt>` — output format: `text|json|toon` (default `text`)\n- `--config <path>` — path to `specd.yaml`\n\nThe `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands."
+      ]
+    },
+    {
+      "requirement": "Text output",
+      "rules": ["On success, text format outputs: `invalidated metadata for <workspace:path>`"]
+    },
+    {
+      "requirement": "JSON output",
+      "rules": [
+        "On success, JSON format outputs: `{ \"result\": \"ok\", \"spec\": \"<workspace:path>\" }`"
+      ]
+    },
+    {
+      "requirement": "Error — spec not found or no metadata",
+      "rules": [
+        "If the spec does not exist, or has no metadata, the command writes `error: spec '<specPath>' not found or has no metadata` to stderr and exits with code 1."
+      ]
+    }
+  ],
+  "constraints": [
+    "The command contains no business logic — all work is delegated to the InvalidateSpecMetadata use case",
+    "The command never reads or writes the filesystem directly for spec content — it uses the kernel"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Text output",
+      "name": "Successful invalidation in text format",
+      "when": ["the invalidation succeeds and format is text"],
+      "then": ["the command outputs invalidated metadata for default:auth/login"]
+    },
+    {
+      "requirement": "JSON output",
+      "name": "Successful invalidation in JSON format",
+      "when": ["the invalidation succeeds and format is json"],
+      "then": ["the command outputs { \"result\": \"ok\", \"spec\": \"default:auth/login\" }"]
+    },
+    {
+      "requirement": "Error — spec not found or no metadata",
+      "name": "Unknown spec exits 1",
+      "when": ["the spec does not exist in the workspace"],
+      "then": [
+        "the command writes error: spec '<specPath>' not found or has no metadata to stderr and exits with code 1"
+      ]
+    },
+    {
+      "requirement": "Error — spec not found or no metadata",
+      "name": "No metadata exits 1",
+      "given": ["a spec that exists but has no metadata"],
+      "when": ["specd spec invalidate-metadata auth/login is invoked"],
+      "then": [
+        "the command writes error: spec 'auth/login' not found or has no metadata to stderr and exits with code 1"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:e4374e88211e136124d0ebe41d0f9dd67754c08223a232c3e270a31a45080be7",
+    "verify.md": "sha256:d4f845d03485a832ab1a354954ad38baf27a5a6d51c02bf198e1ccaa148d9f4d"
+  },
+  "generatedBy": "core"
+}

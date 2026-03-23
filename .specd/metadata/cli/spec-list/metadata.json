@@ -1,0 +1,253 @@
+{
+  "title": "Spec List",
+  "description": "Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. The `specd spec list` command lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.",
+  "dependsOn": ["cli:cli/entrypoint"],
+  "context": [
+    "Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. The `specd spec list` command lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd spec list [--summary] [--metadata-status [filter]] [--format text|json|toon]\n```\n\n- `--summary` — optional flag; when present, a short summary is included for each spec alongside the title\n- `--metadata-status` — optional flag with optional filter value; when present, a metadata-freshness METADATA STATUS column is included for each spec\n  - Without a filter value (`--metadata-status`), all specs are shown with their status\n  - With a comma-separated filter value (`--metadata-status stale`, `--metadata-status stale,missing`), only specs matching at least one of the listed statuses are shown\n  - Valid filter tokens: `fresh`, `stale`, `missing`, `invalid`\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+      ]
+    },
+    {
+      "requirement": "Title resolution",
+      "rules": [
+        "Every spec row always includes a title, resolved in this order:\n\n1. `title` field from the spec's `.specd-metadata.yaml`, if present and non-empty\n2. Fallback: the last segment of the capability-path (e.g. `auth/login` → `login`)\n\nTitle resolution is performed by `@specd/core` — the CLI receives the resolved value."
+      ]
+    },
+    {
+      "requirement": "Summary resolution",
+      "rules": [
+        "When `--summary` is passed, a short summary is included for each spec, resolved in this order:\n\n1. `description` field from the spec's `.specd-metadata.yaml`, if present and non-empty\n2. Fallback: extracted from `spec.md` using this priority order (first match wins):\n   a. First non-empty paragraph immediately after the `# H1` heading\n   b. Body of the first section matching `## Overview`, `## Summary`, or `## Purpose` (first paragraph only)\n3. If no summary can be extracted, the field is omitted in `text` mode and `null` in `json`/`toon` mode\n\nSummary extraction from `spec.md` is performed by `@specd/core` as a pure function — the CLI does not contain Markdown parsing logic."
+      ]
+    },
+    {
+      "requirement": "Status resolution",
+      "rules": [
+        "When `--metadata-status` is passed, each spec receives a metadata-freshness status, determined as follows:\n\n1. If the spec has no `.specd-metadata.yaml` file → `missing`\n2. If the metadata file exists but fails structural validation against `specMetadataSchema` → `invalid`\n3. If the metadata exists but has no `contentHashes` field (or it is empty) → `stale`\n4. If any recorded hash in `contentHashes` does not match the SHA-256 hash of the current artifact file → `stale`\n5. If a file listed in `contentHashes` no longer exists → `stale`\n6. Otherwise → `fresh`\n\nWhen a filter value is provided (e.g. `--metadata-status stale,missing`), only specs whose status matches at least one of the filter tokens are included in the output. Tokens are case-insensitive and comma-separated.\n\nStatus resolution is performed by `@specd/core` — the CLI receives the resolved value."
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "rules": [
+        "In `text` mode (default), specs are grouped by workspace. Each group is rendered as a table:\n\n- The workspace name is printed as a bold title line above the table.\n- Each workspace group begins with an inverse-video workspace header row: `  workspace: <name>  `, padded to the same inner width as the column header row below it.\n- Immediately below the workspace header is an inverse-video column header row. The header includes columns depending on which flags are passed: `PATH  TITLE` (default), with `METADATA STATUS` appended when `--metadata-status` is present, and `SUMMARY` appended when `--summary` is present.\n- Data rows list one spec per line. The PATH column displays the fully-qualified spec identifier `workspace:capability-path` (e.g. `default:auth/login`). All columns are aligned to globally fixed widths (computed across all entries in all workspaces).\n- When `--metadata-status` is passed, a `METADATA STATUS` column appears after `TITLE`, showing `fresh`, `stale`, `missing`, or `invalid`.\n- When `--summary` is passed, `SUMMARY` follows as an additional aligned column using wrap overflow (capped at 60 characters).\n- Workspace groups are separated by a blank line.\n\n```\n  workspace: default\n  PATH                      TITLE\n  default:<capability-path>  <title>\n  default:<capability-path>  <title>\n\n  workspace: default  (with --metadata-status)\n  PATH                      TITLE     METADATA STATUS\n  default:<capability-path>  <title>  fresh\n  default:<capability-path>  <title>  stale\n  default:<capability-path>  <title>  missing\n\n  workspace: default  (with --summary)\n  PATH                      TITLE    SUMMARY\n  default:<capability-path>  <title>  <summary>\n  default:<capability-path>  <title>\n\n  workspace: default  (with --metadata-status --summary)\n  PATH                      TITLE    METADATA STATUS   SUMMARY\n  default:<capability-path>  <title>  fresh    <summary>\n  default:<capability-path>  <title>  stale\n```\n\nIn `json` or `toon` mode, each spec entry is an object. The `path` field uses the fully-qualified `workspace:capability-path` format:\n\n```json\n{\n  \"workspaces\": [\n    {\n      \"name\": \"...\",\n      \"specs\": [\n        {\n          \"path\": \"workspace:cap/path\",\n          \"title\": \"...\",\n          \"metadataStatus\": \"fresh\",\n          \"summary\": \"...\"\n        }\n      ]\n    }\n  ]\n}\n```\n\nWhen `--summary` is not passed, `summary` is omitted from text rows and from JSON/toon objects. When `--summary` is passed but no summary is available for a spec, the text row shows the title only and the JSON/toon object omits `summary` (does not include `null`).\n\nWhen `--metadata-status` is not passed, `metadataStatus` is omitted from JSON/toon objects. When `--metadata-status` is passed, `metadataStatus` is always present as a string (`\"fresh\"`, `\"stale\"`, `\"missing\"`, or `\"invalid\"`)."
+      ]
+    },
+    {
+      "requirement": "Empty output",
+      "rules": [
+        "If a workspace has no specs, its heading is still printed in text mode followed by `  (none)`. In JSON/toon mode it appears as `{\"name\": \"...\", \"specs\": []}`.\n\nIf there are no workspaces configured, the command prints `no workspaces configured` and exits with code 0."
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "rules": ["If the spec filesystem cannot be read (I/O error), exits with code 3."]
+    }
+  ],
+  "constraints": [
+    "No filtering by workspace or prefix in v1",
+    "All configured workspaces are listed, even empty ones",
+    "Title resolution, summary extraction, and status resolution are all implemented in @specd/core, not in the CLI",
+    "Summary is never a hard error — if extraction fails for any reason, the spec is still listed without it",
+    "Status resolution errors (I/O failures reading artifacts for hashing) result in stale status, not a hard error"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Title resolution",
+      "name": "Title from metadata",
+      "given": ["default:auth/login has .specd-metadata.yaml with title: \"Login Flow\""],
+      "when": ["specd spec list is run"],
+      "then": ["the row for default:auth/login shows Login Flow as its title"]
+    },
+    {
+      "requirement": "Title resolution",
+      "name": "Title fallback to last path segment",
+      "given": ["default:auth/login has no .specd-metadata.yaml or its title field is absent"],
+      "when": ["specd spec list is run"],
+      "then": ["the row for default:auth/login shows login as its title"]
+    },
+    {
+      "requirement": "Summary resolution",
+      "name": "Summary from metadata description",
+      "given": ["default:auth/login has .specd-metadata.yaml with description: \"Handles login\""],
+      "when": ["specd spec list --summary is run"],
+      "then": ["the row for default:auth/login shows Handles login as its summary"]
+    },
+    {
+      "requirement": "Summary resolution",
+      "name": "Summary fallback — paragraph after H1",
+      "given": [
+        "default:auth/login has no metadata description but spec.md begins with # Auth Login\\n\\nHandles the login flow.\\n\\n## Overview"
+      ],
+      "when": ["specd spec list --summary is run"],
+      "then": ["the row for default:auth/login shows Handles the login flow. as its summary"]
+    },
+    {
+      "requirement": "Summary resolution",
+      "name": "Summary fallback — Overview section",
+      "given": [
+        "default:auth/login has no metadata description and spec.md has no paragraph after the H1, but has ## Overview\\n\\nManages authentication."
+      ],
+      "when": ["specd spec list --summary is run"],
+      "then": ["the row for default:auth/login shows Manages authentication. as its summary"]
+    },
+    {
+      "requirement": "Summary resolution",
+      "name": "No summary available",
+      "given": [
+        "default:auth/login has no metadata description and spec.md has no extractable summary"
+      ],
+      "when": ["specd spec list --summary is run"],
+      "then": [
+        "the row for default:auth/login shows the title only, with no summary text",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Summary resolution",
+      "name": "Summary not shown without flag",
+      "given": ["default:auth/login has metadata with a description"],
+      "when": ["specd spec list is run without --summary"],
+      "then": ["the row for default:auth/login does not include any summary text"]
+    },
+    {
+      "requirement": "Status resolution",
+      "name": "Status fresh when all hashes match",
+      "given": [
+        "default:auth/login has .specd-metadata.yaml with contentHashes whose SHA-256 values match the current spec.md and verify.md files"
+      ],
+      "when": ["specd spec list --metadata-status is run"],
+      "then": ["the row for default:auth/login shows fresh as its status"]
+    },
+    {
+      "requirement": "Status resolution",
+      "name": "Status stale when hash differs",
+      "given": [
+        "default:auth/login has .specd-metadata.yaml with a contentHashes entry for spec.md whose recorded hash does not match the current file content"
+      ],
+      "when": ["specd spec list --metadata-status is run"],
+      "then": ["the row for default:auth/login shows stale as its status"]
+    },
+    {
+      "requirement": "Status resolution",
+      "name": "Status missing when no metadata file",
+      "given": ["default:auth/login has no .specd-metadata.yaml file"],
+      "when": ["specd spec list --metadata-status is run"],
+      "then": ["the row for default:auth/login shows missing as its status"]
+    },
+    {
+      "requirement": "Status resolution",
+      "name": "Status stale when contentHashes absent",
+      "given": ["default:auth/login has .specd-metadata.yaml but no contentHashes field"],
+      "when": ["specd spec list --metadata-status is run"],
+      "then": ["the row for default:auth/login shows stale as its status"]
+    },
+    {
+      "requirement": "Status resolution",
+      "name": "Status invalid when metadata fails structural validation",
+      "given": [
+        "default:auth/login has .specd-metadata.yaml with keywords: [123] (invalid type per strict schema)"
+      ],
+      "when": ["specd spec list --metadata-status is run"],
+      "then": ["the row for default:auth/login shows invalid as its status"]
+    },
+    {
+      "requirement": "Status resolution",
+      "name": "Status not shown without flag",
+      "given": ["default:auth/login has .specd-metadata.yaml"],
+      "when": ["specd spec list is run without --metadata-status"],
+      "then": ["the row for default:auth/login does not include any status text"]
+    },
+    {
+      "requirement": "Status resolution",
+      "name": "Filter by single status",
+      "given": ["the project has three specs: one fresh, one stale, one missing"],
+      "when": ["specd spec list --metadata-status stale is run"],
+      "then": ["only the spec with stale status is shown"]
+    },
+    {
+      "requirement": "Status resolution",
+      "name": "Filter by multiple statuses",
+      "given": ["the project has three specs: one fresh, one stale, one missing"],
+      "when": ["specd spec list --metadata-status stale,missing is run"],
+      "then": ["the stale and missing specs are shown", "AND the fresh spec is not shown"]
+    },
+    {
+      "requirement": "Status resolution",
+      "name": "JSON output with status",
+      "given": ["workspace default has spec auth/login with fresh metadata"],
+      "when": ["specd spec list --metadata-status --format json is run"],
+      "then": ["the entry for default:auth/login has \"metadataStatus\": \"fresh\""]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Specs listed per workspace with title",
+      "given": [
+        "the project has workspace default with specs auth/login (title Login) and auth/register (title Register)"
+      ],
+      "when": ["specd spec list is run"],
+      "then": [
+        "stdout shows default followed by rows containing default:auth/login  Login and default:auth/register  Register",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Specs in lexicographic order within workspace",
+      "given": ["the default workspace contains specs z/spec, a/spec, and m/spec"],
+      "when": ["specd spec list is run"],
+      "then": [
+        "the specs are listed in alphabetical order: default:a/spec, default:m/spec, default:z/spec"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output without --summary",
+      "given": ["workspace default has spec auth/login with title Login"],
+      "when": ["specd spec list --format json is run"],
+      "then": [
+        "stdout is valid JSON with workspaces[0].specs[0] having path equal to \"default:auth/login\" and title but no summary key"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output with --summary and available summary",
+      "given": [
+        "workspace default has spec auth/login with title Login and description Handles login"
+      ],
+      "when": ["specd spec list --summary --format json is run"],
+      "then": [
+        "stdout is valid JSON with workspaces[0].specs[0] having path equal to \"default:auth/login\", title, and summary equal to \"Handles login\""
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output with --summary but no summary available",
+      "given": ["workspace default has spec auth/register with no extractable summary"],
+      "when": ["specd spec list --summary --format json is run"],
+      "then": ["the entry for default:auth/register has path and title but no summary key"]
+    },
+    {
+      "requirement": "Empty output",
+      "name": "Workspace with no specs",
+      "given": ["the billing workspace exists but has no specs"],
+      "when": ["specd spec list is run"],
+      "then": ["stdout shows the billing heading followed by   (none)"]
+    },
+    {
+      "requirement": "Empty output",
+      "name": "No workspaces at all",
+      "given": ["specd.yaml has no workspaces configured"],
+      "when": ["specd spec list is run"],
+      "then": ["stdout contains no workspaces configured", "AND the process exits with code 0"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:3f7d681c1cc79dfa8076a1bbcf6318b65a3759d661a6655367751cb9ab918b34",
+    "verify.md": "sha256:071f71184904847d961fc3afd3e760d619cddc15ff0201634ea24c38dfb84967"
+  },
+  "generatedBy": "core"
+}

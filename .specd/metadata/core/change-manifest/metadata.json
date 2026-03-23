@@ -1,0 +1,172 @@
+{
+  "title": "Change Manifest",
+  "description": "The Change entity's state must survive process restarts and be recoverable from disk alone, so there needs to be a single, well-defined file that captures everything. The change manifest (`manifest.json`) is that file — it persists identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It lives inside the change's directory and is written and read exclusively by `FsChangeRepository`.",
+  "dependsOn": [
+    "core:core/change",
+    "core:core/storage",
+    "core:core/spec-metadata",
+    "core:core/spec-id-format",
+    "core:core/workspace"
+  ],
+  "context": [
+    "The Change entity's state must survive process restarts and be recoverable from disk alone, so there needs to be a single, well-defined file that captures everything. The change manifest (`manifest.json`) is that file — it persists identity, specs, artifacts, and the complete event history from which lifecycle state is derived. It lives inside the change's directory and is written and read exclusively by `FsChangeRepository`."
+  ],
+  "rules": [
+    {
+      "requirement": "Manifest structure",
+      "rules": [
+        "Each change is persisted as a `manifest.json` file inside its change directory. Its top-level structure is:\n\n```jsonc\n// manifest.json\n{\n  \"name\": \"add-auth-flow\",\n  \"createdAt\": \"2024-03-15T10:00:00.000Z\",\n  \"schema\": {\n    \"name\": \"@specd/schema-std\",\n    \"version\": 2,\n  },\n  \"specIds\": [\"default:auth/login\", \"default:auth/register\"],\n  \"artifacts\": [\n    {\n      \"type\": \"proposal\",\n      \"optional\": false,\n      \"requires\": [],\n      \"files\": [\n        { \"key\": \"proposal\", \"filename\": \"proposal.md\", \"validatedHash\": \"sha256:abc123...\" },\n      ],\n    },\n    {\n      \"type\": \"specs\",\n      \"optional\": false,\n      \"requires\": [\"proposal\"],\n      \"files\": [\n        {\n          \"key\": \"default:auth/login\",\n          \"filename\": \"specs/default/auth/login/spec.md\",\n          \"validatedHash\": null,\n        },\n        {\n          \"key\": \"default:auth/register\",\n          \"filename\": \"specs/default/auth/register/spec.md\",\n          \"validatedHash\": null,\n        },\n      ],\n    },\n    {\n      \"type\": \"design\",\n      \"optional\": true,\n      \"requires\": [\"proposal\"],\n      \"files\": [\n        { \"key\": \"design\", \"filename\": \"design.md\", \"validatedHash\": \"__skipped__\" }, // optional artifact explicitly not produced\n      ],\n    },\n  ],\n  \"history\": [\n    {\n      \"type\": \"created\",\n      \"at\": \"2024-03-15T10:00:00.000Z\",\n      \"by\": { \"name\": \"Alice\", \"email\": \"alice@example.com\" },\n      \"specIds\": [\"auth/login\", \"auth/register\"],\n      \"schemaName\": \"@specd/schema-std\",\n      \"schemaVersion\": 2,\n    },\n    {\n      \"type\": \"transitioned\",\n      \"at\": \"2024-03-15T10:01:00.000Z\",\n      \"by\": { \"name\": \"Alice\", \"email\": \"alice@example.com\" },\n      \"from\": \"drafting\",\n      \"to\": \"designing\",\n    },\n  ],\n}\n```\n\nField definitions:\n\n- **`name`** — the change slug; immutable after creation\n- **`createdAt`** — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix\n- **`schema`** — `name` (string) and `version` (integer) of the schema active at creation; written once, never updated\n- **`workspaces`** — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from `specIds` via `parseSpecId()`\n- **`specIds`** — current snapshot of spec IDs; mutable\n- **`specDependsOn`** (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's declared dependencies. Captured at authoring time to ensure dependencies are tracked even before metadata is generated. Omitted from the manifest when empty.\n- **`artifacts`** — array of artifact descriptors. Each artifact has `type`, `optional`, `requires`, and a `files` array of `ManifestArtifactFile` entries. Each file entry has `key` (artifact type id for `scope: change`, spec ID for `scope: spec`), `filename` (relative path), and `validatedHash` (`null` when not validated, a SHA-256 string when validated, or `\"__skipped__\"` when explicitly skipped). `ArtifactStatus` is never stored — it is derived at load time from `validatedHash` and file presence\n- **`history`** — append-only array of typed events. The event types, their semantics, and the derivation rules (current state, active approval, draft status) are defined in [`specs/core/change/spec.md` — Requirement: History and event sourcing](../change/spec.md). This section defines only the JSON serialization of those events. The current lifecycle state is derived from the most recent `transitioned` event's `to` field.\n\nThe JSON serialization of each event type is:\n\n```jsonc\n// state transition\n{ \"type\": \"transitioned\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"from\": \"drafting\", \"to\": \"designing\" }\n\n// spec gate approved\n{ \"type\": \"spec-approved\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"reason\": \"LGTM\", \"artifactHashes\": { \"proposal\": \"sha256:...\", \"specs\": \"sha256:...\" } }\n\n// signoff gate passed\n{ \"type\": \"signed-off\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"reason\": \"Ship it\", \"artifactHashes\": { \"proposal\": \"sha256:...\", \"specs\": \"sha256:...\" } }\n\n// approval invalidated (prior spec-approved/signed-off events are superseded)\n{ \"type\": \"invalidated\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"cause\": \"spec-change\" }\n// cause values: \"spec-change\" | \"artifact-change\"\n\n// shelved to drafts/\n{ \"type\": \"drafted\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"reason\": \"parking for now\" }\n\n// restored from drafts/\n{ \"type\": \"restored\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" } }\n\n// optional artifact explicitly marked as not produced\n{ \"type\": \"artifact-skipped\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"artifactId\": \"design\", \"reason\": \"not needed for this change\" }\n\n// artifact sync reconciled the artifact map against the schema\n{ \"type\": \"artifacts-synced\", \"at\": \"...\", \"by\": { \"name\": \"specd\", \"email\": \"system@specd.dev\" }, \"typesAdded\": [\"tasks\"], \"typesRemoved\": [], \"filesAdded\": [{ \"type\": \"specs\", \"key\": \"default:auth/register\" }], \"filesRemoved\": [] }\n\n// permanently abandoned\n{ \"type\": \"discarded\", \"at\": \"...\", \"by\": { \"name\": \"...\", \"email\": \"...\" }, \"reason\": \"superseded\", \"supersededBy\": [\"new-auth-flow\"] }\n```"
+      ]
+    },
+    {
+      "requirement": "Schema version",
+      "rules": [
+        "`schema.name` is the value of the `schema` field from `specd.yaml` at creation time. `schema.version` is the `version` integer from the schema's `schema.yaml`. Both are written once at change creation and never updated.\n\nWhen a change is loaded and the active schema's name or version differs from what is recorded in the manifest, specd must emit a warning. The change remains usable — the warning is advisory, not a hard error. Archiving a change with a schema version mismatch must still be possible; the warning surfaces the mismatch so the user can decide whether to proceed."
+      ]
+    },
+    {
+      "requirement": "Atomic writes",
+      "rules": [
+        "The manifest must be written atomically — by writing to a temporary file and then renaming it into place — to prevent partial reads if the process is interrupted mid-write."
+      ]
+    }
+  ],
+  "constraints": [
+    "ArtifactStatus is never stored in the manifest — it is always derived from validatedHash and file presence at load time",
+    "validatedHash has three valid values: null (not yet validated), a SHA-256 string (validated), or \"__skipped__\" (optional artifact explicitly not produced)",
+    "The manifest has no state field; the current lifecycle state is always derived from the history array at load time",
+    "The history array is append-only — existing events must never be modified or removed by any operation",
+    "The schema field is written once at creation and must never be updated by subsequent operations"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Manifest structure",
+      "name": "Manifest written on creation",
+      "when": ["a new change add-auth-flow is created"],
+      "then": [
+        "a manifest.json is written containing name, createdAt, schema, specIds, artifacts, and a history array with a single created event"
+      ]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "No state field in manifest",
+      "when": ["a manifest is read from disk"],
+      "then": [
+        "there is no top-level state field; the current state is derived by reading the to field of the last transitioned event in history"
+      ]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "History never shrinks",
+      "when": ["a manifest is loaded, modified (e.g. workspace added), and saved"],
+      "then": [
+        "the history array on disk has more entries than before — no existing events are missing or reordered"
+      ]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "Artifact validated hash stored",
+      "when": ["ValidateArtifacts marks an artifact complete with hash sha256:abc"],
+      "then": [
+        "the manifest's artifacts entry for that type has validatedHash: \"sha256:abc\" and no status field"
+      ]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "validatedHash is null for unvalidated artifact",
+      "when": ["an artifact exists in artifacts but has never been validated"],
+      "then": ["its validatedHash is null in the manifest"]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "validatedHash is sentinel for skipped artifact",
+      "when": ["an optional artifact is explicitly marked as not produced"],
+      "then": ["its validatedHash is \"__skipped__\" in the manifest and no status field is stored"]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "artifact-skipped event serialized in history",
+      "when": ["an optional artifact is skipped with reason \"not needed for this change\""],
+      "then": [
+        "the history contains { \"type\": \"artifact-skipped\", \"artifactId\": \"design\", \"reason\": \"not needed for this change\", \"at\": \"...\", \"by\": { ... } }"
+      ]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "validatedHash cleared on invalidation",
+      "given": [
+        "one artifact with validatedHash: \"sha256:abc\" and one with validatedHash: \"__skipped__\""
+      ],
+      "when": ["an invalidated event is appended"],
+      "then": ["both validatedHash values are set to null in the manifest — rollback is uniform"]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "specDependsOn does not invalidate approvals",
+      "when": ["specDependsOn is updated on a change that has an active spec-approved event"],
+      "then": ["no invalidated event is appended and the approval remains active"]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "Manifest with specDependsOn round-trips correctly",
+      "when": [
+        "a manifest is saved with specDependsOn: { \"auth/login\": [\"auth/shared\", \"auth/jwt\"] }",
+        "AND the manifest is loaded back"
+      ],
+      "then": ["change.specDependsOn.get(\"auth/login\") returns [\"auth/shared\", \"auth/jwt\"]"]
+    },
+    {
+      "requirement": "Manifest structure",
+      "name": "Manifest without specDependsOn loads with empty dependencies",
+      "when": ["a manifest is loaded that has no specDependsOn field"],
+      "then": ["change.specDependsOn is an empty map"]
+    },
+    {
+      "requirement": "Schema version",
+      "name": "Schema unchanged",
+      "when": [
+        "a change is loaded and its manifest schema matches the active schema name and version"
+      ],
+      "then": ["no warning is emitted"]
+    },
+    {
+      "requirement": "Schema version",
+      "name": "Schema version bumped",
+      "when": [
+        "a change is loaded and the active schema has a higher version than recorded in the manifest"
+      ],
+      "then": [
+        "specd emits a warning indicating the schema has changed since the change was created and the user should review whether the change artifacts are still compatible"
+      ]
+    },
+    {
+      "requirement": "Schema version",
+      "name": "Schema name changed",
+      "when": [
+        "a change is loaded and the active schema name differs from the one recorded in the manifest"
+      ],
+      "then": ["specd emits a warning indicating the change was created under a different schema"]
+    },
+    {
+      "requirement": "Schema version",
+      "name": "Archiving with schema mismatch",
+      "when": ["specd archive is run on a change with a schema version mismatch"],
+      "then": [
+        "the warning is shown and the user is asked to confirm before proceeding; archiving is not blocked"
+      ]
+    },
+    {
+      "requirement": "Atomic writes",
+      "name": "History events appended atomically",
+      "when": ["a state transition occurs"],
+      "then": [
+        "the new transitioned event is appended to history and the entire manifest is written atomically (temp file + rename); no partial writes are visible"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:90ea067a3d1f2d1fb373555586cf263119ce217b612c0914030104a1e4741b93",
+    "verify.md": "sha256:23e836325e6ef3fbb7a148af30741300d15bc021b6dbba364bd588e16ceea8c9"
+  },
+  "generatedBy": "core"
+}

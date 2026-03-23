@@ -1,0 +1,95 @@
+{
+  "title": "Change Artifacts",
+  "description": "Agents need to know the exact filesystem paths where artifact files should be created or edited, without guessing directory layout. `specd change artifacts <name>` lists all artifact files for a change with their absolute paths on disk, effective statuses, and whether each file currently exists.",
+  "dependsOn": ["cli:cli/entrypoint", "core:core/change"],
+  "context": [
+    "Agents need to know the exact filesystem paths where artifact files should be created or edited, without guessing directory layout. `specd change artifacts <name>` lists all artifact files for a change with their absolute paths on disk, effective statuses, and whether each file currently exists."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd change artifacts <name> [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "rules": [
+        "Artifacts are listed per-file. Multi-file artifacts (e.g. `scope: spec` with multiple\nspecIds) produce one row per file. Single-file artifacts produce one row.\n\nIn `text` mode (default), each file is listed on one line:\n\n```\n<id>  <effectiveStatus>  <exists>\n```\n\nFor multi-file artifacts, `<id>` includes the file key: `<artifact-id> [<file-key>]`.\nFor single-file artifacts, `<id>` is just the artifact type id.\n\nWhen an artifact has no files yet (not synced), a summary row is shown with the\nartifact-level `effectiveStatus`.\n\nIn `json` or `toon` mode, the output is (encoded in the respective format):\n\n```json\n{\n  \"name\": \"<change-name>\",\n  \"artifacts\": [\n    {\n      \"id\": \"proposal\",\n      \"filename\": \"proposal.md\",\n      \"effectiveStatus\": \"complete\",\n      \"exists\": true\n    },\n    {\n      \"id\": \"specs [default:auth/login]\",\n      \"filename\": \"specs/default/auth/login/spec.md\",\n      \"effectiveStatus\": \"in-progress\",\n      \"exists\": true\n    }\n  ]\n}\n```\n\nArtifacts are listed in schema-declared order, with per-file entries within each\nartifact."
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "rules": ["- If the change does not exist, exits with code 1."]
+    }
+  ],
+  "constraints": [
+    "Paths are always absolute — never relative",
+    "All artifacts declared by the schema are listed, regardless of whether their files exist on disk",
+    "Delta artifact paths (e.g. deltas/<workspace>/<cap-path>/<filename>.delta.yaml) are included as separate entries when the schema declares delta: true for an artifact"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Missing name argument",
+      "when": ["specd change artifacts is run without a name"],
+      "then": ["the command exits with code 1 and prints a usage error to stderr"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Text output includes all fields",
+      "given": [
+        "a change my-change with artifact proposal (complete, file exists) and tasks (missing, file absent)"
+      ],
+      "when": ["specd change artifacts my-change is run"],
+      "then": [
+        "the proposal line shows complete, yes, and an absolute path",
+        "AND the tasks line shows missing, no, and an absolute path",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "All schema artifacts listed regardless of existence",
+      "given": ["the schema declares three artifacts and none of the files exist on disk"],
+      "when": ["specd change artifacts my-change is run"],
+      "then": ["three lines are printed, all showing missing and no"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Artifacts in schema-declared order",
+      "given": ["the schema declares artifacts in order: proposal, spec, tasks"],
+      "when": ["specd change artifacts my-change is run"],
+      "then": ["the lines appear in that order"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output structure",
+      "given": ["a change my-change with one artifact proposal that exists on disk"],
+      "when": ["specd change artifacts my-change --format json is run"],
+      "then": [
+        "stdout is valid JSON with name, changeDir, and artifacts",
+        "AND artifacts[0] has id, filename, path, effectiveStatus, and exists",
+        "AND path is an absolute filesystem path",
+        "AND changeDir is the absolute path to the change directory"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Paths are absolute",
+      "when": ["specd change artifacts my-change is run from any working directory"],
+      "then": ["all paths in the output are absolute and do not depend on CWD"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Change not found",
+      "when": ["specd change artifacts nonexistent is run"],
+      "then": ["the command exits with code 1", "AND stderr contains an error: message"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:34e76751e7dd73c7c934872fd99d6c9ef8d8e9f7575c8be66ce3a88b71d205c8",
+    "verify.md": "sha256:e9a857428358ecc5fbf562cca125fb94077c481f69ca312e84cfd3abb7fcac03"
+  },
+  "generatedBy": "core"
+}
