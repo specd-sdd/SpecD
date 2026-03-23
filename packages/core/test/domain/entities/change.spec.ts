@@ -912,5 +912,46 @@ describe('Change', () => {
       ;(deps as Map<string, readonly string[]>).delete('auth/login')
       expect(c.specDependsOn.has('auth/login')).toBe(true)
     })
+
+    it('updateSpecIds removes orphaned specDependsOn entries', () => {
+      const c = new Change({
+        name: 'test-orphan',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth/login', 'auth/session'],
+        history: [],
+        specDependsOn: new Map([
+          ['auth/login', ['auth/shared']],
+          ['auth/session', ['auth/jwt']],
+        ]),
+      })
+      c.updateSpecIds(['auth/login'], actor)
+      expect(c.specDependsOn.has('auth/session')).toBe(false)
+      expect([...c.specDependsOn.get('auth/login')!]).toEqual(['auth/shared'])
+    })
+
+    it('updateSpecIds clears all specDependsOn when all specs with deps are removed', () => {
+      const c = new Change({
+        name: 'test-clear',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth/login'],
+        history: [],
+        specDependsOn: new Map([['auth/login', ['auth/shared']]]),
+      })
+      c.updateSpecIds(['billing/core'], actor)
+      expect(c.specDependsOn.size).toBe(0)
+    })
+
+    it('updateSpecIds preserves specDependsOn when no orphans', () => {
+      const c = new Change({
+        name: 'test-preserve',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth/login', 'auth/session'],
+        history: [],
+        specDependsOn: new Map([['auth/login', ['auth/shared']]]),
+      })
+      c.updateSpecIds(['auth/login', 'auth/session'], actor)
+      expect(c.specDependsOn.size).toBe(1)
+      expect([...c.specDependsOn.get('auth/login')!]).toEqual(['auth/shared'])
+    })
   })
 })
