@@ -57,6 +57,15 @@
 - **WHEN** `ArchiveChange.execute` is called
 - **THEN** the artifact content is saved as-is to `SpecRepository`
 
+#### Scenario: New spec with delta-capable artifact copied to project
+
+- **GIVEN** a change has a spec ID for a spec that does not yet exist in the project
+- **AND** the schema declares the artifact type with `delta: true`
+- **AND** the change directory contains a full primary file (e.g. `specs/<workspace>/<path>/spec.md`) instead of a `.delta.yaml`
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** the primary file content is copied directly to `SpecRepository`
+- **AND** the spec directory and file are created in the project
+
 #### Scenario: Optional artifact with missing status — not synced
 
 - **GIVEN** an optional artifact declared in the schema has no file in the change directory and `validatedHash` is `null` (status `missing`)
