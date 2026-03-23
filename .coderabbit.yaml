@@ -1,3 +1,4 @@
 reviews:
   path_filters:
     - '!**/.specd-metadata.yaml'
+    - '!.specd/metadata/**'
