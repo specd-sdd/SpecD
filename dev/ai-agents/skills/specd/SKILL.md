@@ -402,10 +402,34 @@ node packages/cli/dist/index.js change context <name> designing --follow-deps --
 Review the artifacts against this context. If any inconsistency is found, fix the
 artifact and re-validate before transitioning.
 
+### A.4b Post-designing hooks
+
+Run the post-designing hooks and follow any guidance:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> designing --phase post
+```
+
+If hooks fail, fix the issue and re-run.
+
+Then:
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> designing --phase post --format text
+```
+
+Follow the guidance there.
+
 ### A.5 Transition to ready
 
 ```bash
-node packages/cli/dist/index.js change transition <name> ready
+node packages/cli/dist/index.js change hook-instruction <name> ready --phase pre --format text
+```
+
+Follow the guidance there.
+
+```bash
+node packages/cli/dist/index.js change transition <name> ready --skip-hooks source.post
 node packages/cli/dist/index.js change status <name> --format json
 ```
 
@@ -416,6 +440,14 @@ Mark "Design artifacts" task as `completed`. Continue to Phase B.
 ## Phase B — Review and spec approval gate
 
 Mark "Spec approval" task as `in_progress`.
+
+### B.0 Load ready hook instructions
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> ready --phase pre --format text
+```
+
+Follow the guidance there.
 
 ### B.1 Mandatory review stop
 
@@ -457,6 +489,22 @@ return to Phase A (the artifact loop) to make edits and re-validate. When editin
 artifact, apply the propagation check from A.3g — changes may cascade to upstream
 and downstream artifacts.
 
+### B.1b Run ready post hooks
+
+After the user confirms the review:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> ready --phase post
+```
+
+If hooks fail, fix the issue and re-run.
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> ready --phase post --format text
+```
+
+Follow the guidance there.
+
 ### B.2 Spec approval gate
 
 After the user confirms, check if the approval gate is active using `lifecycle.approvals`
@@ -465,13 +513,25 @@ from the status response obtained in B.1. No separate `config show` call is need
 **If `lifecycle.approvals.spec` is `false`:** the gate is inactive — transition directly:
 
 ```bash
-node packages/cli/dist/index.js change transition <name> implementing
+node packages/cli/dist/index.js change hook-instruction <name> implementing --phase pre --format text
+```
+
+Follow the guidance there.
+
+```bash
+node packages/cli/dist/index.js change transition <name> implementing --skip-hooks source.post
 ```
 
 Mark "Spec approval" task as `completed`. Continue to Phase C.
 
 **If `approvals.spec: true`:** `TransitionChange` automatically reroutes to
-`pending-spec-approval`. The agent **cannot** approve — approval is an external
+`pending-spec-approval`. Run hooks for the new state:
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> pending-spec-approval --phase pre --format text
+```
+
+Follow the guidance there. The agent **cannot** approve — approval is an external
 action that must happen outside this skill. Inform the user:
 
 > This change requires spec approval before implementation can begin.
@@ -479,15 +539,41 @@ action that must happen outside this skill. Inform the user:
 >
 > Re-invoke `/specd-design` after approving to continue.
 
-Leave "Spec approval" task as `in_progress` and **stop**.
-
-**If the change is already in `pending-spec-approval`:** remind the user that approval
-is pending and must be done externally. **Stop.**
-
-**If the change is in `spec-approved`:** transition to implementing:
+Run post hooks before stopping:
 
 ```bash
-node packages/cli/dist/index.js change transition <name> implementing
+node packages/cli/dist/index.js change run-hooks <name> pending-spec-approval --phase post
+node packages/cli/dist/index.js change hook-instruction <name> pending-spec-approval --phase post --format text
+```
+
+Follow the guidance there. Leave "Spec approval" task as `in_progress` and **stop**.
+
+**If the change is already in `pending-spec-approval`:** run pre hooks, remind the user
+that approval is pending and must be done externally, run post hooks. **Stop.**
+
+**If the change is in `spec-approved`:** run hooks for the `spec-approved` state:
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> spec-approved --phase pre --format text
+```
+
+Follow the guidance there. Run post hooks, then transition to implementing:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> spec-approved --phase post
+node packages/cli/dist/index.js change hook-instruction <name> spec-approved --phase post --format text
+```
+
+Follow the guidance there.
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> implementing --phase pre --format text
+```
+
+Follow the guidance there.
+
+```bash
+node packages/cli/dist/index.js change transition <name> implementing --skip-hooks source.post
 ```
 
 Mark "Spec approval" task as `completed`. Continue to Phase C.
@@ -591,13 +677,27 @@ node packages/cli/dist/index.js change run-hooks <name> implementing --phase pos
 
 If hooks fail, fix the issue and re-run.
 
+Then:
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> implementing --phase post --format text
+```
+
+Follow the guidance there.
+
 ### C.4 Transition to verifying
 
 The transition enforces task completion — if any artifact with `taskCompletionCheck`
 has incomplete items, it will fail:
 
 ```bash
-node packages/cli/dist/index.js change transition <name> verifying
+node packages/cli/dist/index.js change hook-instruction <name> verifying --phase pre --format text
+```
+
+Follow the guidance there.
+
+```bash
+node packages/cli/dist/index.js change transition <name> verifying --skip-hooks source.post
 ```
 
 If it fails with `InvalidStateTransitionError`, show which items are still incomplete
@@ -630,8 +730,32 @@ Read the verification artifacts for each spec in the change. For each scenario:
 
 **If all scenarios pass:**
 
+Run the post-verifying hooks and follow any guidance:
+
 ```bash
-node packages/cli/dist/index.js change transition <name> done
+node packages/cli/dist/index.js change run-hooks <name> verifying --phase post
+```
+
+If hooks fail, fix the issue and re-run.
+
+Then:
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> verifying --phase post --format text
+```
+
+Follow the guidance there.
+
+Transition to done:
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> done --phase pre --format text
+```
+
+Follow the guidance there.
+
+```bash
+node packages/cli/dist/index.js change transition <name> done --skip-hooks source.post
 ```
 
 Mark "Verify" task as `completed`. Continue to Phase E.
@@ -652,36 +776,106 @@ Inform the user which scenarios failed and what needs fixing. Return to Phase C.
 
 Mark "Signoff" task as `in_progress`.
 
+### E.1 Done state hooks
+
+Run hooks for the `done` state:
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> done --phase pre --format text
+```
+
+Follow the guidance there.
+
 Check if the gate is active. Run `change status <name> --format json` and read
 `lifecycle.approvals.signoff` from the response. No separate `config show` call is needed.
 
-**If `lifecycle.approvals.signoff` is `false`:** transition directly:
+**If `lifecycle.approvals.signoff` is `false`:**
+
+Run done post hooks:
 
 ```bash
-node packages/cli/dist/index.js change transition <name> archivable
+node packages/cli/dist/index.js change run-hooks <name> done --phase post
+node packages/cli/dist/index.js change hook-instruction <name> done --phase post --format text
 ```
 
-Mark "Signoff" task as `completed`. Continue to Phase F.
+Follow the guidance there. Then transition directly:
+
+```bash
+node packages/cli/dist/index.js change transition <name> archivable --skip-hooks source.post
+```
+
+Run hooks for the `archivable` state:
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> archivable --phase pre --format text
+```
+
+Follow the guidance there.
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> archivable --phase post
+node packages/cli/dist/index.js change hook-instruction <name> archivable --phase post --format text
+```
+
+Follow the guidance there. Mark "Signoff" task as `completed`. Continue to Phase F.
 
 **If `approvals.signoff: true`:** `TransitionChange` reroutes to `pending-signoff`.
-Inform the user:
+
+Run done post hooks, then hooks for the new state:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> done --phase post
+node packages/cli/dist/index.js change hook-instruction <name> done --phase post --format text
+node packages/cli/dist/index.js change hook-instruction <name> pending-signoff --phase pre --format text
+```
+
+Follow the guidance there. Inform the user:
 
 > This change requires signoff before archiving.
 > A human must run: `specd change approve signoff <name> --reason "<rationale>"`
 >
 > Re-invoke this skill after signing off to continue.
 
-Leave "Signoff" task as `in_progress` and **stop**.
-
-**If in `pending-signoff`:** remind the user.
-
-**If in `signed-off`:**
-
 ```bash
-node packages/cli/dist/index.js change transition <name> archivable
+node packages/cli/dist/index.js change run-hooks <name> pending-signoff --phase post
+node packages/cli/dist/index.js change hook-instruction <name> pending-signoff --phase post --format text
 ```
 
-Mark "Signoff" task as `completed`. Continue to Phase F.
+Follow the guidance there. Leave "Signoff" task as `in_progress` and **stop**.
+
+**If in `pending-signoff`:** run pre hooks, remind the user, run post hooks. **Stop.**
+
+**If in `signed-off`:** run hooks for the `signed-off` state:
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> signed-off --phase pre --format text
+```
+
+Follow the guidance there. Run post hooks, then transition:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> signed-off --phase post
+node packages/cli/dist/index.js change hook-instruction <name> signed-off --phase post --format text
+```
+
+Follow the guidance there.
+
+```bash
+node packages/cli/dist/index.js change transition <name> archivable --skip-hooks source.post
+```
+
+```bash
+node packages/cli/dist/index.js change hook-instruction <name> archivable --phase pre --format text
+```
+
+Follow the guidance there.
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> archivable --phase post
+node packages/cli/dist/index.js change hook-instruction <name> archivable --phase post --format text
+```
+
+Follow the guidance there. Mark "Signoff" task as `completed`. Continue to Phase F.
 
 ---
 
@@ -731,7 +925,15 @@ This atomically:
 
 Read the archive result. If `postHookFailures` is non-empty, report them to the user.
 
-Load post-archive instructions:
+Run the post-archiving hooks:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> archiving --phase post
+```
+
+If hooks fail, fix the issue and re-run.
+
+Then load post-archive instructions:
 
 ```bash
 node packages/cli/dist/index.js change hook-instruction <name> archiving --phase post --format text
@@ -865,9 +1067,10 @@ and there is no spec for it, that is worth surfacing — even if the user didn't
   spec IDs, write and validate one spec at a time.
 - **Open questions.** If an artifact has unresolved questions affecting downstream work,
   surface them to the user before proceeding.
-- **validate requires a specId.** Run `change validate <name> <specId>` per spec, not
-  just `change validate <name>`. Use `--artifact <artifactId>` during the artifact
-  loop to validate only the artifact just written.
+- **validate** supports `--all` to validate every specId in the change at once:
+  `change validate <name> --all`. Use this for final validation before transitions.
+  During the artifact loop, use `--artifact <artifactId>` to validate only the artifact
+  just written: `change validate <name> <specId> --artifact <artifactId>`.
 - **Approval gates are human-only.** The agent cannot approve — it must tell the user.
 - **The implementing ⇄ verifying loop** can repeat any number of times. Each return to
   implementing clears validation state for the implementing step's required artifacts.
