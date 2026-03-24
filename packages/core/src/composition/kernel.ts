@@ -33,6 +33,8 @@ import { GenerateSpecMetadata } from '../application/use-cases/generate-spec-met
 import { RunStepHooks } from '../application/use-cases/run-step-hooks.js'
 import { GetHookInstructions } from '../application/use-cases/get-hook-instructions.js'
 import { GetArtifactInstruction } from '../application/use-cases/get-artifact-instruction.js'
+import { ValidateSchema } from '../application/use-cases/validate-schema.js'
+import { buildSchema } from '../domain/services/build-schema.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SpecdConfig } from '../application/specd-config.js'
@@ -111,6 +113,8 @@ export interface Kernel {
     invalidateMetadata: InvalidateSpecMetadata
     /** Resolves and returns the active schema for the project. */
     getActiveSchema: GetActiveSchema
+    /** Validates a schema (project resolved, project raw, or external file). */
+    validateSchema: ValidateSchema
     /** Validates spec artifacts against the active schema's structural rules. */
     validate: ValidateSpecs
     /** Generates deterministic metadata from schema-declared extraction rules. */
@@ -233,6 +237,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       saveMetadata: new SaveSpecMetadata(i.specs),
       invalidateMetadata: new InvalidateSpecMetadata(i.specs),
       getActiveSchema: new GetActiveSchema(resolveSchema),
+      validateSchema: new ValidateSchema(i.schemas, i.schemaRef, buildSchema, resolveSchema),
       validate: new ValidateSpecs(i.specs, schemaProvider, i.parsers),
       generateMetadata: new GenerateSpecMetadata(i.specs, schemaProvider, i.parsers, i.hasher),
       getContext: new GetSpecContext(i.specs, i.hasher),
