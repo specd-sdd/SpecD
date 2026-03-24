@@ -56,7 +56,7 @@ The `implementing ↔ verifying` loop may repeat any number of times. The transi
 
 The `implementing` and `verifying` states form a loop that repeats until verification passes.
 
-The transition `implementing → verifying` is only valid when all artifacts listed in the `implementing` step's `requires` field have zero matches for their `taskCompletionCheck.incompletePattern` (defaulting to markdown unchecked checkboxes `- [ ]` if not declared). This is a content-level check on the artifact files, not a check on `effectiveStatus`. Attempting this transition while any incomplete task item remains throws `InvalidStateTransitionError`.
+The transition `implementing → verifying` is gated by the workflow model's task completion gating rule (see [`specs/core/workflow-model/spec.md` — Requirement: Task completion gating](../workflow-model/spec.md)). Because the `verifying` step's `requires` includes `tasks` (which declares `taskCompletionCheck`), the transition is automatically blocked when incomplete task items remain. This is a content-level check on the artifact files, not a check on `effectiveStatus`.
 
 The transition `verifying → implementing` is taken when verification fails and changes are required. No approval invalidation is triggered by this transition; the spec has not changed, only the implementation work has been found insufficient.
 
@@ -210,7 +210,7 @@ A change may be moved between storage locations without affecting its lifecycle 
 - Both approval gates default to `false` — teams opt in via `approvals` in `specd.yaml`
 - When `approvals.spec: true`, spec approval is required before `implementing`
 - When `approvals.signoff: true`, sign-off is always required before `archivable`, regardless of change content
-- `implementing → verifying` requires zero matches of `taskCompletionCheck.incompletePattern` across all artifacts in the `implementing` step's `requires`; defaults to `^\s*-\s+\[ \]` if not declared in the schema; throws `InvalidStateTransitionError` if any incomplete item is found
+- Task completion gating is enforced generically by the workflow model — any step that requires an artifact with `taskCompletionCheck` is automatically gated (see [`specs/core/workflow-model/spec.md`](../workflow-model/spec.md))
 - `verifying → implementing` does not trigger approval invalidation
 - History events are never modified or deleted; invalidated approvals are identifiable by a subsequent `invalidated` event
 - Discarding a change requires a `discarded` event with mandatory `reason` and `by`; it is irreversible
@@ -219,6 +219,7 @@ A change may be moved between storage locations without affecting its lifecycle 
 
 - [`specs/core/config/spec.md`](../config/spec.md) — workspace IDs, active workspace semantics, approval gates config, storage locations
 - [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — artifact type declarations, dependency graph, `preHashCleanup`, `taskCompletionCheck`
+- [`specs/core/workflow-model/spec.md`](../workflow-model/spec.md) — task completion gating rule, requires-based gating semantics
 - [`specs/core/change-manifest/spec.md`](../change-manifest/spec.md) — manifest format and JSON serialization of events
 - [`specs/core/storage/spec.md`](../storage/spec.md) — persistence mechanics, directory naming
 - [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta operations, `ArtifactParser` port

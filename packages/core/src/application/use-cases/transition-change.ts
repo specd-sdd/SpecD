@@ -12,23 +12,6 @@ import { type RunStepHooks, type OnHookProgress } from './run-step-hooks.js'
 /** Selectors for granular hook phase skipping during transitions. */
 export type HookPhaseSelector = 'source.pre' | 'source.post' | 'target.pre' | 'target.post' | 'all'
 
-/** A single task completion check for the `implementing → verifying` transition. */
-export interface TaskCompletionCheck {
-  /**
-   * The artifact type ID to check (e.g. `'tasks'`).
-   * Used only for error context; the actual check reads the file by `filename`.
-   */
-  readonly artifactId: string
-  /** Filename of the artifact file within the change directory (e.g. `'tasks.md'`). */
-  readonly filename: string
-  /**
-   * Regex pattern matched against the artifact content line-by-line.
-   * Defaults to `^\s*-\s+\[ \]` (markdown unchecked checkbox) if not declared in schema.
-   * If any line matches, the transition is blocked.
-   */
-  readonly incompletePattern: string
-}
-
 /** Input for the {@link TransitionChange} use case. */
 export interface TransitionChangeInput {
   /** The change to transition. */
@@ -60,29 +43,6 @@ export interface TransitionChangeInput {
    */
   readonly approvalsSignoff: boolean
   /**
-   * Artifact IDs whose validation is cleared when transitioning
-   * `verifying → implementing`.
-   *
-   * Should be the `requires` list of the schema's `implementing` workflow step.
-   * Ignored on all other transitions.
-   */
-  readonly implementingRequires?: readonly string[]
-  /**
-   * Task completion checks performed before allowing `implementing → verifying`.
-   *
-   * Each entry names an artifact file and the regex pattern for incomplete tasks.
-   * If any artifact file contains a line matching its pattern, the transition
-   * throws `InvalidStateTransitionError`. This is a content-level check on the
-   * artifact files, not a check on `effectiveStatus`.
-   *
-   * Derived by the caller from the `implementing` workflow step's `requires` list
-   * combined with each artifact's `taskCompletionCheck.incompletePattern` (defaulting
-   * to `^\s*-\s+\[ \]` when not declared in the schema).
-   *
-   * Ignored on all other transitions.
-   */
-  readonly implementingTaskChecks?: ReadonlyArray<TaskCompletionCheck>
-  /**
    * Which hook phases to skip during the transition. Valid selectors:
    * `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`.
    *
@@ -111,7 +71,7 @@ export interface TransitionChangeResult {
 
 /**
  * Performs a lifecycle state transition on a change with approval-gate routing,
- * workflow requires enforcement, and hook execution.
+ * workflow requires enforcement, task completion gating, and hook execution.
  *
  * Handles the two smart-routing decision points:
  * - `ready → implementing` is redirected to `ready → pending-spec-approval`
@@ -119,9 +79,9 @@ export interface TransitionChangeResult {
  * - `done → archivable` is redirected to `done → pending-signoff` when the
  *   signoff gate is active.
  *
- * When transitioning `implementing → verifying`, checks each artifact listed
- * in `implementingTaskChecks` for incomplete task items. Throws
- * `InvalidStateTransitionError` if any incomplete item is found.
+ * During requires enforcement, any required artifact whose type declares a
+ * `taskCompletionCheck` is content-checked for incomplete items. This applies
+ * to all transitions, not just `implementing → verifying`.
  *
  * Enforces workflow `requires` for the target step and executes `run:` hooks
  * at step boundaries (unless skipped via `skipHookPhases`).
@@ -179,7 +139,7 @@ export class TransitionChange {
     const schema = await this._schemaProvider.get()
     const workflowStep = schema.workflowStep(effectiveTarget) ?? null
 
-    // --- Enforce workflow requires ---
+    // --- Enforce workflow requires and task completion gating ---
     if (workflowStep !== null && workflowStep.requires.length > 0) {
       for (const artifactId of workflowStep.requires) {
         const status = change.effectiveStatus(artifactId)
@@ -188,17 +148,22 @@ export class TransitionChange {
         if (!satisfied) {
           throw new InvalidStateTransitionError(change.state, effectiveTarget)
         }
-      }
-    }
 
-    // --- Task completion check (implementing → verifying) ---
-    if (change.state === 'implementing' && effectiveTarget === 'verifying') {
-      await this._checkTaskCompletion(change, input.implementingTaskChecks ?? [])
+        // Task completion gating: check content for incomplete items
+        const artifactType = schema.artifact(artifactId)
+        const pattern = artifactType?.taskCompletionCheck?.incompletePattern
+        if (pattern !== undefined) {
+          await this._checkTaskCompletionForArtifact(change, artifactId, pattern, effectiveTarget)
+        }
+      }
     }
 
     // --- Artifact validation clearing (verifying → implementing) ---
     if (change.state === 'verifying' && effectiveTarget === 'implementing') {
-      change.clearArtifactValidations(input.implementingRequires ?? [])
+      const implementingStep = schema.workflowStep('implementing')
+      if (implementingStep !== null) {
+        change.clearArtifactValidations(implementingStep.requires)
+      }
     }
 
     // --- Approval invalidation on transition to designing ---
@@ -263,24 +228,32 @@ export class TransitionChange {
   }
 
   /**
-   * Checks each artifact file for incomplete task items before allowing
-   * the `implementing → verifying` transition.
+   * Checks all files in an artifact for incomplete task items.
    *
    * @param change - The change whose artifact files are checked
-   * @param checks - Task completion check configurations
-   * @throws {InvalidStateTransitionError} If any artifact contains incomplete task items
+   * @param artifactId - The artifact type ID to check
+   * @param incompletePattern - Regex pattern for incomplete task items
+   * @param effectiveTarget - The target state (for error context)
+   * @throws {InvalidStateTransitionError} If any file contains incomplete task items
    */
-  private async _checkTaskCompletion(
+  private async _checkTaskCompletionForArtifact(
     change: Change,
-    checks: ReadonlyArray<TaskCompletionCheck>,
+    artifactId: string,
+    incompletePattern: string,
+    effectiveTarget: ChangeState,
   ): Promise<void> {
-    for (const check of checks) {
-      const artifact = await this._changes.artifact(change, check.filename)
-      if (artifact === null) continue
+    const changeArtifact = change.getArtifact(artifactId)
+    if (changeArtifact === null) return
 
-      const re = safeRegex(check.incompletePattern, 'm')
-      if (re !== null && re.test(artifact.content)) {
-        throw new InvalidStateTransitionError('implementing', 'verifying')
+    const re = safeRegex(incompletePattern, 'm')
+    if (re === null) return
+
+    for (const file of changeArtifact.files.values()) {
+      const loaded = await this._changes.artifact(change, file.filename)
+      if (loaded === null) continue
+
+      if (re.test(loaded.content)) {
+        throw new InvalidStateTransitionError(change.state, effectiveTarget)
       }
     }
   }

@@ -14,11 +14,9 @@ Changes must advance through a strict lifecycle, and the rules for doing so — 
 - `to` (ChangeState, required) — the requested target state
 - `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled
 - `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled
-- `implementingRequires` (readonly string\[], optional) — artifact IDs whose validation is cleared on `verifying` to `implementing`
-- `implementingTaskChecks` (ReadonlyArray\<TaskCompletionCheck>, optional) — task completion checks for `implementing` to `verifying`
 - `skipHookPhases` (ReadonlySet\<HookPhaseSelector>, optional, default empty set) — which hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. When `'all'` is in the set, all hook phases are skipped. When the set is empty (default), all applicable hooks execute.
 
-The previous `skipHooks: boolean` field is removed. Callers that passed `skipHooks: true` should pass `skipHookPhases: new Set(['all'])` instead.
+The `implementingTaskChecks` and `implementingRequires` fields are removed. Task completion checks are now derived automatically from the schema during requires enforcement (see Requirement: Task completion check during requires enforcement). Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema directly.
 
 ### Requirement: Change must exist
 
@@ -44,18 +42,23 @@ If no workflow step exists for the effective target (the schema does not declare
 
 The use case MUST emit a `requires-check` progress event per artifact checked, reporting whether the requirement was satisfied.
 
-### Requirement: Task completion check on implementing to verifying
+### Requirement: Task completion check during requires enforcement
 
-When the current state is `implementing` and the effective target is `verifying`, the use case MUST check each entry in `implementingTaskChecks` before allowing the transition:
+During workflow requires enforcement (see Requirement: Workflow requires enforcement), for each required artifact the use case MUST check whether the artifact's `ArtifactType` declares a `taskCompletionCheck`. If it does, the use case MUST verify the artifact's content contains no incomplete task items:
 
-1. Load the artifact file content via `ChangeRepository.artifact(change, check.filename)`
-2. If the artifact does not exist (returns `null`), skip it
-3. Compile the `incompletePattern` using `safeRegex` with the `'m'` flag
-4. If the regex is valid and matches any line in the artifact content, throw `InvalidStateTransitionError`
+1. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.
+2. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.
+3. If the file does not exist (returns `null`), skip it.
+4. Compile `taskCompletionCheck.incompletePattern` using `safeRegex` with the `'m'` flag.
+5. If the regex is valid and matches any line in the file content, throw `InvalidStateTransitionError`.
+
+This check is performed as part of the requires loop — it applies to ANY transition whose target step requires an artifact with `taskCompletionCheck`, not only `implementing → verifying`. The use case derives all necessary information from the schema; callers do not supply task checks.
 
 ### Requirement: Artifact validation clearing on verifying to implementing
 
-When the current state is `verifying` and the effective target is `implementing`, the use case MUST call `change.clearArtifactValidations` with the `implementingRequires` list (defaulting to an empty array) before performing the transition. This resets validation state for the specified artifacts.
+When the current state is `verifying` and the effective target is `implementing`, the use case MUST look up the `implementing` workflow step from the schema and call `change.clearArtifactValidations` with its `requires` list before performing the transition. This resets validation state for the specified artifacts.
+
+If no `implementing` workflow step exists in the schema, the clearing is skipped.
 
 ### Requirement: Transition to designing from any state
 
@@ -128,12 +131,13 @@ The previous `postHookFailures` field is removed because both hook phases are no
 ## Constraints
 
 - The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates
-- Task completion checks use safeRegex to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
-- The implementingTaskChecks and implementingRequires inputs default to empty arrays when not provided
+- Task completion checks are derived from the schema's `taskCompletionCheck` declarations during requires enforcement — callers never supply them
+- Task completion checks use `safeRegex` to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
 - Approval-gate routing is purely input-driven — the use case does not read configuration directly
 - Pre-hook failure aborts the transition — no state change occurs
 - Post-hook failures are collected in the result — no rollback
 - When schema resolution fails or no workflow step exists for the target, requires and hooks are skipped gracefully
+- Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema — the caller does not supply them
 
 ## Spec Dependencies
 
