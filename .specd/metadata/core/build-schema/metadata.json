@@ -33,7 +33,7 @@
     {
       "requirement": "Array entry ID validation",
       "rules": [
-        "`buildSchema` SHALL validate that every array entry `id` (in hooks, validations, deltaValidations, rules.pre, rules.post, preHashCleanup, and metadataExtraction array entries) matches `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` (1-64 chars) and is unique within its immediate array. Violations throw `SchemaValidationError`."
+        "`buildSchema` SHALL validate that every array entry `id` (in hooks, validations, deltaValidations, rules.pre, rules.post, preHashCleanup, and metadataExtraction array entries) matches `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` (1-64 chars) and is unique within its immediate array. For hooks specifically, IDs must be unique across ALL workflow steps — no two hooks in any workflow step may share the same ID, regardless of whether they are in pre or post arrays. Violations throw `SchemaValidationError`."
       ]
     },
     {
@@ -168,6 +168,24 @@
       "name": "Duplicate artifact IDs",
       "when": ["buildSchema receives two artifacts both with id: \"specs\""],
       "then": ["it throws SchemaValidationError mentioning the duplicate ID \"specs\""]
+    },
+    {
+      "requirement": "Array entry ID validation",
+      "name": "Duplicate hook IDs across workflow steps",
+      "given": [
+        "workflow step \"designing\" with hooks.pre: [{ id: \"run-lint\" }] and workflow step \"implementing\" with hooks.post: [{ id: \"run-lint\" }]"
+      ],
+      "when": ["buildSchema validates the schema"],
+      "then": ["it throws SchemaValidationError mentioning the duplicate hook ID \"run-lint\""]
+    },
+    {
+      "requirement": "Array entry ID validation",
+      "name": "Unique hook IDs across workflow steps accepted",
+      "given": [
+        "workflow steps with hooks \"designing.pre: [lint]\", \"implementing.pre: [test]\", \"implementing.post: [deploy]\""
+      ],
+      "when": ["buildSchema validates the schema"],
+      "then": ["no error is thrown for hook IDs"]
     },
     {
       "requirement": "Template reference validation",
@@ -347,8 +365,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8ca09acd0f2590bd743cdcd0b95156ef40e977ebec83e4caa82c91ce8ac1efcf",
-    "verify.md": "sha256:8f7a13d92ce6065eea0c60fe9b972729caaba6c334de1f980fb757bfe20c5d25"
+    "spec.md": "sha256:b48b1b575ba06a7cf9dafe83d098f2f4f185f580011c06a5d5e1b0ba323e3666",
+    "verify.md": "sha256:21a9a42f5d0295dd7c2f28da55f50b285979a601afb0fa7b323bfbf288c61e8c"
   },
   "generatedBy": "core"
 }

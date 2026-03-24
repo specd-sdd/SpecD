@@ -487,6 +487,29 @@ export function buildSchema(
     }
   }
 
+  // Semantic validation: hook IDs must be globally unique across all workflow steps
+  const hookIdToSteps = new Map<string, string[]>()
+  for (const step of workflow) {
+    for (const hook of step.hooks.pre) {
+      const existing = hookIdToSteps.get(hook.id) ?? []
+      existing.push(`${step.step}.pre`)
+      hookIdToSteps.set(hook.id, existing)
+    }
+    for (const hook of step.hooks.post) {
+      const existing = hookIdToSteps.get(hook.id) ?? []
+      existing.push(`${step.step}.post`)
+      hookIdToSteps.set(hook.id, existing)
+    }
+  }
+  for (const [hookId, steps] of hookIdToSteps) {
+    if (steps.length > 1) {
+      throw new SchemaValidationError(
+        ref,
+        `duplicate hook id '${hookId}' in workflow steps '${steps.join("' and '")}'`,
+      )
+    }
+  }
+
   validateArtifactGraph(ref, artifacts)
 
   const metadataExtraction =
