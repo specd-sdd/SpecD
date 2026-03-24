@@ -14,6 +14,31 @@ inspects the current state and picks up where things left off.
 drafting → designing → ready → [approval] → implementing ⇄ verifying → done → [signoff] → archivable → archived
 ```
 
+## How specd works — mental model
+
+**Every change in specd goes through specs, even pure code changes.** There is no
+"code-only" workflow. The model is:
+
+1. **Specs define what the system should do** — they are requirements, not documentation
+2. **Code implements what the specs say** — the implementation phase writes code that
+   satisfies the specs
+3. **Verification checks code against specs** — the schema defines which artifacts serve
+   as acceptance criteria
+
+If a change modifies code, there MUST be a spec that describes the expected behaviour.
+If no spec exists for the area being changed, **create one as part of the change** — that
+is the normal workflow, not an exception. If an existing spec already covers the area,
+add it to the change's specIds and write a delta to update it.
+
+**Never bypass specs to go straight to code.** The designing phase (proposal → specs →
+verify → design → tasks) is not overhead — it is the process. The implementation phase
+exists to write code that satisfies the specs produced during designing.
+
+A change may include specs that **already exist and don't need modification** — this is
+normal. The spec defines the behaviour; the change adds or modifies the **code** that
+implements it. In this case, use `op: no-op` deltas for the spec artifacts and focus
+the design and tasks on the implementation work.
+
 ## How this skill works
 
 This skill is an **orchestrator**. Each lifecycle phase is defined in its own file
