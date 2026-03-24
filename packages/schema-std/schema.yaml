@@ -57,8 +57,12 @@ artifacts:
       "Specs affected" section. Each new spec defines WHAT the system should do for
       one capability.
 
+      New specs are written as **full files** under `{{change.path}}/specs/` — NOT as deltas.
+      Deltas (under `{{change.path}}/deltas/`) are only for modifying existing specs
+      (handled by deltaInstruction).
+
       The proposal lists each spec as `<workspace>:<capability-path>`. Use those
-      components to create `specs/<workspace>/<capability-path>/spec.md` using the
+      components to create `{{change.path}}/specs/<workspace>/<capability-path>/spec.md` using the
       template.
 
       Format requirements:
@@ -96,7 +100,7 @@ artifacts:
       produce a delta file instead of rewriting the existing file.
 
       The proposal lists each spec as `<workspace>:<capability-path>`. Use those
-      components to create `deltas/<workspace>/<capability-path>/spec.md.delta.yaml`.
+      components to create `{{change.path}}/deltas/<workspace>/<capability-path>/spec.md.delta.yaml`.
 
       Read the existing spec first (`specd spec show <workspace>:<capability-path>`)
       to understand its current structure before writing the delta.
@@ -123,7 +127,7 @@ artifacts:
 
       If a spec listed in the proposal does not need changes to its spec.md (e.g. only
       other artifacts change), create a no-op delta instead of skipping the file:
-        `deltas/<workspace>/<capability-path>/spec.md.delta.yaml`:
+        `{{change.path}}/deltas/<workspace>/<capability-path>/spec.md.delta.yaml`:
         ```yaml
         - op: no-op
           description: "<reason why no spec changes are needed>"
@@ -161,8 +165,12 @@ artifacts:
       "Specs affected" section. Each verify file describes HOW to confirm the
       spec is satisfied.
 
+      New verify files are written as **full files** under `{{change.path}}/specs/` — NOT
+      as deltas. Deltas (under `{{change.path}}/deltas/`) are only for modifying existing
+      verify files (handled by deltaInstruction).
+
       The proposal lists each spec as `<workspace>:<capability-path>`. Create
-      `specs/<workspace>/<capability-path>/verify.md` using the template.
+      `{{change.path}}/specs/<workspace>/<capability-path>/verify.md` using the template.
 
       Format requirements:
       - Top-level heading: `# Verification: <spec name>`
@@ -186,7 +194,7 @@ artifacts:
       produce a delta file for its verification scenarios.
 
       The proposal lists each spec as `<workspace>:<capability-path>`. Create
-      `deltas/<workspace>/<capability-path>/verify.md.delta.yaml`.
+      `{{change.path}}/deltas/<workspace>/<capability-path>/verify.md.delta.yaml`.
 
       Read the existing verify.md first (`specd spec show <workspace>:<capability-path>`)
       to understand its current structure before writing the delta.
@@ -209,7 +217,7 @@ artifacts:
 
       If a spec listed in the proposal does not need changes to its verify.md (e.g.
       existing scenarios remain valid), create a no-op delta instead of skipping the file:
-        `deltas/<workspace>/<capability-path>/verify.md.delta.yaml`:
+        `{{change.path}}/deltas/<workspace>/<capability-path>/verify.md.delta.yaml`:
         ```yaml
         - op: no-op
           description: "<reason why no verify changes are needed>"
@@ -563,7 +571,7 @@ workflow:
             constraints while writing code — they are as binding as the change specs.
 
   - step: verifying
-    requires: [verify]
+    requires: [verify, tasks]
     hooks:
       pre:
         - id: verifying-guidance
