@@ -39,7 +39,7 @@
     {
       "requirement": "Persistence and scaffolding",
       "rules": [
-        "After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks the `SpecRepository` map for each spec ID's workspace. Finally, the use case returns the newly created `Change` instance."
+        "After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks the `SpecRepository` map for each spec ID's workspace. Finally, the use case returns an object containing the newly created `Change` instance and the `changePath` (obtained via `ChangeRepository.changePath(change)`).\n\nThe return type is `{ change: Change; changePath: string }`."
       ]
     },
     {
@@ -110,11 +110,21 @@
       "name": "Change is saved to repository",
       "when": ["CreateChange.execute completes successfully"],
       "then": ["ChangeRepository.save was called with the returned Change instance"]
+    },
+    {
+      "requirement": "Result includes changePath",
+      "name": "changePath returned after creation",
+      "given": ["no change named 'add-login' exists"],
+      "when": ["CreateChange.execute is called with name: 'add-login'"],
+      "then": [
+        "the result includes changePath as an absolute path to the change directory",
+        "AND the result includes change as the Change entity"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:d685d0cc54354d5b183de7fd5f3db560a708b94e90016326c13326bcbd652c7b",
-    "verify.md": "sha256:8cef0ea9f2f8a5891939c851ace9f600f00a3b72cf1820e9fe50bbbca8b28ac2"
+    "spec.md": "sha256:218f089c723672c5188217a1c4b3c1543d9ee81d3a75ae5ccb060c54d1193df5",
+    "verify.md": "sha256:5ec3b8881aa9c3b43364102f48ecc47795926f6a4e8bf07bdff6c59571647d6a"
   },
   "generatedBy": "core"
 }

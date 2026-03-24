@@ -16,7 +16,8 @@ describe('CreateChange', () => {
         schemaVersion: 1,
       })
 
-      expect(result.name).toBe('add-oauth')
+      expect(result.change.name).toBe('add-oauth')
+      expect(result.changePath).toBe('/test/changes/add-oauth')
       expect(repo.store.has('add-oauth')).toBe(true)
     })
 
@@ -31,9 +32,9 @@ describe('CreateChange', () => {
         schemaVersion: 1,
       })
 
-      expect(result.workspaces).toContain('frontend')
-      expect(result.workspaces).toContain('backend')
-      expect(result.specIds).toEqual(['frontend:ui/login', 'backend:api/auth'])
+      expect(result.change.workspaces).toContain('frontend')
+      expect(result.change.workspaces).toContain('backend')
+      expect(result.change.specIds).toEqual(['frontend:ui/login', 'backend:api/auth'])
     })
 
     it('appends a created event with the actor from ActorResolver', async () => {
@@ -47,8 +48,8 @@ describe('CreateChange', () => {
         schemaVersion: 2,
       })
 
-      expect(result.history).toHaveLength(1)
-      const evt = result.history[0]
+      expect(result.change.history).toHaveLength(1)
+      const evt = result.change.history[0]
       expect(evt?.type).toBe('created')
       if (evt?.type !== 'created') throw new Error('unreachable')
       expect(evt.by).toEqual(testActor)
@@ -68,7 +69,7 @@ describe('CreateChange', () => {
         schemaVersion: 1,
       })
 
-      expect(result.state).toBe('drafting')
+      expect(result.change.state).toBe('drafting')
     })
 
     it('allows empty specIds for bootstrapping', async () => {
@@ -82,8 +83,8 @@ describe('CreateChange', () => {
         schemaVersion: 1,
       })
 
-      expect(result.specIds).toEqual([])
-      expect(result.workspaces).toEqual([])
+      expect(result.change.specIds).toEqual([])
+      expect(result.change.workspaces).toEqual([])
     })
 
     it('deduplicates specIds', async () => {
@@ -97,7 +98,7 @@ describe('CreateChange', () => {
         schemaVersion: 1,
       })
 
-      expect(result.specIds).toEqual(['auth/login'])
+      expect(result.change.specIds).toEqual(['auth/login'])
     })
   })
 

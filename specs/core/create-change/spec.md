@@ -12,7 +12,7 @@ Every spec workflow begins with a named change, so the system needs a single ent
 
 - `name` (string, required) — unique slug name for the change (kebab-case)
 - `description` (string, optional) — free-text description of the change's purpose
-- `specIds` (readonly string[], required) — spec paths being created or modified
+- `specIds` (readonly string\[], required) — spec paths being created or modified
 - `schemaName` (string, required) — the active schema name from configuration
 - `schemaVersion` (number, required) — the active schema version from configuration
 
@@ -41,7 +41,9 @@ The `Change` entity MUST be constructed with `name`, `createdAt`, `specIds`, and
 
 ### Requirement: Persistence and scaffolding
 
-After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks the `SpecRepository` map for each spec ID's workspace. Finally, the use case returns the newly created `Change` instance.
+After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks the `SpecRepository` map for each spec ID's workspace. Finally, the use case returns an object containing the newly created `Change` instance and the `changePath` (obtained via `ChangeRepository.changePath(change)`).
+
+The return type is `{ change: Change; changePath: string }`.
 
 ### Requirement: Dependencies
 

@@ -44,6 +44,14 @@
 - **AND** stderr is empty
 - **AND** the process exits with code 0
 
+### Requirement: JSON output includes changePath
+
+#### Scenario: JSON output contains changePath
+
+- **WHEN** `specd change create my-change --format json` succeeds
+- **THEN** the JSON output includes `changePath` as an absolute path string
+- **AND** the path points to the change directory under `.specd/changes/`
+
 ### Requirement: Duplicate name error
 
 #### Scenario: Name already exists
