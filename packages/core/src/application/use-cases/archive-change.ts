@@ -1,6 +1,5 @@
 import path from 'node:path'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
 import { HookFailedError } from '../../domain/errors/hook-failed-error.js'
@@ -120,7 +119,6 @@ export class ArchiveChange {
     if (change === null) throw new ChangeNotFoundError(input.name)
 
     const schema = await this._schemaProvider.get()
-    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     // --- Schema name guard ---
     if (schema.name() !== change.schemaName) {

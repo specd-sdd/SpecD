@@ -64,7 +64,7 @@ On success, `GetStatusResult` MUST include a `lifecycle` object with the followi
 
 ### Requirement: Graceful degradation when schema resolution fails
 
-If `SchemaProvider.get()` returns `null` or throws, the `lifecycle` object MUST still be present with degraded values:
+If `SchemaProvider.get()` throws, the `lifecycle` object MUST still be present with degraded values:
 
 - `validTransitions` MUST be populated normally (it is a static lookup, independent of schema)
 - `availableTransitions` MUST be an empty array
@@ -74,7 +74,7 @@ If `SchemaProvider.get()` returns `null` or throws, the `lifecycle` object MUST 
 - `changePath` MUST be populated normally
 - `schemaInfo` MUST be `null`
 
-The use case MUST NOT throw when schema resolution fails — it degrades the lifecycle fields silently.
+The use case MUST NOT throw when schema resolution fails — it degrades the lifecycle fields silently. It MUST wrap the `SchemaProvider.get()` call in a `try/catch` to achieve this.
 
 ## Constraints
 

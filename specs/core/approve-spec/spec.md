@@ -8,12 +8,12 @@ Changes need a controlled gate where a human confirms the spec is correct before
 
 ### Requirement: Gate guard
 
-Before recording the approval, the use case MUST verify that the change is in a valid state for spec approval. The gate guard sequence is:
+The gate guard sequence is:
 
 1. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.
 2. Assert the change is in `ready` state. If not, throw `InvalidStateTransitionError`.
 3. Resolve the current actor identity via `ActorResolver`.
-4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved (returns `null`), throw `SchemaNotFoundError`.
+4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these.
 5. Compare `schema.name()` with `change.schemaName`. If they differ, throw `SchemaMismatchError`.
 
 ### Requirement: Change lookup

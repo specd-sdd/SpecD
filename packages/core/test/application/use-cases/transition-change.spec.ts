@@ -39,7 +39,7 @@ function makeUseCase(
   return new TransitionChange(
     repo,
     makeActorResolver(),
-    makeSchemaProvider(overrides?.schema ?? null),
+    makeSchemaProvider(overrides?.schema !== undefined ? overrides.schema : makeSchema()),
     overrides?.runStepHooks ?? makeRunStepHooks(),
   )
 }
@@ -1129,26 +1129,21 @@ describe('TransitionChange', () => {
   })
 
   describe('schema resolution edge cases', () => {
-    it('skips requires and hooks when schema cannot be resolved', async () => {
+    it('throws when schema cannot be resolved', async () => {
       const change = makeChangeInState('my-change', [
         { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
         { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
       ])
-      const executeSpy = vi.fn().mockResolvedValue({ hooks: [], success: true, failedHook: null })
-      const runStepHooks = makeRunStepHooks({ execute: executeSpy })
-      const uc = makeUseCase(makeChangeRepository([change]), { schema: null, runStepHooks })
+      const uc = makeUseCase(makeChangeRepository([change]), { schema: null })
 
-      const result = await uc.execute({
-        name: 'my-change',
-        to: 'implementing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
-      })
-
-      expect(result.change.state).toBe('implementing')
-      // No workflow step → hooks are NOT called
-      expect(executeSpy).not.toHaveBeenCalled()
-      expect(result.change).toBeDefined()
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'implementing',
+          approvalsSpec: false,
+          approvalsSignoff: false,
+        }),
+      ).rejects.toThrow()
     })
 
     it('skips requires and hooks when schema has no workflow step for target', async () => {

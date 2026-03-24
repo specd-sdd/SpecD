@@ -27,7 +27,7 @@ Since `GetProjectContext` operates without a change, it has no `specIds` or `spe
 
 ### Requirement: Resolves schema before processing
 
-The use case MUST obtain the project's schema via `SchemaProvider.get()` before processing any specs. If the schema cannot be resolved (returns `null`), the use case MUST throw `SchemaNotFoundError`.
+The use case MUST obtain the project's schema via `SchemaProvider.get()` before processing any specs. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these.
 
 ### Requirement: Renders project-level context entries
 

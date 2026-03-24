@@ -65,7 +65,7 @@
     {
       "requirement": "createKernel constructs shared adapters once",
       "rules": [
-        "`createKernel(config)` MUST construct all shared adapters, ports, and use cases exactly once and wire them together. Constructing the same adapter or use case twice would waste resources and risk inconsistent state.\n\nShared infrastructure includes:\n\n- One `ChangeRepository` instance (shared by all change use cases)\n- One `SpecRepository` per workspace\n- One `SchemaRegistry` instance\n- One `SchemaProvider` instance — a lazy, caching provider that resolves the schema (with plugins and overrides) on first access via `ResolveSchema`, then returns the cached result. All use cases that need the schema MUST receive this provider instead of the raw `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple.\n- One `HookRunner` instance\n- One `RunStepHooks` instance (shared by `TransitionChange`, `ArchiveChange`, and exposed directly)\n- One `ContentHasher` instance\n- One `ArtifactParserRegistry` instance\n\nNo use case constructor may call `SchemaRegistry.resolve()` directly. Schema access is exclusively through `SchemaProvider.get()`, which returns the fully-resolved schema with extends chains, plugins, and `schemaOverrides` applied.\n\n`RunStepHooks` and `GetHookInstructions` do not receive project-level workflow hooks — all hooks are merged into the schema by `ResolveSchema` via `schemaOverrides`. The kernel does not read `config.workflow`."
+        "`createKernel(config, options?)` instantiates every shared dependency once, wires them\ntogether, and returns a `Kernel` object. The construction MUST include:\n\n- One `ChangeRepository` instance (shared by all change use cases)\n- One `SpecRepository` per workspace\n- One `SchemaRegistry` instance\n- One `SchemaProvider` instance — a lazy, caching provider that resolves the schema (with plugins and overrides) on first access via `ResolveSchema`, then returns the cached result. If resolution fails, the error propagates directly — the provider does not cache failures. All use cases that need the schema MUST receive this provider instead of the raw `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple.\n- One `HookRunner` instance\n- One `RunStepHooks` instance (shared by `TransitionChange`, `ArchiveChange`, and exposed directly)\n- One `ContentHasher` instance\n- One `ArtifactParserRegistry` instance\n\nNo use case constructor may call `SchemaRegistry.resolve()` directly. Schema access is exclusively through `SchemaProvider.get()`, which returns the fully-resolved schema with extends chains, plugins, and `schemaOverrides` applied. `get()` throws `SchemaNotFoundError` or `SchemaValidationError` on failure — it never returns `null`.\n\n`RunStepHooks` and `GetHookInstructions` do not receive project-level workflow hooks — all hooks are merged into the schema by `ResolveSchema` via `schemaOverrides`. The kernel does not read `config.workflow`."
       ]
     },
     {
@@ -270,8 +270,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e97ef152ac0a46beb5717c7af8d51e5722418b54ddf560e18cb9c2c81095ea4e",
-    "verify.md": "sha256:0fc05e9d04345029957648b9420e5453b4cca23f5363ad63e2e404f490d1a9d1"
+    "spec.md": "sha256:67bd3b05b8b018483674599131c86bd8afe10b370c8c049a53e5f394e6ca33e8",
+    "verify.md": "sha256:27bc41de377c001ea4dfd731a0ff50f11c6bab8570faab699c0d15fe90a7e3af"
   },
   "generatedBy": "core"
 }

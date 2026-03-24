@@ -4,10 +4,10 @@
 
 ### Requirement: Resolve the active schema
 
-#### Scenario: Schema not found throws SchemaNotFoundError
+#### Scenario: Schema resolution failure propagates
 
-- **WHEN** `SchemaProvider.get()` returns `null` for the configured schema reference
-- **THEN** a `SchemaNotFoundError` is thrown
+- **WHEN** `SchemaProvider.get()` throws `SchemaNotFoundError`
+- **THEN** the error propagates — the use case does not catch it
 
 ### Requirement: Filter to spec-scoped artifact types
 

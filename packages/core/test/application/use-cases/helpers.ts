@@ -1,3 +1,4 @@
+import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { Change, type ActorIdentity } from '../../../src/domain/entities/change.js'
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { type Spec } from '../../../src/domain/entities/spec.js'
@@ -289,10 +290,14 @@ export function makeSchemaRegistry(schema: Schema | null = null): SchemaRegistry
 
 /**
  * Creates a mock `SchemaProvider` that returns a fixed schema on `get()`.
+ *
+ * When `schema` is `null`, the provider throws `SchemaNotFoundError` to
+ * match the real contract where `get()` never returns `null`.
  */
 export function makeSchemaProvider(schema: Schema | null = null): SchemaProvider {
   return {
-    async get(): Promise<Schema | null> {
+    async get(): Promise<Schema> {
+      if (schema === null) throw new SchemaNotFoundError('(test)')
       return schema
     },
   }

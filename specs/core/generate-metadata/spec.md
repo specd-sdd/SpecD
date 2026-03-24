@@ -12,7 +12,7 @@ The use case takes a `specId` string (e.g. `'core/change'` or `'billing:invoices
 
 ### Requirement: Schema resolution
 
-The use case obtains the active schema via `SchemaProvider.get()`. If the schema cannot be resolved (returns `null`), it throws `SchemaNotFoundError`. If the resolved schema has no `metadataExtraction` declarations, the use case returns `{ metadata: {}, hasExtraction: false }` immediately — there is nothing to extract.
+The use case obtains the active schema via `SchemaProvider.get()`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these. If the resolved schema has no `metadataExtraction` declarations, the use case returns `{ metadata: {}, hasExtraction: false }` immediately — there is nothing to extract.
 
 ### Requirement: Spec resolution
 

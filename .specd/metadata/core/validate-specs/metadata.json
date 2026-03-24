@@ -15,7 +15,7 @@
     {
       "requirement": "Resolve the active schema",
       "rules": [
-        "The use case SHALL obtain the schema via `SchemaProvider.get()`. If the schema cannot be resolved (returns `null`), the use case MUST throw a `SchemaNotFoundError`."
+        "The use case SHALL obtain the schema via `SchemaProvider.get()`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these."
       ]
     },
     {
@@ -70,9 +70,9 @@
   "scenarios": [
     {
       "requirement": "Resolve the active schema",
-      "name": "Schema not found throws SchemaNotFoundError",
-      "when": ["SchemaProvider.get() returns null for the configured schema reference"],
-      "then": ["a SchemaNotFoundError is thrown"]
+      "name": "Schema resolution failure propagates",
+      "when": ["SchemaProvider.get() throws SchemaNotFoundError"],
+      "then": ["the error propagates — the use case does not catch it"]
     },
     {
       "requirement": "Filter to spec-scoped artifact types",
@@ -178,8 +178,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9cbeae7136c768a182e3531f37c7ce1c07b6b31d426eab64d11cae59149f4794",
-    "verify.md": "sha256:805d8e2933faae7ae1601b79edda203c735a5156ad4812c09b9705362a9274da"
+    "spec.md": "sha256:5f880eeaaa4004cc873ebba0195034ff1c1a22caab5e59b1d2e882d7f2b432ed",
+    "verify.md": "sha256:748ab9f5b82ef32a9c11a9f76ed0dbc9f6ae3f0fdb1daa997c9ca6d2895868ba"
   },
   "generatedBy": "core"
 }

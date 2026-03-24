@@ -14,7 +14,7 @@
     {
       "requirement": "Gate guard",
       "rules": [
-        "Before recording the approval, the use case MUST verify that the change is in a valid state for spec approval. The gate guard sequence is:\n\n1. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.\n2. Assert the change is in `ready` state. If not, throw `InvalidStateTransitionError`.\n3. Resolve the current actor identity via `ActorResolver`.\n4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved (returns `null`), throw `SchemaNotFoundError`.\n5. Compare `schema.name()` with `change.schemaName`. If they differ, throw `SchemaMismatchError`."
+        "The gate guard sequence is:\n\n1. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.\n2. Assert the change is in `ready` state. If not, throw `InvalidStateTransitionError`.\n3. Resolve the current actor identity via `ActorResolver`.\n4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these.\n5. Compare `schema.name()` with `change.schemaName`. If they differ, throw `SchemaMismatchError`."
       ]
     },
     {
@@ -95,10 +95,10 @@
     },
     {
       "requirement": "Artifact hash computation",
-      "name": "Schema does not resolve",
-      "given": ["SchemaProvider.get() returns null for the configured schema"],
-      "when": ["the use case computes artifact hashes"],
-      "then": ["all artifacts are hashed without any pre-hash cleanup rules applied"]
+      "name": "Schema resolution failure propagates",
+      "given": ["SchemaProvider.get() throws for the configured schema"],
+      "when": ["the use case executes"],
+      "then": ["the error propagates from the gate guard before hash computation is reached"]
     },
     {
       "requirement": "Approval recording and state transition",
@@ -135,8 +135,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:cfb05f1edaec5d2b0b8423e89e726162c7b3c086f772bcf645ddf1d389e723e9",
-    "verify.md": "sha256:1be02ca613e71a11b5cfaa599eff56433dbbb034f274b0eee74d4477b273dccf"
+    "spec.md": "sha256:bd5c2bf0cecfd54c44b040d1da0a4bb1c29f72a4b544727fd5d0a39e16b7d31e",
+    "verify.md": "sha256:1e048d94a78d3cf5ef2088d4192b06b3ff0f0bb5747499ce8358f9c6b8c1183a"
   },
   "generatedBy": "core"
 }
