@@ -103,15 +103,18 @@ artifacts:
 
       Operations:
       - **added**: New requirement. Use `position.parent` targeting the Requirements
-        section. Include the full `### Requirement: <name>` heading in `content`.
+        section. `content` MUST include the full `### Requirement: <name>` heading
+        followed by the body — because there is no existing heading to preserve.
       - **modified**: Changed requirement. Selector must target the requirement section
-        by its exact heading text. Include the complete updated block in `content` —
-        partial content loses detail at archive time.
-      - **removed**: Deprecated requirement. Include a reason and migration path in
-        `content` so readers understand what replaces it.
-      - **renamed**: Name change only. Use `from` / `to` in the selector.
+        by its exact heading text. `content` is the **body only** — do NOT repeat the
+        `### Requirement:` heading in content, it is preserved from the selector match.
+        Include the complete updated body — partial content loses detail at archive time.
+      - **removed**: Deprecated requirement. Selector targets the heading; the entire
+        section (heading + body) is deleted.
+      - **renamed**: Name change only. Use `rename` field on a `modified` operation.
 
-      Every `### Requirement:` heading in `content` must use exactly three hashtags.
+      For **added** operations only, every `### Requirement:` heading in `content` must
+      use exactly three hashtags.
 
       If the change introduces new dependencies on other specs, add or update the
       `## Spec Dependencies` section using an `added` or `modified` operation targeting
@@ -190,17 +193,19 @@ artifacts:
 
       Operations:
       - **modified**: Updated scenarios under an existing requirement. Selector targets
-        the `### Requirement: <name>` section. Include all scenarios for that requirement
-        in `content` — not just the new ones.
+        the `### Requirement: <name>` section. `content` is the **body only** (the
+        scenarios) — do NOT repeat the `### Requirement:` heading. Include all scenarios
+        for that requirement in `content` — not just the new ones.
       - **added**: Required for every new requirement added to spec.md in the same change.
         Every new requirement must have at least one scenario — do not leave a new requirement
         without verification coverage. Use `position.parent` targeting the Requirements section.
-        Include the full `### Requirement:` heading and at least one `#### Scenario:` block
-        in `content`.
+        `content` MUST include the full `### Requirement:` heading and at least one
+        `#### Scenario:` block — because there is no existing heading to preserve.
       - **removed**: Required for every requirement removed from spec.md in the same change.
-        The selector must target the `### Requirement: <name>` section by its exact heading text.
+        Selector targets the `### Requirement: <name>` section; the entire section is deleted.
 
-      Every `#### Scenario:` heading in `content` must use exactly four hashtags.
+      For **added** operations only, every `#### Scenario:` heading in `content` must
+      use exactly four hashtags.
 
       If a spec listed in the proposal does not need changes to its verify.md (e.g.
       existing scenarios remain valid), create a no-op delta instead of skipping the file:
