@@ -7,7 +7,7 @@ argument-hint: '[description of what you want to do]'
 
 # specd-new — discover and create
 
-Read `.claude/skills/specd-v3/shared.md` before doing anything.
+Read `.specd/skills/shared.md` before doing anything.
 
 ## What this does
 
