@@ -34,6 +34,12 @@
       ]
     },
     {
+      "requirement": "Task completion gating",
+      "rules": [
+        "When a workflow step's `requires` array includes an artifact whose `ArtifactType` declares a `taskCompletionCheck`, the transition system MUST verify that the artifact's content contains no incomplete task items before allowing the transition. This check is performed automatically as part of requires enforcement — callers do not need to supply task checks explicitly.\n\nFor each required artifact that has a `taskCompletionCheck`:\n\n1. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.\n2. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.\n3. If the file does not exist (returns `null`), skip it.\n4. Compile `taskCompletionCheck.incompletePattern` using `safeRegex` with the `'m'` flag.\n5. If the regex is valid and matches any line in the file content, reject the transition with `InvalidStateTransitionError`.\n\nThis rule applies to ANY workflow step that requires an artifact with `taskCompletionCheck`, not only to a specific transition. For example, if both `verifying` and `archiving` steps require the `tasks` artifact, both transitions enforce task completion."
+      ]
+    },
+    {
       "requirement": "Step availability evaluation",
       "rules": [
         "Step availability MUST be evaluated consistently by all consumers that need it. `CompileContext` evaluates step availability during context assembly. `GetStatus` reports the current change state, which corresponds directly to the active workflow step (since step name = state name). The evaluation is:\n\n```\nstepAvailable(step, change) =\n  step.requires.every(id => change.effectiveStatus(id) ∈ { complete, skipped })\n```\n\nThis evaluation is performed dynamically on each invocation — it is not cached or snapshotted."
@@ -71,7 +77,9 @@
     "A step with an empty requires is always available regardless of change state",
     "Step requires contains artifact IDs, not step names — step-to-step cycles are structurally impossible",
     "The artifact dependency graph is validated as a DAG by buildSchema() — cycles are rejected at schema load time",
-    "The archiving step is the only step that is both a workflow step and handled by a dedicated use case (ArchiveChange)"
+    "The archiving step is the only step that is both a workflow step and handled by a dedicated use case (ArchiveChange)",
+    "Task completion gating is derived automatically from the schema's taskCompletionCheck declarations — callers never supply task checks explicitly",
+    "Task completion checks use safeRegex to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)"
   ],
   "scenarios": [
     {
@@ -124,6 +132,71 @@
       "then": ["the step is available"]
     },
     {
+      "requirement": "Task completion gating",
+      "name": "Transition blocked when required artifact has incomplete tasks",
+      "given": [
+        "a workflow step with requires: [tasks]",
+        "AND the tasks artifact type declares taskCompletionCheck.incompletePattern: '^\\s*-\\s+\\[ \\]'",
+        "AND the tasks file contains - [ ] implement login"
+      ],
+      "when": ["a transition to that step is attempted"],
+      "then": ["InvalidStateTransitionError is thrown"]
+    },
+    {
+      "requirement": "Task completion gating",
+      "name": "Transition allowed when all tasks are complete",
+      "given": [
+        "a workflow step with requires: [tasks]",
+        "AND the tasks artifact type declares taskCompletionCheck",
+        "AND the tasks file contains only - [x] implement login"
+      ],
+      "when": ["a transition to that step is attempted"],
+      "then": ["the transition proceeds"]
+    },
+    {
+      "requirement": "Task completion gating",
+      "name": "Missing artifact file is skipped",
+      "given": [
+        "a workflow step with requires: [tasks]",
+        "AND the tasks artifact type declares taskCompletionCheck",
+        "AND the tasks file does not exist in the change directory"
+      ],
+      "when": ["a transition to that step is attempted"],
+      "then": ["the check is skipped and the transition proceeds"]
+    },
+    {
+      "requirement": "Task completion gating",
+      "name": "Required artifact without taskCompletionCheck is not content-checked",
+      "given": [
+        "a workflow step with requires: [specs, tasks]",
+        "AND the specs artifact type has no taskCompletionCheck",
+        "AND the tasks artifact type declares taskCompletionCheck"
+      ],
+      "when": ["a transition to that step is attempted"],
+      "then": ["only tasks is content-checked; specs is checked only via effectiveStatus"]
+    },
+    {
+      "requirement": "Task completion gating",
+      "name": "Generic gating applies to any step, not just implementing to verifying",
+      "given": [
+        "a workflow step archiving with requires: [tasks]",
+        "AND the tasks artifact type declares taskCompletionCheck",
+        "AND the tasks file contains incomplete items"
+      ],
+      "when": ["a transition to archiving is attempted"],
+      "then": ["InvalidStateTransitionError is thrown"]
+    },
+    {
+      "requirement": "Task completion gating",
+      "name": "Invalid regex pattern is treated as non-matching",
+      "given": [
+        "a workflow step with requires: [tasks]",
+        "AND the tasks artifact type declares taskCompletionCheck.incompletePattern as an invalid regex"
+      ],
+      "when": ["a transition to that step is attempted"],
+      "then": ["the check is skipped and the transition proceeds"]
+    },
+    {
       "requirement": "Workflow array order is display order",
       "name": "Later step available before earlier step",
       "given": [
@@ -156,8 +229,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:38d63abd0d7065d31eee0ec2349a3dd0d739cc5c7dc5260f54be61a6c46b6bd3",
-    "verify.md": "sha256:18b71b772cd4bd6c422de4869de0bbb8af5540d09f4bd6ad73468bb5385477af"
+    "spec.md": "sha256:2410d1bddbc128d732498fff6e5faa60a0a33b755a513c619da199f447a8089d",
+    "verify.md": "sha256:1eba980d2e19726fe78c8b8d4e9b07fde0399a8dd5f6ef2ce9323ee1a5996466"
   },
   "generatedBy": "core"
 }

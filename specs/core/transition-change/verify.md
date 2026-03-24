@@ -37,51 +37,68 @@
 - **WHEN** `execute` is called with `to: 'archivable'` and `approvalsSignoff: false`
 - **THEN** the change transitions to `archivable`
 
-### Requirement: Task completion check on implementing to verifying
+### Requirement: Task completion check during requires enforcement
 
-#### Scenario: Transition blocked by incomplete tasks
+#### Scenario: Transition blocked by incomplete tasks in required artifact
 
-- **GIVEN** a change in `implementing` state with an artifact file containing an unchecked checkbox line
-- **WHEN** `execute` is called with `to: 'verifying'` and a matching `implementingTaskChecks` entry
+- **GIVEN** a change in `implementing` state
+- **AND** the `verifying` step requires an artifact whose type declares `taskCompletionCheck`
+- **AND** the artifact file contains a line matching `incompletePattern`
+- **WHEN** `execute` is called with `to: 'verifying'`
 - **THEN** it throws `InvalidStateTransitionError`
 
 #### Scenario: Transition allowed when all tasks are complete
 
-- **GIVEN** a change in `implementing` state with an artifact file containing only checked checkboxes
-- **WHEN** `execute` is called with `to: 'verifying'` and `implementingTaskChecks` entries
+- **GIVEN** a change in `implementing` state
+- **AND** the `verifying` step requires an artifact whose type declares `taskCompletionCheck`
+- **AND** the artifact file contains only completed items
+- **WHEN** `execute` is called with `to: 'verifying'`
 - **THEN** the change transitions to `verifying`
 
 #### Scenario: Missing artifact file is skipped
 
 - **GIVEN** a change in `implementing` state
-- **WHEN** `execute` is called with `to: 'verifying'` and a task check referencing a non-existent artifact file
+- **AND** the `verifying` step requires an artifact with `taskCompletionCheck`
+- **AND** the artifact file does not exist
+- **WHEN** `execute` is called with `to: 'verifying'`
 - **THEN** the check is skipped and the transition proceeds
 
 #### Scenario: Invalid regex pattern is treated as non-matching
 
-- **GIVEN** a change in `implementing` state
-- **WHEN** `execute` is called with a task check whose `incompletePattern` is an invalid regex
+- **GIVEN** a required artifact with `taskCompletionCheck.incompletePattern` set to an invalid regex
+- **WHEN** a transition to the step requiring it is attempted
 - **THEN** the check is skipped and the transition proceeds
 
-#### Scenario: No task checks provided defaults to empty
+#### Scenario: Task check applies to any step with taskCompletionCheck requires
 
-- **GIVEN** a change in `implementing` state
-- **WHEN** `execute` is called with `to: 'verifying'` and no `implementingTaskChecks`
-- **THEN** the transition proceeds without any task checks
+- **GIVEN** a change transitioning to a step whose `requires` includes an artifact with `taskCompletionCheck`
+- **AND** the artifact file contains incomplete items
+- **WHEN** `execute` is called
+- **THEN** `InvalidStateTransitionError` is thrown — not limited to `implementing → verifying`
+
+#### Scenario: Required artifact without taskCompletionCheck is not content-checked
+
+- **GIVEN** a step that requires `[specs, tasks]`
+- **AND** `specs` has no `taskCompletionCheck`
+- **AND** `tasks` has `taskCompletionCheck` with incomplete items
+- **WHEN** `execute` is called
+- **THEN** only `tasks` triggers the content check; `specs` is checked only via `effectiveStatus`
 
 ### Requirement: Artifact validation clearing on verifying to implementing
 
-#### Scenario: Artifact validations are cleared on verifying to implementing
+#### Scenario: Artifact validations are cleared using schema requires
 
 - **GIVEN** a change in `verifying` state with validated artifacts
-- **WHEN** `execute` is called with `to: 'implementing'` and `implementingRequires: ['spec', 'tasks']`
-- **THEN** `change.clearArtifactValidations` is called with `['spec', 'tasks']` before the transition
+- **AND** the schema's `implementing` step declares `requires: ['specs', 'tasks']`
+- **WHEN** `execute` is called with `to: 'implementing'`
+- **THEN** `change.clearArtifactValidations` is called with `['specs', 'tasks']` from the schema
 
-#### Scenario: No implementingRequires defaults to empty
+#### Scenario: No implementing step in schema defaults to no clearing
 
 - **GIVEN** a change in `verifying` state
-- **WHEN** `execute` is called with `to: 'implementing'` and no `implementingRequires`
-- **THEN** `change.clearArtifactValidations` is called with an empty array
+- **AND** the schema does not declare an `implementing` workflow step
+- **WHEN** `execute` is called with `to: 'implementing'`
+- **THEN** `change.clearArtifactValidations` is not called
 
 ### Requirement: Transition to designing from any state
 
