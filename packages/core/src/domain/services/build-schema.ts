@@ -558,10 +558,10 @@ export function buildSchema(
         `artifact '${artifact.id}'`,
       )
     }
-    if (artifact.rules?.pre.length ?? 0 > 0) {
+    if ((artifact.rules?.pre.length ?? 0) > 0) {
       validateArrayIds(ref, artifact.rules!.pre, 'rules.pre', `artifact '${artifact.id}'`)
     }
-    if (artifact.rules?.post.length ?? 0 > 0) {
+    if ((artifact.rules?.post.length ?? 0) > 0) {
       validateArrayIds(ref, artifact.rules!.post, 'rules.post', `artifact '${artifact.id}'`)
     }
     if (artifact.preHashCleanup.length > 0) {
