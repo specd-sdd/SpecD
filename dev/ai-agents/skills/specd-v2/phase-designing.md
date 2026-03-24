@@ -59,7 +59,7 @@ the change, then summarize:
 Only proceed to A.2 after the user confirms.
 
 If specIds need updating based on the discovery, look up the correct fully-qualified
-ID from `spec list --format text` (the PATH column) and use it:
+ID from `spec list --format text --summary` (the PATH column) and use it:
 
 ```bash
 node packages/cli/dist/index.js change edit <name> --add-spec <workspace:capability-path>

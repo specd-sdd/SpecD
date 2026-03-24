@@ -43,7 +43,7 @@ spec implications. Examples:
    designing, inform the user of the lifecycle cost.
 
    **Always use fully-qualified spec IDs** (`workspace:capability-path`). Never guess —
-   look up the correct ID from `spec list --format text` before passing it to any command.
+   look up the correct ID from `spec list --format text --summary` before passing it to any command.
 
 5. **If no active change exists** and the conversation reveals a spec-worthy decision,
    note it to the user:
