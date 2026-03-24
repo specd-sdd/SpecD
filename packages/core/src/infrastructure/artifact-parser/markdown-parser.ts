@@ -683,17 +683,32 @@ Markdown files are parsed into a normalized AST using a sectionize algorithm. He
 - \`contains\`: Regex matched against the node's \`value\` (paragraph text).
 - \`parent\`: Constrains the search to nodes inside a specific parent section.
 
-### Key Semantics
-- For \`op: modified\` with \`content\`: the \`content\` is the **body only** — the heading/identifying line is preserved (or replaced via \`rename\`).
-- For \`op: added\` with \`content\`: the \`content\` must start with the full heading line (e.g. \`### Heading\`) followed by the body.
-- \`rename\` changes the heading text (identifying property) without touching the body.
+### Key Semantics — CRITICAL
+
+The selector targets a **parent node**. The \`content\` field replaces its **children** (body).
+Think of it as: selector = container, content = what goes inside.
+
+**\`op: modified\`**: The selector finds the node. \`content\` replaces its children (body only).
+The node itself (heading line) is preserved — NEVER include the heading in \`content\`.
+Use \`rename\` to change the heading text without touching the body.
+
+**\`op: removed\`**: The selector finds the node. The entire node is deleted — the heading
+AND all its children (body, nested sections, everything underneath).
+
+**\`op: added\`**: No existing node to target — \`position\` says where to insert.
+\`content\` is the **complete block** including the heading line (e.g. \`### Heading\`)
+followed by the body, because there is no existing heading to preserve.
+
+Common mistake: repeating the heading matched by the selector inside \`content\` of a
+\`modified\` operation — this duplicates it. Only \`added\` needs the heading in content.
 
 ### Delta Location
 Delta files live at \`deltas/<workspace>/<capability-path>/<filename>.md.delta.yaml\`.
 
 ### Example
 \`\`\`yaml
-# Replace body of an existing section
+# MODIFIED — body only, NO heading in content
+# The heading "### Requirement: Login" is preserved automatically
 - op: modified
   selector:
     type: section
@@ -702,14 +717,23 @@ Delta files live at \`deltas/<workspace>/<capability-path>/<filename>.md.delta.y
     The system SHALL authenticate users with email and password.
     Failed attempts SHALL be rate-limited to 5 per minute.
 
-# Rename a section
+# WRONG — this would DUPLICATE the heading:
+# - op: modified
+#   selector:
+#     type: section
+#     matches: 'Requirement: Login'
+#   content: |
+#     ### Requirement: Login        ← WRONG! Don't include this line
+#     The system SHALL authenticate...
+
+# RENAME — changes heading text, body untouched
 - op: modified
   selector:
     type: section
     matches: 'Requirement: Login'
   rename: 'Requirement: Authentication'
 
-# Add a new section inside Requirements, after a specific sibling
+# ADDED — heading MUST be included in content (no existing heading to preserve)
 - op: added
   position:
     parent:
@@ -723,7 +747,7 @@ Delta files live at \`deltas/<workspace>/<capability-path>/<filename>.md.delta.y
 
     The system SHALL allow password reset via email link.
 
-# Remove a section
+# REMOVED — delete a section
 - op: removed
   selector:
     type: section
