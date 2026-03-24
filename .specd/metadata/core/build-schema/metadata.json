@@ -188,6 +188,106 @@
       "then": ["no error is thrown for hook IDs"]
     },
     {
+      "requirement": "Array entry ID validation",
+      "name": "Duplicate validation IDs within same artifact rejected",
+      "given": [
+        "an artifact with validations: [{ id: \"req-1\", type: \"section\" }, { id: \"req-1\", type: \"list-item\" }]"
+      ],
+      "when": ["buildSchema validates the schema"],
+      "then": ["it throws SchemaValidationError mentioning the duplicate validation ID \"req-1\""]
+    },
+    {
+      "requirement": "Array entry ID validation",
+      "name": "Duplicate deltaValidation IDs within same artifact rejected",
+      "given": [
+        "an artifact with deltaValidations: [{ id: \"has-scenario\", type: \"section\" }, { id: \"has-scenario\", type: \"list-item\" }]"
+      ],
+      "when": ["buildSchema validates the schema"],
+      "then": [
+        "it throws SchemaValidationError mentioning the duplicate deltaValidation ID \"has-scenario\""
+      ]
+    },
+    {
+      "requirement": "Array entry ID validation",
+      "name": "Duplicate rules.pre IDs within same artifact rejected",
+      "given": [
+        "an artifact with rules.pre: [{ id: \"normative\", text: \"...\" }, { id: \"normative\", text: \"...\" }]"
+      ],
+      "when": ["buildSchema validates the schema"],
+      "then": [
+        "it throws SchemaValidationError mentioning the duplicate rules.pre ID \"normative\""
+      ]
+    },
+    {
+      "requirement": "Array entry ID validation",
+      "name": "Duplicate rules.post IDs within same artifact rejected",
+      "given": [
+        "an artifact with rules.post: [{ id: \"format\", text: \"...\" }, { id: \"format\", text: \"...\" }]"
+      ],
+      "when": ["buildSchema validates the schema"],
+      "then": ["it throws SchemaValidationError mentioning the duplicate rules.post ID \"format\""]
+    },
+    {
+      "requirement": "Array entry ID validation",
+      "name": "Duplicate preHashCleanup IDs within same artifact rejected",
+      "given": [
+        "an artifact with preHashCleanup: [{ id: \"checkboxes\", pattern: \"...\" }, { id: \"checkboxes\", pattern: \"...\" }]"
+      ],
+      "when": ["buildSchema validates the schema"],
+      "then": [
+        "it throws SchemaValidationError mentioning the duplicate preHashCleanup ID \"checkboxes\""
+      ]
+    },
+    {
+      "requirement": "Array entry ID validation",
+      "name": "Duplicate metadataExtraction.context IDs rejected",
+      "given": [
+        "metadata extraction with context: [{ id: \"ctx-1\", ... }, { id: \"ctx-1\", ... }]"
+      ],
+      "when": ["buildSchema validates the schema"],
+      "then": ["it throws SchemaValidationError mentioning the duplicate context ID \"ctx-1\""]
+    },
+    {
+      "requirement": "Array entry ID validation",
+      "name": "Duplicate metadataExtraction.rules IDs rejected",
+      "given": [
+        "metadata extraction with rules: [{ id: \"rule-1\", ... }, { id: \"rule-1\", ... }]"
+      ],
+      "when": ["buildSchema validates the schema"],
+      "then": ["it throws SchemaValidationError mentioning the duplicate rules ID \"rule-1\""]
+    },
+    {
+      "requirement": "Array entry ID validation",
+      "name": "Duplicate metadataExtraction.constraints IDs rejected",
+      "given": [
+        "metadata extraction with constraints: [{ id: \"constraint-1\", ... }, { id: \"constraint-1\", ... }]"
+      ],
+      "when": ["buildSchema validates the schema"],
+      "then": [
+        "it throws SchemaValidationError mentioning the duplicate constraints ID \"constraint-1\""
+      ]
+    },
+    {
+      "requirement": "Array entry ID validation",
+      "name": "Duplicate metadataExtraction.scenarios IDs rejected",
+      "given": [
+        "metadata extraction with scenarios: [{ id: \"scenario-1\", ... }, { id: \"scenario-1\", ... }]"
+      ],
+      "when": ["buildSchema validates the schema"],
+      "then": [
+        "it throws SchemaValidationError mentioning the duplicate scenarios ID \"scenario-1\""
+      ]
+    },
+    {
+      "requirement": "Array entry ID validation",
+      "name": "Unique IDs within different arrays are accepted",
+      "given": [
+        "an artifact with validations: [{ id: \"v1\", ... }] and another artifact with validations: [{ id: \"v1\", ... }]"
+      ],
+      "when": ["buildSchema validates the schema"],
+      "then": ["no error is thrown — IDs only need to be unique within their immediate array"]
+    },
+    {
       "requirement": "Template reference validation",
       "name": "Template path not in templates map",
       "when": [
@@ -366,7 +466,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:b48b1b575ba06a7cf9dafe83d098f2f4f185f580011c06a5d5e1b0ba323e3666",
-    "verify.md": "sha256:21a9a42f5d0295dd7c2f28da55f50b285979a601afb0fa7b323bfbf288c61e8c"
+    "verify.md": "sha256:b28e4b4d8165625cd9895c9b9bb72ba017cdab4043f1ff50d759272e7a84f19d"
   },
   "generatedBy": "core"
 }

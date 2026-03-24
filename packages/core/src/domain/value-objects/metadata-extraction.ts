@@ -6,6 +6,8 @@ import { type Extractor } from './extractor.js'
  * artifact types (e.g. `specs`, `verify`).
  */
 export interface MetadataExtractorEntry {
+  /** Unique identifier for this extractor entry within the metadataExtraction block. */
+  readonly id?: string
   /** The artifact type ID this extractor targets (e.g. `'specs'`, `'verify'`). */
   readonly artifact: string
   /** The extraction configuration. */

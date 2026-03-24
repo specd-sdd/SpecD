@@ -59,6 +59,66 @@
 - **WHEN** `buildSchema` validates the schema
 - **THEN** no error is thrown for hook IDs
 
+#### Scenario: Duplicate validation IDs within same artifact rejected
+
+- **GIVEN** an artifact with `validations: [{ id: "req-1", type: "section" }, { id: "req-1", type: "list-item" }]`
+- **WHEN** `buildSchema` validates the schema
+- **THEN** it throws `SchemaValidationError` mentioning the duplicate validation ID `"req-1"`
+
+#### Scenario: Duplicate deltaValidation IDs within same artifact rejected
+
+- **GIVEN** an artifact with `deltaValidations: [{ id: "has-scenario", type: "section" }, { id: "has-scenario", type: "list-item" }]`
+- **WHEN** `buildSchema` validates the schema
+- **THEN** it throws `SchemaValidationError` mentioning the duplicate deltaValidation ID `"has-scenario"`
+
+#### Scenario: Duplicate rules.pre IDs within same artifact rejected
+
+- **GIVEN** an artifact with `rules.pre: [{ id: "normative", text: "..." }, { id: "normative", text: "..." }]`
+- **WHEN** `buildSchema` validates the schema
+- **THEN** it throws `SchemaValidationError` mentioning the duplicate rules.pre ID `"normative"`
+
+#### Scenario: Duplicate rules.post IDs within same artifact rejected
+
+- **GIVEN** an artifact with `rules.post: [{ id: "format", text: "..." }, { id: "format", text: "..." }]`
+- **WHEN** `buildSchema` validates the schema
+- **THEN** it throws `SchemaValidationError` mentioning the duplicate rules.post ID `"format"`
+
+#### Scenario: Duplicate preHashCleanup IDs within same artifact rejected
+
+- **GIVEN** an artifact with `preHashCleanup: [{ id: "checkboxes", pattern: "..." }, { id: "checkboxes", pattern: "..." }]`
+- **WHEN** `buildSchema` validates the schema
+- **THEN** it throws `SchemaValidationError` mentioning the duplicate preHashCleanup ID `"checkboxes"`
+
+#### Scenario: Duplicate metadataExtraction.context IDs rejected
+
+- **GIVEN** metadata extraction with `context: [{ id: "ctx-1", ... }, { id: "ctx-1", ... }]`
+- **WHEN** `buildSchema` validates the schema
+- **THEN** it throws `SchemaValidationError` mentioning the duplicate context ID `"ctx-1"`
+
+#### Scenario: Duplicate metadataExtraction.rules IDs rejected
+
+- **GIVEN** metadata extraction with `rules: [{ id: "rule-1", ... }, { id: "rule-1", ... }]`
+- **WHEN** `buildSchema` validates the schema
+- **THEN** it throws `SchemaValidationError` mentioning the duplicate rules ID `"rule-1"`
+
+#### Scenario: Duplicate metadataExtraction.constraints IDs rejected
+
+- **GIVEN** metadata extraction with `constraints: [{ id: "constraint-1", ... }, { id: "constraint-1", ... }]`
+- **WHEN** `buildSchema` validates the schema
+- **THEN** it throws `SchemaValidationError` mentioning the duplicate constraints ID `"constraint-1"`
+
+#### Scenario: Duplicate metadataExtraction.scenarios IDs rejected
+
+- **GIVEN** metadata extraction with `scenarios: [{ id: "scenario-1", ... }, { id: "scenario-1", ... }]`
+- **WHEN** `buildSchema` validates the schema
+- **THEN** it throws `SchemaValidationError` mentioning the duplicate scenarios ID `"scenario-1"`
+
+#### Scenario: Unique IDs within different arrays are accepted
+
+- **GIVEN** an artifact with `validations: [{ id: "v1", ... }]` and another artifact with `validations: [{ id: "v1", ... }]`
+- **WHEN** `buildSchema` validates the schema
+- **THEN** no error is thrown — IDs only need to be unique within their immediate array
+
 ### Requirement: Template reference validation
 
 #### Scenario: Template path not in templates map
