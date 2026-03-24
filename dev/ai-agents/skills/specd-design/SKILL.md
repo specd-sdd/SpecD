@@ -1,7 +1,7 @@
 ---
 name: specd-design
 description: Write the next artifact for a specd change (or all artifacts in fast-forward mode).
-allowed-tools: Bash(node *), Bash(pnpm *), Read, Write, Edit, Grep, Glob, Agent
+allowed-tools: Bash(node *), Bash(pnpm *), Read, Write, Edit, Grep, Glob, Agent, TaskCreate, TaskUpdate
 argument-hint: '<change-name> [--ff]'
 ---
 
@@ -29,7 +29,15 @@ If state is `drafting`, transition to `designing`:
 node packages/cli/dist/index.js change transition <name> designing
 ```
 
-If state is not `drafting` or `designing`, this is the wrong skill — suggest the right one.
+If state is not `drafting` or `designing`, this is the wrong skill. Suggest based on state:
+
+- `implementing` / `spec-approved` → `/specd-implement <name>`
+- `verifying` → `/specd-verify <name>`
+- `done` / `pending-signoff` / `signed-off` / `archivable` → `/specd-archive <name>`
+- `pending-spec-approval` → "Approval pending. Run: `specd change approve spec <name> --reason ...`"
+- `ready` → Review artifacts, then `/specd-implement <name>` if approved
+
+**Stop — do not continue.**
 
 Store `lifecycle.changePath` — artifacts are written there.
 Store `specIds` from the response — you need them for validation.
@@ -64,15 +72,20 @@ Read carefully — contains project-level coding conventions and spec content.
 **You MUST ask the user this question. Do NOT skip it. Do NOT assume a mode.**
 
 If the user already said "all at once", "fast-forward", or `--ff` in
-their invocation → use fast-forward mode. Otherwise, ask:
+their invocation → use fast-forward mode and mark the `Choose review mode` task
+as done immediately. Otherwise:
+
+1. Create (or update) the `Choose review mode` task to `in_progress`
+2. Ask:
 
 > How would you like to review artifacts?
 >
 > 1. **One at a time** — I write one, you review, then we continue
 > 2. **All at once** — I write everything, you review at the end
 
-**STOP and wait for the answer.** Do not proceed until the user responds.
-Default to option 1 only if the user explicitly says they have no preference.
+3. **STOP. End your response here.** Do not write any more text or call any tools.
+   The `Choose review mode` task stays `in_progress` — that is your reminder that
+   you are waiting. Only mark it done and continue when the user replies.
 
 ### 6. Get next artifact
 
@@ -193,6 +206,46 @@ Suggest: `/specd-implement <name>`
 > Then: `/specd-implement <name>`
 
 **Stop.**
+
+## Session tasks
+
+Create tasks at the start for session visibility. Update them as you go.
+
+1. `Load state & hooks` — mark done after step 2
+2. `Load schema & context` — mark done after step 4
+3. `Choose review mode` — mark done ONLY after the user responds (not when you ask)
+4. For each artifact: `Write <artifactId>` — mark done after validation passes
+5. `Transition to ready` — mark done after step 9
+6. `Review & approval gate` — mark done after step 11
+
+Create task 3 before asking the question in step 5. Its status must stay `in_progress`
+until the user answers — this is your signal to STOP and wait. Do not create artifact
+tasks (step 4) until the user has chosen a mode.
+
+In fast-forward mode, create all artifact tasks upfront (from the schema's artifact DAG).
+In one-at-a-time mode, create each artifact task as you reach it.
+
+## Handling failed transitions
+
+Any `change transition` command may fail with:
+
+```
+Cannot transition from '<current>' to '<target>'
+```
+
+If this happens, the change is in a different state than expected. Extract `<current>`
+from the error message and redirect using this table:
+
+| Current state                                            | Suggest                                                                  |
+| -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `drafting` / `designing`                                 | You're already in the right skill — re-read status and retry             |
+| `implementing` / `spec-approved`                         | `/specd-implement <name>`                                                |
+| `verifying`                                              | `/specd-verify <name>`                                                   |
+| `done` / `pending-signoff` / `signed-off` / `archivable` | `/specd-archive <name>`                                                  |
+| `pending-spec-approval`                                  | "Approval pending. Run: `specd change approve spec <name> --reason ...`" |
+| `ready`                                                  | Review artifacts, then `/specd-implement <name>` if approved             |
+
+**Stop — do not continue after redirecting.**
 
 ## Guardrails
 
