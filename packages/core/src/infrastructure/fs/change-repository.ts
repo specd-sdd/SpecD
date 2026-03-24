@@ -22,6 +22,7 @@ import { applyPreHashCleanup } from '../../domain/services/pre-hash-cleanup.js'
 import { changeDirName } from './dir-name.js'
 import { sha256 } from './hash.js'
 import { isEnoent } from './is-enoent.js'
+import { moveDir } from './move-dir.js'
 import { writeFileAtomic } from './write-atomic.js'
 import {
   type ChangeManifest,
@@ -251,7 +252,8 @@ export class FsChangeRepository extends ChangeRepository {
       }
     } else if (currentDir !== targetDir) {
       // Move to new location (draft ↔ active, or to discarded)
-      await fs.rename(currentDir, targetDir)
+      await fs.mkdir(path.dirname(targetDir), { recursive: true })
+      await moveDir(currentDir, targetDir)
     }
 
     await this._writeManifestAtomic(targetDir, manifest)
