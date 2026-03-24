@@ -161,9 +161,10 @@ describe('change create', () => {
 
   it('creates a change and prints confirmation', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.create.execute.mockResolvedValue(
-      makeMockChange({ name: 'new-feat', state: 'designing' }),
-    )
+    kernel.changes.create.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'new-feat', state: 'designing' }),
+      changePath: '/tmp/test-changes/new-feat',
+    })
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))
@@ -182,9 +183,10 @@ describe('change create', () => {
 
   it('includes spec ids and name in json output', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.create.execute.mockResolvedValue(
-      makeMockChange({ name: 'new-feat', state: 'designing' }),
-    )
+    kernel.changes.create.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'new-feat', state: 'designing' }),
+      changePath: '/tmp/test-changes/new-feat',
+    })
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))
@@ -207,9 +209,10 @@ describe('change create', () => {
 
   it('passes spec ids to the use case', async () => {
     const { kernel } = setup()
-    kernel.changes.create.execute.mockResolvedValue(
-      makeMockChange({ name: 'feat', state: 'designing' }),
-    )
+    kernel.changes.create.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'feat', state: 'designing' }),
+      changePath: '/tmp/test-changes/feat',
+    })
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))
@@ -246,9 +249,10 @@ describe('change create', () => {
 
   it('allows creating a change without --spec flag', async () => {
     const { kernel } = setup()
-    kernel.changes.create.execute.mockResolvedValue(
-      makeMockChange({ name: 'my-change', state: 'drafting' }),
-    )
+    kernel.changes.create.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      changePath: '/tmp/test-changes/my-change',
+    })
     captureStdout()
 
     const program = makeProgram()
@@ -261,9 +265,10 @@ describe('change create', () => {
 
   it('defaults to "default" workspace when prefix is omitted', async () => {
     const { kernel } = setup()
-    kernel.changes.create.execute.mockResolvedValue(
-      makeMockChange({ name: 'my-change', state: 'drafting' }),
-    )
+    kernel.changes.create.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      changePath: '/tmp/test-changes/my-change',
+    })
     captureStdout()
 
     const program = makeProgram()
@@ -308,9 +313,10 @@ describe('change create', () => {
 
   it('JSON output includes state="drafting"', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.create.execute.mockResolvedValue(
-      makeMockChange({ name: 'add-login', state: 'drafting' }),
-    )
+    kernel.changes.create.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'add-login', state: 'drafting' }),
+      changePath: '/tmp/test-changes/add-login',
+    })
 
     const program = makeProgram()
     registerChangeCreate(program.command('change'))

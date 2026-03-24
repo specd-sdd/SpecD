@@ -27,7 +27,7 @@
     {
       "requirement": "Output on success",
       "rules": [
-        "On success, output depends on `--format`:\n\n- `text` (default): prints a single line to stdout:\n- `json` or `toon`: outputs the following to stdout (encoded in the respective format):\n\nNo further output is produced."
+        "On success, output depends on `--format`:\n\n- `text` (default): prints a single line to stdout:\n- `json` or `toon`: outputs the following to stdout (encoded in the respective format): The `changePath` is the absolute filesystem path to the change directory where artifacts should be written.\n\nNo further output is produced."
       ]
     },
     {
@@ -92,6 +92,15 @@
       ]
     },
     {
+      "requirement": "JSON output includes changePath",
+      "name": "JSON output contains changePath",
+      "when": ["specd change create my-change --format json succeeds"],
+      "then": [
+        "the JSON output includes changePath as an absolute path string",
+        "AND the path points to the change directory under .specd/changes/"
+      ]
+    },
+    {
       "requirement": "Duplicate name error",
       "name": "Name already exists",
       "given": ["a change named my-change already exists"],
@@ -113,8 +122,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:613809cfa79f05cc850d6e03b0b5aa7ffaa4f9f6acc389c2ea31eabbbc1feff3",
-    "verify.md": "sha256:d9f0bf5ac247d4f81ba40cf6bdfa4f95771c4fedb4698a857722138458627eec"
+    "spec.md": "sha256:0f9816c753f1db6e00f31df32be0f301252fac6ace8e83bbff24f8dfee33edd3",
+    "verify.md": "sha256:6fa9e0e3b45957f3d88abe879e811292931b7b390ed5bd47aed01087988ca9ac"
   },
   "generatedBy": "core"
 }
