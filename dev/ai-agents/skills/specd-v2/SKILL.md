@@ -103,27 +103,62 @@ node packages/cli/dist/index.js drafts list --format json
 ```
 
 - If there are active changes or drafts: present them with their states and ask the user
-  which one to continue, or whether to create a new one.
+  which one to continue, or whether to start something new.
 - If a draft is selected, restore it first:
   ```bash
   node packages/cli/dist/index.js drafts restore <name>
   ```
-- If there are none: ask the user for a name and proceed to creation.
+- If the user wants something new (or there are no existing changes): proceed to Step 2.
 
-### Step 2 — Create the change (if needed)
+### Step 2 — Understand what the user wants (discovery before creation)
 
-Ask the user for:
+**Do NOT immediately ask for a change name, description, or specIds.** First, understand
+what the user wants to accomplish. This may require a conversation:
 
-- **name** — kebab-case slug (e.g. `add-auth-flow`)
-- **description** — one-liner explaining why
-- **specIds** — which specs will be created or modified. If the user isn't sure yet,
-  start with an empty list — specs can be added later via `change edit`.
+- If the user already explained their intent clearly (in the invocation arguments or
+  prior messages), summarize your understanding and confirm before creating the change.
+- If the intent is vague or you need more context, **explore first**:
+  - Ask what problem they're solving and why
+  - Investigate the codebase if relevant (`spec list`, code search, etc.)
+  - Discuss the approach at a high level
+  - Surface relevant existing specs that might be affected
+
+Let the conversation develop naturally. Don't follow a questionnaire — ask what you
+need to understand the change.
+
+**When the picture is clear enough**, propose the change:
+
+> Based on our discussion, here's what I'd suggest:
+>
+> - **Name:** `<kebab-case-slug>`
+> - **Description:** `<one-liner>`
+> - **Initial specs:** `<workspace:path>, ...` (or none yet — we can add them during designing)
+>
+> Want me to create this change?
+
+Wait for the user to confirm or adjust before creating.
+
+**CRITICAL: Spec IDs must always use the `workspace:capability-path` format** (e.g.
+`core:core/config`, `cli:cli/spec-metadata`, `default:_global/architecture`). Never use
+bare paths like `core/config` — they will be rejected. To find the correct ID, run
+`spec list --format text` and use the IDs from the PATH column. For new specs that don't
+exist yet, **ask the user** which workspace they belong to.
+
+It's fine to create a change with no specs — they can be added later via `change edit`
+during the designing phase as the scope becomes clearer.
 
 ```bash
-node packages/cli/dist/index.js change create <name> --spec <id1> --spec <id2> --description "<desc>"
+node packages/cli/dist/index.js change create <name> --spec <workspace:path> --description "<desc>" --format json
 ```
 
-The change starts in `drafting`. Mark "Create change" task as `completed`.
+The JSON response includes `changePath` — the absolute path to the change directory.
+Store it — all artifacts (proposal.md, design.md, tasks.md, deltas/) are written there.
+
+```json
+{ "result": "ok", "name": "<name>", "state": "drafting", "changePath": "/abs/path/..." }
+```
+
+Mark "Create change" task as `completed`.
 
 **Read `cross-cutting.md` now**, then read `phase-designing.md` and continue to Phase A.
 
@@ -169,6 +204,21 @@ approving, the skill detects the new state and continues.
 
 ## Notes
 
+- **Always use the CLI to discover and read specs.** Never guess filesystem paths to
+  spec files. Use `spec list --format text --summary` to discover specs,
+  `spec show <specId> --format json` to read spec content, and
+  `spec metadata <specId> --format json` to read metadata. The CLI resolves workspace
+  paths, prefixes, and storage locations — reading from disk directly will fail if you
+  guess the wrong path.
+- **Spec IDs are always `workspace:capability-path`.** Every `--spec`, `--add-spec`,
+  `--remove-spec`, and positional `<specPath>` argument MUST use the fully-qualified
+  format: `workspace:capability-path` (e.g. `core:core/config`, `cli:cli/spec-metadata`,
+  `default:_global/architecture`). Never use bare paths like `core/config` or
+  `_global/architecture`. When unsure of the correct workspace, run
+  `node packages/cli/dist/index.js spec list --format text` and use the IDs from the
+  PATH column. For new specs that don't exist yet, **ask the user** which workspace they
+  belong to — never guess. Each workspace has a `prefix` that appears at the start of
+  its spec paths (e.g. workspace `core` has prefix `core`, so specs are `core:core/<name>`).
 - **Schema drives everything.** Never assume specific artifact names or DAG structure.
   Always read from `schema show --format json` and `artifact-instruction --format json`.
   Different schemas may have completely different artifacts, dependencies, and workflow
