@@ -12,6 +12,7 @@ import { UnsupportedPatternError } from '../../domain/errors/unsupported-pattern
 import { CorruptedManifestError } from '../../domain/errors/corrupted-manifest-error.js'
 import { changeDirName } from './dir-name.js'
 import { isEnoent } from './is-enoent.js'
+import { moveDir } from './move-dir.js'
 import { writeFileAtomic } from './write-atomic.js'
 import { type ChangeManifest, changeManifestSchema } from './manifest.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
@@ -165,7 +166,7 @@ export class FsArchiveRepository extends ArchiveRepository {
 
     // Move the change directory into the archive
     await fs.mkdir(path.dirname(archiveDir), { recursive: true })
-    await fs.rename(sourceDir, archiveDir)
+    await moveDir(sourceDir, archiveDir)
 
     // Augment the manifest with archivedAt and optional archivedBy
     const manifest = await this._loadManifest(archiveDir)
