@@ -149,6 +149,7 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
         workflow: () => [],
       }),
     },
+    validateSchema: { execute: vi.fn() },
     validate: { execute: vi.fn() },
     invalidateMetadata: { execute: vi.fn() },
     generateMetadata: { execute: vi.fn() },
