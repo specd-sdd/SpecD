@@ -72,6 +72,51 @@
 - **WHEN** `workflow[0].hooks.pre` has `id: run-lint` and `workflow[1].hooks.post` also has `id: run-lint`
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate hook ID
 
+#### Scenario: Duplicate validation IDs within same artifact rejected
+
+- **WHEN** an artifact has `validations: [{ id: "req-1", ... }, { id: "req-1", ... }]`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate validation ID
+
+#### Scenario: Duplicate deltaValidation IDs within same artifact rejected
+
+- **WHEN** an artifact has `deltaValidations: [{ id: "has-scenario", ... }, { id: "has-scenario", ... }]`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate deltaValidation ID
+
+#### Scenario: Duplicate rules.pre IDs within same artifact rejected
+
+- **WHEN** an artifact has `rules.pre: [{ id: "normative", ... }, { id: "normative", ... }]`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate rules.pre ID
+
+#### Scenario: Duplicate rules.post IDs within same artifact rejected
+
+- **WHEN** an artifact has `rules.post: [{ id: "format", ... }, { id: "format", ... }]`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate rules.post ID
+
+#### Scenario: Duplicate preHashCleanup IDs within same artifact rejected
+
+- **WHEN** an artifact has `preHashCleanup: [{ id: "checkboxes", ... }, { id: "checkboxes", ... }]`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate preHashCleanup ID
+
+#### Scenario: Duplicate metadataExtraction.context IDs rejected
+
+- **WHEN** metadata extraction has `context: [{ id: "ctx-1", ... }, { id: "ctx-1", ... }]`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate context ID
+
+#### Scenario: Duplicate metadataExtraction.rules IDs rejected
+
+- **WHEN** metadata extraction has `rules: [{ id: "rule-1", ... }, { id: "rule-1", ... }]`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate rules ID
+
+#### Scenario: Duplicate metadataExtraction.constraints IDs rejected
+
+- **WHEN** metadata extraction has `constraints: [{ id: "constraint-1", ... }, { id: "constraint-1", ... }]`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate constraints ID
+
+#### Scenario: Duplicate metadataExtraction.scenarios IDs rejected
+
+- **WHEN** metadata extraction has `scenarios: [{ id: "scenario-1", ... }, { id: "scenario-1", ... }]`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate scenarios ID
+
 ### Requirement: Artifact definition
 
 #### Scenario: Filename derived from glob literal segment

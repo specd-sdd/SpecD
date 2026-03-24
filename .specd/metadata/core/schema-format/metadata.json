@@ -211,6 +211,88 @@
       ]
     },
     {
+      "requirement": "Array entry identity",
+      "name": "Duplicate validation IDs within same artifact rejected",
+      "when": ["an artifact has validations: [{ id: \"req-1\", ... }, { id: \"req-1\", ... }]"],
+      "then": [
+        "SchemaRegistry.resolve() must throw a SchemaValidationError mentioning the duplicate validation ID"
+      ]
+    },
+    {
+      "requirement": "Array entry identity",
+      "name": "Duplicate deltaValidation IDs within same artifact rejected",
+      "when": [
+        "an artifact has deltaValidations: [{ id: \"has-scenario\", ... }, { id: \"has-scenario\", ... }]"
+      ],
+      "then": [
+        "SchemaRegistry.resolve() must throw a SchemaValidationError mentioning the duplicate deltaValidation ID"
+      ]
+    },
+    {
+      "requirement": "Array entry identity",
+      "name": "Duplicate rules.pre IDs within same artifact rejected",
+      "when": [
+        "an artifact has rules.pre: [{ id: \"normative\", ... }, { id: \"normative\", ... }]"
+      ],
+      "then": [
+        "SchemaRegistry.resolve() must throw a SchemaValidationError mentioning the duplicate rules.pre ID"
+      ]
+    },
+    {
+      "requirement": "Array entry identity",
+      "name": "Duplicate rules.post IDs within same artifact rejected",
+      "when": ["an artifact has rules.post: [{ id: \"format\", ... }, { id: \"format\", ... }]"],
+      "then": [
+        "SchemaRegistry.resolve() must throw a SchemaValidationError mentioning the duplicate rules.post ID"
+      ]
+    },
+    {
+      "requirement": "Array entry identity",
+      "name": "Duplicate preHashCleanup IDs within same artifact rejected",
+      "when": [
+        "an artifact has preHashCleanup: [{ id: \"checkboxes\", ... }, { id: \"checkboxes\", ... }]"
+      ],
+      "then": [
+        "SchemaRegistry.resolve() must throw a SchemaValidationError mentioning the duplicate preHashCleanup ID"
+      ]
+    },
+    {
+      "requirement": "Array entry identity",
+      "name": "Duplicate metadataExtraction.context IDs rejected",
+      "when": ["metadata extraction has context: [{ id: \"ctx-1\", ... }, { id: \"ctx-1\", ... }]"],
+      "then": [
+        "SchemaRegistry.resolve() must throw a SchemaValidationError mentioning the duplicate context ID"
+      ]
+    },
+    {
+      "requirement": "Array entry identity",
+      "name": "Duplicate metadataExtraction.rules IDs rejected",
+      "when": ["metadata extraction has rules: [{ id: \"rule-1\", ... }, { id: \"rule-1\", ... }]"],
+      "then": [
+        "SchemaRegistry.resolve() must throw a SchemaValidationError mentioning the duplicate rules ID"
+      ]
+    },
+    {
+      "requirement": "Array entry identity",
+      "name": "Duplicate metadataExtraction.constraints IDs rejected",
+      "when": [
+        "metadata extraction has constraints: [{ id: \"constraint-1\", ... }, { id: \"constraint-1\", ... }]"
+      ],
+      "then": [
+        "SchemaRegistry.resolve() must throw a SchemaValidationError mentioning the duplicate constraints ID"
+      ]
+    },
+    {
+      "requirement": "Array entry identity",
+      "name": "Duplicate metadataExtraction.scenarios IDs rejected",
+      "when": [
+        "metadata extraction has scenarios: [{ id: \"scenario-1\", ... }, { id: \"scenario-1\", ... }]"
+      ],
+      "then": [
+        "SchemaRegistry.resolve() must throw a SchemaValidationError mentioning the duplicate scenarios ID"
+      ]
+    },
+    {
       "requirement": "Artifact definition",
       "name": "Filename derived from glob literal segment",
       "when": [
@@ -696,7 +778,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:871369a9742c4fee4ce5e4028454f6df77c8bbb3f8b0c323397e72e3e14d6186",
-    "verify.md": "sha256:d19a5c74f1f338802896e37d18309f17d437c776f2c9d1bd4b9e2cb18c5dc746"
+    "verify.md": "sha256:89c23df4d456a874783c1c96e2e365479bf497c8901dae768873142fb6bc4650"
   },
   "generatedBy": "core"
 }
