@@ -120,7 +120,7 @@ Wait for the user to confirm or adjust before creating.
 **CRITICAL: Spec IDs must always use the `workspace:capability-path` format** (e.g.
 `core:core/config`, `cli:cli/spec-metadata`, `default:_global/architecture`). Never use
 bare paths like `core/config` — they will be rejected. To find the correct ID, run
-`spec list --format text` and use the IDs from the PATH column. For new specs that don't
+`spec list --format text --summary` and use the IDs from the PATH column. For new specs that don't
 exist yet, **ask the user** which workspace they belong to.
 
 It's fine to create a change with no specs — they can be added later via `change edit`
@@ -1132,7 +1132,7 @@ and there is no spec for it, that is worth surfacing — even if the user didn't
   format: `workspace:capability-path` (e.g. `core:core/config`, `cli:cli/spec-metadata`,
   `default:_global/architecture`). Never use bare paths like `core/config` or
   `_global/architecture`. When unsure of the correct workspace, run
-  `node packages/cli/dist/index.js spec list --format text` and use the IDs from the
+  `node packages/cli/dist/index.js spec list --format text --summary` and use the IDs from the
   PATH column. For new specs that don't exist yet, **ask the user** which workspace they
   belong to — never guess. Each workspace has a `prefix` that appears at the start of its
   spec paths (e.g. workspace `core` has prefix `core`, so specs are `core:core/<name>`).
