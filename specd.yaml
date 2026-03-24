@@ -1,5 +1,22 @@
 schema: '@specd/schema-std'
 
+# Agent instructions prepended before spec content
+context:
+  - instruction: >-
+      specd is a spec-driven development platform. TypeScript, pnpm monorepo, ESM only.
+      Hexagonal architecture: domain (no I/O), application (ports), infrastructure (fs adapters).
+      Rich entities enforce invariants; pure functions for stateless services; manual DI, no IoC.
+      Packages: @specd/core (business logic), @specd/cli, @specd/mcp, @specd/skills,
+      @specd/schema-std, plugins (claude, copilot, codex).
+      Never write directly to specs/ folder. Use specd workflow skills or specd commands: draft spec,
+      implement, review, approve, merge, archive.
+      Specs live in specs/ — they are requirements, not documentation. Code implements specs.
+      Don't write code without a spec. Use specd's workflow: draft spec, implement, review, approve, merge, archive.
+      Always keep specs up to date. Specs are the source of truth, not code comments or external docs.
+      Always read existing specs before drafting new ones. Avoid duplicates; update existing specs instead.
+      Use specd's context features to include relevant specs in workflow steps. For example, include
+      'default:*' to always have global specs in context.
+
 workspaces:
   default:
     prefix: _global
@@ -57,16 +74,33 @@ contextIncludeSpecs:
 contextExcludeSpecs:
   - 'default:commits'
 
-# Agent instructions prepended before spec content
-context:
-  - file: AGENTS.md
-  - file: CLAUDE.md
-
 llmOptimizedContext: true
 
 schemaOverrides:
   append:
+    artifacts:
+      - id: design
+        rules:
+          post:
+            - id: check-global-specs-compliance
+              text: >-
+                Cross-reference this design against the global specs (default:_global/*):
+                architecture (hexagonal layers, dependency direction, no I/O in domain),
+                conventions (naming, exports, ESM, no default exports, no any),
+                and testing (test structure, coverage). Flag any decision that violates
+                a global constraint before proceeding.
     workflow:
+      - step: designing
+        hooks:
+          post:
+            - id: designing-check-global-specs
+              instruction: >-
+                Before finishing design, review all artifacts and deltas in this change
+                against the global specs (default:_global/*). Check compliance with:
+                architecture (hexagonal layers, dependency direction), conventions
+                (naming, exports, ESM), testing (structure, coverage expectations),
+                and any other applicable global constraint. Flag violations before
+                transitioning to ready.
       - step: implementing
         hooks:
           post:
