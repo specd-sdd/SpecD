@@ -76,7 +76,11 @@ export class ResolveSchema {
       finalTemplates.set(k, v)
     }
 
-    // 6. Build domain Schema
+    // 6. Build domain Schema — validate base first, then merged if layers applied
+    if (allLayers.length > 0) {
+      buildSchema(this._schemaRef, inheritedData, finalTemplates)
+      return buildSchema(`${this._schemaRef} (resolved)`, mergedData, finalTemplates)
+    }
     return buildSchema(this._schemaRef, mergedData, finalTemplates)
   }
 

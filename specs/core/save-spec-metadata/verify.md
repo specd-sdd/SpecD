@@ -4,16 +4,17 @@
 
 ### Requirement: Content validation before write
 
-#### Scenario: Non-mapping YAML is rejected
+#### Scenario: Non-object JSON is rejected
 
-- **WHEN** `execute()` is called with `content` that parses to a scalar (e.g. `"hello"`)
-- **THEN** `MetadataValidationError` is thrown with a message indicating content must be a YAML mapping
-- **AND** nothing is written to disk
+- **GIVEN** a valid spec exists
+- **WHEN** `SaveSpecMetadata` is called with `content: '"just a string"'`
+- **THEN** it throws `MetadataValidationError` with message containing `content must be a JSON object`
 
-#### Scenario: Null YAML content is rejected
+#### Scenario: Invalid JSON content is rejected
 
-- **WHEN** `execute()` is called with `content` that parses to `null` (e.g. an empty string or `"~"`)
-- **THEN** `MetadataValidationError` is thrown
+- **GIVEN** a valid spec exists
+- **WHEN** `SaveSpecMetadata` is called with `content: "not json at all"`
+- **THEN** it throws `MetadataValidationError` with message containing `content must be a JSON object`
 
 #### Scenario: Missing required fields rejected by strict schema
 
@@ -124,6 +125,6 @@
 
 #### Scenario: Use case receives dependencies via constructor
 
+- **GIVEN** a `ReadonlyMap<string, SpecRepository>` of spec repositories
 - **WHEN** `SaveSpecMetadata` is constructed
-- **THEN** it receives a `ReadonlyMap<string, SpecRepository>` and a `YamlSerializer`
-- **AND** it does not construct any infrastructure adapters internally
+- **THEN** it accepts the spec repositories map as its only dependency

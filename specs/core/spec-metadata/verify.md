@@ -6,13 +6,15 @@
 
 #### Scenario: Metadata file present
 
-- **WHEN** a spec has a corresponding `metadata.yaml` under `.specd/metadata/<specPath>/`
-- **THEN** specd reads it to obtain `dependsOn` and `contentHashes` for that spec
+- **GIVEN** a spec at `core:core/config` with a `metadata.json` at `.specd/metadata/core/config/metadata.json`
+- **WHEN** `metadata(spec)` is called
+- **THEN** the result contains the parsed JSON fields
 
 #### Scenario: Metadata file absent
 
-- **WHEN** a spec has no corresponding metadata file under `.specd/metadata/`
-- **THEN** specd treats the spec as having no declared dependencies and no content hash — no error is emitted
+- **GIVEN** no `metadata.json` exists for the spec
+- **WHEN** `metadata(spec)` is called
+- **THEN** the result is `null`
 
 #### Scenario: Explicit metadataPath in workspace config
 
@@ -38,8 +40,9 @@
 
 #### Scenario: Valid metadata file with all fields
 
-- **WHEN** `metadata.yaml` contains `title`, `description`, `keywords`, `dependsOn`, `contentHashes`, `rules`, `constraints`, and `scenarios`
-- **THEN** specd parses all fields; `title`, `description`, and `keywords` are available to tooling without reading the spec content
+- **GIVEN** a `metadata.json` containing `{"title":"Config","description":"Project configuration","dependsOn":["core:core/storage"],"contentHashes":{"spec.md":"sha256:abc..."},"generatedBy":"core"}`
+- **WHEN** it is parsed by the lenient schema
+- **THEN** all fields are present in the result
 
 #### Scenario: Title absent — fallback to path
 
@@ -282,5 +285,7 @@
 
 #### Scenario: Metadata committed with project
 
-- **WHEN** metadata is generated for a spec
-- **THEN** the `metadata.yaml` file under `.specd/metadata/` appears in `git status` as a tracked file
+- **GIVEN** a project with `.specd/metadata/` tracked in version control
+- **WHEN** metadata is generated (as `metadata.json`)
+- **THEN** the `.json` files are committed alongside specs
+- **AND** consumers read them without regeneration

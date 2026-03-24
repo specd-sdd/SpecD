@@ -34,11 +34,11 @@
 - **WHEN** the use case computes artifact hashes
 - **THEN** that artifact is skipped and does not appear in the hash map
 
-#### Scenario: Schema does not resolve
+#### Scenario: Schema resolution failure propagates
 
-- **GIVEN** `SchemaProvider.get()` returns `null` for the configured schema
-- **WHEN** the use case computes artifact hashes
-- **THEN** all artifacts are hashed without any pre-hash cleanup rules applied
+- **GIVEN** `SchemaProvider.get()` throws for the configured schema
+- **WHEN** the use case executes
+- **THEN** the error propagates from the gate guard before hash computation is reached
 
 ### Requirement: Signoff recording and state transition
 

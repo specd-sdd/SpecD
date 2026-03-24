@@ -15,7 +15,6 @@ import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { type GenerateSpecMetadata } from '../../../src/application/use-cases/generate-spec-metadata.js'
 import { type SaveSpecMetadata } from '../../../src/application/use-cases/save-spec-metadata.js'
-import { YamlSerializer } from '../../../src/application/ports/yaml-serializer.js'
 import { MarkdownParser } from '../../../src/infrastructure/artifact-parser/markdown-parser.js'
 import {
   type RunStepHooksInput,
@@ -44,19 +43,6 @@ function makeSaveMetadata(): SaveSpecMetadata {
   return {
     execute: vi.fn().mockResolvedValue({ spec: 'default:test' }),
   } as unknown as SaveSpecMetadata
-}
-
-class StubYamlSerializer extends YamlSerializer {
-  override parse(content: string): unknown {
-    return JSON.parse(content)
-  }
-  override stringify(data: unknown): string {
-    return JSON.stringify(data)
-  }
-}
-
-function makeYaml(): YamlSerializer {
-  return new StubYamlSerializer()
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +144,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await expect(uc.execute({ name: 'missing' })).rejects.toThrow(ChangeNotFoundError)
     })
@@ -177,7 +162,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(null),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaNotFoundError)
     })
@@ -234,7 +218,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(InvalidStateTransitionError)
     })
@@ -253,7 +236,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema({ name: 'schema-b' })),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaMismatchError)
     })
@@ -272,7 +254,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       const result = await uc.execute({ name: 'my-change' })
       expect(result.archivedChange).toBeDefined()
@@ -293,7 +274,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       const result = await uc.execute({ name: 'add-auth-flow' })
 
@@ -311,7 +291,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -357,7 +336,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -422,7 +400,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -472,7 +449,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -520,7 +496,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -550,7 +525,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -579,7 +553,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -626,7 +599,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -672,7 +644,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -694,7 +665,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -742,7 +712,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       const result = await uc.execute({ name: 'my-change', skipHooks: true })
 
@@ -788,7 +757,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       const result = await uc.execute({ name: 'my-change', skipHooks: true })
 
@@ -836,7 +804,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       const result = await uc.execute({ name: 'my-change', skipHooks: true })
 
@@ -863,7 +830,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       const result = await uc.execute({ name: 'my-change', skipHooks: true })
 
@@ -925,7 +891,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -983,7 +948,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(DeltaApplicationError)
@@ -1046,7 +1010,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1112,7 +1075,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1181,7 +1143,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1247,7 +1208,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1313,7 +1273,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1366,7 +1325,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1421,7 +1379,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1484,7 +1441,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1511,7 +1467,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1554,7 +1509,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(schema),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1592,7 +1546,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1648,7 +1601,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -1677,7 +1629,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1703,7 +1654,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1760,7 +1710,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -1818,7 +1767,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -1847,7 +1795,6 @@ describe('ArchiveChange', () => {
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
         makeSaveMetadata(),
-        makeYaml(),
       )
 
       await uc.execute({ name: 'my-change' })

@@ -6,10 +6,10 @@
 
 #### Scenario: Existing metadata with contentHashes
 
-- **GIVEN** a spec with metadata containing `title`, `description`, `contentHashes`, and `rules`
-- **WHEN** `InvalidateSpecMetadata` is executed for that spec
-- **THEN** the rewritten file has no `contentHashes` field
-- **AND** the spec appears as `stale` in staleness detection
+- **GIVEN** a spec with metadata containing `contentHashes`
+- **WHEN** `InvalidateSpecMetadata` is called
+- **THEN** the metadata is re-saved as JSON without the `contentHashes` field
+- **AND** all other fields (title, description, rules, etc.) are preserved
 
 #### Scenario: Existing metadata without contentHashes
 

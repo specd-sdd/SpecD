@@ -1,5 +1,4 @@
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
@@ -129,7 +128,6 @@ export class ValidateArtifacts {
     }
 
     const schema = await this._schemaProvider.get()
-    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     // --- Schema name guard ---
     if (schema.name() !== change.schemaName) {

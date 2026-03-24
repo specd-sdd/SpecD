@@ -1,0 +1,156 @@
+{
+  "title": "HookRunner Port",
+  "description": "Workflow entries can declare `run:` hooks that execute shell commands, but the application layer must not depend on subprocess APIs, shell detection, or platform-specific execution details. `HookRunner` is the application-layer port that defines the contract for executing these hook commands, abstracting template variable expansion and shell concerns behind a single interface.",
+  "dependsOn": ["default:_global/architecture"],
+  "context": [
+    "Workflow entries can declare `run:` hooks that execute shell commands, but the application layer must not depend on subprocess APIs, shell detection, or platform-specific execution details. `HookRunner` is the application-layer port that defines the contract for executing these hook commands, abstracting template variable expansion and shell concerns behind a single interface."
+  ],
+  "rules": [
+    {
+      "requirement": "Interface shape",
+      "rules": [
+        "The port MUST be declared as a TypeScript `interface` named `HookRunner` with a single method `run`. It SHALL NOT be an abstract class, because there are no invariant constructor arguments shared across all implementations."
+      ]
+    },
+    {
+      "requirement": "Run method signature",
+      "rules": [
+        "The `run` method MUST accept two parameters:\n\n1. `command: string` — the shell command string, optionally containing `{{key.path}}` template variables\n2. `variables: HookVariables` — values for template variable substitution\n\nIt MUST return `Promise<HookResult>`."
+      ]
+    },
+    {
+      "requirement": "Template variable expansion",
+      "rules": [
+        "Before executing the command, implementations MUST expand all `{{key.path}}` template variables by traversing `variables` using dot-separated key paths. Unknown variable paths MUST be left unexpanded (the original `{{key.path}}` token is preserved in the command string)."
+      ]
+    },
+    {
+      "requirement": "Shell escaping",
+      "rules": [
+        "All substituted variable values MUST be shell-escaped before interpolation to prevent shell injection attacks. Only string, number, and boolean values SHALL be substituted; complex types (objects, arrays) MUST be left unexpanded."
+      ]
+    },
+    {
+      "requirement": "HookResult contract",
+      "rules": [
+        "The `run` method MUST always resolve (never reject) and return a `HookResult` containing:\n\n- `exitCode()` — the process exit code (0 for success, non-zero for failure)\n- `stdout()` — all captured standard output as a string\n- `stderr()` — all captured standard error as a string\n- `isSuccess()` — returns `true` when exit code is 0"
+      ]
+    },
+    {
+      "requirement": "HookVariables shape",
+      "rules": [
+        "The `HookVariables` type MUST contain:\n\n- `change?` (optional) — an object with `name: string`, `workspace: string`, and `path: string` fields representing the active change context. Absent for lifecycle points with no active change.\n- `project` (required) — an object with `root: string` representing the absolute path to the git repository root."
+      ]
+    },
+    {
+      "requirement": "Hook type distinction",
+      "rules": [
+        "The port executes only `run:` hooks (deterministic shell commands). `instruction:` hooks are not executed by this port — they are injected as text into the agent context by a different mechanism. The port SHALL NOT handle or interpret `instruction:` hook types."
+      ]
+    },
+    {
+      "requirement": "Lifecycle execution guarantees",
+      "rules": [
+        "The port itself does not enforce lifecycle semantics, but callers rely on the following guarantees:\n\n- `pre-*` hooks: a non-zero exit code signals the caller to abort the operation\n- `post-*` CLI-owned operations: the caller runs post hooks before returning\n- `post-*` agent-driven operations: not supported via `run:` hooks (use `instruction:` hooks instead)"
+      ]
+    }
+  ],
+  "constraints": [
+    "The port lives in application/ports/ per the hexagonal architecture rule",
+    "No direct dependency on child_process, shell detection, or any I/O at the port level",
+    "HookResult and HookVariables are domain value objects re-exported by the port module",
+    "The run method MUST always resolve — subprocess failures are captured in HookResult, not thrown as exceptions"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Interface shape",
+      "name": "Implementation satisfies the contract",
+      "given": ["a concrete class implementing HookRunner"],
+      "when": [
+        "the class implements run(command: string, variables: HookVariables): Promise<HookResult>"
+      ],
+      "then": ["it compiles and can be instantiated"]
+    },
+    {
+      "requirement": "Template variable expansion",
+      "name": "Known variables are expanded",
+      "given": [
+        "a command \"echo {{project.root}}\" and variables { project: { root: \"/app\" } }"
+      ],
+      "when": ["run is called"],
+      "then": ["the shell receives a command with /app substituted for {{project.root}}"]
+    },
+    {
+      "requirement": "Template variable expansion",
+      "name": "Nested variable paths are resolved",
+      "given": [
+        "a command \"echo {{change.name}}\" and variables { change: { name: \"add-login\", workspace: \"auth\", path: \"/x\" }, project: { root: \"/app\" } }"
+      ],
+      "when": ["run is called"],
+      "then": ["the shell receives a command with add-login substituted for {{change.name}}"]
+    },
+    {
+      "requirement": "Template variable expansion",
+      "name": "Unknown variables are left unexpanded",
+      "given": ["a command \"echo {{unknown.var}}\" and any valid variables"],
+      "when": ["run is called"],
+      "then": ["the executed command contains the literal string {{unknown.var}}"]
+    },
+    {
+      "requirement": "Shell escaping",
+      "name": "Values with special characters are escaped",
+      "given": [
+        "a command \"echo {{change.name}}\" and a change name containing shell metacharacters (e.g. \"; rm -rf /\")"
+      ],
+      "when": ["run is called"],
+      "then": ["the substituted value is shell-escaped and does not cause injection"]
+    },
+    {
+      "requirement": "Shell escaping",
+      "name": "Non-primitive values are not substituted",
+      "given": ["a command referencing a variable path that resolves to an object"],
+      "when": ["run is called"],
+      "then": ["the template token is left unexpanded"]
+    },
+    {
+      "requirement": "HookResult contract",
+      "name": "Successful command returns zero exit code",
+      "given": ["a command that exits with code 0"],
+      "when": ["run is called"],
+      "then": ["the returned HookResult has exitCode() equal to 0 and isSuccess() returns true"]
+    },
+    {
+      "requirement": "HookResult contract",
+      "name": "Failed command returns non-zero exit code",
+      "given": ["a command that exits with a non-zero code"],
+      "when": ["run is called"],
+      "then": ["the returned HookResult has a non-zero exitCode() and isSuccess() returns false"]
+    },
+    {
+      "requirement": "HookResult contract",
+      "name": "stdout and stderr are captured",
+      "given": ["a command that writes to both stdout and stderr"],
+      "when": ["run is called"],
+      "then": ["stdout() contains the standard output and stderr() contains the standard error"]
+    },
+    {
+      "requirement": "HookResult contract",
+      "name": "Run always resolves, never rejects",
+      "given": ["a command that fails or crashes"],
+      "when": ["run is called"],
+      "then": ["the promise resolves with a HookResult (it does not reject)"]
+    },
+    {
+      "requirement": "HookVariables shape",
+      "name": "Change context is optional",
+      "given": ["variables with only project and no change field"],
+      "when": ["run is called with a command referencing {{change.name}}"],
+      "then": ["the {{change.name}} token is left unexpanded"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:8ae89ecbfa598b49658dd1a31996e35b6e671c77318ed4586d4d078c1ec21e95",
+    "verify.md": "sha256:f34230bba8ec2521fe5cd36eb88acf006468aa0b9a2d5b76eb7faa5cf91f327a"
+  },
+  "generatedBy": "core"
+}

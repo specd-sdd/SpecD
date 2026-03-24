@@ -1,6 +1,5 @@
 import * as fs from 'node:fs/promises'
 import { type Command } from 'commander'
-import { parse as parseYaml } from 'yaml'
 import { SpecPath } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
@@ -17,7 +16,7 @@ export function registerSpecWriteMetadata(parent: Command): void {
     .command('write-metadata <specPath>')
     .allowExcessArguments(false)
     .description('Write metadata for a spec')
-    .option('--input <file>', 'read YAML content from a file instead of stdin')
+    .option('--input <file>', 'read JSON content from a file instead of stdin')
     .option('--force', 'skip conflict detection and overwrite unconditionally')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -45,12 +44,12 @@ JSON/TOON output schema:
             content = await readStdin()
           }
 
-          // Validate YAML at the CLI boundary
+          // Validate JSON at the CLI boundary
           try {
-            parseYaml(content)
-          } catch (yamlErr) {
-            const msg = yamlErr instanceof Error ? yamlErr.message : String(yamlErr)
-            cliError(`invalid YAML: ${msg}`, opts.format)
+            JSON.parse(content)
+          } catch (jsonErr) {
+            const msg = jsonErr instanceof Error ? jsonErr.message : String(jsonErr)
+            cliError(`invalid JSON: ${msg}`, opts.format)
           }
 
           const result = await kernel.specs.saveMetadata.execute({

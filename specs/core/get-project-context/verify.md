@@ -36,11 +36,10 @@
 
 ### Requirement: Resolves schema before processing
 
-#### Scenario: Schema not found
+#### Scenario: Schema resolution failure propagates
 
-- **GIVEN** `SchemaProvider.get()` returns `null` for the configured schema reference
-- **WHEN** `execute` is called
-- **THEN** a `SchemaNotFoundError` is thrown with the schema reference string
+- **WHEN** `SchemaProvider.get()` throws `SchemaNotFoundError`
+- **THEN** the error propagates — the use case does not catch it
 
 ### Requirement: Renders project-level context entries
 

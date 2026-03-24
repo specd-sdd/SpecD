@@ -6,6 +6,14 @@ import { ChangeAlreadyExistsError } from '../errors/change-already-exists-error.
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 
+/** Result returned by the {@link CreateChange} use case. */
+export interface CreateChangeResult {
+  /** The newly created change entity. */
+  readonly change: Change
+  /** Absolute filesystem path to the change directory. */
+  readonly changePath: string
+}
+
 /** Input for the {@link CreateChange} use case. */
 export interface CreateChangeInput {
   /** Unique slug name for the new change (e.g. `'add-oauth-login'`). */
@@ -53,10 +61,10 @@ export class CreateChange {
    * Executes the use case.
    *
    * @param input - Creation parameters
-   * @returns The newly created change
+   * @returns The newly created change and its filesystem path
    * @throws {ChangeAlreadyExistsError} If a change with the given name already exists
    */
-  async execute(input: CreateChangeInput): Promise<Change> {
+  async execute(input: CreateChangeInput): Promise<CreateChangeResult> {
     const existing = await this._changes.get(input.name)
     if (existing !== null) {
       throw new ChangeAlreadyExistsError(input.name)
@@ -84,7 +92,8 @@ export class CreateChange {
 
     await this._changes.save(change)
     await this._changes.scaffold(change, (specId) => this._specExists(specId))
-    return change
+    const changePath = this._changes.changePath(change)
+    return { change, changePath }
   }
 
   /**

@@ -48,7 +48,13 @@ Every entry in the following schema arrays must carry an `id` field:
 - `artifacts[].preHashCleanup[]`
 - `metadataExtraction` array entries (entries in `rules[]`, `constraints[]`, `scenarios[]`, `context[]`)
 
-Format: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters. IDs must be unique within their immediate array. Duplicate IDs within the same array produce a `SchemaValidationError`.
+Format: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters.
+
+**For hooks:** IDs must be globally unique across ALL workflow steps. No two hooks in any workflow step may share the same ID, regardless of whether they are in pre or post arrays.
+
+**For all other array entries:** IDs must be unique within their immediate array.
+
+Duplicate IDs within the same array (or for hooks, duplicate IDs across any workflow step) produce a `SchemaValidationError`.
 
 Workflow steps use `step` as their identity field instead of `id`. Artifact entries use their existing `id` field.
 

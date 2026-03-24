@@ -56,3 +56,12 @@
 
 - **WHEN** `CreateChange.execute` completes successfully
 - **THEN** `ChangeRepository.save` was called with the returned `Change` instance
+
+### Requirement: Result includes changePath
+
+#### Scenario: changePath returned after creation
+
+- **GIVEN** no change named `'add-login'` exists
+- **WHEN** `CreateChange.execute` is called with `name: 'add-login'`
+- **THEN** the result includes `changePath` as an absolute path to the change directory
+- **AND** the result includes `change` as the `Change` entity

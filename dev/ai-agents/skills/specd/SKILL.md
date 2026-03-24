@@ -14,6 +14,31 @@ inspects the current state and picks up where things left off.
 drafting → designing → ready → [approval] → implementing ⇄ verifying → done → [signoff] → archivable → archived
 ```
 
+## How specd works — mental model
+
+**Every change in specd goes through specs, even pure code changes.** There is no
+"code-only" workflow. The model is:
+
+1. **Specs define what the system should do** — they are requirements, not documentation
+2. **Code implements what the specs say** — the implementation phase writes code that
+   satisfies the specs
+3. **Verification checks code against specs** — the schema defines which artifacts serve
+   as acceptance criteria
+
+If a change modifies code, there MUST be a spec that describes the expected behaviour.
+If no spec exists for the area being changed, **create one as part of the change** — that
+is the normal workflow, not an exception. If an existing spec already covers the area,
+add it to the change's specIds and write a delta to update it.
+
+**Never bypass specs to go straight to code.** The designing phase (proposal → specs →
+verify → design → tasks) is not overhead — it is the process. The implementation phase
+exists to write code that satisfies the specs produced during designing.
+
+A change may include specs that **already exist and don't need modification** — this is
+normal. The spec defines the behaviour; the change adds or modifies the **code** that
+implements it. In this case, use `op: no-op` deltas for the spec artifacts and focus
+the design and tasks on the implementation work.
+
 ---
 
 ## Instructions
@@ -82,28 +107,62 @@ node packages/cli/dist/index.js drafts list --format json
 ```
 
 - If there are active changes or drafts: present them with their states and ask the user
-  which one to continue, or whether to create a new one.
+  which one to continue, or whether to start something new.
 - If a draft is selected, restore it first:
   ```bash
   node packages/cli/dist/index.js drafts restore <name>
   ```
-- If there are none: ask the user for a name and proceed to creation.
+- If the user wants something new (or there are no existing changes): proceed to Step 2.
 
-### Step 2 — Create the change (if needed)
+### Step 2 — Understand what the user wants (discovery before creation)
 
-Ask the user for:
+**Do NOT immediately ask for a change name, description, or specIds.** First, understand
+what the user wants to accomplish. This may require a conversation:
 
-- **name** — kebab-case slug (e.g. `add-auth-flow`)
-- **description** — one-liner explaining why
-- **specIds** — which specs will be created or modified. If the user isn't sure yet,
-  start with an empty list — specs can be added later via `change edit`.
+- If the user already explained their intent clearly (in the invocation arguments or
+  prior messages), summarize your understanding and confirm before creating the change.
+- If the intent is vague or you need more context, **explore first**:
+  - Ask what problem they're solving and why
+  - Investigate the codebase if relevant (`spec list`, code search, etc.)
+  - Discuss the approach at a high level
+  - Surface relevant existing specs that might be affected
+
+Let the conversation develop naturally. Don't follow a questionnaire — ask what you
+need to understand the change.
+
+**When the picture is clear enough**, propose the change:
+
+> Based on our discussion, here's what I'd suggest:
+>
+> - **Name:** `<kebab-case-slug>`
+> - **Description:** `<one-liner>`
+> - **Initial specs:** `<workspace:path>, ...` (or none yet — we can add them during designing)
+>
+> Want me to create this change?
+
+Wait for the user to confirm or adjust before creating.
+
+**CRITICAL: Spec IDs must always use the `workspace:capability-path` format** (e.g.
+`core:core/config`, `cli:cli/spec-metadata`, `default:_global/architecture`). Never use
+bare paths like `core/config` — they will be rejected. To find the correct ID, run
+`spec list --format text --summary` and use the IDs from the PATH column. For new specs that don't
+exist yet, **ask the user** which workspace they belong to.
+
+It's fine to create a change with no specs — they can be added later via `change edit`
+during the designing phase as the scope becomes clearer.
 
 ```bash
-node packages/cli/dist/index.js change create <name> --spec <id1> --spec <id2> --description "<desc>"
+node packages/cli/dist/index.js change create <name> --spec <workspace:path> --description "<desc>" --format json
 ```
 
-The change starts in `drafting`. Mark "Create change" task as `completed`. Continue to
-Phase A.
+The JSON response includes `changePath` — the absolute path to the change directory.
+Store it — all artifacts (proposal.md, design.md, tasks.md, deltas/) are written there.
+
+```json
+{ "result": "ok", "name": "<name>", "state": "drafting", "changePath": "/abs/path/..." }
+```
+
+Mark "Create change" task as `completed`. Continue to Phase A.
 
 ---
 
@@ -137,6 +196,17 @@ If the intent is vague or minimal, have a discovery conversation. Ask about:
   node packages/cli/dist/index.js spec list --format text --summary
   node packages/cli/dist/index.js graph search "<relevant terms>" --specs --limit 10
   ```
+- **What code is affected?** Search for symbols and analyze impact on the codebase:
+  ```bash
+  node packages/cli/dist/index.js graph search "<relevant terms>" --symbols --limit 10
+  node packages/cli/dist/index.js graph impact --symbol "<key symbol>" --direction downstream
+  ```
+  If specific files are already known to change:
+  ```bash
+  node packages/cli/dist/index.js graph impact --changes <file1> <file2> --format text
+  ```
+  Use the impact results to surface files, symbols, and risk levels that the user
+  might not have considered. This prevents scope surprises during implementation.
 - **Are there open questions?** Anything unresolved that might change the direction?
 
 Keep this conversational — don't dump a questionnaire. Ask what you need to understand
@@ -147,6 +217,7 @@ the change, then summarize:
 > - **Problem:** ...
 > - **Approach:** ...
 > - **Specs to create/modify:** ...
+> - **Affected code:** ... (key files/symbols and risk level from impact analysis)
 > - **Open questions:** ...
 >
 > Does this look right? Anything to add or change before I start writing?
@@ -203,7 +274,8 @@ node packages/cli/dist/index.js change context <name> designing --follow-deps --
 
 ### A.2b Choose review mode
 
-Before entering the artifact loop, ask the user how they want to review artifacts:
+**MANDATORY: You MUST ask the user this question before writing any artifacts.
+Do NOT skip this step. Do NOT assume auto-pilot.**
 
 > How would you like to review artifacts as they're written?
 >
@@ -212,8 +284,8 @@ Before entering the artifact loop, ask the user how they want to review artifact
 >    with `scope: spec` (these shape everything downstream), auto-continue on the rest
 > 3. **Auto-pilot** — write and validate all artifacts without stopping, review at the end
 
-Store the choice for the duration of Phase A. Default to option 1 if the user doesn't
-have a preference.
+Wait for the user's response. Default to option 1 if the user doesn't have a preference.
+Store the choice for the duration of Phase A.
 
 ### A.3 Artifact authoring loop
 
@@ -280,15 +352,35 @@ Follow the `instruction` from the previous step. Key decision points:
 After writing each artifact, check if the content implies scope or dependency changes.
 Each artifact can reveal that the change is bigger than expected.
 
-**1. Discover affected specs.** Read the artifact you just wrote and extract every
-reference to a system, module, adapter, configuration area, or domain concept. Then
-cross-reference against existing specs:
+**1. Discover affected code and specs.** Read the artifact you just wrote and extract
+every reference to a system, module, adapter, configuration area, or domain concept.
+
+First, use the code graph to find code that may be affected beyond what the artifact
+explicitly mentions:
+
+```bash
+node packages/cli/dist/index.js graph search "<key concepts from artifact>" --symbols --limit 10
+node packages/cli/dist/index.js graph impact --symbol "<modified symbol>" --direction downstream
+```
+
+If the artifact names specific files that will change, run a multi-file impact analysis:
+
+```bash
+node packages/cli/dist/index.js graph impact --changes <file1> <file2> --format text
+```
+
+Review the impact results — symbols and files flagged as affected may need their own
+spec coverage or dependency registration. Surface any HIGH/CRITICAL risk findings to
+the user.
+
+Then cross-reference against existing specs:
 
 ```bash
 node packages/cli/dist/index.js spec list --format text --summary
 ```
 
-For each area mentioned in the artifact, check whether an existing spec covers it.
+For each area mentioned in the artifact or surfaced by impact analysis, check whether
+an existing spec covers it.
 If so, determine whether the change **modifies** that spec (needs a delta or specId
 addition) or merely **depends on** it (needs a `deps --add`). Present findings to
 the user:
@@ -1054,6 +1146,21 @@ and there is no spec for it, that is worth surfacing — even if the user didn't
 
 ## Notes
 
+- **Always use the CLI to discover and read specs.** Never guess filesystem paths to
+  spec files. Use `spec list --format text --summary` to discover specs,
+  `spec show <specId> --format json` to read spec content, and
+  `spec metadata <specId> --format json` to read metadata. The CLI resolves workspace
+  paths, prefixes, and storage locations — reading from disk directly will fail if you
+  guess the wrong path.
+- **Spec IDs are always `workspace:capability-path`.** Every `--spec`, `--add-spec`,
+  `--remove-spec`, and positional `<specPath>` argument MUST use the fully-qualified
+  format: `workspace:capability-path` (e.g. `core:core/config`, `cli:cli/spec-metadata`,
+  `default:_global/architecture`). Never use bare paths like `core/config` or
+  `_global/architecture`. When unsure of the correct workspace, run
+  `node packages/cli/dist/index.js spec list --format text --summary` and use the IDs from the
+  PATH column. For new specs that don't exist yet, **ask the user** which workspace they
+  belong to — never guess. Each workspace has a `prefix` that appears at the start of its
+  spec paths (e.g. workspace `core` has prefix `core`, so specs are `core:core/<name>`).
 - **Schema drives everything.** Never assume specific artifact names or DAG structure.
   Always read from `schema show --format json` and `artifact-instruction --format json`.
   Different schemas may have completely different artifacts, dependencies, and workflow

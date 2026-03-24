@@ -129,9 +129,9 @@
 
 #### Scenario: Metadata generated for modified specs after archive
 
-- **GIVEN** a change modifies specs `auth/login` and `auth/register`
-- **WHEN** `ArchiveChange.execute` completes successfully
-- **THEN** `.specd-metadata.yaml` is written for both `auth/login` and `auth/register` with `title`, `description`, `dependsOn`, `contentHashes`, and any `rules`, `constraints`, `scenarios` extracted from the spec content
+- **GIVEN** a change with specIds `["default:auth/login"]` is archived
+- **WHEN** the archive process runs post-merge metadata generation
+- **THEN** `SaveSpecMetadata` is called with JSON-serialized content for each spec
 
 #### Scenario: Manifest specDependsOn overrides extracted dependsOn
 

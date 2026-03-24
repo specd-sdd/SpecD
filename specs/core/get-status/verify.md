@@ -120,7 +120,7 @@
 
 #### Scenario: Schema resolution failure degrades lifecycle fields
 
-- **GIVEN** `SchemaProvider.get()` returns `null`
+- **GIVEN** `SchemaProvider.get()` throws `SchemaNotFoundError`
 - **WHEN** `execute()` is called
 - **THEN** the result does not throw
 - **AND** `lifecycle.validTransitions` is populated normally

@@ -1,6 +1,5 @@
 import path from 'node:path'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
 import { HookFailedError } from '../../domain/errors/hook-failed-error.js'
@@ -20,7 +19,6 @@ import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { type GenerateSpecMetadata } from './generate-spec-metadata.js'
 import { type SaveSpecMetadata } from './save-spec-metadata.js'
-import { type YamlSerializer } from '../ports/yaml-serializer.js'
 import { type RunStepHooks } from './run-step-hooks.js'
 
 /** Input for the {@link ArchiveChange} use case. */
@@ -69,7 +67,6 @@ export class ArchiveChange {
   private readonly _schemaProvider: SchemaProvider
   private readonly _generateMetadata: GenerateSpecMetadata
   private readonly _saveMetadata: SaveSpecMetadata
-  private readonly _yaml: YamlSerializer
 
   /**
    * Creates a new `ArchiveChange` use case instance.
@@ -82,8 +79,7 @@ export class ArchiveChange {
    * @param parsers - Registry of artifact format parsers
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param generateMetadata - Use case for deterministic metadata extraction
-   * @param saveMetadata - Use case for writing `.specd-metadata.yaml`
-   * @param yaml - YAML serializer for metadata content
+   * @param saveMetadata - Use case for writing metadata
    */
   constructor(
     changes: ChangeRepository,
@@ -95,7 +91,6 @@ export class ArchiveChange {
     schemaProvider: SchemaProvider,
     generateMetadata: GenerateSpecMetadata,
     saveMetadata: SaveSpecMetadata,
-    yaml: YamlSerializer,
   ) {
     this._changes = changes
     this._specs = specs
@@ -106,7 +101,6 @@ export class ArchiveChange {
     this._schemaProvider = schemaProvider
     this._generateMetadata = generateMetadata
     this._saveMetadata = saveMetadata
-    this._yaml = yaml
   }
 
   /**
@@ -125,7 +119,6 @@ export class ArchiveChange {
     if (change === null) throw new ChangeNotFoundError(input.name)
 
     const schema = await this._schemaProvider.get()
-    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     // --- Schema name guard ---
     if (schema.name() !== change.schemaName) {
@@ -275,12 +268,12 @@ export class ArchiveChange {
             ? { ...result.metadata, dependsOn: [...manifestDeps] }
             : result.metadata
 
-        const yamlContent = this._yaml.stringify(metadata)
+        const jsonContent = JSON.stringify(metadata, null, 2) + '\n'
         const { workspace, capPath } = parseSpecId(specId)
         await this._saveMetadata.execute({
           workspace,
           specPath: SpecPath.parse(capPath),
-          content: yamlContent,
+          content: jsonContent,
           force: true,
         })
       } catch {

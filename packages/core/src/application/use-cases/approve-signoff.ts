@@ -5,7 +5,6 @@ import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-error.js'
-import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
 import { computeArtifactHash, buildCleanupMap } from './_shared/compute-artifact-hash.js'
 
 /** Input for the {@link ApproveSignoff} use case. */
@@ -88,8 +87,7 @@ export class ApproveSignoff {
    */
   private async _computeArtifactHashes(change: Change): Promise<Record<string, string>> {
     const schema = await this._schemaProvider.get()
-    const cleanupMap: ReadonlyMap<string, readonly PreHashCleanup[]> =
-      schema !== null ? buildCleanupMap(schema) : new Map()
+    const cleanupMap = buildCleanupMap(schema)
 
     const result: Record<string, string> = {}
     for (const [type, artifact] of change.artifacts) {

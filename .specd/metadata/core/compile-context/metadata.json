@@ -1,0 +1,507 @@
+{
+  "title": "CompileContext",
+  "description": "AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata via `SpecRepository.metadata()`, evaluates step availability, and combines project context entries, spec content, and available steps into a single structured output. Artifact instructions and step hooks are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively.",
+  "dependsOn": [
+    "core:core/change",
+    "core:core/config",
+    "core:core/spec-metadata",
+    "core:core/schema-format",
+    "core:core/delta-format",
+    "core:core/selector-model",
+    "core:core/spec-id-format",
+    "core:core/workspace",
+    "core:core/get-artifact-instruction",
+    "core:core/get-hook-instructions"
+  ],
+  "context": [
+    "AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata via `SpecRepository.metadata()`, evaluates step availability, and combines project context entries, spec content, and available steps into a single structured output. Artifact instructions and step hooks are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively."
+  ],
+  "rules": [
+    {
+      "requirement": "Ports and constructor",
+      "rules": [
+        "`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, and `ArtifactParserRegistry`.\n\n```typescript\nclass CompileContext {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    files: FileReader,\n    parsers: ArtifactParserRegistry,\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation."
+      ]
+    },
+    {
+      "requirement": "Input",
+      "rules": [
+        "`CompileContext.execute` receives:\n\n- `name` — the change name to compile context for\n- `step` — the lifecycle step name being entered (e.g. `'designing'`, `'implementing'`, `'verifying'`, `'archiving'`)\n- `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`, and `contextMode`\n- `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1–4 are included.\n- `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.\n- `sections` (optional) — when present, restricts the metadata content rendered for each spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, all available sections are rendered (description + rules + constraints + scenarios). `sections` applies only to full-mode spec content — it does not affect summary-mode specs, project context entries, or available steps."
+      ]
+    },
+    {
+      "requirement": "Schema name guard",
+      "rules": [
+        "After resolving the schema from config, `CompileContext` must compare `schema.name()` with `change.schemaName`. If they differ, it must throw `SchemaMismatchError`. This must happen before any context collection or instruction assembly."
+      ]
+    },
+    {
+      "requirement": "Workspace resolution for spec IDs",
+      "rules": [
+        "Every spec ID handled by `CompileContext` carries an explicit or implicit workspace qualifier:\n\n- **Explicit qualifier** (e.g. `billing:auth/login`) — the workspace name before `:` is used to look up the corresponding `SpecRepository` in the map.\n- **No qualifier** (e.g. `auth/login`) — the workspace is inferred from context:\n  - In include/exclude patterns at project level, an unqualified path resolves to `default`.\n  - In include/exclude patterns at workspace level, an unqualified path resolves to that workspace.\n  - In `dependsOn` entries from metadata, an unqualified path resolves to the same workspace as the spec that declared it.\n\nIf a pattern or `dependsOn` entry references a workspace name that has no entry in the `specs` map, `CompileContext` must emit a warning and skip that path. It must not throw."
+      ]
+    },
+    {
+      "requirement": "Context spec collection",
+      "rules": [
+        "`CompileContext` must collect the set of specs to include in the context by applying the five-step resolution defined in [`specs/core/config/spec.md` — Requirement: Context spec selection](../config/spec.md). The steps are:\n\n1. **Project-level include patterns** — always applied, regardless of which workspaces are active.\n2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set.\n3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec IDs appears in `change.specIds`).\n4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set.\n5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's metadata `dependsOn` entries via `SpecRepository.metadata()`, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.\n\nWhen a spec in the traversal has no metadata, `CompileContext` emits a `missing-metadata` warning identifying the spec and suggesting metadata generation. Traversal continues with any `dependsOn` information available from the change manifest's `specDependsOn` or from content extraction via the schema's `metadataExtraction` declarations.\n\nA spec matched by multiple include patterns appears exactly once, at the position of the first matching include pattern. Specs added via `dependsOn` traversal that were already included in steps 1–4 also appear once (at their earlier position)."
+      ]
+    },
+    {
+      "requirement": "Tier classification",
+      "rules": [
+        "After collecting all context specs (steps 1–5), `CompileContext` MUST classify each spec into one of two tiers based on the `config.contextMode` setting:\n\n**When `contextMode` is `'lazy'`:**\n\n- **Tier 1 (full)** — a spec belongs to tier 1 if it appears in `change.specIds` OR if it appears as a value in any entry of `change.specDependsOn`. These are the specs the agent is actively working on or has explicitly declared as needed context.\n- **Tier 2 (summary)** — all other collected specs: those matched by `contextIncludeSpecs` patterns (steps 1–4) and those discovered via `dependsOn` metadata traversal (step 5) that are not already in tier 1.\n\n**When `contextMode` is `'lazy'` (default):**\n\nTier classification is applied as described above.\n\n**When `contextMode` is `'full'`:**\n\nAll specs are classified as tier 1. Behaviour is identical to the pre-change implementation — every spec is rendered with full content.\n\nTier classification MUST happen after the full collection pipeline (steps 1–5) completes and before rendering. A spec that qualifies for both tiers (e.g. it is in `specIds` AND matched by an include pattern) MUST be classified as tier 1."
+      ]
+    },
+    {
+      "requirement": "dependsOn resolution order",
+      "rules": [
+        "For each spec in Step 5, `dependsOn` is resolved using a three-tier fallback:\n\n1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority)\n2. Metadata `dependsOn` field — the persisted metadata loaded via `SpecRepository.metadata()`\n3. Schema `metadataExtraction` engine — extracts `dependsOn` from spec content when metadata is absent\n\nThe first tier that returns a non-empty result is used. If all tiers return empty, the spec is treated as having no dependencies."
+      ]
+    },
+    {
+      "requirement": "Cycle detection during dependsOn traversal",
+      "rules": [
+        "During step 5, if `CompileContext` detects a cycle in the `dependsOn` graph (spec A depends on spec B which depends back on spec A), it must break the cycle and emit a warning. It must not enter an infinite loop. All specs that can be reached without traversing the cycle are still included."
+      ]
+    },
+    {
+      "requirement": "Staleness detection and content fallback",
+      "rules": [
+        "For every spec in the collected context set, `CompileContext` must check whether the spec's metadata exists (via `SpecRepository.metadata()`) and whether its `contentHashes` are fresh (all required artifact file hashes match the recorded values).\n\n- **Fresh metadata** — use the structured content from metadata (`rules`, `constraints`, `scenarios`, `description`).\n- **Stale or absent metadata** — fall back to the full raw content of the spec's artifact files. Emit a warning identifying the spec path so the caller knows metadata should be regenerated.\n\nStaleness is advisory — it never blocks context compilation. The fallback ensures the context is always assembled, even for specs whose metadata has not yet been generated."
+      ]
+    },
+    {
+      "requirement": "Step availability",
+      "rules": [
+        "`CompileContext` must evaluate whether the requested step is available for the current change. A step is available if all artifact IDs in the matching `workflow` entry's `requires` list (the entry whose `step` field equals the requested step name) have effective status `complete` or `skipped` via `change.effectiveStatus(type)`. A skipped optional artifact satisfies the requirement in the same way a completed artifact does.\n\nIf the step is not available (one or more required artifacts are neither `complete` nor `skipped`), `CompileContext` must include the availability status and the list of blocking artifacts in the result. It must not throw — unavailability is surfaced to the caller, not treated as an error."
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "rules": [
+        "`CompileContext` MUST assemble the result by producing three structured components rather than a single text string:\n\n1. **Project context entries** (`projectContext: ProjectContextEntry[]`) — for each entry in `config.context` (in declaration order): resolve `instruction` values verbatim; resolve `file` values by reading the file at the given path relative to the `specd.yaml` directory. Missing files emit a warning and are skipped. Each entry is an object with:\n   - `source` (`'instruction' | 'file'`) — the type of context entry\n   - `path` (string, only for `file` entries) — the file path\n   - `content` (string) — the rendered text content\n2. **Spec entries** (`specs: ContextSpecEntry[]`) — for each spec in the collected context set, produce an entry with: Specs MUST appear in the same order as before: specIds first, then specDependsOn, then include-pattern matches in pattern declaration order, then dependsOn traversal discoveries.\n   - `specId` (string) — the fully-qualified spec ID (e.g. `core:core/compile-context`)\n   - `title` (string) — the spec title from metadata or extracted from the heading\n   - `description` (string) — the spec description from metadata (2–3 sentence summary)\n   - `source` (`'specIds' | 'specDependsOn' | 'includePattern' | 'dependsOnTraversal'`) — how this spec was collected. `specIds` for specs in `change.specIds`; `specDependsOn` for specs that appear as values in `change.specDependsOn`; `includePattern` for specs matched by contextIncludeSpecs patterns (steps 1–4); `dependsOnTraversal` for specs discovered via metadata dependsOn traversal (step 5). When a spec qualifies through multiple sources, the highest-priority source wins: `specIds` > `specDependsOn` > `dependsOnTraversal` > `includePattern`.\n   - `mode` (`'full' | 'summary'`) — `full` for tier 1 specs, `summary` for tier 2 specs\n   - `content` (string, present only when `mode` is `'full'`) — the rendered spec content (rules, constraints, scenarios) using the same fresh-metadata / metadataExtraction-fallback logic as before. When `sections` is present, only the listed sections are rendered.\n3. **Available steps** (`availableSteps: AvailableStep[]`) — list all steps declared in the schema's `workflow[]`, each with:\n   - `step` (string) — the step name\n   - `available` (boolean) — whether the step is currently available\n   - `blockingArtifacts` (string\\[]) — artifact IDs blocking the step (empty if available)"
+      ]
+    },
+    {
+      "requirement": "Result shape",
+      "rules": [
+        "`CompileContext.execute` MUST return a `CompileContextResult` object with:\n\n- `stepAvailable: boolean` — whether the requested step is currently available\n- `blockingArtifacts: string[]` — artifact IDs blocking the step (empty if available)\n- `projectContext: ProjectContextEntry[]` — rendered project context entries\n- `specs: ContextSpecEntry[]` — spec entries with tier classification, source, and content\n- `availableSteps: AvailableStep[]` — all workflow steps with availability status\n- `warnings: ContextWarning[]` — stale metadata warnings and any other advisory conditions\n\n`CompileContext` MUST NOT throw on availability failures. It MUST throw on `ChangeNotFoundError` (change not found) and on schema resolution errors."
+      ]
+    },
+    {
+      "requirement": "Missing spec IDs emit a warning",
+      "rules": [
+        "If a spec ID from an include pattern or `dependsOn` reference does not exist in the corresponding `SpecRepository`, `CompileContext` must emit a warning identifying the missing spec ID and skip it — no error is thrown. This allows the context to be compiled even when specs are temporarily absent, while making the gap visible."
+      ]
+    },
+    {
+      "requirement": "Unknown workspace qualifiers emit a warning",
+      "rules": [
+        "If a pattern or `dependsOn` entry references a workspace name that has no corresponding `SpecRepository` in the `specs` map (e.g. `billing:auth/*` when `billing` was not wired at bootstrap), `CompileContext` must emit a warning and skip the path. It must not throw."
+      ]
+    }
+  ],
+  "constraints": [
+    "Project context entries always appear first in projectContext, before spec entries",
+    "Missing file references in context emit a warning and are skipped — no error",
+    "Steps 1–4 (include/exclude patterns) are applied before dependsOn traversal (step 5)",
+    "Specs added via dependsOn traversal are never removed by exclude rules",
+    "A spec always appears at most once in the specs array, classified by its highest-priority source",
+    "CompileContext MUST NOT perform direct filesystem reads — all file access goes through SpecRepository (for spec files and metadata) or FileReader (for config.context file entries)",
+    "The caller resolves the config and constructs all SpecRepository and FileReader instances before calling the constructor",
+    "The specs map must contain one entry per workspace declared in specd.yaml; workspaces missing from the map produce a warning, not an error",
+    "Artifact instructions, rules, and delta context are NOT part of the result — they are retrieved via GetArtifactInstruction",
+    "instruction: hook entries are NOT part of the result — they are retrieved via GetHookInstructions",
+    "dependsOn traversal is opt-in via followDeps: true; when absent or false, step 5 is skipped entirely",
+    "depth is only meaningful when followDeps: true; it limits traversal levels (1 = direct deps only)",
+    "sections applies only to full-mode spec content rendering; summary-mode specs, project context entries, and available steps are unaffected",
+    "Cycle detection is mandatory — cycles in dependsOn must not cause infinite loops",
+    "Fresh metadata (via SpecRepository.metadata()) is always preferred; the metadataExtraction fallback is only used when metadata is absent or stale",
+    "When contextMode is 'lazy' (default), tier 2 specs MUST have mode: 'summary' with no content field — only specId, title, description, and source",
+    "When contextMode is 'full', all specs MUST have mode: 'full' — behaviour is identical to the pre-change implementation except for the structured result shape"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Context spec collection",
+      "name": "Project-level include applied regardless of active workspace",
+      "given": [
+        "a project-level contextIncludeSpecs pattern that matches specs in multiple workspaces"
+      ],
+      "when": ["CompileContext.execute is called for a specific workspace"],
+      "then": [
+        "all specs matching the project-level pattern are included regardless of the active workspace"
+      ]
+    },
+    {
+      "requirement": "Context spec collection",
+      "name": "Workspace-level include applied only for active workspace",
+      "given": [
+        "billing workspace declares contextIncludeSpecs: ['*']",
+        "AND the current change has no spec in the billing workspace"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": ["no billing specs are included via workspace-level patterns"]
+    },
+    {
+      "requirement": "Context spec collection",
+      "name": "Project-level exclude removes spec before workspace patterns are applied",
+      "given": [
+        "contextIncludeSpecs: ['default:*'] and contextExcludeSpecs: ['default:drafts/*']",
+        "AND default:drafts/old-spec was matched by the project-level include"
+      ],
+      "when": ["CompileContext.execute applies step 2 (project-level exclude)"],
+      "then": ["default:drafts/old-spec is removed before workspace-level patterns are evaluated"]
+    },
+    {
+      "requirement": "Context spec collection",
+      "name": "Workspace-level exclude removes spec after workspace include",
+      "given": [
+        "default workspace declares contextIncludeSpecs: ['*'] and contextExcludeSpecs: ['internal/*']",
+        "AND default is active and default:internal/notes was added by the workspace include (step 3)"
+      ],
+      "when": ["CompileContext.execute applies step 4 (workspace-level exclude)"],
+      "then": ["default:internal/notes is removed from the context set"]
+    },
+    {
+      "requirement": "Context spec collection",
+      "name": "dependsOn traversal adds specs beyond include set",
+      "given": [
+        "change.specIds: ['default:auth/login']",
+        "AND auth/login metadata declares dependsOn: ['auth/jwt']",
+        "AND auth/jwt was not matched by any include pattern"
+      ],
+      "when": ["CompileContext.execute applies step 5 with followDeps: true"],
+      "then": ["auth/jwt is added to the context set"]
+    },
+    {
+      "requirement": "Context spec collection",
+      "name": "dependsOn spec not removed by exclude",
+      "given": [
+        "contextExcludeSpecs: ['default:auth/*']",
+        "AND auth/jwt is added via dependsOn traversal (step 5)"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": ["auth/jwt is not excluded — dependsOn traversal specs are immune to exclude rules"]
+    },
+    {
+      "requirement": "Context spec collection",
+      "name": "Spec appears only once even if matched multiple times",
+      "given": ["contextIncludeSpecs: ['auth/login', 'auth/*']"],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "auth/login appears exactly once in the context, at the position of the first matching pattern"
+      ]
+    },
+    {
+      "requirement": "Tier classification",
+      "name": "Lazy mode — specIds specs are tier 1 full",
+      "given": ["config.contextMode: 'lazy'", "AND change.specIds: ['default:auth/login']"],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "the spec entry for default:auth/login has mode: 'full' and source: 'specIds'",
+        "AND its content field is present with full structured content"
+      ]
+    },
+    {
+      "requirement": "Tier classification",
+      "name": "Lazy mode — specDependsOn specs are tier 1 full",
+      "given": [
+        "config.contextMode: 'lazy'",
+        "AND change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "the spec entry for default:auth/shared has mode: 'full' and source: 'specDependsOn'",
+        "AND its content field is present with full structured content"
+      ]
+    },
+    {
+      "requirement": "Tier classification",
+      "name": "Lazy mode — include pattern specs are tier 2 summary",
+      "given": [
+        "config.contextMode: 'lazy'",
+        "AND contextIncludeSpecs: ['default:*'] matches default:_global/architecture",
+        "AND default:_global/architecture is NOT in change.specIds or change.specDependsOn"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "the spec entry for default:_global/architecture has mode: 'summary' and source: 'includePattern'",
+        "AND its content field is absent",
+        "AND title and description are present"
+      ]
+    },
+    {
+      "requirement": "Tier classification",
+      "name": "Lazy mode — dependsOn traversal specs are tier 2 summary",
+      "given": [
+        "config.contextMode: 'lazy'",
+        "AND followDeps: true",
+        "AND a spec default:auth/jwt is discovered via dependsOn traversal",
+        "AND default:auth/jwt is NOT in change.specIds or change.specDependsOn"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "the spec entry for default:auth/jwt has mode: 'summary' and source: 'dependsOnTraversal'"
+      ]
+    },
+    {
+      "requirement": "Tier classification",
+      "name": "Lazy mode — spec in both specIds and include pattern is tier 1",
+      "given": [
+        "config.contextMode: 'lazy'",
+        "AND change.specIds: ['default:auth/login']",
+        "AND contextIncludeSpecs: ['default:*'] also matches default:auth/login"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "the spec entry for default:auth/login has mode: 'full' and source: 'specIds'",
+        "AND it appears exactly once in the specs array"
+      ]
+    },
+    {
+      "requirement": "Tier classification",
+      "name": "Full mode — all specs are tier 1 full",
+      "given": [
+        "config.contextMode: 'full'",
+        "AND contextIncludeSpecs: ['default:*'] matches multiple specs"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": ["all spec entries have mode: 'full'", "AND all spec entries have content present"]
+    },
+    {
+      "requirement": "Tier classification",
+      "name": "Default contextMode is lazy",
+      "given": [
+        "config.contextMode is not set",
+        "AND change.specIds contains some specs and contextIncludeSpecs matches others"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "specIds specs have mode: 'full' and other specs have mode: 'summary' — same as contextMode: 'lazy'"
+      ]
+    },
+    {
+      "requirement": "Cycle detection during dependsOn traversal",
+      "name": "Cycle broken without infinite loop",
+      "given": ["auth/login depends on auth/jwt and auth/jwt depends back on auth/login"],
+      "when": ["CompileContext.execute traverses dependsOn"],
+      "then": [
+        "both specs are included (or the cycle is broken at one point)",
+        "AND no infinite loop occurs",
+        "AND a cycle warning is emitted"
+      ]
+    },
+    {
+      "requirement": "Staleness warning",
+      "name": "Stale metadata emits warning",
+      "given": [
+        "auth/jwt metadata has contentHashes.spec.md: 'sha256:old'",
+        "AND the current spec.md hashes to sha256:new"
+      ],
+      "when": ["CompileContext.execute adds auth/jwt via dependsOn traversal"],
+      "then": ["the result warnings includes a staleness warning for auth/jwt"]
+    },
+    {
+      "requirement": "Staleness warning",
+      "name": "Fresh metadata emits no staleness warning",
+      "given": ["all contentHashes in metadata match the current file hashes"],
+      "when": ["CompileContext.execute is called"],
+      "then": ["no staleness warnings are emitted"]
+    },
+    {
+      "requirement": "Step availability",
+      "name": "Step unavailable when required artifact not complete",
+      "given": [
+        "workflow.implementing.requires: ['tasks']",
+        "AND the tasks artifact's effective status is in-progress"
+      ],
+      "when": ["CompileContext.execute is called with step: 'implementing'"],
+      "then": ["result.stepAvailable is false", "AND result.blockingArtifacts includes 'tasks'"]
+    },
+    {
+      "requirement": "Step availability",
+      "name": "Step available when all required artifacts are complete",
+      "given": [
+        "workflow.implementing.requires: ['tasks']",
+        "AND the tasks artifact's effective status is complete"
+      ],
+      "when": ["CompileContext.execute is called with step: 'implementing'"],
+      "then": ["result.stepAvailable is true", "AND result.blockingArtifacts is empty"]
+    },
+    {
+      "requirement": "Step availability",
+      "name": "Unavailability does not throw",
+      "given": ["the requested step's required artifacts are not complete"],
+      "when": ["CompileContext.execute is called"],
+      "then": ["the result is returned normally — no exception is thrown"]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "instruction entry in projectContext array",
+      "given": ["config.context: [{ instruction: \"Always prefer editing existing files.\" }]"],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "result.projectContext contains an entry with source: 'instruction' and content: \"Always prefer editing existing files.\""
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "file entry read via FileReader into projectContext",
+      "given": [
+        "config.context: [{ file: \"specd-bootstrap.md\" }]",
+        "AND FileReader.read(\"specd-bootstrap.md\") returns \"# specd Bootstrap\""
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "result.projectContext contains an entry with source: 'file', path: \"specd-bootstrap.md\", and content: \"# specd Bootstrap\""
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "missing file entry emits a warning",
+      "given": [
+        "config.context: [{ file: \"does-not-exist.md\" }]",
+        "AND FileReader.read(\"does-not-exist.md\") returns null"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "a warning is emitted identifying the missing file, the entry is absent from projectContext, and no error is thrown"
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "multiple context entries preserve declaration order",
+      "given": [
+        "config.context: [{ file: AGENTS.md }, { instruction: \"Inline note.\" }, { file: specd-bootstrap.md }]"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "result.projectContext contains entries in order: AGENTS.md file, instruction, specd-bootstrap.md file"
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "availableSteps includes all workflow steps",
+      "given": [
+        "the schema declares workflow steps ['designing', 'ready', 'implementing', 'verifying', 'archiving']"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "result.availableSteps contains an entry for each step with available and blockingArtifacts"
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "spec source priority — specIds wins over includePattern",
+      "given": [
+        "change.specIds: ['default:auth/login']",
+        "AND contextIncludeSpecs: ['default:*'] also matches default:auth/login"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": ["the spec entry for default:auth/login has source: 'specIds', not 'includePattern'"]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "spec source priority — specDependsOn wins over dependsOnTraversal",
+      "given": [
+        "change.specDependsOn: { 'default:auth/login': ['default:auth/shared'] }",
+        "AND default:auth/shared is also discovered via dependsOn metadata traversal"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "the spec entry for default:auth/shared has source: 'specDependsOn', not 'dependsOnTraversal'"
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "No artifact instructions in the result",
+      "given": ["the schema declares artifacts[spec].instruction: 'Create specifications...'"],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "the result does not include the artifact instruction — artifact instructions are retrieved via GetArtifactInstruction"
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "No instruction hooks in the result",
+      "given": ["workflow.archiving.hooks.pre contains { instruction: 'Review delta specs' }"],
+      "when": ["CompileContext.execute is called with step: 'archiving'"],
+      "then": [
+        "the result does not include Review delta specs — instruction hooks are retrieved via GetHookInstructions"
+      ]
+    },
+    {
+      "requirement": "Structured result assembly",
+      "name": "metadataExtraction used as fallback for stale/absent metadata",
+      "given": [
+        "a spec is in the context set with stale or absent metadata",
+        "AND the schema declares metadataExtraction rules"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "the spec entry's content is produced via extraction and a staleness warning is emitted"
+      ]
+    },
+    {
+      "requirement": "Missing spec IDs emit a warning",
+      "name": "Non-existent spec ID emits a warning",
+      "given": ["an include pattern matches a spec ID that does not exist in SpecRepository"],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "a warning is emitted identifying the missing path, the path is skipped, and no error is thrown"
+      ]
+    },
+    {
+      "requirement": "dependsOn resolution order",
+      "name": "Missing metadata during dependsOn traversal emits warning",
+      "given": ["change.specIds includes auth/login", "AND auth/login has no metadata"],
+      "when": ["CompileContext.execute is called with followDeps: true"],
+      "then": ["result.warnings includes a missing-metadata warning for auth/login"]
+    },
+    {
+      "requirement": "dependsOn resolution order",
+      "name": "Fallback to content extraction when metadata absent in dependsOn traversal",
+      "given": [
+        "the schema declares metadataExtraction.dependsOn",
+        "AND a spec in the dependsOn traversal has no metadata",
+        "AND the spec's artifact content contains extractable dependency references"
+      ],
+      "when": ["CompileContext.execute is called with followDeps: true"],
+      "then": [
+        "dependencies are extracted from the spec content via the metadataExtraction engine",
+        "AND a missing-metadata warning is still emitted"
+      ]
+    },
+    {
+      "requirement": "dependsOn resolution order",
+      "name": "Manifest specDependsOn used as primary source for dependencies",
+      "given": [
+        "change.specDependsOn has an entry for auth/login with ['auth/shared']",
+        "AND auth/login metadata declares dependsOn: ['auth/jwt']"
+      ],
+      "when": ["CompileContext.execute is called with followDeps: true"],
+      "then": [
+        "auth/shared is used as the dependency (from manifest), not auth/jwt (from metadata)"
+      ]
+    },
+    {
+      "requirement": "Unknown workspace qualifiers emit a warning",
+      "name": "Unknown workspace qualifier in include pattern",
+      "given": [
+        "contextIncludeSpecs: ['unknown-workspace:*']",
+        "AND unknown-workspace is not declared in the active config"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "result.warnings includes a warning about the unknown qualifier",
+        "AND no exception is thrown"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:7c62a847e9c84884ac49af09a19b6ec11a2c14b710698d15caa4ea080b43a757",
+    "verify.md": "sha256:a8c6e9711ad37d8ee3138b9b939dc70ac9b3ca03defbac7b2c3c659d1351b0b9"
+  },
+  "generatedBy": "core"
+}

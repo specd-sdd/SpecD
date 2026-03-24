@@ -3,6 +3,7 @@ import { type ArtifactStatus } from '../../domain/value-objects/artifact-status.
 import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/change-state.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { type Schema } from '../../domain/value-objects/schema.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 
 /** Input for the {@link GetStatus} use case. */
@@ -127,16 +128,14 @@ export class GetStatus {
     // 1. Valid transitions (static, always works)
     const validTransitions = VALID_TRANSITIONS[change.state]
 
-    // 2. Resolve schema (may fail)
-    let schema: Awaited<ReturnType<SchemaProvider['get']>> = null
+    // 2. Resolve schema (may fail — graceful degradation)
+    let schema: Schema | null = null
     let schemaInfo: LifecycleContext['schemaInfo'] = null
     try {
       schema = await this._schemaProvider.get()
-      if (schema !== null) {
-        schemaInfo = { name: schema.name(), version: schema.version() }
-      }
+      schemaInfo = { name: schema.name(), version: schema.version() }
     } catch {
-      // Graceful degradation — schema-dependent fields will use defaults
+      // Schema-dependent fields will use defaults
     }
 
     // 3. Available transitions and blockers
