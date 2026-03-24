@@ -45,6 +45,20 @@
 - **WHEN** `buildSchema` receives two artifacts both with `id: "specs"`
 - **THEN** it throws `SchemaValidationError` mentioning the duplicate ID `"specs"`
 
+### Requirement: Array entry ID validation
+
+#### Scenario: Duplicate hook IDs across workflow steps
+
+- **GIVEN** workflow step `"designing"` with `hooks.pre: [{ id: "run-lint" }]` and workflow step `"implementing"` with `hooks.post: [{ id: "run-lint" }]`
+- **WHEN** `buildSchema` validates the schema
+- **THEN** it throws `SchemaValidationError` mentioning the duplicate hook ID `"run-lint"`
+
+#### Scenario: Unique hook IDs across workflow steps accepted
+
+- **GIVEN** workflow steps with hooks `"designing.pre: [lint]"`, `"implementing.pre: [test]"`, `"implementing.post: [deploy]"`
+- **WHEN** `buildSchema` validates the schema
+- **THEN** no error is thrown for hook IDs
+
 ### Requirement: Template reference validation
 
 #### Scenario: Template path not in templates map

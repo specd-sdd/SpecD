@@ -62,25 +62,15 @@
 
 ### Requirement: Array entry identity
 
-#### Scenario: Valid id format accepted
-
-- **WHEN** a hook entry declares `id: run-tests`
-- **THEN** the schema loads without error
-
-#### Scenario: Invalid id format rejected
-
-- **WHEN** a hook entry declares `id: Run_Tests`
-- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
-
-#### Scenario: Duplicate id within same array rejected
-
-- **WHEN** two entries in `workflow[0].hooks.pre` both declare `id: run-tests`
-- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
-
 #### Scenario: Same id in different arrays is valid
 
-- **WHEN** `workflow[0].hooks.pre` has `id: run-tests` and `workflow[1].hooks.post` also has `id: run-tests`
-- **THEN** the schema loads without error — uniqueness is per-array, not global
+- **WHEN** `workflow[0].hooks.pre` has `id: run-tests` and `workflow[1].rules.pre` also has `id: run-tests`
+- **THEN** the schema loads without error — rules use per-array uniqueness, not global
+
+#### Scenario: Duplicate hook IDs across workflow steps rejected
+
+- **WHEN** `workflow[0].hooks.pre` has `id: run-lint` and `workflow[1].hooks.post` also has `id: run-lint`
+- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError` mentioning the duplicate hook ID
 
 ### Requirement: Artifact definition
 

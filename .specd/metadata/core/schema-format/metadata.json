@@ -32,7 +32,7 @@
     {
       "requirement": "Array entry identity",
       "rules": [
-        "Every entry in the following schema arrays must carry an `id` field:\n\n- `workflow[].hooks.pre[]` and `workflow[].hooks.post[]`\n- `artifacts[].validations[]`\n- `artifacts[].deltaValidations[]`\n- `artifacts[].rules.pre[]` and `artifacts[].rules.post[]`\n- `artifacts[].preHashCleanup[]`\n- `metadataExtraction` array entries (entries in `rules[]`, `constraints[]`, `scenarios[]`, `context[]`)\n\nFormat: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters. IDs must be unique within their immediate array. Duplicate IDs within the same array produce a `SchemaValidationError`.\n\nWorkflow steps use `step` as their identity field instead of `id`. Artifact entries use their existing `id` field.\n\nSingle-entry metadata fields (`title`, `description`, `dependsOn`, `keywords`) do not have `id` — they are scalars, not array entries."
+        "Every entry in the following schema arrays must carry an `id` field:\n\n- `workflow[].hooks.pre[]` and `workflow[].hooks.post[]`\n- `artifacts[].validations[]`\n- `artifacts[].deltaValidations[]`\n- `artifacts[].rules.pre[]` and `artifacts[].rules.post[]`\n- `artifacts[].preHashCleanup[]`\n- `metadataExtraction` array entries (entries in `rules[]`, `constraints[]`, `scenarios[]`, `context[]`)\n\nFormat: `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64 characters.\n\n**For hooks:** IDs must be globally unique across ALL workflow steps. No two hooks in any workflow step may share the same ID, regardless of whether they are in pre or post arrays.\n\n**For all other array entries:** IDs must be unique within their immediate array.\n\nDuplicate IDs within the same array (or for hooks, duplicate IDs across any workflow step) produce a `SchemaValidationError`.\n\nWorkflow steps use `step` as their identity field instead of `id`. Artifact entries use their existing `id` field.\n\nSingle-entry metadata fields (`title`, `description`, `dependsOn`, `keywords`) do not have `id` — they are scalars, not array entries."
       ]
     },
     {
@@ -194,29 +194,21 @@
     },
     {
       "requirement": "Array entry identity",
-      "name": "Valid id format accepted",
-      "when": ["a hook entry declares id: run-tests"],
-      "then": ["the schema loads without error"]
-    },
-    {
-      "requirement": "Array entry identity",
-      "name": "Invalid id format rejected",
-      "when": ["a hook entry declares id: Run_Tests"],
-      "then": ["SchemaRegistry.resolve() must throw a SchemaValidationError"]
-    },
-    {
-      "requirement": "Array entry identity",
-      "name": "Duplicate id within same array rejected",
-      "when": ["two entries in workflow[0].hooks.pre both declare id: run-tests"],
-      "then": ["SchemaRegistry.resolve() must throw a SchemaValidationError"]
-    },
-    {
-      "requirement": "Array entry identity",
       "name": "Same id in different arrays is valid",
       "when": [
-        "workflow[0].hooks.pre has id: run-tests and workflow[1].hooks.post also has id: run-tests"
+        "workflow[0].hooks.pre has id: run-tests and workflow[1].rules.pre also has id: run-tests"
       ],
-      "then": ["the schema loads without error — uniqueness is per-array, not global"]
+      "then": ["the schema loads without error — rules use per-array uniqueness, not global"]
+    },
+    {
+      "requirement": "Array entry identity",
+      "name": "Duplicate hook IDs across workflow steps rejected",
+      "when": [
+        "workflow[0].hooks.pre has id: run-lint and workflow[1].hooks.post also has id: run-lint"
+      ],
+      "then": [
+        "SchemaRegistry.resolve() must throw a SchemaValidationError mentioning the duplicate hook ID"
+      ]
     },
     {
       "requirement": "Artifact definition",
@@ -703,8 +695,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8cd63d02dab1d3850b0ea65a8c5865a7893b83d4a574ec9b686857eca9595438",
-    "verify.md": "sha256:5136fcf0fdf11876592db813cb646c17349d8d8135628cfb61b9622ae2321874"
+    "spec.md": "sha256:871369a9742c4fee4ce5e4028454f6df77c8bbb3f8b0c323397e72e3e14d6186",
+    "verify.md": "sha256:d19a5c74f1f338802896e37d18309f17d437c776f2c9d1bd4b9e2cb18c5dc746"
   },
   "generatedBy": "core"
 }

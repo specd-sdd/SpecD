@@ -34,4 +34,59 @@ describe('buildSchema', () => {
     const schema = buildSchema('#test', minimalData([step('archiving')]), new Map())
     expect(schema.workflowStep('archiving')).not.toBeNull()
   })
+
+  it('rejects duplicate hook IDs across different workflow steps', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [{ id: 'spec', scope: 'spec' as const, output: 'spec.md' }],
+      workflow: [
+        {
+          step: 'designing',
+          requires: [],
+          hooks: {
+            pre: [{ id: 'run-lint', type: 'instruction' as const, text: 'lint' }],
+            post: [],
+          },
+        },
+        {
+          step: 'implementing',
+          requires: [],
+          hooks: {
+            pre: [],
+            post: [{ id: 'run-lint', type: 'instruction' as const, text: 'lint' }],
+          },
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+  })
+
+  it('accepts unique hook IDs across workflow steps', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [{ id: 'spec', scope: 'spec' as const, output: 'spec.md' }],
+      workflow: [
+        {
+          step: 'designing',
+          requires: [],
+          hooks: { pre: [{ id: 'lint', type: 'instruction' as const, text: 'lint' }], post: [] },
+        },
+        {
+          step: 'implementing',
+          requires: [],
+          hooks: {
+            pre: [{ id: 'test', type: 'instruction' as const, text: 'test' }],
+            post: [{ id: 'deploy', type: 'instruction' as const, text: 'deploy' }],
+          },
+        },
+      ],
+    }
+    const schema = buildSchema('#test', data, new Map())
+    expect(schema.workflowStep('designing')).not.toBeNull()
+    expect(schema.workflowStep('implementing')).not.toBeNull()
+  })
 })
