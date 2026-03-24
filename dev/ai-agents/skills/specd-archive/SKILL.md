@@ -1,7 +1,7 @@
 ---
 name: specd-archive
 description: Archive a specd change — handles signoff gate, merges deltas into specs.
-allowed-tools: Bash(node *), Read
+allowed-tools: Bash(node *), Read, TaskCreate, TaskUpdate
 argument-hint: '<change-name>'
 ---
 
@@ -25,7 +25,15 @@ node packages/cli/dist/index.js change status <name> --format json
 Store `lifecycle.changePath` and `specIds` from the response.
 
 If state is not `done`, `pending-signoff`, `signed-off`, or `archivable`, this is
-the wrong skill — suggest the right one.
+the wrong skill. Suggest based on state:
+
+- `drafting` / `designing` → `/specd-design <name>`
+- `ready` → Review artifacts, then approve or continue designing with `/specd-design <name>`
+- `implementing` / `spec-approved` → `/specd-implement <name>`
+- `verifying` → `/specd-verify <name>`
+- `pending-spec-approval` → "Approval pending. Run: `specd change approve spec <name> --reason ...`"
+
+**Stop — do not continue.**
 
 ### 2. Handle signoff gate
 
@@ -108,6 +116,38 @@ spec in the change.
 > Change `<name>` archived. Deltas merged into specs.
 
 **Stop.**
+
+## Session tasks
+
+Create tasks at the start for session visibility. Update them as you go.
+
+1. `Load state` — mark done after step 1
+2. `Handle signoff gate` — mark done after step 2
+3. `Pre-archive review` — mark done after step 3
+4. `Archive change` — mark done after step 5
+5. `Post-archive & metadata` — mark done after step 8
+
+## Handling failed transitions
+
+Any `change transition` command may fail with:
+
+```
+Cannot transition from '<current>' to '<target>'
+```
+
+If this happens, the change is in a different state than expected. Extract `<current>`
+from the error message and redirect using this table:
+
+| Current state                                            | Suggest                                                                          |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `drafting` / `designing`                                 | `/specd-design <name>`                                                           |
+| `ready`                                                  | Review artifacts, then approve or continue designing with `/specd-design <name>` |
+| `implementing` / `spec-approved`                         | `/specd-implement <name>`                                                        |
+| `verifying`                                              | `/specd-verify <name>`                                                           |
+| `done` / `pending-signoff` / `signed-off` / `archivable` | You're already in the right skill — re-read status and retry                     |
+| `pending-spec-approval`                                  | "Approval pending. Run: `specd change approve spec <name> --reason ...`"         |
+
+**Stop — do not continue after redirecting.**
 
 ## Guardrails
 

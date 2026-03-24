@@ -1,7 +1,7 @@
 ---
 name: specd-new
 description: Explore what the user wants to do and create a new specd change when ready.
-allowed-tools: Bash(node *), Read, Grep, Glob, Agent
+allowed-tools: Bash(node *), Read, Grep, Glob, Agent, TaskCreate, TaskUpdate
 argument-hint: '[description of what you want to do]'
 ---
 
@@ -56,6 +56,26 @@ node packages/cli/dist/index.js change create <name> --spec <workspace:path> --d
 
 The response includes `changePath` — the directory where artifacts will be written.
 
+If `change create` fails with `Change '<name>' already exists`, the change is already
+in progress. Load its status and redirect:
+
+```bash
+node packages/cli/dist/index.js change status <name> --format json
+```
+
+Suggest based on state:
+
+| State                                                    | Suggest                                                                  |
+| -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `drafting` / `designing`                                 | `/specd-design <name>`                                                   |
+| `ready`                                                  | Review artifacts, then `/specd-implement <name>` if approved             |
+| `implementing` / `spec-approved`                         | `/specd-implement <name>`                                                |
+| `verifying`                                              | `/specd-verify <name>`                                                   |
+| `done` / `pending-signoff` / `signed-off` / `archivable` | `/specd-archive <name>`                                                  |
+| `pending-spec-approval`                                  | "Approval pending. Run: `specd change approve spec <name> --reason ...`" |
+
+**Stop — do not continue.**
+
 ### 4. Run entry hooks
 
 ```bash
@@ -76,6 +96,14 @@ Show the change state and suggest next step:
 > Run `/specd-design <name>` to start writing artifacts.
 
 **Stop here.** Do not start writing artifacts.
+
+## Session tasks
+
+Create tasks at the start for session visibility. Update them as you go.
+
+1. `Understand intent` — mark done after confirming what the user wants
+2. `Propose change` — mark done after user confirms name/description/specs
+3. `Create change` — mark done after CLI creates the change successfully
 
 ## Guardrails
 
