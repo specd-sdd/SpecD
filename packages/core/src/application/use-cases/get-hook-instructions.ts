@@ -6,7 +6,6 @@ import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type TemplateExpander } from '../template-expander.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 
 /** Valid `ChangeState` values for step validation. */
@@ -95,7 +94,6 @@ export class GetHookInstructions {
     }
 
     const schema = await this._schemaProvider.get()
-    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     if (schema.name() !== schemaName) {
       throw new SchemaMismatchError(input.name, schemaName, schema.name())

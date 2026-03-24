@@ -4,7 +4,6 @@ import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
 import { type ValidationFailure, type ValidationWarning } from './validate-artifacts.js'
-import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
@@ -82,7 +81,6 @@ export class ValidateSpecs {
    */
   async execute(input: ValidateSpecsInput): Promise<ValidateSpecsResult> {
     const schema = await this._schemaProvider.get()
-    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     const specArtifactTypes = schema.artifacts().filter((a) => a.scope === 'spec')
     const entries: SpecValidationEntry[] = []

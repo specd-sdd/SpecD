@@ -4,10 +4,10 @@
 
 ### Requirement: Schema resolution
 
-#### Scenario: Schema not found
+#### Scenario: Schema resolution failure propagates
 
-- **WHEN** `SchemaProvider.get()` returns `null` for the configured schema reference
-- **THEN** it throws `SchemaNotFoundError`
+- **WHEN** `SchemaProvider.get()` throws `SchemaNotFoundError`
+- **THEN** the error propagates — the use case does not catch it
 
 #### Scenario: Schema has no metadataExtraction
 

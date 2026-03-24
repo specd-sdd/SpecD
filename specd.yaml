@@ -70,14 +70,14 @@ schemaOverrides:
       - step: implementing
         hooks:
           post:
-            - id: run-tests
+            - id: implementing-run-tests
               run: 'pnpm test'
-            - id: run-lint
+            - id: implementing-run-lint
               run: 'pnpm lint'
       - step: archiving
         hooks:
           pre:
-            - id: run-tests
+            - id: archiving-run-tests
               run: 'pnpm test'
-            - id: run-lint
+            - id: archiving-run-lint
               run: 'pnpm lint'

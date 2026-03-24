@@ -8,7 +8,7 @@ When a spec's content changes outside the normal archive flow, its metadata beco
 
 ### Requirement: Removes contentHashes
 
-When executed, the use case reads the existing metadata via `SpecRepository.metadata()`, removes the `contentHashes` key from the parsed YAML, and writes the result back via `SpecRepository.saveMetadata()`. The write uses `force: true` to skip conflict detection — invalidation is always unconditional.
+When executed, loads the existing metadata via `repo.metadata(spec)`. If metadata exists, removes the `contentHashes` and `originalHash` fields, serializes the rest with `JSON.stringify(withoutHashes, null, 2)`, and writes back via `repo.saveMetadata(spec, content, { force: true })`. The `YamlSerializer` dependency is no longer needed.
 
 ### Requirement: Preserves other fields
 

@@ -202,6 +202,7 @@ function buildValidationRule(raw: ValidationRuleRaw): ValidationRule {
   }
 
   return {
+    ...(raw.id !== undefined ? { id: raw.id } : {}),
     ...(selector !== undefined ? { selector } : {}),
     ...(raw.path !== undefined ? { path: raw.path } : {}),
     ...(raw.required !== undefined ? { required: raw.required } : {}),
@@ -258,6 +259,7 @@ function buildExtractor(raw: ExtractorRaw): Extractor {
  */
 function buildMetadataExtractorEntry(raw: MetadataExtractorEntryRaw): MetadataExtractorEntry {
   return {
+    ...(raw.id !== undefined ? { id: raw.id } : {}),
     artifact: raw.artifact,
     extractor: buildExtractor(raw.extractor),
   }
@@ -305,6 +307,7 @@ function buildArtifactType(
   const deltaValidations: ValidationRule[] = (raw.deltaValidations ?? []).map(buildValidationRule)
 
   const preHashCleanup: PreHashCleanup[] = (raw.preHashCleanup ?? []).map((p) => ({
+    ...(p.id !== undefined ? { id: p.id } : {}),
     pattern: p.pattern,
     replacement: p.replacement,
   }))
@@ -487,12 +490,110 @@ export function buildSchema(
     }
   }
 
+  // Semantic validation: hook IDs must be globally unique across all workflow steps
+  const hookIdToSteps = new Map<string, string[]>()
+  for (const step of workflow) {
+    for (const hook of step.hooks.pre) {
+      const existing = hookIdToSteps.get(hook.id) ?? []
+      existing.push(`${step.step}.pre`)
+      hookIdToSteps.set(hook.id, existing)
+    }
+    for (const hook of step.hooks.post) {
+      const existing = hookIdToSteps.get(hook.id) ?? []
+      existing.push(`${step.step}.post`)
+      hookIdToSteps.set(hook.id, existing)
+    }
+  }
+  for (const [hookId, steps] of hookIdToSteps) {
+    if (steps.length > 1) {
+      throw new SchemaValidationError(
+        ref,
+        `duplicate hook id '${hookId}' in workflow steps '${steps.join("' and '")}'`,
+      )
+    }
+  }
+
+  /**
+   * Validates that IDs within an array are unique, reporting duplicates with context.
+   *
+   * @param schemaRef - Schema reference for error messages
+   * @param array - Array of items with optional `id` fields
+   * @param arrayName - Name of the array for error context
+   * @param context - Additional context for error messages
+   * @throws {SchemaValidationError} If duplicate IDs are found
+   */
+  function validateArrayIds<T extends { id?: string }>(
+    schemaRef: string,
+    array: readonly T[],
+    arrayName: string,
+    context: string,
+  ): void {
+    const idToIndices = new Map<string, number[]>()
+    for (let i = 0; i < array.length; i++) {
+      const id = array[i]?.id
+      if (id === undefined) continue
+      const existing = idToIndices.get(id) ?? []
+      existing.push(i)
+      idToIndices.set(id, existing)
+    }
+    for (const [id, indices] of idToIndices) {
+      if (indices.length > 1) {
+        throw new SchemaValidationError(
+          schemaRef,
+          `duplicate ${arrayName} id '${id}' in ${context}`,
+        )
+      }
+    }
+  }
+
+  for (const artifact of artifacts) {
+    if (artifact.validations.length > 0) {
+      validateArrayIds(ref, artifact.validations, 'validations', `artifact '${artifact.id}'`)
+    }
+    if (artifact.deltaValidations.length > 0) {
+      validateArrayIds(
+        ref,
+        artifact.deltaValidations,
+        'deltaValidations',
+        `artifact '${artifact.id}'`,
+      )
+    }
+    if ((artifact.rules?.pre.length ?? 0) > 0) {
+      validateArrayIds(ref, artifact.rules!.pre, 'rules.pre', `artifact '${artifact.id}'`)
+    }
+    if ((artifact.rules?.post.length ?? 0) > 0) {
+      validateArrayIds(ref, artifact.rules!.post, 'rules.post', `artifact '${artifact.id}'`)
+    }
+    if (artifact.preHashCleanup.length > 0) {
+      validateArrayIds(ref, artifact.preHashCleanup, 'preHashCleanup', `artifact '${artifact.id}'`)
+    }
+  }
+
   validateArtifactGraph(ref, artifacts)
 
   const metadataExtraction =
     data.metadataExtraction !== undefined
       ? buildMetadataExtraction(data.metadataExtraction)
       : undefined
+
+  if (metadataExtraction !== undefined) {
+    const ctx = metadataExtraction.context
+    const rules = metadataExtraction.rules
+    const constraints = metadataExtraction.constraints
+    const scenarios = metadataExtraction.scenarios
+    if (ctx && ctx.length > 0) {
+      validateArrayIds(ref, ctx, 'context', 'metadataExtraction')
+    }
+    if (rules && rules.length > 0) {
+      validateArrayIds(ref, rules, 'rules', 'metadataExtraction')
+    }
+    if (constraints && constraints.length > 0) {
+      validateArrayIds(ref, constraints, 'constraints', 'metadataExtraction')
+    }
+    if (scenarios && scenarios.length > 0) {
+      validateArrayIds(ref, scenarios, 'scenarios', 'metadataExtraction')
+    }
+  }
 
   return new Schema(
     data.kind,

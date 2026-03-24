@@ -9,14 +9,13 @@ import { makeSpecRepository, makeArtifactType, makeParser } from '../helpers.js'
 import { Spec } from '../../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../../src/domain/value-objects/spec-path.js'
 import { type MetadataExtraction } from '../../../../src/domain/value-objects/metadata-extraction.js'
-import { stringify } from 'yaml'
 
 function makeSpec(capPath: string): Spec {
   return new Spec('default', SpecPath.parse(capPath), ['.specd-metadata.yaml'])
 }
 
-function metadataYaml(dependsOn: string[]): string {
-  return stringify({ dependsOn })
+function metadataJson(dependsOn: string[]): string {
+  return JSON.stringify({ dependsOn })
 }
 
 describe('traverseDependsOn', () => {
@@ -24,7 +23,7 @@ describe('traverseDependsOn', () => {
     const repo = makeSpecRepository({
       specs: [makeSpec('auth/login'), makeSpec('auth/shared')],
       artifacts: {
-        'auth/login/.specd-metadata.yaml': metadataYaml(['auth/shared']),
+        'auth/login/.specd-metadata.yaml': metadataJson(['auth/shared']),
       },
     })
     const specs = new Map([['default', repo]])
@@ -58,8 +57,8 @@ describe('traverseDependsOn', () => {
     const repo = makeSpecRepository({
       specs: [makeSpec('a/one'), makeSpec('a/two')],
       artifacts: {
-        'a/one/.specd-metadata.yaml': metadataYaml(['a/two']),
-        'a/two/.specd-metadata.yaml': metadataYaml(['a/one']),
+        'a/one/.specd-metadata.yaml': metadataJson(['a/two']),
+        'a/two/.specd-metadata.yaml': metadataJson(['a/one']),
       },
     })
     const specs = new Map([['default', repo]])
@@ -91,8 +90,8 @@ describe('traverseDependsOn', () => {
     const repo = makeSpecRepository({
       specs: [makeSpec('a/one'), makeSpec('a/two'), makeSpec('a/three')],
       artifacts: {
-        'a/one/.specd-metadata.yaml': metadataYaml(['a/two']),
-        'a/two/.specd-metadata.yaml': metadataYaml(['a/three']),
+        'a/one/.specd-metadata.yaml': metadataJson(['a/two']),
+        'a/two/.specd-metadata.yaml': metadataJson(['a/three']),
       },
     })
     const specs = new Map([['default', repo]])
@@ -124,7 +123,7 @@ describe('traverseDependsOn', () => {
     const repo = makeSpecRepository({
       specs: [makeSpec('auth/login'), makeSpec('auth/shared')],
       artifacts: {
-        'auth/login/.specd-metadata.yaml': metadataYaml(['auth/shared']),
+        'auth/login/.specd-metadata.yaml': metadataJson(['auth/shared']),
       },
     })
     const specs = new Map([['default', repo]])
@@ -157,7 +156,7 @@ describe('traverseDependsOn', () => {
     const repo = makeSpecRepository({
       specs: [makeSpec('auth/login')],
       artifacts: {
-        'auth/login/.specd-metadata.yaml': metadataYaml(['unknown:something']),
+        'auth/login/.specd-metadata.yaml': metadataJson(['unknown:something']),
       },
     })
     const specs = new Map([['default', repo]])
@@ -219,7 +218,7 @@ describe('traverseDependsOn', () => {
     const repo = makeSpecRepository({
       specs: [makeSpec('auth/login')],
       artifacts: {
-        'auth/login/.specd-metadata.yaml': stringify({ title: 'Login' }),
+        'auth/login/.specd-metadata.yaml': JSON.stringify({ title: 'Login' }),
       },
     })
     const specs = new Map([['default', repo]])
@@ -256,8 +255,8 @@ describe('traverseDependsOn', () => {
       ],
       artifacts: {
         'auth/login/spec.md': specContent,
-        'auth/shared/.specd-metadata.yaml': stringify({ title: 'Shared' }),
-        'auth/jwt/.specd-metadata.yaml': stringify({ title: 'JWT' }),
+        'auth/shared/.specd-metadata.yaml': JSON.stringify({ title: 'Shared' }),
+        'auth/jwt/.specd-metadata.yaml': JSON.stringify({ title: 'JWT' }),
       },
     })
     const specs = new Map([['default', repo]])

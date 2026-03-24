@@ -8,7 +8,7 @@ Spec artifacts can drift from the schema's structural expectations over time, an
 
 ### Requirement: Resolve the active schema
 
-The use case SHALL obtain the schema via `SchemaProvider.get()`. If the schema cannot be resolved (returns `null`), the use case MUST throw a `SchemaNotFoundError`.
+The use case SHALL obtain the schema via `SchemaProvider.get()`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these.
 
 ### Requirement: Filter to spec-scoped artifact types
 

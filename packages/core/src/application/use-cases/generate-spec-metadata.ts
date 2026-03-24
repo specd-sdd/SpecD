@@ -4,7 +4,6 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
-import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
@@ -74,7 +73,6 @@ export class GenerateSpecMetadata {
    */
   async execute(input: GenerateSpecMetadataInput): Promise<GenerateSpecMetadataResult> {
     const schema = await this._schemaProvider.get()
-    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     const extraction = schema.metadataExtraction()
     if (extraction === undefined) {

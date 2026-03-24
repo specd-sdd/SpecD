@@ -1,0 +1,80 @@
+{
+  "title": "Schema Fork",
+  "description": "Teams that need full control over a schema's artifacts and workflow cannot get it through extension alone -- they need a standalone copy they can modify freely. The `specd schema fork` command copies an existing schema into the project's local schemas directory as a new independent schema with no `extends` relationship.",
+  "dependsOn": ["cli:cli/entrypoint", "core:core/schema-format", "core:core/schema-registry-port"],
+  "context": [
+    "Teams that need full control over a schema's artifacts and workflow cannot get it through extension alone -- they need a standalone copy they can modify freely. The `specd schema fork` command copies an existing schema into the project's local schemas directory as a new independent schema with no `extends` relationship."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd schema fork <ref> [--name <name>] [--workspace <workspace>]\n```\n\n- `<ref>` (required) — the schema reference to fork (npm package, workspace-qualified, bare name, or path). Uses the same reference conventions as the `schema` field in `specd.yaml`.\n- `--name <name>` (optional) — the name for the forked schema directory. Defaults to the source schema's `name` field.\n- `--workspace <workspace>` (optional) — the workspace whose `schemas.fs.path` is used as the target directory. Defaults to `default`."
+      ]
+    },
+    {
+      "requirement": "Fork behaviour",
+      "rules": [
+        "The command must:\n\n1. Resolve the source schema via `SchemaRegistry.resolve(ref, workspaceSchemasPaths)`.\n2. Copy the entire source schema directory (including `schema.yaml`, `templates/`, and any other files) into `<target-schemas-path>/<name>/`.\n3. In the copied `schema.yaml`, ensure `kind: schema` is present and remove any `extends` field — the fork is a standalone schema.\n4. Print the path to the new schema directory.\n\nIf the target directory already exists, the command must exit with an error and not overwrite."
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "rules": [
+        "- Source schema not found — exits with code 3\n- Target directory already exists — exits with code 1, message identifies the existing path\n- Target workspace has no `schemas` section — exits with code 1"
+      ]
+    }
+  ],
+  "constraints": [
+    "The fork is a one-time copy — there is no ongoing link between source and fork",
+    "The command does not modify specd.yaml — the user must update the schema field manually",
+    "Templates are copied as-is; no content transformation is applied"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Fork behaviour",
+      "name": "Fork from npm package",
+      "given": [
+        "@specd/schema-std is installed and the default workspace has schemas.fs.path: specd/schemas"
+      ],
+      "when": ["specd schema fork @specd/schema-std is run"],
+      "then": [
+        "the schema directory is copied to specd/schemas/schema-std/",
+        "AND the copied schema.yaml has kind: schema and no extends field",
+        "AND templates are copied alongside schema.yaml"
+      ]
+    },
+    {
+      "requirement": "Fork behaviour",
+      "name": "Fork with custom name",
+      "when": ["specd schema fork @specd/schema-std --name my-schema is run"],
+      "then": ["the schema is copied to specd/schemas/my-schema/"]
+    },
+    {
+      "requirement": "Fork behaviour",
+      "name": "Target directory already exists",
+      "given": ["specd/schemas/schema-std/ already exists"],
+      "when": ["specd schema fork @specd/schema-std is run"],
+      "then": ["the command exits with code 1 and does not overwrite"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Source schema not found",
+      "when": ["specd schema fork @specd/nonexistent is run"],
+      "then": ["the command exits with code 3"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Target workspace has no schemas section",
+      "when": [
+        "specd schema fork @specd/schema-std --workspace billing is run and billing has no schemas section"
+      ],
+      "then": ["the command exits with code 1"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:6fff226587eec055af02ed2fde3ef9e7a0f43351343eb2ccc45c1374bf46d783",
+    "verify.md": "sha256:0dd80d0e6899df4e42e91c45bc2a9755c9937be2a820c1ba7122485722764853"
+  },
+  "generatedBy": "core"
+}

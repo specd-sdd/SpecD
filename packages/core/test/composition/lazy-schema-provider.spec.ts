@@ -32,28 +32,31 @@ describe('LazySchemaProvider', () => {
     expect(resolve.execute).toHaveBeenCalledOnce()
   })
 
-  it('caches null when ResolveSchema throws', async () => {
+  it('propagates errors from ResolveSchema', async () => {
+    const error = new Error('schema not found')
     const resolve = {
-      execute: vi.fn().mockRejectedValue(new Error('schema not found')),
+      execute: vi.fn().mockRejectedValue(error),
     }
     const provider = new LazySchemaProvider(resolve as never)
 
-    const result = await provider.get()
-
-    expect(result).toBeNull()
+    await expect(provider.get()).rejects.toThrow(error)
     expect(resolve.execute).toHaveBeenCalledOnce()
   })
 
-  it('returns null on subsequent calls after error without retrying', async () => {
+  it('retries resolution after a previous error', async () => {
+    const schema = makeSchema()
     const resolve = {
-      execute: vi.fn().mockRejectedValue(new Error('schema not found')),
+      execute: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('schema not found'))
+        .mockResolvedValue(schema),
     }
     const provider = new LazySchemaProvider(resolve as never)
 
-    await provider.get()
+    await expect(provider.get()).rejects.toThrow()
     const result = await provider.get()
 
-    expect(result).toBeNull()
-    expect(resolve.execute).toHaveBeenCalledOnce()
+    expect(result).toBe(schema)
+    expect(resolve.execute).toHaveBeenCalledTimes(2)
   })
 })

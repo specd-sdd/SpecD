@@ -1,0 +1,91 @@
+{
+  "title": "Discarded Show",
+  "description": "When reviewing past decisions, users need to see why a change was abandoned — not just that it was. `specd discarded show <name>` displays basic metadata for a single discarded change, including the recorded discard reason.",
+  "dependsOn": ["cli:cli/entrypoint", "core:core/change"],
+  "context": [
+    "When reviewing past decisions, users need to see why a change was abandoned — not just that it was. `specd discarded show <name>` displays basic metadata for a single discarded change, including the recorded discard reason."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd discarded show <name> [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the discarded change to show\n- `--format` — controls output encoding; defaults to `text`"
+      ]
+    },
+    {
+      "requirement": "Output format — text",
+      "rules": [
+        "The command prints metadata for the change to stdout:\n\n```\nname:    <name>\nspecs:   <specId>, ...\nschema:  <schema-name>@<version>\nreason:  <discard reason>\n```\n\nThe `reason` value comes from the `discarded` event in the change history."
+      ]
+    },
+    {
+      "requirement": "Output format — JSON",
+      "rules": [
+        "When `--format json` is passed, the command writes a single JSON object to stdout:\n\n```json\n{\"name\":\"...\",\"specIds\":[...],\"schema\":{\"name\":\"...\",\"version\":N},\"reason\":\"...\"}\n```"
+      ]
+    },
+    {
+      "requirement": "Output format — toon",
+      "rules": [
+        "When `--format toon` is passed, the command writes the same data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout."
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "rules": [
+        "- If no change with the given name exists in `discarded/`, the command exits with code 1 and prints an `error:` message to stderr."
+      ]
+    }
+  ],
+  "constraints": [
+    "The reason field is sourced from the discarded event recorded when specd change discard was run",
+    "Errors always go to stderr as plain text regardless of --format",
+    "--format only affects stdout"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Missing name argument",
+      "when": ["specd discarded show is run without a name"],
+      "then": ["the command exits with code 1 and prints a usage error to stderr"]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "Normal text output includes reason",
+      "given": [
+        "discarded/ contains a change old-experiment with specIds ['auth/legacy'], schema schema-std@1, and a discarded event with reason \"approach superseded by new-design\""
+      ],
+      "when": ["specd discarded show old-experiment is run"],
+      "then": [
+        "stdout contains name:, specs:, schema:, and reason: fields with the correct values",
+        "AND the reason: line shows approach superseded by new-design",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Output format — JSON",
+      "name": "JSON format output",
+      "given": [
+        "discarded/ contains a change old-experiment with specIds ['auth/legacy'], schema schema-std@1, and discard reason \"approach superseded by new-design\""
+      ],
+      "when": ["specd discarded show old-experiment --format json is run"],
+      "then": [
+        "stdout is a JSON object with name, specIds, schema, and reason fields matching the change",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Change not found in discarded",
+      "when": [
+        "specd discarded show nonexistent is run and no change named nonexistent exists in discarded/"
+      ],
+      "then": ["the command exits with code 1", "AND stderr contains an error: message"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:49141f673af588ff4d4a960d7801ba1e8121a77a98e9a42968b58878fb50ff23",
+    "verify.md": "sha256:2d42761b06505560b718b40dfef27a470704bf4a6faa350b8548613592907a70"
+  },
+  "generatedBy": "core"
+}

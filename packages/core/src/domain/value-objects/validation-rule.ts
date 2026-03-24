@@ -2,6 +2,8 @@ import { type Selector } from './selector.js'
 
 /** A structural validation constraint applied to an artifact's content. */
 export interface ValidationRule {
+  /** Unique identifier for this validation rule within its artifact. */
+  readonly id?: string
   /** AST node selector that identifies the target node(s) to validate. */
   readonly selector?: Selector
   /** JSONPath expression targeting a value within the artifact (JSON/YAML formats). */
@@ -16,6 +18,8 @@ export interface ValidationRule {
 
 /** A regex-based cleanup rule applied to artifact content before hashing. */
 export interface PreHashCleanup {
+  /** Unique identifier for this cleanup rule within its artifact. */
+  readonly id?: string
   readonly pattern: string
   readonly replacement: string
 }

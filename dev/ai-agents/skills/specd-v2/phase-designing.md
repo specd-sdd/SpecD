@@ -30,6 +30,17 @@ If the intent is vague or minimal, have a discovery conversation. Ask about:
   node packages/cli/dist/index.js spec list --format text --summary
   node packages/cli/dist/index.js graph search "<relevant terms>" --specs --limit 10
   ```
+- **What code is affected?** Search for symbols and analyze impact on the codebase:
+  ```bash
+  node packages/cli/dist/index.js graph search "<relevant terms>" --symbols --limit 10
+  node packages/cli/dist/index.js graph impact --symbol "<key symbol>" --direction downstream
+  ```
+  If specific files are already known to change:
+  ```bash
+  node packages/cli/dist/index.js graph impact --changes <file1> <file2> --format text
+  ```
+  Use the impact results to surface files, symbols, and risk levels that the user
+  might not have considered. This prevents scope surprises during implementation.
 - **Are there open questions?** Anything unresolved that might change the direction?
 
 Keep this conversational — don't dump a questionnaire. Ask what you need to understand
@@ -40,17 +51,22 @@ the change, then summarize:
 > - **Problem:** ...
 > - **Approach:** ...
 > - **Specs to create/modify:** ...
+> - **Affected code:** ... (key files/symbols and risk level from impact analysis)
 > - **Open questions:** ...
 >
 > Does this look right? Anything to add or change before I start writing?
 
 Only proceed to A.2 after the user confirms.
 
-If specIds need updating based on the discovery:
+If specIds need updating based on the discovery, look up the correct fully-qualified
+ID from `spec list --format text --summary` (the PATH column) and use it:
 
 ```bash
-node packages/cli/dist/index.js change edit <name> --add-spec <id>
+node packages/cli/dist/index.js change edit <name> --add-spec <workspace:capability-path>
 ```
+
+**Never guess spec IDs.** Always verify them against `spec list` output. The format is
+always `workspace:capability-path` (e.g. `core:core/config`, not `core/config`).
 
 ## A.2 Load schema, context, and hook instructions
 
@@ -96,7 +112,8 @@ node packages/cli/dist/index.js change context <name> designing --follow-deps --
 
 ## A.2b Choose review mode
 
-Before entering the artifact loop, ask the user how they want to review artifacts:
+**MANDATORY: You MUST ask the user this question before writing any artifacts.
+Do NOT skip this step. Do NOT assume auto-pilot.**
 
 > How would you like to review artifacts as they're written?
 >
@@ -105,8 +122,8 @@ Before entering the artifact loop, ask the user how they want to review artifact
 >    with `scope: spec` (these shape everything downstream), auto-continue on the rest
 > 3. **Auto-pilot** — write and validate all artifacts without stopping, review at the end
 
-Store the choice for the duration of Phase A. Default to option 1 if the user doesn't
-have a preference.
+Wait for the user's response. Default to option 1 if the user doesn't have a preference.
+Store the choice for the duration of Phase A.
 
 ## A.3 Artifact authoring loop
 
@@ -173,15 +190,35 @@ Follow the `instruction` from the previous step. Key decision points:
 After writing each artifact, check if the content implies scope or dependency changes.
 Each artifact can reveal that the change is bigger than expected.
 
-**1. Discover affected specs.** Read the artifact you just wrote and extract every
-reference to a system, module, adapter, configuration area, or domain concept. Then
-cross-reference against existing specs:
+**1. Discover affected code and specs.** Read the artifact you just wrote and extract
+every reference to a system, module, adapter, configuration area, or domain concept.
+
+First, use the code graph to find code that may be affected beyond what the artifact
+explicitly mentions:
+
+```bash
+node packages/cli/dist/index.js graph search "<key concepts from artifact>" --symbols --limit 10
+node packages/cli/dist/index.js graph impact --symbol "<modified symbol>" --direction downstream
+```
+
+If the artifact names specific files that will change, run a multi-file impact analysis:
+
+```bash
+node packages/cli/dist/index.js graph impact --changes <file1> <file2> --format text
+```
+
+Review the impact results — symbols and files flagged as affected may need their own
+spec coverage or dependency registration. Surface any HIGH/CRITICAL risk findings to
+the user.
+
+Then cross-reference against existing specs:
 
 ```bash
 node packages/cli/dist/index.js spec list --format text --summary
 ```
 
-For each area mentioned in the artifact, check whether an existing spec covers it.
+For each area mentioned in the artifact or surfaced by impact analysis, check whether
+an existing spec covers it.
 If so, determine whether the change **modifies** that spec (needs a delta or specId
 addition) or merely **depends on** it (needs a `deps --add`). Present findings to
 the user:

@@ -105,7 +105,7 @@ export interface Kernel {
     list: ListSpecs
     /** Loads a spec and all of its artifact files. */
     get: GetSpec
-    /** Writes a `.specd-metadata.yaml` file for a spec. */
+    /** Writes metadata for a spec. */
     saveMetadata: SaveSpecMetadata
     /** Invalidates a spec's metadata by removing its contentHashes. */
     invalidateMetadata: InvalidateSpecMetadata
@@ -190,8 +190,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.parsers,
         schemaProvider,
         new GenerateSpecMetadata(i.specs, schemaProvider, i.parsers, i.hasher),
-        new SaveSpecMetadata(i.specs, i.yaml),
-        i.yaml,
+        new SaveSpecMetadata(i.specs),
       ),
       validate: new ValidateArtifacts(
         i.changes,
@@ -231,8 +230,8 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       approveSignoff: new ApproveSignoff(i.changes, i.actor, schemaProvider, i.hasher),
       list: new ListSpecs(i.specs, i.hasher, i.yaml),
       get: new GetSpec(i.specs),
-      saveMetadata: new SaveSpecMetadata(i.specs, i.yaml),
-      invalidateMetadata: new InvalidateSpecMetadata(i.specs, i.yaml),
+      saveMetadata: new SaveSpecMetadata(i.specs),
+      invalidateMetadata: new InvalidateSpecMetadata(i.specs),
       getActiveSchema: new GetActiveSchema(resolveSchema),
       validate: new ValidateSpecs(i.specs, schemaProvider, i.parsers),
       generateMetadata: new GenerateSpecMetadata(i.specs, schemaProvider, i.parsers, i.hasher),

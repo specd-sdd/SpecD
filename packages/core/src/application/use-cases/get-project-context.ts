@@ -1,6 +1,5 @@
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
-import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type FileReader } from '../ports/file-reader.js'
@@ -101,7 +100,6 @@ export class GetProjectContext {
    */
   async execute(input: GetProjectContextInput): Promise<GetProjectContextResult> {
     const schema = await this._schemaProvider.get()
-    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     const warnings: ContextWarning[] = []
     const contextEntries: string[] = []

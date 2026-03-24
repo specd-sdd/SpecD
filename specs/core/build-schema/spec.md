@@ -47,7 +47,7 @@ Note: `id` fields on array entries (hooks, validations, rules, preHashCleanup, m
 
 ### Requirement: Array entry ID validation
 
-`buildSchema` SHALL validate that every array entry `id` (in hooks, validations, deltaValidations, rules.pre, rules.post, preHashCleanup, and metadataExtraction array entries) matches `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` (1-64 chars) and is unique within its immediate array. Violations throw `SchemaValidationError`.
+`buildSchema` SHALL validate that every array entry `id` (in hooks, validations, deltaValidations, rules.pre, rules.post, preHashCleanup, and metadataExtraction array entries) matches `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` (1-64 chars) and is unique within its immediate array. For hooks specifically, IDs must be unique across ALL workflow steps — no two hooks in any workflow step may share the same ID, regardless of whether they are in pre or post arrays. Violations throw `SchemaValidationError`.
 
 ### Requirement: Artifact ID uniqueness validation
 

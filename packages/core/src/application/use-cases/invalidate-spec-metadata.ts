@@ -1,5 +1,4 @@
 import { type SpecRepository } from '../ports/spec-repository.js'
-import { type YamlSerializer } from '../ports/yaml-serializer.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
@@ -27,17 +26,14 @@ export interface InvalidateSpecMetadataResult {
  */
 export class InvalidateSpecMetadata {
   private readonly _specRepos: ReadonlyMap<string, SpecRepository>
-  private readonly _yaml: YamlSerializer
 
   /**
    * Creates a new `InvalidateSpecMetadata` use case instance.
    *
    * @param specRepos - Map of workspace name to its spec repository
-   * @param yaml - YAML serializer for parsing and stringifying metadata
    */
-  constructor(specRepos: ReadonlyMap<string, SpecRepository>, yaml: YamlSerializer) {
+  constructor(specRepos: ReadonlyMap<string, SpecRepository>) {
     this._specRepos = specRepos
-    this._yaml = yaml
   }
 
   /**
@@ -65,7 +61,7 @@ export class InvalidateSpecMetadata {
     // Remove contentHashes and originalHash, re-serialize the rest
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { contentHashes: _discarded, originalHash: _hash, ...withoutHashes } = existing
-    const content = this._yaml.stringify(withoutHashes)
+    const content = JSON.stringify(withoutHashes, null, 2) + '\n'
 
     await repo.saveMetadata(spec, content, { force: true })
 

@@ -112,9 +112,11 @@
 
 #### Scenario: Metadata exists
 
-- **GIVEN** a spec with metadata on disk
+- **GIVEN** a spec `core:core/config` with a `metadata.json` in the metadata storage
 - **WHEN** `metadata(spec)` is called
-- **THEN** a parsed `SpecMetadata` object is returned with `originalHash` set
+- **THEN** the result contains the parsed JSON content with `originalHash`
+- **AND** `saveMetadata(spec, '{"title":"Config"}')` persists the JSON content
+- **AND** the file can be read back via `metadata(spec)` with `title: "Config"`
 
 #### Scenario: Metadata does not exist
 

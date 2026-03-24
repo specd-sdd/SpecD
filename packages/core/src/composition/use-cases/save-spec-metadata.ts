@@ -3,7 +3,6 @@ import { SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { createSpecRepository } from '../spec-repository.js'
-import { NodeYamlSerializer } from '../../infrastructure/node/yaml-serializer.js'
 
 /** Filesystem adapter options for `createSaveSpecMetadata(options)`. */
 export interface FsSaveSpecMetadataOptions {
@@ -49,7 +48,7 @@ export function createSaveSpecMetadata(
         ),
       ]),
     )
-    return new SaveSpecMetadata(specRepos, new NodeYamlSerializer())
+    return new SaveSpecMetadata(specRepos)
   }
-  return new SaveSpecMetadata(configOrOptions.specRepositories, new NodeYamlSerializer())
+  return new SaveSpecMetadata(configOrOptions.specRepositories)
 }

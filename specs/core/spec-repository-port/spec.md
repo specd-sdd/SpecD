@@ -50,7 +50,7 @@ Relative resolution MUST be pure computation (no I/O). Absolute resolution MAY r
 
 ### Requirement: saveMetadata persists metadata with conflict detection
 
-`saveMetadata(spec, content, options?)` MUST write the metadata content for the given spec. The `content` parameter is the raw YAML string. If `originalHash` is set on the content and does not match the current file hash on disk, the save MUST be rejected by throwing `ArtifactConflictError`. When `options.force` is `true`, the conflict check MUST be skipped. If the metadata directory does not exist, it MUST be created. This method replaces the previous pattern of `save(spec, new SpecArtifact('.specd-metadata.yaml', content))` for metadata writes.
+`saveMetadata(spec, content, options?)` MUST write the metadata content for the given spec. The `content` parameter is a JSON string. If `originalHash` is set on the content and does not match the current file hash on disk, the save MUST be rejected by throwing `ArtifactConflictError`. When `options.force` is `true`, the conflict check MUST be skipped. If the metadata directory does not exist, it MUST be created. This method replaces the previous pattern of `save(spec, new SpecArtifact('.specd-metadata.yaml', content))` for metadata writes.
 
 ### Requirement: Abstract class with abstract methods
 

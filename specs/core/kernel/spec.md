@@ -28,20 +28,19 @@ Each entry in the `Kernel` interface must be typed as the concrete use case clas
 
 ### Requirement: createKernel constructs shared adapters once
 
-`createKernel(config)` MUST construct all shared adapters, ports, and use cases exactly once and wire them together. Constructing the same adapter or use case twice would waste resources and risk inconsistent state.
-
-Shared infrastructure includes:
+`createKernel(config, options?)` instantiates every shared dependency once, wires them
+together, and returns a `Kernel` object. The construction MUST include:
 
 - One `ChangeRepository` instance (shared by all change use cases)
 - One `SpecRepository` per workspace
 - One `SchemaRegistry` instance
-- One `SchemaProvider` instance — a lazy, caching provider that resolves the schema (with plugins and overrides) on first access via `ResolveSchema`, then returns the cached result. All use cases that need the schema MUST receive this provider instead of the raw `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple.
+- One `SchemaProvider` instance — a lazy, caching provider that resolves the schema (with plugins and overrides) on first access via `ResolveSchema`, then returns the cached result. If resolution fails, the error propagates directly — the provider does not cache failures. All use cases that need the schema MUST receive this provider instead of the raw `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple.
 - One `HookRunner` instance
 - One `RunStepHooks` instance (shared by `TransitionChange`, `ArchiveChange`, and exposed directly)
 - One `ContentHasher` instance
 - One `ArtifactParserRegistry` instance
 
-No use case constructor may call `SchemaRegistry.resolve()` directly. Schema access is exclusively through `SchemaProvider.get()`, which returns the fully-resolved schema with extends chains, plugins, and `schemaOverrides` applied.
+No use case constructor may call `SchemaRegistry.resolve()` directly. Schema access is exclusively through `SchemaProvider.get()`, which returns the fully-resolved schema with extends chains, plugins, and `schemaOverrides` applied. `get()` throws `SchemaNotFoundError` or `SchemaValidationError` on failure — it never returns `null`.
 
 `RunStepHooks` and `GetHookInstructions` do not receive project-level workflow hooks — all hooks are merged into the schema by `ResolveSchema` via `schemaOverrides`. The kernel does not read `config.workflow`.
 

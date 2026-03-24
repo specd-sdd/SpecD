@@ -43,12 +43,12 @@ function setup() {
 
 afterEach(() => vi.restoreAllMocks())
 
-const validYaml = 'title: Auth Login\ndescription: A spec\n'
+const validJson = JSON.stringify({ title: 'Auth Login', description: 'A spec' })
 
 describe('spec write-metadata', () => {
   it('writes metadata from --input file', async () => {
     const { kernel, stdout } = setup()
-    vi.mocked(fsPromises.readFile).mockResolvedValue(validYaml)
+    vi.mocked(fsPromises.readFile).mockResolvedValue(validJson)
     kernel.specs.saveMetadata.execute.mockResolvedValue({ spec: 'default:auth/login' })
 
     const program = makeProgram()
@@ -65,12 +65,12 @@ describe('spec write-metadata', () => {
 
     expect(fsPromises.readFile).toHaveBeenCalledWith('/tmp/metadata.yaml', 'utf-8')
     expect(kernel.specs.saveMetadata.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ content: validYaml }),
+      expect.objectContaining({ content: validJson }),
     )
     expect(stdout()).toContain('wrote metadata for default:auth/login')
   })
 
-  it('exits 1 on invalid YAML', async () => {
+  it('exits 1 on invalid JSON', async () => {
     const { stderr } = setup()
     vi.mocked(fsPromises.readFile).mockResolvedValue('{{{invalid')
 
@@ -84,17 +84,17 @@ describe('spec write-metadata', () => {
         'write-metadata',
         'auth/login',
         '--input',
-        '/tmp/bad.yaml',
+        '/tmp/bad.json',
       ])
       .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
-    expect(stderr()).toContain('error: invalid YAML:')
+    expect(stderr()).toContain('error: invalid JSON:')
   })
 
   it('exits 1 when spec not found', async () => {
     const { kernel, stderr } = setup()
-    vi.mocked(fsPromises.readFile).mockResolvedValue(validYaml)
+    vi.mocked(fsPromises.readFile).mockResolvedValue(validJson)
     kernel.specs.saveMetadata.execute.mockResolvedValue(null)
 
     const program = makeProgram()
@@ -138,7 +138,7 @@ describe('spec write-metadata', () => {
 
   it('outputs JSON with result ok', async () => {
     const { kernel, stdout } = setup()
-    vi.mocked(fsPromises.readFile).mockResolvedValue(validYaml)
+    vi.mocked(fsPromises.readFile).mockResolvedValue(validJson)
     kernel.specs.saveMetadata.execute.mockResolvedValue({ spec: 'default:auth/login' })
 
     const program = makeProgram()
@@ -162,7 +162,7 @@ describe('spec write-metadata', () => {
 
   it('passes --force through to use case', async () => {
     const { kernel } = setup()
-    vi.mocked(fsPromises.readFile).mockResolvedValue(validYaml)
+    vi.mocked(fsPromises.readFile).mockResolvedValue(validJson)
     kernel.specs.saveMetadata.execute.mockResolvedValue({ spec: 'default:auth/login' })
 
     const program = makeProgram()
@@ -185,9 +185,9 @@ describe('spec write-metadata', () => {
 
   it('exits 1 on artifact conflict error', async () => {
     const { kernel, stderr } = setup()
-    vi.mocked(fsPromises.readFile).mockResolvedValue(validYaml)
+    vi.mocked(fsPromises.readFile).mockResolvedValue(validJson)
     kernel.specs.saveMetadata.execute.mockRejectedValue(
-      new ArtifactConflictError('.specd-metadata.yaml', validYaml, 'old content'),
+      new ArtifactConflictError('.specd-metadata.yaml', validJson, 'old content'),
     )
 
     const program = makeProgram()
@@ -210,7 +210,7 @@ describe('spec write-metadata', () => {
 
   it('exits 1 on MetadataValidationError', async () => {
     const { kernel, stdout, stderr } = setup()
-    vi.mocked(fsPromises.readFile).mockResolvedValue(validYaml)
+    vi.mocked(fsPromises.readFile).mockResolvedValue(validJson)
     kernel.specs.saveMetadata.execute.mockRejectedValue(
       new MetadataValidationError('title: Required'),
     )
@@ -237,7 +237,7 @@ describe('spec write-metadata', () => {
 
   it('exits 1 on DependsOnOverwriteError', async () => {
     const { kernel, stdout, stderr } = setup()
-    vi.mocked(fsPromises.readFile).mockResolvedValue(validYaml)
+    vi.mocked(fsPromises.readFile).mockResolvedValue(validJson)
     kernel.specs.saveMetadata.execute.mockRejectedValue(
       new DependsOnOverwriteError(['core:config', 'core:schema-format'], ['core:change']),
     )

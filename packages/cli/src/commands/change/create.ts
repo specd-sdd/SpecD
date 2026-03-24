@@ -38,7 +38,7 @@ JSON/TOON output schema:
 
           const schema = await kernel.specs.getActiveSchema.execute()
 
-          const change = await kernel.changes.create.execute({
+          const { change, changePath } = await kernel.changes.create.execute({
             name,
             ...(opts.description !== undefined ? { description: opts.description } : {}),
             specIds,
@@ -50,7 +50,7 @@ JSON/TOON output schema:
           if (fmt === 'text') {
             output(`created change ${name}`, 'text')
           } else {
-            output({ result: 'ok', name, state: change.state }, fmt)
+            output({ result: 'ok', name, state: change.state, changePath }, fmt)
           }
         } catch (err) {
           handleError(err, opts.format)

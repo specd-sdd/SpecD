@@ -7,7 +7,6 @@ import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type HookRunner, type TemplateVariables } from '../ports/hook-runner.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 
 /** Valid `ChangeState` values for step validation. */
@@ -99,7 +98,6 @@ export class RunStepHooks {
         if (archived === null) throw new ChangeNotFoundError(input.name)
 
         const schema = await this._schemaProvider.get()
-        if (schema === null) throw new SchemaNotFoundError('(provider)')
 
         if (schema.name() !== archived.schemaName) {
           throw new SchemaMismatchError(input.name, archived.schemaName, schema.name())
@@ -150,7 +148,6 @@ export class RunStepHooks {
     }
 
     const schema = await this._schemaProvider.get()
-    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     if (schema.name() !== change.schemaName) {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())

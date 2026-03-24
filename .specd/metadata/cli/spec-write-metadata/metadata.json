@@ -1,0 +1,183 @@
+{
+  "title": "Spec Write-Metadata",
+  "description": "Agents and scripts that produce metadata externally need a safe way to persist it without bypassing validation or conflict detection. The `specd spec write-metadata` command writes metadata for a given spec, accepting YAML content from stdin or a file and persisting it through the `SaveSpecMetadata` use case for conflict detection and atomic writes.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "core:core/spec-metadata"
+  ],
+  "context": [
+    "Agents and scripts that produce metadata externally need a safe way to persist it without bypassing validation or conflict detection. The `specd spec write-metadata` command writes metadata for a given spec, accepting YAML content from stdin or a file and persisting it through the `SaveSpecMetadata` use case for conflict detection and atomic writes."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "The command is registered as `write-metadata <specPath>` on the `spec` parent command. It accepts:\n\n- `--input <file>` — read YAML content from a file path instead of stdin\n- `--force` — skip conflict detection and overwrite unconditionally\n- `--format <fmt>` — output format: `text|json|toon` (default `text`)\n- `--config <path>` — path to `specd.yaml`\n\nThe `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands."
+      ]
+    },
+    {
+      "requirement": "Content source",
+      "rules": [
+        "Content is read from `--input <file>` when provided, otherwise from stdin. The content must be a valid JSON string representing a metadata object."
+      ]
+    },
+    {
+      "requirement": "YAML validation",
+      "rules": ["### Requirement: YAML validation"]
+    },
+    {
+      "requirement": "JSON validation",
+      "rules": [
+        "The command reads content from `--input` file or stdin. Before passing to `SaveSpecMetadata`, it validates the content is valid JSON by calling `JSON.parse()`. If parsing fails, the command writes `error: invalid JSON: <message>` to stderr and exits with code 1."
+      ]
+    },
+    {
+      "requirement": "Text output",
+      "rules": ["On success, text format outputs: `wrote metadata for <workspace:path>`"]
+    },
+    {
+      "requirement": "JSON output",
+      "rules": [
+        "On success, JSON format outputs: `{ \"result\": \"ok\", \"spec\": \"<workspace:path>\" }`"
+      ]
+    },
+    {
+      "requirement": "Error — spec not found",
+      "rules": [
+        "If the spec does not exist in the given workspace, the command writes `error: spec '<specPath>' not found` to stderr and exits with code 1."
+      ]
+    },
+    {
+      "requirement": "Error — invalid YAML",
+      "rules": ["### Requirement: Error — invalid YAML"]
+    },
+    {
+      "requirement": "Error — invalid JSON",
+      "rules": [
+        "If the input content is not valid JSON (syntax error), the command writes `error: invalid JSON: <parse error message>` to stderr and exits with code 1."
+      ]
+    },
+    {
+      "requirement": "Error — invalid metadata structure",
+      "rules": [
+        "If the use case throws a `MetadataValidationError` (content is valid YAML but fails structural validation), the error propagates through `handleError` which writes `error: <message>` to stderr and exits with code 1."
+      ]
+    },
+    {
+      "requirement": "Error — conflict detected",
+      "rules": [
+        "If `--force` is not set and the repository detects a concurrent modification (hash mismatch), the command writes the conflict error to stderr and exits with code 1."
+      ]
+    },
+    {
+      "requirement": "Error — dependsOn overwrite",
+      "rules": [
+        "If `--force` is not set and the incoming metadata would change existing `dependsOn` entries, `SaveSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` which writes `error: dependsOn would change (...)` to stderr and exits with code 1. Stdout remains empty on error.\n\nWhen `--force` is set, the overwrite check is skipped entirely."
+      ]
+    }
+  ],
+  "constraints": [
+    "The command contains no business logic — all writing is delegated to the SaveSpecMetadata use case",
+    "YAML validation happens at the CLI boundary before the use case is invoked",
+    "The command never reads or writes the filesystem directly for spec content — it uses the kernel"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Content source",
+      "name": "Reads JSON from stdin",
+      "given": ["valid JSON metadata is piped to stdin"],
+      "when": ["specd spec write-metadata auth/login is run"],
+      "then": ["the metadata is written successfully"]
+    },
+    {
+      "requirement": "Content source",
+      "name": "Reads JSON from file",
+      "given": ["a file meta.json with valid JSON metadata"],
+      "when": ["specd spec write-metadata auth/login --input meta.json is run"],
+      "then": ["the metadata is written successfully"]
+    },
+    {
+      "requirement": "YAML validation",
+      "name": "Rejects invalid JSON",
+      "when": ["specd spec write-metadata auth/login --input bad.txt is run with non-JSON content"],
+      "then": ["stderr contains error: invalid JSON: and exit code is 1"]
+    },
+    {
+      "requirement": "Text output",
+      "name": "Successful write in text format",
+      "when": ["the write succeeds and format is text"],
+      "then": ["the command outputs wrote metadata for default:auth/login"]
+    },
+    {
+      "requirement": "JSON output",
+      "name": "Successful write in JSON format",
+      "when": ["the write succeeds and format is json"],
+      "then": ["the command outputs { \"result\": \"ok\", \"spec\": \"default:auth/login\" }"]
+    },
+    {
+      "requirement": "Error — invalid metadata structure",
+      "name": "Structurally invalid metadata exits 1",
+      "given": ["valid YAML content with keywords: [123] (invalid type)"],
+      "when": ["specd spec write-metadata auth/login --input /tmp/bad.yaml is invoked"],
+      "then": [
+        "the command writes error: Metadata validation failed: ... to stderr and exits with code 1"
+      ]
+    },
+    {
+      "requirement": "Error — spec not found",
+      "name": "Unknown spec exits 1",
+      "when": ["the spec does not exist in the workspace"],
+      "then": [
+        "the command writes error: spec '<specPath>' not found to stderr and exits with code 1"
+      ]
+    },
+    {
+      "requirement": "Error — conflict detected",
+      "name": "Conflict without --force exits 1",
+      "given": ["the metadata file was modified since it was last read"],
+      "when": ["specd spec write-metadata auth/login is invoked without --force"],
+      "then": ["the command exits with code 1 and reports the conflict"]
+    },
+    {
+      "requirement": "Error — conflict detected",
+      "name": "Force flag bypasses conflict",
+      "given": ["the metadata file was modified since it was last read"],
+      "when": ["specd spec write-metadata auth/login --force is invoked"],
+      "then": ["the write succeeds and the conflict is ignored"]
+    },
+    {
+      "requirement": "Error — dependsOn overwrite",
+      "name": "dependsOn change without --force exits 1",
+      "given": [
+        "existing metadata has dependsOn: [core:config, core:schema-format]",
+        "AND incoming YAML has dependsOn: [core:change]"
+      ],
+      "when": [
+        "specd spec write-metadata auth/login --input /tmp/metadata.yaml is invoked without --force"
+      ],
+      "then": [
+        "the command writes error: dependsOn would change to stderr",
+        "AND exits with code 1",
+        "AND stdout is empty"
+      ]
+    },
+    {
+      "requirement": "Error — dependsOn overwrite",
+      "name": "--force bypasses dependsOn check",
+      "given": [
+        "existing metadata has dependsOn: [core:config]",
+        "AND incoming YAML has dependsOn: [core:change]"
+      ],
+      "when": [
+        "specd spec write-metadata auth/login --input /tmp/metadata.yaml --force is invoked"
+      ],
+      "then": ["the write succeeds"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:f9e3e5849d6e013d16b905bfda9963b4ffdd1b945e9f4de04245de9f46f37696",
+    "verify.md": "sha256:56e205aa0d342bc5b6e0e0f6006a318feca9c43d6c3d11862e3d8e5f8ea9cc14"
+  },
+  "generatedBy": "core"
+}

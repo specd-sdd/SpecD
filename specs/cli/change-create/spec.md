@@ -30,16 +30,7 @@ The workspace IDs for the new change are derived from the workspace prefix of ea
 On success, output depends on `--format`:
 
 - `text` (default): prints a single line to stdout:
-
-  ```
-  created change <name>
-  ```
-
-- `json` or `toon`: outputs the following to stdout (encoded in the respective format):
-
-  ```json
-  { "result": "ok", "name": "<name>", "state": "drafting" }
-  ```
+- `json` or `toon`: outputs the following to stdout (encoded in the respective format): The `changePath` is the absolute filesystem path to the change directory where artifacts should be written.
 
 No further output is produced.
 
