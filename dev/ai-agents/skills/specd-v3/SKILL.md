@@ -7,7 +7,7 @@ argument-hint: '[change-name] or leave empty to list/create'
 
 # specd — entry point
 
-Read `shared.md` in this directory before doing anything.
+Read `.specd/skills/shared.md` before doing anything.
 
 ## What this does
 
@@ -19,7 +19,7 @@ This skill does NOT execute lifecycle phases — it routes to the right skill.
 ### 1. Read shared notes
 
 ```
-Read .claude/skills/specd-v3/shared.md
+Read .specd/skills/shared.md
 ```
 
 ### 2. Check for existing changes

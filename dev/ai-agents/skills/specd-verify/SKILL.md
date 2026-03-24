@@ -7,7 +7,7 @@ argument-hint: '<change-name>'
 
 # specd-verify — check implementation against specs
 
-Read `.claude/skills/specd-v3/shared.md` before doing anything.
+Read `.specd/skills/shared.md` before doing anything.
 
 ## What this does
 

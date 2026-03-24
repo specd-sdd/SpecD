@@ -7,7 +7,7 @@ argument-hint: '<change-name> [--ff]'
 
 # specd-design — write artifacts
 
-Read `.claude/skills/specd-v3/shared.md` before doing anything.
+Read `.specd/skills/shared.md` before doing anything.
 
 ## What this does
 
