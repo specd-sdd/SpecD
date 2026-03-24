@@ -5,7 +5,6 @@ import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry, type OutlineEntry } from '../ports/artifact-parser.js'
 import { type TemplateExpander } from '../template-expander.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
-import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { ArtifactNotFoundError } from '../errors/artifact-not-found-error.js'
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
@@ -92,7 +91,6 @@ export class GetArtifactInstruction {
     if (change === null) throw new ChangeNotFoundError(input.name)
 
     const schema = await this._schemaProvider.get()
-    if (schema === null) throw new SchemaNotFoundError('(provider)')
 
     if (schema.name() !== change.schemaName) {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())

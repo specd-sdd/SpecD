@@ -27,7 +27,7 @@
     {
       "requirement": "Resolves schema before processing",
       "rules": [
-        "The use case MUST obtain the project's schema via `SchemaProvider.get()` before processing any specs. If the schema cannot be resolved (returns `null`), the use case MUST throw `SchemaNotFoundError`."
+        "The use case MUST obtain the project's schema via `SchemaProvider.get()` before processing any specs. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these."
       ]
     },
     {
@@ -126,10 +126,9 @@
     },
     {
       "requirement": "Resolves schema before processing",
-      "name": "Schema not found",
-      "given": ["SchemaProvider.get() returns null for the configured schema reference"],
-      "when": ["execute is called"],
-      "then": ["a SchemaNotFoundError is thrown with the schema reference string"]
+      "name": "Schema resolution failure propagates",
+      "when": ["SchemaProvider.get() throws SchemaNotFoundError"],
+      "then": ["the error propagates — the use case does not catch it"]
     },
     {
       "requirement": "Renders project-level context entries",
@@ -268,8 +267,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e6e20616053f3cd71d50c61fd2e1b5832f039942b0b093fafe1d23d4c222f6df",
-    "verify.md": "sha256:1ec6d1773f127f76a0121b87dcea0243697b858200b9a23995f99ed43c5eb444"
+    "spec.md": "sha256:5d56c93fd70de6100e622eefc341b23b2179e637e5abfd202d9be0299f0ff9e4",
+    "verify.md": "sha256:60b7f9aa1633e5a7113301ff54bd1c436e4b25ac0a496baee6a2ea5bdee8be16"
   },
   "generatedBy": "core"
 }

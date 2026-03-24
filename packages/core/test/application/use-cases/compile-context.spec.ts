@@ -243,7 +243,10 @@ function makeStubChangeRepo(change?: Change) {
 
 function makeStubSchemaProvider(schema: Schema | null): SchemaProvider {
   return {
-    get: async () => schema,
+    get: async () => {
+      if (schema === null) throw new SchemaNotFoundError('(test)')
+      return schema
+    },
   }
 }
 

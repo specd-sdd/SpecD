@@ -175,9 +175,9 @@ export class TransitionChange {
     const fromState = change.state
     const effectiveTarget = this._resolveTarget(change.state, input)
 
-    // --- Resolve schema and workflow step (best-effort) ---
+    // --- Resolve schema and workflow step ---
     const schema = await this._schemaProvider.get()
-    const workflowStep = schema?.workflowStep(effectiveTarget) ?? null
+    const workflowStep = schema.workflowStep(effectiveTarget) ?? null
 
     // --- Enforce workflow requires ---
     if (workflowStep !== null && workflowStep.requires.length > 0) {

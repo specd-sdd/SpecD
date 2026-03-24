@@ -20,7 +20,7 @@
     {
       "requirement": "Schema resolution",
       "rules": [
-        "The use case obtains the active schema via `SchemaProvider.get()`. If the schema cannot be resolved (returns `null`), it throws `SchemaNotFoundError`. If the resolved schema has no `metadataExtraction` declarations, the use case returns `{ metadata: {}, hasExtraction: false }` immediately — there is nothing to extract."
+        "The use case obtains the active schema via `SchemaProvider.get()`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these. If the resolved schema has no `metadataExtraction` declarations, the use case returns `{ metadata: {}, hasExtraction: false }` immediately — there is nothing to extract."
       ]
     },
     {
@@ -69,9 +69,9 @@
   "scenarios": [
     {
       "requirement": "Schema resolution",
-      "name": "Schema not found",
-      "when": ["SchemaProvider.get() returns null for the configured schema reference"],
-      "then": ["it throws SchemaNotFoundError"]
+      "name": "Schema resolution failure propagates",
+      "when": ["SchemaProvider.get() throws SchemaNotFoundError"],
+      "then": ["the error propagates — the use case does not catch it"]
     },
     {
       "requirement": "Schema resolution",
@@ -176,8 +176,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:4e415f1e6349fc8c194879ce2b035347578125de57cdf6c05765456837bb2302",
-    "verify.md": "sha256:02ea21d4dbd1b87fd1a83d61445aeb94653ee85fc10dc0f56c9f67ebe28e380d"
+    "spec.md": "sha256:7d106e48928584ab94d46e9b028cdb33f16f87e3043589a9dfcee145ebc21fcf",
+    "verify.md": "sha256:c986b8c3b6036ac0feb553545baa984948b3b1c64c25204242fd47c7fdc506ad"
   },
   "generatedBy": "core"
 }
