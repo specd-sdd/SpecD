@@ -43,6 +43,19 @@ node packages/cli/dist/index.js spec list --format text --summary
 Use the IDs from the PATH column. For new specs that don't exist yet, **ask the user**
 which workspace they belong to.
 
+## Adding specs before writing artifacts
+
+**Never write a delta or new spec file until the spec is registered in the change.**
+If a spec needs to be part of the change, first add it:
+
+```bash
+node packages/cli/dist/index.js change edit <name> --add-spec <workspace:path>
+```
+
+Only after `--add-spec` succeeds should you write the delta or artifact file in the
+change directory. Writing files for specs not yet added to the change will cause
+validation failures and broken state.
+
 ## Reading specs
 
 **Always use the CLI.** Never guess filesystem paths.

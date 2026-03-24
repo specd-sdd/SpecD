@@ -16,11 +16,38 @@ This skill does NOT execute lifecycle phases — it routes to the right skill.
 
 ## Steps
 
-### 1. Read shared notes
+### 1. Read shared notes and show project welcome
 
 ```
 Read .specd/skills/shared.md
 ```
+
+Then gather project context:
+
+```bash
+node packages/cli/dist/index.js config show --format json
+node packages/cli/dist/index.js spec list --format json --summary
+node packages/cli/dist/index.js change list --format json
+node packages/cli/dist/index.js drafts list --format json
+```
+
+From the results, **print a welcome block** to the user with this structure:
+
+```
+# specd
+
+**Schema:** <schemaRef>
+**Workspaces:** <name> (<specCount> specs), <name> (<specCount> specs), ...
+**Active changes:** <count> — <name> (<state>), ...
+**Drafts:** <count> (or "none")
+
+> **Context:** <summarize the `context` entries from config — for `instruction` entries
+> show a one-line digest of the instruction text; for `file` entries show the filename>
+```
+
+Keep it compact — no more than 8-10 lines. Omit sections that are empty (e.g. skip
+"Drafts" if there are none). The user cannot see tool output directly, so you MUST
+print this yourself.
 
 ### 2. Check for existing changes
 
