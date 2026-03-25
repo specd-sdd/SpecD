@@ -415,12 +415,6 @@
 
 ### Requirement: Artifact definition
 
-#### Scenario: Artifact with rules.pre and rules.post
-
-- **GIVEN** an artifact declares `rules: { pre: [{ id: pre-rule, text: "Before instruction" }], post: [{ id: post-rule, text: "After instruction" }] }`
-- **WHEN** `CompileContext` assembles the instruction block for that artifact
-- **THEN** `pre-rule` text appears before the artifact's `instruction` and `post-rule` text appears after it
-
 #### Scenario: preHashCleanup entry requires id
 
 - **WHEN** a `preHashCleanup` entry omits the `id` field
@@ -489,3 +483,9 @@
 
 - **WHEN** specd compiles context for a spec that has both `spec` and `verify` artifacts with `scope: spec`
 - **THEN** both `spec.md` and `verify.md` are read and included together in the LLM context
+
+#### Scenario: Artifact with rules.pre and rules.post
+
+- **GIVEN** an artifact declares `rules: { pre: [{ id: pre-rule, instruction: "Before instruction" }], post: [{ id: post-rule, instruction: "After instruction" }] }`
+- **WHEN** `CompileContext` assembles the instruction block for that artifact
+- **THEN** `pre-rule` instruction appears before the artifact's `instruction` and `post-rule` instruction appears after it

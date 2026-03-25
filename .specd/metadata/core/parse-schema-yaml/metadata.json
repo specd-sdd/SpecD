@@ -33,7 +33,7 @@
     {
       "requirement": "Zod structural validation",
       "rules": [
-        "After successful YAML parsing, the function SHALL validate the parsed object against the `SchemaYaml` Zod schema. The Zod schema SHALL enforce:\n\n- `name` is a required string\n- `version` is a required integer\n- `kind` is a required enum (`schema` | `schema-plugin`)\n- `extends` is an optional string, only valid when `kind: schema`\n- `artifacts` is a required array of artifact objects, each validated for required fields (`id`, `scope`, `output`) and optional fields with correct types\n- Hook entries require an `id` field alongside `instruction` or `run`\n- Validation/deltaValidation rule entries require an `id` field\n- `preHashCleanup` entries require an `id` field\n- `rules` on artifacts is an optional object with `pre` and `post` arrays of `{ id, text }`\n- `workflow` is an optional array of workflow step objects\n- `metadataExtraction` is an optional object matching the metadata extraction schema; array entries require an `id` field\n- Unknown top-level fields SHALL be ignored (forward compatibility via Zod's default `strip` mode)\n\nThe Zod schemas for selector fields within validation rules, metadata extractors, and related structures SHALL be imported from the existing `infrastructure/zod/selector-schema.ts` module to avoid duplication."
+        "After successful YAML parsing, the function SHALL validate the parsed object against the `SchemaYaml` Zod schema. The Zod schema SHALL enforce:\n\n- `name` is a required string\n- `version` is a required integer\n- `kind` is a required enum (`schema` | `schema-plugin`)\n- `extends` is an optional string, only valid when `kind: schema`\n- `artifacts` is a required array of artifact objects, each validated for required fields (`id`, `scope`, `output`) and optional fields with correct types\n- Hook entries require an `id` field alongside `instruction` or `run`\n- Validation/deltaValidation rule entries require an `id` field\n- `preHashCleanup` entries require an `id` field\n- `rules` on artifacts is an optional object with `pre` and `post` arrays of `{ id, text }` `rules` on artifacts is an optional object with `pre` and `post` arrays of `{ id, instruction }`\n- `workflow` is an optional array of workflow step objects\n- `metadataExtraction` is an optional object matching the metadata extraction schema; array entries require an `id` field\n- Unknown top-level fields SHALL be ignored (forward compatibility via Zod's default `strip` mode)\n\nThe Zod schemas for selector fields within validation rules, metadata extractors, and related structures SHALL be imported from the existing `infrastructure/zod/selector-schema.ts` module to avoid duplication."
       ]
     },
     {
@@ -257,8 +257,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:3c47d2b1d1cb1fe1ecbb542be8b5b43ef64bf56b7144f6d698534ce723198023",
-    "verify.md": "sha256:cdf0907b47a22659c798edfa591a7b98dee12f321eab59958f217b15f47ceb6f"
+    "spec.md": "sha256:68facb09347b70b4cf5d00146ef97efa0827ecf909ef34712a0efca4b93cc30e",
+    "verify.md": "sha256:a7f2fb7802466f2cb2c5cb6a0bb5d8d895aeae8e5f96df2554d40aca5c8d1234"
   },
   "generatedBy": "core"
 }

@@ -38,7 +38,7 @@ artifacts:
     rules:
       post:
         - id: resolve-open-questions
-          text: |
+          instruction: |
             Review the "Open questions" section of the proposal. If any question
             affects downstream artifacts (specs, design, tasks), it must be resolved
             with the user before proceeding. Do not write specs or design while
@@ -88,7 +88,7 @@ artifacts:
     rules:
       post:
         - id: proposal-specs-coverage
-          text: |
+          instruction: |
             Cross-reference proposal.md's "Specs affected" section against the
             spec artifacts just written. Every new spec listed in the proposal
             must have a corresponding spec.md file. Every modified spec must
@@ -225,7 +225,7 @@ artifacts:
     rules:
       post:
         - id: specs-verify-coverage
-          text: |
+          instruction: |
             Cross-reference spec.md's requirements against the verify
             scenarios just written. Every requirement in spec.md must have
             at least one corresponding scenario in verify.md. If any
@@ -355,7 +355,7 @@ artifacts:
     rules:
       post:
         - id: specs-design-coverage
-          text: |
+          instruction: |
             Cross-reference the spec and verify artifacts against the design
             just written. Every requirement in spec.md must have a clear path
             to implementation in design.md (mentioned in Affected areas, New
@@ -363,7 +363,7 @@ artifacts:
             at least one entry in the Testing section. If any requirement or
             scenario lacks design coverage, add it before proceeding.
         - id: resolve-open-questions
-          text: |
+          instruction: |
             Review the "Open questions" section of the design. If any question
             affects implementation tasks, it must be resolved with the user before
             writing tasks.md. Unresolved design questions lead to ambiguous tasks
@@ -436,7 +436,7 @@ artifacts:
     rules:
       post:
         - id: design-tasks-coverage
-          text: |
+          instruction: |
             Cross-reference design.md against the tasks just written. Every
             item in Affected areas, every new construct in New constructs,
             every automated test in Testing, and every manual / E2E

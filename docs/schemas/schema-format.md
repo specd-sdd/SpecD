@@ -354,7 +354,7 @@ taskCompletionCheck:
 
 ### rules
 
-`rules` declares pre- and post-instruction text blocks injected around the artifact's `instruction` field. `pre` rules are injected before the instruction; `post` rules are injected after. Each rule entry requires both `id` and `text`.
+`rules` declares pre- and post-instruction text blocks injected around the artifact's `instruction` field. `pre` rules are injected before the instruction; `post` rules are injected after. Each rule entry requires both `id` and `instruction`.
 
 ```yaml
 - id: tasks
@@ -365,10 +365,10 @@ taskCompletionCheck:
   rules:
     pre:
       - id: read-design-first
-        text: 'Read design.md in full before creating any tasks.'
+        instruction: 'Read design.md in full before creating any tasks.'
     post:
       - id: verify-coverage
-        text: |
+        instruction: |
           Every requirement in spec.md must map to at least one task.
           If any requirement is missing a task, add it before proceeding.
 ```

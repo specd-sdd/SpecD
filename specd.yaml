@@ -83,10 +83,10 @@ schemaOverrides:
         rules:
           post:
             - id: designing-docs
-              text: >-
+              instruction: >-
                 Add instructions to update documentation in docs/ if needed on the design.md.
             - id: check-global-specs-compliance
-              text: >-
+              instruction: >-
                 Cross-reference this design against the global specs (default:_global/*):
                 architecture (hexagonal layers, dependency direction, no I/O in domain),
                 conventions (naming, exports, ESM, no default exports, no any),

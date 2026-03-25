@@ -4,10 +4,10 @@ import {
   type TaskCompletionCheck,
 } from './validation-rule.js'
 
-/** A rule entry with identity and text, used in `rules.pre` / `rules.post`. */
+/** A rule entry with identity and instruction text, used in `rules.pre` / `rules.post`. */
 export interface RuleEntry {
   readonly id: string
-  readonly text: string
+  readonly instruction: string
 }
 
 /** Pre- and post-instruction rules on an artifact type. */

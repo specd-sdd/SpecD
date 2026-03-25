@@ -103,10 +103,10 @@ export interface TaskCompletionCheckRaw {
   completePattern?: string | undefined
 }
 
-/** Raw rule entry shape ({ id, text }) for artifact rules.pre / rules.post. */
+/** Raw rule entry shape ({ id, instruction }) for artifact rules.pre / rules.post. */
 export interface RuleEntryRaw {
   id: string
-  text: string
+  instruction: string
 }
 
 /** Raw artifact rules block shape. */
