@@ -85,14 +85,18 @@ For each task in `tasks.md`:
 
 If a task is ambiguous, consult `design.md` first. If still unclear, ask the user.
 
-### 7. Run exit hooks
+### 7. Run exit hooks — immediately after last checkbox
+
+**Trigger:** the moment the last `- [ ]` across ALL task-bearing artifacts is marked
+`- [x]`, run the post-implementing hooks. Do NOT wait, do NOT ask the user anything
+first — the hooks fire on completion of the implementation work, before any conversation.
 
 ```bash
 node packages/cli/dist/index.js change run-hooks <name> implementing --phase post
 node packages/cli/dist/index.js change hook-instruction <name> implementing --phase post --format text
 ```
 
-Follow guidance. If hooks fail (tests, lint), fix and re-run.
+Follow guidance. If hooks fail (tests, lint), fix and re-run until they pass.
 
 ### 8. Transition to verifying
 

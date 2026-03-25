@@ -146,14 +146,18 @@ Wait for user response. Then go to step 6.
 
 **Fast-forward mode:** show a one-line summary and go to step 6.
 
-### 9. All artifacts done — transition to ready
+### 9. All artifacts done — run exit hooks immediately
 
-Run exit hooks:
+**Trigger:** the moment the last artifact passes validation, run the post-designing
+hooks. Do NOT wait, do NOT ask the user anything first — the hooks fire on completion
+of all design artifacts, before any review conversation.
 
 ```bash
 node packages/cli/dist/index.js change run-hooks <name> designing --phase post
 node packages/cli/dist/index.js change hook-instruction <name> designing --phase post --format text
 ```
+
+Follow guidance. If hooks fail, fix and re-run.
 
 Transition:
 

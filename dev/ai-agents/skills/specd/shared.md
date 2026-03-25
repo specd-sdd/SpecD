@@ -146,5 +146,13 @@ Every workflow step has pre and post hooks. The pattern is always:
 1. **On entry:** `change hook-instruction <name> <step> --phase pre --format text` → follow guidance
 2. **On exit:** `change run-hooks <name> <step> --phase post` → then `change hook-instruction <name> <step> --phase post --format text` → follow guidance
 
+### Post-hooks fire immediately after the phase's work completes
+
+Post-hooks MUST run the moment the phase's work is done — right after the last artifact
+passes validation (designing), after the last task checkbox is marked (implementing),
+after the last scenario is verified (verifying), etc. Do NOT wait, do NOT ask the user
+anything first, do NOT present a summary before running them. The hooks are part of the
+phase completion, not a separate step that follows user interaction.
+
 Execute hooks for every state the change passes through, including intermediate ones
 (`pending-spec-approval`, `spec-approved`, `done`, `pending-signoff`, `signed-off`, `archivable`).
