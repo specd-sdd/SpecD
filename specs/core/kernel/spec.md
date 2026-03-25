@@ -44,6 +44,14 @@ No use case constructor may call `SchemaRegistry.resolve()` directly. Schema acc
 
 `RunStepHooks` and `GetHookInstructions` do not receive project-level workflow hooks — all hooks are merged into the schema by `ResolveSchema` via `schemaOverrides`. The kernel does not read `config.workflow`.
 
+### Requirement: Project-level VCS and actor adapters must use auto-detect
+
+`createKernelInternals` must use `createVcsAdapter(config.projectRoot)` and `createVcsActorResolver(config.projectRoot)` to construct the project-level `VcsAdapter` and `ActorResolver`. It must NOT hardcode a specific VCS implementation (e.g. `new GitVcsAdapter()`).
+
+The same rule applies to the standalone use-case factory functions in `composition/use-cases/`: they must use `createVcsActorResolver()` instead of `new GitActorResolver()`.
+
+This ensures specd works correctly in git, Mercurial, Subversion, and non-VCS environments without caller-visible changes.
+
 ### Requirement: Auto-invalidation on get when artifact files drift
 
 When `ChangeRepository.get()` loads a change, the `FsChangeRepository` implementation must check whether any previously-validated artifact file has drifted — i.e. the file had a `validatedHash` set but now has a derived status of `missing` or `in-progress`. If drift is detected AND either of the following conditions holds, the repository must call `change.invalidate('artifact-change', SYSTEM_ACTOR)` to roll the change back to `designing` and persist the updated state:

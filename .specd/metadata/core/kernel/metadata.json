@@ -69,6 +69,12 @@
       ]
     },
     {
+      "requirement": "Project-level VCS and actor adapters must use auto-detect",
+      "rules": [
+        "`createKernelInternals` must use `createVcsAdapter(config.projectRoot)` and `createVcsActorResolver(config.projectRoot)` to construct the project-level `VcsAdapter` and `ActorResolver`. It must NOT hardcode a specific VCS implementation (e.g. `new GitVcsAdapter()`).\n\nThe same rule applies to the standalone use-case factory functions in `composition/use-cases/`: they must use `createVcsActorResolver()` instead of `new GitActorResolver()`.\n\nThis ensures specd works correctly in git, Mercurial, Subversion, and non-VCS environments without caller-visible changes."
+      ]
+    },
+    {
       "requirement": "Auto-invalidation on get when artifact files drift",
       "rules": [
         "When `ChangeRepository.get()` loads a change, the `FsChangeRepository` implementation must check whether any previously-validated artifact file has drifted — i.e. the file had a `validatedHash` set but now has a derived status of `missing` or `in-progress`. If drift is detected AND either of the following conditions holds, the repository must call `change.invalidate('artifact-change', SYSTEM_ACTOR)` to roll the change back to `designing` and persist the updated state:\n\n1. The change is beyond `designing` state (has progressed past the initial design phase), OR\n2. The change has an active approval (spec approval or signoff) not superseded by a subsequent `invalidated` event.\n\nThis ensures that both state-inconsistent artifact changes and approval drift are detected eagerly on any change load, not only during explicit validation. See [`specs/core/change-repository-port/spec.md`](../change-repository-port/spec.md) for the full port-level contract."
@@ -223,6 +229,39 @@
       ]
     },
     {
+      "requirement": "Project-level VCS and actor adapters must use auto-detect",
+      "name": "Kernel internals use auto-detect for project VCS",
+      "when": ["createKernelInternals constructs the project-level VcsAdapter"],
+      "then": [
+        "it calls createVcsAdapter(config.projectRoot) instead of constructing a specific implementation directly"
+      ]
+    },
+    {
+      "requirement": "Project-level VCS and actor adapters must use auto-detect",
+      "name": "Kernel internals use auto-detect for project actor",
+      "when": ["createKernelInternals constructs the project-level ActorResolver"],
+      "then": [
+        "it calls createVcsActorResolver(config.projectRoot) instead of constructing a specific implementation directly"
+      ]
+    },
+    {
+      "requirement": "Project-level VCS and actor adapters must use auto-detect",
+      "name": "Standalone use-case factories use auto-detect for actor",
+      "when": ["any standalone use-case factory in composition/use-cases/ needs an ActorResolver"],
+      "then": ["it calls createVcsActorResolver() instead of new GitActorResolver()"]
+    },
+    {
+      "requirement": "Project-level VCS and actor adapters must use auto-detect",
+      "name": "Non-git project gets correct adapters",
+      "given": ["a project directory that is not a git repository"],
+      "when": ["createKernelInternals is called"],
+      "then": [
+        "the vcs field is a NullVcsAdapter (or the detected VCS adapter)",
+        "AND the actor field is a NullActorResolver (or the detected actor resolver)",
+        "AND no git-specific errors are thrown"
+      ]
+    },
+    {
       "requirement": "Kernel exposes repository instances for adapter access",
       "name": "ChangeRepository accessible via kernel",
       "when": ["kernel.changes.repo is accessed"],
@@ -270,8 +309,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:67bd3b05b8b018483674599131c86bd8afe10b370c8c049a53e5f394e6ca33e8",
-    "verify.md": "sha256:0fc05e9d04345029957648b9420e5453b4cca23f5363ad63e2e404f490d1a9d1"
+    "spec.md": "sha256:1c55858d175105fa8a703e55d7f4b0bff6c7bdb4e73daae59a6b71d08674cae2",
+    "verify.md": "sha256:8aec19f796dfcc27abb80cbfd4ed74b67bca67d4476446b981bec1afe8b1d6ef"
   },
   "generatedBy": "core"
 }

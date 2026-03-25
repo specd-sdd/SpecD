@@ -9,7 +9,7 @@ import { type SchemaRepository } from '../../application/ports/schema-repository
 import { createSchemaRepository } from '../schema-repository.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
+import { createVcsActorResolver } from '../actor-resolver.js'
 import { createArchiveRepository } from '../archive-repository.js'
 import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
 import { TemplateExpander } from '../../application/template-expander.js'
@@ -144,7 +144,7 @@ export function createTransitionChange(
   const schemaProvider = new LazySchemaProvider(resolveSchema)
   const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
   const hooks = new NodeHookRunner(expander)
-  const actor = new GitActorResolver()
+  const actor = createVcsActorResolver()
   const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, schemaProvider)
   return new TransitionChange(changeRepo, actor, schemaProvider, runStepHooks)
 }

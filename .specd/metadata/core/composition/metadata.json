@@ -25,6 +25,12 @@
       ]
     },
     {
+      "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
+      "rules": [
+        "Standalone use-case factories that need an `ActorResolver` must call `createVcsActorResolver()` instead of constructing a specific implementation (e.g. `new GitActorResolver()`). The auto-detect chain (git → hg → svn → null) ensures the correct implementation is selected based on the project's actual VCS.\n\nThe same applies to any factory that needs a `VcsAdapter` — it must call `createVcsAdapter()`."
+      ]
+    },
+    {
       "requirement": "FsChangeRepository options include artifact type resolution",
       "rules": [
         "`FsChangeRepositoryOptions` accepts two optional fields for artifact sync:\n\n- **`artifactTypes`** (`readonly ArtifactType[]`, optional) — resolved artifact types from the active schema. When provided, the repository uses these directly for `syncArtifacts` on every `get()` and `save()`.\n- **`resolveArtifactTypes`** (`() => Promise<readonly ArtifactType[]>`, optional) — async resolver for artifact types. Used when artifact types aren't known at construction time (e.g. kernel-level repo created before schema is resolved). Resolved lazily on first use and cached thereafter.\n\nAt least one of these should be provided; if neither is available, artifact sync is a no-op (empty artifact types array)."
@@ -111,6 +117,23 @@
       ]
     },
     {
+      "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
+      "name": "Standalone factory uses auto-detect for actor resolution",
+      "when": [
+        "any standalone use-case factory in composition/use-cases/ constructs an ActorResolver"
+      ],
+      "then": ["it calls createVcsActorResolver() instead of new GitActorResolver()"]
+    },
+    {
+      "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
+      "name": "No hardcoded VCS imports in standalone factories",
+      "when": ["inspecting the import statements of all files in composition/use-cases/"],
+      "then": [
+        "none import GitActorResolver, HgActorResolver, SvnActorResolver, or NullActorResolver directly",
+        "AND all import createVcsActorResolver from the composition layer instead"
+      ]
+    },
+    {
       "requirement": "Kernel builds all use cases from SpecdConfig",
       "name": "Kernel returns grouped use cases",
       "when": ["createKernel(config) is called with a valid SpecdConfig"],
@@ -147,8 +170,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:017905178dc6761ff46cf53ab2be35e9506895b26ea71f74355051b5ce71a087",
-    "verify.md": "sha256:0c52ccb33c86395ce167e95216bf13aa6c37f22c8563efee86a04974d7b6049b"
+    "spec.md": "sha256:1776094560648cd3368e35e51142384fe22052f7eb4291f42f359af5b0e21a5c",
+    "verify.md": "sha256:84efd4bbed5752ac2e1d91e89ba24579fa6098fc33f9c294320c4e1ff6cb92a5"
   },
   "generatedBy": "core"
 }
