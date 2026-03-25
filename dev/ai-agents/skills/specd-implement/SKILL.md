@@ -62,6 +62,10 @@ Follow guidance — it tells you which change artifacts to read.
 node packages/cli/dist/index.js change context <name> implementing --follow-deps --depth 1 --rules --constraints --format text
 ```
 
+**MUST follow** — project context entries are binding directives. If lazy mode returns
+summary specs, evaluate each one and load any that are relevant to the code you're
+about to write (see `shared.md` — "Processing `change context` output").
+
 ### 5. Read change artifacts
 
 Read ALL artifacts from `<changePath>/`:

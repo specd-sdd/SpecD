@@ -16,7 +16,17 @@ change when the picture is clear. Does NOT write any artifacts — that's `/spec
 
 ## Steps
 
-### 1. Understand intent
+### 1. Load project context
+
+```bash
+node packages/cli/dist/index.js project context --format text
+```
+
+**MUST follow** — project context entries are binding directives. If lazy mode returns
+summary specs, evaluate and load any that are relevant to the work ahead
+(see `shared.md` — "Processing `change context` output").
+
+### 2. Understand intent
 
 **Do NOT immediately ask for a name, description, or specIds.**
 
@@ -34,7 +44,7 @@ node packages/cli/dist/index.js spec list --format text --summary
 
 Surface existing specs that might be affected. Let the conversation develop naturally.
 
-### 2. Propose the change
+### 3. Propose the change
 
 When the picture is clear enough:
 
@@ -48,7 +58,7 @@ When the picture is clear enough:
 
 Wait for confirmation.
 
-### 3. Create
+### 4. Create
 
 ```bash
 node packages/cli/dist/index.js change create <name> --spec <workspace:path> --description "<desc>" --format json
@@ -76,7 +86,7 @@ Suggest based on state:
 
 **Stop — do not continue.**
 
-### 4. Run entry hooks
+### 5. Run entry hooks
 
 ```bash
 node packages/cli/dist/index.js change hook-instruction <name> drafting --phase pre --format text
@@ -84,7 +94,7 @@ node packages/cli/dist/index.js change hook-instruction <name> drafting --phase 
 
 Follow guidance if any.
 
-### 5. Show status and stop
+### 6. Show status and stop
 
 ```bash
 node packages/cli/dist/index.js change status <name> --format json
@@ -101,9 +111,10 @@ Show the change state and suggest next step:
 
 Create tasks at the start for session visibility. Update them as you go.
 
-1. `Understand intent` — mark done after confirming what the user wants
-2. `Propose change` — mark done after user confirms name/description/specs
-3. `Create change` — mark done after CLI creates the change successfully
+1. `Load project context` — mark done after step 1
+2. `Understand intent` — mark done after confirming what the user wants
+3. `Propose change` — mark done after user confirms name/description/specs
+4. `Create change` — mark done after CLI creates the change successfully
 
 ## Guardrails
 

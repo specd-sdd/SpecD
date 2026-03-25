@@ -35,7 +35,17 @@ the wrong skill. Suggest based on state:
 
 **Stop — do not continue.**
 
-### 2. Handle signoff gate
+### 2. Load context
+
+```bash
+node packages/cli/dist/index.js change context <name> archiving --follow-deps --depth 1 --format text
+```
+
+**MUST follow** — project context entries are binding directives. If lazy mode returns
+summary specs, evaluate and load any that are relevant to the archiving work
+(see `shared.md` — "Processing `change context` output").
+
+### 3. Handle signoff gate
 
 Run `done` hooks:
 
@@ -64,7 +74,7 @@ Run pending-signoff hooks and **stop.**
 
 **If already `archivable`:** skip to step 3.
 
-### 3. Pre-archive review
+### 4. Pre-archive review
 
 ```bash
 node packages/cli/dist/index.js change hook-instruction <name> archiving --phase pre --format text
@@ -72,7 +82,7 @@ node packages/cli/dist/index.js change hook-instruction <name> archiving --phase
 
 Follow guidance — review deltas to ensure specs match what was built.
 
-### 4. Ask before archiving
+### 5. Ask before archiving
 
 > **Ready to archive `<name>`.** This will merge all deltas into your project specs
 > and move the change to the archive. This cannot be undone.
@@ -81,13 +91,13 @@ Follow guidance — review deltas to ensure specs match what was built.
 
 **Do NOT proceed until the user explicitly says "archive" or equivalent.**
 
-### 5. Archive
+### 6. Archive
 
 ```bash
 node packages/cli/dist/index.js change archive <name> --format json
 ```
 
-### 6. Post-archive
+### 7. Post-archive
 
 ```bash
 node packages/cli/dist/index.js change run-hooks <name> archiving --phase post
@@ -96,13 +106,13 @@ node packages/cli/dist/index.js change hook-instruction <name> archiving --phase
 
 Follow guidance (typically: summarize what changed for commit message).
 
-### 7. Regenerate metadata
+### 8. Regenerate metadata
 
 ```bash
 node packages/cli/dist/index.js spec generate-metadata --all --write --status stale,missing
 ```
 
-### 8. Check LLM optimization
+### 9. Check LLM optimization
 
 ```bash
 node packages/cli/dist/index.js config show --format json
@@ -111,7 +121,7 @@ node packages/cli/dist/index.js config show --format json
 If `llmOptimizedContext` is `true`, suggest running `/specd-spec-metadata` for each
 spec in the change.
 
-### 9. Done
+### 10. Done
 
 > Change `<name>` archived. Deltas merged into specs.
 
@@ -122,10 +132,11 @@ spec in the change.
 Create tasks at the start for session visibility. Update them as you go.
 
 1. `Load state` — mark done after step 1
-2. `Handle signoff gate` — mark done after step 2
-3. `Pre-archive review` — mark done after step 3
-4. `Archive change` — mark done after step 5
-5. `Post-archive & metadata` — mark done after step 8
+2. `Load context` — mark done after step 2
+3. `Handle signoff gate` — mark done after step 3
+4. `Pre-archive review` — mark done after step 4
+5. `Archive change` — mark done after step 6
+6. `Post-archive & metadata` — mark done after step 9
 
 ## Handling failed transitions
 
