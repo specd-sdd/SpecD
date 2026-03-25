@@ -46,52 +46,50 @@
 
 ### Requirement: Task completion gating
 
-#### Scenario: Transition blocked when required artifact has incomplete tasks
+#### Scenario: Transition blocked when requiresTaskCompletion artifact has incomplete tasks
 
-- **GIVEN** a workflow step with `requires: [tasks]`
+- **GIVEN** a workflow step with `requires: [verify, tasks]` and `requiresTaskCompletion: [tasks]`
 - **AND** the `tasks` artifact type declares `taskCompletionCheck.incompletePattern: '^\s*-\s+\[ \]'`
 - **AND** the tasks file contains `- [ ] implement login`
 - **WHEN** a transition to that step is attempted
-- **THEN** `InvalidStateTransitionError` is thrown
+- **THEN** `InvalidStateTransitionError` is thrown with reason `incomplete-tasks`
 
 #### Scenario: Transition allowed when all tasks are complete
 
-- **GIVEN** a workflow step with `requires: [tasks]`
-- **AND** the `tasks` artifact type declares `taskCompletionCheck`
+- **GIVEN** a workflow step with `requiresTaskCompletion: [tasks]`
 - **AND** the tasks file contains only `- [x] implement login`
 - **WHEN** a transition to that step is attempted
 - **THEN** the transition proceeds
 
+#### Scenario: No gating when requiresTaskCompletion is absent
+
+- **GIVEN** a workflow step with `requires: [tasks]` but no `requiresTaskCompletion`
+- **AND** the `tasks` artifact type declares `taskCompletionCheck`
+- **AND** the tasks file contains incomplete items
+- **WHEN** a transition to that step is attempted
+- **THEN** the transition proceeds — `taskCompletionCheck` is not enforced without `requiresTaskCompletion`
+
 #### Scenario: Missing artifact file is skipped
 
-- **GIVEN** a workflow step with `requires: [tasks]`
-- **AND** the `tasks` artifact type declares `taskCompletionCheck`
+- **GIVEN** a workflow step with `requiresTaskCompletion: [tasks]`
 - **AND** the tasks file does not exist in the change directory
 - **WHEN** a transition to that step is attempted
 - **THEN** the check is skipped and the transition proceeds
 
-#### Scenario: Required artifact without taskCompletionCheck is not content-checked
-
-- **GIVEN** a workflow step with `requires: [specs, tasks]`
-- **AND** the `specs` artifact type has no `taskCompletionCheck`
-- **AND** the `tasks` artifact type declares `taskCompletionCheck`
-- **WHEN** a transition to that step is attempted
-- **THEN** only `tasks` is content-checked; `specs` is checked only via `effectiveStatus`
-
-#### Scenario: Generic gating applies to any step, not just implementing to verifying
-
-- **GIVEN** a workflow step `archiving` with `requires: [tasks]`
-- **AND** the `tasks` artifact type declares `taskCompletionCheck`
-- **AND** the tasks file contains incomplete items
-- **WHEN** a transition to `archiving` is attempted
-- **THEN** `InvalidStateTransitionError` is thrown
-
 #### Scenario: Invalid regex pattern is treated as non-matching
 
-- **GIVEN** a workflow step with `requires: [tasks]`
-- **AND** the `tasks` artifact type declares `taskCompletionCheck.incompletePattern` as an invalid regex
+- **GIVEN** a workflow step with `requiresTaskCompletion: [tasks]`
+- **AND** `incompletePattern` is an invalid regex
 - **WHEN** a transition to that step is attempted
 - **THEN** the check is skipped and the transition proceeds
+
+#### Scenario: Error includes incomplete and complete counts
+
+- **GIVEN** a workflow step with `requiresTaskCompletion: [tasks]`
+- **AND** the `tasks` artifact declares both `incompletePattern` and `completePattern`
+- **AND** the tasks file contains 3 complete items and 2 incomplete items
+- **WHEN** the transition fails
+- **THEN** the error reason includes `incomplete: 2`, `complete: 3`, `total: 5`
 
 ### Requirement: Workflow array order is display order
 

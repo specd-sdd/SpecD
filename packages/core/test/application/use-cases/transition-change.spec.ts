@@ -224,7 +224,14 @@ describe('TransitionChange', () => {
       change.setArtifact(tasks)
 
       const schema = makeSchema({
-        workflow: [{ step: 'implementing', requires: ['spec'], hooks: { pre: [], post: [] } }],
+        workflow: [
+          {
+            step: 'implementing',
+            requires: ['spec'],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema })
 
@@ -279,7 +286,14 @@ describe('TransitionChange', () => {
           }),
           makeArtifactType('verify'),
         ],
-        workflow: [{ step: stepName, requires: ['verify', 'tasks'], hooks: { pre: [], post: [] } }],
+        workflow: [
+          {
+            step: stepName,
+            requires: ['verify', 'tasks'],
+            requiresTaskCompletion: ['tasks'],
+            hooks: { pre: [], post: [] },
+          },
+        ],
       })
     }
 
@@ -370,7 +384,14 @@ describe('TransitionChange', () => {
 
       const schema = makeSchema({
         artifacts: [makeArtifactType('verify')],
-        workflow: [{ step: 'verifying', requires: ['verify'], hooks: { pre: [], post: [] } }],
+        workflow: [
+          {
+            step: 'verifying',
+            requires: ['verify'],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
       })
       const repo = makeChangeRepository([change])
       const artifactSpy = vi.fn().mockResolvedValue(null)
@@ -407,7 +428,14 @@ describe('TransitionChange', () => {
             taskCompletionCheck: { incompletePattern: '^\\s*-\\s+\\[ \\]' },
           }),
         ],
-        workflow: [{ step: 'archivable', requires: ['tasks'], hooks: { pre: [], post: [] } }],
+        workflow: [
+          {
+            step: 'archivable',
+            requires: ['tasks'],
+            requiresTaskCompletion: ['tasks'],
+            hooks: { pre: [], post: [] },
+          },
+        ],
       })
       const repo = makeChangeRepository([change])
       repo.artifact = async (_c, filename) => {
@@ -427,6 +455,126 @@ describe('TransitionChange', () => {
         }),
       ).rejects.toThrow(InvalidStateTransitionError)
     })
+
+    it('does not gate when requiresTaskCompletion is absent', async () => {
+      const change = makeImplementingChange('my-change')
+      setupChangeWithTaskArtifact(change)
+      const repo = makeChangeRepository([change])
+      repo.artifact = async (_c, filename) => {
+        if (filename === 'tasks.md') {
+          return new SpecArtifact('tasks.md', '- [ ] unfinished task')
+        }
+        return null
+      }
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('tasks', {
+            taskCompletionCheck: { incompletePattern: '^\\s*-\\s+\\[ \\]' },
+          }),
+          makeArtifactType('verify'),
+        ],
+        workflow: [
+          {
+            step: 'verifying',
+            requires: ['verify', 'tasks'],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      })
+      const uc = makeUseCase(repo, { schema })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'verifying',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(result.change.state).toBe('verifying')
+    })
+
+    it('throws with incomplete-tasks reason including counts', async () => {
+      const change = makeImplementingChange('my-change')
+      setupChangeWithTaskArtifact(change)
+      const repo = makeChangeRepository([change])
+      repo.artifact = async (_c, filename) => {
+        if (filename === 'tasks.md') {
+          return new SpecArtifact('tasks.md', '- [ ] task1\n- [x] task2\n- [ ] task3\n- [x] task4')
+        }
+        return null
+      }
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('tasks', {
+            taskCompletionCheck: {
+              incompletePattern: '^\\s*-\\s+\\[ \\]',
+              completePattern: '^\\s*-\\s+\\[x\\]',
+            },
+          }),
+          makeArtifactType('verify'),
+        ],
+        workflow: [
+          {
+            step: 'verifying',
+            requires: ['verify', 'tasks'],
+            requiresTaskCompletion: ['tasks'],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      })
+      const uc = makeUseCase(repo, { schema })
+
+      try {
+        await uc.execute({
+          name: 'my-change',
+          to: 'verifying',
+          approvalsSpec: false,
+          approvalsSignoff: false,
+        })
+        expect.unreachable('should have thrown')
+      } catch (err) {
+        expect(err).toBeInstanceOf(InvalidStateTransitionError)
+        const error = err as InstanceType<typeof InvalidStateTransitionError>
+        expect(error.reason).toEqual({
+          type: 'incomplete-tasks',
+          artifactId: 'tasks',
+          incomplete: 2,
+          complete: 2,
+          total: 4,
+        })
+        expect(error.message).toContain('2/4 tasks complete')
+      }
+    })
+
+    it('emits task-completion-failed progress event before throwing', async () => {
+      const change = makeImplementingChange('my-change')
+      setupChangeWithTaskArtifact(change)
+      const repo = makeChangeRepository([change])
+      repo.artifact = async (_c, filename) => {
+        if (filename === 'tasks.md') {
+          return new SpecArtifact('tasks.md', '- [ ] unfinished\n- [x] done')
+        }
+        return null
+      }
+      const uc = makeUseCase(repo, { schema: setupTaskCheckSchema() })
+
+      const events: TransitionProgressEvent[] = []
+      await expect(
+        uc.execute(
+          { name: 'my-change', to: 'verifying', approvalsSpec: false, approvalsSignoff: false },
+          (evt) => events.push(evt),
+        ),
+      ).rejects.toThrow(InvalidStateTransitionError)
+
+      const failedEvent = events.find((e) => e.type === 'task-completion-failed')
+      expect(failedEvent).toBeDefined()
+      expect(failedEvent).toMatchObject({
+        type: 'task-completion-failed',
+        artifactId: 'tasks',
+        incomplete: 1,
+      })
+    })
   })
 
   describe('workflow requires enforcement', () => {
@@ -441,7 +589,14 @@ describe('TransitionChange', () => {
       const change = makeReadyChange('my-change')
       // No artifacts set → effectiveStatus('tasks') is 'missing'
       const schema = makeSchema({
-        workflow: [{ step: 'implementing', requires: ['tasks'], hooks: { pre: [], post: [] } }],
+        workflow: [
+          {
+            step: 'implementing',
+            requires: ['tasks'],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema })
 
@@ -453,6 +608,39 @@ describe('TransitionChange', () => {
           approvalsSignoff: false,
         }),
       ).rejects.toThrow(InvalidStateTransitionError)
+    })
+
+    it('throws with incomplete-artifact reason when requires unsatisfied', async () => {
+      const change = makeReadyChange('my-change')
+      const schema = makeSchema({
+        workflow: [
+          {
+            step: 'implementing',
+            requires: ['tasks'],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      })
+      const uc = makeUseCase(makeChangeRepository([change]), { schema })
+
+      try {
+        await uc.execute({
+          name: 'my-change',
+          to: 'implementing',
+          approvalsSpec: false,
+          approvalsSignoff: false,
+        })
+        expect.unreachable('should have thrown')
+      } catch (err) {
+        expect(err).toBeInstanceOf(InvalidStateTransitionError)
+        const error = err as InstanceType<typeof InvalidStateTransitionError>
+        expect(error.reason).toEqual({
+          type: 'incomplete-artifact',
+          artifactId: 'tasks',
+        })
+        expect(error.message).toContain("artifact 'tasks' is not complete")
+      }
     })
 
     it('allows transition when all required artifacts are complete', async () => {
@@ -467,7 +655,14 @@ describe('TransitionChange', () => {
       change.setArtifact(tasks)
 
       const schema = makeSchema({
-        workflow: [{ step: 'implementing', requires: ['tasks'], hooks: { pre: [], post: [] } }],
+        workflow: [
+          {
+            step: 'implementing',
+            requires: ['tasks'],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema })
 
@@ -497,7 +692,14 @@ describe('TransitionChange', () => {
       change.setArtifact(tasks)
 
       const schema = makeSchema({
-        workflow: [{ step: 'implementing', requires: ['tasks'], hooks: { pre: [], post: [] } }],
+        workflow: [
+          {
+            step: 'implementing',
+            requires: ['tasks'],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema })
 
@@ -539,7 +741,14 @@ describe('TransitionChange', () => {
       change.setArtifact(tasks)
 
       const schema = makeSchema({
-        workflow: [{ step: 'implementing', requires: ['tasks'], hooks: { pre: [], post: [] } }],
+        workflow: [
+          {
+            step: 'implementing',
+            requires: ['tasks'],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema })
 
@@ -575,7 +784,12 @@ describe('TransitionChange', () => {
 
       const schema = makeSchema({
         workflow: [
-          { step: 'implementing', requires: ['tasks', 'spec'], hooks: { pre: [], post: [] } },
+          {
+            step: 'implementing',
+            requires: ['tasks', 'spec'],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
         ],
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema })
@@ -595,7 +809,14 @@ describe('TransitionChange', () => {
       // No artifacts set → effectiveStatus('tasks') is 'missing'
 
       const schema = makeSchema({
-        workflow: [{ step: 'implementing', requires: ['tasks'], hooks: { pre: [], post: [] } }],
+        workflow: [
+          {
+            step: 'implementing',
+            requires: ['tasks'],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema })
 
@@ -623,7 +844,14 @@ describe('TransitionChange', () => {
   describe('hook execution', () => {
     /** Schema with a workflow step for 'implementing' so hooks are triggered. */
     const hookSchema = makeSchema({
-      workflow: [{ step: 'implementing', requires: [], hooks: { pre: [], post: [] } }],
+      workflow: [
+        {
+          step: 'implementing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+      ],
     })
 
     function makeReadyChange(name: string): Change {
@@ -809,8 +1037,18 @@ describe('TransitionChange', () => {
     it('runs post hooks for source state, not target', async () => {
       const implementingSchema = makeSchema({
         workflow: [
-          { step: 'implementing', requires: [], hooks: { pre: [], post: [] } },
-          { step: 'verifying', requires: [], hooks: { pre: [], post: [] } },
+          {
+            step: 'implementing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+          {
+            step: 'verifying',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
         ],
       })
       const change = makeChangeInState('my-change', [
@@ -877,7 +1115,14 @@ describe('TransitionChange', () => {
         },
       })
       const designingSchema = makeSchema({
-        workflow: [{ step: 'designing', requires: [], hooks: { pre: [], post: [] } }],
+        workflow: [
+          {
+            step: 'designing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
       })
       const uc = makeUseCase(makeChangeRepository([change]), {
         schema: designingSchema,
@@ -899,8 +1144,18 @@ describe('TransitionChange', () => {
     it('source.post runs before target.pre', async () => {
       const implementingSchema = makeSchema({
         workflow: [
-          { step: 'implementing', requires: [], hooks: { pre: [], post: [] } },
-          { step: 'verifying', requires: [], hooks: { pre: [], post: [] } },
+          {
+            step: 'implementing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+          {
+            step: 'verifying',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
         ],
       })
       const change = makeChangeInState('my-change', [
@@ -933,8 +1188,18 @@ describe('TransitionChange', () => {
     it('throws HookFailedError when source.post hook fails', async () => {
       const implementingSchema = makeSchema({
         workflow: [
-          { step: 'implementing', requires: [], hooks: { pre: [], post: [] } },
-          { step: 'verifying', requires: [], hooks: { pre: [], post: [] } },
+          {
+            step: 'implementing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+          {
+            step: 'verifying',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
         ],
       })
       const change = makeChangeInState('my-change', [
@@ -979,8 +1244,18 @@ describe('TransitionChange', () => {
     it('skipHookPhases target.pre skips only pre hooks', async () => {
       const implementingSchema = makeSchema({
         workflow: [
-          { step: 'implementing', requires: [], hooks: { pre: [], post: [] } },
-          { step: 'verifying', requires: [], hooks: { pre: [], post: [] } },
+          {
+            step: 'implementing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+          {
+            step: 'verifying',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
         ],
       })
       const change = makeChangeInState('my-change', [
@@ -1014,8 +1289,18 @@ describe('TransitionChange', () => {
     it('skipHookPhases source.post skips only post hooks', async () => {
       const implementingSchema = makeSchema({
         workflow: [
-          { step: 'implementing', requires: [], hooks: { pre: [], post: [] } },
-          { step: 'verifying', requires: [], hooks: { pre: [], post: [] } },
+          {
+            step: 'implementing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+          {
+            step: 'verifying',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
         ],
       })
       const change = makeChangeInState('my-change', [
@@ -1110,8 +1395,18 @@ describe('TransitionChange', () => {
     it('emits hook-start and hook-done progress events with phase:post', async () => {
       const postSchema = makeSchema({
         workflow: [
-          { step: 'implementing', requires: [], hooks: { pre: [], post: [] } },
-          { step: 'verifying', requires: [], hooks: { pre: [], post: [] } },
+          {
+            step: 'implementing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+          {
+            step: 'verifying',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
         ],
       })
       const change = makeChangeInState('my-change', [
@@ -1159,8 +1454,18 @@ describe('TransitionChange', () => {
     it('emits all events in correct order: source.post → target.pre → transitioned', async () => {
       const schema = makeSchema({
         workflow: [
-          { step: 'implementing', requires: [], hooks: { pre: [], post: [] } },
-          { step: 'verifying', requires: [], hooks: { pre: [], post: [] } },
+          {
+            step: 'implementing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+          {
+            step: 'verifying',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
         ],
       })
       const change = makeChangeInState('my-change', [

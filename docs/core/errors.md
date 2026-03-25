@@ -225,10 +225,26 @@ These are thrown by entities and domain services. Use cases may propagate them t
 
 Thrown when a lifecycle transition is attempted that is not permitted from the current state. See [`VALID_TRANSITIONS`](domain-model.md#changestate-and-valid_transitions) for the complete transition graph.
 
-```typescript
-import { InvalidStateTransitionError } from '@specd/core'
+Carries an optional `reason` property with a structured `TransitionFailureReason`:
 
-// Message: "Cannot transition from '<from>' to '<to>'"
+```typescript
+import { InvalidStateTransitionError, type TransitionFailureReason } from '@specd/core'
+
+type TransitionFailureReason =
+  | { type: 'invalid-transition' }
+  | { type: 'incomplete-artifact'; artifactId: string }
+  | {
+      type: 'incomplete-tasks'
+      artifactId: string
+      incomplete: number
+      complete: number
+      total: number
+    }
+
+// Messages vary by reason:
+// "Cannot transition from 'ready' to 'implementing'"                              (no reason / invalid-transition)
+// "Cannot transition from 'ready' to 'implementing': artifact 'specs' is not complete"  (incomplete-artifact)
+// "Cannot transition from 'implementing' to 'verifying': tasks has incomplete items (3/30 tasks complete)"  (incomplete-tasks)
 ```
 
 **Thrown by:** `TransitionChange`, `ApproveSpec`, `ApproveSignoff`, `ArchiveChange`, and directly by `ArchiveRepository.archive()` when the change is not in an archivable state and `force` is not set.

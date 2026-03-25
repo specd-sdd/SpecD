@@ -65,30 +65,30 @@ Everything exported is a domain type (entity, value object, error, service), an 
 
 **From the domain layer — value objects:**
 
-| Export                | Kind      | Description                                                             |
-| --------------------- | --------- | ----------------------------------------------------------------------- |
-| `SpecPath`            | class     | Validated, immutable spec path value object.                            |
-| `ArtifactType`        | class     | Describes a single artifact type as declared in the schema.             |
-| `Schema`              | class     | A fully-constructed schema with artifacts, workflow, and extraction.    |
-| `ArtifactFile`        | class     | A spec-scoped artifact file record.                                     |
-| `SpecArtifact`        | class     | A spec-scoped artifact record with metadata.                            |
-| `HookResult`          | class     | The outcome of a `run:` hook execution.                                 |
-| `ChangeState`         | type      | Union of all valid lifecycle state strings.                             |
-| `ArtifactStatus`      | type      | `'missing' \| 'in-progress' \| 'complete' \| 'skipped'`                 |
-| `ArtifactScope`       | type      | `'spec' \| 'change'` — whether an artifact lives on the spec or change. |
-| `ArtifactFormat`      | type      | `'markdown' \| 'json' \| 'yaml' \| 'plaintext'`                         |
-| `ActorIdentity`       | interface | `{ name: string; email: string }` — actor identity.                     |
-| `ChangeEvent`         | type      | Discriminated union of all change history event types.                  |
-| `WorkflowStep`        | type      | A single step entry in the schema workflow.                             |
-| `HookEntry`           | type      | A single hook declaration within a workflow step.                       |
-| `ValidationRule`      | type      | A structural validation rule from the schema.                           |
-| `PreHashCleanup`      | type      | A pre-hash substitution rule from the schema.                           |
-| `TaskCompletionCheck` | type      | Pattern-based task completion check from the schema.                    |
-| `Selector`            | type      | An AST node selector used in validations and extractors.                |
-| `Extractor`           | type      | An extraction configuration for metadata derivation.                    |
-| `MetadataExtraction`  | type      | The full metadata extraction block from a schema.                       |
-| `VALID_TRANSITIONS`   | const     | Map of valid transitions per lifecycle state.                           |
-| `isValidTransition`   | function  | Returns whether a state transition is permitted.                        |
+| Export                | Kind      | Description                                                                    |
+| --------------------- | --------- | ------------------------------------------------------------------------------ |
+| `SpecPath`            | class     | Validated, immutable spec path value object.                                   |
+| `ArtifactType`        | class     | Describes a single artifact type as declared in the schema.                    |
+| `Schema`              | class     | A fully-constructed schema with artifacts, workflow, and extraction.           |
+| `ArtifactFile`        | class     | A spec-scoped artifact file record.                                            |
+| `SpecArtifact`        | class     | A spec-scoped artifact record with metadata.                                   |
+| `HookResult`          | class     | The outcome of a `run:` hook execution.                                        |
+| `ChangeState`         | type      | Union of all valid lifecycle state strings.                                    |
+| `ArtifactStatus`      | type      | `'missing' \| 'in-progress' \| 'complete' \| 'skipped'`                        |
+| `ArtifactScope`       | type      | `'spec' \| 'change'` — whether an artifact lives on the spec or change.        |
+| `ArtifactFormat`      | type      | `'markdown' \| 'json' \| 'yaml' \| 'plaintext'`                                |
+| `ActorIdentity`       | interface | `{ name: string; email: string }` — actor identity.                            |
+| `ChangeEvent`         | type      | Discriminated union of all change history event types.                         |
+| `WorkflowStep`        | type      | A single step entry in the schema workflow. Includes `requiresTaskCompletion`. |
+| `HookEntry`           | type      | A single hook declaration within a workflow step.                              |
+| `ValidationRule`      | type      | A structural validation rule from the schema.                                  |
+| `PreHashCleanup`      | type      | A pre-hash substitution rule from the schema.                                  |
+| `TaskCompletionCheck` | type      | Pattern-based task completion check from the schema.                           |
+| `Selector`            | type      | An AST node selector used in validations and extractors.                       |
+| `Extractor`           | type      | An extraction configuration for metadata derivation.                           |
+| `MetadataExtraction`  | type      | The full metadata extraction block from a schema.                              |
+| `VALID_TRANSITIONS`   | const     | Map of valid transitions per lifecycle state.                                  |
+| `isValidTransition`   | function  | Returns whether a state transition is permitted.                               |
 
 **From the domain layer — errors:**
 

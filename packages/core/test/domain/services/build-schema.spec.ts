@@ -3,7 +3,12 @@ import { buildSchema } from '../../../src/domain/services/build-schema.js'
 import { SchemaValidationError } from '../../../src/domain/errors/schema-validation-error.js'
 
 function minimalData(
-  workflow?: Array<{ step: string; requires: string[]; hooks: { pre: never[]; post: never[] } }>,
+  workflow?: Array<{
+    step: string
+    requires: string[]
+    requiresTaskCompletion: string[]
+    hooks: { pre: never[]; post: never[] }
+  }>,
 ) {
   return {
     kind: 'schema' as const,
@@ -15,7 +20,12 @@ function minimalData(
 }
 
 function step(name: string) {
-  return { step: name, requires: [], hooks: { pre: [] as never[], post: [] as never[] } }
+  return {
+    step: name,
+    requires: [],
+    requiresTaskCompletion: [],
+    hooks: { pre: [] as never[], post: [] as never[] },
+  }
 }
 
 describe('buildSchema', () => {
@@ -45,6 +55,7 @@ describe('buildSchema', () => {
         {
           step: 'designing',
           requires: [],
+          requiresTaskCompletion: [],
           hooks: {
             pre: [{ id: 'run-lint', type: 'instruction' as const, text: 'lint' }],
             post: [],
@@ -53,6 +64,7 @@ describe('buildSchema', () => {
         {
           step: 'implementing',
           requires: [],
+          requiresTaskCompletion: [],
           hooks: {
             pre: [],
             post: [{ id: 'run-lint', type: 'instruction' as const, text: 'lint' }],
@@ -73,11 +85,13 @@ describe('buildSchema', () => {
         {
           step: 'designing',
           requires: [],
+          requiresTaskCompletion: [],
           hooks: { pre: [{ id: 'lint', type: 'instruction' as const, text: 'lint' }], post: [] },
         },
         {
           step: 'implementing',
           requires: [],
+          requiresTaskCompletion: [],
           hooks: {
             pre: [{ id: 'test', type: 'instruction' as const, text: 'test' }],
             post: [{ id: 'deploy', type: 'instruction' as const, text: 'deploy' }],
@@ -284,5 +298,73 @@ describe('buildSchema', () => {
     const schema = buildSchema('#test', data, new Map())
     expect(schema.artifact('spec')).not.toBeNull()
     expect(schema.artifact('spec2')).not.toBeNull()
+  })
+
+  it('rejects requiresTaskCompletion entry not in requires', () => {
+    const data = {
+      ...minimalData(),
+      artifacts: [
+        { id: 'specs', scope: 'spec' as const, output: 'spec.md' },
+        {
+          id: 'tasks',
+          scope: 'change' as const,
+          output: 'tasks.md',
+          taskCompletionCheck: { incompletePattern: '^\\s*-\\s+\\[ \\]' },
+        },
+      ],
+      workflow: [
+        {
+          step: 'verifying' as const,
+          requires: ['specs'],
+          requiresTaskCompletion: ['tasks'],
+          hooks: { pre: [] as never[], post: [] as never[] },
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+    expect(() => buildSchema('#test', data, new Map())).toThrow("'tasks' is not in requires")
+  })
+
+  it('rejects requiresTaskCompletion entry referencing artifact without taskCompletionCheck', () => {
+    const data = {
+      ...minimalData(),
+      artifacts: [{ id: 'specs', scope: 'spec' as const, output: 'spec.md' }],
+      workflow: [
+        {
+          step: 'verifying' as const,
+          requires: ['specs'],
+          requiresTaskCompletion: ['specs'],
+          hooks: { pre: [] as never[], post: [] as never[] },
+        },
+      ],
+    }
+    expect(() => buildSchema('#test', data, new Map())).toThrow(SchemaValidationError)
+    expect(() => buildSchema('#test', data, new Map())).toThrow('does not have taskCompletionCheck')
+  })
+
+  it('accepts valid requiresTaskCompletion', () => {
+    const data = {
+      ...minimalData(),
+      artifacts: [
+        { id: 'specs', scope: 'spec' as const, output: 'spec.md' },
+        {
+          id: 'tasks',
+          scope: 'change' as const,
+          output: 'tasks.md',
+          taskCompletionCheck: { incompletePattern: '^\\s*-\\s+\\[ \\]' },
+        },
+      ],
+      workflow: [
+        {
+          step: 'verifying' as const,
+          requires: ['specs', 'tasks'],
+          requiresTaskCompletion: ['tasks'],
+          hooks: { pre: [] as never[], post: [] as never[] },
+        },
+      ],
+    }
+    const schema = buildSchema('#test', data, new Map())
+    const ws = schema.workflowStep('verifying')
+    expect(ws?.requiresTaskCompletion).toEqual(['tasks'])
   })
 })

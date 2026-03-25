@@ -51,7 +51,7 @@
     {
       "requirement": "Workflow step uniqueness validation",
       "rules": [
-        "`buildSchema` SHALL validate that no two workflow entries share the same `step` name. If a duplicate is found, the function MUST throw `SchemaValidationError` identifying the duplicate step name."
+        "`buildSchema` SHALL validate that no two workflow entries share the same `step` name. If a duplicate is found, the function MUST throw `SchemaValidationError` identifying the duplicate step name.\n\nFor each workflow step that declares `requiresTaskCompletion`, `buildSchema` SHALL validate:\n\n1. Every artifact ID in `requiresTaskCompletion` MUST also be present in the step's `requires` array. If not, throw `SchemaValidationError`.\n2. Every artifact ID in `requiresTaskCompletion` MUST reference an artifact type that declares `taskCompletionCheck`. If not, throw `SchemaValidationError`."
       ]
     },
     {
@@ -111,7 +111,7 @@
     {
       "requirement": "Schema entity construction",
       "rules": [
-        "After all validation passes, `buildSchema` SHALL construct and return a `Schema` entity by calling `new Schema(name, version, artifacts, workflow, metadataExtraction)` with the fully converted domain objects, passing `kind` and `extends` to the Schema constructor."
+        "After all validation passes, `buildSchema` SHALL construct and return a `Schema` entity by calling `new Schema(name, version, artifacts, workflow, metadataExtraction)` with the fully converted domain objects, passing `kind` and `extends` to the Schema constructor. Workflow steps include the `requiresTaskCompletion` array when declared."
       ]
     }
   ],
@@ -314,16 +314,43 @@
     {
       "requirement": "Workflow step uniqueness validation",
       "name": "Duplicate step names",
-      "when": ["buildSchema receives workflow entries with two steps both named \"implementing\""],
-      "then": ["it throws SchemaValidationError mentioning the duplicate step name"]
+      "given": ["a schema with workflow: [{ step: \"designing\" }, { step: \"designing\" }]"],
+      "when": ["buildSchema is called"],
+      "then": ["SchemaValidationError is thrown identifying designing as the duplicate"]
     },
     {
       "requirement": "Workflow step uniqueness validation",
       "name": "Unique step names accepted",
-      "when": [
-        "buildSchema receives workflow entries with steps \"designing\", \"implementing\", \"archiving\""
+      "given": ["a schema with workflow: [{ step: \"designing\" }, { step: \"implementing\" }]"],
+      "when": ["buildSchema is called"],
+      "then": ["no error is thrown"]
+    },
+    {
+      "requirement": "Workflow step uniqueness validation",
+      "name": "requiresTaskCompletion not subset of requires",
+      "given": ["a workflow step with requires: [specs] and requiresTaskCompletion: [tasks]"],
+      "when": ["buildSchema is called"],
+      "then": ["SchemaValidationError is thrown because tasks is not in requires"]
+    },
+    {
+      "requirement": "Workflow step uniqueness validation",
+      "name": "requiresTaskCompletion references artifact without taskCompletionCheck",
+      "given": [
+        "a workflow step with requires: [specs, tasks] and requiresTaskCompletion: [specs]",
+        "AND the specs artifact type does not declare taskCompletionCheck"
       ],
-      "then": ["no error is thrown for workflow step names"]
+      "when": ["buildSchema is called"],
+      "then": ["SchemaValidationError is thrown because specs has no taskCompletionCheck"]
+    },
+    {
+      "requirement": "Workflow step uniqueness validation",
+      "name": "Valid requiresTaskCompletion accepted",
+      "given": [
+        "a workflow step with requires: [specs, tasks] and requiresTaskCompletion: [tasks]",
+        "AND the tasks artifact type declares taskCompletionCheck"
+      ],
+      "when": ["buildSchema is called"],
+      "then": ["no error is thrown"]
     },
     {
       "requirement": "Artifact dependency graph validation",
@@ -465,8 +492,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b48b1b575ba06a7cf9dafe83d098f2f4f185f580011c06a5d5e1b0ba323e3666",
-    "verify.md": "sha256:b28e4b4d8165625cd9895c9b9bb72ba017cdab4043f1ff50d759272e7a84f19d"
+    "spec.md": "sha256:1775914c9fa27aa1789df8170578c248968dbe046b46e98ac12a900afa0b3e53",
+    "verify.md": "sha256:6516ccf054524044535a0b28ebfbfd646ed512ebbade77722c86337be8c0e593"
   },
   "generatedBy": "core"
 }
