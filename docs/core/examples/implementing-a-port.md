@@ -40,6 +40,14 @@ export class InMemoryChangeRepository extends ChangeRepository {
     return [...this._changes.values()].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
   }
 
+  async listDrafts(): Promise<Change[]> {
+    return [] // in-memory adapter has no draft storage
+  }
+
+  async listDiscarded(): Promise<Change[]> {
+    return [] // in-memory adapter has no discard storage
+  }
+
   async save(change: Change): Promise<void> {
     this._changes.set(change.name, change)
   }
@@ -69,6 +77,29 @@ export class InMemoryChangeRepository extends ChangeRepository {
     changeArtifacts.set(artifact.filename, artifact)
     this._artifacts.set(change.name, changeArtifacts)
   }
+
+  changePath(_change: Change): string {
+    return '/tmp/in-memory' // not meaningful for an in-memory adapter
+  }
+
+  async artifactExists(change: Change, filename: string): Promise<boolean> {
+    return this._artifacts.get(change.name)?.has(filename) ?? false
+  }
+
+  async deltaExists(_change: Change, _specId: string, _filename: string): Promise<boolean> {
+    return false
+  }
+
+  async scaffold(
+    _change: Change,
+    _specExists: (specId: string) => Promise<boolean>,
+  ): Promise<void> {
+    // no-op for in-memory adapter
+  }
+
+  async unscaffold(_change: Change, _specIds: readonly string[]): Promise<void> {
+    // no-op for in-memory adapter
+  }
 }
 ```
 
@@ -86,7 +117,7 @@ export class InMemoryChangeRepository extends ChangeRepository {
 
 ## Implementing VcsAdapter (interface)
 
-This example implements a `VcsAdapter` backed by the `simple-git` library. `VcsAdapter` covers VCS operations only (root directory, branch, clean status).
+This example implements a `VcsAdapter` backed by the `simple-git` library. `VcsAdapter` covers read-only VCS operations: root directory, branch, clean status, revision ref, and file content at a revision.
 
 ```typescript
 import { type VcsAdapter } from '@specd/core'
@@ -110,12 +141,29 @@ export class SimpleVcsAdapter implements VcsAdapter {
     const status = await this._git.status()
     return status.isClean()
   }
+
+  async ref(): Promise<string | null> {
+    try {
+      const result = await this._git.revparse(['--short', 'HEAD'])
+      return result.trim()
+    } catch {
+      return null
+    }
+  }
+
+  async show(ref: string, filePath: string): Promise<string | null> {
+    try {
+      return await this._git.show([`${ref}:${filePath}`])
+    } catch {
+      return null
+    }
+  }
 }
 ```
 
 ### Key points
 
-**Interfaces have no base class.** Just implement the three methods. TypeScript will tell you if you miss one.
+**Interfaces have no base class.** Just implement all five methods. TypeScript will tell you if you miss one.
 
 **All methods must throw when outside a git repository.** The contracts say so — do not return `null` or an empty string in that case. Let the underlying git error propagate, or wrap it in a descriptive `Error`.
 
@@ -227,13 +275,14 @@ export class PlainTextParser implements ArtifactParser {
       },
       {
         type: 'paragraph',
-        identifiedBy: ['matches'],
-        description: 'A paragraph of text. `matches` is evaluated against the full text content.',
+        identifiedBy: ['contains'],
+        description:
+          'A block of text separated from other blocks by blank lines. `contains` is matched case-insensitively against the full paragraph content.',
       },
       {
         type: 'line',
-        identifiedBy: ['matches'],
-        description: 'A single line within a paragraph.',
+        identifiedBy: ['contains'],
+        description: 'A single line of text within a paragraph.',
       },
     ]
   }
@@ -252,13 +301,13 @@ export class PlainTextParser implements ArtifactParser {
   deltaInstructions(): string {
     return [
       'Plain text files use paragraph nodes as the addressable unit.',
-      'Use type: paragraph with matches: to target a paragraph by its content.',
+      'Use type: paragraph with contains: to target a paragraph by its content.',
       '',
       'Example:',
       '  - op: modified',
       '    selector:',
       '      type: paragraph',
-      '      matches: "^This is the old content"',
+      '      contains: "old content"',
       '    content: |',
       '      This is the new content.',
     ].join('\n')
@@ -300,10 +349,9 @@ import { createKernel, type SpecdConfig } from '@specd/core'
 const kernel = createKernel(config)
 
 // All use cases are ready to use
-const change = await kernel.changes.create.execute({
+const { change } = await kernel.changes.create.execute({
   name: 'add-oauth-login',
-  workspaces: ['default'],
-  specIds: ['auth/oauth'],
+  specIds: ['default:auth/oauth'],
   schemaName: 'spec-driven',
   schemaVersion: 1,
 })
@@ -315,13 +363,13 @@ console.log(status.artifactStatuses) // []
 
 ### Loading the config
 
-Use `FsConfigLoader` to discover and load `specd.yaml` before calling `createKernel`:
+Use `createConfigLoader` to discover and load `specd.yaml` before calling `createKernel`:
 
 ```typescript
-import { FsConfigLoader, createKernel } from '@specd/core'
+import { createConfigLoader, createKernel } from '@specd/core'
 
 // Discovery mode: walks up from CWD, bounded by the git root
-const loader = new FsConfigLoader({ startDir: process.cwd() })
+const loader = createConfigLoader({ startDir: process.cwd() })
 const config = await loader.load()
 const kernel = createKernel(config)
 ```
@@ -329,7 +377,7 @@ const kernel = createKernel(config)
 When the CLI is invoked with `--config path/to/specd.yaml`, use forced mode instead:
 
 ```typescript
-const loader = new FsConfigLoader({ configPath: options.config })
+const loader = createConfigLoader({ configPath: options.config })
 ```
 
 ### Using a single use-case factory
@@ -371,5 +419,5 @@ import { MyActorResolver } from './my-actor-resolver.js'
 
 const changeRepo = new MyDbChangeRepository(…)
 const actor = new MyActorResolver()
-const createChange = new CreateChange(changeRepo, actor)
+const createChange = new CreateChange(changeRepo, new Map(), actor)
 ```
