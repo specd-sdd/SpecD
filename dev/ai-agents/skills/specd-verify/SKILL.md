@@ -60,7 +60,19 @@ For each spec in the change, read its verification scenarios. For each scenario:
 - Run relevant tests if applicable
 - Confirm GIVEN/WHEN/THEN conditions are satisfied
 
-### 5. Report results
+### 5. Run exit hooks — immediately after last scenario verified
+
+The moment all scenarios have been evaluated, run the post-verifying hooks before
+presenting anything to the user or transitioning:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> verifying --phase post
+node packages/cli/dist/index.js change hook-instruction <name> verifying --phase post --format text
+```
+
+Follow guidance. If hooks fail, fix and re-run.
+
+### 6. Report results and transition
 
 Present findings to the user:
 
@@ -71,15 +83,6 @@ Present findings to the user:
 > | ...  | ...      | PASS/FAIL |
 >
 > N/M scenarios pass.
-
-### 6. Transition
-
-Run exit hooks:
-
-```bash
-node packages/cli/dist/index.js change run-hooks <name> verifying --phase post
-node packages/cli/dist/index.js change hook-instruction <name> verifying --phase post --format text
-```
 
 **If all pass:**
 
