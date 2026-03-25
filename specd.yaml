@@ -61,7 +61,7 @@ storage:
     adapter: fs
     fs:
       path: .specd/archive
-      pattern: '{{change.archivedName}}'
+      pattern: '{{year}}/{{month}}/{{change.archivedName}}'
 
 approvals:
   spec: false
@@ -82,6 +82,9 @@ schemaOverrides:
       - id: design
         rules:
           post:
+            - id: designing-docs
+              text: >-
+                Add instructions to update documentation in docs/ if needed on the design.md.
             - id: check-global-specs-compliance
               text: >-
                 Cross-reference this design against the global specs (default:_global/*):
@@ -89,6 +92,7 @@ schemaOverrides:
                 conventions (naming, exports, ESM, no default exports, no any),
                 and testing (test structure, coverage). Flag any decision that violates
                 a global constraint before proceeding.
+                Ensure propper JSDoc per default:_global/docs.
     workflow:
       - step: designing
         hooks:
