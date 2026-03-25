@@ -13,7 +13,7 @@ import { type ResolvedSpec } from './spec-pattern-matching.js'
 
 /**
  * Optional fallback configuration for extracting `dependsOn` from spec content
- * when `.specd-metadata.yaml` is absent.
+ * when `metadata.json` is absent.
  */
 export interface DependsOnFallback {
   /** The schema's metadata extraction declarations. */
@@ -25,7 +25,7 @@ export interface DependsOnFallback {
 }
 
 /**
- * Recursively follows `dependsOn` links from a spec's `.specd-metadata.yaml`,
+ * Recursively follows `dependsOn` links from a spec's `metadata.json`,
  * adding newly discovered specs to `dependsOnAdded`. Uses DFS with ancestor
  * tracking to detect and break cycles.
  *
@@ -136,7 +136,7 @@ export async function traverseDependsOn(
 
 /**
  * Extracts `dependsOn` from spec content using the schema's metadata extraction
- * declarations as a best-effort fallback when `.specd-metadata.yaml` is absent.
+ * declarations as a best-effort fallback when `metadata.json` is absent.
  *
  * @param specRepo - Repository for loading spec artifacts
  * @param spec - The spec entity to extract from

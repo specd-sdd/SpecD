@@ -25,7 +25,7 @@ export interface GetProjectContextInput {
   /** Resolved project configuration. */
   readonly config: CompileContextConfig
   /**
-   * When `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to
+   * When `true`, follows `dependsOn` links from `metadata.json` transitively to
    * discover additional specs beyond those matched by include/exclude patterns.
    * When `false` or absent, traversal is not performed.
    */

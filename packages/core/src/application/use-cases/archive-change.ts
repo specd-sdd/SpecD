@@ -43,7 +43,7 @@ export interface ArchiveChangeResult {
   /** Commands of post-archive hooks that failed; empty on full success. */
   readonly postHookFailures: string[]
   /**
-   * Spec paths where `.specd-metadata.yaml` generation failed during this archive
+   * Spec paths where `metadata.json` generation failed during this archive
    * (e.g. extraction produced no required fields); empty when all metadata was
    * generated successfully.
    */
@@ -224,7 +224,7 @@ export class ArchiveChange {
       if (synced) staleSpecIds.add(specId)
 
       // Specs with manifest-declared dependencies also need metadata regeneration
-      // so that dependsOn flows into .specd-metadata.yaml
+      // so that dependsOn flows into metadata.json
       if (change.specDependsOn.get(specId) !== undefined) {
         staleSpecIds.add(specId)
       }

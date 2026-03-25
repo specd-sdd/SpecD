@@ -39,7 +39,7 @@ export interface FsSpecRepositoryConfig extends SpecRepositoryConfig {
   /**
    * Absolute path to the metadata root directory for this workspace.
    *
-   * Each spec's metadata lives at `<metadataPath>/<specFsPath>/metadata.yaml`.
+   * Each spec's metadata lives at `<metadataPath>/<specFsPath>/metadata.json`.
    * Resolved from workspace config `specs.fs.metadataPath` or auto-derived
    * at composition time from the VCS root.
    */
@@ -214,7 +214,7 @@ export class FsSpecRepository extends SpecRepository {
    * Returns the parsed metadata for the given spec, or `null` if no metadata
    * file exists.
    *
-   * Reads from `<metadataPath>/<specFsPath>/metadata.yaml`, parses via the
+   * Reads from `<metadataPath>/<specFsPath>/metadata.json`, parses via the
    * lenient schema, and attaches `originalHash` (SHA-256 of raw content).
    *
    * @param spec - The spec whose metadata to load
@@ -246,7 +246,7 @@ export class FsSpecRepository extends SpecRepository {
   /**
    * Persists raw YAML metadata content for a spec.
    *
-   * Writes to `<metadataPath>/<specFsPath>/metadata.yaml`. Creates the
+   * Writes to `<metadataPath>/<specFsPath>/metadata.json`. Creates the
    * directory if needed. Supports conflict detection via `originalHash`.
    *
    * @param spec - The spec to write metadata for
@@ -279,7 +279,7 @@ export class FsSpecRepository extends SpecRepository {
 
       const currentHash = sha256(currentContent)
       if (currentHash !== options.originalHash) {
-        throw new ArtifactConflictError('metadata.yaml', content, currentContent)
+        throw new ArtifactConflictError('metadata.json', content, currentContent)
       }
     }
 
@@ -415,7 +415,7 @@ export class FsSpecRepository extends SpecRepository {
    * Returns the absolute path to the metadata file for the given spec name.
    *
    * @param name - The spec identity path
-   * @returns Absolute path to `<metadataPath>/<specFsPath>/metadata.yaml`
+   * @returns Absolute path to `<metadataPath>/<specFsPath>/metadata.json`
    */
   private _metadataFilePath(name: SpecPath): string {
     return path.join(this._metadataPath, name.toFsPath(path.sep), 'metadata.json')

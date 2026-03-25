@@ -1,14 +1,16 @@
 # Ports
 
-Ports are the interfaces between the application layer and the outside world. Each port represents a capability that use cases need — storing changes, reading specs, executing shell commands — without specifying how that capability is implemented.
+Ports are the interfaces between the application layer and the outside world. Each port represents a capability that use cases need — storing changes, reading specs, running shell hooks — without specifying how that capability is implemented.
 
 To use `@specd/core` from your own adapter, you implement the ports it requires and inject them into the use case constructors. See [examples/implementing-a-port.md](examples/implementing-a-port.md) for a complete walkthrough.
 
 All ports are exported from `@specd/core`.
 
+---
+
 ## Repository base class
 
-`Repository` is the abstract base class for all four repository ports. It encapsulates three invariants shared by every repository: workspace, ownership, and locality.
+`Repository` is the abstract base class for `SpecRepository`, `ChangeRepository`, `ArchiveRepository`, and `SchemaRepository`. It encapsulates three invariants shared by every repository: workspace identity, ownership level, and locality.
 
 ```typescript
 import { Repository, type RepositoryConfig } from '@specd/core'
@@ -18,11 +20,19 @@ import { Repository, type RepositoryConfig } from '@specd/core'
 
 ```typescript
 interface RepositoryConfig {
-  workspace: string // workspace name from specd.yaml
+  workspace: string // workspace name from specd.yaml (e.g. 'billing', 'default')
   ownership: 'owned' | 'shared' | 'readOnly'
-  isExternal: boolean // true if specs live outside the git root
+  isExternal: boolean // true if data lives outside the current git root
 }
 ```
+
+Ownership levels:
+
+| Value        | Meaning                                                                         |
+| ------------ | ------------------------------------------------------------------------------- |
+| `'owned'`    | Full control — no restrictions on reads or writes.                              |
+| `'shared'`   | Writes are allowed but recorded in the change manifest as `touchedSharedSpecs`. |
+| `'readOnly'` | No writes permitted. Data may only be read.                                     |
 
 ### Methods inherited by all repositories
 
@@ -98,11 +108,37 @@ await specRepo.save(spec, artifact, { force: true }) // bypass conflict detectio
 
 Deletes the entire spec directory and all its artifact files.
 
+#### `metadata(spec: Spec): Promise<SpecMetadata | null>`
+
+Returns the parsed metadata for the given spec, or `null` if no metadata file exists. The returned object includes an `originalHash` field (SHA-256 of the raw file content) for use in conflict detection when saving back.
+
+#### `saveMetadata(spec: Spec, content: string, options?: { force?: boolean; originalHash?: string }): Promise<void>`
+
+Persists raw YAML metadata content for a spec. Creates the metadata directory if it does not exist. When `originalHash` is provided and `force` is not `true`, the current file on disk is hashed and compared — a mismatch causes `ArtifactConflictError`.
+
+**Throws:** `ArtifactConflictError` on hash mismatch when `force` is not set.
+
+#### `resolveFromPath(inputPath: string, from?: SpecPath): Promise<ResolveFromPathResult | null>`
+
+Resolves a storage path or relative spec link to a spec identity within this workspace. When `inputPath` is relative, `from` must be provided as the reference spec. Returns one of:
+
+- `{ specPath, specId }` — resolved within this workspace.
+- `{ crossWorkspaceHint }` — relative path escaped this workspace; try other repositories with the hint segments.
+- `null` — not a valid spec link.
+
+```typescript
+export type ResolveFromPathResult =
+  | { readonly specPath: SpecPath; readonly specId: string }
+  | { readonly crossWorkspaceHint: readonly string[] }
+```
+
 ---
 
 ## ChangeRepository
 
-Port for reading and writing changes within a single workspace. Changes are persisted as a manifest (state, hashes, approvals) separate from artifact file content. Use cases that need to read or write artifact content call `artifact()` and `saveArtifact()` separately from `save()`.
+Port for reading and writing changes. Changes are persisted as a manifest (state, artifact hashes, approvals) separate from artifact file content. Use cases read and write artifact content via `artifact()` and `saveArtifact()` independently of `save()`.
+
+Changes are stored globally — one `changes/` directory — not per-workspace. The inherited `workspace()`, `ownership()`, and `isExternal()` values carry default workspace settings and are not used by any use case.
 
 ```typescript
 import { ChangeRepository, type RepositoryConfig } from '@specd/core'
@@ -116,7 +152,7 @@ abstract class ChangeRepository extends Repository {
 
 #### `get(name: string): Promise<Change | null>`
 
-Returns the change with the given name, or `null` if not found. Loads the manifest and derives each artifact's status by comparing the current file hash against the stored `validatedHash`. A mismatch resets the artifact to `'in-progress'`.
+Returns the change with the given name, or `null` if not found. Loads the manifest and derives each artifact's status by comparing the current file hash against the stored `validatedHash`. A hash mismatch indicates drift and resets the artifact status to `'in-progress'`.
 
 ```typescript
 const change = await changeRepo.get('add-oauth-login')
@@ -124,11 +160,19 @@ const change = await changeRepo.get('add-oauth-login')
 
 #### `list(): Promise<Change[]>`
 
-Lists all changes in this workspace, sorted by creation order (oldest first). Returns `Change` objects with artifact state but without content.
+Lists all active (non-drafted, non-discarded) changes, sorted by creation order (oldest first). Returns `Change` objects with artifact state but without content.
+
+#### `listDrafts(): Promise<Change[]>`
+
+Lists all drafted (shelved) changes, sorted by creation order. Returns `Change` objects with artifact state but without content.
+
+#### `listDiscarded(): Promise<Change[]>`
+
+Lists all discarded changes, sorted by creation order. Returns `Change` objects with artifact state but without content.
 
 #### `save(change: Change): Promise<void>`
 
-Persists the change manifest — lifecycle state, artifact hashes, and approvals. Does not write artifact file content; use `saveArtifact()` for that.
+Persists the change manifest — lifecycle state, artifact statuses, validated hashes, and approvals. Does not write artifact file content; use `saveArtifact()` for that.
 
 #### `delete(change: Change): Promise<void>`
 
@@ -148,11 +192,31 @@ Writes an artifact file within a change directory. If `artifact.originalHash` is
 
 **Throws:** `ArtifactConflictError` when a concurrent modification is detected and `force` is not set.
 
+#### `changePath(change: Change): string`
+
+Returns the absolute filesystem path to the active change directory. Used by use cases to build the `change.path` template variable.
+
+#### `artifactExists(change: Change, filename: string): Promise<boolean>`
+
+Returns `true` if the given artifact file exists within the change directory, without loading its content.
+
+#### `deltaExists(change: Change, specId: string, filename: string): Promise<boolean>`
+
+Returns `true` if the given delta file exists for the change and spec identifier, without loading its content.
+
+#### `scaffold(change: Change, specExists: (specId: string) => Promise<boolean>): Promise<void>`
+
+Ensures artifact directories exist for all files tracked by the change. For `scope: spec` artifacts, creates `specs/<ws>/<capPath>/` and `deltas/<ws>/<capPath>/` directories under the change directory. For `scope: change` artifacts, the root directory already exists.
+
+#### `unscaffold(change: Change, specIds: readonly string[]): Promise<void>`
+
+Removes the scaffolded spec directories for the given spec IDs from the change directory. For each spec ID, removes both `specs/<workspace>/<capability-path>/` and `deltas/<workspace>/<capability-path>/`. The operation is idempotent — missing directories are silently skipped.
+
 ---
 
 ## ArchiveRepository
 
-Port for archiving and querying archived changes within a single workspace. The archive is append-only — once a change is archived it is never mutated. An `index.jsonl` file provides fast lookup without scanning the directory.
+Port for archiving and querying archived changes within a single workspace. The archive is append-only — once a change is archived it is never mutated. An `index.jsonl` file at the archive root provides fast lookup without scanning the filesystem.
 
 ```typescript
 import { ArchiveRepository, type RepositoryConfig } from '@specd/core'
@@ -164,11 +228,11 @@ abstract class ArchiveRepository extends Repository {
 
 ### Methods
 
-#### `archive(change: Change, options?: { force?: boolean }): Promise<ArchivedChange>`
+#### `archive(change: Change, options?: { force?: boolean; actor?: ActorIdentity }): Promise<{ archivedChange: ArchivedChange; archiveDirPath: string }>`
 
-Moves the change directory to the archive, creates the `ArchivedChange` record, persists its manifest, and appends an entry to `index.jsonl`.
+Moves the change directory to the archive, creates the `ArchivedChange` record, persists its manifest, and appends an entry to `index.jsonl`. Returns both the `ArchivedChange` entity and the absolute path to the archived directory.
 
-As a safety guard, the repository verifies that the change is in `archivable` state before proceeding. Pass `{ force: true }` to bypass this check for recovery or administrative operations.
+As a safety guard, the repository verifies that the change is in `archivable` state before proceeding. Pass `{ force: true }` to bypass this check for recovery or administrative operations. Pass `actor` to record the git identity of the actor performing the archive in the manifest.
 
 **Throws:** `InvalidStateTransitionError` when the change is not in `archivable` state and `force` is not set.
 
@@ -182,43 +246,64 @@ Returns the archived change with the given name, or `null`. Searches `index.json
 
 #### `reindex(): Promise<void>`
 
-Rebuilds `index.jsonl` by scanning the archive directory for all `manifest.json` files. Use this to recover from a corrupted or missing index.
+Rebuilds `index.jsonl` by scanning the archive directory for all `manifest.json` files, sorting by `archivedAt`, and writing a clean index in chronological order. Use this to recover from a corrupted or missing index.
+
+#### `archivePath(archivedChange: ArchivedChange): string`
+
+Returns the absolute filesystem path to an archived change's directory. Mirrors `ChangeRepository.changePath()` for archived changes.
 
 ---
 
 ## SchemaRegistry
 
-Port for discovering and resolving schemas. Unlike the repository ports, `SchemaRegistry` is a plain interface — no abstract base class, no invariant constructor arguments.
+Port for discovering and resolving schemas by reference string. Unlike the repository ports, `SchemaRegistry` is a plain interface — no abstract base class.
+
+Resolution is prefix-driven — no implicit multi-level fallback:
+
+| `ref` form               | Resolves from                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `'@scope/name'`          | `node_modules/@scope/name/schema.yaml` (npm package)                                      |
+| `'#workspace:name'`      | Delegated to the `SchemaRepository` for that workspace                                    |
+| `'#name'` or bare name   | Equivalent to `#default:name` — delegated to the `default` workspace's `SchemaRepository` |
+| relative / absolute path | Loaded directly from that path                                                            |
+
+Implementations receive a `ReadonlyMap<string, SchemaRepository>` at construction time, mapping workspace names to their corresponding `SchemaRepository` instances.
 
 ```typescript
-import { type SchemaRegistry, type SchemaEntry } from '@specd/core'
+import { type SchemaRegistry, type SchemaEntry, type SchemaRawResult } from '@specd/core'
 ```
 
 ### Methods
 
-#### `resolve(ref: string, workspaceSchemasPaths: ReadonlyMap<string, string>): Promise<Schema | null>`
+#### `resolve(ref: string): Promise<Schema | null>`
 
-Resolves a schema reference and returns the fully-parsed `Schema`. The `ref` is the `schema` field from `specd.yaml` verbatim. `workspaceSchemasPaths` is a map of workspace name → resolved `schemasPath`, derived from config by the application layer.
+Resolves a schema reference and returns the fully-parsed `Schema`. The `ref` value is the `schema` field from `specd.yaml` verbatim. Returns `null` if the resolved file does not exist — the caller is responsible for converting `null` to `SchemaNotFoundError`.
 
-Returns `null` if the resolved file does not exist. The caller is responsible for converting `null` to `SchemaNotFoundError`.
+```typescript
+const schema = await schemaRegistry.resolve('@specd/schema-std')
+const schema = await schemaRegistry.resolve('#billing:my-schema')
+```
 
-Resolution is prefix-driven — no implicit fallback:
+#### `resolveRaw(ref: string): Promise<SchemaRawResult | null>`
 
-| `ref` form                | Resolves from                                             |
-| ------------------------- | --------------------------------------------------------- |
-| `'@scope/name'`           | `node_modules/@scope/name/schema.yaml`                    |
-| `'#workspace:name'`       | `workspaceSchemasPaths.get('workspace')/name/schema.yaml` |
-| `'#name'` or bare name    | `workspaceSchemasPaths.get('default')/name/schema.yaml`   |
-| relative or absolute path | directly from that path                                   |
+Resolves a schema reference and returns the intermediate representation — parsed YAML data, loaded templates, and the resolved file path — without building the final domain `Schema`. Used internally by the extends-chain merge pipeline. Returns `null` if the file does not exist.
 
-#### `list(workspaceSchemasPaths: ReadonlyMap<string, string>): Promise<SchemaEntry[]>`
+```typescript
+interface SchemaRawResult {
+  data: SchemaYamlData // parsed and validated intermediate data
+  templates: ReadonlyMap<string, string> // loaded template content keyed by relative path
+  resolvedPath: string // absolute path of the resolved schema file
+}
+```
 
-Lists all schemas discoverable from the given workspace paths and installed npm packages. Does not load schema contents — use `resolve()` for that. Results are grouped: workspace entries first, npm entries last.
+#### `list(): Promise<SchemaEntry[]>`
+
+Lists all schemas discoverable from workspace repositories and installed npm packages. Does not load or validate schema contents — use `resolve()` for that. Results are grouped: workspace entries first (in workspace declaration order), npm entries last.
 
 ```typescript
 interface SchemaEntry {
   ref: string // pass this to resolve()
-  name: string // display name
+  name: string // display name without prefix or workspace qualifier
   source: 'npm' | 'workspace'
   workspace?: string // present when source === 'workspace'
 }
@@ -226,26 +311,85 @@ interface SchemaEntry {
 
 ---
 
-## HookRunner
+## SchemaRepository
 
-Port for executing `run:` hook commands declared in `workflow[]` entries. The hook runner substitutes template variables before invoking the shell.
+Port for reading and listing schemas within a single workspace. Each instance is bound to one workspace. `SchemaRegistry` delegates workspace schema resolution to instances of this port.
+
+Extends `Repository` so that workspace identity, ownership, and locality are handled uniformly with other repository ports.
 
 ```typescript
-import { type HookRunner, type HookResult, type HookVariables } from '@specd/core'
+import { SchemaRepository } from '@specd/core'
+
+abstract class SchemaRepository extends Repository {
+  constructor(config: RepositoryConfig)
+}
 ```
 
 ### Methods
 
-#### `run(command: string, variables: HookVariables): Promise<HookResult>`
+#### `resolve(name: string): Promise<Schema | null>`
 
-Executes `command` in a subprocess, substituting template variables from `variables` before invoking the shell. Unknown variables are left unexpanded.
+Resolves a schema by name within this workspace and returns the fully-built `Schema` entity. Returns `null` if the schema does not exist.
 
 ```typescript
-interface HookVariables {
-  'change.name': string
-  'change.workspace': string
-  codeRoot: string
-  [key: string]: string
+const schema = await schemaRepo.resolve('spec-driven')
+```
+
+#### `resolveRaw(name: string): Promise<SchemaRawResult | null>`
+
+Resolves a schema by name and returns the intermediate representation without building the final domain `Schema`. Returns `null` if the schema does not exist.
+
+#### `list(): Promise<SchemaEntry[]>`
+
+Lists all schemas discoverable within this workspace. Does not load or validate schema file contents — only discovers available schemas and returns their metadata.
+
+---
+
+## SchemaProvider
+
+A simplified schema port for use cases that need the fully-resolved schema for the current project but should not deal with reference routing or the extends-chain merge pipeline themselves.
+
+Unlike `SchemaRegistry`, `SchemaProvider` has no parameters — it returns the pre-resolved schema for the active project configuration. Implementations may resolve lazily and cache the result.
+
+```typescript
+import { type SchemaProvider } from '@specd/core'
+```
+
+### Methods
+
+#### `get(): Promise<Schema>`
+
+Returns the fully-resolved schema for the current project configuration, including extends chains, plugins, and `schemaOverrides`.
+
+**Throws:** `SchemaNotFoundError` if the schema reference cannot be resolved. `SchemaValidationError` if the resolved schema is invalid.
+
+---
+
+## HookRunner
+
+Port for executing `run:` hook commands declared in `workflow[]` entries. Template variables in command strings are expanded before invoking the shell.
+
+Unlike the repository ports, `HookRunner` is a plain interface — no abstract base class, no invariant constructor arguments.
+
+```typescript
+import { type HookRunner, type HookResult, type TemplateVariables } from '@specd/core'
+```
+
+### Methods
+
+#### `run(command: string, variables: TemplateVariables): Promise<HookResult>`
+
+Executes `command` in a subprocess, substituting template variables from `variables` before invoking the shell. Unknown variables are left unexpanded. All substituted values are shell-escaped to prevent injection.
+
+Template variable syntax is `{{namespace.key}}`, e.g. `{{change.name}}`, `{{project.root}}`.
+
+```typescript
+type TemplateVariables = Record<string, Record<string, string | number | boolean>>
+
+// Example shape:
+const variables: TemplateVariables = {
+  project: { root: '/Users/dev/my-project' },
+  change: { name: 'add-auth', workspace: 'default', path: '...' },
 }
 
 interface HookResult {
@@ -265,7 +409,9 @@ interface HookResult {
 
 ## VcsAdapter
 
-Port for querying git repository state. All methods are read-only — write operations (staging, committing, pushing) are intentionally excluded from v1. They are handled by `run:` hooks declared in `workflow[]`.
+Port for querying version control system state. All methods are read-only — write operations (staging, committing, pushing) are intentionally excluded from v1 and are handled by `run:` hooks declared in `workflow[]`.
+
+Unlike the repository ports, `VcsAdapter` is a plain interface — no abstract base class.
 
 ```typescript
 import { type VcsAdapter } from '@specd/core'
@@ -275,21 +421,39 @@ import { type VcsAdapter } from '@specd/core'
 
 #### `rootDir(): Promise<string>`
 
-Returns the absolute path to the root of the current git repository (the directory containing `.git/`). **Throws** when not inside a git repository.
+Returns the absolute path to the root of the current VCS repository (the directory containing `.git/` for git). Useful for resolving all other project-relative paths.
+
+**Throws** when the current working directory is not inside a VCS repository.
 
 #### `branch(): Promise<string>`
 
-Returns the name of the currently checked-out branch. Returns `'HEAD'` in detached HEAD state. **Throws** when not inside a git repository.
+Returns the name of the currently checked-out branch. Returns `'HEAD'` in detached HEAD state.
+
+**Throws** when the current working directory is not inside a VCS repository.
 
 #### `isClean(): Promise<boolean>`
 
-Returns `true` when the working tree and index have no uncommitted changes. Used as a safety guard before archiving. **Throws** when not inside a git repository.
+Returns `true` when the working tree and index have no uncommitted changes. Used as a safety guard before archiving.
+
+**Throws** when the current working directory is not inside a VCS repository.
+
+#### `ref(): Promise<string | null>`
+
+Returns the short revision identifier for the current commit or changeset. Returns `null` when VCS is unavailable or the repository has no commits yet.
+
+#### `show(ref: string, filePath: string): Promise<string | null>`
+
+Returns the content of a file at a given revision. Returns `null` when the revision or file path does not exist.
+
+```typescript
+const content = await vcsAdapter.show('abc1234', 'specs/default/auth/oauth/spec.md')
+```
 
 ---
 
 ## ActorResolver
 
-Port for resolving the identity of the current actor. Use cases record this identity in `ChangeEvent` history entries.
+Port for resolving the identity of the current actor. Use cases record this identity in `ChangeEvent` history entries. Decoupled from any specific identity provider (git config, SSO, environment variables).
 
 ```typescript
 import { type ActorResolver } from '@specd/core'
@@ -299,13 +463,17 @@ import { type ActorResolver } from '@specd/core'
 
 #### `identity(): Promise<ActorIdentity>`
 
-Returns the identity of the current actor. **Throws** when the identity cannot be determined (e.g. git `user.name` / `user.email` are not configured).
+Returns the identity of the current actor as `{ name: string; email: string }`.
+
+**Throws** when the identity cannot be determined (e.g. git `user.name` / `user.email` are not configured).
 
 ---
 
 ## FileReader
 
 Port for reading arbitrary files from the filesystem by absolute path. Returns `null` when the file does not exist rather than throwing.
+
+Unlike the repository ports, `FileReader` is a plain interface — no abstract base class.
 
 ```typescript
 import { type FileReader } from '@specd/core'
@@ -316,6 +484,123 @@ import { type FileReader } from '@specd/core'
 #### `read(absolutePath: string): Promise<string | null>`
 
 Reads the UTF-8 text content of the file at `absolutePath`. Returns `null` if the file does not exist.
+
+---
+
+## ContentHasher
+
+Port for computing deterministic content hashes. Implementations must be stable — the same content always produces the same hash string.
+
+```typescript
+import { ContentHasher } from '@specd/core'
+
+abstract class ContentHasher {
+  abstract hash(content: string): string
+}
+```
+
+### Methods
+
+#### `hash(content: string): string`
+
+Computes a deterministic hash of the given string content. Returns a string in `algorithm:hex` format (e.g. `sha256:abc123…`).
+
+---
+
+## ConfigLoader
+
+Port for loading and resolving the active `specd.yaml` configuration. Delivery mechanisms call `load()` once at startup and pass the resulting `SpecdConfig` to factory functions or use cases.
+
+```typescript
+import { type ConfigLoader } from '@specd/core'
+```
+
+### Methods
+
+#### `load(): Promise<SpecdConfig>`
+
+Loads, validates, and returns the fully-resolved project configuration with all paths made absolute.
+
+**Throws:** `ConfigValidationError` when no config file is found or the YAML is invalid.
+
+---
+
+## ConfigWriter
+
+Port for writing and mutating the project configuration (`specd.yaml`). Handles the operations that create or modify the on-disk configuration, unlike `ConfigLoader` which is read-only.
+
+```typescript
+import { type ConfigWriter, type InitProjectOptions, type InitProjectResult } from '@specd/core'
+```
+
+### Methods
+
+#### `initProject(options: InitProjectOptions): Promise<InitProjectResult>`
+
+Creates a new `specd.yaml` in `projectRoot`, creates the required storage directories, and appends `specd.local.yaml` to `.gitignore`.
+
+```typescript
+interface InitProjectOptions {
+  projectRoot: string // directory to initialise (absolute path)
+  schemaRef: string // schema reference (e.g. '@specd/schema-std')
+  workspaceId: string // default workspace name (e.g. 'default')
+  specsPath: string // relative path for the specs directory (e.g. 'specs/')
+  force?: boolean // when true, overwrite an existing specd.yaml without error
+}
+
+interface InitProjectResult {
+  configPath: string // absolute path to the created specd.yaml
+  schemaRef: string // schema reference as written
+  workspaces: readonly string[] // workspace IDs created
+}
+```
+
+**Throws:** `AlreadyInitialisedError` when `specd.yaml` already exists and `force` is not set.
+
+#### `recordSkillInstall(configPath: string, agent: string, skillNames: readonly string[]): Promise<void>`
+
+Records that a skill set was installed for a given agent by merging the skill names into the `skills` key of `specd.yaml`.
+
+```typescript
+await configWriter.recordSkillInstall('/path/to/specd.yaml', 'claude', [
+  'specd-core',
+  'specd-review',
+])
+```
+
+#### `readSkillsManifest(configPath: string): Promise<Record<string, string[]>>`
+
+Reads the `skills` key from `specd.yaml` and returns it as a map of agent name to installed skill names. Returns `{}` if the key is absent.
+
+```typescript
+const manifest = await configWriter.readSkillsManifest('/path/to/specd.yaml')
+// { claude: ['specd-core'], copilot: ['specd-core', 'specd-review'] }
+```
+
+---
+
+## YamlSerializer
+
+Port for YAML parsing and serialization. Keeps the application layer free from direct YAML library dependencies.
+
+```typescript
+import { YamlSerializer } from '@specd/core'
+
+abstract class YamlSerializer {
+  abstract parse(content: string): unknown
+  abstract stringify(data: unknown): string
+}
+```
+
+### Methods
+
+#### `parse(content: string): unknown`
+
+Parses a YAML string into a JavaScript value.
+
+#### `stringify(data: unknown): string`
+
+Serializes a JavaScript value into a YAML string.
 
 ---
 
@@ -350,6 +635,22 @@ import {
 
 Parses artifact content into a normalized AST.
 
+```typescript
+interface ArtifactAST {
+  root: ArtifactNode
+}
+
+interface ArtifactNode {
+  type: string
+  label?: string
+  value?: string | number | boolean | null
+  children?: readonly ArtifactNode[]
+  level?: number // present on markdown section nodes
+  ordered?: boolean // present on markdown list nodes
+  [key: string]: unknown
+}
+```
+
 #### `apply(ast: ArtifactAST, delta: readonly DeltaEntry[]): ArtifactAST`
 
 Applies a sequence of delta entries to an AST. All selectors are resolved before any operation is applied — if any selector fails to resolve (no match or ambiguous match), the entire application is rejected with `DeltaApplicationError`. Returns a new AST; the input is not mutated.
@@ -362,7 +663,7 @@ Serializes an AST back to the artifact's native format string.
 
 #### `renderSubtree(node: ArtifactNode): string`
 
-Serializes a single AST node and all its descendants back to the artifact's native format string. Used by `ValidateArtifacts` to evaluate `contentMatches` and by the metadata extraction engine to extract spec content via `metadataExtraction`.
+Serializes a single AST node and all its descendants back to the artifact's native format string. Used by `ValidateArtifacts` to evaluate `contentMatches` rules and by the metadata extraction engine.
 
 #### `nodeTypes(): readonly NodeTypeDescriptor[]`
 
@@ -395,4 +696,18 @@ Returns a format-specific static text block that `CompileContext` injects verbat
 
 #### `parseDelta(content: string): readonly DeltaEntry[]`
 
-Parses a YAML delta file's raw content into a typed array of `DeltaEntry[]`. Called by `ValidateArtifacts` and `ArchiveChange` on the YAML adapter to convert the raw delta file before passing to `apply()`. Non-YAML adapters may return an empty array.
+Parses a YAML delta file's raw content into a typed array of `DeltaEntry[]`. Called by `ValidateArtifacts` and `ArchiveChange` on the YAML adapter to convert raw delta files before passing them to `apply()`. Non-YAML adapters may return an empty array.
+
+```typescript
+interface DeltaEntry {
+  op: 'added' | 'modified' | 'removed' | 'no-op'
+  selector?: Selector
+  position?: DeltaPosition
+  rename?: string
+  content?: string
+  value?: unknown
+  strategy?: 'replace' | 'append' | 'merge-by'
+  mergeKey?: string
+  description?: string // free-text, ignored during application
+}
+```

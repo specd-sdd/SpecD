@@ -253,17 +253,23 @@ deltaValidations:
 
 ## Combining validations with metadataExtraction
 
-`validations` and `metadataExtraction` work off the same node type vocabulary and selector model. A pattern you use to validate that a section exists can be reused to extract that section's metadata. Note that `metadataExtraction` is a **top-level schema field**, not a per-artifact field:
+`validations` and `metadataExtraction` work off the same node type vocabulary and selector model. A pattern you use to validate that a section exists can be reused to extract that section's metadata. Note that `metadataExtraction` is a **top-level schema field**, not a per-artifact field, and its structure is a **keyed object** — each key is a metadata category:
 
 ```yaml
-# Top-level schema field
+# Top-level schema field — keyed by metadata category
 metadataExtraction:
-  # Extract the same Requirements section for metadata
-  - selector:
-      type: section
-      matches: '^Requirements$'
-    role: rules
-    contextTitle: Spec Requirements
+  # Array category: each entry extracts one group of rules from a specific artifact.
+  rules:
+    - id: spec-requirements
+      artifact: specs
+      extractor:
+        selector:
+          type: section
+          matches: '^Requirement:'
+          parent: { type: section, matches: '^Requirements$' }
+        groupBy: label
+        strip: '^Requirement:\s*'
+        extract: content
 
 artifacts:
   - id: specs
@@ -275,4 +281,4 @@ artifacts:
         required: true
 ```
 
-This keeps the validation constraint and the metadata extraction declaration aligned — if you add a new section to validate, you can decide whether it also belongs in extracted metadata.
+This keeps the validation constraint and the metadata extraction declaration aligned — if you add a new section to validate, you can decide whether it also belongs in extracted metadata. The `id` field on each extractor entry is optional but recommended: it allows `schemaOverrides` in `specd.yaml` to target the entry by name.
