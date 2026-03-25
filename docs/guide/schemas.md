@@ -124,10 +124,10 @@ Every artifact can carry `instruction` text and `rules` blocks. These are inject
   rules:
     pre:
       - id: read-design-first
-        text: 'Read design.md in full before creating any tasks.'
+        instruction: 'Read design.md in full before creating any tasks.'
     post:
       - id: design-tasks-coverage
-        text: |
+        instruction: |
           Cross-reference design.md against the tasks just written.
           Every item in Affected areas must map to at least one task.
 ```

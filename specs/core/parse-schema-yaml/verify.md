@@ -41,17 +41,17 @@
 
 ### Requirement: Zod structural validation
 
-#### Scenario: Missing required field `name`
+#### Scenario: Missing required field name
 
 - **WHEN** `parseSchemaYaml` is called with YAML containing `version` and `artifacts` but no `name`
 - **THEN** it throws a `SchemaValidationError` whose message includes the path `name`
 
-#### Scenario: Missing required field `artifacts`
+#### Scenario: Missing required field artifacts
 
 - **WHEN** `parseSchemaYaml` is called with YAML containing `name` and `version` but no `artifacts`
 - **THEN** it throws a `SchemaValidationError` whose message includes the path `artifacts`
 
-#### Scenario: Wrong type for `version`
+#### Scenario: Wrong type for version
 
 - **WHEN** `parseSchemaYaml` is called with YAML where `version` is a string (e.g. `"one"`)
 - **THEN** it throws a `SchemaValidationError` whose message includes the path `version`

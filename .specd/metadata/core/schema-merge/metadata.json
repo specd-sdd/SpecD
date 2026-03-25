@@ -157,7 +157,7 @@
       "name": "Plugin appends, then override removes",
       "given": [
         "a base schema with no rules.post on artifact specs",
-        "AND layer 1 (plugin) appends rules.post: [{ id: rfc-rule, text: '...' }] to specs",
+        "AND layer 1 (plugin) appends rules.post: [{ id: rfc-rule, instruction: '...' }] to specs",
         "AND layer 2 (override) removes rules.post entry id: rfc-rule from specs"
       ],
       "when": ["mergeSchemaLayers is applied with [layer1, layer2]"],
@@ -231,8 +231,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:c06eb38cff958cb2b4aebf7d82ad90730e256740b9991e5df6aeb0deea2702b1",
-    "verify.md": "sha256:dec2c3095740037cc6c65b9a7451c76fb1bf80f0e43b0a03b203e420222e5a9b"
+    "spec.md": "sha256:e07831322aa48aa1822b96515e8533f608d6af9e3def3eecfef60026bd9dfa28",
+    "verify.md": "sha256:efa7d4ce355d25b47f5c430b5f9efd8f85eb046f14de52708ad9085b0fc0e93c"
   },
   "generatedBy": "core"
 }

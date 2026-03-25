@@ -99,7 +99,7 @@
     {
       "requirement": "buildArtifactType sub-function",
       "rules": [
-        "`buildArtifactType` SHALL convert a raw artifact entry and an optional template content string into an `ArtifactType` domain entity. It MUST:\n\n- Convert `validations` and `deltaValidations` arrays via `buildValidationRule`\n- Convert `preHashCleanup` entries\n- Convert `taskCompletionCheck` if present\n- Convert `rules` (with `pre` and `post` arrays of `{ id, text }` entries) if present\n- Pass the template content string (not the path) as the `template` property on `ArtifactType`\n- Default `optional` to `false`, `delta` to `false`, and `requires` to `[]` when omitted"
+        "`buildArtifactType` SHALL convert a raw artifact entry and an optional template content string into an `ArtifactType` domain entity. It MUST:\n\n- Convert `validations` and `deltaValidations` arrays via `buildValidationRule`\n- Convert `preHashCleanup` entries\n- Convert `taskCompletionCheck` if present\n- Convert `rules` (with `pre` and `post` arrays of `{ id, instruction }` entries) if present\n- Pass the template content string (not the path) as the `template` property on `ArtifactType`\n- Default `optional` to `false`, `delta` to `false`, and `requires` to `[]` when omitted"
       ]
     },
     {
@@ -492,7 +492,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:1775914c9fa27aa1789df8170578c248968dbe046b46e98ac12a900afa0b3e53",
+    "spec.md": "sha256:a18d01caaee4aadbf070fed0c41942dd47d7ee2dece615ef4cbb1bb64ff4340b",
     "verify.md": "sha256:6516ccf054524044535a0b28ebfbfd646ed512ebbade77722c86337be8c0e593"
   },
   "generatedBy": "core"

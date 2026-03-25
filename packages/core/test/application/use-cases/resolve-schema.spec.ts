@@ -427,7 +427,7 @@ describe('ResolveSchema — plugins', () => {
           id: 'spec',
           scope: 'spec',
           output: 'spec.md',
-          rules: { post: [{ id: 'normative', text: 'Use MUST/SHALL.' }] },
+          rules: { post: [{ id: 'normative', instruction: 'Use MUST/SHALL.' }] },
         },
       ],
     })
@@ -438,7 +438,10 @@ describe('ResolveSchema — plugins', () => {
       operations: {
         append: {
           artifacts: [
-            { id: 'spec', rules: { post: [{ id: 'rfc-rule', text: 'Reference RFC.' }] } },
+            {
+              id: 'spec',
+              rules: { post: [{ id: 'rfc-rule', instruction: 'Reference RFC.' }] },
+            },
           ],
         },
       },
@@ -588,7 +591,7 @@ describe('ResolveSchema — plugins', () => {
           id: 'spec',
           scope: 'spec',
           output: 'spec.md',
-          rules: { pre: [{ id: 'existing', text: 'Existing rule.' }] },
+          rules: { pre: [{ id: 'existing', instruction: 'Existing rule.' }] },
         },
       ],
     })
@@ -599,7 +602,10 @@ describe('ResolveSchema — plugins', () => {
       operations: {
         prepend: {
           artifacts: [
-            { id: 'spec', rules: { pre: [{ id: 'first-rule', text: 'Do this first.' }] } },
+            {
+              id: 'spec',
+              rules: { pre: [{ id: 'first-rule', instruction: 'Do this first.' }] },
+            },
           ],
         },
       },
@@ -837,8 +843,8 @@ describe('ResolveSchema — plugins', () => {
           output: 'spec.md',
           rules: {
             post: [
-              { id: 'normative', text: 'Use MUST/SHALL.' },
-              { id: 'rfc', text: 'Reference RFC.' },
+              { id: 'normative', instruction: 'Use MUST/SHALL.' },
+              { id: 'rfc', instruction: 'Reference RFC.' },
             ],
           },
         },
@@ -1145,7 +1151,7 @@ describe('ResolveSchema — multiple plugins in order', () => {
           id: 'spec',
           scope: 'spec',
           output: 'spec.md',
-          rules: { post: [{ id: 'normative', text: 'Use MUST/SHALL.' }] },
+          rules: { post: [{ id: 'normative', instruction: 'Use MUST/SHALL.' }] },
         },
       ],
     })
@@ -1155,7 +1161,7 @@ describe('ResolveSchema — multiple plugins in order', () => {
       version: 1,
       operations: {
         append: {
-          artifacts: [{ id: 'spec', rules: { post: [{ id: 'rfc-rule', text: 'RFC.' }] } }],
+          artifacts: [{ id: 'spec', rules: { post: [{ id: 'rfc-rule', instruction: 'RFC.' }] } }],
         },
       },
     }
@@ -1195,7 +1201,10 @@ describe('ResolveSchema — overrides', () => {
     const schema = await resolve(registry, '#base', [], {
       append: {
         artifacts: [
-          { id: 'spec', rules: { post: [{ id: 'team-rule', text: 'Reference Jira ticket.' }] } },
+          {
+            id: 'spec',
+            rules: { post: [{ id: 'team-rule', instruction: 'Reference Jira ticket.' }] },
+          },
         ],
       },
     })
@@ -1329,7 +1338,7 @@ describe('ResolveSchema — override applied after plugin', () => {
           id: 'spec',
           scope: 'spec',
           output: 'spec.md',
-          rules: { post: [{ id: 'normative', text: 'Use MUST/SHALL.' }] },
+          rules: { post: [{ id: 'normative', instruction: 'Use MUST/SHALL.' }] },
         },
       ],
     })
@@ -1338,7 +1347,9 @@ describe('ResolveSchema — override applied after plugin', () => {
       name: 'rfc-plugin',
       version: 1,
       operations: {
-        append: { artifacts: [{ id: 'spec', rules: { post: [{ id: 'rfc', text: 'RFC.' }] } }] },
+        append: {
+          artifacts: [{ id: 'spec', rules: { post: [{ id: 'rfc', instruction: 'RFC.' }] } }],
+        },
       },
     }
 
@@ -1439,7 +1450,10 @@ describe('ResolveSchema — extends + plugins + overrides combined', () => {
       operations: {
         append: {
           artifacts: [
-            { id: 'spec', rules: { post: [{ id: 'compliance', text: 'Comply with SOC2.' }] } },
+            {
+              id: 'spec',
+              rules: { post: [{ id: 'compliance', instruction: 'Comply with SOC2.' }] },
+            },
           ],
         },
         create: {

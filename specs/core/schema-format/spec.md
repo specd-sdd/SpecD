@@ -78,10 +78,10 @@ Each entry in `artifacts` must include:
 - `deltaValidations` (array, optional) — structural validation rules checked against the normalized YAML AST of the delta file before application; see Requirement: Delta validation rules. Only valid when `delta: true`.
 - `validations` (array, optional) — structural validation rules for the base artifact (after delta application); see Requirement: Validation rules
 - `metadataExtraction` (object, optional) — top-level declaration of how to extract metadata fields from artifact content; see Requirement: Metadata extraction
-- `rules` (object, optional) — constraint text blocks injected by `GetArtifactInstruction` around the artifact's `instruction`. Rules exist as a **schema composition mechanism**: they allow extending schemas and schema plugins to wrap an artifact's instruction with additional constraints without overriding the `instruction` field itself. A base schema defines the core instruction; child schemas or plugins add `rules.pre`/`rules.post` entries to augment it.
-  - `pre` (array, optional) — entries injected **before** the instruction. Each entry: `{ id: string, text: string }`.
-  - `post` (array, optional) — entries injected **after** the instruction. Each entry: `{ id: string, text: string }`.
-    `id` follows the standard array entry identity format. `text` is injected verbatim as a constraint block.
+- `rules` (object, optional) — constraint blocks injected by `GetArtifactInstruction` around the artifact's `instruction`. Rules exist as a **schema composition mechanism**: they allow extending schemas and schema plugins to wrap an artifact's instruction with additional constraints without overriding the `instruction` field itself. A base schema defines the core instruction; child schemas or plugins add `rules.pre`/`rules.post` entries to augment it.
+  - `pre` (array, optional) — entries injected **before** the instruction. Each entry: `{ id: string, instruction: string }`.
+  - `post` (array, optional) — entries injected **after** the instruction. Each entry: `{ id: string, instruction: string }`.
+    `id` follows the standard array entry identity format. `instruction` is injected verbatim as a constraint block.
 - `preHashCleanup` (array, optional) — list of regex substitutions applied to the artifact content before computing any hash (both `validatedHash` for `ArtifactStatus` and the approval hash). Each entry has `id` (string, required — standard array entry identity format), `pattern` (regex string), and `replacement` (string, may be empty). Substitutions are applied in declaration order. Use this to normalize progress markers or other volatile content that should not affect hash comparisons.
 - `taskCompletionCheck` (object, optional) — declares how to detect task completion within this artifact's file content. Used to gate the `implementing → verifying` transition: if the artifact is listed in the `implementing` step's `requires`, all items matching `incompletePattern` must be absent (zero matches) before the transition is allowed. Both fields are optional and default to markdown checkbox syntax: When both patterns are present, the CLI can report progress (e.g. `3/5 tasks complete`) by counting matches of each. If `taskCompletionCheck` is omitted entirely, the defaults apply.
   - `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item
@@ -317,6 +317,9 @@ The `verify` artifact in the schema should declare `requires: [spec]` — scenar
 - `artifact.scope` must be `spec` or `change`; it is required and has no default
 - `artifact.optional` defaults to `false`; a non-optional artifact with `scope: spec` must be present in every spec directory and every change
 - `artifact.rules.pre` and `artifact.rules.post` are optional arrays of `{ id, text }` entries
+
+  `artifact.rules.pre` and `artifact.rules.post` are optional arrays of `{ id, instruction }` entries
+
 - `workflow[].step` must be unique — duplicate step names in the same `workflow` array are a schema validation error
 - Every hook entry must include an `id` field alongside its `instruction` or `run` field
 - `requires` must not contain cycles; circular dependencies in the artifact graph are a schema validation error

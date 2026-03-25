@@ -27,7 +27,7 @@ function base(overrides: Partial<SchemaYamlData> = {}): SchemaYamlData {
           { id: 'has-requirements', type: 'section', matches: '^Requirements$', required: true },
         ],
         rules: {
-          post: [{ id: 'normative', text: 'Use MUST/SHALL.' }],
+          post: [{ id: 'normative', instruction: 'Use MUST/SHALL.' }],
         },
       },
       {
@@ -206,7 +206,7 @@ describe('mergeSchemaLayers — plugin appends, override removes', () => {
             {
               id: 'specs',
               rules: {
-                post: [{ id: 'rfc-rule', text: 'Reference RFC.' }],
+                post: [{ id: 'rfc-rule', instruction: 'Reference RFC.' }],
               },
             },
           ],

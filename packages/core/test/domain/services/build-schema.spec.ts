@@ -157,8 +157,8 @@ describe('buildSchema', () => {
           output: 'spec.md',
           rules: {
             pre: [
-              { id: 'normative', text: 'Use SHALL' },
-              { id: 'normative', text: 'Use MUST' },
+              { id: 'normative', instruction: 'Use SHALL' },
+              { id: 'normative', instruction: 'Use MUST' },
             ],
           },
         },
@@ -179,8 +179,8 @@ describe('buildSchema', () => {
           output: 'spec.md',
           rules: {
             post: [
-              { id: 'format', text: 'Format rules' },
-              { id: 'format', text: 'More format rules' },
+              { id: 'format', instruction: 'Format rules' },
+              { id: 'format', instruction: 'More format rules' },
             ],
           },
         },

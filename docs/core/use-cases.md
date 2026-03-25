@@ -1073,7 +1073,7 @@ interface GetProjectContextResult {
 
 ### GetArtifactInstruction
 
-Returns artifact-specific instructions: the schema `instruction:` text, composition rules (`rules.pre`/`rules.post`), and delta guidance with existing artifact outlines. Read-only — never modifies state or executes commands.
+Returns artifact-specific instructions: the schema `instruction:` text, composition rules (`rules.pre`/`rules.post`), and delta guidance with existing artifact outlines. Rule entries use `instruction:` text too. Read-only — never modifies state or executes commands.
 
 When `artifactId` is omitted, auto-resolves the next artifact to work on by walking the schema's artifact dependency graph.
 

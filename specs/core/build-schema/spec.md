@@ -111,7 +111,7 @@ This function is currently in `infrastructure/zod/selector-schema.ts` and MUST b
 - Convert `validations` and `deltaValidations` arrays via `buildValidationRule`
 - Convert `preHashCleanup` entries
 - Convert `taskCompletionCheck` if present
-- Convert `rules` (with `pre` and `post` arrays of `{ id, text }` entries) if present
+- Convert `rules` (with `pre` and `post` arrays of `{ id, instruction }` entries) if present
 - Pass the template content string (not the path) as the `template` property on `ArtifactType`
 - Default `optional` to `false`, `delta` to `false`, and `requires` to `[]` when omitted
 
