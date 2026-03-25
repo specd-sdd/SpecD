@@ -572,6 +572,7 @@ workflow:
 
   - step: verifying
     requires: [verify, tasks]
+    requiresTaskCompletion: [tasks]
     hooks:
       pre:
         - id: verifying-guidance
@@ -582,6 +583,7 @@ workflow:
 
   - step: archiving
     requires: [specs, tasks]
+    requiresTaskCompletion: [tasks]
     hooks:
       pre:
         - id: archiving-guidance

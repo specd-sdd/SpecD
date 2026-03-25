@@ -36,7 +36,7 @@
     {
       "requirement": "Task completion gating",
       "rules": [
-        "When a workflow step's `requires` array includes an artifact whose `ArtifactType` declares a `taskCompletionCheck`, the transition system MUST verify that the artifact's content contains no incomplete task items before allowing the transition. This check is performed automatically as part of requires enforcement — callers do not need to supply task checks explicitly.\n\nFor each required artifact that has a `taskCompletionCheck`:\n\n1. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.\n2. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.\n3. If the file does not exist (returns `null`), skip it.\n4. Compile `taskCompletionCheck.incompletePattern` using `safeRegex` with the `'m'` flag.\n5. If the regex is valid and matches any line in the file content, reject the transition with `InvalidStateTransitionError`.\n\nThis rule applies to ANY workflow step that requires an artifact with `taskCompletionCheck`, not only to a specific transition. For example, if both `verifying` and `archiving` steps require the `tasks` artifact, both transitions enforce task completion."
+        "When a workflow step declares a `requiresTaskCompletion` array, the transition system MUST verify that each listed artifact's content contains no incomplete task items before allowing the transition. Only artifacts listed in `requiresTaskCompletion` are content-checked — other artifacts in `requires` are checked only via `effectiveStatus`.\n\nThe `requiresTaskCompletion` array MUST be a subset of the step's `requires` array. Each listed artifact ID MUST reference an artifact type that declares `taskCompletionCheck` on its `ArtifactType`. These constraints are validated at schema build time by `buildSchema`.\n\nFor each artifact ID in `requiresTaskCompletion`:\n\n1. Look up the `ArtifactType` from the schema to obtain `taskCompletionCheck.incompletePattern`.\n2. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.\n3. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.\n4. If the file does not exist (returns `null`), skip it.\n5. Compile `incompletePattern` using `safeRegex` with the `'m'` flag.\n6. If the regex is valid and matches any line in the file content, reject the transition with `InvalidStateTransitionError` including a structured reason (`incomplete-tasks`) with the artifact ID and match counts.\n\nWhen `requiresTaskCompletion` is absent or empty on a workflow step, no task completion gating applies — even if the step requires artifacts that declare `taskCompletionCheck`. The `taskCompletionCheck` on the artifact type defines *what* pattern to check; the workflow step's `requiresTaskCompletion` controls *when* it applies."
       ]
     },
     {
@@ -78,7 +78,8 @@
     "Step requires contains artifact IDs, not step names — step-to-step cycles are structurally impossible",
     "The artifact dependency graph is validated as a DAG by buildSchema() — cycles are rejected at schema load time",
     "The archiving step is the only step that is both a workflow step and handled by a dedicated use case (ArchiveChange)",
-    "Task completion gating is derived automatically from the schema's taskCompletionCheck declarations — callers never supply task checks explicitly",
+    "Task completion gating is controlled by requiresTaskCompletion on the workflow step — not by the mere presence of taskCompletionCheck on the artifact type",
+    "requiresTaskCompletion must be a subset of requires and reference artifacts with taskCompletionCheck — validated at schema build time",
     "Task completion checks use safeRegex to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)"
   ],
   "scenarios": [
@@ -133,21 +134,20 @@
     },
     {
       "requirement": "Task completion gating",
-      "name": "Transition blocked when required artifact has incomplete tasks",
+      "name": "Transition blocked when requiresTaskCompletion artifact has incomplete tasks",
       "given": [
-        "a workflow step with requires: [tasks]",
+        "a workflow step with requires: [verify, tasks] and requiresTaskCompletion: [tasks]",
         "AND the tasks artifact type declares taskCompletionCheck.incompletePattern: '^\\s*-\\s+\\[ \\]'",
         "AND the tasks file contains - [ ] implement login"
       ],
       "when": ["a transition to that step is attempted"],
-      "then": ["InvalidStateTransitionError is thrown"]
+      "then": ["InvalidStateTransitionError is thrown with reason incomplete-tasks"]
     },
     {
       "requirement": "Task completion gating",
       "name": "Transition allowed when all tasks are complete",
       "given": [
-        "a workflow step with requires: [tasks]",
-        "AND the tasks artifact type declares taskCompletionCheck",
+        "a workflow step with requiresTaskCompletion: [tasks]",
         "AND the tasks file contains only - [x] implement login"
       ],
       "when": ["a transition to that step is attempted"],
@@ -155,10 +155,22 @@
     },
     {
       "requirement": "Task completion gating",
+      "name": "No gating when requiresTaskCompletion is absent",
+      "given": [
+        "a workflow step with requires: [tasks] but no requiresTaskCompletion",
+        "AND the tasks artifact type declares taskCompletionCheck",
+        "AND the tasks file contains incomplete items"
+      ],
+      "when": ["a transition to that step is attempted"],
+      "then": [
+        "the transition proceeds — taskCompletionCheck is not enforced without requiresTaskCompletion"
+      ]
+    },
+    {
+      "requirement": "Task completion gating",
       "name": "Missing artifact file is skipped",
       "given": [
-        "a workflow step with requires: [tasks]",
-        "AND the tasks artifact type declares taskCompletionCheck",
+        "a workflow step with requiresTaskCompletion: [tasks]",
         "AND the tasks file does not exist in the change directory"
       ],
       "when": ["a transition to that step is attempted"],
@@ -166,35 +178,24 @@
     },
     {
       "requirement": "Task completion gating",
-      "name": "Required artifact without taskCompletionCheck is not content-checked",
-      "given": [
-        "a workflow step with requires: [specs, tasks]",
-        "AND the specs artifact type has no taskCompletionCheck",
-        "AND the tasks artifact type declares taskCompletionCheck"
-      ],
-      "when": ["a transition to that step is attempted"],
-      "then": ["only tasks is content-checked; specs is checked only via effectiveStatus"]
-    },
-    {
-      "requirement": "Task completion gating",
-      "name": "Generic gating applies to any step, not just implementing to verifying",
-      "given": [
-        "a workflow step archiving with requires: [tasks]",
-        "AND the tasks artifact type declares taskCompletionCheck",
-        "AND the tasks file contains incomplete items"
-      ],
-      "when": ["a transition to archiving is attempted"],
-      "then": ["InvalidStateTransitionError is thrown"]
-    },
-    {
-      "requirement": "Task completion gating",
       "name": "Invalid regex pattern is treated as non-matching",
       "given": [
-        "a workflow step with requires: [tasks]",
-        "AND the tasks artifact type declares taskCompletionCheck.incompletePattern as an invalid regex"
+        "a workflow step with requiresTaskCompletion: [tasks]",
+        "AND incompletePattern is an invalid regex"
       ],
       "when": ["a transition to that step is attempted"],
       "then": ["the check is skipped and the transition proceeds"]
+    },
+    {
+      "requirement": "Task completion gating",
+      "name": "Error includes incomplete and complete counts",
+      "given": [
+        "a workflow step with requiresTaskCompletion: [tasks]",
+        "AND the tasks artifact declares both incompletePattern and completePattern",
+        "AND the tasks file contains 3 complete items and 2 incomplete items"
+      ],
+      "when": ["the transition fails"],
+      "then": ["the error reason includes incomplete: 2, complete: 3, total: 5"]
     },
     {
       "requirement": "Workflow array order is display order",
@@ -229,8 +230,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:2410d1bddbc128d732498fff6e5faa60a0a33b755a513c619da199f447a8089d",
-    "verify.md": "sha256:1eba980d2e19726fe78c8b8d4e9b07fde0399a8dd5f6ef2ce9323ee1a5996466"
+    "spec.md": "sha256:e638247e81a2cc63c7f64526d86d71100a5a65dc3f137be01aaf67e2316c074a",
+    "verify.md": "sha256:d0fe615d69d902a15b68e0094981267da86ffd8cd1369c495d15581df3f19d2e"
   },
   "generatedBy": "core"
 }

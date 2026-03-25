@@ -126,7 +126,7 @@ interface TransitionBlocker {
 
 ### TransitionChange
 
-Performs a lifecycle state transition on a change. Enforces approval-gate routing, workflow `requires`, task completion gating, and executes `run:` hooks at step boundaries.
+Performs a lifecycle state transition on a change. Enforces approval-gate routing, workflow `requires`, task completion gating (via `requiresTaskCompletion`), and executes `run:` hooks at step boundaries.
 
 Smart routing applies at two points:
 
@@ -158,6 +158,13 @@ The `execute` method accepts an optional `onProgress: OnTransitionProgress` call
 ```typescript
 type TransitionProgressEvent =
   | { type: 'requires-check'; artifactId: string; satisfied: boolean }
+  | {
+      type: 'task-completion-failed'
+      artifactId: string
+      incomplete: number
+      complete: number
+      total: number
+    }
   | { type: 'hook-start'; phase: 'pre' | 'post'; hookId: string; command: string }
   | { type: 'hook-done'; phase: 'pre' | 'post'; hookId: string; success: boolean; exitCode: number }
   | { type: 'transitioned'; from: ChangeState; to: ChangeState }
@@ -165,11 +172,11 @@ type TransitionProgressEvent =
 
 **Throws:**
 
-| Error                         | Condition                                                            |
-| ----------------------------- | -------------------------------------------------------------------- |
-| `ChangeNotFoundError`         | No change with the given name exists.                                |
-| `InvalidStateTransitionError` | Transition not permitted, requires unsatisfied, or tasks incomplete. |
-| `HookFailedError`             | A source.post or target.pre hook exited with a non-zero code.        |
+| Error                         | Condition                                                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `ChangeNotFoundError`         | No change with the given name exists.                                                                                                 |
+| `InvalidStateTransitionError` | Transition not permitted, requires unsatisfied, or tasks incomplete. Carries a structured `reason` field (`TransitionFailureReason`). |
+| `HookFailedError`             | A source.post or target.pre hook exited with a non-zero code.                                                                         |
 
 ---
 

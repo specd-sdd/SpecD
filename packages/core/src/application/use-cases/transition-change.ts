@@ -56,6 +56,13 @@ export interface TransitionChangeInput {
 /** Progress event emitted during a transition. */
 export type TransitionProgressEvent =
   | { type: 'requires-check'; artifactId: string; satisfied: boolean }
+  | {
+      type: 'task-completion-failed'
+      artifactId: string
+      incomplete: number
+      complete: number
+      total: number
+    }
   | { type: 'hook-start'; phase: 'pre' | 'post'; hookId: string; command: string }
   | { type: 'hook-done'; phase: 'pre' | 'post'; hookId: string; success: boolean; exitCode: number }
   | { type: 'transitioned'; from: ChangeState; to: ChangeState }
@@ -79,9 +86,9 @@ export interface TransitionChangeResult {
  * - `done → archivable` is redirected to `done → pending-signoff` when the
  *   signoff gate is active.
  *
- * During requires enforcement, any required artifact whose type declares a
- * `taskCompletionCheck` is content-checked for incomplete items. This applies
- * to all transitions, not just `implementing → verifying`.
+ * When the target step declares `requiresTaskCompletion`, each listed artifact
+ * is content-checked for incomplete items. This is controlled per-step, not
+ * globally for all artifacts with `taskCompletionCheck`.
  *
  * Enforces workflow `requires` for the target step and executes `run:` hooks
  * at step boundaries (unless skipped via `skipHookPhases`).
@@ -139,22 +146,33 @@ export class TransitionChange {
     const schema = await this._schemaProvider.get()
     const workflowStep = schema.workflowStep(effectiveTarget) ?? null
 
-    // --- Enforce workflow requires and task completion gating ---
+    // --- Enforce workflow requires ---
     if (workflowStep !== null && workflowStep.requires.length > 0) {
       for (const artifactId of workflowStep.requires) {
         const status = change.effectiveStatus(artifactId)
         const satisfied = status === 'complete' || status === 'skipped'
         onProgress?.({ type: 'requires-check', artifactId, satisfied })
         if (!satisfied) {
-          throw new InvalidStateTransitionError(change.state, effectiveTarget)
+          throw new InvalidStateTransitionError(change.state, effectiveTarget, {
+            type: 'incomplete-artifact',
+            artifactId,
+          })
         }
+      }
+    }
 
-        // Task completion gating: check content for incomplete items
+    // --- Task completion gating (requiresTaskCompletion) ---
+    if (workflowStep !== null && workflowStep.requiresTaskCompletion.length > 0) {
+      for (const artifactId of workflowStep.requiresTaskCompletion) {
         const artifactType = schema.artifact(artifactId)
-        const pattern = artifactType?.taskCompletionCheck?.incompletePattern
-        if (pattern !== undefined) {
-          await this._checkTaskCompletionForArtifact(change, artifactId, pattern, effectiveTarget)
-        }
+        if (artifactType?.taskCompletionCheck === undefined) continue
+        await this._checkTaskCompletionForArtifact(
+          change,
+          artifactId,
+          artifactType.taskCompletionCheck,
+          effectiveTarget,
+          onProgress,
+        )
       }
     }
 
@@ -228,33 +246,65 @@ export class TransitionChange {
   }
 
   /**
-   * Checks all files in an artifact for incomplete task items.
+   * Checks all files in an artifact for incomplete task items, counting matches
+   * and emitting a progress event before throwing.
    *
    * @param change - The change whose artifact files are checked
    * @param artifactId - The artifact type ID to check
-   * @param incompletePattern - Regex pattern for incomplete task items
+   * @param taskCheck - The task completion check config from the artifact type
+   * @param taskCheck.incompletePattern - Regex pattern for incomplete task items
+   * @param taskCheck.completePattern - Optional regex pattern for complete task items (used for counting)
    * @param effectiveTarget - The target state (for error context)
+   * @param onProgress - Optional progress callback
    * @throws {InvalidStateTransitionError} If any file contains incomplete task items
    */
   private async _checkTaskCompletionForArtifact(
     change: Change,
     artifactId: string,
-    incompletePattern: string,
+    taskCheck: { readonly incompletePattern?: string; readonly completePattern?: string },
     effectiveTarget: ChangeState,
+    onProgress?: OnTransitionProgress,
   ): Promise<void> {
+    if (taskCheck.incompletePattern === undefined) return
+
     const changeArtifact = change.getArtifact(artifactId)
     if (changeArtifact === null) return
 
-    const re = safeRegex(incompletePattern, 'm')
-    if (re === null) return
+    const incompleteRe = safeRegex(taskCheck.incompletePattern, 'gm')
+    if (incompleteRe === null) return
+
+    const completeRe =
+      taskCheck.completePattern !== undefined ? safeRegex(taskCheck.completePattern, 'gm') : null
+
+    let incompleteCount = 0
+    let completeCount = 0
 
     for (const file of changeArtifact.files.values()) {
       const loaded = await this._changes.artifact(change, file.filename)
       if (loaded === null) continue
 
-      if (re.test(loaded.content)) {
-        throw new InvalidStateTransitionError(change.state, effectiveTarget)
+      incompleteCount += (loaded.content.match(incompleteRe) ?? []).length
+      if (completeRe !== null) {
+        completeCount += (loaded.content.match(completeRe) ?? []).length
       }
+    }
+
+    if (incompleteCount > 0) {
+      const total = incompleteCount + completeCount
+      onProgress?.({
+        type: 'task-completion-failed',
+        artifactId,
+        incomplete: incompleteCount,
+        complete: completeCount,
+        total,
+      })
+      throw new InvalidStateTransitionError(change.state, effectiveTarget, {
+        type: 'incomplete-tasks',
+        artifactId,
+        incomplete: incompleteCount,
+        complete: completeCount,
+        total,
+      })
     }
   }
 

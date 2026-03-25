@@ -513,6 +513,27 @@ export function buildSchema(
     }
   }
 
+  // Semantic validation: requiresTaskCompletion must be subset of requires
+  // and reference artifacts with taskCompletionCheck
+  const artifactIndex = new Map(artifacts.map((a) => [a.id, a]))
+  for (const step of workflow) {
+    for (const id of step.requiresTaskCompletion ?? []) {
+      if (!step.requires.includes(id)) {
+        throw new SchemaValidationError(
+          ref,
+          `workflow step '${step.step}': requiresTaskCompletion entry '${id}' is not in requires`,
+        )
+      }
+      const artifactType = artifactIndex.get(id)
+      if (artifactType === undefined || artifactType.taskCompletionCheck === undefined) {
+        throw new SchemaValidationError(
+          ref,
+          `workflow step '${step.step}': requiresTaskCompletion entry '${id}' does not have taskCompletionCheck`,
+        )
+      }
+    }
+  }
+
   /**
    * Validates that IDs within an array are unique, reporting duplicates with context.
    *

@@ -39,50 +39,58 @@
 
 ### Requirement: Task completion check during requires enforcement
 
-#### Scenario: Transition blocked by incomplete tasks in required artifact
+#### Scenario: Transition blocked by requiresTaskCompletion artifact with incomplete items
 
 - **GIVEN** a change in `implementing` state
-- **AND** the `verifying` step requires an artifact whose type declares `taskCompletionCheck`
-- **AND** the artifact file contains a line matching `incompletePattern`
+- **AND** the `verifying` step declares `requiresTaskCompletion: [tasks]`
+- **AND** the `tasks` artifact file contains `- [ ] unfinished task`
 - **WHEN** `execute` is called with `to: 'verifying'`
-- **THEN** it throws `InvalidStateTransitionError`
+- **THEN** it throws `InvalidStateTransitionError` with reason `incomplete-tasks`
 
-#### Scenario: Transition allowed when all tasks are complete
+#### Scenario: Transition allowed when all tasks complete
 
 - **GIVEN** a change in `implementing` state
-- **AND** the `verifying` step requires an artifact whose type declares `taskCompletionCheck`
-- **AND** the artifact file contains only completed items
+- **AND** the `verifying` step declares `requiresTaskCompletion: [tasks]`
+- **AND** the tasks file contains only `- [x] done task`
 - **WHEN** `execute` is called with `to: 'verifying'`
 - **THEN** the change transitions to `verifying`
 
-#### Scenario: Missing artifact file is skipped
+#### Scenario: No gating when requiresTaskCompletion absent
 
 - **GIVEN** a change in `implementing` state
-- **AND** the `verifying` step requires an artifact with `taskCompletionCheck`
-- **AND** the artifact file does not exist
+- **AND** the `verifying` step has `requires: [tasks]` but no `requiresTaskCompletion`
+- **AND** the tasks file contains incomplete items
 - **WHEN** `execute` is called with `to: 'verifying'`
+- **THEN** the change transitions to `verifying` — no content check
+
+#### Scenario: Missing artifact file is skipped
+
+- **GIVEN** a step with `requiresTaskCompletion: [tasks]`
+- **AND** the tasks file does not exist
+- **WHEN** `execute` is called
 - **THEN** the check is skipped and the transition proceeds
 
-#### Scenario: Invalid regex pattern is treated as non-matching
+#### Scenario: Error carries incomplete and complete counts
 
-- **GIVEN** a required artifact with `taskCompletionCheck.incompletePattern` set to an invalid regex
-- **WHEN** a transition to the step requiring it is attempted
-- **THEN** the check is skipped and the transition proceeds
-
-#### Scenario: Task check applies to any step with taskCompletionCheck requires
-
-- **GIVEN** a change transitioning to a step whose `requires` includes an artifact with `taskCompletionCheck`
-- **AND** the artifact file contains incomplete items
+- **GIVEN** a step with `requiresTaskCompletion: [tasks]`
+- **AND** the tasks file has 5 complete items and 3 incomplete items
 - **WHEN** `execute` is called
-- **THEN** `InvalidStateTransitionError` is thrown — not limited to `implementing → verifying`
+- **THEN** the error reason includes `artifactId: 'tasks'`, `incomplete: 3`, `complete: 5`, `total: 8`
 
-#### Scenario: Required artifact without taskCompletionCheck is not content-checked
+#### Scenario: task-completion-failed progress event emitted before throwing
 
-- **GIVEN** a step that requires `[specs, tasks]`
-- **AND** `specs` has no `taskCompletionCheck`
-- **AND** `tasks` has `taskCompletionCheck` with incomplete items
+- **GIVEN** a step with `requiresTaskCompletion: [tasks]` and incomplete items
+- **WHEN** `execute` is called with an `onProgress` callback
+- **THEN** a `task-completion-failed` event is emitted with counts before the error is thrown
+
+### Requirement: Workflow requires enforcement
+
+#### Scenario: Unsatisfied requirement throws with structured reason
+
+- **GIVEN** a workflow step with `requires: [specs, tasks]`
+- **AND** `specs` has effective status `in-progress`
 - **WHEN** `execute` is called
-- **THEN** only `tasks` triggers the content check; `specs` is checked only via `effectiveStatus`
+- **THEN** `InvalidStateTransitionError` is thrown with reason `incomplete-artifact` and blocking artifact `specs`
 
 ### Requirement: Artifact validation clearing on verifying to implementing
 

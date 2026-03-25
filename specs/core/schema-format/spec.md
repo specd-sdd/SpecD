@@ -224,6 +224,7 @@ Entries must include:
 
 - `step` (string, required) — step name identifying a phase of the change lifecycle
 - `requires` (array of artifact IDs, optional) — artifacts that must be `complete` before this step is available; empty or omitted means always available
+- `requiresTaskCompletion` (array of artifact IDs, optional) — subset of `requires` for which task completion gating is enforced on this step. Each listed artifact ID must be present in `requires` and must reference an artifact type that declares `taskCompletionCheck`. When present, the transition system checks the artifact's file content for incomplete task items (matching `incompletePattern`) before allowing the transition. When absent or empty, no task completion gating applies to this step.
 - `hooks` (object, optional) — hooks for this step's boundaries; each key is `pre` or `post`, each value is an array of `instruction:` or `run:` hook entries
 
 Every hook entry must include an `id` field (standard array entry identity format) and exactly one of:

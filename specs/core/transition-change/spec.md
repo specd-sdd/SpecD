@@ -36,7 +36,7 @@ When neither approval-gate routing condition is met, the use case MUST transitio
 
 ### Requirement: Workflow requires enforcement
 
-After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError`.
+After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError` with reason `incomplete-artifact` and the blocking artifact ID.
 
 If no workflow step exists for the effective target (the schema does not declare one), or the schema cannot be resolved, the requires check is skipped.
 
@@ -44,15 +44,16 @@ The use case MUST emit a `requires-check` progress event per artifact checked, r
 
 ### Requirement: Task completion check during requires enforcement
 
-During workflow requires enforcement (see Requirement: Workflow requires enforcement), for each required artifact the use case MUST check whether the artifact's `ArtifactType` declares a `taskCompletionCheck`. If it does, the use case MUST verify the artifact's content contains no incomplete task items:
+After workflow requires enforcement passes, if the target workflow step declares a non-empty `requiresTaskCompletion` array, the use case MUST check each listed artifact for incomplete task items:
 
-1. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.
-2. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.
-3. If the file does not exist (returns `null`), skip it.
-4. Compile `taskCompletionCheck.incompletePattern` using `safeRegex` with the `'m'` flag.
-5. If the regex is valid and matches any line in the file content, throw `InvalidStateTransitionError`.
+1. Look up the `ArtifactType` from the schema to obtain `taskCompletionCheck.incompletePattern`.
+2. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.
+3. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.
+4. If the file does not exist (returns `null`), skip it.
+5. Compile `incompletePattern` using `safeRegex` with the `'m'` flag.
+6. If the regex is valid and matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID, incomplete count (lines matching `incompletePattern`), and complete count (lines matching `completePattern` if declared).
 
-This check is performed as part of the requires loop — it applies to ANY transition whose target step requires an artifact with `taskCompletionCheck`, not only `implementing → verifying`. The use case derives all necessary information from the schema; callers do not supply task checks.
+Only artifacts listed in `requiresTaskCompletion` are content-checked. Other artifacts in `requires` are checked only via `effectiveStatus`. When `requiresTaskCompletion` is absent or empty, no task completion gating applies.
 
 ### Requirement: Artifact validation clearing on verifying to implementing
 
@@ -115,6 +116,7 @@ The previous `postHookFailures` field is removed because both hook phases are no
 `TransitionChange.execute` SHALL accept an optional second parameter `onProgress?: OnTransitionProgress`. Progress events are:
 
 - `{ type: 'requires-check', artifactId: string, satisfied: boolean }` — emitted per artifact during requires enforcement
+- `{ type: 'task-completion-failed', artifactId: string, incomplete: number, complete: number, total: number }` — emitted when task completion check fails, before throwing
 - `{ type: 'hook-start', phase: 'pre' | 'post', hookId: string, command: string }` — emitted before each hook
 - `{ type: 'hook-done', phase: 'pre' | 'post', hookId: string, success: boolean, exitCode: number }` — emitted after each hook
 - `{ type: 'transitioned', from: ChangeState, to: ChangeState }` — emitted after state change
@@ -131,8 +133,9 @@ The previous `postHookFailures` field is removed because both hook phases are no
 ## Constraints
 
 - The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates
-- Task completion checks are derived from the schema's `taskCompletionCheck` declarations during requires enforcement — callers never supply them
+- Task completion checks are controlled by `requiresTaskCompletion` on the workflow step — only listed artifacts are content-checked
 - Task completion checks use `safeRegex` to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
+- `InvalidStateTransitionError` carries a structured `reason` field: `'incomplete-artifact'`, `'incomplete-tasks'`, or `'invalid-transition'`
 - Approval-gate routing is purely input-driven — the use case does not read configuration directly
 - Pre-hook failure aborts the transition — no state change occurs
 - Post-hook failures are collected in the result — no rollback

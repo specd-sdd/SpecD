@@ -140,13 +140,35 @@
 
 #### Scenario: Duplicate step names
 
-- **WHEN** `buildSchema` receives workflow entries with two steps both named `"implementing"`
-- **THEN** it throws `SchemaValidationError` mentioning the duplicate step name
+- **GIVEN** a schema with `workflow: [{ step: "designing" }, { step: "designing" }]`
+- **WHEN** `buildSchema` is called
+- **THEN** `SchemaValidationError` is thrown identifying `designing` as the duplicate
 
 #### Scenario: Unique step names accepted
 
-- **WHEN** `buildSchema` receives workflow entries with steps `"designing"`, `"implementing"`, `"archiving"`
-- **THEN** no error is thrown for workflow step names
+- **GIVEN** a schema with `workflow: [{ step: "designing" }, { step: "implementing" }]`
+- **WHEN** `buildSchema` is called
+- **THEN** no error is thrown
+
+#### Scenario: requiresTaskCompletion not subset of requires
+
+- **GIVEN** a workflow step with `requires: [specs]` and `requiresTaskCompletion: [tasks]`
+- **WHEN** `buildSchema` is called
+- **THEN** `SchemaValidationError` is thrown because `tasks` is not in `requires`
+
+#### Scenario: requiresTaskCompletion references artifact without taskCompletionCheck
+
+- **GIVEN** a workflow step with `requires: [specs, tasks]` and `requiresTaskCompletion: [specs]`
+- **AND** the `specs` artifact type does not declare `taskCompletionCheck`
+- **WHEN** `buildSchema` is called
+- **THEN** `SchemaValidationError` is thrown because `specs` has no `taskCompletionCheck`
+
+#### Scenario: Valid requiresTaskCompletion accepted
+
+- **GIVEN** a workflow step with `requires: [specs, tasks]` and `requiresTaskCompletion: [tasks]`
+- **AND** the `tasks` artifact type declares `taskCompletionCheck`
+- **WHEN** `buildSchema` is called
+- **THEN** no error is thrown
 
 ### Requirement: Artifact dependency graph validation
 

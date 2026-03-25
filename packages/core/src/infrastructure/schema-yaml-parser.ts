@@ -121,6 +121,7 @@ const WorkflowStepZodSchema = z
   .object({
     step: z.string(),
     requires: z.array(z.string()).optional(),
+    requiresTaskCompletion: z.array(z.string()).optional(),
     hooks: z
       .object({
         pre: z.array(HookEntryZodSchema).optional(),
@@ -132,6 +133,7 @@ const WorkflowStepZodSchema = z
     (ws): WorkflowStepRaw => ({
       step: ws.step,
       requires: ws.requires ?? [],
+      requiresTaskCompletion: ws.requiresTaskCompletion ?? [],
       hooks: {
         pre: ws.hooks?.pre ?? [],
         post: ws.hooks?.post ?? [],
@@ -233,6 +235,7 @@ export type RuleEntryRaw = z.infer<typeof RuleEntryZodSchema>
 export interface WorkflowStepRaw {
   readonly step: string
   readonly requires: readonly string[]
+  readonly requiresTaskCompletion: readonly string[]
   readonly hooks: {
     readonly pre: readonly HookEntry[]
     readonly post: readonly HookEntry[]
