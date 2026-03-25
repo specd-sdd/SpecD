@@ -12,7 +12,7 @@ import { type SchemaRepository } from '../../application/ports/schema-repository
 import { createSchemaRepository } from '../schema-repository.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
+import { createVcsActorResolver } from '../actor-resolver.js'
 import { TemplateExpander } from '../../application/template-expander.js'
 import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
 import { RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
@@ -183,7 +183,7 @@ export function createArchiveChange(
   const parsers = createArtifactParserRegistry()
   const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
   const hooks = new NodeHookRunner(expander)
-  const actor = new GitActorResolver()
+  const actor = createVcsActorResolver()
   const hasher = new NodeContentHasher()
   const generateMetadata = new GenerateSpecMetadata(
     opts.specRepositories,

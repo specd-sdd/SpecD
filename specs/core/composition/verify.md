@@ -39,6 +39,19 @@
 - **WHEN** the public export surface of `@specd/core` is inspected
 - **THEN** `createSpecRepository`, `createChangeRepository`, and `createArchiveRepository` are not present
 
+### Requirement: Use-case factories must use auto-detect for VCS-dependent adapters
+
+#### Scenario: Standalone factory uses auto-detect for actor resolution
+
+- **WHEN** any standalone use-case factory in `composition/use-cases/` constructs an `ActorResolver`
+- **THEN** it calls `createVcsActorResolver()` instead of `new GitActorResolver()`
+
+#### Scenario: No hardcoded VCS imports in standalone factories
+
+- **WHEN** inspecting the import statements of all files in `composition/use-cases/`
+- **THEN** none import `GitActorResolver`, `HgActorResolver`, `SvnActorResolver`, or `NullActorResolver` directly
+- **AND** all import `createVcsActorResolver` from the composition layer instead
+
 ### Requirement: Kernel builds all use cases from SpecdConfig
 
 #### Scenario: Kernel returns grouped use cases

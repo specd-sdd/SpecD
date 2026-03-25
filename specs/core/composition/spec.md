@@ -23,6 +23,12 @@ Both signatures are public exports. The explicit form is used in tests and in sc
 
 Port implementations that have a single concrete class and no caller-visible configuration — `NodeHookRunner`, `GitVcsAdapter`, `FsFileReader` — are constructed inside use-case factories and never appear in any public export. Repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`) are also internal to the composition layer.
 
+### Requirement: Use-case factories must use auto-detect for VCS-dependent adapters
+
+Standalone use-case factories that need an `ActorResolver` must call `createVcsActorResolver()` instead of constructing a specific implementation (e.g. `new GitActorResolver()`). The auto-detect chain (git → hg → svn → null) ensures the correct implementation is selected based on the project's actual VCS.
+
+The same applies to any factory that needs a `VcsAdapter` — it must call `createVcsAdapter()`.
+
 ### Requirement: FsChangeRepository options include artifact type resolution
 
 `FsChangeRepositoryOptions` accepts two optional fields for artifact sync:
