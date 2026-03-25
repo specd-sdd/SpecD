@@ -22,14 +22,20 @@ This skill does NOT execute lifecycle phases — it routes to the right skill.
 Read .specd/skills/shared.md
 ```
 
-Then gather project context:
+Then gather project info and load project context:
 
 ```bash
 node packages/cli/dist/index.js config show --format json
 node packages/cli/dist/index.js spec list --format json --summary
 node packages/cli/dist/index.js change list --format json
 node packages/cli/dist/index.js drafts list --format json
+node packages/cli/dist/index.js project context --format text
 ```
+
+**MUST follow** — the project context output contains binding directives (instructions
+and file content). Read and absorb them before continuing. If lazy mode returns summary
+specs, evaluate and load any that are relevant (see `shared.md` — "Processing `change
+context` output").
 
 From the results, **print a welcome block** to the user with this structure:
 

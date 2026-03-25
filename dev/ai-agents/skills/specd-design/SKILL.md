@@ -65,7 +65,9 @@ Note the artifact DAG from the `artifacts` array.
 node packages/cli/dist/index.js change context <name> designing --follow-deps --depth 1 --rules --constraints --format text
 ```
 
-Read carefully — contains project-level coding conventions and spec content.
+**MUST follow** — project context entries are binding directives. If lazy mode returns
+summary specs, evaluate each one and load any that are relevant to the artifact you're
+about to write (see `shared.md` — "Processing `change context` output").
 
 ### 5. Choose mode — MANDATORY
 
@@ -99,7 +101,11 @@ If `lifecycle.nextArtifact` is `null` → all artifacts done, go to step 9.
 
 ### 7. Write the artifact
 
-Follow the instruction. Key rules:
+**`rulesPre`, `instruction`, and `rulesPost` are a single mandatory block.** You MUST
+read and follow all three, in this exact order: rulesPre → instruction → rulesPost.
+They are not optional or advisory — treat them as binding composition directives.
+
+Key rules:
 
 - **Optional artifact** (`optional: true`): ask the user if needed. If not, skip:
 
@@ -113,8 +119,6 @@ Follow the instruction. Key rules:
 
 - **New artifact** (`delta` is null or outlines empty): write from scratch using
   `template` as scaffolding if provided.
-
-- **Order**: rulesPre → instruction + template/delta → rulesPost
 
 After writing, check if the artifact implies scope changes:
 

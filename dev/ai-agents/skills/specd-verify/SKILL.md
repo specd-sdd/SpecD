@@ -48,6 +48,10 @@ Follow guidance.
 node packages/cli/dist/index.js change context <name> verifying --follow-deps --depth 1 --scenarios --format text
 ```
 
+**MUST follow** — project context entries are binding directives. If lazy mode returns
+summary specs, evaluate each one and load any that are relevant to the scenarios you're
+about to verify (see `shared.md` — "Processing `change context` output").
+
 ### 4. Verify each scenario
 
 For each spec in the change, read its verification scenarios. For each scenario:

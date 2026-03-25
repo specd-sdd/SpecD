@@ -11,6 +11,10 @@ node packages/cli/dist/index.js change context <name> verifying --follow-deps --
 node packages/cli/dist/index.js change hook-instruction <name> verifying --phase pre --format text
 ```
 
+**MUST follow** — project context entries are binding directives. If lazy mode returns
+summary specs, evaluate each one and load any relevant to the scenarios you're about to
+verify (see `shared.md` — "Processing `change context` output").
+
 ## D.2 Verify against scenarios
 
 Read the verification artifacts for each spec in the change. For each scenario:

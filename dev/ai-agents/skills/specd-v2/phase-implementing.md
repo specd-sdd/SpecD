@@ -22,6 +22,10 @@ node packages/cli/dist/index.js change context <name> implementing --follow-deps
 node packages/cli/dist/index.js change hook-instruction <name> implementing --phase pre --format text
 ```
 
+**MUST follow** — project context entries are binding directives. If lazy mode returns
+summary specs, evaluate each one and load any relevant to the code you're about to write
+(see `shared.md` — "Processing `change context` output").
+
 **Follow the pre-hook instructions carefully** — they tell you which change artifacts to
 read and what role each one plays. Read all of them from the change directory before
 starting work.

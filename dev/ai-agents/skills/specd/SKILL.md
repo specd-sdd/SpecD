@@ -262,8 +262,9 @@ node packages/cli/dist/index.js change context <name> designing --follow-deps --
 node packages/cli/dist/index.js change hook-instruction <name> designing --phase pre --format text
 ```
 
-Read the context carefully — it contains project-level instructions and included specs.
-Follow the pre-hook guidance.
+**MUST follow** — project context entries are binding directives. If lazy mode returns
+summary specs, evaluate each one and load any relevant to the artifact you're about to
+write (see `shared.md` — "Processing `change context` output"). Follow the pre-hook guidance.
 
 **Note:** If dependencies are added during the artifact loop (via `change deps --add`),
 reload the context to pick up the new dependency specs:
@@ -327,7 +328,11 @@ Mark the corresponding artifact sub-task as `in_progress`.
 
 #### A.3c Author the artifact
 
-Follow the `instruction` from the previous step. Key decision points:
+**`rulesPre`, `instruction`, and `rulesPost` are a single mandatory block.** You MUST
+read and follow all three, in this exact order: rulesPre → instruction → rulesPost.
+They are not optional or advisory — treat them as binding composition directives.
+
+Key decision points:
 
 - **Optional artifact** (`optional: true` in schema): **you MUST ask the user** whether
   this artifact is needed for this change. Explain briefly what the artifact is for
@@ -344,8 +349,6 @@ Follow the `instruction` from the previous step. Key decision points:
 
 - **New artifact**: write from scratch using the `instruction`. If `template` is
   non-null, use it as the scaffolding structure for the artifact content.
-
-**Order:** rulesPre → instruction + template (+ delta guidance if applicable) → rulesPost.
 
 #### A.3d Reconcile scope and dependencies
 
@@ -694,6 +697,10 @@ node packages/cli/dist/index.js change context <name> implementing --follow-deps
 node packages/cli/dist/index.js change hook-instruction <name> implementing --phase pre --format text
 ```
 
+**MUST follow** — project context entries are binding directives. If lazy mode returns
+summary specs, evaluate each one and load any relevant to the code you're about to write
+(see `shared.md` — "Processing `change context` output").
+
 **Follow the pre-hook instructions carefully** — they tell you which change artifacts to
 read and what role each one plays. Read all of them from the change directory before
 starting work.
@@ -809,6 +816,10 @@ Mark "Verify" task as `in_progress`.
 node packages/cli/dist/index.js change context <name> verifying --follow-deps --depth 1 --scenarios --format text
 node packages/cli/dist/index.js change hook-instruction <name> verifying --phase pre --format text
 ```
+
+**MUST follow** — project context entries are binding directives. If lazy mode returns
+summary specs, evaluate each one and load any relevant to the scenarios you're about to
+verify (see `shared.md` — "Processing `change context` output").
 
 ### D.2 Verify against scenarios
 

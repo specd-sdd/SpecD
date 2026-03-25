@@ -64,6 +64,81 @@ validation failures and broken state.
 - Read content: `spec show <specId> --format json`
 - Read metadata: `spec metadata <specId> --format json`
 
+## Context loading is mandatory
+
+Every skill that runs CLI instructions, hooks, or artifact instructions MUST load
+context first. No exceptions — the context contains binding directives that govern
+how all subsequent work is performed.
+
+- **Change exists** → `change context <name> <step> --format text`
+- **No change yet** → `project context --format text`
+
+Load context before the first hook or instruction call in the skill, **and reload it
+every time the change transitions to a new state**. A state transition may change which
+specs are relevant, which hooks fire, and what instructions apply. Stale context from
+a previous state can lead to wrong decisions.
+
+Follow the processing rules below ("Processing `change context` output").
+
+## Approvals are human-only
+
+**You MUST NEVER run `change approve` yourself.** Spec approval and signoff approval
+are exclusively human actions. When a change reaches `pending-spec-approval` or
+`pending-signoff`, your only job is to tell the user what command to run:
+
+```
+specd change approve spec <name> --reason "..."
+specd change approve signoff <name> --reason "..."
+```
+
+Do not attempt to approve, do not offer to approve, do not auto-approve. Stop and wait.
+
+## Processing artifact instructions
+
+When you fetch artifact instructions via `change artifact-instruction`, the response
+includes `rulesPre`, `instruction`, and `rulesPost`. These three fields are a **single
+mandatory block** — you MUST read and follow all three, in this exact order:
+
+1. **`rulesPre`** — composition rules to apply before writing
+2. **`instruction`** — what to write (+ `template`/`delta` guidance)
+3. **`rulesPost`** — composition rules to apply after writing
+
+They are not optional or advisory. Treat them as binding composition directives that
+together define how the artifact must be authored.
+
+## Processing `change context` output
+
+Every skill that runs `change context` MUST process its output as follows:
+
+### Project context is binding
+
+The `projectContext` entries (instructions and file content) are **directives, not suggestions**.
+You MUST follow every instruction and apply every file's content as if it were part of
+your skill instructions. If an instruction says "always do X", you always do X — no
+exceptions.
+
+### Lazy mode: evaluate and load needed specs
+
+When `contextMode` is `lazy` (the default), the output contains two tiers:
+
+- **Full specs** — rendered with complete content. Read and absorb them.
+- **Summary specs** — listed in a catalogue table with only specId, title, and description.
+
+You MUST NOT ignore the summary catalogue. Before proceeding with your task:
+
+1. **Scan** every summary spec's title and description
+2. **Identify** which ones are relevant to the work you're about to do
+3. **Load** each relevant spec in full:
+
+   ```bash
+   node packages/cli/dist/index.js spec show <spec-id> --format text
+   ```
+
+4. **Follow** the loaded spec content with the same weight as full-mode specs
+
+When in doubt about whether a summary spec is relevant, err on the side of loading it.
+A spec you didn't read can silently violate a constraint you didn't know existed.
+
 ## Hooks
 
 Every workflow step has pre and post hooks. The pattern is always:
