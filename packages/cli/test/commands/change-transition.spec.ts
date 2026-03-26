@@ -281,6 +281,24 @@ describe('--next failures', () => {
     expect(stderr()).toMatch(/waiting for human spec approval/)
   })
 
+  it('fails clearly in pending-signoff state', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'pending-signoff' }),
+      artifactStatuses: [],
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', '--next'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(kernel.changes.transition.execute).not.toHaveBeenCalled()
+    expect(stderr()).toMatch(/waiting for human signoff/)
+  })
+
   it('fails clearly in archivable state', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.status.execute.mockResolvedValue({

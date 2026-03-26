@@ -149,7 +149,7 @@ The previous `postHookFailures` field is removed because both hook phases are no
 - `InvalidStateTransitionError` carries a structured `reason` field: `'incomplete-artifact'`, `'incomplete-tasks'`, `'invalid-transition'`, or `'approval-required'`
 - Approval-gate routing is purely input-driven — the use case does not read configuration directly
 - Pre-hook failure aborts the transition — no state change occurs
-- Post-hook failures are collected in the result — no rollback
+- Post-hook failure aborts the transition — no state change occurs (both phases are fail-fast)
 - When schema resolution fails or no workflow step exists for the target, requires and hooks are skipped gracefully
 - Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema — the caller does not supply them
 

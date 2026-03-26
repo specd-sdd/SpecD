@@ -44,6 +44,13 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message explaining that the change is waiting for human spec approval
 
+#### Scenario: Next flag fails in pending signoff state
+
+- **GIVEN** the change is in `pending-signoff` state
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message explaining that the change is waiting for human signoff
+
 #### Scenario: Next flag fails in archivable state
 
 - **GIVEN** the change is in `archivable` state
