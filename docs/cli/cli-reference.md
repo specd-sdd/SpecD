@@ -76,17 +76,45 @@ Show the full status of a change: associated specs, artifact file statuses, curr
 
 ```
 specd change transition <name> <step> [options]
+specd change transition <name> --next [options]
 ```
 
-Transition the change to a new lifecycle state. The `<step>` argument is the name of a lifecycle step declared in the active schema (e.g. `implementing`, `verifying`, `archiving`). The transition is blocked if the step's `requires` conditions are not met.
+Transition the change to a new lifecycle state. You can either provide an explicit
+`<step>` or use `--next` to resolve the next logical forward transition from the
+change's current state.
+
+`--next` currently resolves:
+
+- `drafting -> designing`
+- `designing -> ready`
+- `ready -> implementing`
+- `spec-approved -> implementing`
+- `implementing -> verifying`
+- `verifying -> done`
+- `done -> archivable`
+
+The resolved target still goes through the normal `TransitionChange` flow, so
+approval-gate routing, `requires` checks, task completion gating, and hook
+execution behave exactly as they do for an explicit target.
+
+`--next` is not available when the next user action is not another lifecycle
+transition. In particular:
+
+- `pending-spec-approval` fails with an explanation that human spec approval is pending
+- `pending-signoff` fails with an explanation that human signoff is pending
+- `archivable` fails with an explanation that archiving is not a lifecycle transition
 
 | Option                      | Description                                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `--next`                    | Resolve the next logical lifecycle target from the current state. Mutually exclusive with `<step>`.                |
 | `--skip-hooks <phases>`     | Skip hooks at the specified phases. Valid values: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`. |
 | `--format text\|json\|toon` | Output format.                                                                                                     |
 | `--config <path>`           | Config file path.                                                                                                  |
 
 ```bash
+# Resolve the next transition automatically
+specd change transition add-auth-flow --next
+
 # Transition to implementing, skipping all hooks
 specd change transition add-auth-flow implementing --skip-hooks all
 ```

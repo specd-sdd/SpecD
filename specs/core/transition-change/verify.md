@@ -37,6 +37,28 @@
 - **WHEN** `execute` is called with `to: 'archivable'` and `approvalsSignoff: false`
 - **THEN** the change transitions to `archivable`
 
+### Requirement: Human-approval pending states produce explicit transition failures
+
+#### Scenario: Pending spec approval blocks normal forward transition
+
+- **GIVEN** a change in `pending-spec-approval` state
+- **WHEN** `execute` is called with `to: 'spec-approved'`
+- **THEN** it throws `InvalidStateTransitionError`
+- **AND** the error reason equals `{ type: 'approval-required', gate: 'spec' }`
+
+#### Scenario: Pending signoff blocks normal forward transition
+
+- **GIVEN** a change in `pending-signoff` state
+- **WHEN** `execute` is called with `to: 'signed-off'`
+- **THEN** it throws `InvalidStateTransitionError`
+- **AND** the error reason equals `{ type: 'approval-required', gate: 'signoff' }`
+
+#### Scenario: Pending approval still allows redesign
+
+- **GIVEN** a change in `pending-spec-approval` state
+- **WHEN** `execute` is called with `to: 'designing'`
+- **THEN** the change transitions to `designing`
+
 ### Requirement: Task completion check during requires enforcement
 
 #### Scenario: Transition blocked by requiresTaskCompletion artifact with incomplete items

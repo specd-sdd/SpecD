@@ -198,6 +198,79 @@ describe('TransitionChange', () => {
     })
   })
 
+  describe('given a change at a human approval boundary', () => {
+    function makePendingSpecApprovalChange(name: string): Change {
+      return makeChangeInState(name, [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        {
+          type: 'transitioned',
+          from: 'ready',
+          to: 'pending-spec-approval',
+          at: new Date(),
+          by: actor,
+        },
+      ])
+    }
+
+    function makePendingSignoffChange(name: string): Change {
+      return makeChangeInState(name, [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'done', to: 'pending-signoff', at: new Date(), by: actor },
+      ])
+    }
+
+    it('throws approval-required reason for pending spec approval', async () => {
+      const change = makePendingSpecApprovalChange('my-change')
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'spec-approved',
+          approvalsSpec: false,
+          approvalsSignoff: false,
+        }),
+      ).rejects.toMatchObject({
+        reason: { type: 'approval-required', gate: 'spec' },
+      })
+    })
+
+    it('throws approval-required reason for pending signoff', async () => {
+      const change = makePendingSignoffChange('my-change')
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'signed-off',
+          approvalsSpec: false,
+          approvalsSignoff: false,
+        }),
+      ).rejects.toMatchObject({
+        reason: { type: 'approval-required', gate: 'signoff' },
+      })
+    })
+
+    it('still allows redesign from pending spec approval', async () => {
+      const change = makePendingSpecApprovalChange('my-change')
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(result.change.state).toBe('designing')
+    })
+  })
+
   describe('given a verifying → implementing transition', () => {
     function makeVerifyingChange(name: string): Change {
       return makeChangeInState(name, [

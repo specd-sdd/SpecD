@@ -133,6 +133,16 @@ Smart routing applies at two points:
 - `ready → implementing` is redirected to `ready → pending-spec-approval` when `approvalsSpec` is `true`.
 - `done → archivable` is redirected to `done → pending-signoff` when `approvalsSignoff` is `true`.
 
+When the change is already at a human approval boundary, `TransitionChange` does
+not attempt to synthesize a forward transition. Instead, it throws
+`InvalidStateTransitionError` with `reason.type === 'approval-required'`:
+
+- `pending-spec-approval` -> any target other than `designing` yields `{ type: 'approval-required', gate: 'spec' }`
+- `pending-signoff` -> any target other than `designing` yields `{ type: 'approval-required', gate: 'signoff' }`
+
+This keeps redesign available while giving adapters enough context to explain why
+normal progression is blocked.
+
 **Constructor:** `new TransitionChange(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, runStepHooks: RunStepHooks)`
 
 **Input:**
@@ -172,11 +182,11 @@ type TransitionProgressEvent =
 
 **Throws:**
 
-| Error                         | Condition                                                                                                                             |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `ChangeNotFoundError`         | No change with the given name exists.                                                                                                 |
-| `InvalidStateTransitionError` | Transition not permitted, requires unsatisfied, or tasks incomplete. Carries a structured `reason` field (`TransitionFailureReason`). |
-| `HookFailedError`             | A source.post or target.pre hook exited with a non-zero code.                                                                         |
+| Error                         | Condition                                                                                                                                                                               |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ChangeNotFoundError`         | No change with the given name exists.                                                                                                                                                   |
+| `InvalidStateTransitionError` | Transition not permitted, requires unsatisfied, tasks incomplete, or progression blocked at a human approval boundary. Carries a structured `reason` field (`TransitionFailureReason`). |
+| `HookFailedError`             | A source.post or target.pre hook exited with a non-zero code.                                                                                                                           |
 
 ---
 

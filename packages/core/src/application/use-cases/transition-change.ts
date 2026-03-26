@@ -142,6 +142,20 @@ export class TransitionChange {
     const fromState = change.state
     const effectiveTarget = this._resolveTarget(change.state, input)
 
+    if (fromState === 'pending-spec-approval' && effectiveTarget !== 'designing') {
+      throw new InvalidStateTransitionError(fromState, effectiveTarget, {
+        type: 'approval-required',
+        gate: 'spec',
+      })
+    }
+
+    if (fromState === 'pending-signoff' && effectiveTarget !== 'designing') {
+      throw new InvalidStateTransitionError(fromState, effectiveTarget, {
+        type: 'approval-required',
+        gate: 'signoff',
+      })
+    }
+
     // --- Resolve schema and workflow step ---
     const schema = await this._schemaProvider.get()
     const workflowStep = schema.workflowStep(effectiveTarget) ?? null

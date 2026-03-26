@@ -14,7 +14,13 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change transition <name> <step> [--skip-hooks <phases>] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to transition\n- `<step>` — required positional; the target lifecycle state (e.g. `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`)\n- `--skip-hooks <phases>` — optional; comma-separated list of hook phases to skip. Valid values: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`. When `all` is specified, all hook phases are skipped. When omitted, all applicable hooks execute.\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nThe previous `--no-hooks` flag is removed. Use `--skip-hooks all` for equivalent behaviour."
+        "```\nspecd change transition <name> <step> [--skip-hooks <phases>] [--format text|json|toon]\nspecd change transition <name> --next [--skip-hooks <phases>] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to transition\n- `<step>` — required positional when `--next` is not used; the target lifecycle state (e.g. `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`)\n- `--next` — optional flag; resolves the next logical lifecycle target from the change's current state and is mutually exclusive with `<step>`\n- `--skip-hooks <phases>` — optional; comma-separated list of hook phases to skip. Valid values: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`. When `all` is specified, all hook phases are skipped. When omitted, all applicable hooks execute.\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+      ]
+    },
+    {
+      "requirement": "Next-transition resolution",
+      "rules": [
+        "When `--next` is used, the CLI MUST load the current change state and resolve the same logical forward target a human would normally choose for the next workflow step:\n\n- `drafting` → `designing`\n- `designing` → `ready`\n- `ready` → `implementing`\n- `spec-approved` → `implementing`\n- `implementing` → `verifying`\n- `verifying` → `done`\n- `done` → `archivable`\n\nAfter resolving the target, the command MUST execute the normal `TransitionChange` flow for that resolved state. Approval-gate routing, requires enforcement, hook execution, and error handling remain unchanged.\n\n`--next` is unavailable when the current state does not have a transition-driven next action through `change transition`. In those cases, the command MUST exit with code 1 and print an explanatory `error:` message to stderr instead of inventing a synthetic transition target. This includes at least:\n\n- `pending-spec-approval` — waiting for human spec approval\n- `pending-signoff` — waiting for human signoff\n- `archivable` — the next action is archive execution, not another lifecycle transition"
       ]
     },
     {
@@ -50,7 +56,7 @@
     {
       "requirement": "Invalid transition error",
       "rules": [
-        "If the transition is not valid from the current state, the command exits with code 1 and prints an `error:` message to stderr."
+        "If the transition is not valid from the current state, the command exits with code 1 and prints an `error:` message to stderr.\n\nWhen the underlying `InvalidStateTransitionError` carries a structured reason explaining that the change is blocked on human approval or signoff, the command MUST surface that explanation in the stderr message rather than collapsing it to a generic invalid-transition message.\n\nWhen `--next` is invoked from a state where no transition-driven next action exists, the stderr message MUST explain why the command cannot advance automatically from that state."
       ]
     },
     {
@@ -75,6 +81,62 @@
       "name": "Missing arguments",
       "when": ["specd change transition my-change is run without the target state"],
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Next flag resolves a transition target without a positional step",
+      "given": ["the change is in drafting state"],
+      "when": ["specd change transition my-change --next is run"],
+      "then": [
+        "the command resolves designing as the target state",
+        "AND executes the normal transition flow"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Next flag cannot be combined with an explicit step",
+      "when": ["specd change transition my-change designing --next is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message explaining that <step> and --next are mutually exclusive"
+      ]
+    },
+    {
+      "requirement": "Next-transition resolution",
+      "name": "Next flag advances designing to ready",
+      "given": ["the change is in designing state"],
+      "when": ["specd change transition my-change --next is run"],
+      "then": ["the command requests transition to ready"]
+    },
+    {
+      "requirement": "Next-transition resolution",
+      "name": "Next flag honors approval routing from ready",
+      "given": ["approvals.spec: true and the change is in ready state"],
+      "when": ["specd change transition my-change --next is run"],
+      "then": [
+        "the command resolves implementing as the logical next target",
+        "AND the change transitions to pending-spec-approval"
+      ]
+    },
+    {
+      "requirement": "Next-transition resolution",
+      "name": "Next flag fails in pending spec approval state",
+      "given": ["the change is in pending-spec-approval state"],
+      "when": ["specd change transition my-change --next is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message explaining that the change is waiting for human spec approval"
+      ]
+    },
+    {
+      "requirement": "Next-transition resolution",
+      "name": "Next flag fails in archivable state",
+      "given": ["the change is in archivable state"],
+      "when": ["specd change transition my-change --next is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message explaining that archiving is not a lifecycle transition"
+      ]
     },
     {
       "requirement": "Approval-gate routing",
@@ -111,6 +173,16 @@
       "given": ["the change is in drafting state"],
       "when": ["specd change transition my-change done is run"],
       "then": ["the command exits with code 1", "AND stderr contains an error: message"]
+    },
+    {
+      "requirement": "Invalid transition error",
+      "name": "Approval-required reason is surfaced in stderr",
+      "given": ["the change is in pending-signoff state"],
+      "when": ["specd change transition my-change signed-off is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message explaining that the change is waiting for human signoff"
+      ]
     },
     {
       "requirement": "Incomplete tasks error",
@@ -170,8 +242,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:3fa2df1be5cb05e7e074878c3faf384c0896627a8c08d00b005926f01598ac63",
-    "verify.md": "sha256:4718275987e0867feaaa4af995d6551851c190d6281268ef83227ba70485a238"
+    "spec.md": "sha256:cbaa70c97d55fe5de3727036b89f5906a963fa0561e7e4cf383f6a4afc45a10b",
+    "verify.md": "sha256:7b34d4d538a96e3ed00a5740352d2a7d8ccf1c837c819872c2eefd4f47b7e2b4"
   },
   "generatedBy": "core"
 }

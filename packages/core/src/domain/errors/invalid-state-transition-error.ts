@@ -11,6 +11,10 @@ export type TransitionFailureReason =
       readonly complete: number
       readonly total: number
     }
+  | {
+      readonly type: 'approval-required'
+      readonly gate: 'spec' | 'signoff'
+    }
 
 /**
  * Thrown when a state transition is attempted that is not permitted
@@ -55,6 +59,8 @@ function buildMessage(from: string, to: string, reason?: TransitionFailureReason
   if (reason === undefined) return base
 
   switch (reason.type) {
+    case 'approval-required':
+      return `${base}: ${approvalRequiredMessage(reason.gate)}`
     case 'incomplete-artifact':
       return `${base}: artifact '${reason.artifactId}' is not complete`
     case 'incomplete-tasks':
@@ -62,4 +68,16 @@ function buildMessage(from: string, to: string, reason?: TransitionFailureReason
     case 'invalid-transition':
       return base
   }
+}
+
+/**
+ * Builds the human-readable message for approval-boundary failures.
+ *
+ * @param gate - The active approval gate that blocks the transition
+ * @returns The approval-specific explanation
+ */
+function approvalRequiredMessage(gate: 'spec' | 'signoff'): string {
+  return gate === 'spec'
+    ? 'change is waiting for human spec approval'
+    : 'change is waiting for human signoff'
 }

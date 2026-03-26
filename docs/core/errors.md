@@ -240,12 +240,19 @@ type TransitionFailureReason =
       complete: number
       total: number
     }
+  | { type: 'approval-required'; gate: 'spec' | 'signoff' }
 
 // Messages vary by reason:
 // "Cannot transition from 'ready' to 'implementing'"                              (no reason / invalid-transition)
 // "Cannot transition from 'ready' to 'implementing': artifact 'specs' is not complete"  (incomplete-artifact)
 // "Cannot transition from 'implementing' to 'verifying': tasks has incomplete items (3/30 tasks complete)"  (incomplete-tasks)
+// "Cannot transition from 'pending-spec-approval' to 'spec-approved': change is waiting for human spec approval"  (approval-required/spec)
+// "Cannot transition from 'pending-signoff' to 'signed-off': change is waiting for human signoff"  (approval-required/signoff)
 ```
+
+`approval-required` is used when the requested transition tries to move forward
+through a state that requires human approval rather than a normal lifecycle
+transition. `designing` remains available as the escape hatch for redesign.
 
 **Thrown by:** `TransitionChange`, `ApproveSpec`, `ApproveSignoff`, `ArchiveChange`, and directly by `ArchiveRepository.archive()` when the change is not in an archivable state and `force` is not set.
 

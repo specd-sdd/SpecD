@@ -10,14 +10,34 @@ Changes must progress through a governed lifecycle so that validations, approval
 
 ```
 specd change transition <name> <step> [--skip-hooks <phases>] [--format text|json|toon]
+specd change transition <name> --next [--skip-hooks <phases>] [--format text|json|toon]
 ```
 
 - `<name>` — required positional; the name of the change to transition
-- `<step>` — required positional; the target lifecycle state (e.g. `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`)
+- `<step>` — required positional when `--next` is not used; the target lifecycle state (e.g. `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`)
+- `--next` — optional flag; resolves the next logical lifecycle target from the change's current state and is mutually exclusive with `<step>`
 - `--skip-hooks <phases>` — optional; comma-separated list of hook phases to skip. Valid values: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`. When `all` is specified, all hook phases are skipped. When omitted, all applicable hooks execute.
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
-The previous `--no-hooks` flag is removed. Use `--skip-hooks all` for equivalent behaviour.
+### Requirement: Next-transition resolution
+
+When `--next` is used, the CLI MUST load the current change state and resolve the same logical forward target a human would normally choose for the next workflow step:
+
+- `drafting` → `designing`
+- `designing` → `ready`
+- `ready` → `implementing`
+- `spec-approved` → `implementing`
+- `implementing` → `verifying`
+- `verifying` → `done`
+- `done` → `archivable`
+
+After resolving the target, the command MUST execute the normal `TransitionChange` flow for that resolved state. Approval-gate routing, requires enforcement, hook execution, and error handling remain unchanged.
+
+`--next` is unavailable when the current state does not have a transition-driven next action through `change transition`. In those cases, the command MUST exit with code 1 and print an explanatory `error:` message to stderr instead of inventing a synthetic transition target. This includes at least:
+
+- `pending-spec-approval` — waiting for human spec approval
+- `pending-signoff` — waiting for human signoff
+- `archivable` — the next action is archive execution, not another lifecycle transition
 
 ### Requirement: Approval-gate routing
 
@@ -62,6 +82,10 @@ Since both hook phases (source.post and target.pre) are fail-fast, a hook failur
 
 If the transition is not valid from the current state, the command exits with code 1 and prints an `error:` message to stderr.
 
+When the underlying `InvalidStateTransitionError` carries a structured reason explaining that the change is blocked on human approval or signoff, the command MUST surface that explanation in the stderr message rather than collapsing it to a generic invalid-transition message.
+
+When `--next` is invoked from a state where no transition-driven next action exists, the stderr message MUST explain why the command cannot advance automatically from that state.
+
 ### Requirement: Incomplete tasks error
 
 If transitioning `implementing → verifying` and any artifact has incomplete task items (matching `taskCompletionCheck.incompletePattern`), the command exits with code 1 and prints an `error:` message to stderr naming the blocking artifact.
@@ -78,9 +102,10 @@ If the target workflow step has `requires` and any required artifact is not `com
 
 ```
 specd change transition add-login designing
+specd change transition add-login --next
 specd change transition add-login ready
 specd change transition add-login implementing
-specd change transition add-login implementing --no-hooks
+specd change transition add-login --no-hooks
 ```
 
 ## Spec Dependencies
