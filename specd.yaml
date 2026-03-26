@@ -92,7 +92,7 @@ schemaOverrides:
                 conventions (naming, exports, ESM, no default exports, no any),
                 and testing (test structure, coverage). Flag any decision that violates
                 a global constraint before proceeding.
-                Ensure propper JSDoc per default:_global/docs.
+                Ensure proper JSDoc per default:_global/docs.
     workflow:
       - step: designing
         hooks:
