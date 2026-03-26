@@ -85,9 +85,9 @@ Read `state` and suggest the next skill:
 | `spec-approved`         | `/specd-implement <name>`                                                                          |
 | `implementing`          | `/specd-implement <name>`                                                                          |
 | `verifying`             | `/specd-verify <name>`                                                                             |
-| `done`                  | `/specd-archive <name>` (handles signoff gate internally)                                          |
+| `done`                  | `/specd-verify <name>` (verify handles the done→archivable transition)                             |
 | `pending-signoff`       | "Signoff pending. Run: `specd change approve signoff <name> --reason ...`"                         |
-| `signed-off`            | `/specd-archive <name>`                                                                            |
+| `signed-off`            | `/specd-verify <name>` (verify handles the signed-off→archivable transition)                       |
 | `archivable`            | `/specd-archive <name>`                                                                            |
 
 If no changes exist (or the user wants something new):

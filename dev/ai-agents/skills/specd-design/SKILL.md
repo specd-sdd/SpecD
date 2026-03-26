@@ -26,14 +26,16 @@ node packages/cli/dist/index.js change status <name> --format json
 If state is `drafting`, transition to `designing`:
 
 ```bash
-node packages/cli/dist/index.js change transition <name> designing
+node packages/cli/dist/index.js change transition <name> designing --skip-hooks all
 ```
 
 If state is not `drafting` or `designing`, this is the wrong skill. Suggest based on state:
 
 - `implementing` / `spec-approved` → `/specd-implement <name>`
 - `verifying` → `/specd-verify <name>`
-- `done` / `pending-signoff` / `signed-off` / `archivable` → `/specd-archive <name>`
+- `done` / `signed-off` → `/specd-verify <name>` (handles done→archivable transition)
+- `pending-signoff` → "Signoff pending. Run: `specd change approve signoff <name> --reason ...`"
+- `archivable` → `/specd-archive <name>`
 - `pending-spec-approval` → "Approval pending. Run: `specd change approve spec <name> --reason ...`"
 - `ready` → Review artifacts, then `/specd-implement <name>` if approved
 
@@ -46,6 +48,7 @@ Check `artifacts` array — if some are already `complete`, you're resuming mid-
 ### 2. Run entry hooks
 
 ```bash
+node packages/cli/dist/index.js change run-hooks <name> designing --phase pre
 node packages/cli/dist/index.js change hook-instruction <name> designing --phase pre --format text
 ```
 
@@ -159,16 +162,17 @@ node packages/cli/dist/index.js change hook-instruction <name> designing --phase
 
 Follow guidance. If hooks fail, fix and re-run.
 
-Transition:
+Run ready pre-hooks, then transition:
 
 ```bash
-node packages/cli/dist/index.js change transition <name> ready
+node packages/cli/dist/index.js change run-hooks <name> ready --phase pre
+node packages/cli/dist/index.js change hook-instruction <name> ready --phase pre --format text
 ```
 
-Run ready hooks:
+Follow guidance.
 
 ```bash
-node packages/cli/dist/index.js change hook-instruction <name> ready --phase pre --format text
+node packages/cli/dist/index.js change transition <name> ready --skip-hooks all
 ```
 
 ### 10. Mandatory review stop
@@ -203,7 +207,7 @@ Check `lifecycle.approvals.spec`:
 **If `false`:** transition to implementing:
 
 ```bash
-node packages/cli/dist/index.js change transition <name> implementing
+node packages/cli/dist/index.js change transition <name> implementing --skip-hooks all
 ```
 
 Suggest: `/specd-implement <name>`
@@ -244,14 +248,16 @@ Cannot transition from '<current>' to '<target>'
 If this happens, the change is in a different state than expected. Extract `<current>`
 from the error message and redirect using this table:
 
-| Current state                                            | Suggest                                                                  |
-| -------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `drafting` / `designing`                                 | You're already in the right skill — re-read status and retry             |
-| `implementing` / `spec-approved`                         | `/specd-implement <name>`                                                |
-| `verifying`                                              | `/specd-verify <name>`                                                   |
-| `done` / `pending-signoff` / `signed-off` / `archivable` | `/specd-archive <name>`                                                  |
-| `pending-spec-approval`                                  | "Approval pending. Run: `specd change approve spec <name> --reason ...`" |
-| `ready`                                                  | Review artifacts, then `/specd-implement <name>` if approved             |
+| Current state                    | Suggest                                                                    |
+| -------------------------------- | -------------------------------------------------------------------------- |
+| `drafting` / `designing`         | You're already in the right skill — re-read status and retry               |
+| `implementing` / `spec-approved` | `/specd-implement <name>`                                                  |
+| `verifying`                      | `/specd-verify <name>`                                                     |
+| `done` / `signed-off`            | `/specd-verify <name>` (handles done→archivable transition)                |
+| `pending-signoff`                | "Signoff pending. Run: `specd change approve signoff <name> --reason ...`" |
+| `archivable`                     | `/specd-archive <name>`                                                    |
+| `pending-spec-approval`          | "Approval pending. Run: `specd change approve spec <name> --reason ...`"   |
+| `ready`                          | Review artifacts, then `/specd-implement <name>` if approved               |
 
 **Stop — do not continue after redirecting.**
 
