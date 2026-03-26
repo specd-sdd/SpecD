@@ -2,6 +2,28 @@
 
 Every piece of work in specd is a **change**. A change tracks everything related to modifying one or more specs — the proposal, the spec files, the design, the implementation tasks, and the final archive record. This guide explains how changes move through their lifecycle, what each state means, and how approval gates, task completion checks, and hooks affect that progression.
 
+## How the pieces fit together
+
+specd has three layers that work together to drive a change from idea to completion:
+
+**The CLI** is the engine. It manages changes, transitions between states, validates artifacts, compiles context, and enforces gates. Every operation — creating a change, checking status, transitioning states, archiving — is a CLI command. The CLI is the source of truth for what is happening.
+
+**The workflow** is the rules. It defines which states exist, what transitions are valid, what artifacts must be produced, and what gates must be passed. The workflow comes from two sources: the schema (which defines artifacts and their dependency order) and the project config (which enables approval gates and hooks). Together they determine the path a change must follow.
+
+**The skills** are the interface. They are slash commands installed in your coding assistant (`/specd`, `/specd-new`, `/specd-design`, etc.) that orchestrate the workflow by calling the CLI. Each skill knows how to guide the agent through one phase — loading context, writing artifacts, validating, transitioning. You interact with skills; skills interact with the CLI; the CLI enforces the workflow.
+
+```
+You ←→ Skills ←→ CLI ←→ Workflow (schema + config)
+         │                    │
+         │  calls commands    │  enforces rules
+         │  reads context     │  validates artifacts
+         │  writes artifacts  │  manages transitions
+```
+
+In practice, you type `/specd` and the skill figures out where you are, what to do next, and which CLI commands to run. You can also use the CLI directly — for scripting, CI pipelines, or when you want fine-grained control — but for day-to-day work the skills provide the guided experience.
+
+---
+
 ## The lifecycle at a glance
 
 ```
@@ -411,17 +433,21 @@ The skill suggests creating a change and invokes `/specd-new`.
 
 ### 2. Creation — `/specd-new`
 
-The agent explores the existing specs, identifies the relevant capability paths, and creates the change:
+The agent has a discovery conversation with you — understanding the problem, discussing the approach, identifying affected specs, and reaching agreements about scope. Once the picture is clear, it creates the change:
 
 ```bash
 specd change create add-auth --spec default:auth/login --spec default:auth/logout
 ```
 
-State: `drafting` → the agent transitions to `designing` and invokes `/specd-design`.
+Before handing off, the agent writes a `specd-exploration.md` file to the change directory. This captures everything from the conversation — the problem, the agreed approach, design decisions, rejected alternatives, codebase observations, and open questions. It is the agent's working memory, persisted so that the next phase can pick up where you left off even in a different session. See [Exploration context](#exploration-context-specd-explorationmd) for details.
+
+State: `drafting` → the agent suggests running `/specd-design`.
 
 ### 3. Designing — `/specd-design`
 
-This is the longest phase. The agent works through each artifact in dependency order:
+The agent loads the change state, the schema, and the compiled context. It also reads `specd-exploration.md` from the change directory to recover the full discovery context — if time has passed since creation, it verifies that referenced files and spec IDs still exist and flags any drift before proceeding.
+
+This is the longest phase. The agent works through each artifact in dependency order. The artifacts below follow `@specd/schema-std` — other schemas may define a different set or order:
 
 **Step 3a: Proposal** — The agent writes `proposal.md`:
 
@@ -492,7 +518,13 @@ Once all checkboxes are `[x]`, the agent transitions to `verifying`.
 
 ### 5. Verifying — `/specd-verify`
 
-The agent reads each scenario from `verify.md` and confirms the implementation satisfies it:
+Verification is not the same as running tests. Tests check that code behaves as programmed — verification checks that the implementation satisfies the _requirements_. These are different questions:
+
+- **Not every project has tests.** Documentation changes, configuration changes, infrastructure work, early prototypes — many changes have no test suite at all. Verification still applies: the agent inspects the implementation against each scenario and confirms it holds.
+- **Tests can pass while requirements are missed.** A test suite exercises the code paths the developer thought to write. Verification scenarios come from the spec — they represent what was _agreed_ the system should do. A passing test suite does not guarantee that every requirement was addressed.
+- **Verification checks more than code.** The agent inspects the implementation holistically: does the code structure match the design? Were all tasks completed? Do the changes satisfy the GIVEN/WHEN/THEN conditions from `verify.md`? It runs tests where they exist, but also reads code, checks behaviour, and confirms edge cases that tests may not cover.
+
+The agent reads each scenario from `verify.md` and confirms the implementation satisfies it — by inspecting code, running tests where applicable, and verifying GIVEN/WHEN/THEN conditions:
 
 ```
 ### Requirement: Valid credentials
@@ -507,7 +539,7 @@ The agent reads each scenario from `verify.md` and confirms the implementation s
 → ✓ Verified: handler returns 401 with generic message
 ```
 
-If a scenario fails, the agent can transition back to `implementing` to fix the issue, then return to `verifying`.
+If a scenario fails, the agent goes back to fix the issue and then returns to verify again.
 
 Once all scenarios pass, the agent transitions to `done`.
 
@@ -537,6 +569,56 @@ The agent transitions back to `designing`. This:
 - Resets artifact validation hashes
 
 The agent updates the spec, verify, design, and tasks, then works forward through the lifecycle again.
+
+---
+
+## Exploration context (`specd-exploration.md`)
+
+When an AI agent runs `/specd-new`, it has a discovery conversation with the user — understanding the problem, discussing approaches, identifying affected specs, and reaching agreements about scope and direction. All of this context is captured in a file called `specd-exploration.md`, written to the change directory (`<changePath>/specd-exploration.md`) before the agent hands off to `/specd-design`.
+
+### Why it exists
+
+Design happens in a different session — often hours or days after creation. The agent that writes artifacts has no memory of the discovery conversation. Without a persistent record, it would need to start from scratch: ask the user to re-explain everything, or worse, guess based on the change name and one-line description alone.
+
+`specd-exploration.md` bridges this gap. It is the agent's working memory, persisted to disk so that any future session can pick up exactly where the conversation left off.
+
+### How it differs from `proposal.md`
+
+They may look similar at first glance, but they serve fundamentally different purposes:
+
+|                              | `specd-exploration.md`                                                                                        | `proposal.md`                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| **What it is**               | Agent working memory — raw conversation context                                                               | Formal schema artifact — structured document                                      |
+| **Who it's for**             | The AI agent in future sessions                                                                               | Humans and agents reviewing the change                                            |
+| **When it's written**        | During `/specd-new`, before any artifacts exist                                                               | During `/specd-design`, as the first artifact                                     |
+| **Part of the schema DAG?**  | No — it's outside the artifact pipeline                                                                       | Yes — other artifacts depend on it                                                |
+| **Validated?**               | No — no schema validation applies                                                                             | Yes — must pass schema validations                                                |
+| **Required by all schemas?** | Yes — every schema needs exploration context                                                                  | No — a schema can omit `proposal` entirely                                        |
+| **Content**                  | Everything discussed: rejected ideas, tangential topics, agreements, codebase observations, conversation flow | Curated: motivation, current behaviour, proposed solution, specs affected, impact |
+
+The key distinction: **`proposal.md` is a schema artifact that a schema may or may not include.** A custom schema could replace `proposal` with a different first artifact, or skip it entirely and go straight to specs. But even without a proposal, the agent still needs to know what the user wants to build and why. That's what `specd-exploration.md` provides — it is schema-independent context that ensures continuity across sessions regardless of which artifacts the schema defines.
+
+### What it contains
+
+The file captures everything from the discovery conversation:
+
+- **Problem statement** — what the user wants to achieve and why
+- **Approach / solution outline** — the agreed strategy
+- **Affected areas** — packages, modules, files, specs discussed
+- **Spec IDs** — attached to the change and mentioned as relevant
+- **Design decisions and agreements** — anything confirmed, rejected, or constrained
+- **Steps or plan** — if specific phases or ordering were agreed
+- **Rejected alternatives** — with reasons, so the agent doesn't re-propose them
+- **Open questions** — unresolved items for design to clarify
+- **Codebase observations** — file paths, patterns, current behaviour
+- **Tangential topics** — related issues, future ideas, things mentioned in passing
+- **Conversation flow** — how the discussion evolved
+
+Each item includes concrete anchors (file paths, spec IDs, function names) so the reader can verify whether they still hold, and reasons behind decisions so edge cases can be judged even if details have changed.
+
+### Staleness
+
+Time passes between exploration and design. Code changes, specs get renamed, decisions become outdated. The file includes a `Generated: YYYY-MM-DD` timestamp, and `/specd-design` performs a staleness check before trusting its content — verifying that referenced paths and spec IDs still exist, and flagging any significant drift to the user.
 
 ---
 
