@@ -10,7 +10,7 @@ Consumers of `@specd/core` need a single, stable entry point that exposes every 
 
 The `Kernel` interface organises use cases into three groups that mirror the domain areas of the platform:
 
-- `changes` — use cases that operate on change lifecycle (create, transition, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status)
+- `changes` — use cases that operate on change lifecycle (create, transition, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status, detect overlap)
 - `specs` — use cases that operate on specs and approval gates (approve spec, approve signoff, list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context)
 - `project` — use cases that operate on the project configuration (init, record skill install, get skills manifest, get project context)
 
@@ -98,6 +98,7 @@ The following table is the exhaustive mapping between kernel paths and use case 
 | `changes.runStepHooks`           | `RunStepHooks`           | [run-step-hooks](../run-step-hooks/spec.md)                     | Executes run: hooks for a step and phase                |
 | `changes.getHookInstructions`    | `GetHookInstructions`    | [get-hook-instructions](../get-hook-instructions/spec.md)       | Returns instruction: hook text for a step and phase     |
 | `changes.getArtifactInstruction` | `GetArtifactInstruction` | [get-artifact-instruction](../get-artifact-instruction/spec.md) | Returns artifact instruction block with rules and delta |
+| `changes.detectOverlap`          | `DetectOverlap`          | [spec-overlap](../spec-overlap/spec.md)                         | Detects specs targeted by multiple active changes       |
 
 #### kernel.specs
 
@@ -218,3 +219,4 @@ await kernel.project.init.execute({
 - [`specs/core/get-skills-manifest/spec.md`](../get-skills-manifest/spec.md)
 - [`specs/core/get-project-context/spec.md`](../get-project-context/spec.md)
 - [`specs/core/resolve-schema/spec.md`](../resolve-schema/spec.md)
+- [`specs/core/spec-overlap/spec.md`](../spec-overlap/spec.md)

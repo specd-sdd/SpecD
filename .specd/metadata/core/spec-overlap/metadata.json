@@ -1,0 +1,176 @@
+{
+  "title": "Spec Overlap",
+  "description": "When multiple active changes target the same spec, conflicts are only discovered late — at archive time, when delta application fails or drift is detected. There is no proactive mechanism to warn users that overlapping work may collide. The spec overlap feature provides early awareness by scanning active change manifests and reporting which specs are targeted by more than one change.",
+  "context": [
+    "When multiple active changes target the same spec, conflicts are only discovered late — at archive time, when delta application fails or drift is detected. There is no proactive mechanism to warn users that overlapping work may collide. The spec overlap feature provides early awareness by scanning active change manifests and reporting which specs are targeted by more than one change."
+  ],
+  "rules": [
+    {
+      "requirement": "Domain service is a pure function",
+      "rules": [
+        "`detectSpecOverlap` MUST be a pure function in `domain/services/` that takes a list of `Change` entities and returns an `OverlapReport`. It MUST NOT perform I/O or access any ports.\n\nThe function signature MUST be:\n\n```ts\nfunction detectSpecOverlap(changes: readonly Change[]): OverlapReport\n```"
+      ]
+    },
+    {
+      "requirement": "OverlapReport structure",
+      "rules": [
+        "`OverlapReport` MUST be a domain type containing:\n\n- `entries` — a readonly array of `OverlapEntry` objects, one per overlapping spec\n- `hasOverlap` — a boolean that is `true` when `entries` is non-empty\n\nEach `OverlapEntry` MUST contain:\n\n- `specId` — the qualified spec ID (e.g. `core:core/config`) targeted by multiple changes\n- `changes` — a readonly array of objects, each containing:\n  - `name` — the change name\n  - `state` — the change's current lifecycle state"
+      ]
+    },
+    {
+      "requirement": "Overlap detection logic",
+      "rules": [
+        "A spec is overlapping when two or more active changes include it in their `specIds`. The domain service MUST:\n\n1. Build an index of spec ID to list of changes that target it\n2. Filter to entries where the list has more than one change\n3. Sort entries by spec ID (lexicographic ascending)\n4. Within each entry, sort changes by name (lexicographic ascending)"
+      ]
+    },
+    {
+      "requirement": "Single-change and zero-change inputs",
+      "rules": [
+        "When the input list contains zero or one change, the domain service MUST return an `OverlapReport` with an empty `entries` array and `hasOverlap` equal to `false`. It MUST NOT throw."
+      ]
+    },
+    {
+      "requirement": "DetectOverlap use case",
+      "rules": [
+        "`DetectOverlap` MUST be an application use case that:\n\n1. Calls `ChangeRepository.list()` to retrieve all active changes\n2. Calls the `detectSpecOverlap` domain service with the result\n3. Returns the `OverlapReport`"
+      ]
+    },
+    {
+      "requirement": "DetectOverlap accepts an optional change name filter",
+      "rules": [
+        "`DetectOverlap.execute()` MUST accept an optional `name` parameter. When provided, the returned report MUST include only `OverlapEntry` objects where one of the overlapping changes matches the given name. All active changes MUST still participate in overlap detection — the filter affects the output, not the input.\n\nWhen the named change is not found among active changes, `DetectOverlap` MUST throw `ChangeNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Constructor accepts a ChangeRepository",
+      "rules": [
+        "`DetectOverlap` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.list()` to retrieve changes."
+      ]
+    }
+  ],
+  "constraints": [
+    "The domain service MUST NOT include drafted or discarded changes — only active changes from ChangeRepository.list() participate",
+    "Severity levels beyond Info (Warning, Error) are out of scope for this change — they depend on sync (#21) and baseline (#22) features not yet implemented"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Domain service is a pure function",
+      "name": "Returns result without I/O",
+      "when": ["detectSpecOverlap is called with a list of Change entities"],
+      "then": [
+        "it returns an OverlapReport synchronously",
+        "AND it does not invoke any ports, repositories, or I/O operations"
+      ]
+    },
+    {
+      "requirement": "OverlapReport structure",
+      "name": "Report contains expected fields",
+      "given": ["two changes both targeting core:core/config"],
+      "when": ["detectSpecOverlap is called"],
+      "then": [
+        "the result has hasOverlap equal to true",
+        "AND entries contains one OverlapEntry with specId equal to core:core/config",
+        "AND the entry's changes array has two elements, each with name and state"
+      ]
+    },
+    {
+      "requirement": "Overlap detection logic",
+      "name": "Two changes share one spec",
+      "given": [
+        "change alpha targets ['core:core/config', 'core:core/change']",
+        "AND change beta targets ['core:core/config']"
+      ],
+      "when": ["detectSpecOverlap is called with both changes"],
+      "then": [
+        "the report has one entry for core:core/config",
+        "AND the entry lists alpha and beta (sorted by name)",
+        "AND core:core/change does not appear in the report"
+      ]
+    },
+    {
+      "requirement": "Overlap detection logic",
+      "name": "Three changes share two specs",
+      "given": [
+        "change alpha targets ['core:core/config', 'core:core/kernel']",
+        "AND change beta targets ['core:core/config']",
+        "AND change gamma targets ['core:core/kernel']"
+      ],
+      "when": ["detectSpecOverlap is called with all three"],
+      "then": [
+        "the report has two entries sorted as core:core/config, core:core/kernel",
+        "AND core:core/config lists alpha, beta",
+        "AND core:core/kernel lists alpha, gamma"
+      ]
+    },
+    {
+      "requirement": "Overlap detection logic",
+      "name": "No overlapping specs",
+      "given": [
+        "change alpha targets ['core:core/config']",
+        "AND change beta targets ['core:core/kernel']"
+      ],
+      "when": ["detectSpecOverlap is called with both"],
+      "then": ["hasOverlap is false", "AND entries is empty"]
+    },
+    {
+      "requirement": "Single-change and zero-change inputs",
+      "name": "Empty input",
+      "when": ["detectSpecOverlap is called with an empty array"],
+      "then": ["hasOverlap is false", "AND entries is empty"]
+    },
+    {
+      "requirement": "Single-change and zero-change inputs",
+      "name": "Single change",
+      "given": ["one change targeting ['core:core/config', 'core:core/kernel']"],
+      "when": ["detectSpecOverlap is called with that single change"],
+      "then": ["hasOverlap is false", "AND entries is empty"]
+    },
+    {
+      "requirement": "DetectOverlap use case",
+      "name": "Use case retrieves active changes and delegates to domain service",
+      "given": ["ChangeRepository.list() returns two changes both targeting core:core/config"],
+      "when": ["DetectOverlap.execute() is called without a name filter"],
+      "then": ["the result is an OverlapReport with one entry for core:core/config"]
+    },
+    {
+      "requirement": "DetectOverlap accepts an optional change name filter",
+      "name": "Filter narrows output to named change",
+      "given": [
+        "three active changes: alpha targets ['core:core/config'], beta targets ['core:core/config', 'core:core/kernel'], gamma targets ['core:core/kernel']"
+      ],
+      "when": ["execute({ name: 'alpha' }) is called"],
+      "then": [
+        "the report contains only the entry for core:core/config (where alpha participates)",
+        "AND core:core/kernel is not in the report"
+      ]
+    },
+    {
+      "requirement": "DetectOverlap accepts an optional change name filter",
+      "name": "Named change has no overlap",
+      "given": ["change alpha targets ['core:core/config'] and no other change targets that spec"],
+      "when": ["execute({ name: 'alpha' }) is called"],
+      "then": ["hasOverlap is false", "AND entries is empty"]
+    },
+    {
+      "requirement": "DetectOverlap accepts an optional change name filter",
+      "name": "Named change not found",
+      "given": ["no active change named nonexistent exists"],
+      "when": ["execute({ name: 'nonexistent' }) is called"],
+      "then": ["a ChangeNotFoundError is thrown"]
+    },
+    {
+      "requirement": "Constructor accepts a ChangeRepository",
+      "name": "Use case is constructed with repository",
+      "when": ["new DetectOverlap(changeRepository) is called"],
+      "then": [
+        "the instance is created successfully",
+        "AND execute() delegates to changeRepository.list()"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:62948852cb85ebb62b71213055654991f4976ec4e1cfb57a706d377e2f3f4370",
+    "verify.md": "sha256:4c783eb17e79577c575182f2e3d8dcb6d4332bd27914ec36fee2fc5b1ee5850e"
+  },
+  "generatedBy": "core"
+}

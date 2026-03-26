@@ -55,3 +55,4 @@ export {
   type RuleEvaluatorNode,
   type RuleEvaluatorParser,
 } from './rule-evaluator.js'
+export { detectSpecOverlap } from './detect-spec-overlap.js'

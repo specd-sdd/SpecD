@@ -34,6 +34,7 @@ import { RunStepHooks } from '../application/use-cases/run-step-hooks.js'
 import { GetHookInstructions } from '../application/use-cases/get-hook-instructions.js'
 import { GetArtifactInstruction } from '../application/use-cases/get-artifact-instruction.js'
 import { ValidateSchema } from '../application/use-cases/validate-schema.js'
+import { DetectOverlap } from '../application/use-cases/detect-overlap.js'
 import { buildSchema } from '../domain/services/build-schema.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
@@ -94,6 +95,8 @@ export interface Kernel {
     getHookInstructions: GetHookInstructions
     /** Returns artifact-specific instructions, rules, and delta guidance. */
     getArtifactInstruction: GetArtifactInstruction
+    /** Detects specs targeted by multiple active changes. */
+    detectOverlap: DetectOverlap
   }
   /** Use cases that operate on specs and approval gates. */
   specs: {
@@ -220,6 +223,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         schemaProvider,
         i.expander,
       ),
+      detectOverlap: new DetectOverlap(i.changes),
       getArtifactInstruction: new GetArtifactInstruction(
         i.changes,
         i.specs,
