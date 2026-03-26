@@ -144,7 +144,7 @@ export function registerProjectDashboard(parent: Command): void {
         )
 
         // ── "Using config:" line ──────────────────────────────────────────────
-        const displayPath = configFilePath ?? path.join(config.projectRoot, 'specd.yaml')
+        const displayPath = configFilePath ?? '<unknown config>'
         const relConfigPath = path.relative(process.cwd(), displayPath)
         process.stdout.write(`Using config: ${relConfigPath}\n\n`)
 
