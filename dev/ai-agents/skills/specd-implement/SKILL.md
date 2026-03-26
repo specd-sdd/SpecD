@@ -114,10 +114,9 @@ Do not hardcode filenames — the schema defines what exists.
 
 ### 6. Work through tasks
 
-#### 6a. Analyze task dependencies (multi-agent support)
+#### 6a. Analyze task dependencies
 
-If your environment supports launching parallel agents (e.g. the `Agent` tool), analyze
-the tasks before starting:
+Before implementing anything, plan the execution order:
 
 1. **Read all tasks** from the task-bearing artifact(s) identified in step 2
 2. **Read all other change artifacts** (loaded in step 5) for context on dependencies
@@ -125,24 +124,92 @@ the tasks before starting:
 3. **Map dependencies** — for each task, determine which other tasks must complete first
 4. **Group into waves** — tasks with no unresolved dependencies form wave 1. Tasks that
    depend only on wave-1 tasks form wave 2, and so on.
-5. **Parallelize each wave** — launch one agent per task within a wave. Each agent
-   implements its task and marks its checkbox done. Wait for the full wave to complete
-   before starting the next.
-6. **Conflict resolution** — if two tasks in the same wave need to edit the same file,
+5. **Conflict resolution** — if two tasks in the same wave need to edit the same file,
    move one to the next wave instead.
 
-If multi-agent is not available or all tasks are sequential (single dependency chain),
-fall back to implementing tasks one by one in their listed order.
+Present the wave plan to the user before starting:
 
-#### 6b. Implement
+> **Execution plan:**
+>
+> Wave 1 (parallel): 1.1, 1.2, 2.1
+> Wave 2 (parallel): 2.2, 3.1 — depends on 1.1, 2.1
+> Wave 3 (sequential): 4.1 — depends on all above
 
-For each task (whether parallel or sequential):
+#### 6b. Implement — parallel mode
+
+**Use this mode when the `Agent` tool is available AND at least one wave has 2+ tasks.**
+
+For each wave, launch one agent per task using the `Agent` tool. Each agent runs in
+a worktree (`isolation: "worktree"`) so file edits don't conflict.
+
+Each agent prompt must include:
+
+1. **The task** — the full checkbox line with its indented context
+2. **The design excerpt** — the relevant section from `design.md` that covers this task
+3. **The spec requirements** — requirements and constraints from the compiled context
+   that apply to this task
+4. **File paths** — exact files to create or modify (from the task's indented context)
+5. **Instruction to mark done** — "After implementing, mark the checkbox done in
+   `<changePath>/<taskFile>`"
+6. **Project conventions** — remind the agent to follow the project context directives
+   (coding conventions, linting rules, etc.)
+
+Example agent launch:
+
+```
+Agent tool call:
+  description: "Implement task 1.1"
+  prompt: |
+    You are implementing one task from a specd change.
+
+    ## Task
+    - [ ] 1.1 Add optional `artifactId` field to input interface
+          `packages/core/src/application/use-cases/validate-artifacts.ts`:
+          `ValidateArtifactsInput` — add `artifactId?: string` property
+          Approach: add as optional field; when present, `execute()` filters
+          the schema artifacts array to only the matching ID before validation
+
+    ## Design context
+    [relevant excerpt from design.md]
+
+    ## Spec requirements
+    [relevant requirements and constraints]
+
+    ## Conventions
+    [project context directives — ESM, strict TS, no any, etc.]
+
+    Implement this task. When done, mark the checkbox as `- [x]` in
+    `<changePath>/tasks.md`.
+  isolation: "worktree"
+```
+
+Launch all tasks in a wave as parallel Agent calls in a **single message** — this is
+how the Agent tool parallelizes. Wait for all agents in the wave to complete, then
+verify their work before starting the next wave.
+
+Between waves:
+
+- Check that all checkboxes from the wave are marked `[x]`
+- Review the code briefly for consistency across agents
+- If an agent's work conflicts with another's, resolve before the next wave
+
+#### 6c. Implement — sequential mode
+
+**Use this mode when the `Agent` tool is NOT available, or when all tasks form a single
+dependency chain (no parallelism possible).**
+
+For each task in order:
 
 1. Implement the code
 2. **Immediately** mark it done (`- [ ]` → `- [x]`) in the task-bearing artifact
 3. Check if the code touches areas outside the change's specs — if so, surface to the user
 
-If a task is ambiguous, consult the other change artifacts first. If still unclear, ask the user.
+#### 6d. Common rules (both modes)
+
+- If a task is ambiguous, consult the other change artifacts first. If still unclear,
+  ask the user.
+- Mark tasks done in real time — don't batch checkbox updates.
+- If you touch code outside the change's spec scope, surface it to the user.
 
 ### 7. Run exit hooks — immediately after last checkbox
 
