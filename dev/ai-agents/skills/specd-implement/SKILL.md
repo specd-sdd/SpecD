@@ -42,6 +42,38 @@ node packages/cli/dist/index.js change transition <name> implementing --skip-hoo
 
 Store `lifecycle.changePath` and `specIds` from the response.
 
+### 1b. Check workspace ownership
+
+```bash
+node packages/cli/dist/index.js config show --format json
+```
+
+From the JSON output, build a map of each workspace's `codeRoot` and `ownership`.
+For each `specId` in the change, determine which workspace it belongs to.
+
+**If any spec targets a `readOnly` workspace:**
+
+> **Blocked.** The following specs belong to readOnly workspaces and cannot be modified:
+>
+> | Spec | Workspace | codeRoot |
+> | ---- | --------- | -------- |
+> | ...  | ...       | ...      |
+>
+> Remove them from the change or update the workspace ownership in `specd.yaml`.
+
+**Stop — do not continue.**
+
+**Continuous guard — applies throughout the entire implementation session:**
+
+ReadOnly workspaces are off-limits. You must NOT write or edit any file under
+the `codeRoot` of a readOnly workspace. Before every file write or edit, verify
+the target path does not fall within a readOnly `codeRoot`.
+
+If a task requires modifying code in a readOnly workspace, **stop immediately** —
+do not implement it, do not work around it, do not assume it's okay. Surface it
+to the user. The design may need revision, or the workspace ownership must change
+in `specd.yaml` before you can proceed.
+
 ### 2. Load schema and find task file
 
 ```bash
