@@ -22,6 +22,7 @@
 <!-- Specs to be created. Each becomes specs/<workspace>/<capability-path>/spec.md -->
 
 - `<workspace>:<capability-path>`: <!-- brief description of what this spec covers -->
+  - Depends on: <!-- list spec IDs this spec depends on, or "none" -->
 
 ### Modified specs
 
@@ -29,6 +30,7 @@
      Only list if spec-level behaviour changes — not just implementation. -->
 
 - `<workspace>:<capability-path>`: <!-- what requirement is changing and why -->
+  - Depends on (added): <!-- new dependencies introduced by this change, or "none" -->
 
 ## Impact
 
