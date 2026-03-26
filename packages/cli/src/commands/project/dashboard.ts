@@ -105,7 +105,9 @@ export function registerProjectDashboard(parent: Command): void {
     .action(async (opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+        const { config, configFilePath, kernel } = await resolveCliContext({
+          configPath: opts.config,
+        })
 
         const [specs, activeChanges, drafts, discarded] = await Promise.all([
           kernel.specs.list.execute({ includeSummary: false }),
@@ -142,8 +144,8 @@ export function registerProjectDashboard(parent: Command): void {
         )
 
         // ── "Using config:" line ──────────────────────────────────────────────
-        const configFilePath = opts.config ?? path.join(config.projectRoot, 'specd.yaml')
-        const relConfigPath = path.relative(process.cwd(), configFilePath)
+        const displayPath = configFilePath ?? path.join(config.projectRoot, 'specd.yaml')
+        const relConfigPath = path.relative(process.cwd(), displayPath)
         process.stdout.write(`Using config: ${relConfigPath}\n\n`)
 
         // ── Project box ──────────────────────────────────────────────────────

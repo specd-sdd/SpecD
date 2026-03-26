@@ -11,7 +11,10 @@ import {
   captureStderr,
 } from './helpers.js'
 
-vi.mock('../../src/load-config.js', () => ({ loadConfig: vi.fn() }))
+vi.mock('../../src/load-config.js', () => ({
+  loadConfig: vi.fn(),
+  resolveConfigPath: vi.fn().mockResolvedValue(null),
+}))
 vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 
 import { loadConfig } from '../../src/load-config.js'

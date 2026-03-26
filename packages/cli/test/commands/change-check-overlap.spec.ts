@@ -20,7 +20,7 @@ import { registerChangeOverlap } from '../../src/commands/change/check-overlap.j
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, kernel })
+  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
