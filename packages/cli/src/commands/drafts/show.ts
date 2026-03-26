@@ -13,7 +13,7 @@ export function registerDraftsShow(parent: Command): void {
     .command('show <name>')
     .allowExcessArguments(false)
     .description(
-      'Display the full details of a drafted change, including its specs, description, and last known lifecycle state.',
+      'Display the full details of a drafted change, including its specs, schema, and last known lifecycle state.',
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

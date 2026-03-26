@@ -55,7 +55,7 @@ export function registerSchemaFork(parent: Command): void {
     .command('fork <ref>')
     .allowExcessArguments(false)
     .description(
-      'Fork a schema into the project as an independent local copy, allowing full customisation without inheriting future upstream changes.',
+      'Fork a schema into the project as an independent local copy, allowing full customization without inheriting future upstream changes.',
     )
     .option('--name <name>', 'name for the forked schema')
     .option('--workspace <workspace>', 'target workspace', 'default')
