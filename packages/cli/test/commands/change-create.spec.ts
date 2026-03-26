@@ -221,3 +221,46 @@ describe('Duplicate name error', () => {
     expect(stderr()).toMatch(/error:/)
   })
 })
+
+describe('ReadOnly workspace rejection', () => {
+  it('rejects --spec targeting readOnly workspace', async () => {
+    const { kernel, stderr } = setup({
+      workspaces: [
+        {
+          name: 'default',
+          specsPath: '/project/specs',
+          schemasPath: null,
+          codeRoot: '/project',
+          ownership: 'owned' as const,
+          isExternal: false,
+        },
+        {
+          name: 'platform',
+          specsPath: '/external/platform/specs',
+          schemasPath: null,
+          codeRoot: '/external/platform',
+          ownership: 'readOnly' as const,
+          isExternal: true,
+        },
+      ],
+    })
+
+    const program = makeProgram()
+    registerChangeCreate(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'create',
+        'my-change',
+        '--spec',
+        'platform:auth/tokens',
+      ])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('workspace "platform" is readOnly')
+    expect(kernel.changes.create.execute).not.toHaveBeenCalled()
+  })
+})
