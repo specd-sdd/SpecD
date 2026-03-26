@@ -13,7 +13,7 @@
 #### Scenario: Changes group contains all change use cases
 
 - **WHEN** `kernel.changes` is inspected
-- **THEN** it contains entries for: `create`, `status`, `transition`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`
+- **THEN** it contains entries for: `create`, `status`, `transition`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `detectOverlap`
 - **AND** it contains `repo` as the underlying `ChangeRepository`
 
 #### Scenario: Specs group contains all spec use cases

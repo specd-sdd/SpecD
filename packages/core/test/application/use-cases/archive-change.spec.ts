@@ -1801,4 +1801,102 @@ describe('ArchiveChange', () => {
       expect(stateAtHookTime).toBe('archiving')
     })
   })
+
+  describe('overlap guard', () => {
+    it('throws SpecOverlapError when other changes target the same specs', async () => {
+      const { SpecOverlapError } = await import('../../../src/domain/errors/spec-overlap-error.js')
+      const archivable = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+      })
+      const other = new Change({
+        name: 'other-change',
+        createdAt: new Date(),
+        specIds: ['default:auth/oauth'],
+        history: [
+          {
+            type: 'created',
+            at: new Date(),
+            by: testActor,
+            specIds: ['default:auth/oauth'],
+            schemaName: 'test-schema',
+            schemaVersion: 1,
+          },
+        ],
+      })
+      const repo = makeChangeRepository([archivable, other])
+      const specRepo = makeSpecRepository()
+      const uc = new ArchiveChange(
+        repo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SpecOverlapError)
+    })
+
+    it('proceeds when allowOverlap is true despite overlap', async () => {
+      const archivable = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+      })
+      const other = new Change({
+        name: 'other-change',
+        createdAt: new Date(),
+        specIds: ['default:auth/oauth'],
+        history: [
+          {
+            type: 'created',
+            at: new Date(),
+            by: testActor,
+            specIds: ['default:auth/oauth'],
+            schemaName: 'test-schema',
+            schemaVersion: 1,
+          },
+        ],
+      })
+      const repo = makeChangeRepository([archivable, other])
+      const specRepo = makeSpecRepository()
+      const uc = new ArchiveChange(
+        repo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+      )
+
+      const result = await uc.execute({ name: 'my-change', allowOverlap: true })
+      expect(result.archivedChange).toBeDefined()
+    })
+
+    it('proceeds without flag when no overlap exists', async () => {
+      const archivable = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+      })
+      const repo = makeChangeRepository([archivable])
+      const specRepo = makeSpecRepository()
+      const uc = new ArchiveChange(
+        repo,
+        new Map([['default', specRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+      )
+
+      const result = await uc.execute({ name: 'my-change' })
+      expect(result.archivedChange).toBeDefined()
+    })
+  })
 })

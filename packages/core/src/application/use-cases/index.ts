@@ -123,6 +123,7 @@ export {
   type GetHookInstructionsInput,
   type GetHookInstructionsResult,
 } from './get-hook-instructions.js'
+export { type DetectOverlap, type DetectOverlapInput } from './detect-overlap.js'
 export {
   type GetArtifactInstruction,
   type GetArtifactInstructionInput,
