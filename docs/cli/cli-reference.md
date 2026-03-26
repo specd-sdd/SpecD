@@ -5,15 +5,16 @@ The `specd` CLI is the primary interface for managing the spec-driven developmen
 ## Invocation
 
 ```
-specd [--hide-banner] [--config <path>] <command> [options]
+specd [--config <path>] <command> [options]
 ```
+
+When `specd` is invoked with no subcommand and a `specd.yaml` is discoverable from the current directory, the project dashboard is shown automatically. If no config is found, the help text is printed instead.
 
 **Global options:**
 
 | Option                      | Description                                                                                 |
 | --------------------------- | ------------------------------------------------------------------------------------------- |
-| `--hide-banner`             | Suppress the startup banner. Useful for scripted or piped output.                           |
-| `--config <path>`           | Use this config file directly. Skips normal file discovery.                                 |
+| `--config <path>`           | Use this config file directly. Skips normal file discovery. Applies to all subcommands.     |
 | `--format text\|json\|toon` | Output format. `text` is the default for interactive use; `json` is suitable for scripting. |
 
 **Config discovery** — when `--config` is not given, SpecD walks up from the current working directory looking for `specd.local.yaml`, then `specd.yaml`, stopping at the git repo root. See the [configuration reference](../config/config-reference.md#file-discovery) for the full discovery algorithm.
@@ -643,13 +644,13 @@ Update installed agent skills after upgrading SpecD. Reads the `plugins` list fr
 | `--format text\|json\|toon` | Output format.    |
 | `--config <path>`           | Config file path. |
 
-### project overview
+### project dashboard
 
 ```
-specd project overview [options]
+specd project dashboard [options]
 ```
 
-Display a visual dashboard of the project: active changes, recent archives, spec coverage, and metadata freshness.
+Display a project-level dashboard showing schema, workspaces, spec counts, and change activity. Also runs automatically when `specd` is invoked with no subcommand and a config is present (see [Invocation](#invocation)).
 
 | Option                      | Description       |
 | --------------------------- | ----------------- |

@@ -18,10 +18,29 @@
 
 ### Requirement: Config flag override
 
-#### Scenario: Valid explicit config
+#### Scenario: Valid explicit config before subcommand (global position)
 
 - **WHEN** `specd --config /abs/path/specd.yaml change list` is run and the file exists
-- **THEN** that file is loaded regardless of whether a `specd.yaml` exists in the CWD tree
+- **THEN** that file is loaded and the subcommand executes successfully
+
+#### Scenario: Valid explicit config after subcommand (local position)
+
+- **WHEN** `specd change list --config /abs/path/specd.yaml` is run and the file exists
+- **THEN** that file is loaded and the subcommand executes successfully
+
+#### Scenario: Global config takes effect when subcommand has no local --config
+
+- **GIVEN** `--config /abs/path/specd.yaml` is provided before the subcommand
+- **AND** the subcommand does not also specify `--config`
+- **WHEN** the action handler runs
+- **THEN** `opts.config` is populated with the root-level value via `preAction` propagation
+
+#### Scenario: --config specified twice uses the last value
+
+- **GIVEN** `specd --config /root/specd.yaml change list --config /local/specd.yaml` is run
+- **WHEN** Commander parses the command line
+- **THEN** the last `--config` value (`/local/specd.yaml`) is used (Commander option override semantics)
+- **AND** the command executes normally — no error is produced
 
 #### Scenario: Explicit config file missing
 
@@ -86,6 +105,41 @@
 
 - **WHEN** any leaf command is run with an unexpected extra positional argument (e.g. `specd change list some-name`)
 - **THEN** the command exits with code 1 and prints a usage error to stderr
+
+### Requirement: Banner in help
+
+#### Scenario: Banner appears in root help output
+
+- **WHEN** `specd --help` is run
+- **THEN** stdout contains the SpecD ASCII art banner before the Commander-generated help text
+
+#### Scenario: Banner does not appear in subcommand help
+
+- **WHEN** `specd change --help` or any other subcommand `--help` is run
+- **THEN** stdout does not contain the SpecD ASCII art banner
+
+### Requirement: Auto-show dashboard
+
+#### Scenario: Bare specd invocation with config present shows dashboard
+
+- **GIVEN** `specd.yaml` is discoverable from CWD
+- **WHEN** `specd` is run with no subcommand
+- **THEN** the project dashboard output is displayed (same as `specd project dashboard`)
+- **AND** the process exits with code 0
+
+#### Scenario: specd with only --config and no subcommand shows dashboard
+
+- **GIVEN** a valid `specd.yaml` exists at `/path/to/specd.yaml`
+- **WHEN** `specd --config /path/to/specd.yaml` is run with no subcommand
+- **THEN** the project dashboard output is displayed
+- **AND** the process exits with code 0
+
+#### Scenario: Bare specd invocation without config shows help
+
+- **GIVEN** no `specd.yaml` is discoverable from CWD
+- **WHEN** `specd` is run with no subcommand
+- **THEN** the standard help text is shown
+- **AND** the process exits with code 0
 
 ### Requirement: Output format flag
 
