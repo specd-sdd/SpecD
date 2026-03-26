@@ -84,40 +84,6 @@
 - **THEN** `alpha` itself does not cause an overlap detection
 - **AND** the archive proceeds normally
 
-### Requirement: Overlap guard
-
-#### Scenario: Archive blocked when other changes target same specs
-
-- **GIVEN** a change `alpha` in `archivable` state targeting `core:core/config`
-- **AND** another active change `beta` also targets `core:core/config`
-- **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called without `allowOverlap`
-- **THEN** `SpecOverlapError` is thrown
-- **AND** the error message includes `core:core/config` and `beta`
-- **AND** no files are modified and no hooks are executed
-
-#### Scenario: Archive proceeds with allowOverlap flag
-
-- **GIVEN** a change `alpha` in `archivable` state targeting `core:core/config`
-- **AND** another active change `beta` also targets `core:core/config`
-- **WHEN** `ArchiveChange.execute({ name: 'alpha', allowOverlap: true })` is called
-- **THEN** the archive proceeds normally
-- **AND** no `SpecOverlapError` is thrown
-
-#### Scenario: No overlap allows archive without flag
-
-- **GIVEN** a change `alpha` in `archivable` state targeting `core:core/config`
-- **AND** no other active change targets `core:core/config`
-- **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called
-- **THEN** the archive proceeds normally
-
-#### Scenario: Overlap check excludes the change being archived
-
-- **GIVEN** a change `alpha` in `archivable` state targeting `core:core/config`
-- **AND** no other active change targets `core:core/config`
-- **WHEN** `ArchiveChange.execute({ name: 'alpha' })` is called
-- **THEN** `alpha` itself does not cause an overlap detection
-- **AND** the archive proceeds normally
-
 ### Requirement: Pre-archive hooks
 
 #### Scenario: Pre-archive run hook executes before file sync

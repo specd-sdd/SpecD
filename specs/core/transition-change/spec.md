@@ -61,7 +61,7 @@ After workflow requires enforcement passes, if the target workflow step declares
 2. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.
 3. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.
 4. If the file does not exist (returns `null`), skip it.
-5. Compile `incompletePattern` using `safeRegex` with the `'m'` flag.
+5. Compile `incompletePattern` using `safeRegex` with the `'gm'` flags.
 6. If the regex is valid and matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID, incomplete count (lines matching `incompletePattern`), and complete count (lines matching `completePattern` if declared).
 
 Only artifacts listed in `requiresTaskCompletion` are content-checked. Other artifacts in `requires` are checked only via `effectiveStatus`. When `requiresTaskCompletion` is absent or empty, no task completion gating applies.

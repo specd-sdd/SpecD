@@ -31,7 +31,7 @@ After computing the new `specIds`, the CLI derives the new `workspaces` set from
 
 After resolving the workspace for each `--add-spec` value, the CLI MUST check the workspace's `ownership` from `SpecdConfig`. If any spec's workspace has `readOnly` ownership, the command MUST exit with code 1 and print an error message to stderr:
 
-```
+```text
 error: Cannot add spec "<specId>" to change — workspace "<workspace>" is readOnly.
 
 ReadOnly workspaces are protected: their specs and code cannot be modified by changes.
@@ -53,7 +53,7 @@ Any modification to `specIds` (and by extension `workspaces`) causes the domain 
 
 On success, output depends on `--format`:
 
-- `text` (default): prints to stdout: If approval invalidation occurred, a warning is also printed to stderr:
+- `text` (default): prints a human-readable success message to stdout showing the updated change name, spec IDs, and workspaces. If approval invalidation occurred, a warning is also printed to stderr.
 - `json` or `toon`: outputs (encoded in the respective format):
 
 ### Requirement: Error cases

@@ -156,7 +156,7 @@ Each agent prompt must include:
 
 Example agent launch:
 
-```
+```text
 Agent tool call:
   description: "Implement task 1.1"
   prompt: |

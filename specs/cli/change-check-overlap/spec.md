@@ -8,7 +8,7 @@ Users need a way to check whether their in-progress work overlaps with other act
 
 ### Requirement: Command signature
 
-```
+```text
 specd change check-overlap [<name>] [--format text|json|toon]
 ```
 
@@ -19,7 +19,7 @@ specd change check-overlap [<name>] [--format text|json|toon]
 
 In `text` mode, the command MUST print a grouped display where each overlapping spec is a header followed by the changes that target it:
 
-```
+```text
 <specId>
   <changeName>  <state>
   <changeName>  <state>
