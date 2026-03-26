@@ -9,6 +9,7 @@ import {
   captureStdout,
   captureStderr,
 } from './helpers.js'
+import { ConfigValidationError } from '@specd/core'
 
 vi.mock('../../src/load-config.js', () => ({
   loadConfig: vi.fn(),
@@ -190,14 +191,16 @@ describe('project dashboard', () => {
 
   it('exits 1 when config is missing', async () => {
     const { stderr } = setup()
-    vi.mocked(loadConfig).mockRejectedValue(new Error('specd.yaml not found'))
+    vi.mocked(loadConfig).mockRejectedValue(
+      new ConfigValidationError('specd.yaml', 'config file not found'),
+    )
 
     const program = makeProgram()
     registerProjectDashboard(program.command('project'))
     await program.parseAsync(['node', 'specd', 'project', 'dashboard']).catch(() => {})
 
-    expect(process.exit).toHaveBeenCalledWith(expect.any(Number))
-    expect(stderr()).toMatch(/error:|fatal:/)
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toMatch(/error:/)
   })
 
   it('queries all four data sources', async () => {

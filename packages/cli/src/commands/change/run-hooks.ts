@@ -13,7 +13,7 @@ export function registerChangeRunHooks(parent: Command): void {
     .command('run-hooks <name> <step>')
     .allowExcessArguments(false)
     .description(
-      'Execute all run-hooks defined for a lifecycle phase of a change, triggering any configured side effects.',
+      'Execute run-hooks for a lifecycle phase of a change, optionally filtered with --only.',
     )
     .requiredOption('--phase <phase>', 'hook phase: pre or post')
     .option('--only <hook-id>', 'execute only the hook with this ID')

@@ -21,7 +21,7 @@
     {
       "requirement": "ReadOnly workspace rejection",
       "rules": [
-        "After resolving the workspace for each `--spec` value, the CLI MUST check the workspace's `ownership` from `SpecdConfig`. If any spec's workspace has `readOnly` ownership, the command MUST exit with code 1 and print an error message to stderr:\n\n```\nerror: Cannot add spec \"<specId>\" to change — workspace \"<workspace>\" is readOnly.\n\nReadOnly workspaces are protected: their specs and code cannot be modified by changes.\n```\n\nThis check MUST occur before invoking the `CreateChange` use case. If multiple specs target readOnly workspaces, one error per spec MUST be printed. The error message MUST NOT suggest remediation steps."
+        "After resolving the workspace for each `--spec` value, the CLI MUST check the workspace's `ownership` from `SpecdConfig`. If any spec's workspace has `readOnly` ownership, the command MUST exit with code 1 and print an error message to stderr:\n\n```text\nerror: Cannot add spec \"<specId>\" to change — workspace \"<workspace>\" is readOnly.\n\nReadOnly workspaces are protected: their specs and code cannot be modified by changes.\n```\n\nThis check MUST occur before invoking the `CreateChange` use case. If multiple specs target readOnly workspaces, one error per spec MUST be printed. The error message MUST NOT suggest remediation steps."
       ]
     },
     {
@@ -165,7 +165,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9c4f6216ce28bddadaeafb151307712dc6fa85c2e96bd40e082aa9714a03b605",
+    "spec.md": "sha256:b66fb97047cb054a769f457b35603884f1994aefe2b2a94795319c79fe67d863",
     "verify.md": "sha256:4a2dcd0a78e27d0d3879fa474766e0d968f99090dad85fb4b232a0d66057f5fa"
   },
   "generatedBy": "core"

@@ -270,7 +270,7 @@ Permanently discard a change. The change is moved to the discarded directory and
 
 ### change check-overlap
 
-```
+```text
 specd change check-overlap [<name>] [options]
 ```
 
@@ -675,7 +675,7 @@ Update installed agent skills after upgrading SpecD. Reads the `plugins` list fr
 
 ### project dashboard
 
-```
+```text
 specd project dashboard [options]
 ```
 

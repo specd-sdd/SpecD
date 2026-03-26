@@ -71,6 +71,22 @@ Follow guidance — review deltas to ensure specs match what was built.
 node packages/cli/dist/index.js change archive <name> --no-hooks --format json
 ```
 
+If the command fails with a `SpecOverlapError` (spec overlap detected), other active
+changes target the same specs as this change. Archiving would modify the canonical
+specs those changes are working against. When this happens:
+
+1. Show the user the overlapping specs and the other changes involved
+2. Explain the risk: the other changes' deltas were written against the pre-archive
+   version of the spec — archiving may cause their deltas to conflict at their own
+   archive time
+3. Ask the user whether to proceed or abort
+
+If the user confirms, re-run the command with `--allow-overlap`:
+
+```bash
+node packages/cli/dist/index.js change archive <name> --no-hooks --allow-overlap --format json
+```
+
 ### 6. Post-archive hooks
 
 ```bash

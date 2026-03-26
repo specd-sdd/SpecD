@@ -61,7 +61,7 @@ After the archivable guard passes and the change transitions to `archiving`, `Ar
 
 If any spec belongs to a workspace with `readOnly` ownership, `ArchiveChange` MUST throw `ReadOnlyWorkspaceError` with a message listing all affected specs and their workspaces. The error message format:
 
-```
+```text
 Cannot archive change "<name>" — it contains specs from readOnly workspaces:
 
   - <specId>  →  workspace "<workspace>" (readOnly)
@@ -70,21 +70,6 @@ Archiving would write deltas into protected specs.
 ```
 
 This check MUST occur before any hooks execute or any spec files are written. It is a defense-in-depth guard — upstream guards at `change create` and `change edit` should prevent readOnly specs from entering a change, but the archive MUST NOT silently merge deltas into protected specs if those guards are bypassed.
-
-### Requirement: Overlap guard
-
-After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes.
-
-The check MUST:
-
-1. Call `ChangeRepository.list()` to retrieve all active changes
-2. Exclude the change being archived from the list
-3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived
-4. Filter the result to entries where the change being archived participates
-
-If the filtered report has overlap and `allowOverlap` is `false`, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.
-
-If `allowOverlap` is `true`, the overlap check is skipped entirely — the use case proceeds to pre-archive hooks without calling `detectSpecOverlap`.
 
 ### Requirement: Overlap guard
 

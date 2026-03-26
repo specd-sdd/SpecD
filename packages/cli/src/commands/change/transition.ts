@@ -105,9 +105,9 @@ function resolveNextTarget(fromState: ChangeState, format?: string): ChangeState
       return cliError('cannot advance with --next: change is waiting for human signoff', format)
     case 'archivable':
       return cliError('cannot advance with --next: archiving is not a lifecycle transition', format)
+    case 'archiving':
+      return cliError('cannot advance with --next: archiving is a terminal state', format)
   }
-
-  return cliError(`cannot advance with --next from unsupported state '${fromState}'`, format)
 }
 
 /**
