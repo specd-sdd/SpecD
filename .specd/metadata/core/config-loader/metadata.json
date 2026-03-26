@@ -14,7 +14,13 @@
     {
       "requirement": "Factory signature and return type",
       "rules": [
-        "`createConfigLoader(options)` SHALL accept an `FsConfigLoaderOptions` discriminated union and return a `ConfigLoader`. The options union has two forms:\n\n- `{ startDir: string }` — discovery mode\n- `{ configPath: string }` — forced mode\n\nThe returned `ConfigLoader` exposes a single method `load(): Promise<SpecdConfig>`."
+        "`createConfigLoader(options)` SHALL accept an `FsConfigLoaderOptions` discriminated union and return a `ConfigLoader`. The options union has two forms:\n\n- `{ startDir: string }` — discovery mode\n- `{ configPath: string }` — forced mode\n\nThe returned `ConfigLoader` exposes two methods:\n\n- `load(): Promise<SpecdConfig>` — loads, validates, and returns the fully-resolved config. Throws `ConfigValidationError` on any failure.\n- `resolvePath(): Promise<string | null>` — resolves and returns the path to the active config file without loading or parsing it. Returns `null` when no config file can be located (discovery mode) or when the adapter has no concept of a file path. Never throws."
+      ]
+    },
+    {
+      "requirement": "Path probe",
+      "rules": [
+        "`resolvePath()` SHALL return the absolute path to the config file that `load()` would use, without reading or parsing it.\n\n- **Discovery mode** (`{ startDir }`): runs the same directory walk as `load()` (honouring `specd.local.yaml`, bounded by git root). Returns the found path, or `null` if no file is found. Never throws.\n- **Forced mode** (`{ configPath }`): returns the resolved absolute path directly. Does not check whether the file exists — existence is validated only by `load()`.\n\nAdapters that have no concept of a local file path (e.g. remote adapters) SHALL return `null`.\n\nThe purpose of `resolvePath()` is to allow delivery mechanisms to probe for config presence before deciding to dispatch to a default action (such as auto-showing the project dashboard), without paying the cost of a full load and without silencing load errors for explicitly-provided paths."
       ]
     },
     {
@@ -105,8 +111,47 @@
       "when": ["createConfigLoader({ startDir: '/some/dir' }) is called"],
       "then": [
         "the returned object satisfies the ConfigLoader interface",
-        "AND it exposes a load() method returning Promise<SpecdConfig>"
+        "AND it exposes a load() method returning Promise<SpecdConfig>",
+        "AND it exposes a resolvePath() method returning Promise<string | null>"
       ]
+    },
+    {
+      "requirement": "Path probe",
+      "name": "Discovery mode returns found path",
+      "given": ["specd.yaml exists at /repo/specd.yaml"],
+      "when": ["resolvePath() is called with { startDir: '/repo/src' }"],
+      "then": ["it returns '/repo/specd.yaml'"]
+    },
+    {
+      "requirement": "Path probe",
+      "name": "Discovery mode returns null when no config found",
+      "given": ["no specd.yaml or specd.local.yaml exists in or above startDir up to the git root"],
+      "when": ["resolvePath() is called"],
+      "then": ["it returns null", "AND no error is thrown"]
+    },
+    {
+      "requirement": "Path probe",
+      "name": "Discovery mode prefers specd.local.yaml",
+      "given": ["both specd.local.yaml and specd.yaml exist at /repo/"],
+      "when": ["resolvePath() is called with { startDir: '/repo' }"],
+      "then": ["it returns '/repo/specd.local.yaml'"]
+    },
+    {
+      "requirement": "Path probe",
+      "name": "Forced mode returns resolved absolute path without existence check",
+      "given": ["{ configPath: './custom/specd.yaml' } is used and the file does NOT exist"],
+      "when": ["resolvePath() is called"],
+      "then": [
+        "it returns the resolved absolute path (e.g. /cwd/custom/specd.yaml)",
+        "AND no error is thrown"
+      ]
+    },
+    {
+      "requirement": "Path probe",
+      "name": "resolvePath never throws",
+      "given": ["any loader configuration"],
+      "when": ["resolvePath() is called regardless of filesystem state"],
+      "then": ["no exception is thrown"]
     },
     {
       "requirement": "Discovery mode",
@@ -436,8 +481,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:a8370ddfc456dc057e9c24326021ae2aab3147b0d7cacd27fd8071fdd12608f1",
-    "verify.md": "sha256:5b82a90ec3241dc2c64072cc696e815e03ce7e926e069f977986ba2d9bc1caaa"
+    "spec.md": "sha256:8729dbb7b6e8854352566c1209633a70046415cbc4470344a18a2815f8c85078",
+    "verify.md": "sha256:955e6dfb8d2c7520973acdc3dc8b202bcf2b957e84c263d1fc1756f9bc466b8c"
   },
   "generatedBy": "core"
 }

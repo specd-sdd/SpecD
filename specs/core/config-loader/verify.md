@@ -9,6 +9,41 @@
 - **WHEN** `createConfigLoader({ startDir: '/some/dir' })` is called
 - **THEN** the returned object satisfies the `ConfigLoader` interface
 - **AND** it exposes a `load()` method returning `Promise<SpecdConfig>`
+- **AND** it exposes a `resolvePath()` method returning `Promise<string | null>`
+
+### Requirement: Path probe
+
+#### Scenario: Discovery mode returns found path
+
+- **GIVEN** `specd.yaml` exists at `/repo/specd.yaml`
+- **WHEN** `resolvePath()` is called with `{ startDir: '/repo/src' }`
+- **THEN** it returns `'/repo/specd.yaml'`
+
+#### Scenario: Discovery mode returns null when no config found
+
+- **GIVEN** no `specd.yaml` or `specd.local.yaml` exists in or above `startDir` up to the git root
+- **WHEN** `resolvePath()` is called
+- **THEN** it returns `null`
+- **AND** no error is thrown
+
+#### Scenario: Discovery mode prefers specd.local.yaml
+
+- **GIVEN** both `specd.local.yaml` and `specd.yaml` exist at `/repo/`
+- **WHEN** `resolvePath()` is called with `{ startDir: '/repo' }`
+- **THEN** it returns `'/repo/specd.local.yaml'`
+
+#### Scenario: Forced mode returns resolved absolute path without existence check
+
+- **GIVEN** `{ configPath: './custom/specd.yaml' }` is used and the file does NOT exist
+- **WHEN** `resolvePath()` is called
+- **THEN** it returns the resolved absolute path (e.g. `/cwd/custom/specd.yaml`)
+- **AND** no error is thrown
+
+#### Scenario: resolvePath never throws
+
+- **GIVEN** any loader configuration
+- **WHEN** `resolvePath()` is called regardless of filesystem state
+- **THEN** no exception is thrown
 
 ### Requirement: Discovery mode
 
