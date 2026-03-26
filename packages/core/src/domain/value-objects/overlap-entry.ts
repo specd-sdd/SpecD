@@ -27,7 +27,7 @@ export class OverlapEntry {
    */
   constructor(specId: string, changes: readonly OverlapChange[]) {
     this._specId = specId
-    this._changes = changes
+    this._changes = [...changes]
   }
 
   /** The qualified spec ID (e.g. `core:core/config`). */
