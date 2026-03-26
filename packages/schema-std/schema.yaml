@@ -22,16 +22,26 @@ artifacts:
         two subsections:
         - **New specs**: each becomes `specs/<workspace>/<capability-path>/spec.md`.
           Format: `<workspace>:<capability-path>`: brief description.
+          Under each spec, list its dependencies: `Depends on: <specId>, <specId>, ...`
+          or `Depends on: none`.
         - **Modified specs**: existing specs whose requirements change. Each needs a delta file.
           Run `specd spec list --format json --summary` to discover existing specs, and
           `specd spec show <workspace>:<capability-path> --format json` for full review.
           Format: `<workspace>:<capability-path>`: what requirement is changing and why.
+          Under each spec, list any new dependencies this change introduces:
+          `Depends on (added): <specId>, ...` or `Depends on (added): none`.
       - **Impact**: Affected code areas, APIs, data models, or external dependencies.
       - **Open questions**: Unresolved decisions that must be settled before spec work begins.
 
       The "Specs affected" section is the contract between proposal and specs — every spec
       listed there will need a corresponding file or delta. Research existing specs before
       filling it in.
+
+      Dependencies listed under each spec are also a contract — they declare which other
+      specs a given spec depends on (uses their types, calls their APIs, or builds on
+      their requirements). These dependencies are used by specd for transitive context
+      compilation. To identify dependencies, examine what each spec will need from other
+      specs: shared types, APIs it calls, concepts it references.
 
       Keep it concise (1–2 pages). Focus on the "why", not the "how" — implementation
       details belong in design.md.
@@ -43,6 +53,12 @@ artifacts:
             affects downstream artifacts (specs, design, tasks), it must be resolved
             with the user before proceeding. Do not write specs or design while
             unresolved questions could change the direction of those artifacts.
+        - id: register-spec-deps
+          instruction: |
+            Review the "Specs affected" section. For each spec (new or modified)
+            that lists dependencies, register them now. Dependency registration
+            affects context compilation for all downstream artifacts — do not
+            defer this to the specs artifact.
 
   # ── specs ──────────────────────────────────────────────────────────────────
   - id: specs
