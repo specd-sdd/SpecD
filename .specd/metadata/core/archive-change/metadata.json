@@ -48,6 +48,7 @@
     {
       "requirement": "Overlap guard",
       "rules": [
+        "After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes.\n\nThe check MUST:\n\n1. Call `ChangeRepository.list()` to retrieve all active changes\n2. Exclude the change being archived from the list\n3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived\n4. Filter the result to entries where the change being archived participates\n\nIf the filtered report has overlap and `allowOverlap` is `false`, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.\n\nIf `allowOverlap` is `true`, the overlap check is skipped entirely — the use case proceeds to pre-archive hooks without calling `detectSpecOverlap`.",
         "After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes.\n\nThe check MUST:\n\n1. Call `ChangeRepository.list()` to retrieve all active changes\n2. Exclude the change being archived from the list\n3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived\n4. Filter the result to entries where the change being archived participates\n\nIf the filtered report has overlap and `allowOverlap` is `false`, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.\n\nIf `allowOverlap` is `true`, the overlap check is skipped entirely — the use case proceeds to pre-archive hooks without calling `detectSpecOverlap`."
       ]
     },
@@ -121,6 +122,53 @@
         "AND the change transitions to archiving via change.transition('archiving', actor)",
         "AND the change is persisted via ChangeRepository.save(change)",
         "AND execution proceeds to pre-archive hooks"
+      ]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "Archive blocked when other changes target same specs",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config",
+        "AND another active change beta also targets core:core/config"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha' }) is called without allowOverlap"],
+      "then": [
+        "SpecOverlapError is thrown",
+        "AND the error message includes core:core/config and beta",
+        "AND no files are modified and no hooks are executed"
+      ]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "Archive proceeds with allowOverlap flag",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config",
+        "AND another active change beta also targets core:core/config"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha', allowOverlap: true }) is called"],
+      "then": ["the archive proceeds normally", "AND no SpecOverlapError is thrown"]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "No overlap allows archive without flag",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config",
+        "AND no other active change targets core:core/config"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha' }) is called"],
+      "then": ["the archive proceeds normally"]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "Overlap check excludes the change being archived",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config",
+        "AND no other active change targets core:core/config"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha' }) is called"],
+      "then": [
+        "alpha itself does not cause an overlap detection",
+        "AND the archive proceeds normally"
       ]
     },
     {
@@ -355,8 +403,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:68140e9e414d9c5628fffe77b9e9f1dbd64851f14250dfde1cd0740d91557fba",
-    "verify.md": "sha256:1435ec2eb2b6d863796ff13b0f0d435bbb476bbbcfff569aec37e9d65dd57212"
+    "spec.md": "sha256:83e43986fc7810c9aed84cdeefc279df7a40c7154d2913026b390fe03a093d63",
+    "verify.md": "sha256:85dd15d35e166c5ad01d7a8a4aea880f7a78eaa917af5951b8ac9dd820285e73"
   },
   "generatedBy": "core"
 }
