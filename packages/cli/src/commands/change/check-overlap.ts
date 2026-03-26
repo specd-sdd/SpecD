@@ -26,7 +26,7 @@ function renderOverlapReport(report: OverlapReport): string {
 }
 
 /**
- * Registers the `change overlap` subcommand on the given parent command.
+ * Registers the `change check-overlap` subcommand on the given parent command.
  *
  * @param parent - The parent Commander command to attach the subcommand to.
  */
