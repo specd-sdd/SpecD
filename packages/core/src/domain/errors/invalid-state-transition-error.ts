@@ -67,6 +67,10 @@ function buildMessage(from: string, to: string, reason?: TransitionFailureReason
       return `${base}: ${reason.artifactId} has incomplete items (${reason.complete}/${reason.total} tasks complete)`
     case 'invalid-transition':
       return base
+    default: {
+      const _exhaustive: never = reason
+      return `${base}: unknown reason '${(_exhaustive as TransitionFailureReason).type}'`
+    }
   }
 }
 

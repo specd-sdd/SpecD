@@ -6,6 +6,7 @@ import { SchemaMismatchError } from '../../../src/application/errors/schema-mism
 import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { DeltaApplicationError } from '../../../src/domain/errors/delta-application-error.js'
+import { SpecOverlapError } from '../../../src/domain/errors/spec-overlap-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -1804,7 +1805,6 @@ describe('ArchiveChange', () => {
 
   describe('overlap guard', () => {
     it('throws SpecOverlapError when other changes target the same specs', async () => {
-      const { SpecOverlapError } = await import('../../../src/domain/errors/spec-overlap-error.js')
       const archivable = makeArchivableChange('my-change', {
         specIds: ['default:auth/oauth'],
       })
