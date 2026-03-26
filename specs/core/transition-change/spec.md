@@ -30,6 +30,17 @@ When the change is in `ready` state, the requested target is `implementing`, and
 
 When the change is in `done` state, the requested target is `archivable`, and `approvalsSignoff` is `true`, the use case MUST route the transition to `pending-signoff` instead of `archivable`.
 
+### Requirement: Human-approval pending states produce explicit transition failures
+
+When the current change state represents a human approval boundary, `TransitionChange` MUST fail with an `InvalidStateTransitionError` that carries a structured reason explaining why normal lifecycle progression cannot continue through `change transition`.
+
+Specifically:
+
+- When the change is in `pending-spec-approval` and the requested target is anything other than `designing`, the use case MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'spec' }`
+- When the change is in `pending-signoff` and the requested target is anything other than `designing`, the use case MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'signoff' }`
+
+This explicit failure happens before delegating to `change.transition(...)`. The goal is to preserve the existing lifecycle rules while giving callers enough information to explain why the transition cannot proceed automatically.
+
 ### Requirement: Direct transition when gates are inactive
 
 When neither approval-gate routing condition is met, the use case MUST transition to the exact target state requested in the input.
@@ -135,7 +146,7 @@ The previous `postHookFailures` field is removed because both hook phases are no
 - The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates
 - Task completion checks are controlled by `requiresTaskCompletion` on the workflow step — only listed artifacts are content-checked
 - Task completion checks use `safeRegex` to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
-- `InvalidStateTransitionError` carries a structured `reason` field: `'incomplete-artifact'`, `'incomplete-tasks'`, or `'invalid-transition'`
+- `InvalidStateTransitionError` carries a structured `reason` field: `'incomplete-artifact'`, `'incomplete-tasks'`, `'invalid-transition'`, or `'approval-required'`
 - Approval-gate routing is purely input-driven — the use case does not read configuration directly
 - Pre-hook failure aborts the transition — no state change occurs
 - Post-hook failures are collected in the result — no rollback

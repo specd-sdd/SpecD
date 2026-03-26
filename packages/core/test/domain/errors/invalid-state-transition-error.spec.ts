@@ -36,4 +36,22 @@ describe('InvalidStateTransitionError', () => {
     expect(err.message).toBe("Cannot transition from 'drafting' to 'archivable'")
     expect(err.reason).toEqual({ type: 'invalid-transition' })
   })
+
+  it('includes approval message for spec gate', () => {
+    const err = new InvalidStateTransitionError('pending-spec-approval', 'spec-approved', {
+      type: 'approval-required',
+      gate: 'spec',
+    })
+    expect(err.message).toContain('waiting for human spec approval')
+    expect(err.reason).toEqual({ type: 'approval-required', gate: 'spec' })
+  })
+
+  it('includes approval message for signoff gate', () => {
+    const err = new InvalidStateTransitionError('pending-signoff', 'signed-off', {
+      type: 'approval-required',
+      gate: 'signoff',
+    })
+    expect(err.message).toContain('waiting for human signoff')
+    expect(err.reason).toEqual({ type: 'approval-required', gate: 'signoff' })
+  })
 })

@@ -37,6 +37,12 @@
       ]
     },
     {
+      "requirement": "Human-approval pending states produce explicit transition failures",
+      "rules": [
+        "When the current change state represents a human approval boundary, `TransitionChange` MUST fail with an `InvalidStateTransitionError` that carries a structured reason explaining why normal lifecycle progression cannot continue through `change transition`.\n\nSpecifically:\n\n- When the change is in `pending-spec-approval` and the requested target is anything other than `designing`, the use case MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'spec' }`\n- When the change is in `pending-signoff` and the requested target is anything other than `designing`, the use case MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'signoff' }`\n\nThis explicit failure happens before delegating to `change.transition(...)`. The goal is to preserve the existing lifecycle rules while giving callers enough information to explain why the transition cannot proceed automatically."
+      ]
+    },
+    {
       "requirement": "Direct transition when gates are inactive",
       "rules": [
         "When neither approval-gate routing condition is met, the use case MUST transition to the exact target state requested in the input."
@@ -119,7 +125,7 @@
     "The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates",
     "Task completion checks are controlled by requiresTaskCompletion on the workflow step — only listed artifacts are content-checked",
     "Task completion checks use safeRegex to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)",
-    "InvalidStateTransitionError carries a structured reason field: 'incomplete-artifact', 'incomplete-tasks', or 'invalid-transition'",
+    "InvalidStateTransitionError carries a structured reason field: 'incomplete-artifact', 'incomplete-tasks', 'invalid-transition', or 'approval-required'",
     "Approval-gate routing is purely input-driven — the use case does not read configuration directly",
     "Pre-hook failure aborts the transition — no state change occurs",
     "Post-hook failures are collected in the result — no rollback",
@@ -162,6 +168,33 @@
       "given": ["a change in done state"],
       "when": ["execute is called with to: 'archivable' and approvalsSignoff: false"],
       "then": ["the change transitions to archivable"]
+    },
+    {
+      "requirement": "Human-approval pending states produce explicit transition failures",
+      "name": "Pending spec approval blocks normal forward transition",
+      "given": ["a change in pending-spec-approval state"],
+      "when": ["execute is called with to: 'spec-approved'"],
+      "then": [
+        "it throws InvalidStateTransitionError",
+        "AND the error reason equals { type: 'approval-required', gate: 'spec' }"
+      ]
+    },
+    {
+      "requirement": "Human-approval pending states produce explicit transition failures",
+      "name": "Pending signoff blocks normal forward transition",
+      "given": ["a change in pending-signoff state"],
+      "when": ["execute is called with to: 'signed-off'"],
+      "then": [
+        "it throws InvalidStateTransitionError",
+        "AND the error reason equals { type: 'approval-required', gate: 'signoff' }"
+      ]
+    },
+    {
+      "requirement": "Human-approval pending states produce explicit transition failures",
+      "name": "Pending approval still allows redesign",
+      "given": ["a change in pending-spec-approval state"],
+      "when": ["execute is called with to: 'designing'"],
+      "then": ["the change transitions to designing"]
     },
     {
       "requirement": "Task completion check during requires enforcement",
@@ -400,8 +433,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:4d56573925172e62b6ce0e9344711fa22ee74b8e8e3496135fc911dfc484c6c6",
-    "verify.md": "sha256:931f3e0231c168b348991ccfbb3f533391d654faac36700c7c21bd015ac6d4ae"
+    "spec.md": "sha256:748548ee1462ad253205e10349647fd87d45ab50e79df812475c0ecded444b97",
+    "verify.md": "sha256:5eba8b94e28dbb3ae47e0199594bcbbbd8bf310f0e41a1f7d3e294d11bacb00f"
   },
   "generatedBy": "core"
 }
