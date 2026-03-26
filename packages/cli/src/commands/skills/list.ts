@@ -39,7 +39,7 @@ export function registerSkillsList(parent: Command): void {
     .command('list')
     .allowExcessArguments(false)
     .description(
-      'List all available specd agent skills, showing their names, versions, and target agents.',
+      'List all available specd agent skills with their descriptions. Use --agent to check installation status for a specific agent.',
     )
     .option('--agent <id>', 'check installation status for this agent (e.g. claude)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

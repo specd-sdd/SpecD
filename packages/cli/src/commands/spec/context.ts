@@ -53,7 +53,7 @@ export function registerSpecContext(parent: Command): void {
     .command('context <specPath>')
     .allowExcessArguments(false)
     .description(
-      'Compile and print the context block for a spec, including relevant rules, constraints, and schema sections.',
+      'Compile and print the context block for a spec, including relevant rules, constraints, and scenarios.',
     )
     .option('--rules', 'include only rules sections')
     .option('--constraints', 'include only constraints sections')
