@@ -191,8 +191,14 @@ class StubSpecRepository extends SpecRepository {
     artifacts?: Record<string, string | null>
     save?: (spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>
     delete?: (spec: Spec) => Promise<void>
+    ownership?: 'owned' | 'shared' | 'readOnly'
+    workspace?: string
   }) {
-    super({ workspace: 'default', ownership: 'owned', isExternal: false })
+    super({
+      workspace: opts.workspace ?? 'default',
+      ownership: opts.ownership ?? 'owned',
+      isExternal: false,
+    })
     this._specs = opts.specs ?? []
     this._artifacts = opts.artifacts ?? {}
     this._saveFn = opts.save
@@ -261,13 +267,23 @@ class StubSpecRepository extends SpecRepository {
  * Creates a `SpecRepository` backed by in-memory arrays.
  */
 export function makeSpecRepository(
-  overrides: {
-    specs?: Spec[]
-    artifacts?: Record<string, string | null>
-    save?: (spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>
-    delete?: (spec: Spec) => Promise<void>
-  } = {},
+  overridesOrOwnership?:
+    | {
+        specs?: Spec[]
+        artifacts?: Record<string, string | null>
+        save?: (spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>
+        delete?: (spec: Spec) => Promise<void>
+        ownership?: 'owned' | 'shared' | 'readOnly'
+        workspace?: string
+      }
+    | 'owned'
+    | 'shared'
+    | 'readOnly',
 ): SpecRepository & { saved: Map<string, string> } {
+  const overrides =
+    typeof overridesOrOwnership === 'string'
+      ? { ownership: overridesOrOwnership }
+      : (overridesOrOwnership ?? {})
   return new StubSpecRepository(overrides)
 }
 

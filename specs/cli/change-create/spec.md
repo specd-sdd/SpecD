@@ -21,6 +21,18 @@ specd change create <name> [--spec <id>...] [--format text|json|toon]
 
 The workspace IDs for the new change are derived from the workspace prefix of each `--spec` value. If the workspace prefix is omitted, `default` is used. If a named workspace is not declared in `specd.yaml`, the command fails with exit code 1 and prints an `error:` message to stderr.
 
+### Requirement: ReadOnly workspace rejection
+
+After resolving the workspace for each `--spec` value, the CLI MUST check the workspace's `ownership` from `SpecdConfig`. If any spec's workspace has `readOnly` ownership, the command MUST exit with code 1 and print an error message to stderr:
+
+```
+error: Cannot add spec "<specId>" to change — workspace "<workspace>" is readOnly.
+
+ReadOnly workspaces are protected: their specs and code cannot be modified by changes.
+```
+
+This check MUST occur before invoking the `CreateChange` use case. If multiple specs target readOnly workspaces, one error per spec MUST be printed. The error message MUST NOT suggest remediation steps.
+
 ### Requirement: Schema name and version
 
 `schemaName` and `schemaVersion` are resolved from the active `SpecdConfig` at command time and passed to the `CreateChange` use case. The user does not specify these values.
@@ -40,9 +52,10 @@ If a change with the given name already exists (`ChangeAlreadyExistsError`), the
 
 ## Constraints
 
-- `--spec` is optional; when omitted, the change is created with an empty specIds list
+- \--spec is optional; when omitted, the change is created with an empty specIds list
 - The change name must be a valid kebab-case slug; the CLI validates the format before invoking the use case
-- The workspace prefix in `--spec` defaults to `default` when omitted; workspace IDs are never a separate flag
+- The workspace prefix in --spec defaults to default when omitted; workspace IDs are never a separate flag
+- Specs targeting readOnly workspaces are rejected before the use case is invoked
 
 ## Examples
 

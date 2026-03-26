@@ -42,6 +42,20 @@ Ownership describes the project's relationship to a workspace's specs:
 
 Ownership defaults to `owned` for the `default` workspace and `readOnly` for non-`default` workspaces. Ownership affects whether changes can target specs in the workspace and whether approval gates apply.
 
+#### ReadOnly enforcement
+
+When a workspace's ownership is `readOnly`, the following operations MUST be rejected with `ReadOnlyWorkspaceError`:
+
+1. **Change scope** — adding a spec from a `readOnly` workspace to a change via `change create --spec` or `change edit --add-spec` MUST fail. A `readOnly` spec cannot be part of a change's `specIds`.
+2. **Archive** — `ArchiveChange` MUST reject archiving when any spec in the change belongs to a `readOnly` workspace. This is a defense-in-depth guard — upstream guards should prevent this state, but the archive MUST NOT silently merge deltas into protected specs.
+3. **Direct spec writes** — `SpecRepository.save()` and `SpecRepository.saveMetadata()` MUST reject writes when the repository's workspace is `readOnly`. This is the lowest-level guard and cannot be bypassed by any code path.
+
+Error messages MUST state what operation was blocked and why (the workspace is `readOnly`). Error messages MUST NOT suggest remediation steps (e.g. "change ownership in specd.yaml") to prevent LLM agents from autonomously modifying configuration to bypass the restriction.
+
+`readOnly` workspaces MAY still be read — specs can be loaded, listed, used as context dependencies, and referenced in `dependsOn`. Only write operations are blocked.
+
+`shared` ownership permits all write operations identical to `owned`. No enforcement distinction exists between `owned` and `shared` for write operations.
+
 ### Requirement: Prefix semantics
 
 When a workspace declares a `prefix`, the prefix is prepended to all capability paths in that workspace. A spec stored at `architecture/` on disk becomes `<prefix>/architecture` in the specd model. When no prefix is declared, specs use bare capability paths.
@@ -109,16 +123,18 @@ Each project's `specd.yaml` is the sole source of truth for that project's view 
 
 ## Constraints
 
-- Every project must declare a `default` workspace
-- Workspace names must match `/^[a-z][a-z0-9-]*$/`
-- `codeRoot` is required for non-`default` workspaces
-- `isExternal` is inferred, never declared
+- Every project must declare a default workspace
+- Workspace names must match /^\[a-z]\[a-z0-9-]\*$/
+- codeRoot is required for non-default workspaces
+- isExternal is inferred, never declared
 - Spec IDs are always workspace-qualified internally
-- A change's workspaces are derived from its `specIds` via `parseSpecId()` — not persisted
-- When `specIds` is empty, `workspaces` is empty
-- Workspace-level exclude patterns do not apply to specs reached via `dependsOn`
+- A change's workspaces are derived from its specIds via parseSpecId() — not persisted
+- When specIds is empty, workspaces is empty
+- Workspace-level exclude patterns do not apply to specs reached via dependsOn
 - External repository configurations are never read — each project declares its own view
 - Change artifacts always include the workspace segment in their path
+- ReadOnly workspaces reject all write operations — change scope additions, archive merges, and direct spec writes
+- ReadOnly enforcement error messages must not suggest remediation steps
 
 ## Spec Dependencies
 

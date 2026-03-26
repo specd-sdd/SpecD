@@ -60,6 +60,51 @@
 - **WHEN** configuration is loaded
 - **THEN** `isExternal` is `true`
 
+### Requirement: Ownership semantics
+
+#### Scenario: Owned workspace allows all operations
+
+- **GIVEN** a workspace with `ownership: owned`
+- **WHEN** a change is created with a spec from that workspace
+- **THEN** the change is created successfully
+
+#### Scenario: Shared workspace allows all operations
+
+- **GIVEN** a workspace with `ownership: shared`
+- **WHEN** a change is created with a spec from that workspace
+- **THEN** the change is created successfully
+
+#### Scenario: ReadOnly workspace blocks change scope addition
+
+- **GIVEN** a workspace with `ownership: readOnly`
+- **WHEN** a spec from that workspace is added to a change via `change create --spec` or `change edit --add-spec`
+- **THEN** `ReadOnlyWorkspaceError` is thrown
+- **AND** the change is not created or modified
+
+#### Scenario: ReadOnly workspace blocks archive
+
+- **GIVEN** a change that contains specs from a `readOnly` workspace
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** `ReadOnlyWorkspaceError` is thrown before any hooks or file modifications
+
+#### Scenario: ReadOnly workspace blocks direct spec writes
+
+- **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
+- **WHEN** `save()` or `saveMetadata()` is called
+- **THEN** `ReadOnlyWorkspaceError` is thrown before any filesystem operation
+
+#### Scenario: ReadOnly workspace allows reads
+
+- **GIVEN** a workspace with `ownership: readOnly`
+- **WHEN** `SpecRepository.get()`, `list()`, `artifact()`, or `metadata()` is called
+- **THEN** the operation succeeds normally
+
+#### Scenario: Error messages do not suggest remediation
+
+- **WHEN** any `ReadOnlyWorkspaceError` is thrown
+- **THEN** the error message states the blocked operation and the workspace name
+- **AND** the message does not contain suggestions to change `specd.yaml` or modify ownership
+
 ### Requirement: Prefix semantics
 
 #### Scenario: Prefix prepended to capability path

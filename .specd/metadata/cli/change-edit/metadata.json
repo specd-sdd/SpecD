@@ -24,6 +24,12 @@
       ]
     },
     {
+      "requirement": "ReadOnly workspace rejection",
+      "rules": [
+        "After resolving the workspace for each `--add-spec` value, the CLI MUST check the workspace's `ownership` from `SpecdConfig`. If any spec's workspace has `readOnly` ownership, the command MUST exit with code 1 and print an error message to stderr:\n\n```\nerror: Cannot add spec \"<specId>\" to change — workspace \"<workspace>\" is readOnly.\n\nReadOnly workspaces are protected: their specs and code cannot be modified by changes.\n```\n\nThis check MUST occur before applying any edits to the change. If multiple specs target readOnly workspaces, one error per spec MUST be printed. The error message MUST NOT suggest remediation steps.\n\nThe `--remove-spec` flag is not subject to ownership checks — removing a spec from a change does not write to the workspace."
+      ]
+    },
+    {
       "requirement": "Invariant enforcement",
       "rules": [
         "The change must retain at least one `specId` after editing. If `--remove-spec` operations would leave `specIds` empty, the command exits with code 1 before making any changes."
@@ -44,7 +50,7 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "- If the change does not exist, exits with code 1.\n- If a `--remove-spec` value is not in the current `specIds`, exits with code 1.\n- If an `--add-spec` value uses a workspace prefix not declared in `specd.yaml`, exits with code 1.\n- If the result would leave `specIds` empty, exits with code 1."
+        "- If the change does not exist, exits with code 1.\n- If a `--remove-spec` value is not in the current `specIds`, exits with code 1.\n- If an `--add-spec` value uses a workspace prefix not declared in `specd.yaml`, exits with code 1.\n- If an `--add-spec` value targets a workspace with `readOnly` ownership, exits with code 1.\n- If the result would leave `specIds` empty, exits with code 1."
       ]
     }
   ],
@@ -52,7 +58,9 @@
     "All edits are applied atomically — either all succeed or none are applied",
     "The change name and createdAt are immutable and cannot be changed",
     "A discarded change cannot be edited",
-    "Workspaces are always derived from specIds — they are never set independently"
+    "Workspaces are always derived from specIds — they are never set independently",
+    "Specs targeting readOnly workspaces are rejected via --add-spec before any edits are applied",
+    "--remove-spec is not subject to ownership checks"
   ],
   "scenarios": [
     {
@@ -90,6 +98,40 @@
       "then": [
         "billing-ws remains in workspaces because billing-ws:billing/payments still references it"
       ]
+    },
+    {
+      "requirement": "ReadOnly workspace rejection",
+      "name": "Adding spec from readOnly workspace rejected",
+      "given": [
+        "workspace platform is declared with ownership: readOnly in specd.yaml",
+        "AND a change my-change exists"
+      ],
+      "when": ["specd change edit my-change --add-spec platform:auth/tokens is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains Cannot add spec \"platform:auth/tokens\" to change — workspace \"platform\" is readOnly.",
+        "AND the change is not modified"
+      ]
+    },
+    {
+      "requirement": "ReadOnly workspace rejection",
+      "name": "Removing spec not subject to ownership check",
+      "given": [
+        "a change my-change with specIds including platform:auth/tokens",
+        "AND workspace platform is readOnly"
+      ],
+      "when": ["specd change edit my-change --remove-spec platform:auth/tokens is run"],
+      "then": ["the spec is removed from the change", "AND no ownership error is raised"]
+    },
+    {
+      "requirement": "ReadOnly workspace rejection",
+      "name": "No edits applied when readOnly check fails",
+      "given": ["a change my-change with specIds: [\"default:auth/login\"]"],
+      "when": [
+        "specd change edit my-change --add-spec default:auth/register --add-spec platform:auth/tokens is run",
+        "AND workspace platform is readOnly"
+      ],
+      "then": ["the command exits with code 1", "AND neither spec is added (atomic rejection)"]
     },
     {
       "requirement": "Invariant enforcement",
@@ -156,11 +198,21 @@
       "name": "Unknown workspace prefix in --add-spec",
       "when": ["specd change edit my-change --add-spec unknown-ws:some/path is run"],
       "then": ["the command exits with code 1", "AND stderr contains an error: message"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "ReadOnly workspace in --add-spec",
+      "given": ["workspace platform is declared with ownership: readOnly"],
+      "when": ["specd change edit my-change --add-spec platform:auth/tokens is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error about readOnly ownership"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:96284daa08447b3a6e65dce211f17b885e1f19eb3c1dd4d8c47cc33b74a9cac7",
-    "verify.md": "sha256:f8c6d4d264bbc3cccb36aa2da1bc76979ab1dffd96a9a35c62ac1f442442b2bf"
+    "spec.md": "sha256:9884dc3e715942a0ddc0b632a2350de9fb7d5fc7c27e59d12ab22b76fd913abb",
+    "verify.md": "sha256:1d311e63c680c4ed181479c08faade2be7e2eef5695cd4724d22162e40d3c559"
   },
   "generatedBy": "core"
 }

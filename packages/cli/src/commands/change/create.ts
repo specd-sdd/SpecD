@@ -34,7 +34,25 @@ JSON/TOON output schema:
         try {
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
-          const specIds = opts.spec.map((s) => parseSpecId(s, config).specId)
+          const parsedSpecs = opts.spec.map((s) => parseSpecId(s, config))
+
+          const readOnlyErrors: string[] = []
+          for (const parsed of parsedSpecs) {
+            const ws = config.workspaces.find((w) => w.name === parsed.workspace)
+            if (ws && ws.ownership === 'readOnly') {
+              readOnlyErrors.push(
+                `Cannot add spec "${parsed.specId}" to change — workspace "${parsed.workspace}" is readOnly.\n\nReadOnly workspaces are protected: their specs and code cannot be modified by changes.`,
+              )
+            }
+          }
+          if (readOnlyErrors.length > 0) {
+            for (const msg of readOnlyErrors) {
+              process.stderr.write(`error: ${msg}\n`)
+            }
+            process.exit(1)
+          }
+
+          const specIds = parsedSpecs.map((p) => p.specId)
 
           const schema = await kernel.specs.getActiveSchema.execute()
 
