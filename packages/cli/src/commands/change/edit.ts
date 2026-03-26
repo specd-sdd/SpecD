@@ -60,10 +60,7 @@ export function registerChangeEdit(parent: Command): void {
               }
             }
             if (readOnlyErrors.length > 0) {
-              for (const msg of readOnlyErrors) {
-                process.stderr.write(`error: ${msg}\n`)
-              }
-              process.exit(1)
+              cliError(readOnlyErrors.join('\n'), opts.format)
             }
           }
 

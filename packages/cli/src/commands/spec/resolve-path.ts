@@ -14,7 +14,7 @@ export function registerSpecResolvePath(parent: Command): void {
     .command('resolve-path <path>')
     .allowExcessArguments(false)
     .description(
-      'Resolve and print the filesystem path for a given spec identifier, based on the active workspace configuration.',
+      'Resolve and print the spec identifier for a given filesystem path, based on the active workspace configuration.',
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
