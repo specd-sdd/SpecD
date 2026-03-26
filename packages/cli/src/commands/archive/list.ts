@@ -13,7 +13,9 @@ export function registerArchiveList(parent: Command): void {
   parent
     .command('list')
     .allowExcessArguments(false)
-    .description('List all archived changes')
+    .description(
+      'List all archived changes, showing their names, associated specs, and completion date.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .action(async (opts: { format: string; config?: string }) => {

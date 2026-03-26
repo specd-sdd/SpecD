@@ -12,7 +12,9 @@ export function registerChangeStatus(parent: Command): void {
   parent
     .command('status <name>')
     .allowExcessArguments(false)
-    .description('Show the status of a change')
+    .description(
+      'Display the current state, artifact statuses, lifecycle transitions, and blockers for a named change.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, opts: { format: string; config?: string }) => {

@@ -14,7 +14,7 @@ export function registerChangeCreate(parent: Command): void {
   parent
     .command('create <name>')
     .allowExcessArguments(false)
-    .description('Create a new change')
+    .description('Create a new change to track a unit of work through the specd lifecycle.')
     .option('--spec <id>', 'spec path (repeatable)', collect, [] as string[])
     .option('--description <text>', 'change description (informational)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
