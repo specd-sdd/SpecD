@@ -216,4 +216,42 @@ describe('change edit', () => {
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
   })
+
+  it('exits 1 when --add-spec targets readOnly workspace', async () => {
+    const config = makeMockConfig({
+      workspaces: [
+        {
+          name: 'default',
+          specsPath: '/project/specs',
+          schemasPath: null,
+          codeRoot: '/project',
+          ownership: 'owned' as const,
+          isExternal: false,
+        },
+        {
+          name: 'platform',
+          specsPath: '/external/platform/specs',
+          schemasPath: null,
+          codeRoot: '/external/platform',
+          ownership: 'readOnly' as const,
+          isExternal: true,
+        },
+      ],
+    })
+    const kernel = makeMockKernel()
+    vi.mocked(loadConfig).mockResolvedValue(config)
+    vi.mocked(createCliKernel).mockResolvedValue(kernel)
+    const stderr = captureStderr()
+    mockProcessExit()
+
+    const program = makeProgram()
+    registerChangeEdit(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'edit', 'feat', '--add-spec', 'platform:auth/tokens'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('workspace "platform" is readOnly')
+    expect(kernel.changes.edit.execute).not.toHaveBeenCalled()
+  })
 })

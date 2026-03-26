@@ -15,7 +15,7 @@
     {
       "requirement": "Text dashboard",
       "rules": [
-        "In `text` mode the command outputs:\n\n1. **Config line** — a plain text line `Using config: <relative-path>` printed to stdout before any box decoration. `<relative-path>` is the path to the loaded `specd.yaml` relative to `process.cwd()`.\n2. **Banner** — the SpecD ASCII logo rendered above the dashboard box.\n3. **Outer container** — a rounded `boxen` box with the title `SpecD project dashboard` centred at the top and a cyan border. The minimum inner width of this box MUST be at least the default `boxen` width plus 10 characters to accommodate typical project root paths.\n4. **Project box** — an inner box labelled `Project` showing:\n   - `root:` — absolute path to the project root. If the value would cause the row to overflow the outer box width, the value wraps to a new line indented to align with the start of the value column (i.e. the column position where values begin).\n   - `schema:` — the schema reference from `specd.yaml`.\n   - `workspaces:` — comma-separated list of workspace names.\n5. **Specs box** — an inner box labelled `Specs` showing total spec count and a per-workspace breakdown.\n6. **Changes box** — an inner box labelled `Changes` showing active count, draft count, discarded count, and a per-state breakdown of active changes.\n7. **Layout** — the Project box occupies the full width on its own row; the Specs and Changes boxes are rendered side by side on the row below."
+        "In `text` mode the command outputs:\n\n1. **Banner** — the SpecD ASCII logo rendered above the dashboard box.\n2. **Config line** — a plain text line `Using config: <relative-path>` printed to stdout before any box decoration. `<relative-path>` is the path to the loaded `specd.yaml` relative to `process.cwd()`.\n3. **Outer container** — a rounded `boxen` box with the title `SpecD project dashboard` centred at the top and a cyan border. The minimum inner width of this box MUST be at least the default `boxen` width plus 10 characters to accommodate typical project root paths.\n4. **Project box** — an inner box labelled `Project` showing:\n   - `root:` — absolute path to the project root. If the value would cause the row to overflow the outer box width, the value wraps to a new line indented to align with the start of the value column (i.e. the column position where values begin).\n   - `schema:` — the schema reference from `specd.yaml`.\n   - `workspaces:` — comma-separated list of workspace names.\n5. **Specs box** — an inner box labelled `Specs` showing total spec count and a per-workspace breakdown.\n6. **Changes box** — an inner box labelled `Changes` showing active count, draft count, discarded count, and a per-state breakdown of active changes.\n7. **Layout** — the Project box occupies the full width on its own row; the Specs and Changes boxes are rendered side by side on the row below."
       ]
     },
     {
@@ -157,7 +157,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b190de898a4311d3cba48fa28da8519f0269524f7320d957e26b662de845f1ff",
+    "spec.md": "sha256:f13747db602ef3900d623704274a8dd04f9b33f623cce647cfd1f955b4586960",
     "verify.md": "sha256:c0571294cd14da6cac99efbb1eb36d0e4c54cbbcfd2f6434353026a1724e1b63"
   },
   "generatedBy": "core"

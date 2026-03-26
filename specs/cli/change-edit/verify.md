@@ -30,6 +30,33 @@
 - **WHEN** `specd change edit my-change --remove-spec billing-ws:billing/invoices` is run
 - **THEN** `billing-ws` remains in `workspaces` because `billing-ws:billing/payments` still references it
 
+### Requirement: ReadOnly workspace rejection
+
+#### Scenario: Adding spec from readOnly workspace rejected
+
+- **GIVEN** workspace `platform` is declared with `ownership: readOnly` in `specd.yaml`
+- **AND** a change `my-change` exists
+- **WHEN** `specd change edit my-change --add-spec platform:auth/tokens` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains `Cannot add spec "platform:auth/tokens" to change — workspace "platform" is readOnly.`
+- **AND** the change is not modified
+
+#### Scenario: Removing spec not subject to ownership check
+
+- **GIVEN** a change `my-change` with `specIds` including `platform:auth/tokens`
+- **AND** workspace `platform` is `readOnly`
+- **WHEN** `specd change edit my-change --remove-spec platform:auth/tokens` is run
+- **THEN** the spec is removed from the change
+- **AND** no ownership error is raised
+
+#### Scenario: No edits applied when readOnly check fails
+
+- **GIVEN** a change `my-change` with `specIds: ["default:auth/login"]`
+- **WHEN** `specd change edit my-change --add-spec default:auth/register --add-spec platform:auth/tokens` is run
+- **AND** workspace `platform` is `readOnly`
+- **THEN** the command exits with code 1
+- **AND** neither spec is added (atomic rejection)
+
 ### Requirement: Invariant enforcement
 
 #### Scenario: Removing last spec rejected
@@ -91,3 +118,10 @@
 - **WHEN** `specd change edit my-change --add-spec unknown-ws:some/path` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
+
+#### Scenario: ReadOnly workspace in --add-spec
+
+- **GIVEN** workspace `platform` is declared with `ownership: readOnly`
+- **WHEN** `specd change edit my-change --add-spec platform:auth/tokens` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an error about readOnly ownership

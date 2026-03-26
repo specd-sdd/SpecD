@@ -55,6 +55,22 @@ The first step of `ArchiveChange.execute` after the schema name guard must call 
 
 After the guard passes, `ArchiveChange` MUST transition the change to `archiving` via `change.transition('archiving', actor)` and persist the change via `ChangeRepository.save(change)`. This records the state transition before any hooks execute or files are modified.
 
+### Requirement: ReadOnly workspace guard
+
+After the archivable guard passes and the change transitions to `archiving`, `ArchiveChange` MUST check every spec ID in `change.specIds` against the `SpecRepository` map. For each spec ID, it MUST look up the corresponding `SpecRepository` by workspace name and check `repository.ownership()`.
+
+If any spec belongs to a workspace with `readOnly` ownership, `ArchiveChange` MUST throw `ReadOnlyWorkspaceError` with a message listing all affected specs and their workspaces. The error message format:
+
+```
+Cannot archive change "<name>" — it contains specs from readOnly workspaces:
+
+  - <specId>  →  workspace "<workspace>" (readOnly)
+
+Archiving would write deltas into protected specs.
+```
+
+This check MUST occur before any hooks execute or any spec files are written. It is a defense-in-depth guard — upstream guards at `change create` and `change edit` should prevent readOnly specs from entering a change, but the archive MUST NOT silently merge deltas into protected specs if those guards are bypassed.
+
 ### Requirement: Overlap guard
 
 After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes.
@@ -157,7 +173,7 @@ After merging deltas and archiving the change, the archive process generates met
 ## Constraints
 
 - `change.assertArchivable()` must be called before any hooks or file modifications
-- The overlap guard must run after the archivable guard and before pre-archive hooks
+- ReadOnly workspace guard must run after archivable guard and state transition, before any hooks or file modifications
 - Pre-archive hook failures abort the archive and throw — no partial state is written
 - Post-archive hook failures are returned in the result; the archive is not rolled back
 - `ArchiveChange` must not call `change.invalidate()` or any mutation on the `Change` entity — the change is already at its terminal state

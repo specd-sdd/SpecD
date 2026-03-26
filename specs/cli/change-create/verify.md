@@ -35,6 +35,36 @@
 - **WHEN** `specd change create my-change --spec nonexistent-ws:some/path` is run
 - **THEN** the command exits with code 1 and prints an `error:` message to stderr
 
+### Requirement: ReadOnly workspace rejection
+
+#### Scenario: Spec targeting readOnly workspace rejected
+
+- **GIVEN** workspace `platform` is declared with `ownership: readOnly` in `specd.yaml`
+- **WHEN** `specd change create my-change --spec platform:auth/tokens` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains `Cannot add spec "platform:auth/tokens" to change — workspace "platform" is readOnly.`
+- **AND** no change is created
+
+#### Scenario: Multiple readOnly specs each produce an error
+
+- **GIVEN** workspace `platform` is `readOnly`
+- **WHEN** `specd change create my-change --spec platform:auth/tokens --spec platform:auth/sessions` is run
+- **THEN** stderr contains one error message per readOnly spec
+- **AND** no change is created
+
+#### Scenario: Mixed owned and readOnly specs rejected
+
+- **GIVEN** workspace `default` is `owned` and workspace `platform` is `readOnly`
+- **WHEN** `specd change create my-change --spec default:auth/login --spec platform:auth/tokens` is run
+- **THEN** the command exits with code 1 due to the readOnly spec
+- **AND** no change is created
+
+#### Scenario: Owned workspace specs accepted normally
+
+- **GIVEN** workspace `default` is `owned`
+- **WHEN** `specd change create my-change --spec default:auth/login` is run
+- **THEN** the change is created successfully
+
 ### Requirement: Output on success
 
 #### Scenario: Successful creation

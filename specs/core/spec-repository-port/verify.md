@@ -57,9 +57,17 @@
 
 ### Requirement: save persists a single artifact with conflict detection
 
+#### Scenario: ReadOnly workspace rejects save
+
+- **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
+- **WHEN** `save(spec, artifact)` is called
+- **THEN** `ReadOnlyWorkspaceError` is thrown
+- **AND** no file is written to disk
+
 #### Scenario: First write creates spec directory
 
 - **GIVEN** a spec whose directory does not yet exist
+- **AND** the workspace ownership is `owned`
 - **WHEN** `save(spec, artifact)` is called
 - **THEN** the directory is created and the artifact file is written
 
@@ -109,6 +117,13 @@
 - **THEN** `null` is returned
 
 ### Requirement: metadata returns parsed metadata or null
+
+#### Scenario: ReadOnly workspace rejects saveMetadata
+
+- **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
+- **WHEN** `saveMetadata(spec, content)` is called
+- **THEN** `ReadOnlyWorkspaceError` is thrown
+- **AND** no file is written to disk
 
 #### Scenario: Metadata exists
 

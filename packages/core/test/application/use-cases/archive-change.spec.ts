@@ -1899,4 +1899,35 @@ describe('ArchiveChange', () => {
       expect(result.archivedChange).toBeDefined()
     })
   })
+
+  describe('readOnly workspace guard', () => {
+    it('throws ReadOnlyWorkspaceError when change contains readOnly specs', async () => {
+      const { ReadOnlyWorkspaceError } =
+        await import('../../../src/domain/errors/read-only-workspace-error.js')
+
+      const change = makeArchivableChange('my-change', {
+        specIds: ['platform:auth/tokens'],
+      })
+
+      const readOnlySpecRepo = makeSpecRepository('readOnly')
+
+      const schema = makeSchema({
+        artifacts: [makeArtifactType('specs', { scope: 'spec', delta: true })],
+      })
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([change]),
+        new Map([['platform', readOnlySpecRepo]]),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(schema),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+      )
+
+      await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(ReadOnlyWorkspaceError)
+    })
+  })
 })

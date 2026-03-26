@@ -60,10 +60,28 @@ JSON/TOON output schema:
             )
           }
 
-          const addSpecIds =
-            opts.addSpec.length > 0
-              ? opts.addSpec.map((s) => parseSpecId(s, config).specId)
-              : undefined
+          const parsedAddSpecs =
+            opts.addSpec.length > 0 ? opts.addSpec.map((s) => parseSpecId(s, config)) : undefined
+
+          if (parsedAddSpecs) {
+            const readOnlyErrors: string[] = []
+            for (const parsed of parsedAddSpecs) {
+              const ws = config.workspaces.find((w) => w.name === parsed.workspace)
+              if (ws && ws.ownership === 'readOnly') {
+                readOnlyErrors.push(
+                  `Cannot add spec "${parsed.specId}" to change — workspace "${parsed.workspace}" is readOnly.\n\nReadOnly workspaces are protected: their specs and code cannot be modified by changes.`,
+                )
+              }
+            }
+            if (readOnlyErrors.length > 0) {
+              for (const msg of readOnlyErrors) {
+                process.stderr.write(`error: ${msg}\n`)
+              }
+              process.exit(1)
+            }
+          }
+
+          const addSpecIds = parsedAddSpecs?.map((p) => p.specId)
           const removeSpecIds =
             opts.removeSpec.length > 0
               ? opts.removeSpec.map((s) => parseSpecId(s, config).specId)

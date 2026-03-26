@@ -614,4 +614,68 @@ describe('FsSpecRepository', () => {
       expect(oauthExists).toBe(true)
     })
   })
+
+  describe('readOnly ownership enforcement', () => {
+    let roCtx: RepoContext
+
+    beforeEach(async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-spec-ro-'))
+      const specsPath = path.join(tmpDir, 'specs')
+      await fs.mkdir(specsPath, { recursive: true })
+
+      const repo = new FsSpecRepository({
+        workspace: 'platform',
+        ownership: 'readOnly',
+        isExternal: false,
+        specsPath,
+        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
+      })
+
+      roCtx = { repo, specsPath, tmpDir }
+
+      // Pre-populate a spec for read tests
+      await writeSpecFile(roCtx, 'auth/tokens', 'spec.md', '# Tokens spec')
+    })
+
+    afterEach(async () => {
+      await cleanupRepo(roCtx)
+    })
+
+    it('save() throws ReadOnlyWorkspaceError', async () => {
+      const { ReadOnlyWorkspaceError } =
+        await import('../../../src/domain/errors/read-only-workspace-error.js')
+      const spec = makeSpec(roCtx, 'auth/tokens', ['spec.md'])
+      const artifact = new SpecArtifact('spec.md', '# Updated')
+
+      await expect(roCtx.repo.save(spec, artifact)).rejects.toThrow(ReadOnlyWorkspaceError)
+    })
+
+    it('saveMetadata() throws ReadOnlyWorkspaceError', async () => {
+      const { ReadOnlyWorkspaceError } =
+        await import('../../../src/domain/errors/read-only-workspace-error.js')
+      const spec = makeSpec(roCtx, 'auth/tokens', ['spec.md'])
+
+      await expect(roCtx.repo.saveMetadata(spec, '{"title":"Tokens"}')).rejects.toThrow(
+        ReadOnlyWorkspaceError,
+      )
+    })
+
+    it('get() still works on readOnly workspace', async () => {
+      const specPath = SpecPath.parse('auth/tokens')
+      const result = await roCtx.repo.get(specPath)
+      expect(result).not.toBeNull()
+    })
+
+    it('list() still works on readOnly workspace', async () => {
+      const result = await roCtx.repo.list()
+      expect(result.length).toBeGreaterThan(0)
+    })
+
+    it('artifact() still works on readOnly workspace', async () => {
+      const spec = makeSpec(roCtx, 'auth/tokens', ['spec.md'])
+      const result = await roCtx.repo.artifact(spec, 'spec.md')
+      expect(result).not.toBeNull()
+      expect(result!.content).toBe('# Tokens spec')
+    })
+  })
 })

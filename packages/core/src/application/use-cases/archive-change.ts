@@ -3,6 +3,7 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
 import { HookFailedError } from '../../domain/errors/hook-failed-error.js'
+import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type ArchiveRepository } from '../ports/archive-repository.js'
@@ -156,6 +157,24 @@ export class ArchiveChange {
           throw new SpecOverlapError(relevant)
         }
       }
+    }
+
+    // --- ReadOnly workspace guard ---
+    const readOnlySpecs: Array<{ specId: string; workspace: string }> = []
+    for (const specId of change.specIds) {
+      const { workspace } = parseSpecId(specId)
+      const specRepo = this._specs.get(workspace)
+      if (specRepo && specRepo.ownership() === 'readOnly') {
+        readOnlySpecs.push({ specId, workspace })
+      }
+    }
+    if (readOnlySpecs.length > 0) {
+      const lines = readOnlySpecs.map(
+        (s) => `  - ${s.specId}  →  workspace "${s.workspace}" (readOnly)`,
+      )
+      throw new ReadOnlyWorkspaceError(
+        `Cannot archive change "${change.name}" — it contains specs from readOnly workspaces:\n\n${lines.join('\n')}\n\nArchiving would write deltas into protected specs.`,
+      )
     }
 
     // --- Pre-archive hooks (delegated to RunStepHooks) ---
