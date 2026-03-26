@@ -33,7 +33,7 @@ import { registerProjectUpdate } from '../../src/commands/project/update.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, kernel })
+  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()

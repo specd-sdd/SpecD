@@ -10,7 +10,10 @@ import {
   captureStderr,
 } from './helpers.js'
 
-vi.mock('../../src/load-config.js', () => ({ loadConfig: vi.fn() }))
+vi.mock('../../src/load-config.js', () => ({
+  loadConfig: vi.fn(),
+  resolveConfigPath: vi.fn().mockResolvedValue(null),
+}))
 vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 
 import { loadConfig } from '../../src/load-config.js'
@@ -33,7 +36,6 @@ afterEach(() => vi.restoreAllMocks())
 describe('project dashboard', () => {
   it('command name is dashboard', async () => {
     const { kernel } = setup()
-    captureStdout()
     kernel.specs.list.execute.mockResolvedValue([])
     kernel.changes.list.execute.mockResolvedValue([])
 
@@ -173,7 +175,6 @@ describe('project dashboard', () => {
     vi.mocked(loadConfig).mockResolvedValue(config)
     vi.mocked(createCliKernel).mockResolvedValue(makeMockKernel())
     const stdout = captureStdout()
-    captureStderr()
     mockProcessExit()
 
     const program = makeProgram()

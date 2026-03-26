@@ -9,7 +9,10 @@ import {
 } from './commands/helpers.js'
 import { renderBanner } from '../src/banner.js'
 
-vi.mock('../src/load-config.js', () => ({ loadConfig: vi.fn() }))
+vi.mock('../src/load-config.js', () => ({
+  loadConfig: vi.fn(),
+  resolveConfigPath: vi.fn().mockResolvedValue(null),
+}))
 vi.mock('../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 
 import { loadConfig } from '../src/load-config.js'

@@ -22,7 +22,7 @@ import { InvalidStateTransitionError, HookFailedError, InvalidChangeError } from
 function setup(configOverrides: Record<string, unknown> = {}) {
   const config = makeMockConfig(configOverrides)
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, kernel })
+  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
