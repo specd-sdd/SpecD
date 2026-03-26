@@ -59,6 +59,7 @@ export function registerChangeArchive(parent: Command): void {
               .map(
                 (e) =>
                   `  ${e.specId} — also targeted by: ${e.changes
+                    .filter((c) => c.name !== name)
                     .map((c) => `${c.name} (${c.state})`)
                     .join(', ')}`,
               )
