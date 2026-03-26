@@ -22,6 +22,27 @@ defines the behaviour and the change implements the code for it. Use `op: no-op`
 
 Use `node packages/cli/dist/index.js` for ALL commands. Never use bare `specd`.
 
+## Command sequencing — no write-then-read parallelism
+
+**Never run a command in parallel with another command that depends on the first one's
+persisted side-effect.** Parallel execution is only safe for independent reads.
+
+Commands that MUST run sequentially (the second depends on the first completing):
+
+- `change validate` → then `change status` (validate marks artifacts complete)
+- `change edit --add-spec` → then write the delta/artifact file (spec must be registered first)
+- `change transition` → then `change context` for the new state (state must change first)
+- `change run-hooks` → then `change hook-instruction` (hooks must execute first)
+- Any write operation → then any read that checks its effect
+
+**Safe to parallelize:** multiple `spec show` calls, multiple `Read` calls, `config show`
+
+- `spec list` + `change list`, or any set of pure reads with no write dependency.
+
+If a command succeeds but the subsequent read shows unexpected state (e.g. validate
+reports success but status still shows `pending`), **re-read sequentially** before
+concluding there's a bug. The most common cause is accidental parallelism.
+
 ## changePath
 
 Every skill starts by running `change status <name> --format json`. The response
