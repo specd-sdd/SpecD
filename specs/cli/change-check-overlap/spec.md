@@ -2,14 +2,14 @@
 
 ## Purpose
 
-Users need a way to check whether their in-progress work overlaps with other active changes targeting the same specs. Without a dedicated command, overlap is invisible until archive time when delta application fails. `specd change overlap` surfaces this information proactively.
+Users need a way to check whether their in-progress work overlaps with other active changes targeting the same specs. Without a dedicated command, overlap is invisible until archive time when delta application fails. `specd change check-overlap` surfaces this information proactively.
 
 ## Requirements
 
 ### Requirement: Command signature
 
 ```
-specd change overlap [<name>] [--format text|json|toon]
+specd change check-overlap [<name>] [--format text|json|toon]
 ```
 
 - `<name>` — optional; when provided, shows overlap only for the named change

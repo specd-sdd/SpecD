@@ -316,10 +316,7 @@ The `verify` artifact in the schema should declare `requires: [spec]` — scenar
 - Array entry `id` must match `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/`, 1–64 characters, unique within its immediate array
 - `artifact.scope` must be `spec` or `change`; it is required and has no default
 - `artifact.optional` defaults to `false`; a non-optional artifact with `scope: spec` must be present in every spec directory and every change
-- `artifact.rules.pre` and `artifact.rules.post` are optional arrays of `{ id, text }` entries
-
-  `artifact.rules.pre` and `artifact.rules.post` are optional arrays of `{ id, instruction }` entries
-
+- `artifact.rules.pre` and `artifact.rules.post` are optional arrays of `{ id, instruction }` entries
 - `workflow[].step` must be unique — duplicate step names in the same `workflow` array are a schema validation error
 - Every hook entry must include an `id` field alongside its `instruction` or `run` field
 - `requires` must not contain cycles; circular dependencies in the artifact graph are a schema validation error

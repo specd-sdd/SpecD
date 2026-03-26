@@ -49,9 +49,7 @@ After successful YAML parsing, the function SHALL validate the parsed object aga
 - Hook entries require an `id` field alongside `instruction` or `run`
 - Validation/deltaValidation rule entries require an `id` field
 - `preHashCleanup` entries require an `id` field
-- `rules` on artifacts is an optional object with `pre` and `post` arrays of `{ id, text }`
-
-  `rules` on artifacts is an optional object with `pre` and `post` arrays of `{ id, instruction }`
+- `rules` on artifacts is an optional object with `pre` and `post` arrays of `{ id, instruction }`
 
 - `workflow` is an optional array of workflow step objects
 - `metadataExtraction` is an optional object matching the metadata extraction schema; array entries require an `id` field
