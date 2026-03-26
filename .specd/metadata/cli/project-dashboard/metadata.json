@@ -9,7 +9,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd project dashboard [--format text|json|toon] [--config <path>]\n```\n\n- `--format text|json|toon` — optional; output format. Defaults to `text`.\n- `--config <path>` — optional; path to `specd.yaml`. Uses standard config discovery when omitted."
+        "```text\nspecd project dashboard [--format text|json|toon] [--config <path>]\n```\n\n- `--format text|json|toon` — optional; output format. Defaults to `text`.\n- `--config <path>` — optional; path to `specd.yaml`. Uses standard config discovery when omitted."
       ]
     },
     {
@@ -157,7 +157,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:f13747db602ef3900d623704274a8dd04f9b33f623cce647cfd1f955b4586960",
+    "spec.md": "sha256:645cbd30c88a70e4e0d2a04d52f3809bbdad6f1b8a26c74de940d50d9433844c",
     "verify.md": "sha256:c0571294cd14da6cac99efbb1eb36d0e4c54cbbcfd2f6434353026a1724e1b63"
   },
   "generatedBy": "core"

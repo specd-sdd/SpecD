@@ -25,7 +25,7 @@ The workspace IDs for the new change are derived from the workspace prefix of ea
 
 After resolving the workspace for each `--spec` value, the CLI MUST check the workspace's `ownership` from `SpecdConfig`. If any spec's workspace has `readOnly` ownership, the command MUST exit with code 1 and print an error message to stderr:
 
-```
+```text
 error: Cannot add spec "<specId>" to change — workspace "<workspace>" is readOnly.
 
 ReadOnly workspaces are protected: their specs and code cannot be modified by changes.

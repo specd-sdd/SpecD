@@ -6,13 +6,13 @@
 
 #### Scenario: Command accepts optional name and format
 
-- **WHEN** `specd change overlap` is run without arguments
+- **WHEN** `specd change check-overlap` is run without arguments
 - **THEN** it shows overlap for all active changes
 - **AND** defaults to `text` format
 
 #### Scenario: Named change filter
 
-- **WHEN** `specd change overlap my-change` is run
+- **WHEN** `specd change check-overlap my-change` is run
 - **THEN** the output only shows overlap entries involving `my-change`
 
 ### Requirement: Text output format
@@ -21,7 +21,7 @@
 
 - **GIVEN** changes `alpha` (designing) and `beta` (implementing) both target `core:core/config`
 - **AND** changes `beta` and `gamma` (designing) both target `core:core/kernel`
-- **WHEN** `specd change overlap` is run in text mode
+- **WHEN** `specd change check-overlap` is run in text mode
 - **THEN** stdout shows two groups, sorted by spec ID
 - **AND** the first group header is `core:core/config` with `alpha` and `beta` listed below
 - **AND** the second group header is `core:core/kernel` with `beta` and `gamma` listed below
@@ -31,7 +31,7 @@
 #### Scenario: JSON output matches OverlapReport structure
 
 - **GIVEN** overlap exists between two changes on one spec
-- **WHEN** `specd change overlap --format json` is run
+- **WHEN** `specd change check-overlap --format json` is run
 - **THEN** stdout is valid JSON with `hasOverlap` equal to `true`
 - **AND** `entries` is an array of objects with `specId` and `changes` fields
 
@@ -40,14 +40,14 @@
 #### Scenario: No overlap in text mode
 
 - **GIVEN** no specs are targeted by more than one active change
-- **WHEN** `specd change overlap` is run
+- **WHEN** `specd change check-overlap` is run
 - **THEN** stdout contains `no overlap detected`
 - **AND** exit code is 0
 
 #### Scenario: No overlap in JSON mode
 
 - **GIVEN** no overlap exists
-- **WHEN** `specd change overlap --format json` is run
+- **WHEN** `specd change check-overlap --format json` is run
 - **THEN** stdout is `{"hasOverlap":false,"entries":[]}`
 - **AND** exit code is 0
 
@@ -55,7 +55,7 @@
 
 #### Scenario: Error for nonexistent change
 
-- **WHEN** `specd change overlap nonexistent` is run
+- **WHEN** `specd change check-overlap nonexistent` is run
 - **THEN** stderr contains an error message
 - **AND** exit code is 1
 
@@ -64,5 +64,5 @@
 #### Scenario: Overlap present does not affect exit code
 
 - **GIVEN** overlap exists between active changes
-- **WHEN** `specd change overlap` is run
+- **WHEN** `specd change check-overlap` is run
 - **THEN** exit code is 0

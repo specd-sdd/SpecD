@@ -128,9 +128,9 @@ Follow the processing rules below ("Processing `change context` output").
 are exclusively human actions. When a change reaches `pending-spec-approval` or
 `pending-signoff`, your only job is to tell the user what command to run:
 
-```
-specd change approve spec <name> --reason "..."
-specd change approve signoff <name> --reason "..."
+```bash
+node packages/cli/dist/index.js change approve spec <name> --reason "..."
+node packages/cli/dist/index.js change approve signoff <name> --reason "..."
 ```
 
 Do not attempt to approve, do not offer to approve, do not auto-approve. Stop and wait.
