@@ -39,6 +39,27 @@ export function registerChangeCreate(parent: Command): void {
             schemaVersion: schema.version(),
           })
 
+          // Check for spec overlap and warn
+          if (specIds.length > 0) {
+            try {
+              const overlapReport = await kernel.changes.detectOverlap.execute({ name })
+              if (overlapReport.hasOverlap) {
+                const specList = overlapReport.entries
+                  .map(
+                    (e) =>
+                      `  ${e.specId} — also targeted by: ${e.changes
+                        .filter((c) => c.name !== name)
+                        .map((c) => `${c.name} (${c.state})`)
+                        .join(', ')}`,
+                  )
+                  .join('\n')
+                process.stderr.write(`warning: spec overlap detected:\n${specList}\n`)
+              }
+            } catch {
+              // Overlap detection is best-effort — don't fail create
+            }
+          }
+
           const fmt = parseFormat(opts.format)
           if (fmt === 'text') {
             output(`created change ${name}`, 'text')

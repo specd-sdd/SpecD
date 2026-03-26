@@ -1,0 +1,119 @@
+{
+  "title": "Change Check Overlap",
+  "description": "Users need a way to check whether their in-progress work overlaps with other active changes targeting the same specs. Without a dedicated command, overlap is invisible until archive time when delta application fails. `specd change overlap` surfaces this information proactively.",
+  "context": [
+    "Users need a way to check whether their in-progress work overlaps with other active changes targeting the same specs. Without a dedicated command, overlap is invisible until archive time when delta application fails. `specd change overlap` surfaces this information proactively."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd change overlap [<name>] [--format text|json|toon]\n```\n\n- `<name>` — optional; when provided, shows overlap only for the named change\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+      ]
+    },
+    {
+      "requirement": "Text output format",
+      "rules": [
+        "In `text` mode, the command MUST print a grouped display where each overlapping spec is a header followed by the changes that target it:\n\n```\n<specId>\n  <changeName>  <state>\n  <changeName>  <state>\n\n<specId>\n  <changeName>  <state>\n  <changeName>  <state>\n```\n\nSpec IDs MUST be sorted lexicographically. Changes within each group MUST be sorted by name."
+      ]
+    },
+    {
+      "requirement": "JSON output format",
+      "rules": [
+        "In `json` or `toon` mode, the command MUST output the `OverlapReport` structure:\n\n```json\n{\n  \"hasOverlap\": true,\n  \"entries\": [\n    {\n      \"specId\": \"core:core/config\",\n      \"changes\": [\n        { \"name\": \"change-a\", \"state\": \"designing\" },\n        { \"name\": \"change-b\", \"state\": \"implementing\" }\n      ]\n    }\n  ]\n}\n```"
+      ]
+    },
+    {
+      "requirement": "No overlap output",
+      "rules": [
+        "When no overlap is detected, the command MUST:\n\n- In `text` mode: print `no overlap detected` to stdout\n- In `json`/`toon` mode: output `{\"hasOverlap\":false,\"entries\":[]}`\n\nThe process MUST exit with code 0."
+      ]
+    },
+    {
+      "requirement": "Named change not found",
+      "rules": [
+        "When `<name>` is provided but no active change with that name exists, the command MUST print an error message to stderr and exit with code 1."
+      ]
+    },
+    {
+      "requirement": "Exit codes",
+      "rules": [
+        "- `0` — command succeeded (overlap or no overlap)\n- `1` — named change not found or unexpected error\n\nOverlap presence MUST NOT cause a non-zero exit code."
+      ]
+    }
+  ],
+  "constraints": [
+    "The command MUST delegate to DetectOverlap via the kernel — it MUST NOT scan changes directly",
+    "No filtering by workspace or spec ID in v1"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Command accepts optional name and format",
+      "when": ["specd change overlap is run without arguments"],
+      "then": ["it shows overlap for all active changes", "AND defaults to text format"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Named change filter",
+      "when": ["specd change overlap my-change is run"],
+      "then": ["the output only shows overlap entries involving my-change"]
+    },
+    {
+      "requirement": "Text output format",
+      "name": "Two specs overlapping across multiple changes",
+      "given": [
+        "changes alpha (designing) and beta (implementing) both target core:core/config",
+        "AND changes beta and gamma (designing) both target core:core/kernel"
+      ],
+      "when": ["specd change overlap is run in text mode"],
+      "then": [
+        "stdout shows two groups, sorted by spec ID",
+        "AND the first group header is core:core/config with alpha and beta listed below",
+        "AND the second group header is core:core/kernel with beta and gamma listed below"
+      ]
+    },
+    {
+      "requirement": "JSON output format",
+      "name": "JSON output matches OverlapReport structure",
+      "given": ["overlap exists between two changes on one spec"],
+      "when": ["specd change overlap --format json is run"],
+      "then": [
+        "stdout is valid JSON with hasOverlap equal to true",
+        "AND entries is an array of objects with specId and changes fields"
+      ]
+    },
+    {
+      "requirement": "No overlap output",
+      "name": "No overlap in text mode",
+      "given": ["no specs are targeted by more than one active change"],
+      "when": ["specd change overlap is run"],
+      "then": ["stdout contains no overlap detected", "AND exit code is 0"]
+    },
+    {
+      "requirement": "No overlap output",
+      "name": "No overlap in JSON mode",
+      "given": ["no overlap exists"],
+      "when": ["specd change overlap --format json is run"],
+      "then": ["stdout is {\"hasOverlap\":false,\"entries\":[]}", "AND exit code is 0"]
+    },
+    {
+      "requirement": "Named change not found",
+      "name": "Error for nonexistent change",
+      "when": ["specd change overlap nonexistent is run"],
+      "then": ["stderr contains an error message", "AND exit code is 1"]
+    },
+    {
+      "requirement": "Exit codes",
+      "name": "Overlap present does not affect exit code",
+      "given": ["overlap exists between active changes"],
+      "when": ["specd change overlap is run"],
+      "then": ["exit code is 0"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:b07966cdbc5fc8576d1a68ab9b56788b699e546c3092173222ce76349c2cb0a7",
+    "verify.md": "sha256:d143b19868553e6422daa776cbb61675f8df70b073b3fce13328cf45b62b4a2d"
+  },
+  "generatedBy": "core"
+}
