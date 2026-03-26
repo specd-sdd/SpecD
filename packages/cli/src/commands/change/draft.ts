@@ -12,7 +12,9 @@ export function registerChangeDraft(parent: Command): void {
   parent
     .command('draft <name>')
     .allowExcessArguments(false)
-    .description('Shelve a change to drafts/')
+    .description(
+      'Shelve a change as a draft, moving it out of the active list so it can be resumed later.',
+    )
     .option('--reason <text>', 'reason for shelving')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

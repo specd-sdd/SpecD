@@ -86,7 +86,7 @@ export function registerChangeList(parent: Command): void {
   parent
     .command('list')
     .allowExcessArguments(false)
-    .description('List all active changes')
+    .description('List all active changes with their current lifecycle state and associated specs.')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .action(async (opts: { format: string; config?: string }) => {

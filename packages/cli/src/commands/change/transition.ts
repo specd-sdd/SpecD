@@ -175,7 +175,9 @@ export function registerChangeTransition(parent: Command): void {
   parent
     .command('transition <name> [step]')
     .allowExcessArguments(false)
-    .description('Transition a change to a new lifecycle state')
+    .description(
+      'Transition a change to a new lifecycle state (e.g. designing → ready → implementing → verifying).',
+    )
     .option('--next', 'transition to the next logical lifecycle step')
     .option(
       '--skip-hooks <phases>',

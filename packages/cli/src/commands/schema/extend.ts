@@ -54,7 +54,9 @@ export function registerSchemaExtend(parent: Command): void {
   parent
     .command('extend <ref>')
     .allowExcessArguments(false)
-    .description('Create a new local schema that extends an existing schema')
+    .description(
+      'Create a new local extension schema that inherits from an existing schema, allowing selective overrides without forking.',
+    )
     .option('--name <name>', 'name for the new schema')
     .option('--workspace <workspace>', 'target workspace', 'default')
     .option('--config <path>', 'path to specd.yaml')

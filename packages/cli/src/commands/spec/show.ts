@@ -14,7 +14,9 @@ export function registerSpecShow(parent: Command): void {
   parent
     .command('show <specPath>')
     .allowExcessArguments(false)
-    .description('Show the contents of a spec')
+    .description(
+      'Display the full content of a spec artifact, rendered from its source files on disk.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .action(async (specPath: string, opts: { format: string; config?: string }) => {

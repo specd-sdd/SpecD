@@ -13,7 +13,9 @@ export function registerChangeArtifacts(parent: Command): void {
   parent
     .command('artifacts <name>')
     .allowExcessArguments(false)
-    .description('Show artifact files for a change')
+    .description(
+      'List all artifacts and their current statuses (present, missing, skipped) for a named change.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .action(async (name: string, opts: { format: string; config?: string }) => {

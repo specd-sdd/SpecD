@@ -116,7 +116,9 @@ export function registerSpecList(parent: Command): void {
   parent
     .command('list')
     .allowExcessArguments(false)
-    .description('List all available specs across all workspaces')
+    .description(
+      'List all specs in the project across all workspaces, with their identifiers, status, and metadata freshness.',
+    )
     .option('--summary', 'include a short description for each spec')
     .option(
       '--metadata-status [filter]',

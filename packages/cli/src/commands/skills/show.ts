@@ -12,7 +12,9 @@ export function registerSkillsShow(parent: Command): void {
   parent
     .command('show <name>')
     .allowExcessArguments(false)
-    .description('Show the content of a skill')
+    .description(
+      'Display the full content of a named specd agent skill, as it would be installed for an AI agent.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .action((name: string, opts: { format: string }) => {
       try {

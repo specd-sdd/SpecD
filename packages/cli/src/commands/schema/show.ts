@@ -12,7 +12,9 @@ export function registerSchemaShow(parent: Command): void {
   parent
     .command('show')
     .allowExcessArguments(false)
-    .description('Show the active schema')
+    .description(
+      'Display the full definition of the active schema, including all artifact types, fields, and extraction rules.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .action(async (opts: { format: string; config?: string }) => {

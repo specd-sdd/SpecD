@@ -74,7 +74,9 @@ export function registerConfigShow(parent: Command): void {
   parent
     .command('show')
     .allowExcessArguments(false)
-    .description('Show the resolved project configuration')
+    .description(
+      'Display the fully resolved project configuration, showing all values after applying defaults and environment overrides.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .action(async (opts: { format: string; config?: string }) => {

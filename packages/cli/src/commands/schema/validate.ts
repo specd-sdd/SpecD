@@ -14,7 +14,9 @@ export function registerSchemaValidate(parent: Command): void {
   parent
     .command('validate')
     .allowExcessArguments(false)
-    .description('Validate the active schema or an external schema file')
+    .description(
+      'Validate a schema file against the specd schema format, reporting any structural or constraint violations.',
+    )
     .option('--file <path>', 'validate an external schema file')
     .option('--raw', 'validate the base schema without plugins or overrides')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

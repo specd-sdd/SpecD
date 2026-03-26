@@ -13,7 +13,7 @@ export function registerChangeArchive(parent: Command): void {
   parent
     .command('archive <name>')
     .allowExcessArguments(false)
-    .description('Archive a completed change')
+    .description('Move a completed change to the archive, removing it from the active change list.')
     .option('--no-hooks', 'skip run: hook execution')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
