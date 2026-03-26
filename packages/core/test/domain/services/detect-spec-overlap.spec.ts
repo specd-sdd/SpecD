@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { detectSpecOverlap } from '../../../src/domain/services/detect-spec-overlap.js'
 import { Change } from '../../../src/domain/entities/change.js'
+import type { ChangeState } from '../../../src/domain/value-objects/change-state.js'
 
 function makeChange(name: string, specIds: string[], state?: string): Change {
   const history =
@@ -19,7 +20,7 @@ function makeChange(name: string, specIds: string[], state?: string): Change {
             at: new Date(),
             by: { name: 'test', email: 'test@test.com' },
             from: 'drafting' as const,
-            to: state as 'designing',
+            to: state as ChangeState,
           },
         ]
       : [
