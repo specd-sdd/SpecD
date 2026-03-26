@@ -14,7 +14,7 @@ export function registerDraftsList(parent: Command): void {
   parent
     .command('list')
     .allowExcessArguments(false)
-    .description('List all drafted (shelved) changes')
+    .description('List all drafted (shelved) changes, showing their names and current state.')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(

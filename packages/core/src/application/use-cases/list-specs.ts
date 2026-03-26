@@ -18,14 +18,14 @@ export interface SpecListEntry {
   /** The spec's capability path within the workspace (e.g. `auth/login`). */
   readonly path: string
   /**
-   * Human-readable title: the `title` field from `.specd-metadata.yaml` when
+   * Human-readable title: the `title` field from `metadata.json` when
    * present and non-empty, otherwise the last segment of the capability path.
    */
   readonly title: string
   /**
    * Short summary, present only when `includeSummary` was requested and a
    * summary could be resolved. Sources in priority order:
-   * 1. `description` field from `.specd-metadata.yaml`
+   * 1. `description` field from `metadata.json`
    * 2. Extracted from `spec.md` via {@link extractSpecSummary}
    */
   readonly summary?: string | undefined
@@ -34,7 +34,7 @@ export interface SpecListEntry {
    * - `fresh`: metadata exists, is structurally valid, and all content hashes match current files
    * - `stale`: metadata exists and is valid but hashes are missing or don't match
    * - `invalid`: metadata file exists but fails structural validation
-   * - `missing`: no `.specd-metadata.yaml` file
+   * - `missing`: no `metadata.json` file
    */
   readonly metadataStatus?: SpecMetadataStatus | undefined
 }
@@ -196,7 +196,7 @@ export class ListSpecs {
    *
    * @param repo - Spec repository to read artifacts from
    * @param spec - The spec to check
-   * @param hasMetadata - Whether `.specd-metadata.yaml` exists
+   * @param hasMetadata - Whether `metadata.json` exists
    * @param metadataValid - Whether the metadata passes structural validation
    * @param contentHashes - Recorded content hashes from metadata, if any
    * @returns The resolved freshness status

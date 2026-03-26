@@ -27,7 +27,7 @@ function base(overrides: Partial<SchemaYamlData> = {}): SchemaYamlData {
           { id: 'has-requirements', type: 'section', matches: '^Requirements$', required: true },
         ],
         rules: {
-          post: [{ id: 'normative', text: 'Use MUST/SHALL.' }],
+          post: [{ id: 'normative', instruction: 'Use MUST/SHALL.' }],
         },
       },
       {
@@ -44,6 +44,7 @@ function base(overrides: Partial<SchemaYamlData> = {}): SchemaYamlData {
       {
         step: 'designing',
         requires: [],
+        requiresTaskCompletion: [],
         hooks: {
           pre: [{ id: 'design-guidance', type: 'instruction', text: 'Design carefully.' }],
           post: [],
@@ -52,6 +53,7 @@ function base(overrides: Partial<SchemaYamlData> = {}): SchemaYamlData {
       {
         step: 'implementing',
         requires: ['specs'],
+        requiresTaskCompletion: [],
         hooks: {
           pre: [],
           post: [{ id: 'run-tests', type: 'run', command: 'pnpm test' }],
@@ -108,8 +110,18 @@ describe('mergeSchemaLayers — append adds at end in order', () => {
       layer('plugin', {
         append: {
           workflow: [
-            { step: 'reviewing', requires: [], hooks: { pre: [], post: [] } },
-            { step: 'deploying', requires: [], hooks: { pre: [], post: [] } },
+            {
+              step: 'reviewing',
+              requires: [],
+              requiresTaskCompletion: [],
+              hooks: { pre: [], post: [] },
+            },
+            {
+              step: 'deploying',
+              requires: [],
+              requiresTaskCompletion: [],
+              hooks: { pre: [], post: [] },
+            },
           ],
         },
       }),
@@ -194,7 +206,7 @@ describe('mergeSchemaLayers — plugin appends, override removes', () => {
             {
               id: 'specs',
               rules: {
-                post: [{ id: 'rfc-rule', text: 'Reference RFC.' }],
+                post: [{ id: 'rfc-rule', instruction: 'Reference RFC.' }],
               },
             },
           ],

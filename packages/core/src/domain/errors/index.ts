@@ -1,5 +1,8 @@
 export { SpecdError } from './specd-error.js'
-export { InvalidStateTransitionError } from './invalid-state-transition-error.js'
+export {
+  InvalidStateTransitionError,
+  type TransitionFailureReason,
+} from './invalid-state-transition-error.js'
 export { ApprovalRequiredError } from './approval-required-error.js'
 export { InvalidSpecPathError } from './invalid-spec-path-error.js'
 export { ArtifactConflictError } from './artifact-conflict-error.js'
@@ -18,3 +21,4 @@ export { InvalidChangeError } from './invalid-change-error.js'
 export { MissingDefaultWorkspaceError } from './missing-default-workspace-error.js'
 export { StepNotValidError } from './step-not-valid-error.js'
 export { HookNotFoundError } from './hook-not-found-error.js'
+export { SpecOverlapError } from './spec-overlap-error.js'

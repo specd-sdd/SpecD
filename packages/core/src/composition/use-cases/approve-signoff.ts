@@ -7,7 +7,7 @@ import { type SchemaRepository } from '../../application/ports/schema-repository
 import { createSchemaRepository } from '../schema-repository.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
+import { createVcsActorResolver } from '../actor-resolver.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
 /**
@@ -95,7 +95,7 @@ export function createApproveSignoff(
     )
   }
   const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  const actor = new GitActorResolver()
+  const actor = createVcsActorResolver()
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: [options!.projectRoot + '/node_modules'],
     configDir: options!.projectRoot,

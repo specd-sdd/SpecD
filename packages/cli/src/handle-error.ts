@@ -62,20 +62,21 @@ export function cliError(
  *
  * @param err - The caught error
  * @param format - Optional output format; when `json` or `toon`, a structured error is also written to stdout
+ * @returns Never. Always terminates the process with the mapped exit code.
  */
 export function handleError(err: unknown, format?: string): never {
   // Known domain/application errors — all extend SpecdError with a machine-readable code
   if (err instanceof SpecdError) {
     if (err instanceof HookFailedError) {
-      cliError(`hook '${err.command}' failed`, format, 2, err.code, { detail: err.stderr })
+      return cliError(`hook '${err.command}' failed`, format, 2, err.code, { detail: err.stderr })
     }
 
     if (err instanceof SchemaNotFoundError || err instanceof SchemaValidationError) {
-      cliError(err.message, format, 3, err.code)
+      return cliError(err.message, format, 3, err.code)
     }
 
     // All other SpecdError subtypes → exit 1
-    cliError(err.message, format, 1, err.code)
+    return cliError(err.message, format, 1, err.code)
   }
 
   // Generic/unexpected errors — stderr only, no structured output

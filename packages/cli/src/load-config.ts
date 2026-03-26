@@ -19,3 +19,21 @@ export function loadConfig(options?: { configPath?: string | undefined }): Promi
   )
   return loader.load()
 }
+
+/**
+ * Resolves the path to the active config file without loading it.
+ *
+ * @param options - Resolution options
+ * @param options.configPath - Optional absolute path to `specd.yaml`
+ * @returns Absolute path to the config file, or `null` if not locatable
+ */
+export function resolveConfigPath(options?: {
+  configPath?: string | undefined
+}): Promise<string | null> {
+  const loader = createConfigLoader(
+    options?.configPath !== undefined
+      ? { configPath: options.configPath }
+      : { startDir: process.cwd() },
+  )
+  return loader.resolvePath()
+}

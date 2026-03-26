@@ -290,17 +290,17 @@ artifacts:
     rules:
       pre:
         - id: normative
-          text: 'Use SHALL/MUST for normative statements.'
+          instruction: 'Use SHALL/MUST for normative statements.'
       post:
         - id: examples
-          text: 'Include examples where possible.'
+          instruction: 'Include examples where possible.'
 `
     const data = parseSchemaYaml('#test', yaml)
     const rules = data.artifacts![0]!.rules
     expect(rules?.pre).toHaveLength(1)
     expect(rules?.pre![0]!.id).toBe('normative')
     expect(rules?.post).toHaveLength(1)
-    expect(rules?.post![0]!.text).toBe('Include examples where possible.')
+    expect(rules?.post![0]!.instruction).toBe('Include examples where possible.')
   })
 })
 

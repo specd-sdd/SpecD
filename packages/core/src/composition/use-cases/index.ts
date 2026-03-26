@@ -101,3 +101,8 @@ export {
 } from './compile-context.js'
 export { createValidateSpecs, type FsValidateSpecsOptions } from './validate-specs.js'
 export { createGetSpecContext, type FsGetSpecContextOptions } from './get-spec-context.js'
+export {
+  createDetectOverlap,
+  type DetectOverlapContext,
+  type FsDetectOverlapOptions,
+} from './detect-overlap.js'

@@ -22,7 +22,7 @@ const specIdString = z.string().refine(
   { message: 'must be a valid spec ID (capabilityPath or workspace:capabilityPath)' },
 )
 
-/** Lenient schema for reading `.specd-metadata.yaml` — used by {@link parseMetadata}. */
+/** Lenient schema for reading `metadata.json` — used by {@link parseMetadata}. */
 export const specMetadataSchema = z
   .object({
     title: z.string().optional(),
@@ -56,7 +56,7 @@ export const specMetadataSchema = z
   .passthrough()
 
 /**
- * Strict schema for writing `.specd-metadata.yaml` — used by {@link SaveSpecMetadata}.
+ * Strict schema for writing `metadata.json` — used by {@link SaveSpecMetadata}.
  * `title` and `description` are required; other fields are optional but validated when present.
  */
 export const strictSpecMetadataSchema = z
@@ -103,7 +103,7 @@ export const strictSpecMetadataSchema = z
   })
   .passthrough()
 
-/** Parsed `.specd-metadata.yaml` content. */
+/** Parsed `metadata.json` content. */
 export interface SpecMetadata {
   readonly title?: string
   readonly description?: string

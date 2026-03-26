@@ -35,12 +35,15 @@ Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not recei
 
 `ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `ArchiveChange` uses it to look up the correct adapter when applying delta files to base artifacts. The bootstrap layer constructs it and injects it here — `ArchiveChange` does not instantiate parsers directly.
 
+`ChangeRepository` is used both for loading and persisting the change being archived and for listing all active changes during the overlap check.
+
 ### Requirement: Input
 
 `ArchiveChange.execute` receives:
 
 - `name` — the change name to archive
 - `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
+- `allowOverlap` (boolean, optional, default `false`) — when `true`, the use case skips the overlap check and permits archiving even when other active changes target the same specs
 
 ### Requirement: Schema name guard
 
@@ -51,6 +54,36 @@ After obtaining the schema from `SchemaProvider`, `ArchiveChange` must compare `
 The first step of `ArchiveChange.execute` after the schema name guard must call `change.assertArchivable()`. If the change is not in `archivable` state, this throws `InvalidStateTransitionError` and the archive is aborted without running any hooks or modifying any files.
 
 After the guard passes, `ArchiveChange` MUST transition the change to `archiving` via `change.transition('archiving', actor)` and persist the change via `ChangeRepository.save(change)`. This records the state transition before any hooks execute or files are modified.
+
+### Requirement: Overlap guard
+
+After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes.
+
+The check MUST:
+
+1. Call `ChangeRepository.list()` to retrieve all active changes
+2. Exclude the change being archived from the list
+3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived
+4. Filter the result to entries where the change being archived participates
+
+If the filtered report has overlap and `allowOverlap` is `false`, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.
+
+If `allowOverlap` is `true`, the overlap check is skipped entirely — the use case proceeds to pre-archive hooks without calling `detectSpecOverlap`.
+
+### Requirement: Overlap guard
+
+After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes.
+
+The check MUST:
+
+1. Call `ChangeRepository.list()` to retrieve all active changes
+2. Exclude the change being archived from the list
+3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived
+4. Filter the result to entries where the change being archived participates
+
+If the filtered report has overlap and `allowOverlap` is `false`, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.
+
+If `allowOverlap` is `true`, the overlap check is skipped entirely — the use case proceeds to pre-archive hooks without calling `detectSpecOverlap`.
 
 ### Requirement: Pre-archive hooks
 
@@ -124,6 +157,7 @@ After merging deltas and archiving the change, the archive process generates met
 ## Constraints
 
 - `change.assertArchivable()` must be called before any hooks or file modifications
+- The overlap guard must run after the archivable guard and before pre-archive hooks
 - Pre-archive hook failures abort the archive and throw — no partial state is written
 - Post-archive hook failures are returned in the result; the archive is not rolled back
 - `ArchiveChange` must not call `change.invalidate()` or any mutation on the `Change` entity — the change is already at its terminal state
@@ -148,3 +182,4 @@ After merging deltas and archiving the change, the archive process generates met
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port-per-workspace pattern; manual DI at entry points
 - [`specs/core/workspace/spec.md`](../workspace/spec.md) — primary workspace for archive path template resolution
 - [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
+- [`specs/core/spec-overlap/spec.md`](../spec-overlap/spec.md) — `detectSpecOverlap` domain service for overlap detection

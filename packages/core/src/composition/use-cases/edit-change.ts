@@ -2,7 +2,7 @@ import { EditChange } from '../../application/use-cases/edit-change.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
-import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
+import { createVcsActorResolver } from '../actor-resolver.js'
 
 /** Domain context for `createEditChange(context, options)`. */
 export interface EditChangeContext {
@@ -65,6 +65,6 @@ export function createEditChange(
     draftsPath: opts.draftsPath,
     discardedPath: opts.discardedPath,
   })
-  const actor = new GitActorResolver()
+  const actor = createVcsActorResolver()
   return new EditChange(changeRepo, new Map(), actor)
 }

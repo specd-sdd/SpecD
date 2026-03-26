@@ -61,7 +61,7 @@
 #### Scenario: Plugin appends, then override removes
 
 - **GIVEN** a base schema with no `rules.post` on artifact `specs`
-- **AND** layer 1 (plugin) appends `rules.post: [{ id: rfc-rule, text: '...' }]` to `specs`
+- **AND** layer 1 (plugin) appends `rules.post: [{ id: rfc-rule, instruction: '...' }]` to `specs`
 - **AND** layer 2 (override) removes `rules.post` entry `id: rfc-rule` from `specs`
 - **WHEN** `mergeSchemaLayers` is applied with `[layer1, layer2]`
 - **THEN** the `specs` artifact has no `rfc-rule` in `rules.post`

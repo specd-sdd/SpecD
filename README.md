@@ -169,13 +169,26 @@ See the [configuration reference](docs/config/config-reference.md) for all avail
 
 ## Documentation
 
+**Start here:**
+
+| Guide                                                            | Contents                                                          |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [`docs/guide/getting-started.md`](docs/guide/getting-started.md) | Philosophy, core concepts, project structure, lifecycle overview. |
+| [`docs/guide/workflow.md`](docs/guide/workflow.md)               | Lifecycle states, transitions, hooks, approval gates.             |
+| [`docs/guide/schemas.md`](docs/guide/schemas.md)                 | Artifacts, templates, customisation (fork/extend/overrides).      |
+| [`docs/guide/workspaces.md`](docs/guide/workspaces.md)           | Multi-package and multi-repo spec organisation.                   |
+| [`docs/guide/configuration.md`](docs/guide/configuration.md)     | specd.yaml explained: storage, context, plugins, overrides.       |
+| [`docs/guide/selectors.md`](docs/guide/selectors.md)             | Selectors, extractors, validations, metadata extraction.          |
+
+**Reference:**
+
 | Section                          | Contents                                                                    |
 | -------------------------------- | --------------------------------------------------------------------------- |
+| [`docs/cli/`](docs/cli/)         | CLI command reference.                                                      |
+| [`docs/config/`](docs/config/)   | `specd.yaml` technical reference and configuration examples.                |
+| [`docs/schemas/`](docs/schemas/) | Schema format technical reference and schema examples.                      |
 | [`docs/core/`](docs/core/)       | Core API and model docs (`overview`, `domain-model`, `ports`, `use-cases`). |
-| [`docs/config/`](docs/config/)   | `specd.yaml` reference and configuration examples.                          |
-| [`docs/schemas/`](docs/schemas/) | Schema format reference and schema examples.                                |
 | [`docs/adr/`](docs/adr/)         | Architecture Decision Records.                                              |
-| [`docs/cli/`](docs/cli/)         | CLI docs directory (currently mostly pending).                              |
 | [`docs/mcp/`](docs/mcp/)         | MCP docs directory (currently mostly pending).                              |
 
 ## Development model

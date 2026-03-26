@@ -14,7 +14,8 @@
     "core:core/content-extraction",
     "default:_global/architecture",
     "core:core/workspace",
-    "core:core/spec-id-format"
+    "core:core/spec-id-format",
+    "core:core/spec-overlap"
   ],
   "context": [
     "Once a change has completed its full lifecycle, its spec modifications need to be applied to the project and the change itself preserved for posterity — but this finalization involves delta merging, hook execution, and metadata generation that must happen atomically and in the right order. `ArchiveChange` is the use case that merges delta artifacts into project specs, moves the change directory to the archive, and fires lifecycle hooks before and after. It is gated on `archivable` state."
@@ -23,13 +24,13 @@
     {
       "requirement": "Ports and constructor",
       "rules": [
-        "`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaProvider`, `SaveSpecMetadata`, `YamlSerializer`, and `ActorResolver`.\n\n```typescript\nclass ArchiveChange {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    archive: ArchiveRepository,\n    runStepHooks: RunStepHooks,\n    actor: ActorResolver,\n    parsers: ArtifactParserRegistry,\n    schemaProvider: SchemaProvider,\n    generateMetadata: GenerateSpecMetadata,\n    saveMetadata: SaveSpecMetadata,\n    yaml: YamlSerializer,\n  )\n}\n```\n\nHook execution is delegated to `RunStepHooks` — `ArchiveChange` does not receive `HookRunner` or `projectWorkflowHooks` directly.\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.\n\n`specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec ID's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.\n\n`ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `ArchiveChange` uses it to look up the correct adapter when applying delta files to base artifacts. The bootstrap layer constructs it and injects it here — `ArchiveChange` does not instantiate parsers directly."
+        "`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `VcsAdapter`, `ArtifactParserRegistry`, `SchemaProvider`, `SaveSpecMetadata`, `YamlSerializer`, and `ActorResolver`.\n\n```typescript\nclass ArchiveChange {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    archive: ArchiveRepository,\n    runStepHooks: RunStepHooks,\n    actor: ActorResolver,\n    parsers: ArtifactParserRegistry,\n    schemaProvider: SchemaProvider,\n    generateMetadata: GenerateSpecMetadata,\n    saveMetadata: SaveSpecMetadata,\n    yaml: YamlSerializer,\n  )\n}\n```\n\nHook execution is delegated to `RunStepHooks` — `ArchiveChange` does not receive `HookRunner` or `projectWorkflowHooks` directly.\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.\n\n`specs` is keyed by workspace name. A change may touch specs in multiple workspaces (e.g. `default` and `billing`); `ArchiveChange` looks up the `SpecRepository` for each spec ID's workspace before reading the base spec or writing the merged result. The bootstrap layer constructs and passes all workspace repositories.\n\n`ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `ArchiveChange` uses it to look up the correct adapter when applying delta files to base artifacts. The bootstrap layer constructs it and injects it here — `ArchiveChange` does not instantiate parsers directly.\n\n`ChangeRepository` is used both for loading and persisting the change being archived and for listing all active changes during the overlap check."
       ]
     },
     {
       "requirement": "Input",
       "rules": [
-        "`ArchiveChange.execute` receives:\n\n- `name` — the change name to archive\n- `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`"
+        "`ArchiveChange.execute` receives:\n\n- `name` — the change name to archive\n- `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`\n- `allowOverlap` (boolean, optional, default `false`) — when `true`, the use case skips the overlap check and permits archiving even when other active changes target the same specs"
       ]
     },
     {
@@ -42,6 +43,13 @@
       "requirement": "Archivable guard",
       "rules": [
         "The first step of `ArchiveChange.execute` after the schema name guard must call `change.assertArchivable()`. If the change is not in `archivable` state, this throws `InvalidStateTransitionError` and the archive is aborted without running any hooks or modifying any files.\n\nAfter the guard passes, `ArchiveChange` MUST transition the change to `archiving` via `change.transition('archiving', actor)` and persist the change via `ChangeRepository.save(change)`. This records the state transition before any hooks execute or files are modified."
+      ]
+    },
+    {
+      "requirement": "Overlap guard",
+      "rules": [
+        "After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes.\n\nThe check MUST:\n\n1. Call `ChangeRepository.list()` to retrieve all active changes\n2. Exclude the change being archived from the list\n3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived\n4. Filter the result to entries where the change being archived participates\n\nIf the filtered report has overlap and `allowOverlap` is `false`, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.\n\nIf `allowOverlap` is `true`, the overlap check is skipped entirely — the use case proceeds to pre-archive hooks without calling `detectSpecOverlap`.",
+        "After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes.\n\nThe check MUST:\n\n1. Call `ChangeRepository.list()` to retrieve all active changes\n2. Exclude the change being archived from the list\n3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived\n4. Filter the result to entries where the change being archived participates\n\nIf the filtered report has overlap and `allowOverlap` is `false`, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.\n\nIf `allowOverlap` is `true`, the overlap check is skipped entirely — the use case proceeds to pre-archive hooks without calling `detectSpecOverlap`."
       ]
     },
     {
@@ -83,6 +91,7 @@
   ],
   "constraints": [
     "change.assertArchivable() must be called before any hooks or file modifications",
+    "The overlap guard must run after the archivable guard and before pre-archive hooks",
     "Pre-archive hook failures abort the archive and throw — no partial state is written",
     "Post-archive hook failures are returned in the result; the archive is not rolled back",
     "ArchiveChange must not call change.invalidate() or any mutation on the Change entity — the change is already at its terminal state",
@@ -113,6 +122,100 @@
         "AND the change transitions to archiving via change.transition('archiving', actor)",
         "AND the change is persisted via ChangeRepository.save(change)",
         "AND execution proceeds to pre-archive hooks"
+      ]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "Archive blocked when other changes target same specs",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config",
+        "AND another active change beta also targets core:core/config"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha' }) is called without allowOverlap"],
+      "then": [
+        "SpecOverlapError is thrown",
+        "AND the error message includes core:core/config and beta",
+        "AND no files are modified and no hooks are executed"
+      ]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "Archive proceeds with allowOverlap flag",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config",
+        "AND another active change beta also targets core:core/config"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha', allowOverlap: true }) is called"],
+      "then": ["the archive proceeds normally", "AND no SpecOverlapError is thrown"]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "No overlap allows archive without flag",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config",
+        "AND no other active change targets core:core/config"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha' }) is called"],
+      "then": ["the archive proceeds normally"]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "Overlap check excludes the change being archived",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config",
+        "AND no other active change targets core:core/config"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha' }) is called"],
+      "then": [
+        "alpha itself does not cause an overlap detection",
+        "AND the archive proceeds normally"
+      ]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "Archive blocked when other changes target same specs",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config",
+        "AND another active change beta also targets core:core/config"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha' }) is called without allowOverlap"],
+      "then": [
+        "SpecOverlapError is thrown",
+        "AND the error message includes core:core/config and beta",
+        "AND no files are modified and no hooks are executed"
+      ]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "Archive proceeds with allowOverlap flag",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config",
+        "AND another active change beta also targets core:core/config"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha', allowOverlap: true }) is called"],
+      "then": ["the archive proceeds normally", "AND no SpecOverlapError is thrown"]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "No overlap allows archive without flag",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config",
+        "AND no other active change targets core:core/config"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha' }) is called"],
+      "then": ["the archive proceeds normally"]
+    },
+    {
+      "requirement": "Overlap guard",
+      "name": "Overlap check excludes the change being archived",
+      "given": [
+        "a change alpha in archivable state targeting core:core/config",
+        "AND no other active change targets core:core/config"
+      ],
+      "when": ["ArchiveChange.execute({ name: 'alpha' }) is called"],
+      "then": [
+        "alpha itself does not cause an overlap detection",
+        "AND the archive proceeds normally"
       ]
     },
     {
@@ -300,8 +403,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:d136c16ce9476ee5f78212d546903fdb0ff33fedabb1ee8271f4ea7c2d396573",
-    "verify.md": "sha256:a4788a7b2a8d64699b73d92532e683730f8600a1a447fd476e583a728219637d"
+    "spec.md": "sha256:83e43986fc7810c9aed84cdeefc279df7a40c7154d2913026b390fe03a093d63",
+    "verify.md": "sha256:85dd15d35e166c5ad01d7a8a4aea880f7a78eaa917af5951b8ac9dd820285e73"
   },
   "generatedBy": "core"
 }

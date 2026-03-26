@@ -15,6 +15,8 @@ import { type ArtifactFile } from '../../domain/value-objects/artifact-file.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { detectSpecOverlap } from '../../domain/services/detect-spec-overlap.js'
+import { SpecOverlapError } from '../../domain/errors/spec-overlap-error.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { type GenerateSpecMetadata } from './generate-spec-metadata.js'
@@ -32,6 +34,13 @@ export interface ArchiveChangeInput {
    * Defaults to `false`.
    */
   readonly skipHooks?: boolean
+  /**
+   * When `true`, skips the overlap check and permits archiving even when
+   * other active changes target the same specs.
+   *
+   * Defaults to `false`.
+   */
+  readonly allowOverlap?: boolean
 }
 
 /** Result returned by a successful {@link ArchiveChange} execution. */
@@ -43,7 +52,7 @@ export interface ArchiveChangeResult {
   /** Commands of post-archive hooks that failed; empty on full success. */
   readonly postHookFailures: string[]
   /**
-   * Spec paths where `.specd-metadata.yaml` generation failed during this archive
+   * Spec paths where `metadata.json` generation failed during this archive
    * (e.g. extraction produced no required fields); empty when all metadata was
    * generated successfully.
    */
@@ -131,6 +140,22 @@ export class ArchiveChange {
     if (change.state !== 'archiving') {
       change.transition('archiving', archivingActor)
       await this._changes.save(change)
+    }
+
+    // --- Overlap guard ---
+    if (!(input.allowOverlap ?? false)) {
+      const allChanges = await this._changes.list()
+      const others = allChanges.filter((c) => c.name !== change.name)
+      if (others.length > 0) {
+        const combined = [...others, change]
+        const overlapReport = detectSpecOverlap(combined)
+        const relevant = overlapReport.entries.filter((entry) =>
+          entry.changes.some((c) => c.name === change.name),
+        )
+        if (relevant.length > 0) {
+          throw new SpecOverlapError(relevant)
+        }
+      }
     }
 
     // --- Pre-archive hooks (delegated to RunStepHooks) ---
@@ -224,7 +249,7 @@ export class ArchiveChange {
       if (synced) staleSpecIds.add(specId)
 
       // Specs with manifest-declared dependencies also need metadata regeneration
-      // so that dependsOn flows into .specd-metadata.yaml
+      // so that dependsOn flows into metadata.json
       if (change.specDependsOn.get(specId) !== undefined) {
         staleSpecIds.add(specId)
       }

@@ -13,7 +13,9 @@ export function registerChangeValidate(parent: Command): void {
   parent
     .command('validate <name> [specPath]')
     .allowExcessArguments(false)
-    .description('Validate artifact files against the active schema')
+    .description(
+      'Validate artifacts in a change against their spec scenarios and the active schema, reporting any violations.',
+    )
     .option('--all', 'validate all specIds in the change')
     .option('--artifact <artifactId>', 'validate only this artifact')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

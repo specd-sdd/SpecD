@@ -12,7 +12,9 @@ export function registerChangeHookInstruction(parent: Command): void {
   parent
     .command('hook-instruction <name> <step>')
     .allowExcessArguments(false)
-    .description('Get instruction: hook text for a workflow step')
+    .description(
+      'Return the hook instruction text for a named lifecycle phase, for use by agents executing that phase.',
+    )
     .requiredOption('--phase <phase>', 'hook phase: pre or post')
     .option('--only <hook-id>', 'return only the instruction with this ID')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

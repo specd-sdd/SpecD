@@ -4,6 +4,7 @@
   "dependsOn": [
     "core:core/config",
     "core:core/schema-format",
+    "core:core/workflow-model",
     "core:core/change-manifest",
     "core:core/storage",
     "core:core/delta-format",
@@ -36,7 +37,7 @@
     {
       "requirement": "Implementation and verification loop",
       "rules": [
-        "The `implementing` and `verifying` states form a loop that repeats until verification passes.\n\nThe transition `implementing → verifying` is only valid when all artifacts listed in the `implementing` step's `requires` field have zero matches for their `taskCompletionCheck.incompletePattern` (defaulting to markdown unchecked checkboxes `- [ ]` if not declared). This is a content-level check on the artifact files, not a check on `effectiveStatus`. Attempting this transition while any incomplete task item remains throws `InvalidStateTransitionError`.\n\nThe transition `verifying → implementing` is taken when verification fails and changes are required. No approval invalidation is triggered by this transition; the spec has not changed, only the implementation work has been found insufficient.\n\nThe loop may repeat any number of times. History records each round in full."
+        "The `implementing` and `verifying` states form a loop that repeats until verification passes.\n\nThe transition `implementing → verifying` is gated by the workflow model's task completion gating rule (see [`specs/core/workflow-model/spec.md` — Requirement: Task completion gating](../workflow-model/spec.md)). Because the `verifying` step's `requires` includes `tasks` (which declares `taskCompletionCheck`), the transition is automatically blocked when incomplete task items remain. This is a content-level check on the artifact files, not a check on `effectiveStatus`.\n\nThe transition `verifying → implementing` is taken when verification fails and changes are required. No approval invalidation is triggered by this transition; the spec has not changed, only the implementation work has been found insufficient.\n\nThe loop may repeat any number of times. History records each round in full."
       ]
     },
     {
@@ -102,7 +103,7 @@
     "Both approval gates default to false — teams opt in via approvals in specd.yaml",
     "When approvals.spec: true, spec approval is required before implementing",
     "When approvals.signoff: true, sign-off is always required before archivable, regardless of change content",
-    "implementing → verifying requires zero matches of taskCompletionCheck.incompletePattern across all artifacts in the implementing step's requires; defaults to ^\\s*-\\s+\\[ \\] if not declared in the schema; throws InvalidStateTransitionError if any incomplete item is found",
+    "Task completion gating is enforced generically by the workflow model — any step that requires an artifact with taskCompletionCheck is automatically gated (see [specs/core/workflow-model/spec.md](../workflow-model/spec.md))",
     "verifying → implementing does not trigger approval invalidation",
     "History events are never modified or deleted; invalidated approvals are identifiable by a subsequent invalidated event",
     "Discarding a change requires a discarded event with mandatory reason and by; it is irreversible"
@@ -169,15 +170,23 @@
     },
     {
       "requirement": "Lifecycle",
-      "name": "Valid transition succeeds",
+      "name": "Valid transition — drafting to designing",
       "when": ["a Change in drafting state is transitioned to designing"],
       "then": [
-        "a transitioned event with from: 'drafting' and to: 'designing' is appended and deriving state from history returns designing"
+        "a transitioned event with from: 'drafting' and to: 'designing' is appended and deriving state returns designing"
       ]
     },
     {
       "requirement": "Lifecycle",
-      "name": "Invalid transition throws",
+      "name": "Invalid transition — drafting to implementing (skip designing)",
+      "when": ["a Change in drafting state is transitioned to implementing"],
+      "then": [
+        "InvalidStateTransitionError is thrown, no event is appended, and the state remains drafting"
+      ]
+    },
+    {
+      "requirement": "Lifecycle",
+      "name": "Invalid transition — drafting to archivable (skip everything)",
       "when": ["a Change in drafting state is transitioned to archivable"],
       "then": [
         "InvalidStateTransitionError is thrown, no event is appended, and the state remains drafting"
@@ -204,11 +213,23 @@
       "name": "Valid transition — implementing to verifying when all task items complete",
       "given": [
         "a Change in implementing state",
-        "AND all artifacts in the implementing step's requires have zero matches for their taskCompletionCheck.incompletePattern"
+        "AND the verifying step requires an artifact with taskCompletionCheck and all items are complete"
       ],
       "when": ["the change is transitioned to verifying"],
       "then": [
         "a transitioned event with from: 'implementing' and to: 'verifying' is appended and deriving state returns verifying"
+      ]
+    },
+    {
+      "requirement": "Lifecycle",
+      "name": "Task completion gating applies generically",
+      "given": [
+        "a Change in a state transitioning to a step that requires an artifact with taskCompletionCheck",
+        "AND incomplete items remain in the artifact"
+      ],
+      "when": ["the transition is attempted"],
+      "then": [
+        "InvalidStateTransitionError is thrown — this is not specific to implementing → verifying"
       ]
     },
     {
@@ -218,7 +239,7 @@
         "an artifact with no taskCompletionCheck declared",
         "AND its file contains - [ ] implement login and - [x] implement logout"
       ],
-      "when": ["the implementing → verifying transition is attempted"],
+      "when": ["a transition to a step requiring that artifact is attempted"],
       "then": [
         "the default pattern ^\\s*-\\s+\\[ \\] matches - [ ] implement login and the transition is blocked"
       ]
@@ -230,7 +251,7 @@
         "an artifact declares taskCompletionCheck.incompletePattern: '^\\s*TODO:'",
         "AND its file contains TODO: implement login and DONE: implement logout"
       ],
-      "when": ["the implementing → verifying transition is attempted"],
+      "when": ["a transition to a step requiring that artifact is attempted"],
       "then": ["the custom pattern matches TODO: implement login and the transition is blocked"]
     },
     {
@@ -238,7 +259,7 @@
       "name": "Invalid transition — implementing to verifying when a task item is incomplete",
       "given": [
         "a Change in implementing state",
-        "AND at least one artifact in the implementing step's requires has one or more matches for taskCompletionCheck.incompletePattern"
+        "AND the verifying step requires an artifact with taskCompletionCheck and incomplete items remain"
       ],
       "when": ["the change is transitioned to verifying"],
       "then": ["InvalidStateTransitionError is thrown and the state remains implementing"]
@@ -270,21 +291,6 @@
         "a transitioned event with from: 'verifying' and to: 'implementing' is appended",
         "AND no approval invalidation is triggered"
       ]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "implementing ↔ verifying loop repeats until verification passes",
-      "given": [
-        "a Change that has cycled through implementing → verifying → implementing → verifying"
-      ],
-      "when": ["verification passes on the second verifying round"],
-      "then": ["the change transitions to done and the full cycle is recorded in history"]
-    },
-    {
-      "requirement": "Lifecycle",
-      "name": "Valid transition — verifying to done",
-      "when": ["a Change in verifying state transitions to done"],
-      "then": ["a transitioned event with from: 'verifying' and to: 'done' is appended"]
     },
     {
       "requirement": "Spec approval gate",
@@ -596,8 +602,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:2b377d69090ac1d40fa1fec616fa44a9aea11397fa9fb9127ddf07f4314fb42b",
-    "verify.md": "sha256:ae8f0951bbeac2123fd4ad471c5e3ceae23aebd17eb132c8fe6e37eb2a1f6bfd"
+    "spec.md": "sha256:d8c56344869ac67086eae82f4128cc8ef6b1d89ea59e435daa0dfcd72b7294e9",
+    "verify.md": "sha256:297a4de390bedcabb9ccc1713a5dfff919510270532cb31b437c860a3d7945ab"
   },
   "generatedBy": "core"
 }

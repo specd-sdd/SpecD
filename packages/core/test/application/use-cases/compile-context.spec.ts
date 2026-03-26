@@ -661,6 +661,7 @@ describe('CompileContext', () => {
       const workflowStep: WorkflowStep = {
         step: 'implementing',
         requires: ['tasks'],
+        requiresTaskCompletion: [],
         hooks: { pre: [], post: [] },
       }
       const change = makeChange('my-change', {
@@ -686,6 +687,7 @@ describe('CompileContext', () => {
       const workflowStep: WorkflowStep = {
         step: 'implementing',
         requires: ['tasks'],
+        requiresTaskCompletion: [],
         hooks: { pre: [], post: [] },
       }
       const tasksArtifact = new ChangeArtifact({
@@ -722,6 +724,7 @@ describe('CompileContext', () => {
       const workflowStep: WorkflowStep = {
         step: 'implementing',
         requires: ['tasks'],
+        requiresTaskCompletion: [],
         hooks: { pre: [], post: [] },
       }
       const change = makeChange('my-change')
@@ -835,6 +838,7 @@ describe('CompileContext', () => {
       const workflowStep: WorkflowStep = {
         step: 'archiving',
         requires: [],
+        requiresTaskCompletion: [],
         hooks: {
           pre: [
             { id: 'review-delta', type: 'instruction', text: 'Review delta specs' },
@@ -863,11 +867,13 @@ describe('CompileContext', () => {
       const designStep: WorkflowStep = {
         step: 'designing',
         requires: [],
+        requiresTaskCompletion: [],
         hooks: { pre: [], post: [] },
       }
       const implStep: WorkflowStep = {
         step: 'implementing',
         requires: ['tasks'],
+        requiresTaskCompletion: [],
         hooks: { pre: [], post: [] },
       }
       const change = makeChange('my-change') // tasks artifact not complete
@@ -1390,6 +1396,7 @@ describe('CompileContext', () => {
       const workflowStep: WorkflowStep = {
         step: 'designing',
         requires: [],
+        requiresTaskCompletion: [],
         hooks: { pre: [], post: [] },
       }
       const change = makeChange('my-change')
@@ -1547,6 +1554,7 @@ describe('CompileContext', () => {
       const workflowStep: WorkflowStep = {
         step: 'implementing',
         requires: ['design'],
+        requiresTaskCompletion: [],
         hooks: { pre: [], post: [] },
       }
       const designArtifact = new ChangeArtifact({

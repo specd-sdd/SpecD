@@ -11,12 +11,16 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 export function registerChangeApprove(parent: Command): void {
   const approveCmd = parent
     .command('approve')
-    .description('Approve a change (sub-commands: spec, signoff)')
+    .description(
+      'Approve a change at a lifecycle gate; use sub-commands spec or signoff to record the approval.',
+    )
 
   approveCmd
     .command('spec <name>')
     .allowExcessArguments(false)
-    .description('Record a spec approval')
+    .description(
+      'Record a spec approval for a change, satisfying the spec gate in the specd lifecycle.',
+    )
     .requiredOption('--reason <text>', 'rationale for approval')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -53,7 +57,9 @@ JSON/TOON output schema:
   approveCmd
     .command('signoff <name>')
     .allowExcessArguments(false)
-    .description('Record a sign-off')
+    .description(
+      'Record a sign-off approval for a change, satisfying the signoff gate in the specd lifecycle.',
+    )
     .requiredOption('--reason <text>', 'rationale for sign-off')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

@@ -13,7 +13,9 @@ export function registerChangeDeps(parent: Command): void {
   parent
     .command('deps <name> <specId>')
     .allowExcessArguments(false)
-    .description('Manage declared dependencies for a spec within a change')
+    .description(
+      'Add, remove, or list declared spec dependencies for a change, controlling which specs must be satisfied before this change proceeds.',
+    )
     .option('--add <id>', 'add a dependency spec ID (repeatable)', collect, [] as string[])
     .option('--remove <id>', 'remove a dependency spec ID (repeatable)', collect, [] as string[])
     .option(

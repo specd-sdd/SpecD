@@ -29,6 +29,23 @@ An empty or omitted `requires` means the step has no gating — the transition p
 
 A skipped optional artifact satisfies the requirement identically to a completed one.
 
+### Requirement: Task completion gating
+
+When a workflow step declares a `requiresTaskCompletion` array, the transition system MUST verify that each listed artifact's content contains no incomplete task items before allowing the transition. Only artifacts listed in `requiresTaskCompletion` are content-checked — other artifacts in `requires` are checked only via `effectiveStatus`.
+
+The `requiresTaskCompletion` array MUST be a subset of the step's `requires` array. Each listed artifact ID MUST reference an artifact type that declares `taskCompletionCheck` on its `ArtifactType`. These constraints are validated at schema build time by `buildSchema`.
+
+For each artifact ID in `requiresTaskCompletion`:
+
+1. Look up the `ArtifactType` from the schema to obtain `taskCompletionCheck.incompletePattern`.
+2. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.
+3. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.
+4. If the file does not exist (returns `null`), skip it.
+5. Compile `incompletePattern` using `safeRegex` with the `'m'` flag.
+6. If the regex is valid and matches any line in the file content, reject the transition with `InvalidStateTransitionError` including a structured reason (`incomplete-tasks`) with the artifact ID and match counts.
+
+When `requiresTaskCompletion` is absent or empty on a workflow step, no task completion gating applies — even if the step requires artifacts that declare `taskCompletionCheck`. The `taskCompletionCheck` on the artifact type defines _what_ pattern to check; the workflow step's `requiresTaskCompletion` controls _when_ it applies.
+
 ### Requirement: Step availability evaluation
 
 Step availability MUST be evaluated consistently by all consumers that need it. `CompileContext` evaluates step availability during context assembly. `GetStatus` reports the current change state, which corresponds directly to the active workflow step (since step name = state name). The evaluation is:
@@ -65,6 +82,9 @@ A workflow step's `requires` array contains **artifact IDs** (e.g. `specs`, `tas
 - Step `requires` contains artifact IDs, not step names — step-to-step cycles are structurally impossible
 - The artifact dependency graph is validated as a DAG by `buildSchema()` — cycles are rejected at schema load time
 - The archiving step is the only step that is both a workflow step and handled by a dedicated use case (`ArchiveChange`)
+- Task completion gating is controlled by `requiresTaskCompletion` on the workflow step — not by the mere presence of `taskCompletionCheck` on the artifact type
+- `requiresTaskCompletion` must be a subset of `requires` and reference artifacts with `taskCompletionCheck` — validated at schema build time
+- Task completion checks use `safeRegex` to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
 
 ## Spec Dependencies
 

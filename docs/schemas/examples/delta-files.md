@@ -26,7 +26,7 @@ deltas/<workspace>/<spec-path>/<delta-filename>
 For example, a delta targeting `specs/core/config/spec.md` in the `default` workspace lives at:
 
 ```
-specd/changes/<change-name>/deltas/default/core/config/spec.md.delta.yaml
+.specd/changes/<change-name>/deltas/default/core/config/spec.md.delta.yaml
 ```
 
 Delta files are never synced to permanent spec directories — they remain in the change directory as part of its record.
@@ -35,18 +35,19 @@ Delta files are never synced to permanent spec directories — they remain in th
 
 A delta file is a YAML sequence. Each entry is one delta operation.
 
-| Field      | Required for                   | Description                                                                                                                         |
-| ---------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `op`       | all                            | Operation type: `added`, `modified`, or `removed`.                                                                                  |
-| `selector` | `modified`, `removed`          | Identifies the existing node to target. Not valid on `added`.                                                                       |
-| `position` | `added` (optional)             | Where to insert the new node. See [Position](#position).                                                                            |
-| `rename`   | `modified` (optional)          | New label for the node's identifying property (heading text, key name).                                                             |
-| `content`  | `added`, `modified` (optional) | New node content in the artifact's native format. Mutually exclusive with `value`.                                                  |
-| `value`    | `added`, `modified` (optional) | Node value as a structured YAML value. For JSON/YAML structured nodes. Mutually exclusive with `content`.                           |
-| `strategy` | optional                       | Array merge strategy: `replace` (default), `append`, or `merge-by`. Only valid when the selector targets an array or sequence node. |
-| `mergeKey` | required with `merge-by`       | Key field used to match objects in `merge-by` strategy.                                                                             |
+| Field         | Required for                   | Description                                                                                                                                               |
+| ------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `op`          | all                            | Operation type: `added`, `modified`, `removed`, or `no-op`.                                                                                               |
+| `selector`    | `modified`, `removed`          | Identifies the existing node to target. Not valid on `added` or `no-op`.                                                                                  |
+| `position`    | `added` (optional)             | Where to insert the new node. See [Position](#position). Not valid on `no-op`.                                                                            |
+| `rename`      | `modified` (optional)          | New label for the node's identifying property (heading text, key name). Only valid on `modified`.                                                         |
+| `content`     | `added`, `modified` (optional) | New node content in the artifact's native format. Mutually exclusive with `value`. Not valid on `no-op`.                                                  |
+| `value`       | `added`, `modified` (optional) | Node value as a structured YAML value. For JSON/YAML structured nodes. Mutually exclusive with `content`. Not valid on `no-op`.                           |
+| `strategy`    | optional                       | Array merge strategy: `replace` (default), `append`, or `merge-by`. Only valid when the selector targets an array or sequence node. Not valid on `no-op`. |
+| `mergeKey`    | required with `merge-by`       | Key field used to match objects in `merge-by` strategy. Not valid on `no-op`.                                                                             |
+| `description` | optional on all                | Free-text explanation of what this entry does or why. Ignored during application. Valid on all operation types including `no-op`.                         |
 
-## The three operations
+## The four operations
 
 ### modified — change an existing node
 
@@ -188,6 +189,56 @@ For text-based formats (markdown, plain text), `content` includes the identifyin
     ```
 ````
 
+### no-op — explicitly document that no change is needed
+
+`no-op` declares that the artifact requires no changes for this delta. It is used when a spec is listed in the proposal but a particular artifact does not need modifications — the existing content is already valid.
+
+Rather than omitting the delta file (which is ambiguous — was it forgotten or intentionally skipped?), write a `no-op` entry with a `description` explaining why no change is needed.
+
+A `no-op` entry must be the **only** entry in the delta file. Mixing `no-op` with any other operation is an error — SpecD rejects such a file during parsing.
+
+The only valid fields on a `no-op` entry are `op` and `description`. All other fields (`selector`, `position`, `rename`, `content`, `value`, `strategy`, `mergeKey`) are invalid.
+
+When SpecD encounters a `no-op` delta, it skips delta application, delta validations, and structural validations entirely. It proceeds directly to hash computation on the raw delta file content and marks the artifact complete. The `no-op` declares that the existing artifact is already correct.
+
+```yaml
+# verify.md does not need changes — existing scenarios remain valid
+- op: no-op
+  description: 'Constructor signature changed but all existing verify scenarios still apply.'
+```
+
+```yaml
+# spec.md requires no changes — only design.md and tasks.md are updated in this change
+- op: no-op
+  description: 'No spec changes needed. This change only updates the implementation plan.'
+```
+
+## Description field
+
+Every delta entry, regardless of operation type, accepts an optional `description` field. Use it to record the intent behind the operation — why this node is being changed, what the business reason is, or what downstream effect is expected. The description is ignored during delta application; it exists purely for human and AI readers.
+
+```yaml
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Load config'
+  description: 'Tightened wording to reflect that the walk stops at the git root, not just any ancestor.'
+  content: |
+    The system must load specd.yaml from the nearest ancestor directory
+    that contains the file, stopping at the git repo root.
+
+- op: added
+  description: 'New requirement introduced by ADR-0012 — cache invalidation on file change.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Evict cache on change
+
+    The system must evict the in-memory config cache when specd.yaml is modified on disk.
+```
+
 ## Position
 
 `position` controls where an `added` entry inserts its node. All fields are optional — omitting `position` entirely appends the node at the end of the document.
@@ -283,23 +334,25 @@ To modify a specific item in an array or sequence, use a selector that targets t
 
 SpecD validates the entire delta for conflicts before applying any operation. If any conflict is found, the whole delta is rejected with a `DeltaApplicationError` and no changes are made to the artifact.
 
-| Conflict                                                                   | Error                                              |
-| -------------------------------------------------------------------------- | -------------------------------------------------- |
-| Two `modified` or `removed` entries resolve to the same node               | Cannot apply two operations to the same node.      |
-| A `rename` target already exists as a sibling                              | Would produce a duplicate node.                    |
-| Two `modified` entries rename to the same target within the same parent    | Ambiguous result.                                  |
-| `content` and `value` both present in the same entry                       | Mutually exclusive.                                |
-| `selector` on an `added` entry                                             | Use `position.parent` instead.                     |
-| `rename` on an `added` or `removed` entry                                  | Only valid on `modified`.                          |
-| `strategy: merge-by` without `mergeKey`                                    | `mergeKey` is required for `merge-by`.             |
-| `mergeKey` without `strategy: merge-by`                                    | `mergeKey` is only meaningful with `merge-by`.     |
-| `strategy` on a non-array selector                                         | Strategy is only valid for array/sequence targets. |
-| More than one of `after`, `before`, `first`, `last` in the same `position` | Mutually exclusive placement hints.                |
-| `position.parent` resolves to no node                                      | SpecD cannot scope the insertion.                  |
+| Conflict                                                                               | Error                                              |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Two `modified` or `removed` entries resolve to the same node                           | Cannot apply two operations to the same node.      |
+| A `rename` target already exists as a sibling                                          | Would produce a duplicate node.                    |
+| Two `modified` entries rename to the same target within the same parent scope          | Ambiguous result.                                  |
+| `content` and `value` both present in the same entry                                   | Mutually exclusive.                                |
+| `selector` on an `added` or `no-op` entry                                              | Use `position.parent` instead for `added`.         |
+| `rename` on an `added`, `removed`, or `no-op` entry                                    | Only valid on `modified`.                          |
+| `strategy: merge-by` without `mergeKey`                                                | `mergeKey` is required for `merge-by`.             |
+| `mergeKey` without `strategy: merge-by`                                                | `mergeKey` is only meaningful with `merge-by`.     |
+| `strategy` on a non-array selector                                                     | Strategy is only valid for array/sequence targets. |
+| More than one of `after`, `before`, `first`, `last` in the same `position`             | Mutually exclusive placement hints.                |
+| `position.parent` resolves to no node                                                  | SpecD cannot scope the insertion.                  |
+| `no-op` entry combined with any other entry in the same delta file                     | `no-op` must be the sole entry.                    |
+| `position`, `rename`, `content`, `value`, `strategy`, or `mergeKey` on a `no-op` entry | Only `op` and `description` are valid on `no-op`.  |
 
 ## Complete delta file example
 
-A realistic delta for a spec that is gaining a new requirement and losing an obsolete one:
+A realistic delta for a spec that is gaining a new requirement, updating an existing one, and removing an obsolete one:
 
 ```yaml
 # spec.md.delta.yaml
@@ -307,6 +360,7 @@ A realistic delta for a spec that is gaining a new requirement and losing an obs
 
 # Update the existing discovery requirement with tighter wording
 - op: modified
+  description: 'Clarified that the walk stops at the git root boundary — not just any ancestor.'
   selector:
     type: section
     matches: 'Requirement: Discover config'
@@ -317,6 +371,7 @@ A realistic delta for a spec that is gaining a new requirement and losing an obs
 
 # Add a new caching requirement after the discovery requirement
 - op: added
+  description: 'New requirement from ADR-0012: cache must be process-scoped only.'
   position:
     parent:
       type: section
@@ -336,4 +391,12 @@ A realistic delta for a spec that is gaining a new requirement and losing an obs
   selector:
     type: section
     matches: 'Requirement: Legacy override'
+```
+
+Paired no-op delta for the verify file, when its scenarios require no changes:
+
+```yaml
+# verify.md.delta.yaml
+- op: no-op
+  description: 'Existing verification scenarios remain valid for the updated requirements.'
 ```

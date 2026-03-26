@@ -1,0 +1,185 @@
+{
+  "title": "ValidateSchema",
+  "description": "Schema validation logic is currently embedded in the resolution pipeline (`ResolveSchema`) and the domain service (`buildSchema`), but there is no dedicated use case that exposes validation as a first-class operation. Delivery mechanisms that need to validate a schema — whether the project's active schema or an external file — must either duplicate orchestration logic or import infrastructure functions directly, violating the architecture spec. `ValidateSchema` is an application use case that encapsulates schema validation for both modes, keeping delivery mechanisms as thin adapters.",
+  "dependsOn": [
+    "core:core/resolve-schema",
+    "core:core/build-schema",
+    "core:core/schema-registry-port",
+    "core:core/parse-schema-yaml"
+  ],
+  "context": [
+    "Schema validation logic is currently embedded in the resolution pipeline (`ResolveSchema`) and the domain service (`buildSchema`), but there is no dedicated use case that exposes validation as a first-class operation. Delivery mechanisms that need to validate a schema — whether the project's active schema or an external file — must either duplicate orchestration logic or import infrastructure functions directly, violating the architecture spec. `ValidateSchema` is an application use case that encapsulates schema validation for both modes, keeping delivery mechanisms as thin adapters."
+  ],
+  "rules": [
+    {
+      "requirement": "Construction dependencies",
+      "rules": [
+        "`ValidateSchema` MUST be constructed with:\n\n- `schemas` (`SchemaRegistry`) — the registry port for resolving schema references and loading raw schema data\n- `buildSchemaFn` (`(ref: string, data: SchemaYamlData, templates: ReadonlyMap<string, string>) => Schema`) — the domain service for semantic validation (injected to avoid coupling the use case to a specific module path)"
+      ]
+    },
+    {
+      "requirement": "Project mode — resolved",
+      "rules": [
+        "When `execute` is called with `{ mode: 'project', schemaRef, schemaPlugins, schemaOverrides }`, the use case SHALL validate the project's active schema through the full resolution pipeline:\n\n1. Construct a `ResolveSchema` instance with the provided parameters and the injected `SchemaRegistry`.\n2. Call `resolveSchema.execute()` to run the full pipeline (base → extends → plugins → overrides → merge → build).\n3. Return a success result with the resolved `Schema`.\n\nIf any step throws `SchemaValidationError` or `SchemaNotFoundError`, the use case SHALL catch the error and return a failure result."
+      ]
+    },
+    {
+      "requirement": "Project mode — raw",
+      "rules": [
+        "When `execute` is called with `{ mode: 'project-raw', schemaRef }`, the use case SHALL validate only the base schema without applying plugins or overrides:\n\n1. Call `schemas.resolveRaw(schemaRef)` to get the raw schema data and templates.\n2. If `null`, return a failure result with a \"schema not found\" error.\n3. If the schema declares `extends`, resolve the extends chain by walking `resolveRaw` calls until a root schema is reached (same cycle detection as `ResolveSchema`). Cascade data using child-overrides-parent semantics.\n4. Call `buildSchemaFn(ref, data, templates)` for semantic validation.\n5. Return a success result with the validated `Schema`.\n\nThis mode isolates base schema errors from merge-layer errors."
+      ]
+    },
+    {
+      "requirement": "File mode",
+      "rules": [
+        "When `execute` is called with `{ mode: 'file', filePath }`, the use case SHALL validate an external schema file:\n\n1. Call `schemas.resolveRaw(filePath)` to read, parse, and load templates for the file. If `null`, return a failure result with a \"file not found\" error.\n2. If the schema declares `extends`, resolve the extends chain via `schemas.resolveRaw()` (the registry handles path-based refs). Detect cycles by tracking resolved paths. Cascade data using child-overrides-parent semantics.\n3. Call `buildSchemaFn(ref, data, templates)` for semantic validation.\n4. Return a success result with the validated `Schema` and a list of warnings.\n5. No project plugins or overrides are applied — the file is validated with its extends chain only."
+      ]
+    },
+    {
+      "requirement": "Result type",
+      "rules": [
+        "`execute` MUST return `Promise<ValidateSchemaResult>` where:\n\n```typescript\ntype ValidateSchemaResult =\n  | { valid: true; schema: Schema; warnings: string[] }\n  | { valid: false; errors: string[]; warnings: string[] }\n```\n\nThe use case MUST NOT throw for validation failures — it catches `SchemaValidationError` and `SchemaNotFoundError` and returns them as structured error results. Only unexpected errors (bugs) propagate as exceptions."
+      ]
+    },
+    {
+      "requirement": "Extends chain warnings in file mode",
+      "rules": [
+        "When validating a file that declares `extends` and the extends chain resolves successfully, the use case SHALL include a warning: `extends '<ref>' resolved from <resolvedPath>`. This helps the user understand which parent schema was used.\n\nWhen the extends reference cannot be resolved (e.g. the parent is an npm package not installed), the use case SHALL return a failure result with the resolution error — extends resolution is not optional in file mode."
+      ]
+    }
+  ],
+  "constraints": [
+    "ValidateSchema is an application use case — it lives in application/use-cases/",
+    "It imports the SchemaRegistry port and the buildSchema domain service — it MUST NOT import from infrastructure/",
+    "For project mode (resolved), it delegates to ResolveSchema rather than reimplementing the pipeline",
+    "For project-raw and file modes, it uses SchemaRegistry.resolveRaw() for all I/O",
+    "The use case never throws for validation failures — it returns structured results",
+    "The buildSchemaFn parameter is the actual buildSchema function, injected to maintain testability"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Construction dependencies",
+      "name": "Use case constructed with required dependencies",
+      "given": ["a SchemaRegistry and a buildSchema function"],
+      "when": ["ValidateSchema is constructed with both"],
+      "then": ["it does not throw"]
+    },
+    {
+      "requirement": "Project mode — resolved",
+      "name": "Valid project schema resolves successfully",
+      "given": ["a project with a valid schema, plugins, and overrides"],
+      "when": ["execute is called with mode: 'project'"],
+      "then": ["result is { valid: true } with the resolved Schema"]
+    },
+    {
+      "requirement": "Project mode — resolved",
+      "name": "Project schema with invalid plugin",
+      "given": ["a project referencing a non-existent plugin"],
+      "when": ["execute is called with mode: 'project'"],
+      "then": ["result is { valid: false } with an error mentioning the missing plugin"]
+    },
+    {
+      "requirement": "Project mode — resolved",
+      "name": "Project schema with validation error",
+      "given": ["a project whose merged schema has a duplicate artifact ID"],
+      "when": ["execute is called with mode: 'project'"],
+      "then": ["result is { valid: false } with the validation error message"]
+    },
+    {
+      "requirement": "Project mode — raw",
+      "name": "Valid base schema without plugins",
+      "given": ["a valid base schema with no extends"],
+      "when": ["execute is called with mode: 'project-raw'"],
+      "then": ["result is { valid: true } with the base Schema"]
+    },
+    {
+      "requirement": "Project mode — raw",
+      "name": "Base schema with extends chain",
+      "given": ["a base schema that extends a parent"],
+      "when": ["execute is called with mode: 'project-raw'"],
+      "then": ["the extends chain is resolved and cascaded", "AND result is { valid: true }"]
+    },
+    {
+      "requirement": "Project mode — raw",
+      "name": "Base schema not found",
+      "given": ["a schema ref that does not resolve"],
+      "when": ["execute is called with mode: 'project-raw'"],
+      "then": ["result is { valid: false } with a \"not found\" error"]
+    },
+    {
+      "requirement": "Project mode — raw",
+      "name": "Raw mode with semantic error in base",
+      "given": ["a base schema with an invalid artifact ID"],
+      "when": ["execute is called with mode: 'project-raw'"],
+      "then": ["result is { valid: false } with the validation error"]
+    },
+    {
+      "requirement": "File mode",
+      "name": "Valid external file",
+      "given": ["a valid schema YAML file on disk"],
+      "when": ["execute is called with mode: 'file' and the file path"],
+      "then": ["result is { valid: true } with the validated Schema"]
+    },
+    {
+      "requirement": "File mode",
+      "name": "External file with extends",
+      "given": ["a schema file that declares extends: @specd/schema-std"],
+      "when": ["execute is called with mode: 'file'"],
+      "then": ["the extends chain is resolved", "AND result is { valid: true }"]
+    },
+    {
+      "requirement": "File mode",
+      "name": "External file not found",
+      "given": ["a file path that does not exist"],
+      "when": ["execute is called with mode: 'file'"],
+      "then": ["result is { valid: false } with a \"file not found\" error"]
+    },
+    {
+      "requirement": "File mode",
+      "name": "External file with invalid artifact ID",
+      "given": ["a schema file with an artifact ID that fails format validation"],
+      "when": ["execute is called with mode: 'file'"],
+      "then": ["result is { valid: false } with the validation error"]
+    },
+    {
+      "requirement": "File mode",
+      "name": "External file with circular extends",
+      "given": ["a schema file whose extends chain forms a cycle"],
+      "when": ["execute is called with mode: 'file'"],
+      "then": ["result is { valid: false } with a cycle detection error"]
+    },
+    {
+      "requirement": "File mode",
+      "name": "External file with unresolvable extends",
+      "given": ["a schema file that extends a reference that cannot be resolved"],
+      "when": ["execute is called with mode: 'file'"],
+      "then": ["result is { valid: false } with a resolution error"]
+    },
+    {
+      "requirement": "Result type",
+      "name": "Success result structure",
+      "when": ["validation succeeds"],
+      "then": ["result has valid: true, schema (Schema entity), and warnings (string array)"]
+    },
+    {
+      "requirement": "Result type",
+      "name": "Failure result structure",
+      "when": ["validation fails"],
+      "then": [
+        "result has valid: false, errors (non-empty string array), and warnings (string array)"
+      ]
+    },
+    {
+      "requirement": "Extends chain warnings in file mode",
+      "name": "File with extends emits resolution warning",
+      "given": ["a schema file that extends @specd/schema-std resolved from /path/to/schema.yaml"],
+      "when": ["execute is called with mode: 'file'"],
+      "then": ["warnings contains extends '@specd/schema-std' resolved from /path/to/schema.yaml"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:9c02e18b493b8985c5c1c5251bd13148df57efb1e5d2998de630e2cc4957b599",
+    "verify.md": "sha256:6ce741faea4a2a8add5710d090d26d33c6b22bf954e9b35462b68b646cd42eae"
+  },
+  "generatedBy": "core"
+}

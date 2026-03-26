@@ -515,6 +515,23 @@ export class FsConfigLoader implements ConfigLoader {
     }
   }
 
+  /**
+   * Resolves the path to the active config file without loading or parsing it.
+   *
+   * - **Discovery mode**: delegates to `findConfigFile()` and returns the result
+   *   directly (`string | null`). Never throws.
+   * - **Forced mode**: returns `path.resolve(configPath)` without checking whether
+   *   the file exists. Never throws.
+   *
+   * @returns Absolute path to the config file, or `null` if not found in discovery mode
+   */
+  async resolvePath(): Promise<string | null> {
+    if ('configPath' in this._options) {
+      return path.resolve(this._options.configPath)
+    }
+    return findConfigFile(this._options.startDir)
+  }
+
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------

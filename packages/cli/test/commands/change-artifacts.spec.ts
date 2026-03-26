@@ -22,7 +22,7 @@ import { registerChangeArtifacts } from '../../src/commands/change/artifacts.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, kernel })
+  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
   // Default: schema resolution returns no artifacts (skip delta enrichment)
   kernel.specs.getActiveSchema.execute.mockResolvedValue({
     name: () => 'test',

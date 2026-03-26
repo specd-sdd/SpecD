@@ -12,7 +12,15 @@ When no `--config` flag is provided, `specd` discovers `specd.yaml` by walking u
 
 ### Requirement: Config flag override
 
-Every `specd` command accepts a `--config <path>` flag. When provided, config discovery is skipped and `specd.yaml` is loaded directly from `<path>`. If the file does not exist or cannot be parsed, the command fails with exit code 1 and a descriptive error on stderr.
+`--config <path>` is a global option defined on the root `specd` program. When provided before a subcommand (`specd --config <path> change list`), Commander parses it at the root level. When provided after a subcommand (`specd change list --config <path>`), individual subcommands that declare their own `--config` option parse it locally.
+
+To make both positions work seamlessly, the root program's `preAction` hook propagates the root-level `--config` value to any subcommand that has not received its own `--config` value. This means:
+
+- `specd --config /path/to/specd.yaml change list` — root parses it, `preAction` injects into `change list`
+- `specd change list --config /path/to/specd.yaml` — `change list` parses it directly
+- `specd --config /path/to/specd.yaml` (no subcommand) — root parses it; used for auto-dashboard dispatch
+
+When provided, config discovery is skipped and `specd.yaml` is loaded directly from `<path>`. If the file does not exist or cannot be parsed, the command fails with exit code 1 and a descriptive error on stderr.
 
 ### Requirement: Output conventions
 
@@ -97,24 +105,41 @@ This ensures programmatic consumers (agents, scripts, CI pipelines) can discover
 
 Every leaf command rejects unexpected positional arguments. If a user passes more positional arguments than the command declares, the command exits with code 1 and prints a usage error to stderr. This prevents silent typos and misremembered syntax from being ignored.
 
+### Requirement: Banner in help
+
+When `specd --help` is invoked, the SpecD ASCII art banner is rendered above the standard Commander help text. The banner is prepended using Commander's `addHelpText('before', ...)` mechanism. The banner does not appear in subcommand help pages (e.g. `specd change --help`).
+
+### Requirement: Auto-show dashboard
+
+When `specd` is invoked with no subcommand — either as `specd` alone or as `specd --config <path>` — the CLI attempts config discovery (or loads the provided path). If a valid config is found, the `project dashboard` command is executed automatically as if the user had run `specd project dashboard [--config <path>]`. If config discovery fails (no `specd.yaml` found), the standard help text is shown instead.
+
+This behaviour makes `specd` act as a project landing page when a project is present, rather than always showing generic help.
+
 ## Constraints
 
 - Every leaf command must call `.allowExcessArguments(false)` so Commander rejects extra positional arguments
-- `--config` must be the first flag processed, before any sub-command-specific flag parsing
+- `--config` is defined on the root program as a global option; individual subcommands MAY also declare their own `--config` option for ergonomic use after the subcommand name. Commander lifts any `--config` occurrence to the root level, so the `preAction` hook propagates `program.opts().config` to the action command via `setOptionValue`. When `--config` appears twice, Commander's last-value-wins semantics apply.
 - Config discovery halts at the git repository root; it does not cross repository boundaries
 - Stdout and stderr must be independent streams — no interleaving of normal output and error messages
 - Exit code 2 is reserved exclusively for hook failures; domain errors from hooks (e.g. the hook emits an error message and exits 1) still yield exit code 2
 - `--format` never affects stderr — errors are always plain text on stderr regardless of format
 - When `--format` is `json` or `toon`, errors are written to both stderr (plain text) and stdout (structured) — stderr for humans/logs, stdout for programmatic consumers
+- The banner MUST NOT be shown in subcommand help pages; it is only prepended to the root `specd --help` output
 
 ## Examples
 
 ```
-# Discovery from CWD
-specd change list
+# Discovery from CWD — also auto-shows project dashboard if config is found
+specd
 
-# Explicit config path
+# Global --config before subcommand
 specd --config /path/to/specd.yaml change list
+
+# Per-subcommand --config after subcommand name (equivalent)
+specd change list --config /path/to/specd.yaml
+
+# Auto-dashboard with explicit config
+specd --config /path/to/specd.yaml
 
 # Hook failure example — exit code 2 even if the hook printed its own error
 specd change transition my-change implementing

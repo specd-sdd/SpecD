@@ -3,6 +3,8 @@ import { createInitProject, createRecordSkillInstall, createVcsAdapter } from '@
 import { listSkills } from '@specd/skills'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
+import { renderBanner } from '../../banner.js'
+import { CLI_VERSION, CORE_VERSION } from '../../version.js'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { KNOWN_AGENTS } from '../../helpers/known-agents.js'
@@ -74,7 +76,9 @@ export function registerProjectInit(parent: Command): void {
   parent
     .command('init')
     .allowExcessArguments(false)
-    .description('Initialise a new SpecD project')
+    .description(
+      'Initialise a new specd project in the current directory, writing specd.yaml and creating the required folder structure.',
+    )
     .option('--schema <ref>', 'schema reference (e.g. @specd/schema-std)')
     .option('--workspace <id>', 'default workspace ID', 'default')
     .option('--workspace-path <path>', 'path to specs directory', 'specs/')
@@ -105,6 +109,13 @@ JSON/TOON output schema:
       }) => {
         try {
           const fmt = parseFormat(opts.format)
+
+          if (fmt === 'text') {
+            process.stdout.write(
+              renderBanner({ cliVersion: CLI_VERSION, coreVersion: CORE_VERSION }) + '\n\n',
+            )
+          }
+
           const hasConfigFlags = opts.schema !== undefined || opts.agent.length > 0
 
           const isInteractive = process.stdout.isTTY === true && fmt === 'text' && !hasConfigFlags

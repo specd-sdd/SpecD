@@ -11,7 +11,7 @@ import { type SchemaRepository } from '../../application/ports/schema-repository
 import { createSchemaRepository } from '../schema-repository.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { GitActorResolver } from '../../infrastructure/git/actor-resolver.js'
+import { createVcsActorResolver } from '../actor-resolver.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
 /**
@@ -150,7 +150,7 @@ export function createValidateArtifacts(
   const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
   const schemaProvider = new LazySchemaProvider(resolveSchema)
   const parsers = createArtifactParserRegistry()
-  const actor = new GitActorResolver()
+  const actor = createVcsActorResolver()
   const hasher = new NodeContentHasher()
   return new ValidateArtifacts(
     changeRepo,

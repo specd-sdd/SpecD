@@ -13,7 +13,9 @@ export function registerProjectContext(parent: Command): void {
   parent
     .command('context')
     .allowExcessArguments(false)
-    .description('Compile and print the project-level context block')
+    .description(
+      'Compile and print the project-level context entries from specd.yaml, for use as background context in agent prompts.',
+    )
     .option('--rules', 'include only rules sections in spec content')
     .option('--constraints', 'include only constraints sections in spec content')
     .option('--scenarios', 'include only scenarios sections in spec content')

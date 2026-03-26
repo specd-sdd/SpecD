@@ -8,6 +8,7 @@ import {
 import { buildSchema, type SchemaYamlData } from '../../domain/services/build-schema.js'
 import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import { SchemaValidationError } from '../../domain/errors/schema-validation-error.js'
+import { resolveExtendsChain } from './resolve-extends-chain.js'
 
 /**
  * Orchestrates the full schema resolution pipeline: resolve the base schema,
@@ -92,6 +93,7 @@ export class ResolveSchema {
    * Resolves the full extends chain and cascades data using child-overrides-parent
    * semantics. Returns the inherited data (root → ... → parent → leaf merged)
    * and accumulated templates.
+   *
    * @param baseRaw - The raw result of the base schema whose extends chain to resolve
    * @returns The cascaded inherited data and accumulated templates
    */
@@ -99,110 +101,8 @@ export class ResolveSchema {
     inheritedData: SchemaYamlData
     templates: Map<string, string>
   }> {
-    if (baseRaw.data.extends === undefined) {
-      return { inheritedData: baseRaw.data, templates: new Map() }
-    }
-
-    // Walk up the chain: leaf → parent → grandparent → root
-    const chain: SchemaRawResult[] = []
-    const visitedPaths = new Set<string>([baseRaw.resolvedPath])
-
-    let currentData = baseRaw.data
-    while (currentData.extends !== undefined) {
-      const parentRef = currentData.extends
-      const parentRaw = await this._schemas.resolveRaw(parentRef)
-      if (parentRaw === null) {
-        throw new SchemaNotFoundError(parentRef)
-      }
-      if (visitedPaths.has(parentRaw.resolvedPath)) {
-        throw new SchemaValidationError(
-          parentRef,
-          `extends cycle detected: '${parentRef}' was already resolved in the chain`,
-        )
-      }
-      visitedPaths.add(parentRaw.resolvedPath)
-      chain.push(parentRaw)
-      currentData = parentRaw.data
-    }
-
-    // chain = [parent, grandparent, ..., root] — reverse to get root-first
-    chain.reverse()
-
-    // Cascade data: root → grandparent → ... → parent → leaf
-    let cascaded = chain[0]!.data
-    for (let i = 1; i < chain.length; i++) {
-      cascaded = this._overlayData(cascaded, chain[i]!.data)
-    }
-    cascaded = this._overlayData(cascaded, baseRaw.data)
-
-    // Accumulate templates: root first, each child overrides
-    const templates = new Map<string, string>()
-    for (const item of chain) {
-      for (const [k, v] of item.templates) {
-        templates.set(k, v)
-      }
-    }
-
-    return { inheritedData: cascaded, templates }
-  }
-
-  /**
-   * Overlays child data on top of parent data. Child values take precedence
-   * when present. Arrays (artifacts, workflow) are merged by identity key.
-   * @param parent - The parent schema data to overlay onto
-   * @param child - The child schema data whose values take precedence
-   * @returns A new SchemaYamlData with child values overlaid on parent
-   */
-  private _overlayData(parent: SchemaYamlData, child: SchemaYamlData): SchemaYamlData {
-    const result: SchemaYamlData = {
-      kind: child.kind,
-      name: child.name,
-      version: child.version,
-      description: child.description ?? parent.description,
-      extends: child.extends,
-      artifacts: this._mergeArtifactArrays(parent.artifacts, child.artifacts),
-      workflow: this._mergeWorkflowArrays(parent.workflow, child.workflow),
-      metadataExtraction: child.metadataExtraction ?? parent.metadataExtraction,
-    }
-    return result
-  }
-
-  /**
-   * Merges artifact arrays by id. Child entries with matching id replace the
-   * parent entry; child entries with new ids are appended.
-   * @param parentArtifacts - The parent artifact array (may be undefined)
-   * @param childArtifacts - The child artifact array (may be undefined)
-   * @returns The merged artifact array, or undefined if both inputs are undefined
-   */
-  private _mergeArtifactArrays(
-    parentArtifacts: SchemaYamlData['artifacts'],
-    childArtifacts: SchemaYamlData['artifacts'],
-  ): SchemaYamlData['artifacts'] {
-    if (parentArtifacts === undefined) return childArtifacts
-    if (childArtifacts === undefined) return parentArtifacts
-
-    const childIds = new Set(childArtifacts.map((a) => a.id))
-    const inherited = parentArtifacts.filter((a) => !childIds.has(a.id))
-    return [...inherited, ...childArtifacts]
-  }
-
-  /**
-   * Merges workflow arrays by step name. Child entries replace parent entries
-   * with the same step; new steps are appended.
-   * @param parentWorkflow - The parent workflow array (may be undefined)
-   * @param childWorkflow - The child workflow array (may be undefined)
-   * @returns The merged workflow array, or undefined if both inputs are undefined
-   */
-  private _mergeWorkflowArrays(
-    parentWorkflow: SchemaYamlData['workflow'],
-    childWorkflow: SchemaYamlData['workflow'],
-  ): SchemaYamlData['workflow'] {
-    if (parentWorkflow === undefined) return childWorkflow
-    if (childWorkflow === undefined) return parentWorkflow
-
-    const childSteps = new Set(childWorkflow.map((s) => s.step))
-    const inherited = parentWorkflow.filter((s) => !childSteps.has(s.step))
-    return [...inherited, ...childWorkflow]
+    const result = await resolveExtendsChain(this._schemas, baseRaw)
+    return { inheritedData: result.cascadedData, templates: result.templates }
   }
 
   // ---------------------------------------------------------------------------

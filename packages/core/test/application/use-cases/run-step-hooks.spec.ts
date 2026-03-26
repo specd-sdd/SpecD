@@ -49,6 +49,7 @@ function makeSchemaWithHooks(
       {
         step: 'implementing',
         requires: [],
+        requiresTaskCompletion: [],
         hooks: { pre: preHooks, post: postHooks },
       },
     ],
@@ -541,6 +542,7 @@ describe('RunStepHooks', () => {
           {
             step: 'archiving',
             requires: [],
+            requiresTaskCompletion: [],
             hooks: { pre: [], post: postHooks },
           },
         ],

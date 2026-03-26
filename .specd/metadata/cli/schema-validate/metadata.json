@@ -1,0 +1,233 @@
+{
+  "title": "Schema Validate",
+  "description": "Schema authors and project maintainers need a way to verify that their schema configuration is correct before other commands consume it. Errors in schema YAML — malformed structure, invalid artifact IDs, dependency cycles, missing templates — currently surface only as side effects of unrelated commands. The `specd schema validate` command provides a dedicated validation entry point that delegates to the `ValidateSchema` use case in core, keeping the CLI as a thin adapter.",
+  "dependsOn": ["cli:cli/entrypoint", "core:core/validate-schema"],
+  "context": [
+    "Schema authors and project maintainers need a way to verify that their schema configuration is correct before other commands consume it. Errors in schema YAML — malformed structure, invalid artifact IDs, dependency cycles, missing templates — currently surface only as side effects of unrelated commands. The `specd schema validate` command provides a dedicated validation entry point that delegates to the `ValidateSchema` use case in core, keeping the CLI as a thin adapter."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "`specd schema validate [--file <path>] [--raw] [--format text|json|toon] [--config <path>]`\n\n- When neither `--file` nor `--raw` is provided, the command validates the project's fully-resolved schema (merged).\n- When `--raw` is provided (without `--file`), the command validates the project's base schema without plugins or overrides.\n- When `--file` is provided, the command validates the specified external file (resolving its extends chain).\n- `--file` and `--raw` are mutually exclusive. If both are provided, the command SHALL fail with an error."
+      ]
+    },
+    {
+      "requirement": "Project mode — resolved",
+      "rules": [
+        "When invoked without `--file` or `--raw`, the command SHALL call `ValidateSchema.execute` with `mode: 'project'`, passing `schemaRef`, `schemaPlugins`, and `schemaOverrides` from the project config. This runs the full resolution pipeline."
+      ]
+    },
+    {
+      "requirement": "Project mode — raw",
+      "rules": [
+        "When invoked with `--raw` (without `--file`), the command SHALL call `ValidateSchema.execute` with `mode: 'project-raw'`, passing only `schemaRef`. This validates the base schema with its extends chain but without plugins or overrides."
+      ]
+    },
+    {
+      "requirement": "File mode",
+      "rules": [
+        "When invoked with `--file <path>`, the command SHALL call `ValidateSchema.execute` with `mode: 'file'` and the resolved absolute path. The use case handles extends resolution, file reading, and validation."
+      ]
+    },
+    {
+      "requirement": "Text output — success",
+      "rules": [
+        "When validation succeeds and `--format` is `text`, the command SHALL write:\n\n- Project resolved mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps)`\n- Project raw mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [raw]`\n- File mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [file]`\n\nWarning lines, if any, are appended as `  warning: <text>`."
+      ]
+    },
+    {
+      "requirement": "Text output — failure",
+      "rules": [
+        "When validation fails and `--format` is `text`, the command SHALL write `schema validation failed:` followed by indented error lines, one per validation error."
+      ]
+    },
+    {
+      "requirement": "JSON output",
+      "rules": [
+        "When `--format` is `json` or `toon`, the command SHALL write a structured result object:\n\nSuccess:\n\n```json\n{\n  \"result\": \"ok\",\n  \"schema\": { \"name\": \"...\", \"version\": 1 },\n  \"artifacts\": 5,\n  \"workflowSteps\": 4,\n  \"mode\": \"project\" | \"project-raw\" | \"file\",\n  \"warnings\": []\n}\n```\n\nFailure:\n\n```json\n{\n  \"result\": \"error\",\n  \"errors\": [{ \"message\": \"...\" }],\n  \"warnings\": [],\n  \"mode\": \"project\" | \"project-raw\" | \"file\"\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Exit code",
+      "rules": [
+        "The command SHALL exit with code 0 when the schema is valid and code 1 when validation fails."
+      ]
+    },
+    {
+      "requirement": "Error — file not found",
+      "rules": [
+        "When `--file <path>` references a file that does not exist, the validation result SHALL contain the error and exit with code 1."
+      ]
+    },
+    {
+      "requirement": "Error — config required in project modes",
+      "rules": [
+        "When invoked without `--file` and no `specd.yaml` can be discovered, the command SHALL fail with the standard config-not-found error (as defined by the entrypoint spec)."
+      ]
+    },
+    {
+      "requirement": "Mutually exclusive flags",
+      "rules": [
+        "When both `--file` and `--raw` are provided, the command SHALL write an error: `--file and --raw are mutually exclusive` and exit with code 1."
+      ]
+    }
+  ],
+  "constraints": [
+    "The command contains no validation logic — all validation is performed by the ValidateSchema use case in core",
+    "The command follows all global CLI conventions (exit codes, --format, --config, excess argument rejection)",
+    "The CLI imports only use-case factories or the kernel — never domain services or infrastructure functions directly"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "No flags defaults to project resolved mode",
+      "when": ["the user runs specd schema validate without --file or --raw"],
+      "then": ["the command validates the project's fully-resolved schema"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--raw triggers project raw mode",
+      "when": ["the user runs specd schema validate --raw"],
+      "then": ["the command validates only the base schema without plugins or overrides"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--file triggers file mode",
+      "when": ["the user runs specd schema validate --file ./my-schema.yaml"],
+      "then": ["the command validates the specified file with extends resolution"]
+    },
+    {
+      "requirement": "Project mode — resolved",
+      "name": "Valid resolved project schema",
+      "given": ["a project with a valid specd.yaml and a valid schema"],
+      "when": ["the user runs specd schema validate"],
+      "then": ["exit code is 0", "AND output confirms the schema is valid"]
+    },
+    {
+      "requirement": "Project mode — resolved",
+      "name": "Resolved schema with invalid plugin",
+      "given": ["a project whose config references a plugin that does not exist"],
+      "when": ["the user runs specd schema validate"],
+      "then": ["exit code is 1", "AND the error identifies the missing plugin"]
+    },
+    {
+      "requirement": "Project mode — raw",
+      "name": "Valid raw project schema",
+      "given": ["a project with a valid base schema"],
+      "when": ["the user runs specd schema validate --raw"],
+      "then": ["exit code is 0", "AND output contains [raw] suffix"]
+    },
+    {
+      "requirement": "Project mode — raw",
+      "name": "Raw mode isolates base errors from plugin errors",
+      "given": ["a project whose base schema is valid but a plugin introduces an error"],
+      "when": ["the user runs specd schema validate --raw"],
+      "then": ["exit code is 0 (base is valid regardless of plugin issues)"]
+    },
+    {
+      "requirement": "File mode",
+      "name": "Valid external file",
+      "given": ["a syntactically and semantically valid schema.yaml file"],
+      "when": ["the user runs specd schema validate --file ./schema.yaml"],
+      "then": ["exit code is 0", "AND output contains [file] suffix"]
+    },
+    {
+      "requirement": "File mode",
+      "name": "External file with extends resolves chain",
+      "given": ["a schema file that declares extends: @specd/schema-std"],
+      "when": ["the user runs specd schema validate --file ./schema.yaml"],
+      "then": ["the extends chain is resolved", "AND exit code is 0"]
+    },
+    {
+      "requirement": "File mode",
+      "name": "External file with invalid artifact ID",
+      "given": ["a schema.yaml with an artifact whose id is Invalid_ID"],
+      "when": ["the user runs specd schema validate --file ./schema.yaml"],
+      "then": ["exit code is 1", "AND the error mentions the invalid artifact ID"]
+    },
+    {
+      "requirement": "File mode",
+      "name": "External file with circular extends",
+      "given": ["a schema file whose extends chain forms a cycle"],
+      "when": ["the user runs specd schema validate --file ./schema.yaml"],
+      "then": ["exit code is 1", "AND the error mentions cycle detection"]
+    },
+    {
+      "requirement": "Text output — success",
+      "name": "Project resolved mode success text",
+      "when": [
+        "project resolved validation succeeds with schema my-schema v1 with 3 artifacts and 2 workflow steps"
+      ],
+      "then": ["stdout contains schema valid: my-schema v1 (3 artifacts, 2 workflow steps)"]
+    },
+    {
+      "requirement": "Text output — success",
+      "name": "Project raw mode success text",
+      "when": ["project raw validation succeeds"],
+      "then": ["stdout contains [raw] suffix"]
+    },
+    {
+      "requirement": "Text output — success",
+      "name": "File mode success text",
+      "when": ["file mode validation succeeds"],
+      "then": ["stdout contains [file] suffix"]
+    },
+    {
+      "requirement": "Text output — failure",
+      "name": "Failure text lists errors",
+      "when": ["validation fails with two errors"],
+      "then": ["stdout contains schema validation failed: followed by two indented error lines"]
+    },
+    {
+      "requirement": "JSON output",
+      "name": "JSON success contains expected keys",
+      "when": ["the user runs specd schema validate --format json and validation succeeds"],
+      "then": [
+        "the JSON output contains result, schema, artifacts, workflowSteps, mode, and warnings"
+      ]
+    },
+    {
+      "requirement": "JSON output",
+      "name": "JSON failure contains error details",
+      "when": ["the user runs specd schema validate --format json and validation fails"],
+      "then": ["the JSON output contains result: \"error\", errors, warnings, and mode"]
+    },
+    {
+      "requirement": "Exit code",
+      "name": "Exit 0 on valid schema",
+      "when": ["validation succeeds"],
+      "then": ["exit code is 0"]
+    },
+    {
+      "requirement": "Exit code",
+      "name": "Exit 1 on invalid schema",
+      "when": ["validation fails"],
+      "then": ["exit code is 1"]
+    },
+    {
+      "requirement": "Error — file not found",
+      "name": "--file with nonexistent path",
+      "when": ["the user runs specd schema validate --file ./nonexistent.yaml"],
+      "then": ["the error mentions the file", "AND exit code is 1"]
+    },
+    {
+      "requirement": "Error — config required in project modes",
+      "name": "No specd.yaml discoverable",
+      "given": ["CWD is not under any directory containing specd.yaml"],
+      "when": ["the user runs specd schema validate without --file and without --config"],
+      "then": ["the command fails with the standard config-not-found error", "AND exit code is 1"]
+    },
+    {
+      "requirement": "Mutually exclusive flags",
+      "name": "--file and --raw together",
+      "when": ["the user runs specd schema validate --file ./schema.yaml --raw"],
+      "then": ["stderr contains --file and --raw are mutually exclusive", "AND exit code is 1"]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:30fef4a130162a00bae270798e190d14aef6867e5abce2443558708b74d81b5b",
+    "verify.md": "sha256:b1e570ecc98e8d5b572aeea7a50038cfcd24e7032c62f6c9e87b3b73d2143818"
+  },
+  "generatedBy": "core"
+}

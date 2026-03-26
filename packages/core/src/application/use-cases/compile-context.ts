@@ -665,7 +665,7 @@ export class CompileContext {
   }
 
   /**
-   * Checks whether a spec's `.specd-metadata.yaml` is fresh by comparing
+   * Checks whether a spec's `metadata.json` is fresh by comparing
    * SHA-256 hashes of current spec artifact files against the recorded hashes.
    *
    * @param specRepo - Repository to read spec artifact files from

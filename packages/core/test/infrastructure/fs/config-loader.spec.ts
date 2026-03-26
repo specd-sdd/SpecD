@@ -829,4 +829,62 @@ storage:
       expect(config.storage.changesPath).toContain('.specd')
     })
   })
+
+  // ---------------------------------------------------------------------------
+  // resolvePath()
+  // ---------------------------------------------------------------------------
+
+  describe('resolvePath()', () => {
+    it('given discovery mode and specd.yaml found, returns the path without throwing', async () => {
+      execSync('git init', { cwd: tmpDir, stdio: 'ignore' })
+      await writeConfig(minimalYaml())
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const result = await loader.resolvePath()
+
+      expect(result).toBe(path.join(tmpDir, 'specd.yaml'))
+    })
+
+    it('given discovery mode and no config file found, returns null without throwing', async () => {
+      execSync('git init', { cwd: tmpDir, stdio: 'ignore' })
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const result = await loader.resolvePath()
+
+      expect(result).toBeNull()
+    })
+
+    it('given discovery mode, prefers specd.local.yaml over specd.yaml at same level', async () => {
+      execSync('git init', { cwd: tmpDir, stdio: 'ignore' })
+      await writeConfig(minimalYaml(), 'specd.yaml')
+      await writeConfig(minimalYaml(), 'specd.local.yaml')
+
+      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const result = await loader.resolvePath()
+
+      expect(result).toBe(path.join(tmpDir, 'specd.local.yaml'))
+    })
+
+    it('given forced mode, returns resolved absolute path even when file does not exist', async () => {
+      const nonExistent = path.join(tmpDir, 'custom', 'specd.yaml')
+
+      const loader = new FsConfigLoader({ configPath: nonExistent })
+      const result = await loader.resolvePath()
+
+      expect(result).toBe(nonExistent)
+    })
+
+    it('given forced mode with relative path, returns resolved absolute path', async () => {
+      const loader = new FsConfigLoader({ configPath: './specd.yaml' })
+      const result = await loader.resolvePath()
+
+      expect(result).toBe(path.resolve('./specd.yaml'))
+    })
+
+    it('never throws regardless of filesystem state', async () => {
+      const loader = new FsConfigLoader({ startDir: path.join(tmpDir, 'nonexistent', 'deep') })
+
+      await expect(loader.resolvePath()).resolves.not.toThrow()
+    })
+  })
 })

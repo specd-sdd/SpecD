@@ -115,7 +115,7 @@ export class GetArtifactInstruction {
 
     // rules.pre
     const rulesPre = (artifactType.rules?.pre ?? []).map((r) =>
-      this._templates.expand(r.text, contextVars),
+      this._templates.expand(r.instruction, contextVars),
     )
 
     // instruction
@@ -167,7 +167,7 @@ export class GetArtifactInstruction {
 
     // rules.post
     const rulesPost = (artifactType.rules?.post ?? []).map((r) =>
-      this._templates.expand(r.text, contextVars),
+      this._templates.expand(r.instruction, contextVars),
     )
 
     return {
