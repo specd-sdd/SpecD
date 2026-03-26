@@ -268,6 +268,32 @@ Permanently discard a change. The change is moved to the discarded directory and
 | `--format text\|json\|toon` | Output format.                   |
 | `--config <path>`           | Config file path.                |
 
+### change check-overlap
+
+```
+specd change check-overlap [<name>] [options]
+```
+
+Detect specs targeted by multiple active changes. When `<name>` is given, shows only overlaps involving that change. Without a name, shows all overlaps across all active changes.
+
+Overlap presence does not affect the exit code — the command exits 0 whether or not overlap is detected. Exit code 1 indicates an error (e.g. named change not found).
+
+| Option                      | Description       |
+| --------------------------- | ----------------- |
+| `--format text\|json\|toon` | Output format.    |
+| `--config <path>`           | Config file path. |
+
+```bash
+# Check all active changes for overlap
+specd change check-overlap
+
+# Check overlap for a specific change
+specd change check-overlap add-auth-flow
+
+# JSON output for scripting
+specd change check-overlap --format json
+```
+
 ### change archive
 
 ```
@@ -276,11 +302,14 @@ specd change archive <name> [options]
 
 Archive a completed change. Scope-`spec` artifacts are synced into the spec repository, and the change is moved to the archive directory. The change must be in the `archivable` state.
 
-| Option                      | Description           |
-| --------------------------- | --------------------- |
-| `--no-hooks`                | Skip archiving hooks. |
-| `--format text\|json\|toon` | Output format.        |
-| `--config <path>`           | Config file path.     |
+If other active changes target the same specs, the archive is blocked by default. Use `--allow-overlap` to proceed despite the overlap.
+
+| Option                      | Description                                                      |
+| --------------------------- | ---------------------------------------------------------------- |
+| `--no-hooks`                | Skip archiving hooks.                                            |
+| `--allow-overlap`           | Permit archiving despite spec overlap with other active changes. |
+| `--format text\|json\|toon` | Output format.                                                   |
+| `--config <path>`           | Config file path.                                                |
 
 ### change run-hooks
 
