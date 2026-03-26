@@ -70,6 +70,21 @@ If the filtered report has overlap and `allowOverlap` is `false`, `ArchiveChange
 
 If `allowOverlap` is `true`, the overlap check is skipped entirely — the use case proceeds to pre-archive hooks without calling `detectSpecOverlap`.
 
+### Requirement: Overlap guard
+
+After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes.
+
+The check MUST:
+
+1. Call `ChangeRepository.list()` to retrieve all active changes
+2. Exclude the change being archived from the list
+3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived
+4. Filter the result to entries where the change being archived participates
+
+If the filtered report has overlap and `allowOverlap` is `false`, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.
+
+If `allowOverlap` is `true`, the overlap check is skipped entirely — the use case proceeds to pre-archive hooks without calling `detectSpecOverlap`.
+
 ### Requirement: Pre-archive hooks
 
 After the archivable guard passes, when `skipHooks` is `false` (default), `ArchiveChange` must execute pre-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'pre' })`.
