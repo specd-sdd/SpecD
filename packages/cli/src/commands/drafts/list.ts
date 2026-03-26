@@ -14,9 +14,7 @@ export function registerDraftsList(parent: Command): void {
   parent
     .command('list')
     .allowExcessArguments(false)
-    .description(
-      'List all drafted (shelved) changes, showing their names and the specs they are scoped to.',
-    )
+    .description('List all drafted (shelved) changes, showing their names and current state.')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .action(async (opts: { format: string; config?: string }) => {
