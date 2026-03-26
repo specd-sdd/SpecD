@@ -70,7 +70,9 @@ import { registerSkillsInstall } from './commands/skills/install.js'
 import { registerSkillsUpdate } from './commands/skills/update.js'
 
 const program = new Command('specd')
-  .description('SpecD — spec-driven development CLI')
+  .description(
+    'SpecD is a spec-driven development platform. Specs define what the system should do, changes track the lifecycle from design through implementation to verification, and schemas govern artifact structure and workflow. This CLI is typically invoked by AI agent skills — start with /specd to enter the workflow, which routes to /specd-design, /specd-implement, /specd-verify, and other lifecycle skills. All commands are also available for direct manual use.',
+  )
   .version(CLI_VERSION)
   .option('--config <path>', 'path to specd.yaml (overrides config discovery)')
 
