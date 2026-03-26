@@ -130,6 +130,16 @@
     },
     {
       "requirement": "Next-transition resolution",
+      "name": "Next flag fails in pending signoff state",
+      "given": ["the change is in pending-signoff state"],
+      "when": ["specd change transition my-change --next is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains an error: message explaining that the change is waiting for human signoff"
+      ]
+    },
+    {
+      "requirement": "Next-transition resolution",
       "name": "Next flag fails in archivable state",
       "given": ["the change is in archivable state"],
       "when": ["specd change transition my-change --next is run"],
@@ -242,8 +252,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:cbaa70c97d55fe5de3727036b89f5906a963fa0561e7e4cf383f6a4afc45a10b",
-    "verify.md": "sha256:7b34d4d538a96e3ed00a5740352d2a7d8ccf1c837c819872c2eefd4f47b7e2b4"
+    "spec.md": "sha256:ee3f8cdd7c4496e50a833023c370cb60597a2ee2ecc895f239fea73a5334cf76",
+    "verify.md": "sha256:e0b86b7d64815a4e75e0ecd09b4702bf3ad674c9035f24b423bef2a3c7e8b96c"
   },
   "generatedBy": "core"
 }

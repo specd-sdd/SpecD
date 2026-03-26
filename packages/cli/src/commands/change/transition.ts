@@ -85,6 +85,7 @@ function resolveNextTarget(fromState: ChangeState, format?: string): ChangeState
     case 'designing':
       return 'ready'
     case 'ready':
+      return 'implementing'
     case 'spec-approved':
       return 'implementing'
     case 'implementing':
@@ -92,6 +93,8 @@ function resolveNextTarget(fromState: ChangeState, format?: string): ChangeState
     case 'verifying':
       return 'done'
     case 'done':
+      return 'archivable'
+    case 'signed-off':
       return 'archivable'
     case 'pending-spec-approval':
       return cliError(
