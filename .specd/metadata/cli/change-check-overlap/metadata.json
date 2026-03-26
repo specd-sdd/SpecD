@@ -1,14 +1,14 @@
 {
   "title": "Change Check Overlap",
-  "description": "Users need a way to check whether their in-progress work overlaps with other active changes targeting the same specs. Without a dedicated command, overlap is invisible until archive time when delta application fails. `specd change overlap` surfaces this information proactively.",
+  "description": "Users need a way to check whether their in-progress work overlaps with other active changes targeting the same specs. Without a dedicated command, overlap is invisible until archive time when delta application fails. `specd change check-overlap` surfaces this information proactively.",
   "context": [
-    "Users need a way to check whether their in-progress work overlaps with other active changes targeting the same specs. Without a dedicated command, overlap is invisible until archive time when delta application fails. `specd change overlap` surfaces this information proactively."
+    "Users need a way to check whether their in-progress work overlaps with other active changes targeting the same specs. Without a dedicated command, overlap is invisible until archive time when delta application fails. `specd change check-overlap` surfaces this information proactively."
   ],
   "rules": [
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change overlap [<name>] [--format text|json|toon]\n```\n\n- `<name>` — optional; when provided, shows overlap only for the named change\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd change check-overlap [<name>] [--format text|json|toon]\n```\n\n- `<name>` — optional; when provided, shows overlap only for the named change\n- `--format text|json|toon` — optional; output format, defaults to `text`"
       ]
     },
     {
@@ -112,7 +112,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b07966cdbc5fc8576d1a68ab9b56788b699e546c3092173222ce76349c2cb0a7",
+    "spec.md": "sha256:ffa4e15dac8c217dd789c64db44ca9b34a1786b5183098adc7e3dfa80b366c80",
     "verify.md": "sha256:d143b19868553e6422daa776cbb61675f8df70b073b3fce13328cf45b62b4a2d"
   },
   "generatedBy": "core"

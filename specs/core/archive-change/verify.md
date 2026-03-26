@@ -20,6 +20,36 @@
 - **AND** the change is persisted via `ChangeRepository.save(change)`
 - **AND** execution proceeds to pre-archive hooks
 
+### Requirement: ReadOnly workspace guard
+
+#### Scenario: Archive rejected when change contains readOnly specs
+
+- **GIVEN** a change in `archivable` state with `specIds` including `platform:auth/tokens`
+- **AND** the `platform` workspace has `readOnly` ownership
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** `ReadOnlyWorkspaceError` is thrown
+- **AND** the error message lists the affected specs and workspaces
+- **AND** no hooks are executed and no spec files are written
+
+#### Scenario: Archive proceeds when all specs are in owned workspaces
+
+- **GIVEN** a change in `archivable` state with all `specIds` in `owned` workspaces
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** the readOnly guard passes and execution proceeds to hooks
+
+#### Scenario: Archive proceeds when specs are in shared workspaces
+
+- **GIVEN** a change in `archivable` state with `specIds` in `shared` workspaces
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** the readOnly guard passes and execution proceeds to hooks
+
+#### Scenario: Guard runs after archivable check and state transition
+
+- **GIVEN** a change that is not in `archivable` state
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** `InvalidStateTransitionError` is thrown (from `assertArchivable`)
+- **AND** the readOnly guard is never reached
+
 ### Requirement: Overlap guard
 
 #### Scenario: Archive blocked when other changes target same specs

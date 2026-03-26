@@ -46,6 +46,12 @@
       ]
     },
     {
+      "requirement": "ReadOnly workspace guard",
+      "rules": [
+        "After the archivable guard passes and the change transitions to `archiving`, `ArchiveChange` MUST check every spec ID in `change.specIds` against the `SpecRepository` map. For each spec ID, it MUST look up the corresponding `SpecRepository` by workspace name and check `repository.ownership()`.\n\nIf any spec belongs to a workspace with `readOnly` ownership, `ArchiveChange` MUST throw `ReadOnlyWorkspaceError` with a message listing all affected specs and their workspaces. The error message format:\n\n```\nCannot archive change \"<name>\" — it contains specs from readOnly workspaces:\n\n  - <specId>  →  workspace \"<workspace>\" (readOnly)\n\nArchiving would write deltas into protected specs.\n```\n\nThis check MUST occur before any hooks execute or any spec files are written. It is a defense-in-depth guard — upstream guards at `change create` and `change edit` should prevent readOnly specs from entering a change, but the archive MUST NOT silently merge deltas into protected specs if those guards are bypassed."
+      ]
+    },
+    {
       "requirement": "Overlap guard",
       "rules": [
         "After the archivable guard passes and the change transitions to `archiving`, but before pre-archive hooks execute, `ArchiveChange` MUST check for spec overlap with other active changes.\n\nThe check MUST:\n\n1. Call `ChangeRepository.list()` to retrieve all active changes\n2. Exclude the change being archived from the list\n3. Call the `detectSpecOverlap` domain service with the remaining changes plus the change being archived\n4. Filter the result to entries where the change being archived participates\n\nIf the filtered report has overlap and `allowOverlap` is `false`, `ArchiveChange` MUST throw `SpecOverlapError` with the overlap entries. The error message MUST list the overlapping spec IDs and the names of the other changes targeting them.\n\nIf `allowOverlap` is `true`, the overlap check is skipped entirely — the use case proceeds to pre-archive hooks without calling `detectSpecOverlap`.",
@@ -91,7 +97,7 @@
   ],
   "constraints": [
     "change.assertArchivable() must be called before any hooks or file modifications",
-    "The overlap guard must run after the archivable guard and before pre-archive hooks",
+    "ReadOnly workspace guard must run after archivable guard and state transition, before any hooks or file modifications",
     "Pre-archive hook failures abort the archive and throw — no partial state is written",
     "Post-archive hook failures are returned in the result; the archive is not rolled back",
     "ArchiveChange must not call change.invalidate() or any mutation on the Change entity — the change is already at its terminal state",
@@ -122,6 +128,44 @@
         "AND the change transitions to archiving via change.transition('archiving', actor)",
         "AND the change is persisted via ChangeRepository.save(change)",
         "AND execution proceeds to pre-archive hooks"
+      ]
+    },
+    {
+      "requirement": "ReadOnly workspace guard",
+      "name": "Archive rejected when change contains readOnly specs",
+      "given": [
+        "a change in archivable state with specIds including platform:auth/tokens",
+        "AND the platform workspace has readOnly ownership"
+      ],
+      "when": ["ArchiveChange.execute is called"],
+      "then": [
+        "ReadOnlyWorkspaceError is thrown",
+        "AND the error message lists the affected specs and workspaces",
+        "AND no hooks are executed and no spec files are written"
+      ]
+    },
+    {
+      "requirement": "ReadOnly workspace guard",
+      "name": "Archive proceeds when all specs are in owned workspaces",
+      "given": ["a change in archivable state with all specIds in owned workspaces"],
+      "when": ["ArchiveChange.execute is called"],
+      "then": ["the readOnly guard passes and execution proceeds to hooks"]
+    },
+    {
+      "requirement": "ReadOnly workspace guard",
+      "name": "Archive proceeds when specs are in shared workspaces",
+      "given": ["a change in archivable state with specIds in shared workspaces"],
+      "when": ["ArchiveChange.execute is called"],
+      "then": ["the readOnly guard passes and execution proceeds to hooks"]
+    },
+    {
+      "requirement": "ReadOnly workspace guard",
+      "name": "Guard runs after archivable check and state transition",
+      "given": ["a change that is not in archivable state"],
+      "when": ["ArchiveChange.execute is called"],
+      "then": [
+        "InvalidStateTransitionError is thrown (from assertArchivable)",
+        "AND the readOnly guard is never reached"
       ]
     },
     {
@@ -403,8 +447,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:83e43986fc7810c9aed84cdeefc279df7a40c7154d2913026b390fe03a093d63",
-    "verify.md": "sha256:85dd15d35e166c5ad01d7a8a4aea880f7a78eaa917af5951b8ac9dd820285e73"
+    "spec.md": "sha256:a95bf62a4aa0583934294ef1b9e301b46295cbe95d2ab43cf66e4583895eb477",
+    "verify.md": "sha256:6e532df883cbf15a6093d932f847bccfd7260a13ec89d8c0f923e9f5a6b294a0"
   },
   "generatedBy": "core"
 }
