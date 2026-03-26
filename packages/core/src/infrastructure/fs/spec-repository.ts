@@ -4,6 +4,7 @@ import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
+import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
 import { specMetadataSchema, type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import {
   SpecRepository,
@@ -167,6 +168,12 @@ export class FsSpecRepository extends SpecRepository {
     artifact: SpecArtifact,
     options?: { force?: boolean },
   ): Promise<void> {
+    if (this.ownership() === 'readOnly') {
+      throw new ReadOnlyWorkspaceError(
+        `Cannot write to spec "${this.workspace()}:${spec.name.toString()}" — workspace "${this.workspace()}" is readOnly.`,
+      )
+    }
+
     const dir = this._specDir(spec.name)
     await fs.mkdir(dir, { recursive: true })
 
@@ -261,6 +268,12 @@ export class FsSpecRepository extends SpecRepository {
     content: string,
     options?: { force?: boolean; originalHash?: string },
   ): Promise<void> {
+    if (this.ownership() === 'readOnly') {
+      throw new ReadOnlyWorkspaceError(
+        `Cannot write to spec "${this.workspace()}:${spec.name.toString()}" — workspace "${this.workspace()}" is readOnly.`,
+      )
+    }
+
     const filePath = this._metadataFilePath(spec.name)
     const dir = path.dirname(filePath)
     await fs.mkdir(dir, { recursive: true })
