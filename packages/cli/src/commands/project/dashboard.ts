@@ -1,12 +1,41 @@
+import path from 'node:path'
 import { type Command } from 'commander'
 import chalk from 'chalk'
 import boxen from 'boxen'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
+import { renderBanner } from '../../banner.js'
+import { CLI_VERSION, CORE_VERSION } from '../../version.js'
 
 /** Width of each stat column box. */
 const COL_WIDTH = 28
+
+/** Inner width of the project section box. */
+const PROJECT_BOX_WIDTH = 56
+
+/** Label for the root row, including trailing spaces to align the value column. */
+const ROOT_LABEL = 'root:    '
+
+/**
+ * Splits a long value string into chunks that fit within `maxWidth` characters,
+ * with continuation lines prefixed by `indent`.
+ *
+ * @param text - The string to wrap.
+ * @param maxWidth - Maximum characters per line.
+ * @param indent - Prefix to prepend to continuation lines.
+ * @returns Array of line chunks (first line is the raw text segment; continuations are indented).
+ */
+function wrapValue(text: string, maxWidth: number, indent: string): string[] {
+  const chunks: string[] = []
+  let remaining = text
+  while (remaining.length > maxWidth) {
+    chunks.push(remaining.slice(0, maxWidth))
+    remaining = indent + remaining.slice(maxWidth)
+  }
+  chunks.push(remaining)
+  return chunks
+}
 
 /**
  * Renders a titled inner box using box-drawing characters and chalk styling.
@@ -60,15 +89,17 @@ function sideBySide(left: string, right: string, gap = 2): string {
 }
 
 /**
- * Registers the `project overview` subcommand on the given parent command.
+ * Registers the `project dashboard` subcommand on the given parent command.
  *
  * @param parent - The parent Commander command to attach the subcommand to.
  */
-export function registerProjectOverview(parent: Command): void {
+export function registerProjectDashboard(parent: Command): void {
   parent
-    .command('overview')
+    .command('dashboard')
     .allowExcessArguments(false)
-    .description('Show a visual dashboard of the project status')
+    .description(
+      'Display a project-level dashboard showing schema, workspaces, spec counts, and change activity. Runs automatically when specd is invoked with no subcommand and a config is present.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .action(async (opts: { format: string; config?: string }) => {
@@ -105,14 +136,33 @@ export function registerProjectOverview(parent: Command): void {
           return
         }
 
+        // ── Banner ────────────────────────────────────────────────────────────
+        process.stdout.write(
+          renderBanner({ cliVersion: CLI_VERSION, coreVersion: CORE_VERSION }) + '\n\n',
+        )
+
+        // ── "Using config:" line ──────────────────────────────────────────────
+        const configFilePath = opts.config ?? path.join(config.projectRoot, 'specd.yaml')
+        const relConfigPath = path.relative(process.cwd(), configFilePath)
+        process.stdout.write(`Using config: ${relConfigPath}\n\n`)
+
         // ── Project box ──────────────────────────────────────────────────────
         const wsNames = config.workspaces.map((w) => w.name).join(', ')
+        const rootIndent = ' '.repeat(ROOT_LABEL.length)
+        const valueWidth = PROJECT_BOX_WIDTH - 1 - ROOT_LABEL.length
+        const rootChunks = wrapValue(config.projectRoot, valueWidth, rootIndent)
+        const rootFirstLine = `${chalk.dim('root:')}    ${chalk.white(rootChunks[0] ?? '')}`
+        const rootContinuations = rootChunks
+          .slice(1)
+          .map((chunk) => rootIndent + chalk.white(chunk))
+
         const projectLines = [
-          `${chalk.dim('root:')}    ${chalk.white(config.projectRoot)}`,
+          rootFirstLine,
+          ...rootContinuations,
           `${chalk.dim('schema:')}  ${chalk.cyan(config.schemaRef)}`,
           `${chalk.dim('workspaces:')} ${chalk.white(wsNames)}`,
         ]
-        const projectSection = innerBox('Project', projectLines, 46)
+        const projectSection = innerBox('Project', projectLines, PROJECT_BOX_WIDTH)
 
         // ── Specs box ────────────────────────────────────────────────────────
         const specsByWorkspace: Record<string, number> = {}
@@ -147,7 +197,7 @@ export function registerProjectOverview(parent: Command): void {
         const body = [projectSection, '', bottomRow].join('\n')
 
         const dashboard = boxen(body, {
-          title: chalk.bold.white('SpecD') + chalk.dim(' project overview'),
+          title: chalk.bold.white('SpecD') + chalk.dim(' project dashboard'),
           titleAlignment: 'center',
           padding: { top: 0, bottom: 0, left: 1, right: 1 },
           borderStyle: 'round',
