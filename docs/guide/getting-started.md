@@ -396,8 +396,8 @@ A real session looks like this:
 1. You type `/specd` in your coding assistant
 2. specd shows the project status and asks what you want to do
 3. You describe the change you want to make (or pick an existing one)
-4. `/specd-new` creates the change and transitions to designing
-5. `/specd-design` guides the agent through writing the proposal, specs, verification scenarios, design, and tasks
+4. `/specd-new` explores what you want through a conversation, creates the change, and saves the full discovery context to `specd-exploration.md` in the change directory — so nothing is lost between sessions
+5. `/specd-design` reads the exploration context, verifies it's still current, and guides the agent through writing the artifacts defined by the schema — in `@specd/schema-std` that means proposal, specs, verification scenarios, design, and tasks. Other schemas may define a different set of artifacts.
 6. You review the artifacts. If approval gates are enabled, you approve the spec.
 7. `/specd-implement` works through the task list, writing code that satisfies the specs
 8. `/specd-verify` runs through each verification scenario to confirm correctness
