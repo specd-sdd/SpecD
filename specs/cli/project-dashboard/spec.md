@@ -19,8 +19,8 @@ specd project dashboard [--format text|json|toon] [--config <path>]
 
 In `text` mode the command outputs:
 
-1. **Config line** — a plain text line `Using config: <relative-path>` printed to stdout before any box decoration. `<relative-path>` is the path to the loaded `specd.yaml` relative to `process.cwd()`.
-2. **Banner** — the SpecD ASCII logo rendered above the dashboard box.
+1. **Banner** — the SpecD ASCII logo rendered above the dashboard box.
+2. **Config line** — a plain text line `Using config: <relative-path>` printed to stdout before any box decoration. `<relative-path>` is the path to the loaded `specd.yaml` relative to `process.cwd()`.
 3. **Outer container** — a rounded `boxen` box with the title `SpecD project dashboard` centred at the top and a cyan border. The minimum inner width of this box MUST be at least the default `boxen` width plus 10 characters to accommodate typical project root paths.
 4. **Project box** — an inner box labelled `Project` showing:
    - `root:` — absolute path to the project root. If the value would cause the row to overflow the outer box width, the value wraps to a new line indented to align with the start of the value column (i.e. the column position where values begin).
