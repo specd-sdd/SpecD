@@ -23,7 +23,7 @@ import { registerGraphImpact } from '../../src/commands/graph/impact.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, kernel })
+  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
 
   const mockProvider = {
     analyzeImpact: vi.fn(),

@@ -170,7 +170,14 @@ describe('ResolveSchema — extends', () => {
         { id: 'spec', scope: 'spec', output: 'spec.md', description: 'Root spec' },
         { id: 'tasks', scope: 'change', output: 'tasks.md', instruction: 'Root tasks' },
       ],
-      workflow: [{ step: 'designing', requires: [], hooks: { pre: [], post: [] } }],
+      workflow: [
+        {
+          step: 'designing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+      ],
     })
     const parent = minimalData({
       name: 'parent',
@@ -208,6 +215,7 @@ describe('ResolveSchema — extends', () => {
         {
           step: 'implementing',
           requires: [],
+          requiresTaskCompletion: [],
           hooks: {
             pre: [{ id: 'guidance', type: 'instruction' as const, text: 'Read tasks.' }],
             post: [],
@@ -236,6 +244,7 @@ describe('ResolveSchema — extends', () => {
         {
           step: 'implementing',
           requires: [],
+          requiresTaskCompletion: [],
           hooks: {
             pre: [{ id: 'old-hook', type: 'instruction' as const, text: 'Old.' }],
             post: [],
@@ -250,6 +259,7 @@ describe('ResolveSchema — extends', () => {
         {
           step: 'implementing',
           requires: [],
+          requiresTaskCompletion: [],
           hooks: {
             pre: [{ id: 'new-hook', type: 'instruction' as const, text: 'New.' }],
             post: [],
@@ -417,7 +427,7 @@ describe('ResolveSchema — plugins', () => {
           id: 'spec',
           scope: 'spec',
           output: 'spec.md',
-          rules: { post: [{ id: 'normative', text: 'Use MUST/SHALL.' }] },
+          rules: { post: [{ id: 'normative', instruction: 'Use MUST/SHALL.' }] },
         },
       ],
     })
@@ -428,7 +438,10 @@ describe('ResolveSchema — plugins', () => {
       operations: {
         append: {
           artifacts: [
-            { id: 'spec', rules: { post: [{ id: 'rfc-rule', text: 'Reference RFC.' }] } },
+            {
+              id: 'spec',
+              rules: { post: [{ id: 'rfc-rule', instruction: 'Reference RFC.' }] },
+            },
           ],
         },
       },
@@ -447,7 +460,14 @@ describe('ResolveSchema — plugins', () => {
   it('plugin append — adds new workflow step', async () => {
     const base = minimalData({
       name: 'base',
-      workflow: [{ step: 'designing', requires: [], hooks: { pre: [], post: [] } }],
+      workflow: [
+        {
+          step: 'designing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+      ],
     })
     const plugin: SchemaYamlData = {
       kind: 'schema-plugin',
@@ -455,7 +475,14 @@ describe('ResolveSchema — plugins', () => {
       version: 1,
       operations: {
         append: {
-          workflow: [{ step: 'verifying', requires: [], hooks: { pre: [], post: [] } }],
+          workflow: [
+            {
+              step: 'verifying',
+              requires: [],
+              requiresTaskCompletion: [],
+              hooks: { pre: [], post: [] },
+            },
+          ],
         },
       },
     }
@@ -477,6 +504,7 @@ describe('ResolveSchema — plugins', () => {
         {
           step: 'implementing',
           requires: [],
+          requiresTaskCompletion: [],
           hooks: {
             pre: [{ id: 'read-tasks', type: 'instruction' as const, text: 'Read tasks.' }],
             post: [],
@@ -563,7 +591,7 @@ describe('ResolveSchema — plugins', () => {
           id: 'spec',
           scope: 'spec',
           output: 'spec.md',
-          rules: { pre: [{ id: 'existing', text: 'Existing rule.' }] },
+          rules: { pre: [{ id: 'existing', instruction: 'Existing rule.' }] },
         },
       ],
     })
@@ -574,7 +602,10 @@ describe('ResolveSchema — plugins', () => {
       operations: {
         prepend: {
           artifacts: [
-            { id: 'spec', rules: { pre: [{ id: 'first-rule', text: 'Do this first.' }] } },
+            {
+              id: 'spec',
+              rules: { pre: [{ id: 'first-rule', instruction: 'Do this first.' }] },
+            },
           ],
         },
       },
@@ -593,14 +624,30 @@ describe('ResolveSchema — plugins', () => {
   it('plugin prepend — adds workflow step at the beginning', async () => {
     const base = minimalData({
       name: 'base',
-      workflow: [{ step: 'implementing', requires: [], hooks: { pre: [], post: [] } }],
+      workflow: [
+        {
+          step: 'implementing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+      ],
     })
     const plugin: SchemaYamlData = {
       kind: 'schema-plugin',
       name: 'plan-plugin',
       version: 1,
       operations: {
-        prepend: { workflow: [{ step: 'ready', requires: [], hooks: { pre: [], post: [] } }] },
+        prepend: {
+          workflow: [
+            {
+              step: 'ready',
+              requires: [],
+              requiresTaskCompletion: [],
+              hooks: { pre: [], post: [] },
+            },
+          ],
+        },
       },
     }
 
@@ -662,14 +709,30 @@ describe('ResolveSchema — plugins', () => {
   it('plugin create — adds a new workflow step', async () => {
     const base = minimalData({
       name: 'base',
-      workflow: [{ step: 'designing', requires: [], hooks: { pre: [], post: [] } }],
+      workflow: [
+        {
+          step: 'designing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+      ],
     })
     const plugin: SchemaYamlData = {
       kind: 'schema-plugin',
       name: 'deploy-plugin',
       version: 1,
       operations: {
-        create: { workflow: [{ step: 'archiving', requires: [], hooks: { pre: [], post: [] } }] },
+        create: {
+          workflow: [
+            {
+              step: 'archiving',
+              requires: [],
+              requiresTaskCompletion: [],
+              hooks: { pre: [], post: [] },
+            },
+          ],
+        },
       },
     }
 
@@ -689,7 +752,16 @@ describe('ResolveSchema — plugins', () => {
       name: 'bad-plugin',
       version: 1,
       operations: {
-        create: { workflow: [{ step: 'reviewing', requires: [], hooks: { pre: [], post: [] } }] },
+        create: {
+          workflow: [
+            {
+              step: 'reviewing',
+              requires: [],
+              requiresTaskCompletion: [],
+              hooks: { pre: [], post: [] },
+            },
+          ],
+        },
       },
     }
 
@@ -771,8 +843,8 @@ describe('ResolveSchema — plugins', () => {
           output: 'spec.md',
           rules: {
             post: [
-              { id: 'normative', text: 'Use MUST/SHALL.' },
-              { id: 'rfc', text: 'Reference RFC.' },
+              { id: 'normative', instruction: 'Use MUST/SHALL.' },
+              { id: 'rfc', instruction: 'Reference RFC.' },
             ],
           },
         },
@@ -804,6 +876,7 @@ describe('ResolveSchema — plugins', () => {
         {
           step: 'implementing',
           requires: [],
+          requiresTaskCompletion: [],
           hooks: {
             pre: [{ id: 'guidance', type: 'instruction' as const, text: 'Read tasks.' }],
             post: [{ id: 'run-tests', type: 'run' as const, command: 'pnpm test' }],
@@ -837,8 +910,18 @@ describe('ResolveSchema — plugins', () => {
     const base = minimalData({
       name: 'base',
       workflow: [
-        { step: 'designing', requires: [], hooks: { pre: [], post: [] } },
-        { step: 'implementing', requires: [], hooks: { pre: [], post: [] } },
+        {
+          step: 'designing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+        {
+          step: 'implementing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
       ],
     })
     const plugin: SchemaYamlData = {
@@ -927,6 +1010,7 @@ describe('ResolveSchema — plugins', () => {
         {
           step: 'implementing',
           requires: ['tasks'],
+          requiresTaskCompletion: [],
           hooks: { pre: [], post: [] },
         },
       ],
@@ -1067,7 +1151,7 @@ describe('ResolveSchema — multiple plugins in order', () => {
           id: 'spec',
           scope: 'spec',
           output: 'spec.md',
-          rules: { post: [{ id: 'normative', text: 'Use MUST/SHALL.' }] },
+          rules: { post: [{ id: 'normative', instruction: 'Use MUST/SHALL.' }] },
         },
       ],
     })
@@ -1077,7 +1161,7 @@ describe('ResolveSchema — multiple plugins in order', () => {
       version: 1,
       operations: {
         append: {
-          artifacts: [{ id: 'spec', rules: { post: [{ id: 'rfc-rule', text: 'RFC.' }] } }],
+          artifacts: [{ id: 'spec', rules: { post: [{ id: 'rfc-rule', instruction: 'RFC.' }] } }],
         },
       },
     }
@@ -1117,7 +1201,10 @@ describe('ResolveSchema — overrides', () => {
     const schema = await resolve(registry, '#base', [], {
       append: {
         artifacts: [
-          { id: 'spec', rules: { post: [{ id: 'team-rule', text: 'Reference Jira ticket.' }] } },
+          {
+            id: 'spec',
+            rules: { post: [{ id: 'team-rule', instruction: 'Reference Jira ticket.' }] },
+          },
         ],
       },
     })
@@ -1132,6 +1219,7 @@ describe('ResolveSchema — overrides', () => {
         {
           step: 'archiving',
           requires: [],
+          requiresTaskCompletion: [],
           hooks: {
             pre: [{ id: 'review', type: 'instruction' as const, text: 'Review.' }],
             post: [],
@@ -1250,7 +1338,7 @@ describe('ResolveSchema — override applied after plugin', () => {
           id: 'spec',
           scope: 'spec',
           output: 'spec.md',
-          rules: { post: [{ id: 'normative', text: 'Use MUST/SHALL.' }] },
+          rules: { post: [{ id: 'normative', instruction: 'Use MUST/SHALL.' }] },
         },
       ],
     })
@@ -1259,7 +1347,9 @@ describe('ResolveSchema — override applied after plugin', () => {
       name: 'rfc-plugin',
       version: 1,
       operations: {
-        append: { artifacts: [{ id: 'spec', rules: { post: [{ id: 'rfc', text: 'RFC.' }] } }] },
+        append: {
+          artifacts: [{ id: 'spec', rules: { post: [{ id: 'rfc', instruction: 'RFC.' }] } }],
+        },
       },
     }
 
@@ -1325,6 +1415,7 @@ describe('ResolveSchema — extends + plugins + overrides combined', () => {
         {
           step: 'designing',
           requires: [],
+          requiresTaskCompletion: [],
           hooks: {
             pre: [{ id: 'design-hint', type: 'instruction' as const, text: 'Design.' }],
             post: [],
@@ -1359,7 +1450,10 @@ describe('ResolveSchema — extends + plugins + overrides combined', () => {
       operations: {
         append: {
           artifacts: [
-            { id: 'spec', rules: { post: [{ id: 'compliance', text: 'Comply with SOC2.' }] } },
+            {
+              id: 'spec',
+              rules: { post: [{ id: 'compliance', instruction: 'Comply with SOC2.' }] },
+            },
           ],
         },
         create: {
@@ -1435,7 +1529,14 @@ describe('ResolveSchema — override hook normalization', () => {
   it('normalizes YAML-format run hooks in overrides to domain format', async () => {
     const base = minimalData({
       name: 'base',
-      workflow: [{ step: 'implementing', requires: [], hooks: { pre: [], post: [] } }],
+      workflow: [
+        {
+          step: 'implementing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+      ],
     })
     const registry = makeRegistry({ '#base': rawResult(base) })
 
@@ -1463,7 +1564,14 @@ describe('ResolveSchema — override hook normalization', () => {
   it('normalizes YAML-format instruction hooks in overrides to domain format', async () => {
     const base = minimalData({
       name: 'base',
-      workflow: [{ step: 'implementing', requires: [], hooks: { pre: [], post: [] } }],
+      workflow: [
+        {
+          step: 'implementing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+      ],
     })
     const registry = makeRegistry({ '#base': rawResult(base) })
 
@@ -1490,7 +1598,14 @@ describe('ResolveSchema — override hook normalization', () => {
   it('passes through hooks already in domain format', async () => {
     const base = minimalData({
       name: 'base',
-      workflow: [{ step: 'implementing', requires: [], hooks: { pre: [], post: [] } }],
+      workflow: [
+        {
+          step: 'implementing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: { pre: [], post: [] },
+        },
+      ],
     })
     const registry = makeRegistry({ '#base': rawResult(base) })
 

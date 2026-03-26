@@ -13,8 +13,6 @@ import { type HookRunner } from '../application/ports/hook-runner.js'
 import { type ConfigWriter } from '../application/ports/config-writer.js'
 import { type YamlSerializer } from '../application/ports/yaml-serializer.js'
 import { TemplateExpander } from '../application/template-expander.js'
-import { GitActorResolver } from '../infrastructure/git/actor-resolver.js'
-import { GitVcsAdapter } from '../infrastructure/git/vcs-adapter.js'
 import { NodeHookRunner } from '../infrastructure/node/hook-runner.js'
 import { NodeContentHasher } from '../infrastructure/node/content-hasher.js'
 import { NodeYamlSerializer } from '../infrastructure/node/yaml-serializer.js'
@@ -27,6 +25,7 @@ import { createSpecRepository } from './spec-repository.js'
 import { createSchemaRegistry } from './schema-registry.js'
 import { createSchemaRepository } from './schema-repository.js'
 import { type SchemaRepository } from '../application/ports/schema-repository.js'
+import { createVcsActorResolver } from './actor-resolver.js'
 import { createVcsAdapter } from './vcs-adapter.js'
 import { getDefaultWorkspace } from './get-default-workspace.js'
 import { type KernelOptions } from './kernel.js'
@@ -178,8 +177,8 @@ export async function createKernelInternals(
     parsers: createArtifactParserRegistry(),
     hasher: new NodeContentHasher(),
     files: new FsFileReader(),
-    actor: new GitActorResolver(),
-    vcs: new GitVcsAdapter(),
+    actor: await createVcsActorResolver(config.projectRoot),
+    vcs: await createVcsAdapter(config.projectRoot),
     hooks: new NodeHookRunner(expander),
     configWriter: new FsConfigWriter(),
     yaml: new NodeYamlSerializer(),

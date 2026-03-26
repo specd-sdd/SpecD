@@ -12,7 +12,9 @@ export function registerChangeArtifactInstruction(parent: Command): void {
   parent
     .command('artifact-instruction <name> [artifact-id]')
     .allowExcessArguments(false)
-    .description('Get artifact-specific instructions, rules, and delta guidance')
+    .description(
+      'Return the next artifact instruction for a change, including rules, constraints, and delta guidance for the current lifecycle step.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(

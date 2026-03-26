@@ -281,7 +281,7 @@ export interface ChangeManifest {
    * Per-spec declared dependencies, keyed by spec ID.
    *
    * Captured during change authoring to track dependencies even before
-   * `.specd-metadata.yaml` is generated. Omitted from the manifest when empty.
+   * `metadata.json` is generated. Omitted from the manifest when empty.
    */
   readonly specDependsOn?: Record<string, string[]>
   /** Artifact descriptors including their validation hashes. */

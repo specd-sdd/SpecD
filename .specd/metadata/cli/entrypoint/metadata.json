@@ -15,7 +15,7 @@
     {
       "requirement": "Config flag override",
       "rules": [
-        "Every `specd` command accepts a `--config <path>` flag. When provided, config discovery is skipped and `specd.yaml` is loaded directly from `<path>`. If the file does not exist or cannot be parsed, the command fails with exit code 1 and a descriptive error on stderr."
+        "`--config <path>` is a global option defined on the root `specd` program. When provided before a subcommand (`specd --config <path> change list`), Commander parses it at the root level. When provided after a subcommand (`specd change list --config <path>`), individual subcommands that declare their own `--config` option parse it locally.\n\nTo make both positions work seamlessly, the root program's `preAction` hook propagates the root-level `--config` value to any subcommand that has not received its own `--config` value. This means:\n\n- `specd --config /path/to/specd.yaml change list` — root parses it, `preAction` injects into `change list`\n- `specd change list --config /path/to/specd.yaml` — `change list` parses it directly\n- `specd --config /path/to/specd.yaml` (no subcommand) — root parses it; used for auto-dashboard dispatch\n\nWhen provided, config discovery is skipped and `specd.yaml` is loaded directly from `<path>`. If the file does not exist or cannot be parsed, the command fails with exit code 1 and a descriptive error on stderr."
       ]
     },
     {
@@ -53,16 +53,29 @@
       "rules": [
         "Every leaf command rejects unexpected positional arguments. If a user passes more positional arguments than the command declares, the command exits with code 1 and prints a usage error to stderr. This prevents silent typos and misremembered syntax from being ignored."
       ]
+    },
+    {
+      "requirement": "Banner in help",
+      "rules": [
+        "When `specd --help` is invoked, the SpecD ASCII art banner is rendered above the standard Commander help text. The banner is prepended using Commander's `addHelpText('before', ...)` mechanism. The banner does not appear in subcommand help pages (e.g. `specd change --help`)."
+      ]
+    },
+    {
+      "requirement": "Auto-show dashboard",
+      "rules": [
+        "When `specd` is invoked with no subcommand — either as `specd` alone or as `specd --config <path>` — the CLI attempts config discovery (or loads the provided path). If a valid config is found, the `project dashboard` command is executed automatically as if the user had run `specd project dashboard [--config <path>]`. If config discovery fails (no `specd.yaml` found), the standard help text is shown instead.\n\nThis behaviour makes `specd` act as a project landing page when a project is present, rather than always showing generic help."
+      ]
     }
   ],
   "constraints": [
     "Every leaf command must call .allowExcessArguments(false) so Commander rejects extra positional arguments",
-    "--config must be the first flag processed, before any sub-command-specific flag parsing",
+    "--config is defined on the root program as a global option; individual subcommands MAY also declare their own --config option for ergonomic use after the subcommand name. Commander lifts any --config occurrence to the root level, so the preAction hook propagates program.opts().config to the action command via setOptionValue. When --config appears twice, Commander's last-value-wins semantics apply.",
     "Config discovery halts at the git repository root; it does not cross repository boundaries",
     "Stdout and stderr must be independent streams — no interleaving of normal output and error messages",
     "Exit code 2 is reserved exclusively for hook failures; domain errors from hooks (e.g. the hook emits an error message and exits 1) still yield exit code 2",
     "--format never affects stderr — errors are always plain text on stderr regardless of format",
-    "When --format is json or toon, errors are written to both stderr (plain text) and stdout (structured) — stderr for humans/logs, stdout for programmatic consumers"
+    "When --format is json or toon, errors are written to both stderr (plain text) and stdout (structured) — stderr for humans/logs, stdout for programmatic consumers",
+    "The banner MUST NOT be shown in subcommand help pages; it is only prepended to the root specd --help output"
   ],
   "scenarios": [
     {
@@ -81,9 +94,35 @@
     },
     {
       "requirement": "Config flag override",
-      "name": "Valid explicit config",
+      "name": "Valid explicit config before subcommand (global position)",
       "when": ["specd --config /abs/path/specd.yaml change list is run and the file exists"],
-      "then": ["that file is loaded regardless of whether a specd.yaml exists in the CWD tree"]
+      "then": ["that file is loaded and the subcommand executes successfully"]
+    },
+    {
+      "requirement": "Config flag override",
+      "name": "Valid explicit config after subcommand (local position)",
+      "when": ["specd change list --config /abs/path/specd.yaml is run and the file exists"],
+      "then": ["that file is loaded and the subcommand executes successfully"]
+    },
+    {
+      "requirement": "Config flag override",
+      "name": "Global config takes effect when subcommand has no local --config",
+      "given": [
+        "--config /abs/path/specd.yaml is provided before the subcommand",
+        "AND the subcommand does not also specify --config"
+      ],
+      "when": ["the action handler runs"],
+      "then": ["opts.config is populated with the root-level value via preAction propagation"]
+    },
+    {
+      "requirement": "Config flag override",
+      "name": "--config specified twice uses the last value",
+      "given": ["specd --config /root/specd.yaml change list --config /local/specd.yaml is run"],
+      "when": ["Commander parses the command line"],
+      "then": [
+        "the last --config value (/local/specd.yaml) is used (Commander option override semantics)",
+        "AND the command executes normally — no error is produced"
+      ]
     },
     {
       "requirement": "Config flag override",
@@ -153,6 +192,44 @@
         "any leaf command is run with an unexpected extra positional argument (e.g. specd change list some-name)"
       ],
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
+    },
+    {
+      "requirement": "Banner in help",
+      "name": "Banner appears in root help output",
+      "when": ["specd --help is run"],
+      "then": [
+        "stdout contains the SpecD ASCII art banner before the Commander-generated help text"
+      ]
+    },
+    {
+      "requirement": "Banner in help",
+      "name": "Banner does not appear in subcommand help",
+      "when": ["specd change --help or any other subcommand --help is run"],
+      "then": ["stdout does not contain the SpecD ASCII art banner"]
+    },
+    {
+      "requirement": "Auto-show dashboard",
+      "name": "Bare specd invocation with config present shows dashboard",
+      "given": ["specd.yaml is discoverable from CWD"],
+      "when": ["specd is run with no subcommand"],
+      "then": [
+        "the project dashboard output is displayed (same as specd project dashboard)",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Auto-show dashboard",
+      "name": "specd with only --config and no subcommand shows dashboard",
+      "given": ["a valid specd.yaml exists at /path/to/specd.yaml"],
+      "when": ["specd --config /path/to/specd.yaml is run with no subcommand"],
+      "then": ["the project dashboard output is displayed", "AND the process exits with code 0"]
+    },
+    {
+      "requirement": "Auto-show dashboard",
+      "name": "Bare specd invocation without config shows help",
+      "given": ["no specd.yaml is discoverable from CWD"],
+      "when": ["specd is run with no subcommand"],
+      "then": ["the standard help text is shown", "AND the process exits with code 0"]
     },
     {
       "requirement": "Output format flag",
@@ -244,8 +321,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:ed9c11d3a126ec29a58d00c04336f8b43cdbf9ea14a7bbfaad4ece622e00fb24",
-    "verify.md": "sha256:249cca51e3d5d5052752d223b8caaf4500862b08e6a8946d5d4bfe67cd64d9b7"
+    "spec.md": "sha256:5748c2eee6518aed85cc6ccb257be2192fa1db5160147d2c60f5f5cf0e128db6",
+    "verify.md": "sha256:9a1a13a24111505d67b3dbab1b20fa246ed52c5072fcfa0e0ce476906fa0955a"
   },
   "generatedBy": "core"
 }

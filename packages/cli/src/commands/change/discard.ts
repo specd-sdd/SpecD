@@ -12,7 +12,9 @@ export function registerChangeDiscard(parent: Command): void {
   parent
     .command('discard <name>')
     .allowExcessArguments(false)
-    .description('Permanently discard a change')
+    .description(
+      'Discard a change, moving it to the discarded state and removing it from the active change list.',
+    )
     .requiredOption('--reason <text>', 'mandatory explanation for discarding')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

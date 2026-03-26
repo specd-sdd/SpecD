@@ -23,7 +23,9 @@ export function registerSpecGenerateMetadata(parent: Command): void {
   parent
     .command('generate-metadata [specPath]')
     .allowExcessArguments(false)
-    .description('Generate metadata deterministically from schema extraction rules')
+    .description(
+      'Generate and write metadata files for one or more specs by applying schema extraction rules to their content.',
+    )
     .option('--write', 'write the generated metadata')
     .option('--force', 'overwrite existing metadata without conflict detection (requires --write)')
     .option('--all', 'generate metadata for all specs matching --status filter')

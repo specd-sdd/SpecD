@@ -61,6 +61,11 @@ For each artifact that declares a `template` path, `buildSchema` SHALL verify th
 
 `buildSchema` SHALL validate that no two workflow entries share the same `step` name. If a duplicate is found, the function MUST throw `SchemaValidationError` identifying the duplicate step name.
 
+For each workflow step that declares `requiresTaskCompletion`, `buildSchema` SHALL validate:
+
+1. Every artifact ID in `requiresTaskCompletion` MUST also be present in the step's `requires` array. If not, throw `SchemaValidationError`.
+2. Every artifact ID in `requiresTaskCompletion` MUST reference an artifact type that declares `taskCompletionCheck`. If not, throw `SchemaValidationError`.
+
 ### Requirement: Artifact dependency graph validation
 
 `buildSchema` SHALL validate the artifact dependency graph after constructing all `ArtifactType` instances:
@@ -106,7 +111,7 @@ This function is currently in `infrastructure/zod/selector-schema.ts` and MUST b
 - Convert `validations` and `deltaValidations` arrays via `buildValidationRule`
 - Convert `preHashCleanup` entries
 - Convert `taskCompletionCheck` if present
-- Convert `rules` (with `pre` and `post` arrays of `{ id, text }` entries) if present
+- Convert `rules` (with `pre` and `post` arrays of `{ id, instruction }` entries) if present
 - Pass the template content string (not the path) as the `template` property on `ArtifactType`
 - Default `optional` to `false`, `delta` to `false`, and `requires` to `[]` when omitted
 
@@ -116,7 +121,7 @@ This function is currently in `infrastructure/zod/selector-schema.ts` and MUST b
 
 ### Requirement: Schema entity construction
 
-After all validation passes, `buildSchema` SHALL construct and return a `Schema` entity by calling `new Schema(name, version, artifacts, workflow, metadataExtraction)` with the fully converted domain objects, passing `kind` and `extends` to the Schema constructor.
+After all validation passes, `buildSchema` SHALL construct and return a `Schema` entity by calling `new Schema(name, version, artifacts, workflow, metadataExtraction)` with the fully converted domain objects, passing `kind` and `extends` to the Schema constructor. Workflow steps include the `requiresTaskCompletion` array when declared.
 
 ## Constraints
 

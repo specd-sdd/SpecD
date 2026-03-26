@@ -208,5 +208,22 @@ describe('GetArtifactInstruction', () => {
 
       expect(result.instruction).toBeNull()
     })
+
+    it('expands pre and post rule instructions', async () => {
+      const artifactType = makeArtifactType('spec', {
+        rules: {
+          pre: [{ id: 'pre', instruction: 'Before {{change.name}}' }],
+          post: [{ id: 'post', instruction: 'After {{change.name}}' }],
+        },
+      })
+      const schema = makeSchema({ name: 'test-schema', artifacts: [artifactType] })
+      const change = makeChange('my-change', { schemaName: 'test-schema' })
+      const { sut } = makeSut({ change, schema })
+
+      const result = await sut.execute({ name: 'my-change', artifactId: 'spec' })
+
+      expect(result.rulesPre).toEqual(['Before my-change'])
+      expect(result.rulesPost).toEqual(['After my-change'])
+    })
   })
 })

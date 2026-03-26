@@ -16,7 +16,9 @@ export function registerSpecMetadata(parent: Command): void {
   parent
     .command('metadata <specPath>')
     .allowExcessArguments(false)
-    .description('Show the metadata for a spec')
+    .description(
+      'Display the parsed metadata for a spec, including extracted fields, content hashes, and freshness status.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(

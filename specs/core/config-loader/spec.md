@@ -13,7 +13,21 @@ Delivery mechanisms need to load and validate `specd.yaml` without knowing the d
 - `{ startDir: string }` — discovery mode
 - `{ configPath: string }` — forced mode
 
-The returned `ConfigLoader` exposes a single method `load(): Promise<SpecdConfig>`.
+The returned `ConfigLoader` exposes two methods:
+
+- `load(): Promise<SpecdConfig>` — loads, validates, and returns the fully-resolved config. Throws `ConfigValidationError` on any failure.
+- `resolvePath(): Promise<string | null>` — resolves and returns the path to the active config file without loading or parsing it. Returns `null` when no config file can be located (discovery mode) or when the adapter has no concept of a file path. Never throws.
+
+### Requirement: Path probe
+
+`resolvePath()` SHALL return the absolute path to the config file that `load()` would use, without reading or parsing it.
+
+- **Discovery mode** (`{ startDir }`): runs the same directory walk as `load()` (honouring `specd.local.yaml`, bounded by git root). Returns the found path, or `null` if no file is found. Never throws.
+- **Forced mode** (`{ configPath }`): returns the resolved absolute path directly. Does not check whether the file exists — existence is validated only by `load()`.
+
+Adapters that have no concept of a local file path (e.g. remote adapters) SHALL return `null`.
+
+The purpose of `resolvePath()` is to allow delivery mechanisms to probe for config presence before deciding to dispatch to a default action (such as auto-showing the project dashboard), without paying the cost of a full load and without silencing load errors for explicitly-provided paths.
 
 ### Requirement: Discovery mode
 

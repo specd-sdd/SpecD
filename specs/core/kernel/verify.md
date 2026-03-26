@@ -13,7 +13,7 @@
 #### Scenario: Changes group contains all change use cases
 
 - **WHEN** `kernel.changes` is inspected
-- **THEN** it contains entries for: `create`, `status`, `transition`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`
+- **THEN** it contains entries for: `create`, `status`, `transition`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `detectOverlap`
 - **AND** it contains `repo` as the underlying `ChangeRepository`
 
 #### Scenario: Specs group contains all spec use cases
@@ -92,6 +92,31 @@
 - **AND** all use cases that need the schema receive `SchemaProvider`
 - **AND** `SchemaProvider.get()` returns the schema with overrides applied
 - **AND** `RunStepHooks` and `GetHookInstructions` do not receive project-level workflow hooks
+
+### Requirement: Project-level VCS and actor adapters must use auto-detect
+
+#### Scenario: Kernel internals use auto-detect for project VCS
+
+- **WHEN** `createKernelInternals` constructs the project-level `VcsAdapter`
+- **THEN** it calls `createVcsAdapter(config.projectRoot)` instead of constructing a specific implementation directly
+
+#### Scenario: Kernel internals use auto-detect for project actor
+
+- **WHEN** `createKernelInternals` constructs the project-level `ActorResolver`
+- **THEN** it calls `createVcsActorResolver(config.projectRoot)` instead of constructing a specific implementation directly
+
+#### Scenario: Standalone use-case factories use auto-detect for actor
+
+- **WHEN** any standalone use-case factory in `composition/use-cases/` needs an `ActorResolver`
+- **THEN** it calls `createVcsActorResolver()` instead of `new GitActorResolver()`
+
+#### Scenario: Non-git project gets correct adapters
+
+- **GIVEN** a project directory that is not a git repository
+- **WHEN** `createKernelInternals` is called
+- **THEN** the `vcs` field is a `NullVcsAdapter` (or the detected VCS adapter)
+- **AND** the `actor` field is a `NullActorResolver` (or the detected actor resolver)
+- **AND** no git-specific errors are thrown
 
 ### Requirement: Kernel exposes repository instances for adapter access
 

@@ -12,7 +12,7 @@ export function registerDraftsRestore(parent: Command): void {
   parent
     .command('restore <name>')
     .allowExcessArguments(false)
-    .description('Restore a drafted change back to active changes')
+    .description('Restore a drafted change back to the active change list so work can continue.')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(

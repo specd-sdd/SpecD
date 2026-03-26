@@ -26,7 +26,7 @@ export interface GenerateSpecMetadataResult {
 }
 
 /**
- * Generates `.specd-metadata.yaml` content deterministically from schema-declared
+ * Generates `metadata.json` content deterministically from schema-declared
  * extraction rules, without any LLM involvement.
  *
  * Algorithm:

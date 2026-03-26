@@ -14,7 +14,9 @@ export function registerChangeEdit(parent: Command): void {
   parent
     .command('edit <name>')
     .allowExcessArguments(false)
-    .description('Edit the spec scope of a change')
+    .description(
+      "Edit a change's metadata, including its description and the list of specs it is scoped to.",
+    )
     .option('--add-spec <id>', 'add a spec path (repeatable)', collect, [] as string[])
     .option('--remove-spec <id>', 'remove a spec path (repeatable)', collect, [] as string[])
     .option('--description <text>', 'set or replace the change description (informational)')
@@ -78,6 +80,27 @@ JSON/TOON output schema:
             process.stderr.write(
               'warning: approvals invalidated — change rolled back to designing\n',
             )
+          }
+
+          // Check for spec overlap and warn (only when specs changed)
+          if (addSpecIds !== undefined || removeSpecIds !== undefined) {
+            try {
+              const overlapReport = await kernel.changes.detectOverlap.execute({ name })
+              if (overlapReport.hasOverlap) {
+                const specList = overlapReport.entries
+                  .map(
+                    (e) =>
+                      `  ${e.specId} — also targeted by: ${e.changes
+                        .filter((c) => c.name !== name)
+                        .map((c) => `${c.name} (${c.state})`)
+                        .join(', ')}`,
+                  )
+                  .join('\n')
+                process.stderr.write(`warning: spec overlap detected:\n${specList}\n`)
+              }
+            } catch {
+              // Overlap detection is best-effort — don't fail edit
+            }
           }
 
           const fmt = parseFormat(opts.format)

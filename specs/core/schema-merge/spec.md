@@ -141,7 +141,7 @@ const pluginLayer: SchemaLayer = {
         {
           id: 'specs',
           rules: {
-            post: [{ id: 'rfc-reference', text: 'All requirements must reference the relevant RFC' }],
+            post: [{ id: 'rfc-reference', instruction: 'All requirements must reference the relevant RFC' }],
           },
         },
       ],

@@ -14,7 +14,9 @@ export function registerSpecInvalidateMetadata(parent: Command): void {
   parent
     .command('invalidate-metadata <specPath>')
     .allowExcessArguments(false)
-    .description('Invalidate metadata by removing contentHashes (marks as stale)')
+    .description(
+      'Mark spec metadata as stale by clearing its content hashes, forcing regeneration on the next metadata read.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(

@@ -13,7 +13,9 @@ export function registerSpecValidate(parent: Command): void {
   parent
     .command('validate [specPath]')
     .allowExcessArguments(false)
-    .description('Validate spec artifacts against the active schema')
+    .description(
+      "Validate a spec's content against the active schema requirements, reporting any structural or constraint violations.",
+    )
     .option('--all', 'validate all specs across all workspaces')
     .option('--workspace <name>', 'validate all specs in a workspace')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

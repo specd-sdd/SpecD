@@ -14,7 +14,7 @@ export function registerDiscardedList(parent: Command): void {
   parent
     .command('list')
     .allowExcessArguments(false)
-    .description('List all discarded changes')
+    .description('List all discarded changes, showing their names and the reason for discarding.')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(

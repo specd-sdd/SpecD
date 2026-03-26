@@ -46,6 +46,13 @@ export interface WorkflowStep {
    */
   readonly requires: readonly string[]
 
+  /**
+   * Subset of `requires` for which task completion gating is enforced on this step.
+   * Each listed artifact ID must be in `requires` and reference an artifact type
+   * that declares `taskCompletionCheck`. Empty array means no task completion gating.
+   */
+  readonly requiresTaskCompletion: readonly string[]
+
   /** Pre- and post-event hooks for this step. */
   readonly hooks: {
     /** Hooks that fire before the step executes. */

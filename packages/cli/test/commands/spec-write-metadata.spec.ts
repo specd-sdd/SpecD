@@ -10,7 +10,10 @@ import {
   captureStderr,
 } from './helpers.js'
 
-vi.mock('../../src/load-config.js', () => ({ loadConfig: vi.fn() }))
+vi.mock('../../src/load-config.js', () => ({
+  loadConfig: vi.fn(),
+  resolveConfigPath: vi.fn().mockResolvedValue(null),
+}))
 vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 vi.mock('node:fs/promises', async () => {
   const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')

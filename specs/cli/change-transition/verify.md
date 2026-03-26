@@ -9,6 +9,55 @@
 - **WHEN** `specd change transition my-change` is run without the target state
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
+#### Scenario: Next flag resolves a transition target without a positional step
+
+- **GIVEN** the change is in `drafting` state
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** the command resolves `designing` as the target state
+- **AND** executes the normal transition flow
+
+#### Scenario: Next flag cannot be combined with an explicit step
+
+- **WHEN** `specd change transition my-change designing --next` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message explaining that `<step>` and `--next` are mutually exclusive
+
+### Requirement: Next-transition resolution
+
+#### Scenario: Next flag advances designing to ready
+
+- **GIVEN** the change is in `designing` state
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** the command requests transition to `ready`
+
+#### Scenario: Next flag honors approval routing from ready
+
+- **GIVEN** `approvals.spec: true` and the change is in `ready` state
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** the command resolves `implementing` as the logical next target
+- **AND** the change transitions to `pending-spec-approval`
+
+#### Scenario: Next flag fails in pending spec approval state
+
+- **GIVEN** the change is in `pending-spec-approval` state
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message explaining that the change is waiting for human spec approval
+
+#### Scenario: Next flag fails in pending signoff state
+
+- **GIVEN** the change is in `pending-signoff` state
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message explaining that the change is waiting for human signoff
+
+#### Scenario: Next flag fails in archivable state
+
+- **GIVEN** the change is in `archivable` state
+- **WHEN** `specd change transition my-change --next` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message explaining that archiving is not a lifecycle transition
+
 ### Requirement: Approval-gate routing
 
 #### Scenario: Spec approval gate active
@@ -41,6 +90,13 @@
 - **WHEN** `specd change transition my-change done` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
+
+#### Scenario: Approval-required reason is surfaced in stderr
+
+- **GIVEN** the change is in `pending-signoff` state
+- **WHEN** `specd change transition my-change signed-off` is run
+- **THEN** the command exits with code 1
+- **AND** stderr contains an `error:` message explaining that the change is waiting for human signoff
 
 ### Requirement: Incomplete tasks error
 

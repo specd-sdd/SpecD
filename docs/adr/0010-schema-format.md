@@ -125,7 +125,7 @@ Workflow steps use `step` instead of `id` as their identity field — the `step`
 
 ### 13. `rules.pre` / `rules.post` on artifacts
 
-Each artifact may declare `rules: { pre: [], post: [] }` — arrays of `{ id, text }` entries. `CompileContext` injects them as constraint blocks:
+Each artifact may declare `rules: { pre: [], post: [] }` — arrays of `{ id, instruction }` entries. `CompileContext` injects them as constraint blocks:
 
 - `rules.pre` — injected **before** the artifact's `instruction`
 - `rules.post` — injected **after** the artifact's `instruction`

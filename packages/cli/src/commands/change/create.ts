@@ -14,7 +14,7 @@ export function registerChangeCreate(parent: Command): void {
   parent
     .command('create <name>')
     .allowExcessArguments(false)
-    .description('Create a new change')
+    .description('Create a new change to track a unit of work through the specd lifecycle.')
     .option('--spec <id>', 'spec path (repeatable)', collect, [] as string[])
     .option('--description <text>', 'change description (informational)')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
@@ -45,6 +45,27 @@ JSON/TOON output schema:
             schemaName: schema.name(),
             schemaVersion: schema.version(),
           })
+
+          // Check for spec overlap and warn
+          if (specIds.length > 0) {
+            try {
+              const overlapReport = await kernel.changes.detectOverlap.execute({ name })
+              if (overlapReport.hasOverlap) {
+                const specList = overlapReport.entries
+                  .map(
+                    (e) =>
+                      `  ${e.specId} — also targeted by: ${e.changes
+                        .filter((c) => c.name !== name)
+                        .map((c) => `${c.name} (${c.state})`)
+                        .join(', ')}`,
+                  )
+                  .join('\n')
+                process.stderr.write(`warning: spec overlap detected:\n${specList}\n`)
+              }
+            } catch {
+              // Overlap detection is best-effort — don't fail create
+            }
+          }
 
           const fmt = parseFormat(opts.format)
           if (fmt === 'text') {

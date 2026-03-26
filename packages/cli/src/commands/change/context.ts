@@ -13,7 +13,9 @@ export function registerChangeContext(parent: Command): void {
   parent
     .command('context <name> <step>')
     .allowExcessArguments(false)
-    .description('Compile the context block for a lifecycle step')
+    .description(
+      'Compile and print the full context block for a change, including relevant specs, rules, and constraints for the current lifecycle step.',
+    )
     .option('--rules', 'include only rules sections in spec content')
     .option('--constraints', 'include only constraints sections in spec content')
     .option('--scenarios', 'include only scenarios sections in spec content')

@@ -28,19 +28,65 @@ description: Proposal → specs → design → tasks workflow
 
 # Top-level metadata extraction — declares how to extract metadata fields
 # (title, description, rules, constraints, scenarios, dependsOn) from artifact
-# content. Used by CompileContext when .specd-metadata.yaml is absent or stale.
+# content. Used by CompileContext when metadata.json is absent or stale.
+# The structure is a keyed object: each key is a metadata category, the value is
+# a single entry (scalar categories) or an array of entries (array categories).
 metadataExtraction:
-  # Extract the Requirements section for AI context.
-  - selector:
-      type: section
-      matches: '^Requirements$'
-    role: rules
-    contextTitle: Spec Requirements
-  # Extract the Constraints section separately with its semantic role.
-  - selector:
-      type: section
-      matches: '^Constraints$'
-    role: constraints
+  title:
+    artifact: specs
+    extractor:
+      selector: { type: section, level: 1 }
+      extract: label
+
+  description:
+    artifact: specs
+    extractor:
+      selector: { type: section, matches: '^Purpose$' }
+      extract: content
+
+  # Array category: each entry produces a named group of rules.
+  rules:
+    - id: spec-requirements
+      artifact: specs
+      extractor:
+        selector:
+          type: section
+          matches: '^Requirement:'
+          parent: { type: section, matches: '^Requirements$' }
+        groupBy: label
+        strip: '^Requirement:\s*'
+        extract: content
+
+  # Array category: extracts constraint strings from the Constraints section.
+  constraints:
+    - id: spec-constraints
+      artifact: specs
+      extractor:
+        selector:
+          type: list-item
+          parent: { type: section, matches: '^Constraints$' }
+        extract: label
+
+  # Array category: extracts structured verification scenarios from verify.md.
+  scenarios:
+    - id: verify-scenarios
+      artifact: verify
+      extractor:
+        selector:
+          type: section
+          matches: '^Scenario:'
+          parent: { type: section, matches: '^Requirement:' }
+        fields:
+          name: { from: label, strip: '^Scenario:\s*' }
+          requirement: { from: parentLabel, strip: '^Requirement:\s*' }
+          when:
+            childSelector: { type: list-item, matches: '^WHEN\b' }
+            capture: '^WHEN\s+(.+)'
+            followSiblings: '^(?:AND|OR)\b'
+          then:
+            childSelector: { type: list-item, matches: '^THEN\b' }
+            capture: '^THEN\s+(.+)'
+            followSiblings: '^(?:AND|OR)\b'
 
 artifacts:
   # ── proposal ──────────────────────────────────────────────────────────────
@@ -81,15 +127,18 @@ artifacts:
       the Requirements section. Include the full ### Requirement: heading in content.
     validations:
       # The spec must have a Purpose section.
-      - type: section
+      - id: has-purpose
+        type: section
         matches: '^Purpose$'
         required: true
       # The spec must have a Requirements section containing at least one requirement.
-      - type: section
+      - id: has-requirements
+        type: section
         matches: '^Requirements$'
         required: true
         children:
-          - type: section
+          - id: has-requirement-block
+            type: section
             matches: '^Requirement:'
             required: true
   # ── verify ─────────────────────────────────────────────────────────────────
@@ -117,21 +166,25 @@ artifacts:
       ### Requirement: heading and at least one #### Scenario: block in content.
     deltaValidations:
       # Every delta that adds or modifies content must include at least one scenario.
-      - type: sequence-item
+      - id: added-has-scenario
+        type: sequence-item
         where:
           op: 'added|modified'
         contentMatches: '#### Scenario:'
-        required: false # warning only — some requirements legitimately have no scenarios
+        required: true
     validations:
-      - type: section
+      - id: has-requirements
+        type: section
         matches: '^Requirements$'
         required: true
         children:
-          - type: section
+          - id: has-requirement-block
+            type: section
             matches: '^Requirement:'
             required: true
             children:
-              - type: section
+              - id: has-scenario
+                type: section
                 matches: '^Scenario:'
                 required: true
 
@@ -172,8 +225,9 @@ artifacts:
     preHashCleanup:
       # Normalise checked boxes before hashing so that checking off a task
       # does not change the artifact's content hash and invalidate its status.
-      - pattern: '^\s*-\s+\[x\]'
-        replacement: '- [ ]'
+      - id: normalize-checkboxes
+        pattern: '^([ \t]*-\s+)\[x\]'
+        replacement: '$1[ ]'
     taskCompletionCheck:
       incompletePattern: '^\s*-\s+\[ \]'
       completePattern: '^\s*-\s+\[x\]'
@@ -184,7 +238,8 @@ workflow:
     requires: []
     hooks:
       pre:
-        - instruction: |
+        - id: designing-guidance
+          instruction: |
             Begin by writing the proposal document. Once approved, write the
             spec.md and verify.md files. Use delta files when modifying existing specs.
 
@@ -193,13 +248,16 @@ workflow:
     requires: [tasks]
     hooks:
       pre:
-        - instruction: |
+        - id: implementing-guidance
+          instruction: |
             Read the tasks in tasks.md. Work through them one by one, marking
             each complete (- [x]) as you go. Pause and ask for guidance if you
             hit a blocker. Do not mark implementing complete while any - [ ] items remain.
       post:
-        - run: 'pnpm test'
-        - instruction: |
+        - id: run-tests
+          run: 'pnpm test'
+        - id: confirm-tests
+          instruction: |
             Confirm all tests pass before marking implementing complete.
 
   # verifying — gated on verify.md being complete
@@ -207,7 +265,8 @@ workflow:
     requires: [verify]
     hooks:
       pre:
-        - instruction: |
+        - id: verifying-guidance
+          instruction: |
             Run through each scenario in verify.md. For each one, confirm the
             implementation satisfies it by checking the code and running tests.
             If a scenario fails, return to implementing.
@@ -217,13 +276,17 @@ workflow:
     requires: [specs, tasks]
     hooks:
       pre:
-        - run: 'pnpm test'
-        - instruction: |
+        - id: pre-archive-tests
+          run: 'pnpm test'
+        - id: pre-archive-review
+          instruction: |
             Review the delta files before confirming the archive. Ensure all
             modified specs accurately reflect the implementation that was built.
       post:
-        - run: 'git checkout -b specd/{{change.name}}'
-        - instruction: |
+        - id: create-branch
+          run: 'git checkout -b specd/{{change.name}}'
+        - id: summarise-archive
+          instruction: |
             Summarise what changed in this archive for the commit message.
 ```
 
@@ -245,3 +308,5 @@ The agent cannot produce `specs` until `proposal` is complete. It cannot produce
 **taskCompletionCheck on tasks** — the `implementing → verifying` transition is blocked while any `- [ ]` item exists in `tasks.md`. The agent cannot advance to verifying until every task is checked off.
 
 **workflow gating** — the `implementing` step requires `tasks`. The agent cannot enter the implementing phase until the task list is produced and complete. The `verifying` step requires `verify`. The `archiving` step requires both `specs` and `tasks` — ensuring the spec record and the task list are both validated before the change is permanently recorded.
+
+**Hook ids** — every hook entry declares an `id`. This is required by the schema format, and it allows `schemaOverrides` in `specd.yaml` to target individual hook entries for append, prepend, or removal without touching the rest of the schema.

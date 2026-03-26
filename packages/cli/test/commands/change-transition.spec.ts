@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { CommanderError } from 'commander'
 import {
   makeMockConfig,
   makeMockKernel,
@@ -23,7 +22,7 @@ import { InvalidStateTransitionError, HookFailedError, InvalidChangeError } from
 function setup(configOverrides: Record<string, unknown> = {}) {
   const config = makeMockConfig(configOverrides)
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, kernel })
+  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -34,13 +33,48 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('Command signature', () => {
   it('Missing arguments', async () => {
-    setup()
+    const { stderr } = setup()
 
     const program = makeProgram()
     registerChangeTransition(program.command('change'))
-    await expect(
-      program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change']),
-    ).rejects.toThrow(CommanderError)
+    await program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change']).catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toMatch(/either <step> or --next is required/)
+  })
+
+  it('rejects combining explicit step with --next', async () => {
+    const { stderr } = setup()
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'designing', '--next'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toMatch(/mutually exclusive/)
+  })
+
+  it('resolves target from --next without positional step', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      artifactStatuses: [],
+    })
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change', '--next'])
+
+    expect(kernel.changes.transition.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'designing' }),
+      expect.any(Function),
+    )
+    expect(stdout()).toContain('transitioned my-change: drafting')
   })
 })
 
@@ -85,6 +119,29 @@ describe('Approval-gate routing', () => {
     const out = stdout()
     expect(out).toContain('transitioned my-change: done')
     expect(out).toContain('pending-signoff')
+  })
+
+  it('resolves ready --next and preserves approval routing', async () => {
+    const { kernel, stdout } = setup({
+      approvals: { spec: true, signoff: false },
+    })
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'ready' }),
+      artifactStatuses: [],
+    })
+    kernel.changes.transition.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change', '--next'])
+
+    expect(kernel.changes.transition.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'implementing', approvalsSpec: true }),
+      expect.any(Function),
+    )
+    expect(stdout()).toContain('pending-spec-approval')
   })
 })
 
@@ -179,6 +236,85 @@ describe('Invalid transition error', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
+  })
+
+  it('surfaces approval-required message for blocked signoff transition', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'pending-signoff' }),
+      artifactStatuses: [],
+    })
+    kernel.changes.transition.execute.mockRejectedValue(
+      new InvalidStateTransitionError('pending-signoff', 'signed-off', {
+        type: 'approval-required',
+        gate: 'signoff',
+      }),
+    )
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'signed-off'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toMatch(/waiting for human signoff/)
+  })
+})
+
+describe('--next failures', () => {
+  it('fails clearly in pending-spec-approval state', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
+      artifactStatuses: [],
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', '--next'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(kernel.changes.transition.execute).not.toHaveBeenCalled()
+    expect(stderr()).toMatch(/waiting for human spec approval/)
+  })
+
+  it('fails clearly in pending-signoff state', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'pending-signoff' }),
+      artifactStatuses: [],
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', '--next'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(kernel.changes.transition.execute).not.toHaveBeenCalled()
+    expect(stderr()).toMatch(/waiting for human signoff/)
+  })
+
+  it('fails clearly in archivable state', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'archivable' }),
+      artifactStatuses: [],
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', '--next'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(kernel.changes.transition.execute).not.toHaveBeenCalled()
+    expect(stderr()).toMatch(/archiving is not a lifecycle transition/)
   })
 })
 

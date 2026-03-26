@@ -33,6 +33,7 @@ function makeArchivingSchema(
       {
         step: 'archiving',
         requires: [],
+        requiresTaskCompletion: [],
         hooks: { pre: [], post: postHooks },
       },
     ],

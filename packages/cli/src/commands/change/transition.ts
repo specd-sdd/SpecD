@@ -24,6 +24,93 @@ const VALID_HOOK_PHASES = new Set<HookPhaseSelector>([
 const VALID_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
 
 /**
+ * Validates the user-facing target selection arguments.
+ *
+ * @param step - The explicit step argument, if provided
+ * @param useNext - Whether `--next` was requested
+ * @param format - The CLI output format for structured errors
+ * @returns Nothing. Throws/terminates the process when the invocation shape is invalid.
+ */
+function validateRequestedTarget(
+  step: string | undefined,
+  useNext: boolean,
+  format?: string,
+): void {
+  if (step !== undefined && useNext) {
+    return cliError('<step> and --next are mutually exclusive', format)
+  }
+
+  if (step === undefined && !useNext) {
+    return cliError('either <step> or --next is required', format)
+  }
+
+  if (step !== undefined && !(VALID_STATES as string[]).includes(step)) {
+    return cliError(`invalid state '${step}'. valid states: ${VALID_STATES.join(', ')}`, format)
+  }
+}
+
+/**
+ * Resolves the effective target requested by the CLI invocation.
+ *
+ * @param fromState - The change's current lifecycle state
+ * @param step - The explicit step argument, if provided
+ * @param useNext - Whether `--next` was requested
+ * @param format - The CLI output format for structured errors
+ * @returns The target state to pass to the transition use case
+ */
+function resolveRequestedTarget(
+  fromState: ChangeState,
+  step: string | undefined,
+  useNext: boolean,
+  format?: string,
+): ChangeState {
+  if (step !== undefined) {
+    return step as ChangeState
+  }
+
+  return resolveNextTarget(fromState, format)
+}
+
+/**
+ * Resolves the next logical lifecycle target for `--next`.
+ *
+ * @param fromState - The change's current lifecycle state
+ * @param format - The CLI output format for structured errors
+ * @returns The next transition target
+ */
+function resolveNextTarget(fromState: ChangeState, format?: string): ChangeState {
+  switch (fromState) {
+    case 'drafting':
+      return 'designing'
+    case 'designing':
+      return 'ready'
+    case 'ready':
+      return 'implementing'
+    case 'spec-approved':
+      return 'implementing'
+    case 'implementing':
+      return 'verifying'
+    case 'verifying':
+      return 'done'
+    case 'done':
+      return 'archivable'
+    case 'signed-off':
+      return 'archivable'
+    case 'pending-spec-approval':
+      return cliError(
+        'cannot advance with --next: change is waiting for human spec approval',
+        format,
+      )
+    case 'pending-signoff':
+      return cliError('cannot advance with --next: change is waiting for human signoff', format)
+    case 'archivable':
+      return cliError('cannot advance with --next: archiving is not a lifecycle transition', format)
+  }
+
+  return cliError(`cannot advance with --next from unsupported state '${fromState}'`, format)
+}
+
+/**
  * Builds an `OnTransitionProgress` callback that renders step-by-step
  * feedback to stderr in text format. Returns a no-op for structured formats.
  *
@@ -86,9 +173,12 @@ function makeProgressRenderer(isText: boolean): {
  */
 export function registerChangeTransition(parent: Command): void {
   parent
-    .command('transition <name> <step>')
+    .command('transition <name> [step]')
     .allowExcessArguments(false)
-    .description('Transition a change to a new lifecycle state')
+    .description(
+      'Transition a change to a new lifecycle state (e.g. designing → ready → implementing → verifying).',
+    )
+    .option('--next', 'transition to the next logical lifecycle step')
     .option(
       '--skip-hooks <phases>',
       'skip hook phases (source.pre,source.post,target.pre,target.post,all)',
@@ -111,16 +201,11 @@ JSON/TOON output schema:
     .action(
       async (
         name: string,
-        step: string,
-        opts: { format: string; config?: string; skipHooks?: string },
+        step: string | undefined,
+        opts: { format: string; config?: string; next?: boolean; skipHooks?: string },
       ) => {
         try {
-          if (!(VALID_STATES as string[]).includes(step)) {
-            cliError(
-              `invalid state '${step}'. valid states: ${VALID_STATES.join(', ')}`,
-              opts.format,
-            )
-          }
+          validateRequestedTarget(step, opts.next ?? false, opts.format)
 
           const skipHookPhases =
             opts.skipHooks !== undefined
@@ -132,13 +217,19 @@ JSON/TOON output schema:
 
           const { change: statusBefore } = await kernel.changes.status.execute({ name })
           const fromState = statusBefore.state
+          const requestedTarget = resolveRequestedTarget(
+            fromState,
+            step,
+            opts.next ?? false,
+            opts.format,
+          )
 
           const { onProgress } = makeProgressRenderer(fmt === 'text')
 
           const result = await kernel.changes.transition.execute(
             {
               name,
-              to: step as ChangeState,
+              to: requestedTarget,
               approvalsSpec: config.approvals.spec,
               approvalsSignoff: config.approvals.signoff,
               skipHookPhases,

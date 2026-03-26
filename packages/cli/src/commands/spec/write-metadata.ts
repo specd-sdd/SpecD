@@ -15,7 +15,9 @@ export function registerSpecWriteMetadata(parent: Command): void {
   parent
     .command('write-metadata <specPath>')
     .allowExcessArguments(false)
-    .description('Write metadata for a spec')
+    .description(
+      'Write precomputed metadata to disk for a spec, updating its stored fields and content hashes.',
+    )
     .option('--input <file>', 'read JSON content from a file instead of stdin')
     .option('--force', 'skip conflict detection and overwrite unconditionally')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

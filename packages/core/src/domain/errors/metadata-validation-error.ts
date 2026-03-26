@@ -1,7 +1,7 @@
 import { SpecdError } from './specd-error.js'
 
 /**
- * Thrown when `.specd-metadata.yaml` content fails structural validation
+ * Thrown when `metadata.json` content fails structural validation
  * during a write operation ({@link SaveSpecMetadata}).
  *
  * Read-path parsing ({@link parseMetadata}) remains lenient and never throws.

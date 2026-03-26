@@ -37,51 +37,98 @@
 - **WHEN** `execute` is called with `to: 'archivable'` and `approvalsSignoff: false`
 - **THEN** the change transitions to `archivable`
 
-### Requirement: Task completion check on implementing to verifying
+### Requirement: Human-approval pending states produce explicit transition failures
 
-#### Scenario: Transition blocked by incomplete tasks
+#### Scenario: Pending spec approval blocks normal forward transition
 
-- **GIVEN** a change in `implementing` state with an artifact file containing an unchecked checkbox line
-- **WHEN** `execute` is called with `to: 'verifying'` and a matching `implementingTaskChecks` entry
+- **GIVEN** a change in `pending-spec-approval` state
+- **WHEN** `execute` is called with `to: 'spec-approved'`
 - **THEN** it throws `InvalidStateTransitionError`
+- **AND** the error reason equals `{ type: 'approval-required', gate: 'spec' }`
 
-#### Scenario: Transition allowed when all tasks are complete
+#### Scenario: Pending signoff blocks normal forward transition
 
-- **GIVEN** a change in `implementing` state with an artifact file containing only checked checkboxes
-- **WHEN** `execute` is called with `to: 'verifying'` and `implementingTaskChecks` entries
+- **GIVEN** a change in `pending-signoff` state
+- **WHEN** `execute` is called with `to: 'signed-off'`
+- **THEN** it throws `InvalidStateTransitionError`
+- **AND** the error reason equals `{ type: 'approval-required', gate: 'signoff' }`
+
+#### Scenario: Pending approval still allows redesign
+
+- **GIVEN** a change in `pending-spec-approval` state
+- **WHEN** `execute` is called with `to: 'designing'`
+- **THEN** the change transitions to `designing`
+
+### Requirement: Task completion check during requires enforcement
+
+#### Scenario: Transition blocked by requiresTaskCompletion artifact with incomplete items
+
+- **GIVEN** a change in `implementing` state
+- **AND** the `verifying` step declares `requiresTaskCompletion: [tasks]`
+- **AND** the `tasks` artifact file contains `- [ ] unfinished task`
+- **WHEN** `execute` is called with `to: 'verifying'`
+- **THEN** it throws `InvalidStateTransitionError` with reason `incomplete-tasks`
+
+#### Scenario: Transition allowed when all tasks complete
+
+- **GIVEN** a change in `implementing` state
+- **AND** the `verifying` step declares `requiresTaskCompletion: [tasks]`
+- **AND** the tasks file contains only `- [x] done task`
+- **WHEN** `execute` is called with `to: 'verifying'`
 - **THEN** the change transitions to `verifying`
+
+#### Scenario: No gating when requiresTaskCompletion absent
+
+- **GIVEN** a change in `implementing` state
+- **AND** the `verifying` step has `requires: [tasks]` but no `requiresTaskCompletion`
+- **AND** the tasks file contains incomplete items
+- **WHEN** `execute` is called with `to: 'verifying'`
+- **THEN** the change transitions to `verifying` — no content check
 
 #### Scenario: Missing artifact file is skipped
 
-- **GIVEN** a change in `implementing` state
-- **WHEN** `execute` is called with `to: 'verifying'` and a task check referencing a non-existent artifact file
+- **GIVEN** a step with `requiresTaskCompletion: [tasks]`
+- **AND** the tasks file does not exist
+- **WHEN** `execute` is called
 - **THEN** the check is skipped and the transition proceeds
 
-#### Scenario: Invalid regex pattern is treated as non-matching
+#### Scenario: Error carries incomplete and complete counts
 
-- **GIVEN** a change in `implementing` state
-- **WHEN** `execute` is called with a task check whose `incompletePattern` is an invalid regex
-- **THEN** the check is skipped and the transition proceeds
+- **GIVEN** a step with `requiresTaskCompletion: [tasks]`
+- **AND** the tasks file has 5 complete items and 3 incomplete items
+- **WHEN** `execute` is called
+- **THEN** the error reason includes `artifactId: 'tasks'`, `incomplete: 3`, `complete: 5`, `total: 8`
 
-#### Scenario: No task checks provided defaults to empty
+#### Scenario: task-completion-failed progress event emitted before throwing
 
-- **GIVEN** a change in `implementing` state
-- **WHEN** `execute` is called with `to: 'verifying'` and no `implementingTaskChecks`
-- **THEN** the transition proceeds without any task checks
+- **GIVEN** a step with `requiresTaskCompletion: [tasks]` and incomplete items
+- **WHEN** `execute` is called with an `onProgress` callback
+- **THEN** a `task-completion-failed` event is emitted with counts before the error is thrown
+
+### Requirement: Workflow requires enforcement
+
+#### Scenario: Unsatisfied requirement throws with structured reason
+
+- **GIVEN** a workflow step with `requires: [specs, tasks]`
+- **AND** `specs` has effective status `in-progress`
+- **WHEN** `execute` is called
+- **THEN** `InvalidStateTransitionError` is thrown with reason `incomplete-artifact` and blocking artifact `specs`
 
 ### Requirement: Artifact validation clearing on verifying to implementing
 
-#### Scenario: Artifact validations are cleared on verifying to implementing
+#### Scenario: Artifact validations are cleared using schema requires
 
 - **GIVEN** a change in `verifying` state with validated artifacts
-- **WHEN** `execute` is called with `to: 'implementing'` and `implementingRequires: ['spec', 'tasks']`
-- **THEN** `change.clearArtifactValidations` is called with `['spec', 'tasks']` before the transition
+- **AND** the schema's `implementing` step declares `requires: ['specs', 'tasks']`
+- **WHEN** `execute` is called with `to: 'implementing'`
+- **THEN** `change.clearArtifactValidations` is called with `['specs', 'tasks']` from the schema
 
-#### Scenario: No implementingRequires defaults to empty
+#### Scenario: No implementing step in schema defaults to no clearing
 
 - **GIVEN** a change in `verifying` state
-- **WHEN** `execute` is called with `to: 'implementing'` and no `implementingRequires`
-- **THEN** `change.clearArtifactValidations` is called with an empty array
+- **AND** the schema does not declare an `implementing` workflow step
+- **WHEN** `execute` is called with `to: 'implementing'`
+- **THEN** `change.clearArtifactValidations` is not called
 
 ### Requirement: Transition to designing from any state
 

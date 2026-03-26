@@ -17,7 +17,9 @@ export function registerSkillsInstall(parent: Command): void {
   parent
     .command('install <name>')
     .allowExcessArguments(false)
-    .description('Install a skill (or "all") for an agent')
+    .description(
+      'Install one or all specd agent skills into the configured location for the target AI agent (e.g. Claude, Copilot, Codex).',
+    )
     .option('--agent <id>', 'agent to install for (e.g. claude)', 'claude')
     .option('--global', 'install globally to the user-level commands directory')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

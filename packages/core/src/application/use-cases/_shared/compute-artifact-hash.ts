@@ -7,7 +7,7 @@ import { applyPreHashCleanup } from '../../../domain/services/pre-hash-cleanup.j
  *
  * Returns a hash string in the format produced by the supplied `hashContent`
  * function (e.g. `sha256:<hex>`), consistent with the format used in
- * `.specd-metadata.yaml` content hashes.
+ * `metadata.json` content hashes.
  *
  * @param content - The raw artifact content
  * @param hashContent - Function that computes a content hash string

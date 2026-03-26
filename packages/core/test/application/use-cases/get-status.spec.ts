@@ -43,18 +43,25 @@ function makeStdSchema() {
       makeArtifactType('tasks', { requires: ['specs', 'design'] }),
     ],
     workflow: [
-      { step: 'designing', requires: [], hooks: { pre: [], post: [] } },
+      { step: 'designing', requires: [], requiresTaskCompletion: [], hooks: { pre: [], post: [] } },
       {
         step: 'ready',
         requires: ['proposal', 'specs', 'verify', 'design', 'tasks'],
+        requiresTaskCompletion: [],
         hooks: { pre: [], post: [] },
       },
       {
         step: 'implementing',
         requires: ['proposal', 'specs', 'verify', 'design', 'tasks'],
+        requiresTaskCompletion: [],
         hooks: { pre: [], post: [] },
       },
-      { step: 'verifying', requires: ['verify'], hooks: { pre: [], post: [] } },
+      {
+        step: 'verifying',
+        requires: ['verify'],
+        requiresTaskCompletion: [],
+        hooks: { pre: [], post: [] },
+      },
     ],
   })
 }
@@ -307,6 +314,7 @@ describe('GetStatus', () => {
             {
               step: 'ready',
               requires: ['proposal'],
+              requiresTaskCompletion: [],
               hooks: { pre: [], post: [] },
             },
           ],

@@ -12,7 +12,9 @@ export function registerChangeSkipArtifact(parent: Command): void {
   parent
     .command('skip-artifact <name> <artifactId>')
     .allowExcessArguments(false)
-    .description('Explicitly skip an optional artifact')
+    .description(
+      'Mark an optional artifact as skipped for a change, so it is not required to satisfy the current lifecycle step.',
+    )
     .option('--reason <text>', 'reason for skipping')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

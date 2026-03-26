@@ -15,7 +15,7 @@
     {
       "requirement": "Input contract",
       "rules": [
-        "`TransitionChange.execute` SHALL accept a `TransitionChangeInput` with the following fields:\n\n- `name` (string, required) — the change to transition\n- `to` (ChangeState, required) — the requested target state\n- `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled\n- `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled\n- `implementingRequires` (readonly string\\[], optional) — artifact IDs whose validation is cleared on `verifying` to `implementing`\n- `implementingTaskChecks` (ReadonlyArray\\<TaskCompletionCheck>, optional) — task completion checks for `implementing` to `verifying`\n- `skipHookPhases` (ReadonlySet\\<HookPhaseSelector>, optional, default empty set) — which hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. When `'all'` is in the set, all hook phases are skipped. When the set is empty (default), all applicable hooks execute.\n\nThe previous `skipHooks: boolean` field is removed. Callers that passed `skipHooks: true` should pass `skipHookPhases: new Set(['all'])` instead."
+        "`TransitionChange.execute` SHALL accept a `TransitionChangeInput` with the following fields:\n\n- `name` (string, required) — the change to transition\n- `to` (ChangeState, required) — the requested target state\n- `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled\n- `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled\n- `skipHookPhases` (ReadonlySet\\<HookPhaseSelector>, optional, default empty set) — which hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. When `'all'` is in the set, all hook phases are skipped. When the set is empty (default), all applicable hooks execute.\n\nThe `implementingTaskChecks` and `implementingRequires` fields are removed. Task completion checks are now derived automatically from the schema during requires enforcement (see Requirement: Task completion check during requires enforcement). Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema directly."
       ]
     },
     {
@@ -37,6 +37,12 @@
       ]
     },
     {
+      "requirement": "Human-approval pending states produce explicit transition failures",
+      "rules": [
+        "When the current change state represents a human approval boundary, `TransitionChange` MUST fail with an `InvalidStateTransitionError` that carries a structured reason explaining why normal lifecycle progression cannot continue through `change transition`.\n\nSpecifically:\n\n- When the change is in `pending-spec-approval` and the requested target is anything other than `designing`, the use case MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'spec' }`\n- When the change is in `pending-signoff` and the requested target is anything other than `designing`, the use case MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'signoff' }`\n\nThis explicit failure happens before delegating to `change.transition(...)`. The goal is to preserve the existing lifecycle rules while giving callers enough information to explain why the transition cannot proceed automatically."
+      ]
+    },
+    {
       "requirement": "Direct transition when gates are inactive",
       "rules": [
         "When neither approval-gate routing condition is met, the use case MUST transition to the exact target state requested in the input."
@@ -45,19 +51,19 @@
     {
       "requirement": "Workflow requires enforcement",
       "rules": [
-        "After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError`.\n\nIf no workflow step exists for the effective target (the schema does not declare one), or the schema cannot be resolved, the requires check is skipped.\n\nThe use case MUST emit a `requires-check` progress event per artifact checked, reporting whether the requirement was satisfied."
+        "After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check `change.effectiveStatus(artifactId)` for each required artifact ID. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError` with reason `incomplete-artifact` and the blocking artifact ID.\n\nIf no workflow step exists for the effective target (the schema does not declare one), or the schema cannot be resolved, the requires check is skipped.\n\nThe use case MUST emit a `requires-check` progress event per artifact checked, reporting whether the requirement was satisfied."
       ]
     },
     {
-      "requirement": "Task completion check on implementing to verifying",
+      "requirement": "Task completion check during requires enforcement",
       "rules": [
-        "When the current state is `implementing` and the effective target is `verifying`, the use case MUST check each entry in `implementingTaskChecks` before allowing the transition:\n\n1. Load the artifact file content via `ChangeRepository.artifact(change, check.filename)`\n2. If the artifact does not exist (returns `null`), skip it\n3. Compile the `incompletePattern` using `safeRegex` with the `'m'` flag\n4. If the regex is valid and matches any line in the artifact content, throw `InvalidStateTransitionError`"
+        "After workflow requires enforcement passes, if the target workflow step declares a non-empty `requiresTaskCompletion` array, the use case MUST check each listed artifact for incomplete task items:\n\n1. Look up the `ArtifactType` from the schema to obtain `taskCompletionCheck.incompletePattern`.\n2. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.\n3. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.\n4. If the file does not exist (returns `null`), skip it.\n5. Compile `incompletePattern` using `safeRegex` with the `'m'` flag.\n6. If the regex is valid and matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID, incomplete count (lines matching `incompletePattern`), and complete count (lines matching `completePattern` if declared).\n\nOnly artifacts listed in `requiresTaskCompletion` are content-checked. Other artifacts in `requires` are checked only via `effectiveStatus`. When `requiresTaskCompletion` is absent or empty, no task completion gating applies."
       ]
     },
     {
       "requirement": "Artifact validation clearing on verifying to implementing",
       "rules": [
-        "When the current state is `verifying` and the effective target is `implementing`, the use case MUST call `change.clearArtifactValidations` with the `implementingRequires` list (defaulting to an empty array) before performing the transition. This resets validation state for the specified artifacts."
+        "When the current state is `verifying` and the effective target is `implementing`, the use case MUST look up the `implementing` workflow step from the schema and call `change.clearArtifactValidations` with its `requires` list before performing the transition. This resets validation state for the specified artifacts.\n\nIf no `implementing` workflow step exists in the schema, the clearing is skipped."
       ]
     },
     {
@@ -105,7 +111,7 @@
     {
       "requirement": "Progress callback",
       "rules": [
-        "`TransitionChange.execute` SHALL accept an optional second parameter `onProgress?: OnTransitionProgress`. Progress events are:\n\n- `{ type: 'requires-check', artifactId: string, satisfied: boolean }` — emitted per artifact during requires enforcement\n- `{ type: 'hook-start', phase: 'pre' | 'post', hookId: string, command: string }` — emitted before each hook\n- `{ type: 'hook-done', phase: 'pre' | 'post', hookId: string, success: boolean, exitCode: number }` — emitted after each hook\n- `{ type: 'transitioned', from: ChangeState, to: ChangeState }` — emitted after state change"
+        "`TransitionChange.execute` SHALL accept an optional second parameter `onProgress?: OnTransitionProgress`. Progress events are:\n\n- `{ type: 'requires-check', artifactId: string, satisfied: boolean }` — emitted per artifact during requires enforcement\n- `{ type: 'task-completion-failed', artifactId: string, incomplete: number, complete: number, total: number }` — emitted when task completion check fails, before throwing\n- `{ type: 'hook-start', phase: 'pre' | 'post', hookId: string, command: string }` — emitted before each hook\n- `{ type: 'hook-done', phase: 'pre' | 'post', hookId: string, success: boolean, exitCode: number }` — emitted after each hook\n- `{ type: 'transitioned', from: ChangeState, to: ChangeState }` — emitted after state change"
       ]
     },
     {
@@ -117,12 +123,14 @@
   ],
   "constraints": [
     "The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates",
+    "Task completion checks are controlled by requiresTaskCompletion on the workflow step — only listed artifacts are content-checked",
     "Task completion checks use safeRegex to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)",
-    "The implementingTaskChecks and implementingRequires inputs default to empty arrays when not provided",
+    "InvalidStateTransitionError carries a structured reason field: 'incomplete-artifact', 'incomplete-tasks', 'invalid-transition', or 'approval-required'",
     "Approval-gate routing is purely input-driven — the use case does not read configuration directly",
     "Pre-hook failure aborts the transition — no state change occurs",
-    "Post-hook failures are collected in the result — no rollback",
-    "When schema resolution fails or no workflow step exists for the target, requires and hooks are skipped gracefully"
+    "Post-hook failure aborts the transition — no state change occurs (both phases are fail-fast)",
+    "When schema resolution fails or no workflow step exists for the target, requires and hooks are skipped gracefully",
+    "Artifact validation clearing on verifying → implementing reads the implementing step's requires from the schema — the caller does not supply them"
   ],
   "scenarios": [
     {
@@ -162,65 +170,122 @@
       "then": ["the change transitions to archivable"]
     },
     {
-      "requirement": "Task completion check on implementing to verifying",
-      "name": "Transition blocked by incomplete tasks",
-      "given": [
-        "a change in implementing state with an artifact file containing an unchecked checkbox line"
-      ],
-      "when": [
-        "execute is called with to: 'verifying' and a matching implementingTaskChecks entry"
-      ],
-      "then": ["it throws InvalidStateTransitionError"]
+      "requirement": "Human-approval pending states produce explicit transition failures",
+      "name": "Pending spec approval blocks normal forward transition",
+      "given": ["a change in pending-spec-approval state"],
+      "when": ["execute is called with to: 'spec-approved'"],
+      "then": [
+        "it throws InvalidStateTransitionError",
+        "AND the error reason equals { type: 'approval-required', gate: 'spec' }"
+      ]
     },
     {
-      "requirement": "Task completion check on implementing to verifying",
-      "name": "Transition allowed when all tasks are complete",
+      "requirement": "Human-approval pending states produce explicit transition failures",
+      "name": "Pending signoff blocks normal forward transition",
+      "given": ["a change in pending-signoff state"],
+      "when": ["execute is called with to: 'signed-off'"],
+      "then": [
+        "it throws InvalidStateTransitionError",
+        "AND the error reason equals { type: 'approval-required', gate: 'signoff' }"
+      ]
+    },
+    {
+      "requirement": "Human-approval pending states produce explicit transition failures",
+      "name": "Pending approval still allows redesign",
+      "given": ["a change in pending-spec-approval state"],
+      "when": ["execute is called with to: 'designing'"],
+      "then": ["the change transitions to designing"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "Transition blocked by requiresTaskCompletion artifact with incomplete items",
       "given": [
-        "a change in implementing state with an artifact file containing only checked checkboxes"
+        "a change in implementing state",
+        "AND the verifying step declares requiresTaskCompletion: [tasks]",
+        "AND the tasks artifact file contains - [ ] unfinished task"
       ],
-      "when": ["execute is called with to: 'verifying' and implementingTaskChecks entries"],
+      "when": ["execute is called with to: 'verifying'"],
+      "then": ["it throws InvalidStateTransitionError with reason incomplete-tasks"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "Transition allowed when all tasks complete",
+      "given": [
+        "a change in implementing state",
+        "AND the verifying step declares requiresTaskCompletion: [tasks]",
+        "AND the tasks file contains only - [x] done task"
+      ],
+      "when": ["execute is called with to: 'verifying'"],
       "then": ["the change transitions to verifying"]
     },
     {
-      "requirement": "Task completion check on implementing to verifying",
+      "requirement": "Task completion check during requires enforcement",
+      "name": "No gating when requiresTaskCompletion absent",
+      "given": [
+        "a change in implementing state",
+        "AND the verifying step has requires: [tasks] but no requiresTaskCompletion",
+        "AND the tasks file contains incomplete items"
+      ],
+      "when": ["execute is called with to: 'verifying'"],
+      "then": ["the change transitions to verifying — no content check"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
       "name": "Missing artifact file is skipped",
-      "given": ["a change in implementing state"],
-      "when": [
-        "execute is called with to: 'verifying' and a task check referencing a non-existent artifact file"
-      ],
+      "given": ["a step with requiresTaskCompletion: [tasks]", "AND the tasks file does not exist"],
+      "when": ["execute is called"],
       "then": ["the check is skipped and the transition proceeds"]
     },
     {
-      "requirement": "Task completion check on implementing to verifying",
-      "name": "Invalid regex pattern is treated as non-matching",
-      "given": ["a change in implementing state"],
-      "when": ["execute is called with a task check whose incompletePattern is an invalid regex"],
-      "then": ["the check is skipped and the transition proceeds"]
-    },
-    {
-      "requirement": "Task completion check on implementing to verifying",
-      "name": "No task checks provided defaults to empty",
-      "given": ["a change in implementing state"],
-      "when": ["execute is called with to: 'verifying' and no implementingTaskChecks"],
-      "then": ["the transition proceeds without any task checks"]
-    },
-    {
-      "requirement": "Artifact validation clearing on verifying to implementing",
-      "name": "Artifact validations are cleared on verifying to implementing",
-      "given": ["a change in verifying state with validated artifacts"],
-      "when": [
-        "execute is called with to: 'implementing' and implementingRequires: ['spec', 'tasks']"
+      "requirement": "Task completion check during requires enforcement",
+      "name": "Error carries incomplete and complete counts",
+      "given": [
+        "a step with requiresTaskCompletion: [tasks]",
+        "AND the tasks file has 5 complete items and 3 incomplete items"
       ],
+      "when": ["execute is called"],
       "then": [
-        "change.clearArtifactValidations is called with ['spec', 'tasks'] before the transition"
+        "the error reason includes artifactId: 'tasks', incomplete: 3, complete: 5, total: 8"
+      ]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "task-completion-failed progress event emitted before throwing",
+      "given": ["a step with requiresTaskCompletion: [tasks] and incomplete items"],
+      "when": ["execute is called with an onProgress callback"],
+      "then": ["a task-completion-failed event is emitted with counts before the error is thrown"]
+    },
+    {
+      "requirement": "Workflow requires enforcement",
+      "name": "Unsatisfied requirement throws with structured reason",
+      "given": [
+        "a workflow step with requires: [specs, tasks]",
+        "AND specs has effective status in-progress"
+      ],
+      "when": ["execute is called"],
+      "then": [
+        "InvalidStateTransitionError is thrown with reason incomplete-artifact and blocking artifact specs"
       ]
     },
     {
       "requirement": "Artifact validation clearing on verifying to implementing",
-      "name": "No implementingRequires defaults to empty",
-      "given": ["a change in verifying state"],
-      "when": ["execute is called with to: 'implementing' and no implementingRequires"],
-      "then": ["change.clearArtifactValidations is called with an empty array"]
+      "name": "Artifact validations are cleared using schema requires",
+      "given": [
+        "a change in verifying state with validated artifacts",
+        "AND the schema's implementing step declares requires: ['specs', 'tasks']"
+      ],
+      "when": ["execute is called with to: 'implementing'"],
+      "then": ["change.clearArtifactValidations is called with ['specs', 'tasks'] from the schema"]
+    },
+    {
+      "requirement": "Artifact validation clearing on verifying to implementing",
+      "name": "No implementing step in schema defaults to no clearing",
+      "given": [
+        "a change in verifying state",
+        "AND the schema does not declare an implementing workflow step"
+      ],
+      "when": ["execute is called with to: 'implementing'"],
+      "then": ["change.clearArtifactValidations is not called"]
     },
     {
       "requirement": "Transition to designing from any state",
@@ -368,8 +433,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:f1e2b19083bf6502e2000b90432edb80b11c75e65d879bac59f9ce8195fb362a",
-    "verify.md": "sha256:620702061fb51bbc37eed642b383bffdd1c9b44790b4a7ce1d1ff237284eb4db"
+    "spec.md": "sha256:812ca53ef2d069e4538505380a016e334da039c0e6be3b65aa69e814a0a5e745",
+    "verify.md": "sha256:5eba8b94e28dbb3ae47e0199594bcbbbd8bf310f0e41a1f7d3e294d11bacb00f"
   },
   "generatedBy": "core"
 }

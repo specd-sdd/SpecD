@@ -12,7 +12,7 @@ export function registerArchiveShow(parent: Command): void {
   parent
     .command('show <name>')
     .allowExcessArguments(false)
-    .description('Show details of an archived change')
+    .description('Display the full details of an archived change, including its specs and schema.')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(

@@ -20,7 +20,7 @@ export interface MetadataFreshnessResult {
 /**
  * Checks whether recorded content hashes match the current file contents.
  *
- * @param contentHashes - Recorded hashes from `.specd-metadata.yaml` (`contentHashes` field).
+ * @param contentHashes - Recorded hashes from `metadata.json` (`contentHashes` field).
  *   When `undefined` or empty, the result is `{ allFresh: false, entries: [] }`.
  * @param resolveContent - Async function that returns the current content of a file by filename,
  *   or `null` if the file does not exist.

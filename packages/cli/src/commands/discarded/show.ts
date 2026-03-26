@@ -12,7 +12,9 @@ export function registerDiscardedShow(parent: Command): void {
   parent
     .command('show <name>')
     .allowExcessArguments(false)
-    .description('Show details of a discarded change')
+    .description(
+      'Display the full details of a discarded change, including the reason it was discarded and its last known state.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(

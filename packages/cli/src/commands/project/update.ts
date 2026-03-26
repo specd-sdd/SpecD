@@ -16,7 +16,9 @@ export function registerProjectUpdate(parent: Command): void {
   parent
     .command('update')
     .allowExcessArguments(false)
-    .description('Update the project after upgrading specd')
+    .description(
+      'Update the specd project configuration and generated files to match the currently installed version of specd.',
+    )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(

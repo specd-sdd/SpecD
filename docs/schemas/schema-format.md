@@ -82,6 +82,7 @@ Each entry in `artifacts` defines one type of file that participates in a change
 | `deltaInstruction`    | string                                        | no       | —                   | Domain-specific guidance injected alongside the format-level delta instructions. Only valid with `delta: true`. |
 | `deltaValidations`    | array                                         | no       | —                   | Structural validation rules checked against the delta file AST. Only valid with `delta: true`.                  |
 | `validations`         | array                                         | no       | —                   | Structural validation rules checked against the artifact content.                                               |
+| `rules`               | object                                        | no       | —                   | Pre- and post-instruction rules injected around this artifact's `instruction`. See [`rules`](#rules).           |
 | `preHashCleanup`      | array                                         | no       | —                   | Regex substitutions applied before computing the artifact's content hash.                                       |
 | `taskCompletionCheck` | object                                        | no       | markdown checkboxes | How to detect incomplete task items in this artifact's content.                                                 |
 
@@ -172,7 +173,23 @@ When `delta: true`, a delta file may be present at `deltas/<workspace>/<spec-pat
       required: true
 ```
 
-For the full delta file format, see [examples/delta-files.md](examples/delta-files.md).
+A delta file is a YAML sequence of operation entries. Each entry has an `op` field. The supported operations are:
+
+| `op`       | Description                                                                                                                                |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `added`    | Inserts a new node at a specified position in the target artifact.                                                                         |
+| `modified` | Updates an existing node identified by `selector`. The node is replaced with `content` or `value`.                                         |
+| `removed`  | Deletes the node identified by `selector` from the target artifact.                                                                        |
+| `no-op`    | Records that no change is needed for this artifact in this delta. The entry is ignored during application but documents intent explicitly. |
+
+The `no-op` operation is useful when a spec is listed in the proposal but its artifact requires no modifications in this change. Rather than omitting the delta file (which is ambiguous), write a `no-op` entry with a `description` explaining why no change is needed:
+
+```yaml
+- op: no-op
+  description: 'No changes to this spec — only the verify.md scenarios are updated.'
+```
+
+For the full delta file format with all options, position hints, rename, and merge strategies, see [examples/delta-files.md](examples/delta-files.md).
 
 ### validations
 
@@ -193,28 +210,117 @@ validations:
 
 ### metadataExtraction
 
-`metadataExtraction` is a **top-level schema field** that declares how to extract metadata fields (title, description, rules, constraints, scenarios, dependsOn, etc.) from artifact content using extractors. This is the fallback mechanism used by `CompileContext` when `.specd-metadata.yaml` is absent or stale — SpecD extracts content directly from the artifact files using these declarations.
+`metadataExtraction` is a **top-level schema field** that declares how to extract metadata fields from artifact content. This is the fallback mechanism used by `CompileContext` when `metadata.json` is absent or stale — SpecD extracts content directly from the artifact files using these declarations.
 
-Each entry has four fields:
+The structure is a **keyed object**, not a flat array. Each key is a metadata category; the value is either a single extractor entry (for scalar categories) or an array of entries (for array categories).
 
-| Field          | Type                                                 | Required | Default    | Description                                                                                |
-| -------------- | ---------------------------------------------------- | -------- | ---------- | ------------------------------------------------------------------------------------------ |
-| `selector`     | selector                                             | yes      | —          | Identifies which node(s) to extract. See [Selector model](#selector-model).                |
-| `role`         | `rules` \| `constraints` \| `scenarios` \| `context` | no       | `context`  | Semantic category. `CompileContext` uses this to label and group the injected block.       |
-| `extract`      | `content` \| `label` \| `both`                       | no       | `content`  | What to inject: full subtree content, the node's label only, or label followed by content. |
-| `contextTitle` | string                                               | no       | node label | Title used for this section in the compiled context block.                                 |
+**Scalar categories** (single entry each):
+
+| Category      | Description                                                    |
+| ------------- | -------------------------------------------------------------- |
+| `title`       | The spec title, typically extracted from the first H1 heading. |
+| `description` | A prose description, typically the Overview/Purpose section.   |
+| `dependsOn`   | Dependency spec paths extracted from link references.          |
+| `keywords`    | Keyword terms.                                                 |
+
+**Array categories** (one or more entries each):
+
+| Category      | Description                                                     |
+| ------------- | --------------------------------------------------------------- |
+| `rules`       | Structured rule groups extracted from the spec.                 |
+| `constraints` | Constraint strings extracted from the spec.                     |
+| `scenarios`   | Structured scenario objects extracted from the verify artifact. |
+| `context`     | Always-included context content.                                |
+
+**Extractor entry fields:**
+
+| Field       | Required | Description                                                                                                   |
+| ----------- | -------- | ------------------------------------------------------------------------------------------------------------- |
+| `id`        | no       | Unique identifier for this entry within its category. Used by `schemaOverrides` to target individual entries. |
+| `artifact`  | yes      | The artifact type ID this extractor targets (e.g. `'specs'`, `'verify'`).                                     |
+| `extractor` | yes      | The extraction configuration — see Extractor fields below.                                                    |
+
+**Extractor fields** (under the `extractor` key of each entry):
+
+| Field       | Description                                                                                                                                                      |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `selector`  | Selector identifying the AST node(s) to extract from. See [Selector model](#selector-model).                                                                     |
+| `extract`   | What to extract: `'content'` (full subtree text), `'label'` (node heading/key only), or `'both'`. Defaults to `'content'`.                                       |
+| `capture`   | Regex with a capture group applied to the extracted text. Only the captured portion is retained.                                                                 |
+| `strip`     | Regex removed from labels or values before output.                                                                                                               |
+| `groupBy`   | Group matched nodes by their label (after `strip`). Only `'label'` is supported.                                                                                 |
+| `transform` | Named post-processing callback (e.g. `'resolveSpecPath'`).                                                                                                       |
+| `fields`    | Structured field mapping. When present, each matched node produces one object with the declared fields. Used for complex structured extraction (e.g. scenarios). |
 
 ```yaml
 metadataExtraction:
-  - selector:
-      type: section
-      matches: '^Requirements$'
-    role: rules
-    contextTitle: Spec Requirements
-  - selector:
-      type: section
-      matches: '^Constraints$'
-    role: constraints
+  title:
+    artifact: specs
+    extractor:
+      selector: { type: section, level: 1 }
+      extract: label
+
+  description:
+    artifact: specs
+    extractor:
+      selector: { type: section, matches: '^Purpose$' }
+      extract: content
+
+  dependsOn:
+    artifact: specs
+    extractor:
+      selector: { type: section, matches: '^Spec Dependencies$' }
+      extract: content
+      capture: '\[.*?\]\(([^)]+)\)'
+      transform: resolveSpecPath
+
+  rules:
+    - id: spec-requirements
+      artifact: specs
+      extractor:
+        selector:
+          type: section
+          matches: '^Requirement:'
+          parent: { type: section, matches: '^Requirements$' }
+        groupBy: label
+        strip: '^Requirement:\s*'
+        extract: content
+
+  constraints:
+    - id: spec-constraints
+      artifact: specs
+      extractor:
+        selector:
+          type: list-item
+          parent: { type: section, matches: '^Constraints$' }
+        extract: label
+
+  scenarios:
+    - id: verify-scenarios
+      artifact: verify
+      extractor:
+        selector:
+          type: section
+          matches: '^Scenario:'
+          parent: { type: section, matches: '^Requirement:' }
+        fields:
+          name: { from: label, strip: '^Scenario:\s*' }
+          requirement: { from: parentLabel, strip: '^Requirement:\s*' }
+          when:
+            childSelector: { type: list-item, matches: '^WHEN\b' }
+            capture: '^WHEN\s+(.+)'
+            followSiblings: '^(?:AND|OR)\b'
+          then:
+            childSelector: { type: list-item, matches: '^THEN\b' }
+            capture: '^THEN\s+(.+)'
+            followSiblings: '^(?:AND|OR)\b'
+
+  context:
+    - id: spec-overview
+      artifact: specs
+      extractor:
+        selector: { type: section, matches: '^Purpose$' }
+        extract: content
 ```
 
 ### preHashCleanup
@@ -246,6 +352,29 @@ taskCompletionCheck:
   completePattern: '^\s*-\s+\[x\]'
 ```
 
+### rules
+
+`rules` declares pre- and post-instruction text blocks injected around the artifact's `instruction` field. `pre` rules are injected before the instruction; `post` rules are injected after. Each rule entry requires both `id` and `instruction`.
+
+```yaml
+- id: tasks
+  scope: change
+  output: tasks.md
+  instruction: |
+    Create the implementation checklist.
+  rules:
+    pre:
+      - id: read-design-first
+        instruction: 'Read design.md in full before creating any tasks.'
+    post:
+      - id: verify-coverage
+        instruction: |
+          Every requirement in spec.md must map to at least one task.
+          If any requirement is missing a task, add it before proceeding.
+```
+
+`schemaOverrides` can add or remove individual rule entries by `id` using `append`, `prepend`, and `remove` operations, without touching the base schema's artifact definition.
+
 ## Selector model
 
 A selector identifies one or more nodes in an artifact's AST. Selectors appear in `validations`, `deltaValidations`, `metadataExtraction`, and inside delta file entries.
@@ -260,6 +389,7 @@ A selector identifies one or more nodes in an artifact's AST. Selectors appear i
 | `parent`   | selector | Constrains search to nodes whose nearest ancestor matches this selector. Used to disambiguate nodes with the same label at different nesting levels.                                                   |
 | `index`    | integer  | For `array-item` and `sequence-item` nodes: targets the item at this zero-based index. Mutually exclusive with `where`.                                                                                |
 | `where`    | object   | For `array-item` and `sequence-item` nodes that are objects: targets the item whose fields match all key–value pairs. Values are matched as case-insensitive regexes. Mutually exclusive with `index`. |
+| `level`    | integer  | For markdown `section` nodes only: matches sections at exactly this heading level (1 = `#`, 2 = `##`, etc.). Non-markdown node types ignore `level`.                                                   |
 
 ### Node types by file format
 
@@ -332,10 +462,12 @@ selector:
 
 ### Hook entries
 
-Each hook entry is one of:
+Each hook entry requires an `id` field. The `id` uniquely identifies the entry within its `pre` or `post` array and is used by `schemaOverrides` to target individual entries for appending, prepending, or removal.
 
-- `{ instruction: 'text' }` — injected into the AI context when this step is compiled. Used to guide agent behaviour during this phase.
-- `{ run: 'shell command' }` — executed at the phase boundary. Supports template variables.
+Each entry is one of:
+
+- `{ id: 'my-id', instruction: 'text' }` — injected into the AI context when this step is compiled. Used to guide agent behaviour during this phase.
+- `{ id: 'my-id', run: 'shell command' }` — executed at the phase boundary. Supports template variables.
 
 **Hook failure behaviour:**
 
@@ -344,15 +476,16 @@ Each hook entry is one of:
 
 ### Template variables in `run:` hooks
 
-| Variable               | Value                                                       |
-| ---------------------- | ----------------------------------------------------------- |
-| `{{change.name}}`      | The change's slug name                                      |
-| `{{change.workspace}}` | The primary workspace of the change                         |
-| `{{codeRoot}}`         | Resolved absolute path to the active workspace's `codeRoot` |
+| Variable               | Value                                                  |
+| ---------------------- | ------------------------------------------------------ |
+| `{{change.name}}`      | The change's slug name                                 |
+| `{{change.workspace}}` | The primary workspace of the change                    |
+| `{{change.path}}`      | Absolute path to the change directory                  |
+| `{{project.root}}`     | Absolute path to the directory containing `specd.yaml` |
 
-### Relationship with specd.yaml workflow hooks
+### Relationship with schemaOverrides hooks
 
-`specd.yaml` can add project-level hooks to any step declared in the schema using the same `workflow` format, with one difference: `requires` is not valid in `specd.yaml` workflow entries. Schema hooks fire first, then project hooks, within the same `pre` or `post` event. See the [configuration reference](../config/config-reference.md#workflow).
+`schemaOverrides` in `specd.yaml` can append, prepend, or remove individual hook entries on any step declared in the schema by targeting them via `id`. Schema hooks always fire first. See the [configuration reference](../config/config-reference.md#schemaoverrides).
 
 ```yaml
 workflow:
@@ -363,19 +496,23 @@ workflow:
     requires: [tasks]
     hooks:
       pre:
-        - instruction: |
+        - id: implementing-guidance
+          instruction: |
             Read the pending tasks, work through them one by one,
             and mark each complete as you go.
       post:
-        - run: 'pnpm test'
-        - instruction: |
+        - id: run-tests
+          run: 'pnpm test'
+        - id: confirm-tests
+          instruction: |
             Confirm all tests pass before marking implementing complete.
 
   - step: verifying
     requires: [verify]
     hooks:
       pre:
-        - instruction: |
+        - id: verifying-guidance
+          instruction: |
             Run through each scenario in verify.md and confirm the
             implementation satisfies it.
 
@@ -383,9 +520,11 @@ workflow:
     requires: [specs, tasks]
     hooks:
       pre:
-        - run: 'pnpm test'
+        - id: pre-archive-tests
+          run: 'pnpm test'
       post:
-        - run: 'git checkout -b specd/{{change.name}}'
+        - id: create-branch
+          run: 'git checkout -b specd/{{change.name}}'
 ```
 
 ## verify.md format

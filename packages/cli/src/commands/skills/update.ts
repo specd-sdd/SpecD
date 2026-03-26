@@ -16,7 +16,9 @@ export function registerSkillsUpdate(parent: Command): void {
   parent
     .command('update')
     .allowExcessArguments(false)
-    .description('Update installed skills from the skills registry')
+    .description(
+      'Update all installed specd agent skills to the latest versions from the skills registry.',
+    )
     .option('--agent <id>', 'restrict update to one agent')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')

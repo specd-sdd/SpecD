@@ -9,7 +9,10 @@ import {
   captureStderr,
 } from './helpers.js'
 
-vi.mock('../../src/load-config.js', () => ({ loadConfig: vi.fn() }))
+vi.mock('../../src/load-config.js', () => ({
+  loadConfig: vi.fn(),
+  resolveConfigPath: vi.fn().mockResolvedValue(null),
+}))
 
 import { loadConfig } from '../../src/load-config.js'
 import { ConfigValidationError } from '@specd/core'
