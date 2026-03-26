@@ -12,7 +12,7 @@ specd has three layers that work together to drive a change from idea to complet
 
 **The skills** are the interface. They are slash commands installed in your coding assistant (`/specd`, `/specd-new`, `/specd-design`, etc.) that orchestrate the workflow by calling the CLI. Each skill knows how to guide the agent through one phase — loading context, writing artifacts, validating, transitioning. You interact with skills; skills interact with the CLI; the CLI enforces the workflow.
 
-```
+```text
 You ←→ Skills ←→ CLI ←→ Workflow (schema + config)
          │                    │
          │  calls commands    │  enforces rules

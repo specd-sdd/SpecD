@@ -124,7 +124,7 @@ Each project's `specd.yaml` is the sole source of truth for that project's view 
 ## Constraints
 
 - Every project must declare a default workspace
-- Workspace names must match /^\[a-z]\[a-z0-9-]\*$/
+- Workspace names must match /^[a-z][a-z0-9-]\*$/
 - codeRoot is required for non-default workspaces
 - isExternal is inferred, never declared
 - Spec IDs are always workspace-qualified internally

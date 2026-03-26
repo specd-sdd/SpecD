@@ -57,7 +57,7 @@
     {
       "requirement": "Task completion check during requires enforcement",
       "rules": [
-        "After workflow requires enforcement passes, if the target workflow step declares a non-empty `requiresTaskCompletion` array, the use case MUST check each listed artifact for incomplete task items:\n\n1. Look up the `ArtifactType` from the schema to obtain `taskCompletionCheck.incompletePattern`.\n2. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.\n3. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.\n4. If the file does not exist (returns `null`), skip it.\n5. Compile `incompletePattern` using `safeRegex` with the `'m'` flag.\n6. If the regex is valid and matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID, incomplete count (lines matching `incompletePattern`), and complete count (lines matching `completePattern` if declared).\n\nOnly artifacts listed in `requiresTaskCompletion` are content-checked. Other artifacts in `requires` are checked only via `effectiveStatus`. When `requiresTaskCompletion` is absent or empty, no task completion gating applies."
+        "After workflow requires enforcement passes, if the target workflow step declares a non-empty `requiresTaskCompletion` array, the use case MUST check each listed artifact for incomplete task items:\n\n1. Look up the `ArtifactType` from the schema to obtain `taskCompletionCheck.incompletePattern`.\n2. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.\n3. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.\n4. If the file does not exist (returns `null`), skip it.\n5. Compile `incompletePattern` using `safeRegex` with the `'gm'` flags.\n6. If the regex is valid and matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID, incomplete count (lines matching `incompletePattern`), and complete count (lines matching `completePattern` if declared).\n\nOnly artifacts listed in `requiresTaskCompletion` are content-checked. Other artifacts in `requires` are checked only via `effectiveStatus`. When `requiresTaskCompletion` is absent or empty, no task completion gating applies."
       ]
     },
     {
@@ -433,7 +433,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:812ca53ef2d069e4538505380a016e334da039c0e6be3b65aa69e814a0a5e745",
+    "spec.md": "sha256:217f268ee2b3f5d6fad3d093aa4846b2ee03afe679d3cb7fd059f89121fe5b54",
     "verify.md": "sha256:5eba8b94e28dbb3ae47e0199594bcbbbd8bf310f0e41a1f7d3e294d11bacb00f"
   },
   "generatedBy": "core"

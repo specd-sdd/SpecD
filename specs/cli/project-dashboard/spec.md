@@ -8,7 +8,7 @@ Users joining a project or returning after time away need a quick snapshot of wh
 
 ### Requirement: Command signature
 
-```
+```text
 specd project dashboard [--format text|json|toon] [--config <path>]
 ```
 
@@ -78,7 +78,7 @@ The command requires a valid `specd.yaml`. If config discovery fails the command
 
 ## Examples
 
-```
+```bash
 # Text dashboard (default) — also triggered automatically by bare 'specd' invocation
 specd project dashboard
 
