@@ -27,7 +27,9 @@ If not in `implementing` or `spec-approved`, this is the wrong skill. Suggest ba
 - `drafting` / `designing` → `/specd-design <name>`
 - `ready` → Review artifacts, then approve or continue designing with `/specd-design <name>`
 - `verifying` → `/specd-verify <name>`
-- `done` / `pending-signoff` / `signed-off` / `archivable` → `/specd-archive <name>`
+- `done` / `signed-off` → `/specd-verify <name>` (handles done→archivable transition)
+- `pending-signoff` → "Signoff pending. Run: `specd change approve signoff <name> --reason ...`"
+- `archivable` → `/specd-archive <name>`
 - `pending-spec-approval` → "Approval pending. Run: `specd change approve spec <name> --reason ...`"
 
 **Stop — do not continue.**
@@ -35,7 +37,7 @@ If not in `implementing` or `spec-approved`, this is the wrong skill. Suggest ba
 If in `spec-approved`, transition:
 
 ```bash
-node packages/cli/dist/index.js change transition <name> implementing
+node packages/cli/dist/index.js change transition <name> implementing --skip-hooks all
 ```
 
 Store `lifecycle.changePath` and `specIds` from the response.
@@ -51,6 +53,7 @@ Find artifacts with `hasTaskCompletionCheck: true` — those have trackable chec
 ### 3. Run entry hooks
 
 ```bash
+node packages/cli/dist/index.js change run-hooks <name> implementing --phase pre
 node packages/cli/dist/index.js change hook-instruction <name> implementing --phase pre --format text
 ```
 
@@ -68,22 +71,46 @@ about to write (see `shared.md` — "Processing `change context` output").
 
 ### 5. Read change artifacts
 
-Read ALL artifacts from `<changePath>/`:
+Use the schema's `artifacts` array (from step 2) to know which artifacts exist and
+their `output` paths. Read ALL change artifacts from `<changePath>/`:
 
-- `proposal.md` — why
-- `design.md` — how (primary technical reference)
-- `tasks.md` — what to do
-- Spec deltas — what the system should do
+- **Change-scoped** artifacts — directly in `<changePath>/`
+- **Spec-scoped deltas** — in `<changePath>/deltas/` (existing specs modified by this change)
+- **Spec-scoped new specs** — in `<changePath>/specs/` (new specs created by this change)
+
+Do not hardcode filenames — the schema defines what exists.
 
 ### 6. Work through tasks
 
-For each task in `tasks.md`:
+#### 6a. Analyze task dependencies (multi-agent support)
+
+If your environment supports launching parallel agents (e.g. the `Agent` tool), analyze
+the tasks before starting:
+
+1. **Read all tasks** from the task-bearing artifact(s) identified in step 2
+2. **Read all other change artifacts** (loaded in step 5) for context on dependencies
+   between tasks — shared files, types consumed/produced, API contracts, ordering constraints
+3. **Map dependencies** — for each task, determine which other tasks must complete first
+4. **Group into waves** — tasks with no unresolved dependencies form wave 1. Tasks that
+   depend only on wave-1 tasks form wave 2, and so on.
+5. **Parallelize each wave** — launch one agent per task within a wave. Each agent
+   implements its task and marks its checkbox done. Wait for the full wave to complete
+   before starting the next.
+6. **Conflict resolution** — if two tasks in the same wave need to edit the same file,
+   move one to the next wave instead.
+
+If multi-agent is not available or all tasks are sequential (single dependency chain),
+fall back to implementing tasks one by one in their listed order.
+
+#### 6b. Implement
+
+For each task (whether parallel or sequential):
 
 1. Implement the code
-2. **Immediately** mark it done (`- [ ]` → `- [x]`) in `tasks.md`
+2. **Immediately** mark it done (`- [ ]` → `- [x]`) in the task-bearing artifact
 3. Check if the code touches areas outside the change's specs — if so, surface to the user
 
-If a task is ambiguous, consult `design.md` first. If still unclear, ask the user.
+If a task is ambiguous, consult the other change artifacts first. If still unclear, ask the user.
 
 ### 7. Run exit hooks — immediately after last checkbox
 
@@ -101,7 +128,7 @@ Follow guidance. If hooks fail (tests, lint), fix and re-run until they pass.
 ### 8. Transition to verifying
 
 ```bash
-node packages/cli/dist/index.js change transition <name> verifying
+node packages/cli/dist/index.js change transition <name> verifying --skip-hooks all
 ```
 
 If it fails (incomplete tasks), show which items are still `- [ ]` and continue working.
@@ -135,20 +162,22 @@ Cannot transition from '<current>' to '<target>'
 If this happens, the change is in a different state than expected. Extract `<current>`
 from the error message and redirect using this table:
 
-| Current state                                            | Suggest                                                                          |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `drafting` / `designing`                                 | `/specd-design <name>`                                                           |
-| `ready`                                                  | Review artifacts, then approve or continue designing with `/specd-design <name>` |
-| `implementing` / `spec-approved`                         | You're already in the right skill — re-read status and retry                     |
-| `verifying`                                              | `/specd-verify <name>`                                                           |
-| `done` / `pending-signoff` / `signed-off` / `archivable` | `/specd-archive <name>`                                                          |
-| `pending-spec-approval`                                  | "Approval pending. Run: `specd change approve spec <name> --reason ...`"         |
+| Current state                    | Suggest                                                                          |
+| -------------------------------- | -------------------------------------------------------------------------------- |
+| `drafting` / `designing`         | `/specd-design <name>`                                                           |
+| `ready`                          | Review artifacts, then approve or continue designing with `/specd-design <name>` |
+| `implementing` / `spec-approved` | You're already in the right skill — re-read status and retry                     |
+| `verifying`                      | `/specd-verify <name>`                                                           |
+| `done` / `signed-off`            | `/specd-verify <name>` (handles done→archivable transition)                      |
+| `pending-signoff`                | "Signoff pending. Run: `specd change approve signoff <name> --reason ...`"       |
+| `archivable`                     | `/specd-archive <name>`                                                          |
+| `pending-spec-approval`          | "Approval pending. Run: `specd change approve spec <name> --reason ...`"         |
 
 **Stop — do not continue after redirecting.**
 
 ## Guardrails
 
 - Mark tasks done in real time — don't batch checkbox updates
-- `design.md` is the source of truth for implementation approach
+- The change artifacts are the source of truth for implementation approach
 - If you touch code outside the change's spec scope, surface it to the user
 - Never skip the pre-hook — it tells you what to read

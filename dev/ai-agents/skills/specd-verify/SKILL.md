@@ -27,7 +27,9 @@ If not in `verifying`, this is the wrong skill. Suggest based on state:
 - `drafting` / `designing` → `/specd-design <name>`
 - `ready` → Review artifacts, then approve or continue designing with `/specd-design <name>`
 - `implementing` / `spec-approved` → `/specd-implement <name>`
-- `done` / `pending-signoff` / `signed-off` / `archivable` → `/specd-archive <name>`
+- `done` / `signed-off` → You're already past verification — check signoff gate and transition to archivable
+- `pending-signoff` → "Signoff pending. Run: `specd change approve signoff <name> --reason ...`"
+- `archivable` → `/specd-archive <name>`
 - `pending-spec-approval` → "Approval pending. Run: `specd change approve spec <name> --reason ...`"
 
 **Stop — do not continue.**
@@ -37,6 +39,7 @@ Store `lifecycle.changePath` and `specIds` from the response.
 ### 2. Run entry hooks
 
 ```bash
+node packages/cli/dist/index.js change run-hooks <name> verifying --phase pre
 node packages/cli/dist/index.js change hook-instruction <name> verifying --phase pre --format text
 ```
 
@@ -84,23 +87,78 @@ Present findings to the user:
 >
 > N/M scenarios pass.
 
-**If all pass:**
-
-```bash
-node packages/cli/dist/index.js change transition <name> done
-```
-
-Suggest: `/specd-archive <name>`
-
 **If any fail:**
 
 ```bash
-node packages/cli/dist/index.js change transition <name> implementing
+node packages/cli/dist/index.js change transition <name> implementing --skip-hooks all
 ```
 
 Tell the user which scenarios failed and suggest:
 
 > Some scenarios failed. Run `/specd-implement <name>` to fix.
+
+**Stop.**
+
+**If all pass:** transition through `done` and the signoff gate to reach `archivable`.
+
+#### 6a. Transition to done
+
+Run done pre-hooks, then transition:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> done --phase pre
+node packages/cli/dist/index.js change hook-instruction <name> done --phase pre --format text
+```
+
+Follow guidance.
+
+```bash
+node packages/cli/dist/index.js change transition <name> done --skip-hooks all
+```
+
+Run done post-hooks:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> done --phase post
+node packages/cli/dist/index.js change hook-instruction <name> done --phase post --format text
+```
+
+#### 6b. Handle signoff gate
+
+```bash
+node packages/cli/dist/index.js change status <name> --format json
+```
+
+Check `lifecycle.approvals.signoff`:
+
+**If `false`:** no signoff needed — run archivable hooks and transition:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> archivable --phase pre
+node packages/cli/dist/index.js change hook-instruction <name> archivable --phase pre --format text
+```
+
+Follow guidance.
+
+```bash
+node packages/cli/dist/index.js change transition <name> archivable --skip-hooks all
+```
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> archivable --phase post
+node packages/cli/dist/index.js change hook-instruction <name> archivable --phase post --format text
+```
+
+Follow guidance.
+
+**If `true`:** the transition will route to `pending-signoff`. Tell user:
+
+> Signoff required. Run: `specd change approve signoff <name> --reason "..."`
+> Then: `/specd-archive <name>`
+
+**Stop.**
+
+> All scenarios pass. Change is ready to archive. Run `/specd-archive <name>`.
 
 **Stop.**
 
@@ -126,14 +184,16 @@ Cannot transition from '<current>' to '<target>'
 If this happens, the change is in a different state than expected. Extract `<current>`
 from the error message and redirect using this table:
 
-| Current state                                            | Suggest                                                                          |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `drafting` / `designing`                                 | `/specd-design <name>`                                                           |
-| `ready`                                                  | Review artifacts, then approve or continue designing with `/specd-design <name>` |
-| `implementing` / `spec-approved`                         | `/specd-implement <name>`                                                        |
-| `verifying`                                              | You're already in the right skill — re-read status and retry                     |
-| `done` / `pending-signoff` / `signed-off` / `archivable` | `/specd-archive <name>`                                                          |
-| `pending-spec-approval`                                  | "Approval pending. Run: `specd change approve spec <name> --reason ...`"         |
+| Current state                    | Suggest                                                                          |
+| -------------------------------- | -------------------------------------------------------------------------------- |
+| `drafting` / `designing`         | `/specd-design <name>`                                                           |
+| `ready`                          | Review artifacts, then approve or continue designing with `/specd-design <name>` |
+| `implementing` / `spec-approved` | `/specd-implement <name>`                                                        |
+| `verifying`                      | You're already in the right skill — re-read status and retry                     |
+| `done` / `signed-off`            | Check signoff gate and transition to archivable                                  |
+| `pending-signoff`                | "Signoff pending. Run: `specd change approve signoff <name> --reason ...`"       |
+| `archivable`                     | `/specd-archive <name>`                                                          |
+| `pending-spec-approval`          | "Approval pending. Run: `specd change approve spec <name> --reason ...`"         |
 
 **Stop — do not continue after redirecting.**
 

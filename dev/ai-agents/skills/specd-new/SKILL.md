@@ -75,20 +75,23 @@ node packages/cli/dist/index.js change status <name> --format json
 
 Suggest based on state:
 
-| State                                                    | Suggest                                                                  |
-| -------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `drafting` / `designing`                                 | `/specd-design <name>`                                                   |
-| `ready`                                                  | Review artifacts, then `/specd-implement <name>` if approved             |
-| `implementing` / `spec-approved`                         | `/specd-implement <name>`                                                |
-| `verifying`                                              | `/specd-verify <name>`                                                   |
-| `done` / `pending-signoff` / `signed-off` / `archivable` | `/specd-archive <name>`                                                  |
-| `pending-spec-approval`                                  | "Approval pending. Run: `specd change approve spec <name> --reason ...`" |
+| State                            | Suggest                                                                    |
+| -------------------------------- | -------------------------------------------------------------------------- |
+| `drafting` / `designing`         | `/specd-design <name>`                                                     |
+| `ready`                          | Review artifacts, then `/specd-implement <name>` if approved               |
+| `implementing` / `spec-approved` | `/specd-implement <name>`                                                  |
+| `verifying`                      | `/specd-verify <name>`                                                     |
+| `done` / `signed-off`            | `/specd-verify <name>` (handles done→archivable transition)                |
+| `pending-signoff`                | "Signoff pending. Run: `specd change approve signoff <name> --reason ...`" |
+| `archivable`                     | `/specd-archive <name>`                                                    |
+| `pending-spec-approval`          | "Approval pending. Run: `specd change approve spec <name> --reason ...`"   |
 
 **Stop — do not continue.**
 
 ### 5. Run entry hooks
 
 ```bash
+node packages/cli/dist/index.js change run-hooks <name> drafting --phase pre
 node packages/cli/dist/index.js change hook-instruction <name> drafting --phase pre --format text
 ```
 

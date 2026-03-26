@@ -167,6 +167,23 @@ Every workflow step has pre and post hooks. The pattern is always:
 1. **On entry:** `change hook-instruction <name> <step> --phase pre --format text` → follow guidance
 2. **On exit:** `change run-hooks <name> <step> --phase post` → then `change hook-instruction <name> <step> --phase post --format text` → follow guidance
 
+### Pre-hooks run BEFORE the transition, always
+
+**The skill controls hook execution, not the transition.** Always call `change transition`
+with `--skip-hooks all` so that hooks are not executed implicitly. The skill runs them
+explicitly in the correct order.
+
+The complete pattern for every transition is:
+
+1. `change run-hooks <name> <source-state> --phase post` — finish the current state
+2. `change hook-instruction <name> <source-state> --phase post` → follow guidance
+3. `change run-hooks <name> <target-state> --phase pre` — prepare the target state
+4. `change hook-instruction <name> <target-state> --phase pre` → follow guidance
+5. `change transition <name> <target-state> --skip-hooks all` — transition without implicit hooks
+
+This gives the skill full control over ordering, error handling, and guidance compliance.
+Never let the transition run hooks implicitly — it cannot follow `instruction:` guidance.
+
 ### Post-hooks fire immediately after the phase's work completes
 
 Post-hooks MUST run the moment the phase's work is done — right after the last artifact
@@ -176,4 +193,7 @@ anything first, do NOT present a summary before running them. The hooks are part
 phase completion, not a separate step that follows user interaction.
 
 Execute hooks for every state the change passes through, including intermediate ones
-(`pending-spec-approval`, `spec-approved`, `done`, `pending-signoff`, `signed-off`, `archivable`).
+(`pending-spec-approval`, `spec-approved`, `done`, `pending-signoff`, `signed-off`,
+`archivable`). In code, all 12 `ChangeState` values are valid hook steps — the system
+accepts them all and silently returns empty results if the schema doesn't define hooks
+for that step. Always call them; never skip a state assuming it has no hooks.
