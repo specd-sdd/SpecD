@@ -77,6 +77,27 @@ Only after `--add-spec` succeeds should you write the delta or artifact file in 
 change directory. Writing files for specs not yet added to the change will cause
 validation failures and broken state.
 
+## Spec scope vs spec dependencies
+
+These are two distinct operations — do not confuse them:
+
+**`change edit --add-spec <specId>`** — adds a spec to the **change's scope**. This
+means the change creates or modifies that spec. It controls which specs get artifacts
+and deltas.
+
+**`change deps <name> <specId> --add <depId>`** — declares that **spec A depends on
+spec B**. This is a relationship between specs, not between a change and a spec. It
+controls transitive context compilation — when working on spec A, spec B's context is
+automatically included.
+
+**When to use which:**
+
+- "This change should also touch spec X" → `change edit --add-spec X`
+- "Spec A references types/APIs/concepts from spec B" → `change deps ... A --add B`
+
+Both matter: scope determines what gets written, dependencies determine what context
+is available while writing it.
+
 ## Reading specs
 
 **Always use the CLI.** Never guess filesystem paths.
