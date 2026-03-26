@@ -19,6 +19,12 @@
       ]
     },
     {
+      "requirement": "ReadOnly workspace rejection",
+      "rules": [
+        "After resolving the workspace for each `--spec` value, the CLI MUST check the workspace's `ownership` from `SpecdConfig`. If any spec's workspace has `readOnly` ownership, the command MUST exit with code 1 and print an error message to stderr:\n\n```\nerror: Cannot add spec \"<specId>\" to change — workspace \"<workspace>\" is readOnly.\n\nReadOnly workspaces are protected: their specs and code cannot be modified by changes.\n```\n\nThis check MUST occur before invoking the `CreateChange` use case. If multiple specs target readOnly workspaces, one error per spec MUST be printed. The error message MUST NOT suggest remediation steps."
+      ]
+    },
+    {
       "requirement": "Schema name and version",
       "rules": [
         "`schemaName` and `schemaVersion` are resolved from the active `SpecdConfig` at command time and passed to the `CreateChange` use case. The user does not specify these values."
@@ -40,7 +46,8 @@
   "constraints": [
     "--spec is optional; when omitted, the change is created with an empty specIds list",
     "The change name must be a valid kebab-case slug; the CLI validates the format before invoking the use case",
-    "The workspace prefix in --spec defaults to default when omitted; workspace IDs are never a separate flag"
+    "The workspace prefix in --spec defaults to default when omitted; workspace IDs are never a separate flag",
+    "Specs targeting readOnly workspaces are rejected before the use case is invoked"
   ],
   "scenarios": [
     {
@@ -80,6 +87,42 @@
       "name": "Unknown workspace prefix",
       "when": ["specd change create my-change --spec nonexistent-ws:some/path is run"],
       "then": ["the command exits with code 1 and prints an error: message to stderr"]
+    },
+    {
+      "requirement": "ReadOnly workspace rejection",
+      "name": "Spec targeting readOnly workspace rejected",
+      "given": ["workspace platform is declared with ownership: readOnly in specd.yaml"],
+      "when": ["specd change create my-change --spec platform:auth/tokens is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr contains Cannot add spec \"platform:auth/tokens\" to change — workspace \"platform\" is readOnly.",
+        "AND no change is created"
+      ]
+    },
+    {
+      "requirement": "ReadOnly workspace rejection",
+      "name": "Multiple readOnly specs each produce an error",
+      "given": ["workspace platform is readOnly"],
+      "when": [
+        "specd change create my-change --spec platform:auth/tokens --spec platform:auth/sessions is run"
+      ],
+      "then": ["stderr contains one error message per readOnly spec", "AND no change is created"]
+    },
+    {
+      "requirement": "ReadOnly workspace rejection",
+      "name": "Mixed owned and readOnly specs rejected",
+      "given": ["workspace default is owned and workspace platform is readOnly"],
+      "when": [
+        "specd change create my-change --spec default:auth/login --spec platform:auth/tokens is run"
+      ],
+      "then": ["the command exits with code 1 due to the readOnly spec", "AND no change is created"]
+    },
+    {
+      "requirement": "ReadOnly workspace rejection",
+      "name": "Owned workspace specs accepted normally",
+      "given": ["workspace default is owned"],
+      "when": ["specd change create my-change --spec default:auth/login is run"],
+      "then": ["the change is created successfully"]
     },
     {
       "requirement": "Output on success",
@@ -122,8 +165,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:0f9816c753f1db6e00f31df32be0f301252fac6ace8e83bbff24f8dfee33edd3",
-    "verify.md": "sha256:6fa9e0e3b45957f3d88abe879e811292931b7b390ed5bd47aed01087988ca9ac"
+    "spec.md": "sha256:9c4f6216ce28bddadaeafb151307712dc6fa85c2e96bd40e082aa9714a03b605",
+    "verify.md": "sha256:4a2dcd0a78e27d0d3879fa474766e0d968f99090dad85fb4b232a0d66057f5fa"
   },
   "generatedBy": "core"
 }

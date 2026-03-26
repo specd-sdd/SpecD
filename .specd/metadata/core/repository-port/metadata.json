@@ -29,13 +29,20 @@
       "rules": [
         "Subclasses (`ChangeRepository`, `SpecRepository`, `ArchiveRepository`) extend `Repository` and declare their storage operations as `abstract` methods. The base class defines no storage operations — it only provides the shared construction and accessor contract."
       ]
+    },
+    {
+      "requirement": "ReadOnlyWorkspaceError",
+      "rules": [
+        "`Repository` MUST export a `ReadOnlyWorkspaceError` class for use by subclasses and use cases that enforce `readOnly` ownership. The error MUST extend the project's base `DomainError` class.\n\nThe constructor MUST accept a `message` string. Callers construct the message with context appropriate to the enforcement point (spec ID, workspace name, operation type). The error class itself does not format messages — it is a marker type that consumers can catch or inspect.\n\n`ReadOnlyWorkspaceError` is a domain error because ownership is a domain concept — it represents a violated invariant, not an I/O failure or a user input error."
+      ]
     }
   ],
   "constraints": [
     "Repository defines no storage operations — it is purely a construction and accessor base",
     "All three accessors are explicit methods, not property signatures (per architecture spec)",
     "Backing fields are private to Repository — subclasses cannot access them directly",
-    "RepositoryConfig is a plain interface, not a class"
+    "RepositoryConfig is a plain interface, not a class",
+    "ReadOnlyWorkspaceError extends DomainError and is exported from the repository-port module"
   ],
   "scenarios": [
     {
@@ -60,11 +67,26 @@
         "the subclass is constructed with { workspace: \"default\", ownership: \"owned\", isExternal: false }"
       ],
       "then": ["all three accessors return the values from RepositoryConfig"]
+    },
+    {
+      "requirement": "ReadOnlyWorkspaceError",
+      "name": "Error extends DomainError",
+      "when": ["a ReadOnlyWorkspaceError is constructed"],
+      "then": ["it is an instance of DomainError", "AND it is an instance of Error"]
+    },
+    {
+      "requirement": "ReadOnlyWorkspaceError",
+      "name": "Error preserves message",
+      "given": [
+        "a message 'Cannot write to spec \"platform:auth/tokens\" — workspace \"platform\" is readOnly.'"
+      ],
+      "when": ["ReadOnlyWorkspaceError is constructed with that message"],
+      "then": ["error.message equals the provided message"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:d7f3771ce8f39be760718b4d2c03e859828b644565a84da6c48250e7d52d889b",
-    "verify.md": "sha256:80feeee62aa5597af8e9316596b86a8f4b650d7c1ea7ea56a89043f659843af6"
+    "spec.md": "sha256:95ef46a179406efd01d4290f3d1842b407a0866053c2004e31989c56cd0b90cb",
+    "verify.md": "sha256:621d3a442f47a8b360d4649135dc1f97c9c5545445210d71314327aef9c46f3d"
   },
   "generatedBy": "core"
 }

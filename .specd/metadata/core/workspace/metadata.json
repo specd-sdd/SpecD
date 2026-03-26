@@ -27,7 +27,7 @@
     {
       "requirement": "Ownership semantics",
       "rules": [
-        "Ownership describes the project's relationship to a workspace's specs:\n\n| Ownership  | Meaning                                                           |\n| ---------- | ----------------------------------------------------------------- |\n| `owned`    | The project owns these specs; changes are freely proposed         |\n| `shared`   | The project co-owns these specs; changes may require coordination |\n| `readOnly` | The project reads but does not modify these specs                 |\n\nOwnership defaults to `owned` for the `default` workspace and `readOnly` for non-`default` workspaces. Ownership affects whether changes can target specs in the workspace and whether approval gates apply."
+        "Ownership describes the project's relationship to a workspace's specs:\n\n| Ownership  | Meaning                                                           |\n| ---------- | ----------------------------------------------------------------- |\n| `owned`    | The project owns these specs; changes are freely proposed         |\n| `shared`   | The project co-owns these specs; changes may require coordination |\n| `readOnly` | The project reads but does not modify these specs                 |\n\nOwnership defaults to `owned` for the `default` workspace and `readOnly` for non-`default` workspaces. Ownership affects whether changes can target specs in the workspace and whether approval gates apply.\n\n#### ReadOnly enforcement\n\nWhen a workspace's ownership is `readOnly`, the following operations MUST be rejected with `ReadOnlyWorkspaceError`:\n\n1. **Change scope** — adding a spec from a `readOnly` workspace to a change via `change create --spec` or `change edit --add-spec` MUST fail. A `readOnly` spec cannot be part of a change's `specIds`.\n2. **Archive** — `ArchiveChange` MUST reject archiving when any spec in the change belongs to a `readOnly` workspace. This is a defense-in-depth guard — upstream guards should prevent this state, but the archive MUST NOT silently merge deltas into protected specs.\n3. **Direct spec writes** — `SpecRepository.save()` and `SpecRepository.saveMetadata()` MUST reject writes when the repository's workspace is `readOnly`. This is the lowest-level guard and cannot be bypassed by any code path.\n\nError messages MUST state what operation was blocked and why (the workspace is `readOnly`). Error messages MUST NOT suggest remediation steps (e.g. \"change ownership in specd.yaml\") to prevent LLM agents from autonomously modifying configuration to bypass the restriction.\n\n`readOnly` workspaces MAY still be read — specs can be loaded, listed, used as context dependencies, and referenced in `dependsOn`. Only write operations are blocked.\n\n`shared` ownership permits all write operations identical to `owned`. No enforcement distinction exists between `owned` and `shared` for write operations."
       ]
     },
     {
@@ -95,7 +95,9 @@
     "When specIds is empty, workspaces is empty",
     "Workspace-level exclude patterns do not apply to specs reached via dependsOn",
     "External repository configurations are never read — each project declares its own view",
-    "Change artifacts always include the workspace segment in their path"
+    "Change artifacts always include the workspace segment in their path",
+    "ReadOnly workspaces reject all write operations — change scope additions, archive merges, and direct spec writes",
+    "ReadOnly enforcement error messages must not suggest remediation steps"
   ],
   "scenarios": [
     {
@@ -159,6 +161,59 @@
       "given": ["project root is /project and workspace specs path is ../external-repo/specs"],
       "when": ["configuration is loaded"],
       "then": ["isExternal is true"]
+    },
+    {
+      "requirement": "Ownership semantics",
+      "name": "Owned workspace allows all operations",
+      "given": ["a workspace with ownership: owned"],
+      "when": ["a change is created with a spec from that workspace"],
+      "then": ["the change is created successfully"]
+    },
+    {
+      "requirement": "Ownership semantics",
+      "name": "Shared workspace allows all operations",
+      "given": ["a workspace with ownership: shared"],
+      "when": ["a change is created with a spec from that workspace"],
+      "then": ["the change is created successfully"]
+    },
+    {
+      "requirement": "Ownership semantics",
+      "name": "ReadOnly workspace blocks change scope addition",
+      "given": ["a workspace with ownership: readOnly"],
+      "when": [
+        "a spec from that workspace is added to a change via change create --spec or change edit --add-spec"
+      ],
+      "then": ["ReadOnlyWorkspaceError is thrown", "AND the change is not created or modified"]
+    },
+    {
+      "requirement": "Ownership semantics",
+      "name": "ReadOnly workspace blocks archive",
+      "given": ["a change that contains specs from a readOnly workspace"],
+      "when": ["ArchiveChange.execute is called"],
+      "then": ["ReadOnlyWorkspaceError is thrown before any hooks or file modifications"]
+    },
+    {
+      "requirement": "Ownership semantics",
+      "name": "ReadOnly workspace blocks direct spec writes",
+      "given": ["a SpecRepository bound to a workspace with readOnly ownership"],
+      "when": ["save() or saveMetadata() is called"],
+      "then": ["ReadOnlyWorkspaceError is thrown before any filesystem operation"]
+    },
+    {
+      "requirement": "Ownership semantics",
+      "name": "ReadOnly workspace allows reads",
+      "given": ["a workspace with ownership: readOnly"],
+      "when": ["SpecRepository.get(), list(), artifact(), or metadata() is called"],
+      "then": ["the operation succeeds normally"]
+    },
+    {
+      "requirement": "Ownership semantics",
+      "name": "Error messages do not suggest remediation",
+      "when": ["any ReadOnlyWorkspaceError is thrown"],
+      "then": [
+        "the error message states the blocked operation and the workspace name",
+        "AND the message does not contain suggestions to change specd.yaml or modify ownership"
+      ]
     },
     {
       "requirement": "Prefix semantics",
@@ -256,8 +311,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e2ac89a775310ccddeb5fbb1f59c97e9b38740ef3f9016daf2829f4b7a497165",
-    "verify.md": "sha256:90850de8eef3bc31e4be14a77c9a1c318821919cc6da70fada534aa4cf0e0a76"
+    "spec.md": "sha256:e2ebdb453b7ec5777fae61776e071308a920a54e87677052b0f58a3ccd454bbf",
+    "verify.md": "sha256:a3ab7819cdeea3be3938cc8d070a7db3d90562a403af15dec25606f4a4abf4ab"
   },
   "generatedBy": "core"
 }
