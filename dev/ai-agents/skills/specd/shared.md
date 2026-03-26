@@ -218,3 +218,15 @@ Execute hooks for every state the change passes through, including intermediate 
 `archivable`). In code, all 12 `ChangeState` values are valid hook steps — the system
 accepts them all and silently returns empty results if the schema doesn't define hooks
 for that step. Always call them; never skip a state assuming it has no hooks.
+
+## Spec overlap awareness
+
+Commands that modify a change's spec scope (`change create`, `change edit --add-spec`)
+may emit a `warning: spec overlap detected` message to stderr when the specs in the
+change are also targeted by other active changes. The `change archive` command blocks
+by default when overlap is detected.
+
+When the CLI output of `change create` or `change edit` contains a spec overlap warning,
+you MUST stop and surface it to the user before continuing. Show which specs overlap and
+with which other active changes, then ask whether to proceed or adjust the spec scope.
+Do not silently continue past an overlap warning.
