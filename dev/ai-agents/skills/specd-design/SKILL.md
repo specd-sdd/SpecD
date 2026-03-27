@@ -106,6 +106,29 @@ node packages/cli/dist/index.js change context <name> designing --follow-deps --
 summary specs, evaluate each one and load any that are relevant to the artifact you're
 about to write (see `shared.md` — "Processing `change context` output").
 
+#### Use code graph to enrich context
+
+When the change targets specific code areas, use the graph to find related symbols and
+assess complexity — this is mandatory, not optional:
+
+```bash
+node packages/cli/dist/index.js graph search "<keyword from spec>" --specs --format json
+node packages/cli/dist/index.js graph hotspots --min-risk MEDIUM --format json
+```
+
+Graph search helps you discover specs you might need to load as context. Hotspots help
+you identify high-coupling symbols that the design should handle carefully — if a task
+will modify a CRITICAL hotspot, the design should note the risk and suggest extra testing.
+
+When writing the **design** or **tasks** artifact, if you know specific files or symbols
+that will be modified, check their impact:
+
+```bash
+node packages/cli/dist/index.js graph impact --symbol "<name>" --direction downstream --format json
+```
+
+Include impact findings in the design artifact so the implementer knows what's at stake.
+
 #### Load exploration context
 
 Check if `<changePath>/specd-exploration.md` exists. If it does, read it — it contains
@@ -220,11 +243,22 @@ If new specs should be added or existing ones removed, surface to the user.
 
 ### 9. Validate
 
-```bash
-node packages/cli/dist/index.js change validate <name> <specId> --artifact <artifactId>
-```
+Check the artifact's `scope` (from the schema JSON loaded in step 3):
 
-Run for each specId if the artifact has `scope: spec`.
+- **`scope: change`** (e.g. proposal, design, tasks): validate ONCE, using any specId
+  from the change — the result is the same regardless of which specId you pick because
+  the artifact is not spec-specific.
+
+  ```bash
+  node packages/cli/dist/index.js change validate <name> <anySpecId> --artifact <artifactId>
+  ```
+
+- **`scope: spec`** (e.g. specs, verify): validate ONCE PER specId, because each spec
+  has its own artifact file.
+
+  ```bash
+  node packages/cli/dist/index.js change validate <name> <specId> --artifact <artifactId>
+  ```
 
 If validation fails: fix and re-validate. Do not proceed until it passes.
 

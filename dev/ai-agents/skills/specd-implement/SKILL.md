@@ -101,6 +101,25 @@ node packages/cli/dist/index.js change context <name> implementing --follow-deps
 summary specs, evaluate each one and load any that are relevant to the code you're
 about to write (see `shared.md` — "Processing `change context` output").
 
+### 4b. Assess impact with code graph
+
+Before reading artifacts, use the code graph to understand the blast radius of the
+files and symbols you'll be modifying:
+
+```bash
+node packages/cli/dist/index.js graph hotspots --min-risk MEDIUM --format json
+```
+
+If the tasks (from the design artifact) mention specific symbols or files, check their
+downstream dependents:
+
+```bash
+node packages/cli/dist/index.js graph impact --symbol "<name>" --direction downstream --format json
+```
+
+Surface HIGH or CRITICAL risk findings to the user before starting implementation.
+This helps prioritize which tasks need extra care and testing.
+
 ### 5. Read change artifacts
 
 Use the schema's `artifacts` array (from step 2) to know which artifacts exist and

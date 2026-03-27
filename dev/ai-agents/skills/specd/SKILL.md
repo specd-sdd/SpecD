@@ -30,6 +30,7 @@ node packages/cli/dist/index.js spec list --format json --summary
 node packages/cli/dist/index.js change list --format json
 node packages/cli/dist/index.js drafts list --format json
 node packages/cli/dist/index.js project context --format text
+node packages/cli/dist/index.js graph stats --format json
 ```
 
 **MUST follow** — the project context output contains binding directives (instructions
@@ -39,13 +40,15 @@ context` output").
 
 From the results, **print a welcome block** to the user with this structure:
 
-```
+```text
 # specd
 
 **Schema:** <schemaRef>
 **Workspaces:** <name> (<specCount> specs), <name> (<specCount> specs), ...
 **Active changes:** <count> — <name> (<state>), ...
 **Drafts:** <count> (or "none")
+**Code graph:** <"fresh" if stale=false, "stale" if stale=true,
+                 "not indexed" if command failed or no data>
 
 > **Context:** <summarize the `context` entries from config — for `instruction` entries
 > show a one-line digest of the instruction text; for `file` entries show the filename>
@@ -54,6 +57,16 @@ From the results, **print a welcome block** to the user with this structure:
 Keep it compact — no more than 8-10 lines. Omit sections that are empty (e.g. skip
 "Drafts" if there are none). The user cannot see tool output directly, so you MUST
 print this yourself.
+
+If the code graph is stale or not indexed, re-index it in the background:
+
+```bash
+node packages/cli/dist/index.js graph index --format json
+```
+
+Do not wait for completion before continuing — indexing can take a few seconds and
+subsequent skills will benefit from a fresh graph. If `graph stats` failed (graph
+never indexed), run `graph index` to bootstrap it.
 
 ### 2. Check for existing changes
 

@@ -44,6 +44,24 @@ node packages/cli/dist/index.js spec list --format text --summary
 
 Surface existing specs that might be affected. Let the conversation develop naturally.
 
+#### Use code graph for deeper investigation
+
+When the user describes affected areas, use graph search to find related symbols and specs:
+
+```bash
+node packages/cli/dist/index.js graph search "<keyword>" --format json
+```
+
+If the user mentions specific files or symbols, check their impact to understand scope:
+
+```bash
+node packages/cli/dist/index.js graph impact --file "<path>" --direction both --format json
+node packages/cli/dist/index.js graph impact --symbol "<name>" --direction both --format json
+```
+
+This helps you surface specs and code areas the user may not have considered. If `riskLevel`
+is HIGH or CRITICAL, mention it — it affects how many specs should be in scope.
+
 ### 3. Propose the change
 
 When the picture is clear enough, first check workspace ownership:
