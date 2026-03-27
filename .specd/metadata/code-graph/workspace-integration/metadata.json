@@ -1,0 +1,220 @@
+{
+  "title": "Workspace Integration",
+  "description": "`@specd/code-graph` must integrate with specd's multi-workspace system to index code and specs from each workspace individually, while storing everything in a single graph database. This enables cross-workspace impact analysis and ensures file paths are globally unique across workspaces.",
+  "dependsOn": [
+    "code-graph:code-graph/symbol-model",
+    "code-graph:code-graph/indexer",
+    "code-graph:code-graph/composition"
+  ],
+  "context": [
+    "`@specd/code-graph` must integrate with specd's multi-workspace system to index code and specs from each workspace individually, while storing everything in a single graph database. This enables cross-workspace impact analysis and ensures file paths are globally unique across workspaces."
+  ],
+  "rules": [
+    {
+      "requirement": "FileNode path and workspace semantics",
+      "rules": [
+        "`FileNode.path` SHALL be globally unique by prefixing the workspace name to the code-root-relative path:\n\n- **`path`** = `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`)\n- **`workspace`** = workspace name string (e.g. `core`, `cli`, `default`)\n\nThis ensures that two workspaces with identical relative paths (e.g. both having `src/index.ts`) produce distinct `FileNode.path` values. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration."
+      ]
+    },
+    {
+      "requirement": "SymbolNode ID includes workspace",
+      "rules": [
+        "`SymbolNode.id` SHALL include the workspace-prefixed path:\n\n- **`id`** = `{workspace}:{relativePath}:{kind}:{name}:{line}` (e.g. `core:src/index.ts:function:main:1`)\n\nThis follows naturally from `SymbolNode.filePath` being the `FileNode.path`."
+      ]
+    },
+    {
+      "requirement": "SpecNode workspace field",
+      "rules": [
+        "`SpecNode` SHALL include a `workspace` field:\n\n- **`workspace`** (`string`) — the workspace name this spec belongs to (e.g. `core`, `_global`)\n\nSpec IDs use the format `{workspace}:{specPath}` (e.g. `core:core/change`, `default:_global/architecture`), matching the format produced by `SpecRepository`. The workspace name prefix in the specPath comes from the workspace's configured `prefix` in `specd.yaml`."
+      ]
+    },
+    {
+      "requirement": "File discovery from codeRoot",
+      "rules": [
+        "For each workspace with a `codeRoot`, the indexer SHALL discover files starting from the workspace's `codeRoot` (an absolute path). The `codeRoot` is provided by `SpecdWorkspaceConfig.codeRoot` from the specd configuration.\n\nFiles are discovered per workspace and their paths are prefixed with the workspace name before being stored in the graph. The `discoverFiles` function itself has no workspace knowledge — it accepts a root directory and returns paths relative to that root."
+      ]
+    },
+    {
+      "requirement": "Spec resolution via SpecRepository",
+      "rules": [
+        "Instead of brute-walking a `specs/` directory, each workspace provides a callback function that returns discovered specs:\n\n```typescript\ninterface WorkspaceIndexTarget {\n  readonly name: string\n  readonly codeRoot: string\n  readonly specs: () => Promise<DiscoveredSpec[]>\n}\n```\n\nThe `specs` callback is implemented by the CLI/MCP integration layer using `SpecRepository` from `@specd/core`:\n\n1. Call `repo.list()` to get all `Spec` entities in the workspace\n2. For each spec, load all artifacts via `repo.artifact(spec, filename)` — artifact filenames come from `spec.filenames` and no longer include metadata files\n3. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order\n4. Load metadata via `repo.metadata(spec)` to extract `title`, `description`, and `dependsOn`. If metadata is absent (`null`), `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.\n5. Build the `specId` as `{workspace}:{specPath}` (e.g. `core:core/change`), matching the format produced by `SpecRepository.resolveFromPath`\n\nThis decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`.\n\nThe `DiscoveredSpec` type is re-exported from `@specd/code-graph` for use by integration layers."
+      ]
+    },
+    {
+      "requirement": "Cross-workspace import resolution",
+      "rules": [
+        "During Pass 2 (import resolution), the indexer SHALL resolve imports across workspaces:\n\n- **Relative imports** — resolved within the same workspace (same path prefix)\n- **Package imports** — the `packageName → workspaceName` map (built from `LanguageAdapter.getPackageIdentity`) correlates package names with workspace names, allowing resolution across workspace boundaries. This works for both monorepo and multirepo setups.\n- **PHP qualified names** — resolved globally across all workspaces\n\nThe in-memory `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins, enabling cross-workspace resolution."
+      ]
+    },
+    {
+      "requirement": "WorkspaceIndexTarget",
+      "rules": [
+        "`IndexOptions` SHALL accept an array of `WorkspaceIndexTarget` objects instead of a single `workspacePath`:\n\n```typescript\ninterface IndexOptions {\n  readonly workspaces: readonly WorkspaceIndexTarget[]\n  readonly projectRoot: string\n  readonly onProgress?: IndexProgressCallback\n  readonly chunkBytes?: number\n}\n```\n\n- **`workspaces`** — one entry per workspace to index\n- **`projectRoot`** — absolute path to the monorepo/project root (for monorepo package resolution)"
+      ]
+    },
+    {
+      "requirement": "Per-workspace IndexResult breakdown",
+      "rules": [
+        "`IndexResult` SHALL include a per-workspace breakdown:\n\n```typescript\ninterface WorkspaceIndexBreakdown {\n  readonly name: string\n  readonly filesDiscovered: number\n  readonly filesIndexed: number\n  readonly filesSkipped: number\n  readonly filesRemoved: number\n  readonly specsDiscovered: number\n  readonly specsIndexed: number\n}\n\ninterface IndexResult {\n  // ... existing aggregate fields ...\n  readonly workspaces: readonly WorkspaceIndexBreakdown[]\n}\n```"
+      ]
+    },
+    {
+      "requirement": ".gitignore handling for codeRoot",
+      "rules": [
+        "When discovering files from a `codeRoot`, `.gitignore` rules SHALL be loaded hierarchically:\n\n1. Find the git root by walking up from `codeRoot` looking for `.git/`\n2. Load `.gitignore` from the git root\n3. Load any `.gitignore` files found in subdirectories during the walk\n4. Apply rules relative to the directory containing each `.gitignore`\n\nThis handles the case where `codeRoot` is a subdirectory of a git repo (e.g. `packages/core/` within a monorepo)."
+      ]
+    }
+  ],
+  "constraints": [
+    "@specd/code-graph depends on @specd/core as a runtime dependency (types, domain services)",
+    "Single .specd/code-graph.lbug file for the whole project",
+    "The discoverFiles function remains workspace-agnostic — workspace prefixing happens in the indexer",
+    "Spec resolution uses SpecRepository exclusively — no filesystem fallback",
+    "Existing .specd/code-graph.lbug files are incompatible with the new path format — --force re-index is required after upgrading"
+  ],
+  "scenarios": [
+    {
+      "requirement": "FileNode path and workspace semantics",
+      "name": "Single workspace file path",
+      "when": [
+        "a file src/index.ts is discovered in workspace core with codeRoot /project/packages/core"
+      ],
+      "then": ["FileNode.path SHALL be core/src/index.ts", "AND FileNode.workspace SHALL be core"]
+    },
+    {
+      "requirement": "FileNode path and workspace semantics",
+      "name": "Duplicate filenames across workspaces",
+      "when": ["two workspaces core and cli both contain src/index.ts"],
+      "then": [
+        "their FileNode paths SHALL be core/src/index.ts and cli/src/index.ts respectively",
+        "AND both SHALL be stored in the same graph without conflict"
+      ]
+    },
+    {
+      "requirement": "SymbolNode ID includes workspace",
+      "name": "Symbol ID format",
+      "when": ["a function main is found at line 1 of src/index.ts in workspace core"],
+      "then": [
+        "SymbolNode.id SHALL be core/src/index.ts:function:main:1",
+        "AND SymbolNode.filePath SHALL be core/src/index.ts"
+      ]
+    },
+    {
+      "requirement": "SpecNode workspace field",
+      "name": "Named workspace",
+      "when": ["a spec is discovered in workspace core"],
+      "then": ["SpecNode.workspace SHALL be core"]
+    },
+    {
+      "requirement": "SpecNode workspace field",
+      "name": "Global workspace",
+      "when": ["a spec is discovered in workspace _global"],
+      "then": ["SpecNode.workspace SHALL be _global"]
+    },
+    {
+      "requirement": "File discovery from codeRoot",
+      "name": "Multi-workspace discovery",
+      "when": ["IndexOptions contains workspaces [{name: 'core', ...}, {name: 'cli', ...}]"],
+      "then": [
+        "the indexer SHALL discover files from each workspace's codeRoot separately",
+        "AND prefix all paths with the workspace name",
+        "AND store all results in a single bulkLoad call"
+      ]
+    },
+    {
+      "requirement": "File discovery from codeRoot",
+      "name": "Single-workspace equivalence",
+      "when": ["IndexOptions contains a single workspace"],
+      "then": ["the indexer SHALL behave identically to multi-workspace with one entry"]
+    },
+    {
+      "requirement": "Spec resolution via SpecRepository",
+      "name": "Specs callback delegates to SpecRepository",
+      "when": ["a workspace provides a specs callback backed by SpecRepository"],
+      "then": [
+        "the indexer SHALL call it to get specs instead of walking the filesystem",
+        "AND the returned specs SHALL be stored with the workspace name"
+      ]
+    },
+    {
+      "requirement": "Spec resolution via SpecRepository",
+      "name": "Content hash excludes metadata",
+      "when": ["a spec has artifacts spec.md and verify.md"],
+      "then": [
+        "the contentHash SHALL be computed from all artifacts in spec.filenames concatenated",
+        "AND spec.md SHALL be ordered first, then the rest alphabetically",
+        "AND metadata SHALL NOT be included in the content hash"
+      ]
+    },
+    {
+      "requirement": "Spec resolution via SpecRepository",
+      "name": "Metadata loaded via repository metadata port",
+      "when": ["a spec has metadata available via repo.metadata(spec)"],
+      "then": [
+        "title SHALL be taken from metadata.title",
+        "AND description SHALL be taken from metadata.description",
+        "AND dependsOn SHALL be taken from metadata.dependsOn"
+      ]
+    },
+    {
+      "requirement": "Spec resolution via SpecRepository",
+      "name": "Missing metadata uses defaults",
+      "when": ["repo.metadata(spec) returns null"],
+      "then": [
+        "title SHALL default to the specId",
+        "AND description SHALL default to an empty string",
+        "AND dependsOn SHALL default to an empty array"
+      ]
+    },
+    {
+      "requirement": "Spec resolution via SpecRepository",
+      "name": "Unique specIds across workspaces",
+      "when": ["core and cli both have a spec named spec-metadata"],
+      "then": [
+        "specIds SHALL be core:core/spec-metadata and cli:cli/spec-metadata respectively",
+        "AND no primary key collision SHALL occur"
+      ]
+    },
+    {
+      "requirement": "Cross-workspace import resolution",
+      "name": "Monorepo package import",
+      "when": [
+        "workspace cli imports createKernel from @specd/core",
+        "AND the monorepo map resolves @specd/core to the core workspace prefix"
+      ],
+      "then": ["the import SHALL resolve to the symbol in core/src/..."]
+    },
+    {
+      "requirement": "WorkspaceIndexTarget",
+      "name": "Single-workspace indexing isolation",
+      "when": ["indexing with --workspace core"],
+      "then": [
+        "only files with workspace core SHALL be considered for deletion",
+        "AND files from cli and code-graph workspaces SHALL remain untouched in the store"
+      ]
+    },
+    {
+      "requirement": "Per-workspace IndexResult breakdown",
+      "name": "Breakdown per workspace",
+      "when": ["indexing completes for workspaces core (100 files) and cli (50 files)"],
+      "then": [
+        "IndexResult.workspaces SHALL contain two entries",
+        "AND each entry SHALL report its own filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed"
+      ]
+    },
+    {
+      "requirement": ".gitignore handling for codeRoot",
+      "name": "Hierarchical gitignore loading",
+      "when": ["codeRoot is /project/packages/core and git root is /project"],
+      "then": [
+        ".gitignore from /project SHALL be loaded and applied",
+        "AND any .gitignore files in subdirectories SHALL also be applied"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:d067263503c8926db85101f15e8de162a267d8c7ba3dbefb00f8d04337b041fb",
+    "verify.md": "sha256:b096c2de4fcb5da401b03b1dfb50a99f0c78078b14b422354aee6677a165fb29"
+  },
+  "generatedBy": "core"
+}

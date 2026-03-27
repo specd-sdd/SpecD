@@ -33,6 +33,14 @@ artifacts:
           Under each spec, list any new dependencies this change introduces:
           `Depends on (added): <specId>, ...` or `Depends on (added): none`.
       - **Impact**: Affected code areas, APIs, data models, or external dependencies.
+      - **Technical context**: Technical insights, constraints, and decisions discussed
+        during the proposal conversation. Record what was actually discussed — if concrete
+        structures, file paths, or interfaces came up, include them. Covers constraints
+        discovered, alternatives evaluated and ruled out, architectural direction, domain
+        modelling decisions, and any concrete structures or interfaces explored. Do not
+        invent design details that were not discussed — only record what was agreed or
+        explored with the user. This section may be left empty if no technical discussion
+        took place.
       - **Open questions**: Unresolved decisions that must be settled before spec work begins.
 
       The "Specs affected" section is the contract between proposal and specs — every spec
@@ -299,6 +307,16 @@ artifacts:
       service" or "update the module" — specify the exact class name, method signatures,
       and file paths. A developer reading the design should know precisely what to build
       without needing to make design decisions of their own.
+
+      Before writing, analyse the codebase to understand impact:
+      - **Symbol-level impact**: for each symbol being modified, identify its direct and
+        transitive callers/dependents. Assess risk — symbols with many cross-workspace
+        callers are high-risk and need careful handling.
+      - **Spec ripple effect**: when the change modifies existing specs, trace their
+        dependents (direct and transitive). Assess whether dependent specs' requirements
+        are still satisfied or need updating.
+      - **Dependency map**: for non-trivial changes, visualise the key relationships
+        (symbols → callers, specs → dependents) to make the blast radius explicit.
 
       The implementation approach must satisfy every requirement and scenario defined
       in the specs and verify artifacts of this change. Reference them to ensure full
