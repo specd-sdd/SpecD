@@ -219,6 +219,79 @@ Execute hooks for every state the change passes through, including intermediate 
 accepts them all and silently returns empty results if the schema doesn't define hooks
 for that step. Always call them; never skip a state assuming it has no hooks.
 
+## Code graph intelligence
+
+The CLI includes a code graph that indexes symbols, files, specs, and their relationships.
+You MUST use it for discovery, design, implementation, and verification — it is the
+primary tool for understanding the codebase, not a nice-to-have. If the graph hasn't
+been indexed yet, index it before proceeding. Only fall back to manual file exploration
+(Glob/Grep/Read) when the graph is genuinely broken after an indexing attempt.
+
+### Keeping the graph fresh
+
+Before using graph queries, check freshness:
+
+```bash
+node packages/cli/dist/index.js graph stats --format json
+```
+
+If `stale` is `true` (or the graph has never been indexed), re-index before querying:
+
+```bash
+node packages/cli/dist/index.js graph index --format json
+```
+
+Incremental indexing is fast (only changed files are re-processed). Use `--force` only
+if you suspect corruption or want a full rebuild. The `/specd` entry skill re-indexes
+automatically when it detects staleness, so downstream skills can usually assume a
+fresh graph.
+
+### Available commands
+
+**Search** — find symbols or specs by keyword (BM25 scoring):
+
+```bash
+node packages/cli/dist/index.js graph search "<query>" --format json
+node packages/cli/dist/index.js graph search "<query>" --symbols --kind function --format json
+node packages/cli/dist/index.js graph search "<query>" --specs --spec-content --format json
+```
+
+**Impact analysis** — understand blast radius before making changes:
+
+```bash
+node packages/cli/dist/index.js graph impact --symbol "<name>" --direction both --format json
+node packages/cli/dist/index.js graph impact --file "<path>" --format json
+node packages/cli/dist/index.js graph impact --changes <file1> <file2> --format json
+```
+
+Returns `riskLevel` (LOW/MEDIUM/HIGH/CRITICAL), affected files, and affected symbols.
+
+**Hotspots** — find high-coupling symbols that need careful handling:
+
+```bash
+node packages/cli/dist/index.js graph hotspots --format json
+node packages/cli/dist/index.js graph hotspots --min-risk HIGH --format json
+```
+
+Score = `(sameWsCallers × 3) + (crossWsCallers × 5) + fileImporters`.
+
+### When to use graph commands in each skill
+
+| Skill              | When                 | Command                  | Why                                                      |
+| ------------------ | -------------------- | ------------------------ | -------------------------------------------------------- |
+| `/specd`           | Welcome              | `graph stats`            | Show graph freshness alongside project status            |
+| `/specd-new`       | Understanding intent | `graph search`           | Find related specs and symbols by keyword                |
+| `/specd-new`       | Proposing specs      | `graph impact --file`    | Assess which areas a file change would affect            |
+| `/specd-design`    | Loading context      | `graph search --specs`   | Find specs related to the artifact being written         |
+| `/specd-design`    | Writing design/tasks | `graph hotspots`         | Identify high-risk symbols the design should account for |
+| `/specd-implement` | Before coding        | `graph impact --symbol`  | Understand blast radius of symbols you'll modify         |
+| `/specd-implement` | Before coding        | `graph hotspots --file`  | Spot risky symbols in files you'll touch                 |
+| `/specd-verify`    | After verifying      | `graph impact --changes` | Check blast radius of all files changed                  |
+
+Graph queries are the **primary** way to understand the codebase. Always prefer graph
+commands over manual exploration (Glob/Grep). If a graph query returns useful results,
+use them directly — don't duplicate the search manually.
+
 ## Spec overlap awareness
 
 Commands that modify a change's spec scope (`change create`, `change edit --add-spec`)
