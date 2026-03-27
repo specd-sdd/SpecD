@@ -36,6 +36,21 @@
 
 <!-- Affected code areas, APIs, data models, or external dependencies. -->
 
+## Technical context
+
+<!-- Capture technical insights, constraints, and decisions discussed during the
+     proposal conversation that should inform specs and design. Record what was
+     actually discussed — if concrete structures, file paths, or interfaces came
+     up, include them. Focus on:
+     - Technical constraints discovered (API limitations, performance bounds, compatibility)
+     - Alternatives evaluated and why they were ruled out
+     - Architectural direction agreed upon (patterns, layers, boundaries)
+     - Domain modelling decisions (entity vs value object, aggregate boundaries)
+     - Concrete structures or interfaces discussed, even if preliminary
+     This section preserves conversational context so it is not lost between
+     sessions. Do not invent design details that were not discussed — only
+     record what was actually agreed or explored with the user. -->
+
 ## Open questions
 
 <!-- Any unresolved questions or decisions that need to be made before spec work begins. -->

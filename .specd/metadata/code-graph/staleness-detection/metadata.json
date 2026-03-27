@@ -1,0 +1,135 @@
+{
+  "title": "Staleness Detection",
+  "description": "The code graph powers impact analysis, search, and hotspot detection — but there is no way to know whether it reflects the current state of the codebase. Users and agents can operate on stale data without realising it, leading to incorrect impact results, missed dependencies, and false confidence. This spec defines how staleness is detected by comparing VCS refs and the policy for handling stale data.",
+  "dependsOn": [
+    "code-graph:code-graph/graph-store",
+    "code-graph:code-graph/indexer",
+    "cli:cli/graph-stats"
+  ],
+  "context": [
+    "The code graph powers impact analysis, search, and hotspot detection — but there is no way to know whether it reflects the current state of the codebase. Users and agents can operate on stale data without realising it, leading to incorrect impact results, missed dependencies, and false confidence. This spec defines how staleness is detected by comparing VCS refs and the policy for handling stale data."
+  ],
+  "rules": [
+    {
+      "requirement": "VCS ref storage at index time",
+      "rules": [
+        "The indexer SHALL accept an optional `vcsRef: string` field in `IndexOptions`. When provided, the indexer SHALL persist the ref in the graph store's metadata (via the `lastIndexedRef` meta key) after successful indexing completes. The ref value is opaque — it may be a git commit hash, an hg changeset ID, or any string returned by `VcsAdapter.ref()`.\n\nWhen `vcsRef` is not provided (e.g. the project has no VCS), the `lastIndexedRef` meta key SHALL remain `null`. This is a valid state — staleness detection is simply unavailable."
+      ]
+    },
+    {
+      "requirement": "Staleness comparison",
+      "rules": [
+        "A graph is **stale** when:\n\n1. `lastIndexedRef` is not `null`, AND\n2. The current VCS ref (obtained from `VcsAdapter.ref()` at query time) differs from `lastIndexedRef`\n\nA graph is **fresh** when:\n\n1. `lastIndexedRef` is not `null`, AND\n2. The current VCS ref equals `lastIndexedRef`\n\nWhen `lastIndexedRef` is `null`, the staleness state is **unknown** — no comparison is possible. The system SHALL NOT treat unknown as stale."
+      ]
+    },
+    {
+      "requirement": "Warn-not-block policy",
+      "rules": [
+        "Commands that read from the graph (e.g. `graph stats`, `graph search`, `graph impact`, `graph hotspots`) SHALL **warn** when the graph is stale but SHALL NOT block execution. The command SHALL always return results based on the current (possibly stale) graph data.\n\nThis is a deliberate design choice: stale results are better than no results, and the user can decide whether to re-index."
+      ]
+    },
+    {
+      "requirement": "GraphStatistics extension",
+      "rules": [
+        "`GraphStatistics` SHALL include a `lastIndexedRef: string | null` field alongside the existing `lastIndexedAt`. This field is populated from the graph store's metadata. When the store has no ref stored, the value SHALL be `null`."
+      ]
+    },
+    {
+      "requirement": "Staleness in graph stats output",
+      "rules": [
+        "The `graph stats` command SHALL resolve the current VCS ref and compare it against `lastIndexedRef`:\n\n- **Text output**: If stale, append a warning line after `Last indexed`: Where `<short-ref>` is the first 7 characters of the ref. If `lastIndexedRef` is `null`, no staleness line is shown.\n- **JSON/TOON output**: Add two fields to the output object:\n  - `stale: boolean | null` — `true` if stale, `false` if fresh, `null` if unknown\n  - `currentRef: string | null` — the current VCS ref, or `null` if unavailable"
+      ]
+    }
+  ],
+  "constraints": [
+    "Staleness detection is VCS-agnostic — it uses VcsAdapter from @specd/core, not git-specific APIs",
+    "The VCS ref is stored as an opaque string — no parsing, validation, or truncation at storage time",
+    "No auto-refresh: detecting staleness never triggers re-indexing",
+    "The current VCS ref is resolved by the CLI layer (not by @specd/code-graph) and passed as a parameter"
+  ],
+  "scenarios": [
+    {
+      "requirement": "VCS ref storage at index time",
+      "name": "Ref persisted after indexing",
+      "given": ["IndexOptions.vcsRef is \"abc1234\""],
+      "when": ["indexing completes successfully"],
+      "then": ["the graph store's lastIndexedRef meta key SHALL be \"abc1234\""]
+    },
+    {
+      "requirement": "VCS ref storage at index time",
+      "name": "No VCS ref provided",
+      "given": ["IndexOptions.vcsRef is not provided"],
+      "when": ["indexing completes successfully"],
+      "then": ["the graph store's lastIndexedRef meta key SHALL remain null"]
+    },
+    {
+      "requirement": "Staleness comparison",
+      "name": "Stale graph",
+      "given": ["lastIndexedRef is \"abc1234\""],
+      "when": ["the current VCS ref is \"def5678\""],
+      "then": ["the graph SHALL be considered stale"]
+    },
+    {
+      "requirement": "Staleness comparison",
+      "name": "Fresh graph",
+      "given": ["lastIndexedRef is \"abc1234\""],
+      "when": ["the current VCS ref is \"abc1234\""],
+      "then": ["the graph SHALL be considered fresh"]
+    },
+    {
+      "requirement": "Staleness comparison",
+      "name": "Unknown staleness",
+      "given": ["lastIndexedRef is null"],
+      "when": ["staleness is checked"],
+      "then": ["the staleness state SHALL be unknown", "AND the system SHALL NOT treat it as stale"]
+    },
+    {
+      "requirement": "Warn-not-block policy",
+      "name": "Stale graph still returns results",
+      "given": ["the graph is stale"],
+      "when": ["graph stats is executed"],
+      "then": [
+        "a staleness warning SHALL be displayed",
+        "AND the command SHALL still return results from the current graph data"
+      ]
+    },
+    {
+      "requirement": "GraphStatistics extension",
+      "name": "lastIndexedRef in statistics",
+      "when": ["getStatistics() is called"],
+      "then": [
+        "the returned GraphStatistics SHALL include lastIndexedRef",
+        "AND its value SHALL match the stored meta key"
+      ]
+    },
+    {
+      "requirement": "Staleness in graph stats output",
+      "name": "Text output with stale graph",
+      "given": ["lastIndexedRef is \"abc1234def\"", "AND the current VCS ref is \"fff9999aaa\""],
+      "when": ["graph stats is run in text mode"],
+      "then": [
+        "a line ⚠ Graph is stale (indexed at abc1234, current: fff9999) SHALL appear after Last indexed"
+      ]
+    },
+    {
+      "requirement": "Staleness in graph stats output",
+      "name": "Text output with null ref",
+      "given": ["lastIndexedRef is null"],
+      "when": ["graph stats is run in text mode"],
+      "then": ["no staleness line SHALL be shown"]
+    },
+    {
+      "requirement": "Staleness in graph stats output",
+      "name": "JSON output includes staleness fields",
+      "when": ["graph stats --format json is run"],
+      "then": [
+        "the output SHALL include stale (boolean or null) and currentRef (string or null) fields"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:767c72b9f8f5e8eb8b25096f1b07927aec76cf763e6227aaa4fa3cdae748e599",
+    "verify.md": "sha256:9a8e2460d0ae0a71d981cd2fd8bbbac6f1ce35b93cb08394f15cff0304bf72fc"
+  },
+  "generatedBy": "core"
+}
