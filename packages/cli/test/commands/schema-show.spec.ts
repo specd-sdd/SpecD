@@ -291,6 +291,101 @@ describe('Output format', () => {
   })
 })
 
+describe('Ref mode', () => {
+  it('[ref] argument dispatches with mode ref', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.getActiveSchema.execute.mockResolvedValue({
+      name: () => 'specd-std',
+      version: () => 1,
+      artifacts: () => [],
+      workflow: () => [],
+    })
+
+    const program = makeProgram()
+    registerSchemaShow(program.command('schema'))
+    await program.parseAsync(['node', 'specd', 'schema', 'show', '@specd/schema-std'])
+
+    expect(kernel.specs.getActiveSchema.execute).toHaveBeenCalledWith({
+      mode: 'ref',
+      ref: '@specd/schema-std',
+    })
+    expect(stdout()).toContain('specd-std')
+  })
+
+  it('JSON output includes mode ref', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.getActiveSchema.execute.mockResolvedValue({
+      name: () => 'specd-std',
+      version: () => 1,
+      artifacts: () => [],
+      workflow: () => [],
+    })
+
+    const program = makeProgram()
+    registerSchemaShow(program.command('schema'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'schema',
+      'show',
+      '@specd/schema-std',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.mode).toBe('ref')
+  })
+})
+
+describe('File mode', () => {
+  it('--file dispatches with mode file', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.getActiveSchema.execute.mockResolvedValue({
+      name: () => 'my-schema',
+      version: () => 1,
+      artifacts: () => [],
+      workflow: () => [],
+    })
+
+    const program = makeProgram()
+    registerSchemaShow(program.command('schema'))
+    await program.parseAsync(['node', 'specd', 'schema', 'show', '--file', '/tmp/schema.yaml'])
+
+    expect(kernel.specs.getActiveSchema.execute).toHaveBeenCalledWith({
+      mode: 'file',
+      filePath: '/tmp/schema.yaml',
+    })
+    expect(stdout()).toContain('my-schema')
+  })
+
+  it('JSON output includes mode file', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.getActiveSchema.execute.mockResolvedValue({
+      name: () => 'my-schema',
+      version: () => 1,
+      artifacts: () => [],
+      workflow: () => [],
+    })
+
+    const program = makeProgram()
+    registerSchemaShow(program.command('schema'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'schema',
+      'show',
+      '--file',
+      '/tmp/schema.yaml',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.mode).toBe('file')
+  })
+})
+
 describe('Error cases', () => {
   it('Schema cannot be resolved', async () => {
     const { kernel, stderr } = setup()
@@ -304,5 +399,42 @@ describe('Error cases', () => {
 
     expect(process.exit).toHaveBeenCalledWith(3)
     expect(stderr()).toMatch(/fatal:/)
+  })
+
+  it('Ref not found exits with code 3', async () => {
+    const { kernel, stderr } = setup()
+    kernel.specs.getActiveSchema.execute.mockRejectedValue(
+      new SchemaNotFoundError('@nonexistent/schema'),
+    )
+
+    const program = makeProgram()
+    registerSchemaShow(program.command('schema'))
+    await program
+      .parseAsync(['node', 'specd', 'schema', 'show', '@nonexistent/schema'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(3)
+    expect(stderr()).toMatch(/fatal:/)
+  })
+
+  it('[ref] and --file are mutually exclusive', async () => {
+    const { stderr } = setup()
+
+    const program = makeProgram()
+    registerSchemaShow(program.command('schema'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'schema',
+        'show',
+        '@specd/schema-std',
+        '--file',
+        '/tmp/schema.yaml',
+      ])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('[ref] and --file are mutually exclusive')
   })
 })

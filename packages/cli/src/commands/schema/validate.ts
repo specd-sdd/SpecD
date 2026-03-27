@@ -12,40 +12,53 @@ import { cliError, handleError } from '../../handle-error.js'
  */
 export function registerSchemaValidate(parent: Command): void {
   parent
-    .command('validate')
+    .command('validate [ref]')
     .allowExcessArguments(false)
     .description(
-      'Validate a schema file against the specd schema format, reporting any structural or constraint violations.',
+      'Validate a schema against the specd schema format, reporting any structural or constraint violations.',
     )
     .option('--file <path>', 'validate an external schema file')
     .option('--raw', 'validate the base schema without plugins or overrides')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
-    .action(async (opts: { file?: string; raw?: boolean; format: string; config?: string }) => {
-      const fmt = parseFormat(opts.format)
+    .action(
+      async (
+        ref: string | undefined,
+        opts: { file?: string; raw?: boolean; format: string; config?: string },
+      ) => {
+        const fmt = parseFormat(opts.format)
 
-      if (opts.file !== undefined && opts.raw === true) {
-        cliError('--file and --raw are mutually exclusive', opts.format)
-      }
+        if (ref !== undefined && opts.file !== undefined) {
+          cliError('[ref] and --file are mutually exclusive', opts.format)
+        }
+        if (ref !== undefined && opts.raw === true) {
+          cliError('[ref] and --raw are mutually exclusive', opts.format)
+        }
+        if (opts.file !== undefined && opts.raw === true) {
+          cliError('--file and --raw are mutually exclusive', opts.format)
+        }
 
-      try {
-        const { kernel } = await resolveCliContext({ configPath: opts.config })
+        try {
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
 
-        const input =
-          opts.file !== undefined
-            ? { mode: 'file' as const, filePath: resolve(opts.file) }
-            : opts.raw === true
-              ? { mode: 'project-raw' as const }
-              : { mode: 'project' as const }
+          const input =
+            ref !== undefined
+              ? { mode: 'ref' as const, ref }
+              : opts.file !== undefined
+                ? { mode: 'file' as const, filePath: resolve(opts.file) }
+                : opts.raw === true
+                  ? { mode: 'project-raw' as const }
+                  : { mode: 'project' as const }
 
-        const result = await kernel.specs.validateSchema.execute(input)
-        const modeLabel = input.mode === 'project-raw' ? 'project-raw' : input.mode
+          const result = await kernel.specs.validateSchema.execute(input)
+          const modeLabel = input.mode === 'project-raw' ? 'project-raw' : input.mode
 
-        formatResult(result, modeLabel, fmt)
-      } catch (err) {
-        handleError(err, opts.format)
-      }
-    })
+          formatResult(result, modeLabel, fmt)
+        } catch (err) {
+          handleError(err, opts.format)
+        }
+      },
+    )
 }
 
 /**
@@ -62,7 +75,14 @@ function formatResult(
 ): void {
   if (result.valid) {
     const schema = result.schema
-    const suffix = mode === 'project-raw' ? ' [raw]' : mode === 'file' ? ' [file]' : ''
+    const suffix =
+      mode === 'project-raw'
+        ? ' [raw]'
+        : mode === 'file'
+          ? ' [file]'
+          : mode === 'ref'
+            ? ' [ref]'
+            : ''
     if (fmt === 'text') {
       let text = `schema valid: ${schema.name()} v${schema.version()} (${schema.artifacts().length} artifacts, ${schema.workflow().length} workflow steps)${suffix}`
       for (const w of result.warnings) {

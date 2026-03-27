@@ -45,6 +45,18 @@ When `execute` is called with `{ mode: 'file', filePath }`, the use case SHALL v
 4. Return a success result with the validated `Schema` and a list of warnings.
 5. No project plugins or overrides are applied — the file is validated with its extends chain only.
 
+### Requirement: Ref mode
+
+When `execute` is called with `{ mode: 'ref', ref: string }`, the use case SHALL validate a schema resolved by reference through the `SchemaRegistry`:
+
+1. Call `schemas.resolveRaw(ref)` to resolve the reference and get raw schema data and templates. If `null`, return a failure result with a "schema not found" error message that includes the ref.
+2. If the schema declares `extends`, resolve the extends chain via `schemas.resolveRaw()`. Detect cycles by tracking resolved paths. Cascade data using child-overrides-parent semantics.
+3. Call `buildSchemaFn(ref, cascadedData, templates)` for semantic validation.
+4. Return a success result with the validated `Schema` and a list of warnings.
+5. No project plugins or overrides are applied — the schema is validated with its extends chain only.
+
+The `ref` parameter accepts any format supported by `SchemaRegistry`: npm-scoped (`@scope/name`), workspace-qualified (`#workspace:name`), bare name (`#name` or `name`), or filesystem path.
+
 ### Requirement: Result type
 
 `execute` MUST return `Promise<ValidateSchemaResult>` where:
@@ -57,11 +69,11 @@ type ValidateSchemaResult =
 
 The use case MUST NOT throw for validation failures — it catches `SchemaValidationError` and `SchemaNotFoundError` and returns them as structured error results. Only unexpected errors (bugs) propagate as exceptions.
 
-### Requirement: Extends chain warnings in file mode
+### Requirement: Extends chain warnings in file and ref modes
 
-When validating a file that declares `extends` and the extends chain resolves successfully, the use case SHALL include a warning: `extends '<ref>' resolved from <resolvedPath>`. This helps the user understand which parent schema was used.
+When validating a file or ref that declares `extends` and the extends chain resolves successfully, the use case SHALL include a warning: `extends '<ref>' resolved from <resolvedPath>`. This helps the user understand which parent schema was used.
 
-When the extends reference cannot be resolved (e.g. the parent is an npm package not installed), the use case SHALL return a failure result with the resolution error — extends resolution is not optional in file mode.
+When the extends reference cannot be resolved (e.g. the parent is an npm package not installed), the use case SHALL return a failure result with the resolution error — extends resolution is not optional in file or ref mode.
 
 ## Constraints
 

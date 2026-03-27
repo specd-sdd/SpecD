@@ -8,12 +8,14 @@ Schema authors and project maintainers need a way to verify that their schema co
 
 ### Requirement: Command signature
 
-`specd schema validate [--file <path>] [--raw] [--format text|json|toon] [--config <path>]`
+`specd schema validate [ref] [--file <path>] [--raw] [--format text|json|toon] [--config <path>]`
 
-- When neither `--file` nor `--raw` is provided, the command validates the project's fully-resolved schema (merged).
-- When `--raw` is provided (without `--file`), the command validates the project's base schema without plugins or overrides.
+- `[ref]` — optional positional argument; a schema reference in the same format as `specd.yaml`'s `schema` field (e.g. `@specd/schema-std`, `#workspace:name`, `#name`, bare name). Resolved through `SchemaRegistry`.
+- When neither `[ref]`, `--file`, nor `--raw` is provided, the command validates the project's fully-resolved schema (merged).
+- When `--raw` is provided (without `[ref]` or `--file`), the command validates the project's base schema without plugins or overrides.
 - When `--file` is provided, the command validates the specified external file (resolving its extends chain).
-- `--file` and `--raw` are mutually exclusive. If both are provided, the command SHALL fail with an error.
+- When `[ref]` is provided, the command validates the referenced schema (resolving its extends chain, without project plugins or overrides).
+- `[ref]`, `--file`, and `--raw` are mutually exclusive. If any combination is provided, the command SHALL fail with an error.
 
 ### Requirement: Project mode — resolved
 
@@ -27,6 +29,10 @@ When invoked with `--raw` (without `--file`), the command SHALL call `ValidateSc
 
 When invoked with `--file <path>`, the command SHALL call `ValidateSchema.execute` with `mode: 'file'` and the resolved absolute path. The use case handles extends resolution, file reading, and validation.
 
+### Requirement: Ref mode
+
+When invoked with `[ref]` (without `--file` or `--raw`), the command SHALL call `ValidateSchema.execute` with `mode: 'ref'` and the provided reference string. The use case handles resolution through `SchemaRegistry`, extends chain resolution, and validation. No project plugins or overrides are applied.
+
 ### Requirement: Text output — success
 
 When validation succeeds and `--format` is `text`, the command SHALL write:
@@ -34,6 +40,7 @@ When validation succeeds and `--format` is `text`, the command SHALL write:
 - Project resolved mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps)`
 - Project raw mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [raw]`
 - File mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [file]`
+- Ref mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [ref]`
 
 Warning lines, if any, are appended as `  warning: <text>`.
 
@@ -53,7 +60,7 @@ Success:
   "schema": { "name": "...", "version": 1 },
   "artifacts": 5,
   "workflowSteps": 4,
-  "mode": "project" | "project-raw" | "file",
+  "mode": "project" | "project-raw" | "file" | "ref",
   "warnings": []
 }
 ```
@@ -65,7 +72,7 @@ Failure:
   "result": "error",
   "errors": [{ "message": "..." }],
   "warnings": [],
-  "mode": "project" | "project-raw" | "file"
+  "mode": "project" | "project-raw" | "file" | "ref"
 }
 ```
 
@@ -77,13 +84,21 @@ The command SHALL exit with code 0 when the schema is valid and code 1 when vali
 
 When `--file <path>` references a file that does not exist, the validation result SHALL contain the error and exit with code 1.
 
+### Requirement: Error — ref not found
+
+When `[ref]` references a schema that cannot be resolved (e.g. npm package not installed, workspace schema does not exist), the validation result SHALL contain the error and exit with code 1.
+
 ### Requirement: Error — config required in project modes
 
 When invoked without `--file` and no `specd.yaml` can be discovered, the command SHALL fail with the standard config-not-found error (as defined by the entrypoint spec).
 
 ### Requirement: Mutually exclusive flags
 
-When both `--file` and `--raw` are provided, the command SHALL write an error: `--file and --raw are mutually exclusive` and exit with code 1.
+`[ref]`, `--file`, and `--raw` are mutually exclusive. If any combination of two or more is provided, the command SHALL write a descriptive error and exit with code 1:
+
+- `[ref]` + `--file`: `[ref] and --file are mutually exclusive`
+- `[ref]` + `--raw`: `[ref] and --raw are mutually exclusive`
+- `--file` + `--raw`: `--file and --raw are mutually exclusive`
 
 ## Constraints
 

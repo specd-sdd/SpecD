@@ -9,18 +9,20 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd schema show [--format text|json|toon]\n```\n\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd schema show [ref] [--file <path>] [--format text|json|toon]\n```\n\n- `[ref]` — optional positional argument; a schema reference in the same format as `specd.yaml`'s `schema` field (e.g. `@specd/schema-std`, `#workspace:name`, `#name`, bare name). Resolved through `SchemaRegistry`.\n- `--file <path>` — optional; show a schema from an external file path (absolute or relative to CWD).\n- `--format text|json|toon` — optional; output format, defaults to `text`.\n\nWhen neither `[ref]` nor `--file` is provided, the command shows the project's active (configured) schema — the current default behaviour.\n\n`[ref]` and `--file` are mutually exclusive. If both are provided, the command SHALL fail with an error: `[ref] and --file are mutually exclusive`."
       ]
     },
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode (default), the command prints the schema metadata followed by two sections:\n\n```\nschema: <name>  version: <N>  kind: <kind>\nextends: <ref>  (only if present)\nplugins: <count> applied  (only if schemaPlugins is non-empty)\n\nartifacts:\n  <id>  <scope>  <optional>  requires=[<id>,...]  output=<pattern>  [<description>]\n  ...\n\nworkflow:\n  <step>  requires=[<id>,...]\n  ...\n```\n\nwhere `<optional>` is `optional` or `required`, and `requires` lists the artifact IDs or step names that must be complete before this entry is available. The `requires` field is omitted when empty. `output` is always shown. `<description>` is shown in brackets when present.\n\nIn `json` or `toon` mode, the output is (encoded in the respective format):\n\n```json\n{\n  \"schema\": {\"name\": \"...\", \"version\": N, \"kind\": \"schema\", \"extends\": \"...\"},\n  \"plugins\": [\"@specd/plugin-rfc\"],\n  \"artifacts\": [\n    {\n      \"id\": \"...\",\n      \"scope\": \"change|spec\",\n      \"optional\": false,\n      \"requires\": [],\n      \"format\": \"...\",\n      \"delta\": false,\n      \"description\": \"...\" | null,\n      \"output\": \"...\",\n      \"hasTaskCompletionCheck\": false\n    }\n  ],\n  \"workflow\": [\n    {\n      \"step\": \"...\",\n      \"requires\": []\n    }\n  ]\n}\n```\n\n- `description` (string | null) — human-readable summary of the artifact's purpose; `null` when the schema does not declare one\n- `output` (string) — the filename or glob pattern for the artifact's output files (e.g. `\"proposal.md\"`, `\"specs/**/spec.md\"`)\n- `hasTaskCompletionCheck` (boolean) — `true` when the artifact declares a `taskCompletionCheck` configuration; `false` otherwise"
+        "In `text` mode (default), the command prints the schema metadata followed by two sections:\n\n```\nschema: <name>  version: <N>  kind: <kind>\nextends: <ref>  (only if present)\nplugins: <count> applied  (only if schemaPlugins is non-empty — project mode only)\n\nartifacts:\n  <id>  <scope>  <optional>  requires=[<id>,...]  output=<pattern>  [<description>]\n  ...\n\nworkflow:\n  <step>  requires=[<id>,...]\n  ...\n```\n\nwhere `<optional>` is `optional` or `required`, and `requires` lists the artifact IDs or step names that must be complete before this entry is available. The `requires` field is omitted when empty. `output` is always shown. `<description>` is shown in brackets when present.\n\nThe `plugins` line is only shown when the project's active schema is displayed (no `[ref]` or `--file`), because plugins and overrides are not applied when resolving by ref or file.\n\nIn `json` or `toon` mode, the output is (encoded in the respective format):\n\n```json\n{\n  \"schema\": {\"name\": \"...\", \"version\": N, \"kind\": \"schema\", \"extends\": \"...\"},\n  \"plugins\": [\"@specd/plugin-rfc\"],\n  \"mode\": \"project\" | \"ref\" | \"file\",\n  \"artifacts\": [\n    {\n      \"id\": \"...\",\n      \"scope\": \"change|spec\",\n      \"optional\": false,\n      \"requires\": [],\n      \"format\": \"...\",\n      \"delta\": false,\n      \"description\": \"...\" | null,\n      \"output\": \"...\",\n      \"hasTaskCompletionCheck\": false\n    }\n  ],\n  \"workflow\": [\n    {\n      \"step\": \"...\",\n      \"requires\": []\n    }\n  ]\n}\n```\n\n- `mode` (string) — indicates how the schema was resolved: `\"project\"` for the active schema, `\"ref\"` when `[ref]` was provided, `\"file\"` when `--file` was provided\n- `plugins` (string array) — list of applied schema plugins; empty array when mode is `ref` or `file` (plugins are not applied)\n- `description` (string | null) — human-readable summary of the artifact's purpose; `null` when the schema does not declare one\n- `output` (string) — the filename or glob pattern for the artifact's output files (e.g. `\"proposal.md\"`, `\"specs/**/spec.md\"`)\n- `hasTaskCompletionCheck` (boolean) — `true` when the artifact declares a `taskCompletionCheck` configuration; `false` otherwise\n\nWhen resolving by `[ref]` or `--file`, the schema is resolved with its extends chain but WITHOUT the project's plugins or overrides. Only the project mode applies plugins and overrides."
       ]
     },
     {
       "requirement": "Error cases",
-      "rules": ["- If the schema reference in `specd.yaml` cannot be resolved, exits with code 3."]
+      "rules": [
+        "- If the schema reference in `specd.yaml` cannot be resolved (project mode), exits with code 3.\n- If `[ref]` is provided and the reference cannot be resolved, exits with code 3.\n- If `--file` is provided and the file does not exist, exits with code 3.\n- If both `[ref]` and `--file` are provided, the command SHALL write an error: `[ref] and --file are mutually exclusive` and exit with code 1."
+      ]
     }
   ],
   "constraints": [
@@ -56,6 +58,13 @@
     },
     {
       "requirement": "Output format",
+      "name": "Plugins line omitted when showing schema by ref",
+      "given": ["specd.yaml declares schemaPlugins: ['@specd/plugin-rfc']"],
+      "when": ["specd schema show @specd/schema-std is run"],
+      "then": ["stdout does NOT contain a plugins: line"]
+    },
+    {
+      "requirement": "Output format",
       "name": "Optional and required artifacts distinguished",
       "given": [
         "the schema declares artifact proposal as optional: true and spec as optional: false"
@@ -82,8 +91,9 @@
       "name": "JSON output structure",
       "when": ["specd schema show --format json is run"],
       "then": [
-        "stdout is valid JSON with schema, plugins, artifacts, and workflow",
+        "stdout is valid JSON with schema, plugins, mode, artifacts, and workflow",
         "AND schema has name, version, kind, and optionally extends",
+        "AND mode is \"project\"",
         "AND each artifact entry has id, scope, optional, requires, format, and delta",
         "AND each workflow entry has step and requires",
         "AND the process exits with code 0"
@@ -103,16 +113,71 @@
       ]
     },
     {
+      "requirement": "Output format",
+      "name": "Show schema by ref displays resolved schema",
+      "given": ["@specd/schema-std is installed as an npm package"],
+      "when": ["specd schema show @specd/schema-std is run"],
+      "then": [
+        "stdout contains the schema name and version from that package",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Show schema by ref with JSON includes mode ref",
+      "given": ["@specd/schema-std is installed"],
+      "when": ["specd schema show @specd/schema-std --format json is run"],
+      "then": ["the JSON output contains \"mode\": \"ref\""]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Show schema by file displays resolved schema",
+      "given": ["a valid schema file at ./test-schema.yaml"],
+      "when": ["specd schema show --file ./test-schema.yaml is run"],
+      "then": [
+        "stdout contains the schema name and version from the file",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Show schema by file with JSON includes mode file",
+      "given": ["a valid schema file at ./test-schema.yaml"],
+      "when": ["specd schema show --file ./test-schema.yaml --format json is run"],
+      "then": ["the JSON output contains \"mode\": \"file\""]
+    },
+    {
       "requirement": "Error cases",
       "name": "Schema cannot be resolved",
       "given": ["specd.yaml references a schema that does not exist"],
       "when": ["specd schema show is run"],
       "then": ["the command exits with code 3", "AND stderr contains a fatal: message"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Ref cannot be resolved",
+      "when": ["specd schema show @nonexistent/schema is run"],
+      "then": ["the command exits with code 3"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "File does not exist",
+      "when": ["specd schema show --file ./nonexistent.yaml is run"],
+      "then": ["the command exits with code 3"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Ref and --file are mutually exclusive",
+      "when": ["specd schema show @specd/schema-std --file ./schema.yaml is run"],
+      "then": [
+        "stderr contains [ref] and --file are mutually exclusive",
+        "AND the command exits with code 1"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:d30d38a85c4b96eeab1df1b84b62fd6e460e26152be04761ffff5135bd399b94",
-    "verify.md": "sha256:013f43b2dec8919fca9e15757cb3bdcc14e22b4878bfeab9c333931e8cc0e432"
+    "spec.md": "sha256:0f6e10ae776c56bc8abc783a2b6cd504d3dfc1c8a62d0eba4b0cd57d8cc04a47",
+    "verify.md": "sha256:b19971873aacbb1ea73bf250645e0ed65822d3968e960e7de69c28a2776e9c67"
   },
   "generatedBy": "core"
 }

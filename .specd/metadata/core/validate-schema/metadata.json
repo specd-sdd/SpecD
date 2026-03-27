@@ -36,15 +36,21 @@
       ]
     },
     {
+      "requirement": "Ref mode",
+      "rules": [
+        "When `execute` is called with `{ mode: 'ref', ref: string }`, the use case SHALL validate a schema resolved by reference through the `SchemaRegistry`:\n\n1. Call `schemas.resolveRaw(ref)` to resolve the reference and get raw schema data and templates. If `null`, return a failure result with a \"schema not found\" error message that includes the ref.\n2. If the schema declares `extends`, resolve the extends chain via `schemas.resolveRaw()`. Detect cycles by tracking resolved paths. Cascade data using child-overrides-parent semantics.\n3. Call `buildSchemaFn(ref, cascadedData, templates)` for semantic validation.\n4. Return a success result with the validated `Schema` and a list of warnings.\n5. No project plugins or overrides are applied — the schema is validated with its extends chain only.\n\nThe `ref` parameter accepts any format supported by `SchemaRegistry`: npm-scoped (`@scope/name`), workspace-qualified (`#workspace:name`), bare name (`#name` or `name`), or filesystem path."
+      ]
+    },
+    {
       "requirement": "Result type",
       "rules": [
         "`execute` MUST return `Promise<ValidateSchemaResult>` where:\n\n```typescript\ntype ValidateSchemaResult =\n  | { valid: true; schema: Schema; warnings: string[] }\n  | { valid: false; errors: string[]; warnings: string[] }\n```\n\nThe use case MUST NOT throw for validation failures — it catches `SchemaValidationError` and `SchemaNotFoundError` and returns them as structured error results. Only unexpected errors (bugs) propagate as exceptions."
       ]
     },
     {
-      "requirement": "Extends chain warnings in file mode",
+      "requirement": "Extends chain warnings in file and ref modes",
       "rules": [
-        "When validating a file that declares `extends` and the extends chain resolves successfully, the use case SHALL include a warning: `extends '<ref>' resolved from <resolvedPath>`. This helps the user understand which parent schema was used.\n\nWhen the extends reference cannot be resolved (e.g. the parent is an npm package not installed), the use case SHALL return a failure result with the resolution error — extends resolution is not optional in file mode."
+        "When validating a file or ref that declares `extends` and the extends chain resolves successfully, the use case SHALL include a warning: `extends '<ref>' resolved from <resolvedPath>`. This helps the user understand which parent schema was used.\n\nWhen the extends reference cannot be resolved (e.g. the parent is an npm package not installed), the use case SHALL return a failure result with the resolution error — extends resolution is not optional in file or ref mode."
       ]
     }
   ],
@@ -156,6 +162,51 @@
       "then": ["result is { valid: false } with a resolution error"]
     },
     {
+      "requirement": "Ref mode",
+      "name": "Valid schema resolved by ref",
+      "given": ["a valid schema registered in the SchemaRegistry under ref @specd/schema-std"],
+      "when": ["execute is called with { mode: 'ref', ref: '@specd/schema-std' }"],
+      "then": ["result is { valid: true } with the validated Schema"]
+    },
+    {
+      "requirement": "Ref mode",
+      "name": "Ref with extends chain",
+      "given": ["a schema ref #default:child that declares extends: '#default:parent'"],
+      "when": ["execute is called with { mode: 'ref', ref: '#default:child' }"],
+      "then": ["the extends chain is resolved and cascaded", "AND result is { valid: true }"]
+    },
+    {
+      "requirement": "Ref mode",
+      "name": "Ref not found",
+      "given": ["a ref that does not resolve in the SchemaRegistry"],
+      "when": ["execute is called with { mode: 'ref', ref: '@nonexistent/schema' }"],
+      "then": ["result is { valid: false } with a \"schema not found\" error"]
+    },
+    {
+      "requirement": "Ref mode",
+      "name": "Ref with invalid artifact ID",
+      "given": ["a schema ref whose schema file has an invalid artifact ID"],
+      "when": ["execute is called with { mode: 'ref', ref: '#default:bad-schema' }"],
+      "then": ["result is { valid: false } with the validation error"]
+    },
+    {
+      "requirement": "Ref mode",
+      "name": "Ref with circular extends",
+      "given": ["a schema ref whose extends chain forms a cycle"],
+      "when": ["execute is called with { mode: 'ref', ref: '#default:cyclic' }"],
+      "then": ["result is { valid: false } with a cycle detection error"]
+    },
+    {
+      "requirement": "Ref mode",
+      "name": "No project plugins or overrides applied",
+      "given": [
+        "a project with schemaPlugins and schemaOverrides configured",
+        "AND a valid schema ref @specd/schema-std"
+      ],
+      "when": ["execute is called with { mode: 'ref', ref: '@specd/schema-std' }"],
+      "then": ["the result schema does NOT include project plugin or override modifications"]
+    },
+    {
       "requirement": "Result type",
       "name": "Success result structure",
       "when": ["validation succeeds"],
@@ -175,11 +226,18 @@
       "given": ["a schema file that extends @specd/schema-std resolved from /path/to/schema.yaml"],
       "when": ["execute is called with mode: 'file'"],
       "then": ["warnings contains extends '@specd/schema-std' resolved from /path/to/schema.yaml"]
+    },
+    {
+      "requirement": "Extends chain warnings in file mode",
+      "name": "Ref with extends emits resolution warning",
+      "given": ["a schema ref that extends @specd/schema-std resolved from /path/to/schema.yaml"],
+      "when": ["execute is called with { mode: 'ref', ref: '#default:child' }"],
+      "then": ["warnings contains extends '@specd/schema-std' resolved from /path/to/schema.yaml"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9c02e18b493b8985c5c1c5251bd13148df57efb1e5d2998de630e2cc4957b599",
-    "verify.md": "sha256:6ce741faea4a2a8add5710d090d26d33c6b22bf954e9b35462b68b646cd42eae"
+    "spec.md": "sha256:3fb74fc8ffdadd230d027657636d35980b620fb3adcec1a7262b3b77b8d2cd44",
+    "verify.md": "sha256:1334f9fc3a06f6e35cd07c46ef07d1ffe0f1b3ed99f2d40fa39c80eba15349d6"
   },
   "generatedBy": "core"
 }
