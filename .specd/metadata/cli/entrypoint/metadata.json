@@ -49,6 +49,12 @@
       ]
     },
     {
+      "requirement": "JSON/TOON output schema in help",
+      "rules": [
+        "Every command that supports `--format json|toon` MUST include a human-readable description of its JSON output schema in the command help text, appended after the options list using Commander's `addHelpText('after', ...)`. The schema block MUST:\n\n- Start with a header line: `\\nJSON/TOON output schema:`\n- Show the output shape as a TypeScript-style type annotation with one property per line\n- Use `// comment` for brief field descriptions only when the field name is not self-explanatory\n- Use `?` suffix for optional/conditional fields\n- Show array element types inline (e.g. `Array<{ name: string, score: number }>`)\n\nExample:\n\n```\nJSON/TOON output schema:\n  {\n    totalSymbols: number\n    entries: Array<{\n      symbol: { id: string, name: string, kind: string, filePath: string, line: number, col: number, comment?: string }\n      score: number\n      riskLevel: \"LOW\" | \"MEDIUM\" | \"HIGH\" | \"CRITICAL\"\n    }>\n  }\n```\n\nThis ensures programmatic consumers (agents, scripts, CI pipelines) can discover the output shape without reading source code or running the command."
+      ]
+    },
+    {
       "requirement": "Excess arguments rejected",
       "rules": [
         "Every leaf command rejects unexpected positional arguments. If a user passes more positional arguments than the command declares, the command exits with code 1 and prints a usage error to stderr. This prevents silent typos and misremembered syntax from being ignored."
@@ -321,7 +327,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:5748c2eee6518aed85cc6ccb257be2192fa1db5160147d2c60f5f5cf0e128db6",
+    "spec.md": "sha256:e605551d95ad242733a76cb5a0814645e4886b09d3af084fb06c02fc0d78ecbf",
     "verify.md": "sha256:9a1a13a24111505d67b3dbab1b20fa246ed52c5072fcfa0e0ce476906fa0955a"
   },
   "generatedBy": "core"

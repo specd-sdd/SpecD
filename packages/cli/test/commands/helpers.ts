@@ -133,6 +133,7 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     detectOverlap: {
       execute: vi.fn().mockResolvedValue({ hasOverlap: false, entries: [] }),
     },
+    preview: { execute: vi.fn() },
   }
 
   const specs = {
