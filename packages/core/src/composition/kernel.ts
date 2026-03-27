@@ -35,6 +35,7 @@ import { GetHookInstructions } from '../application/use-cases/get-hook-instructi
 import { GetArtifactInstruction } from '../application/use-cases/get-artifact-instruction.js'
 import { ValidateSchema } from '../application/use-cases/validate-schema.js'
 import { DetectOverlap } from '../application/use-cases/detect-overlap.js'
+import { PreviewSpec } from '../application/use-cases/preview-spec.js'
 import { buildSchema } from '../domain/services/build-schema.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
@@ -97,6 +98,8 @@ export interface Kernel {
     getArtifactInstruction: GetArtifactInstruction
     /** Detects specs targeted by multiple active changes. */
     detectOverlap: DetectOverlap
+    /** Previews a spec with deltas applied from a change. */
+    preview: PreviewSpec
   }
   /** Use cases that operate on specs and approval gates. */
   specs: {
@@ -176,6 +179,9 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   // Shared RunStepHooks instance — used by TransitionChange, ArchiveChange, and exposed directly
   const runStepHooks = new RunStepHooks(i.changes, i.archive, i.hooks, schemaProvider)
 
+  // PreviewSpec — used by CompileContext and exposed as changes.preview
+  const previewSpec = new PreviewSpec(i.changes, i.specs, schemaProvider, i.parsers)
+
   return {
     changes: {
       repo: i.changes,
@@ -207,7 +213,15 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.actor,
         i.hasher,
       ),
-      compile: new CompileContext(i.changes, i.specs, schemaProvider, i.files, i.parsers, i.hasher),
+      compile: new CompileContext(
+        i.changes,
+        i.specs,
+        schemaProvider,
+        i.files,
+        i.parsers,
+        i.hasher,
+        previewSpec,
+      ),
       list: new ListChanges(i.changes),
       listDrafts: new ListDrafts(i.changes),
       listDiscarded: new ListDiscarded(i.changes),
@@ -224,6 +238,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.expander,
       ),
       detectOverlap: new DetectOverlap(i.changes),
+      preview: previewSpec,
       getArtifactInstruction: new GetArtifactInstruction(
         i.changes,
         i.specs,

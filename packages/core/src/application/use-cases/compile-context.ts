@@ -12,6 +12,7 @@ import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
+import { type PreviewSpec } from './preview-spec.js'
 import { type ContextWarning } from './_shared/context-warning.js'
 import { extractMetadata, type SubtreeRenderer } from '../../domain/services/extract-metadata.js'
 import { type SelectorNode } from '../../domain/services/selector-matching.js'
@@ -154,6 +155,7 @@ export class CompileContext {
   private readonly _files: FileReader
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
+  private readonly _previewSpec: PreviewSpec
 
   /**
    * Creates a new `CompileContext` use case instance.
@@ -164,6 +166,7 @@ export class CompileContext {
    * @param files - Reader for project-level context file entries
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hasher for metadata freshness checks
+   * @param previewSpec - Use case for merging deltas into spec content
    */
   constructor(
     changes: ChangeRepository,
@@ -172,6 +175,7 @@ export class CompileContext {
     files: FileReader,
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
+    previewSpec: PreviewSpec,
   ) {
     this._changes = changes
     this._specs = specs
@@ -179,6 +183,7 @@ export class CompileContext {
     this._files = files
     this._parsers = parsers
     this._hasher = hasher
+    this._previewSpec = previewSpec
   }
 
   /**
@@ -439,49 +444,75 @@ export class CompileContext {
       }
 
       // Tier 1: full content rendering
-      let isFresh = false
-      if (metadata !== null) {
-        isFresh = await this._isMetadataFresh(specRepo, spec, metadata)
+      // Attempt materialized delta view for specs in the change's specIds
+      let content: string | undefined
+      if (specIdsSet.has(specId)) {
+        try {
+          const preview = await this._previewSpec.execute({
+            name: input.name,
+            specId,
+          })
+          for (const w of preview.warnings) {
+            warnings.push({ type: 'preview', path: specId, message: w })
+          }
+          if (preview.files.length > 0) {
+            // Use merged content from spec.md entry, or first file
+            const specMdEntry = preview.files.find((f) => f.filename === 'spec.md')
+            content = (specMdEntry ?? preview.files[0])!.merged
+          }
+        } catch {
+          warnings.push({
+            type: 'preview',
+            path: specId,
+            message: `PreviewSpec failed for '${specId}' — falling back to base content`,
+          })
+        }
       }
 
-      const sectionsFilter = input.sections
-      const showAll = sectionsFilter === undefined
-
-      let content: string
-
-      if (isFresh && metadata !== null) {
-        content = this._renderFromMetadata(metadata, sectionsFilter, showAll)
-      } else {
+      // Fall back to metadata or extraction if preview didn't produce content
+      if (content === undefined) {
+        let isFresh = false
         if (metadata !== null) {
-          warnings.push({
-            type: 'stale-metadata',
-            path: specId,
-            message: `Metadata for '${specId}' is stale — falling back to raw artifact content`,
-          })
+          isFresh = await this._isMetadataFresh(specRepo, spec, metadata)
+        }
+
+        const sectionsFilter = input.sections
+        const showAll = sectionsFilter === undefined
+
+        if (isFresh && metadata !== null) {
+          content = this._renderFromMetadata(metadata, sectionsFilter, showAll)
         } else {
-          warnings.push({
-            type: 'stale-metadata',
-            path: specId,
-            message: `No metadata for '${specId}' — falling back to raw artifact content`,
-          })
+          if (metadata !== null) {
+            warnings.push({
+              type: 'stale-metadata',
+              path: specId,
+              message: `Metadata for '${specId}' is stale — falling back to raw artifact content`,
+            })
+          } else {
+            warnings.push({
+              type: 'stale-metadata',
+              path: specId,
+              message: `No metadata for '${specId}' — falling back to raw artifact content`,
+            })
+          }
+
+          const extraction = schema.metadataExtraction()
+          let fallbackParts: string[] = []
+
+          if (extraction !== undefined) {
+            fallbackParts = await this._extractionFallback(
+              specRepo,
+              spec,
+              schema,
+              extraction,
+              specId,
+              sectionsFilter,
+              showAll,
+            )
+          }
+
+          content = fallbackParts.join('\n\n')
         }
-
-        const extraction = schema.metadataExtraction()
-        let fallbackParts: string[] = []
-
-        if (extraction !== undefined) {
-          fallbackParts = await this._extractionFallback(
-            specRepo,
-            spec,
-            schema,
-            extraction,
-            specId,
-            sectionsFilter,
-            showAll,
-          )
-        }
-
-        content = fallbackParts.join('\n\n')
       }
 
       specs.push({ specId, title, description, source, mode, content })

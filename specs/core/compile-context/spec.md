@@ -107,6 +107,24 @@ For every spec in the collected context set, `CompileContext` must check whether
 
 Staleness is advisory — it never blocks context compilation. The fallback ensures the context is always assembled, even for specs whose metadata has not yet been generated.
 
+### Requirement: Ports and constructor — PreviewSpec
+
+`CompileContext` MUST receive a `PreviewSpec` instance at construction time, in addition to its existing ports. This is the use case it delegates to for merging deltas into spec content.
+
+```typescript
+class CompileContext {
+  constructor(
+    changes: ChangeRepository,
+    specs: ReadonlyMap<string, SpecRepository>,
+    schemaProvider: SchemaProvider,
+    files: FileReader,
+    parsers: ArtifactParserRegistry,
+    hasher: ContentHasher,
+    previewSpec: PreviewSpec,
+  )
+}
+```
+
 ### Requirement: Step availability
 
 `CompileContext` must evaluate whether the requested step is available for the current change. A step is available if all artifact IDs in the matching `workflow` entry's `requires` list (the entry whose `step` field equals the requested step name) have effective status `complete` or `skipped` via `change.effectiveStatus(type)`. A skipped optional artifact satisfies the requirement in the same way a completed artifact does.
@@ -173,6 +191,7 @@ If a pattern or `dependsOn` entry references a workspace name that has no corres
 - Fresh metadata (via `SpecRepository.metadata()`) is always preferred; the `metadataExtraction` fallback is only used when metadata is absent or stale
 - When `contextMode` is `'lazy'` (default), tier 2 specs MUST have `mode: 'summary'` with no `content` field — only `specId`, `title`, `description`, and `source`
 - When `contextMode` is `'full'`, all specs MUST have `mode: 'full'` — behaviour is identical to the pre-change implementation except for the structured result shape
+- `PreviewSpec` errors MUST NOT block context compilation — `CompileContext` falls back to base content on any preview failure
 
 ## Examples
 
@@ -216,3 +235,4 @@ const result = await compileContext.execute({
 - [`specs/core/workspace/spec.md`](../workspace/spec.md) — active workspace determination, workspace-level context patterns, port-per-workspace pattern
 - [`specs/core/get-artifact-instruction/spec.md`](../get-artifact-instruction/spec.md) — artifact instructions (separate concern)
 - [`specs/core/get-hook-instructions/spec.md`](../get-hook-instructions/spec.md) — step hook instructions (separate concern)
+- [`specs/core/preview-spec/spec.md`](../preview-spec/spec.md) — delta merge for materialized spec views in context

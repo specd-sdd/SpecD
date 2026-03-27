@@ -2,16 +2,9 @@
   "title": "CompileContext",
   "description": "AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata via `SpecRepository.metadata()`, evaluates step availability, and combines project context entries, spec content, and available steps into a single structured output. Artifact instructions and step hooks are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively.",
   "dependsOn": [
-    "core:core/change",
-    "core:core/config",
-    "core:core/spec-metadata",
-    "core:core/schema-format",
     "core:core/delta-format",
-    "core:core/selector-model",
-    "core:core/spec-id-format",
-    "core:core/workspace",
-    "core:core/get-artifact-instruction",
-    "core:core/get-hook-instructions"
+    "core:core/artifact-parser-port",
+    "core:core/preview-spec"
   ],
   "context": [
     "AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata via `SpecRepository.metadata()`, evaluates step availability, and combines project context entries, spec content, and available steps into a single structured output. Artifact instructions and step hooks are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively."
@@ -72,6 +65,12 @@
       ]
     },
     {
+      "requirement": "Ports and constructor — PreviewSpec",
+      "rules": [
+        "`CompileContext` MUST receive a `PreviewSpec` instance at construction time, in addition to its existing ports. This is the use case it delegates to for merging deltas into spec content.\n\n```typescript\nclass CompileContext {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    files: FileReader,\n    parsers: ArtifactParserRegistry,\n    hasher: ContentHasher,\n    previewSpec: PreviewSpec,\n  )\n}\n```"
+      ]
+    },
+    {
       "requirement": "Step availability",
       "rules": [
         "`CompileContext` must evaluate whether the requested step is available for the current change. A step is available if all artifact IDs in the matching `workflow` entry's `requires` list (the entry whose `step` field equals the requested step name) have effective status `complete` or `skipped` via `change.effectiveStatus(type)`. A skipped optional artifact satisfies the requirement in the same way a completed artifact does.\n\nIf the step is not available (one or more required artifacts are neither `complete` nor `skipped`), `CompileContext` must include the availability status and the list of blocking artifacts in the result. It must not throw — unavailability is surfaced to the caller, not treated as an error."
@@ -119,7 +118,8 @@
     "Cycle detection is mandatory — cycles in dependsOn must not cause infinite loops",
     "Fresh metadata (via SpecRepository.metadata()) is always preferred; the metadataExtraction fallback is only used when metadata is absent or stale",
     "When contextMode is 'lazy' (default), tier 2 specs MUST have mode: 'summary' with no content field — only specId, title, description, and source",
-    "When contextMode is 'full', all specs MUST have mode: 'full' — behaviour is identical to the pre-change implementation except for the structured result shape"
+    "When contextMode is 'full', all specs MUST have mode: 'full' — behaviour is identical to the pre-change implementation except for the structured result shape",
+    "PreviewSpec errors MUST NOT block context compilation — CompileContext falls back to base content on any preview failure"
   ],
   "scenarios": [
     {
@@ -497,11 +497,66 @@
         "result.warnings includes a warning about the unknown qualifier",
         "AND no exception is thrown"
       ]
+    },
+    {
+      "requirement": "Materialized delta view",
+      "name": "Spec with validated delta returns merged content",
+      "given": [
+        "a change with specIds: [\"core:core/config\"] and a validated delta for spec.md",
+        "AND PreviewSpec returns a files entry with filename: \"spec.md\" and merged: \"merged content\""
+      ],
+      "when": ["CompileContext.execute renders content for core:core/config in full mode"],
+      "then": ["the ContextSpecEntry.content equals \"merged content\""]
+    },
+    {
+      "requirement": "Materialized delta view",
+      "name": "Spec with no delta falls back to base content",
+      "given": [
+        "a change with specIds: [\"core:core/config\"] and no delta files",
+        "AND PreviewSpec returns an empty files array"
+      ],
+      "when": ["CompileContext.execute renders content for core:core/config in full mode"],
+      "then": [
+        "the ContextSpecEntry.content is rendered from metadata or extraction fallback as before"
+      ]
+    },
+    {
+      "requirement": "Materialized delta view",
+      "name": "PreviewSpec failure falls back gracefully",
+      "given": [
+        "a change with specIds: [\"core:core/config\"] and a delta file",
+        "AND PreviewSpec throws an error during execution"
+      ],
+      "when": ["CompileContext.execute renders content for core:core/config"],
+      "then": [
+        "the ContextSpecEntry.content is rendered from metadata or extraction fallback",
+        "AND a warning is added to the result"
+      ]
+    },
+    {
+      "requirement": "Materialized delta view",
+      "name": "Preview only applies to specIds specs",
+      "given": [
+        "a change with specIds: [\"core:core/config\"]",
+        "AND the context includes default:_global/architecture via include pattern"
+      ],
+      "when": ["CompileContext.execute is called"],
+      "then": [
+        "PreviewSpec is NOT called for default:_global/architecture",
+        "AND default:_global/architecture content is rendered from its base (metadata or fallback)"
+      ]
+    },
+    {
+      "requirement": "Materialized delta view",
+      "name": "Summary-mode specs not previewed",
+      "given": ["contextMode: 'lazy' and a spec matched only via include pattern (tier 2 summary)"],
+      "when": ["CompileContext.execute is called"],
+      "then": ["PreviewSpec is NOT called for that spec — summary specs have no content to merge"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:7c62a847e9c84884ac49af09a19b6ec11a2c14b710698d15caa4ea080b43a757",
-    "verify.md": "sha256:a8c6e9711ad37d8ee3138b9b939dc70ac9b3ca03defbac7b2c3c659d1351b0b9"
+    "spec.md": "sha256:90da9f5215733fdbc03ce11b115236b3cf407ec22c78bb86c9d139c594528615",
+    "verify.md": "sha256:6642cfea021f53a8d673f0cd0e0d9e75f9c91508310285b72f458d9e95d89d43"
   },
   "generatedBy": "core"
 }

@@ -106,3 +106,8 @@ export {
   type DetectOverlapContext,
   type FsDetectOverlapOptions,
 } from './detect-overlap.js'
+export {
+  createPreviewSpec,
+  type PreviewSpecWorkspace,
+  type FsPreviewSpecOptions,
+} from './preview-spec.js'
