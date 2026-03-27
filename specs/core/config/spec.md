@@ -70,7 +70,7 @@ workspaces:
     schemas: # where named local schemas live (optional)
       adapter: fs
       fs:
-        path: specd/schemas # default: specd/schemas (relative to specd.yaml)
+        path: .specd/schemas # default: .specd/schemas (relative to specd.yaml)
     codeRoot: ./ # where implementation code lives (default: project root)
     ownership: owned # owned | shared | readOnly (default: owned)
 
@@ -95,10 +95,21 @@ workspaces:
 
 **`schemas`** (optional) — declares where named local schemas for this workspace are stored. Has its own `adapter` and adapter-specific config block, independent of `specs`. Used when the `schema` field references `#workspace:name` or a bare/hash-prefixed name targeting this workspace.
 
-- For the `default` workspace, if omitted, defaults to `adapter: fs` with `fs.path: specd/schemas`.
+- For the `default` workspace, if omitted, defaults to `adapter: fs` with `fs.path: .specd/schemas`.
 - For non-`default` workspaces, if omitted, the workspace has no local schemas — any schema reference targeting it (e.g. `#billing:name`) will produce a `SchemaNotFoundError`.
 
 **`codeRoot`** — directory where the implementation code for this workspace lives. Used by `CompileContext` to tell the agent where to write code.
+
+- For the `default` workspace, defaults to the project root (directory containing `specd.yaml`).
+- For non-`default` workspaces, `codeRoot` is required — there is no default.
+
+**`ownership`** — the project's relationship to this workspace's specs.
+
+- `owned` — the project owns these specs and can create, modify, and archive changes against them. Default for the `default` workspace.
+- `shared` — specs can be modified, but external teams may also modify them.
+- `readOnly` — specs are imported for context only; changes cannot target them. Default for non-`default` workspaces.
+
+**Workspace-specific context filtering:** Each workspace may optionally declare `context.includeSpecs` and `context.excludeSpecs` arrays to filter which specs appear in compiled context for changes touching that workspace's specs. These follow the same glob-like pattern syntax as the project-level `context.includeSpecs` / `context.excludeSpecs` and are combined (intersected) with the project-level filters.
 
 ### Requirement: Storage configuration
 

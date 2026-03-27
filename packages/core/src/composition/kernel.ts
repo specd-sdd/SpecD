@@ -38,6 +38,7 @@ import { DetectOverlap } from '../application/use-cases/detect-overlap.js'
 import { PreviewSpec } from '../application/use-cases/preview-spec.js'
 import { buildSchema } from '../domain/services/build-schema.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
+import { type SchemaRegistry } from '../application/ports/schema-registry.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SpecdConfig } from '../application/specd-config.js'
 import { createKernelInternals } from './kernel-internals.js'
@@ -52,6 +53,8 @@ import { LazySchemaProvider } from './lazy-schema-provider.js'
  * `schemaRef`, `schemaRepositories`) are injected at construction time.
  */
 export interface Kernel {
+  /** The schema registry for resolving arbitrary schema references. */
+  schemas: SchemaRegistry
   /** Use cases that operate on changes. */
   changes: {
     /** The change repository — exposes existence checks for artifacts and deltas. */
@@ -183,6 +186,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const previewSpec = new PreviewSpec(i.changes, i.specs, schemaProvider, i.parsers)
 
   return {
+    schemas: i.schemas,
     changes: {
       repo: i.changes,
       create: new CreateChange(i.changes, i.specs, i.actor),
