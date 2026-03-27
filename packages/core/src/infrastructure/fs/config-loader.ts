@@ -415,7 +415,7 @@ export class FsConfigLoader implements ConfigLoader {
         ws.schemas !== undefined
           ? path.resolve(configDir, ws.schemas.fs.path)
           : name === 'default'
-            ? path.resolve(configDir, 'specd/schemas')
+            ? path.resolve(configDir, '.specd/schemas')
             : null
 
       let codeRoot: string

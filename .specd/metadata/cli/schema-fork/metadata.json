@@ -9,19 +9,19 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd schema fork <ref> [--name <name>] [--workspace <workspace>]\n```\n\n- `<ref>` (required) — the schema reference to fork (npm package, workspace-qualified, bare name, or path). Uses the same reference conventions as the `schema` field in `specd.yaml`.\n- `--name <name>` (optional) — the name for the forked schema directory. Defaults to the source schema's `name` field.\n- `--workspace <workspace>` (optional) — the workspace whose `schemas.fs.path` is used as the target directory. Defaults to `default`."
+        "```\nspecd schema fork <ref> <name> [--workspace <workspace> | --output <path>]\n```\n\n- `<ref>` (required) — the schema reference to fork (npm package, workspace-qualified, bare name, or path). Uses the same reference conventions as the `schema` field in `specd.yaml`.\n- `<name>` (required) — the name for the forked schema. Used as the directory name under the workspace's `schemasPath` and written into the forked `schema.yaml`'s `name` field.\n- `--workspace <workspace>` (optional) — the workspace whose `schemas.fs.path` is used as the target directory. Defaults to `default`. Mutually exclusive with `--output`.\n- `--output <path>` (optional) — explicit target directory for the forked schema. The directory is created recursively if it does not exist. Mutually exclusive with `--workspace`."
       ]
     },
     {
       "requirement": "Fork behaviour",
       "rules": [
-        "The command must:\n\n1. Resolve the source schema via `SchemaRegistry.resolve(ref, workspaceSchemasPaths)`.\n2. Copy the entire source schema directory (including `schema.yaml`, `templates/`, and any other files) into `<target-schemas-path>/<name>/`.\n3. In the copied `schema.yaml`, ensure `kind: schema` is present and remove any `extends` field — the fork is a standalone schema.\n4. Print the path to the new schema directory.\n\nIf the target directory already exists, the command must exit with an error and not overwrite."
+        "The command must:\n\n1. Resolve the source schema via the kernel's `SchemaRegistry.resolveRaw(ref)` — the same registry used by all other schema commands, properly wired with the CLI's `node_modules` paths. The resolved result provides the `schema.yaml` content and loaded templates.\n2. Write `schema.yaml` into the target directory with:\n   - `name` set to `<name>` (the required positional argument)\n   - `kind: schema` present\n   - Any `extends` field removed — the fork is a standalone schema\n3. Copy all templates from the source schema into the target directory, preserving their relative paths.\n4. Print the path to the new schema directory.\n\nOnly `schema.yaml` and `templates/` are copied — other files in the source directory (e.g. `package.json`, `src/`, `dist/` from npm packages) are excluded.\n\nTarget directory resolution:\n\n- If `--output <path>` is provided, use that path directly. Create parent directories recursively if they do not exist.\n- Otherwise, resolve `<workspace>.schemasPath` and append `<name>/` to form the target. If the workspace has no `schemasPath`, exit with an error.\n\n`--workspace` and `--output` are mutually exclusive — if both are provided, the command SHALL exit with code 1.\n\nIf the target directory already exists, the command must exit with an error and not overwrite."
       ]
     },
     {
       "requirement": "Error cases",
       "rules": [
-        "- Source schema not found — exits with code 3\n- Target directory already exists — exits with code 1, message identifies the existing path\n- Target workspace has no `schemas` section — exits with code 1"
+        "- Source schema not found — exits with code 3\n- Target directory already exists — exits with code 1, message identifies the existing path\n- Target workspace has no `schemas` section and no `--output` provided — exits with code 1\n- Both `--workspace` and `--output` provided — exits with code 1, message explains mutual exclusion"
       ]
     }
   ],
@@ -34,47 +34,79 @@
     {
       "requirement": "Fork behaviour",
       "name": "Fork from npm package",
-      "given": [
-        "@specd/schema-std is installed and the default workspace has schemas.fs.path: specd/schemas"
-      ],
-      "when": ["specd schema fork @specd/schema-std is run"],
+      "given": ["@specd/schema-std is installed and the default workspace has a schemasPath"],
+      "when": ["specd schema fork @specd/schema-std my-schema is run"],
       "then": [
-        "the schema directory is copied to specd/schemas/schema-std/",
-        "AND the copied schema.yaml has kind: schema and no extends field",
+        "the schema directory is copied to <default-schemasPath>/my-schema/",
+        "AND the copied schema.yaml has kind: schema, name: my-schema, and no extends field",
         "AND templates are copied alongside schema.yaml"
       ]
     },
     {
       "requirement": "Fork behaviour",
-      "name": "Fork with custom name",
-      "when": ["specd schema fork @specd/schema-std --name my-schema is run"],
-      "then": ["the schema is copied to specd/schemas/my-schema/"]
+      "name": "Fork from npm package in pnpm monorepo",
+      "given": [
+        "@specd/schema-std is installed via pnpm and only exists in packages/cli/node_modules/ as a symlink"
+      ],
+      "when": ["specd schema fork @specd/schema-std my-fork is run"],
+      "then": [
+        "the schema is resolved successfully via the kernel's registry",
+        "AND symlinks are dereferenced during copy",
+        "AND the schema directory is copied to the target"
+      ]
+    },
+    {
+      "requirement": "Fork behaviour",
+      "name": "Fork with --output",
+      "when": ["specd schema fork @specd/schema-std my-fork --output /tmp/my-schema is run"],
+      "then": [
+        "the schema directory is copied to /tmp/my-schema/",
+        "AND the directory is created if it does not exist",
+        "AND schema.yaml contains name: my-fork"
+      ]
+    },
+    {
+      "requirement": "Fork behaviour",
+      "name": "Fork with --output to non-existent nested path",
+      "given": ["/tmp/deep/nested/path does not exist"],
+      "when": ["specd schema fork @specd/schema-std my-fork --output /tmp/deep/nested/path is run"],
+      "then": [
+        "the full parent directory tree is created recursively",
+        "AND the schema is copied into it"
+      ]
     },
     {
       "requirement": "Fork behaviour",
       "name": "Target directory already exists",
-      "given": ["specd/schemas/schema-std/ already exists"],
-      "when": ["specd schema fork @specd/schema-std is run"],
+      "given": ["the target directory already exists"],
+      "when": ["specd schema fork @specd/schema-std my-fork is run"],
       "then": ["the command exits with code 1 and does not overwrite"]
     },
     {
       "requirement": "Error cases",
       "name": "Source schema not found",
-      "when": ["specd schema fork @specd/nonexistent is run"],
+      "when": ["specd schema fork @specd/nonexistent my-fork is run"],
       "then": ["the command exits with code 3"]
     },
     {
       "requirement": "Error cases",
       "name": "Target workspace has no schemas section",
-      "when": [
-        "specd schema fork @specd/schema-std --workspace billing is run and billing has no schemas section"
-      ],
+      "given": ["workspace billing has no schemas section configured"],
+      "when": ["specd schema fork @specd/schema-std my-fork --workspace billing is run"],
       "then": ["the command exits with code 1"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Both --workspace and --output provided",
+      "when": [
+        "specd schema fork @specd/schema-std my-fork --workspace billing --output /tmp/out is run"
+      ],
+      "then": ["the command exits with code 1 with a message explaining mutual exclusion"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:6fff226587eec055af02ed2fde3ef9e7a0f43351343eb2ccc45c1374bf46d783",
-    "verify.md": "sha256:0dd80d0e6899df4e42e91c45bc2a9755c9937be2a820c1ba7122485722764853"
+    "spec.md": "sha256:bd54b825f5e7e6bd553509a7ef040a5a6c721b27e1ad587dad81cd4d5007377e",
+    "verify.md": "sha256:498124cfe2c0b4f45057cdf5bdd164867acd2f5fc7a1185630fe042a7dd459d2"
   },
   "generatedBy": "core"
 }

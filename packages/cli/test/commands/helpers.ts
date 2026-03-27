@@ -19,11 +19,13 @@ import type { Skill } from '@specd/skills'
  * mock API while keeping the intersection with `Kernel` compatible.
  */
 export type MockKernel = {
-  [G in keyof Kernel]: {
-    [K in keyof Kernel[G]]: Kernel[G][K] extends { execute: (...args: never[]) => unknown }
-      ? { execute: ReturnType<typeof vi.fn> }
-      : Kernel[G][K]
-  }
+  [G in keyof Kernel]: Kernel[G] extends Record<string, unknown>
+    ? {
+        [K in keyof Kernel[G]]: Kernel[G][K] extends { execute: (...args: never[]) => unknown }
+          ? { execute: ReturnType<typeof vi.fn> }
+          : Kernel[G][K]
+      }
+    : Kernel[G]
 }
 
 /**
@@ -174,10 +176,16 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     },
   }
 
+  const schemas = {
+    resolve: vi.fn().mockResolvedValue(null),
+    resolveRaw: vi.fn().mockResolvedValue(null),
+    list: vi.fn().mockResolvedValue([]),
+  }
+
   // The mock satisfies Kernel structurally at runtime (every group has every
   // key with an { execute } stub). A single cast is enough — MockKernel
   // mirrors Kernel's shape with mock execute functions.
-  return { changes, specs, project, ...overrides } as unknown as Kernel & MockKernel
+  return { schemas, changes, specs, project, ...overrides } as unknown as Kernel & MockKernel
 }
 
 // ---------------------------------------------------------------------------

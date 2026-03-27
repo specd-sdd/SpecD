@@ -887,4 +887,17 @@ storage:
       await expect(loader.resolvePath()).resolves.not.toThrow()
     })
   })
+
+  describe('Requirement: Default schemasPath for default workspace', () => {
+    it('defaults schemasPath to .specd/schemas when no schemas section is configured', async () => {
+      const configPath = await writeConfig(minimalYaml())
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      const defaultWs = config.workspaces.find((ws) => ws.name === 'default')
+      expect(defaultWs).toBeDefined()
+      expect(defaultWs!.schemasPath).toBe(path.join(tmpDir, '.specd/schemas'))
+    })
+  })
 })
