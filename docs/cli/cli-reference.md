@@ -714,15 +714,31 @@ Inspect and manage the active schema.
 ### schema show
 
 ```
-specd schema show [options]
+specd schema show [ref] [options]
 ```
 
-Print the contents of the active schema as resolved from `specd.yaml`.
+Display the full definition of a schema, including all artifact types, fields, and extraction rules.
 
-| Option                      | Description       |
-| --------------------------- | ----------------- |
-| `--format text\|json\|toon` | Output format.    |
-| `--config <path>`           | Config file path. |
+When neither `[ref]` nor `--file` is provided, shows the project's active schema as resolved from `specd.yaml`. When `[ref]` is provided, resolves the referenced schema through the registry (with extends chain, but without project plugins or overrides). When `--file` is provided, resolves the schema from the given file path.
+
+`[ref]` accepts any valid schema reference: npm package (`@specd/schema-std`), workspace-qualified (`#workspace:name`), bare name, or path.
+
+| Option                      | Description                                                 |
+| --------------------------- | ----------------------------------------------------------- |
+| `--file <path>`             | Show a schema from a file. Mutually exclusive with `[ref]`. |
+| `--format text\|json\|toon` | Output format.                                              |
+| `--config <path>`           | Config file path.                                           |
+
+```bash
+# Show the project's active schema
+specd schema show
+
+# Show a schema by reference
+specd schema show @specd/schema-std
+
+# Show a schema from a file
+specd schema show --file .specd/schemas/my-workflow/schema.yaml
+```
 
 ### schema fork
 
@@ -777,21 +793,32 @@ specd schema extend @specd/schema-std my-custom --output .specd/schemas/my-custo
 ### schema validate
 
 ```
-specd schema validate [options]
+specd schema validate [ref] [options]
 ```
 
-Validate a schema file. By default validates the active schema. Use `--file` to validate any schema file, or `--raw` to validate a schema provided on stdin.
+Validate a schema against the specd schema format. By default validates the project's active schema (fully resolved with plugins and overrides). Use `[ref]` to validate any schema by reference, `--file` to validate a schema file, or `--raw` to validate the base schema without plugins or overrides.
 
-| Option                      | Description                                  |
-| --------------------------- | -------------------------------------------- |
-| `--file <path>`             | Path to a schema file to validate.           |
-| `--raw`                     | Read schema YAML from stdin and validate it. |
-| `--format text\|json\|toon` | Output format.                               |
-| `--config <path>`           | Config file path.                            |
+`[ref]` accepts any valid schema reference: npm package (`@specd/schema-std`), workspace-qualified (`#workspace:name`), bare name, or path. `[ref]`, `--file`, and `--raw` are mutually exclusive.
+
+| Option                      | Description                                                                                          |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `--file <path>`             | Path to a schema file to validate. Mutually exclusive with `[ref]` and `--raw`.                      |
+| `--raw`                     | Validate the base schema without plugins or overrides. Mutually exclusive with `[ref]` and `--file`. |
+| `--format text\|json\|toon` | Output format.                                                                                       |
+| `--config <path>`           | Config file path.                                                                                    |
 
 ```bash
+# Validate the project's active schema
+specd schema validate
+
+# Validate a schema by reference
+specd schema validate @specd/schema-std
+
 # Validate a schema file before switching to it
-specd schema validate --file specd/schemas/my-workflow/schema.yaml
+specd schema validate --file .specd/schemas/my-workflow/schema.yaml
+
+# Validate the base schema without plugins or overrides
+specd schema validate --raw
 ```
 
 ---

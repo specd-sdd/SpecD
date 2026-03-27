@@ -1,26 +1,28 @@
 {
   "title": "GetActiveSchema",
-  "description": "Delivery mechanisms (CLI, MCP, plugins) need a single canonical way to obtain the project's resolved schema without duplicating multi-step resolution logic. `GetActiveSchema` provides this by delegating to `ResolveSchema`, which orchestrates the full pipeline (base schema, extends chain, plugins, overrides, merge, build), and returning the resulting `Schema` entity.",
+  "description": "Delivery mechanisms (CLI, MCP, plugins) need a single canonical way to obtain a resolved schema — either the project's active schema or an arbitrary schema identified by reference or file path — without duplicating multi-step resolution logic. `GetActiveSchema` provides this by delegating to `ResolveSchema` for the project's active schema, or by resolving a ref/file through the `SchemaRegistry` with extends chain resolution, and returning the resulting `Schema` entity.",
   "dependsOn": [
     "core:core/resolve-schema",
     "core:core/config",
     "core:core/schema-format",
+    "core:core/schema-registry-port",
+    "core:core/build-schema",
     "default:_global/architecture"
   ],
   "context": [
-    "Delivery mechanisms (CLI, MCP, plugins) need a single canonical way to obtain the project's resolved schema without duplicating multi-step resolution logic. `GetActiveSchema` provides this by delegating to `ResolveSchema`, which orchestrates the full pipeline (base schema, extends chain, plugins, overrides, merge, build), and returning the resulting `Schema` entity."
+    "Delivery mechanisms (CLI, MCP, plugins) need a single canonical way to obtain a resolved schema — either the project's active schema or an arbitrary schema identified by reference or file path — without duplicating multi-step resolution logic. `GetActiveSchema` provides this by delegating to `ResolveSchema` for the project's active schema, or by resolving a ref/file through the `SchemaRegistry` with extends chain resolution, and returning the resulting `Schema` entity."
   ],
   "rules": [
     {
-      "requirement": "Accepts no input",
+      "requirement": "Optional input",
       "rules": [
-        "`execute()` MUST take no arguments. All configuration is provided at construction time, not at invocation time."
+        "`execute()` MAY be called with no arguments or with an optional `GetActiveSchemaInput`:\n\n```typescript\ntype GetActiveSchemaInput =\n  | { readonly mode: 'ref'; readonly ref: string }\n  | { readonly mode: 'file'; readonly filePath: string }\n```\n\n- When called with **no arguments** (or `undefined`): resolves the project's active schema via `ResolveSchema` — the current default behaviour.\n- When called with `{ mode: 'ref', ref }`: resolves the referenced schema through `SchemaRegistry` with extends chain resolution, without applying project plugins or overrides.\n- When called with `{ mode: 'file', filePath }`: resolves the schema from the given file path with extends chain resolution, without applying project plugins or overrides."
       ]
     },
     {
       "requirement": "Delegates to ResolveSchema",
       "rules": [
-        "The use case MUST call `resolveSchema.execute()` to obtain the active schema. It SHALL NOT resolve schemas directly or implement any resolution logic itself. `ResolveSchema` handles the full pipeline: base resolution, extends chain, plugins, overrides, merge, and build."
+        "When called without input (project mode), the use case MUST call `resolveSchema.execute()` to obtain the active schema. It SHALL NOT resolve schemas directly or implement any resolution logic itself for this mode.\n\nWhen called with `ref` or `file` input, the use case SHALL resolve the schema through `SchemaRegistry.resolveRaw()`, resolve the extends chain, merge templates, and build the `Schema` via `buildSchema`. No project plugins or overrides are applied in these modes."
       ]
     },
     {
@@ -30,30 +32,83 @@
     {
       "requirement": "Construction dependencies",
       "rules": [
-        "`GetActiveSchema` MUST be constructed with one dependency:\n\n- `resolveSchema` (`ResolveSchema`) — the use case that orchestrates the full schema resolution pipeline.\n\nAll lower-level dependencies (schema registry, schema ref, plugins, overrides) are provided to `ResolveSchema` at its construction time."
+        "`GetActiveSchema` MUST be constructed with:\n\n- `resolveSchema` (`ResolveSchema`) — the use case that orchestrates the full schema resolution pipeline (used for project mode).\n- `schemas` (`SchemaRegistry`) — the registry port for resolving schema references (used for ref and file modes).\n- `buildSchemaFn` (`(ref: string, data: SchemaYamlData, templates: ReadonlyMap<string, string>) => Schema`) — the domain service for building the Schema entity (used for ref and file modes).\n\nAll lower-level dependencies (schema ref, plugins, overrides) are provided to `ResolveSchema` at its construction time."
       ]
     }
   ],
   "constraints": [
-    "The use case contains no business logic — it is a thin delegation to ResolveSchema.",
-    "The schema reference is fixed at construction time — calling execute multiple times resolves the same reference.",
+    "For project mode, the use case contains no business logic — it is a thin delegation to ResolveSchema.",
+    "For ref and file modes, the use case orchestrates SchemaRegistry.resolveRaw(), extends chain resolution, template merging, and buildSchema — the same pattern used by ValidateSchema for file mode.",
+    "The schema reference is fixed at construction time for project mode — calling execute() multiple times without input resolves the same reference.",
     "The use case is async — it returns Promise<Schema>."
   ],
   "scenarios": [
     {
-      "requirement": "Accepts no input",
-      "name": "Execute called without arguments",
+      "requirement": "Optional input",
+      "name": "Execute called without arguments resolves project schema",
       "when": ["execute() is called with no arguments"],
-      "then": ["the call succeeds and uses the ResolveSchema instance provided at construction"]
+      "then": ["the call succeeds and resolves the project's active schema via ResolveSchema"]
+    },
+    {
+      "requirement": "Optional input",
+      "name": "Execute called with ref resolves referenced schema",
+      "given": ["@specd/schema-std is registered in the SchemaRegistry"],
+      "when": ["execute({ mode: 'ref', ref: '@specd/schema-std' }) is called"],
+      "then": [
+        "the result is the Schema resolved from that ref with extends chain applied",
+        "AND no project plugins or overrides are applied"
+      ]
+    },
+    {
+      "requirement": "Optional input",
+      "name": "Execute called with file resolves file schema",
+      "given": ["a valid schema file at /tmp/test-schema.yaml"],
+      "when": ["execute({ mode: 'file', filePath: '/tmp/test-schema.yaml' }) is called"],
+      "then": [
+        "the result is the Schema resolved from that file with extends chain applied",
+        "AND no project plugins or overrides are applied"
+      ]
+    },
+    {
+      "requirement": "Optional input",
+      "name": "Ref not found throws SchemaNotFoundError",
+      "given": ["a ref that does not resolve in the SchemaRegistry"],
+      "when": ["execute({ mode: 'ref', ref: '@nonexistent/schema' }) is called"],
+      "then": ["SchemaNotFoundError is thrown"]
+    },
+    {
+      "requirement": "Optional input",
+      "name": "File not found throws SchemaNotFoundError",
+      "given": ["a file path that does not exist"],
+      "when": ["execute({ mode: 'file', filePath: '/tmp/nonexistent.yaml' }) is called"],
+      "then": ["SchemaNotFoundError is thrown"]
     },
     {
       "requirement": "Delegates to ResolveSchema",
-      "name": "ResolveSchema receives construction-time parameters",
+      "name": "Project mode delegates to ResolveSchema",
       "given": [
-        "the use case was constructed with a ResolveSchema instance configured for \"@specd/schema-std\""
+        "the use case was constructed with a ResolveSchema instance configured for @specd/schema-std"
       ],
-      "when": ["execute() is called"],
-      "then": ["resolveSchema.execute() is called"]
+      "when": ["execute() is called without arguments"],
+      "then": ["ResolveSchema.execute() is called exactly once"]
+    },
+    {
+      "requirement": "Delegates to ResolveSchema",
+      "name": "Ref mode uses SchemaRegistry directly",
+      "when": ["execute({ mode: 'ref', ref: '@specd/schema-std' }) is called"],
+      "then": [
+        "SchemaRegistry.resolveRaw() is called with the ref",
+        "AND ResolveSchema.execute() is NOT called"
+      ]
+    },
+    {
+      "requirement": "Delegates to ResolveSchema",
+      "name": "File mode uses SchemaRegistry directly",
+      "when": ["execute({ mode: 'file', filePath: '/tmp/schema.yaml' }) is called"],
+      "then": [
+        "SchemaRegistry.resolveRaw() is called with the file path",
+        "AND ResolveSchema.execute() is NOT called"
+      ]
     },
     {
       "requirement": "Returns the resolved Schema on success",
@@ -82,15 +137,22 @@
     },
     {
       "requirement": "Construction dependencies",
-      "name": "Multiple executions resolve the same reference",
-      "given": ["the use case was constructed with a ResolveSchema instance"],
-      "when": ["execute() is called twice"],
-      "then": ["resolveSchema.execute() is called twice"]
+      "name": "Constructed with all required dependencies",
+      "given": ["a ResolveSchema, SchemaRegistry, and buildSchema function"],
+      "when": ["GetActiveSchema is constructed with all three"],
+      "then": ["it does not throw"]
+    },
+    {
+      "requirement": "Construction dependencies",
+      "name": "Multiple project-mode executions resolve the same reference",
+      "given": ["GetActiveSchema was constructed with specific config"],
+      "when": ["execute() is called twice without arguments"],
+      "then": ["both calls produce an equivalent Schema object"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:7e311f1cacd151a8f9fd05978a289549f3128ba7a5c961ffea9d734a02e974f8",
-    "verify.md": "sha256:6a085145a0f051fcf9eafe3a4476cfad77e8db9ed4f8c3f76406e23dc8f3ffdf"
+    "spec.md": "sha256:0b4e7f65f72a13aa8beedb39b583f58820b925362a33a6f57e681a19c90589dc",
+    "verify.md": "sha256:b8cd0383e72732dd449fd7cc98287f47f73e637f4f25538da03be80871a46d2c"
   },
   "generatedBy": "core"
 }

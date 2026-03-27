@@ -271,6 +271,82 @@ describe('File mode', () => {
   })
 })
 
+describe('Ref mode', () => {
+  it('valid ref returns success', async () => {
+    const data = minimalData()
+    const registry = makeRegistry({
+      '@specd/schema-std': rawResult(data, '/npm/schema-std/schema.yaml'),
+    })
+    const buildFn = vi.fn().mockReturnValue(fakeSchema())
+    const { sut } = makeSut({ registry, buildSchemaFn: buildFn })
+
+    const result = await sut.execute({ mode: 'ref', ref: '@specd/schema-std' })
+
+    expect(result.valid).toBe(true)
+  })
+
+  it('ref not found returns failure', async () => {
+    const registry = makeRegistry({})
+    const { sut } = makeSut({ registry })
+
+    const result = await sut.execute({ mode: 'ref', ref: '@nonexistent/schema' })
+
+    expect(result.valid).toBe(false)
+    if (!result.valid) expect(result.errors[0]).toContain("schema '@nonexistent/schema' not found")
+  })
+
+  it('ref with extends resolves and adds warnings', async () => {
+    const parentData = minimalData({ name: 'parent' })
+    const childData = minimalData({ name: 'child', extends: '@specd/schema-std' })
+    const registry = makeRegistry({
+      '#default:child': rawResult(childData, '/schemas/child/schema.yaml'),
+      '@specd/schema-std': rawResult(parentData, '/npm/schema-std/schema.yaml'),
+    })
+    const buildFn = vi.fn().mockReturnValue(fakeSchema())
+    const { sut } = makeSut({ registry, buildSchemaFn: buildFn })
+
+    const result = await sut.execute({ mode: 'ref', ref: '#default:child' })
+
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.warnings.length).toBeGreaterThan(0)
+      expect(result.warnings[0]).toContain("extends '@specd/schema-std'")
+      expect(result.warnings[0]).toContain('/npm/schema-std/schema.yaml')
+    }
+  })
+
+  it('ref with circular extends returns failure', async () => {
+    const parentData = minimalData({ name: 'parent', extends: 'child-ref' })
+    const childData = minimalData({ name: 'child', extends: 'parent-ref' })
+    const registry = makeRegistry({
+      'child-ref': rawResult(childData, '/path/child.yaml'),
+      'parent-ref': rawResult(parentData, '/path/parent.yaml'),
+    })
+    const { sut } = makeSut({ registry })
+
+    const result = await sut.execute({ mode: 'ref', ref: 'child-ref' })
+
+    expect(result.valid).toBe(false)
+    if (!result.valid) expect(result.errors[0]).toContain('cycle')
+  })
+
+  it('ref with invalid content returns failure', async () => {
+    const data = minimalData()
+    const registry = makeRegistry({
+      '@specd/schema-std': rawResult(data, '/npm/schema-std/schema.yaml'),
+    })
+    const buildFn = vi.fn().mockImplementation(() => {
+      throw new SchemaValidationError('schema', 'invalid artifact ID')
+    })
+    const { sut } = makeSut({ registry, buildSchemaFn: buildFn })
+
+    const result = await sut.execute({ mode: 'ref', ref: '@specd/schema-std' })
+
+    expect(result.valid).toBe(false)
+    if (!result.valid) expect(result.errors[0]).toContain('invalid artifact ID')
+  })
+})
+
 describe('Result type', () => {
   it('success result has valid, schema, and warnings', async () => {
     const { sut } = makeSut()

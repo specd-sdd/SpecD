@@ -4,6 +4,7 @@ import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
 import { type SchemaRepository } from '../../application/ports/schema-repository.js'
+import { buildSchema } from '../../domain/services/build-schema.js'
 import { createSchemaRepository } from '../schema-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 
@@ -79,7 +80,7 @@ export function createGetActiveSchema(
       configOrOptions.schemaPlugins ?? [],
       configOrOptions.schemaOverrides,
     )
-    return new GetActiveSchema(resolveSchema)
+    return new GetActiveSchema(resolveSchema, schemas, buildSchema)
   }
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: configOrOptions.nodeModulesPaths,
@@ -92,5 +93,5 @@ export function createGetActiveSchema(
     configOrOptions.schemaPlugins ?? [],
     configOrOptions.schemaOverrides,
   )
-  return new GetActiveSchema(resolveSchema)
+  return new GetActiveSchema(resolveSchema, schemas, buildSchema)
 }

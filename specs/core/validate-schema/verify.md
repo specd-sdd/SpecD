@@ -96,6 +96,46 @@
 - **WHEN** `execute` is called with `mode: 'file'`
 - **THEN** result is `{ valid: false }` with a resolution error
 
+### Requirement: Ref mode
+
+#### Scenario: Valid schema resolved by ref
+
+- **GIVEN** a valid schema registered in the SchemaRegistry under ref `@specd/schema-std`
+- **WHEN** `execute` is called with `{ mode: 'ref', ref: '@specd/schema-std' }`
+- **THEN** result is `{ valid: true }` with the validated `Schema`
+
+#### Scenario: Ref with extends chain
+
+- **GIVEN** a schema ref `#default:child` that declares `extends: '#default:parent'`
+- **WHEN** `execute` is called with `{ mode: 'ref', ref: '#default:child' }`
+- **THEN** the extends chain is resolved and cascaded
+- **AND** result is `{ valid: true }`
+
+#### Scenario: Ref not found
+
+- **GIVEN** a ref that does not resolve in the SchemaRegistry
+- **WHEN** `execute` is called with `{ mode: 'ref', ref: '@nonexistent/schema' }`
+- **THEN** result is `{ valid: false }` with a "schema not found" error
+
+#### Scenario: Ref with invalid artifact ID
+
+- **GIVEN** a schema ref whose schema file has an invalid artifact ID
+- **WHEN** `execute` is called with `{ mode: 'ref', ref: '#default:bad-schema' }`
+- **THEN** result is `{ valid: false }` with the validation error
+
+#### Scenario: Ref with circular extends
+
+- **GIVEN** a schema ref whose extends chain forms a cycle
+- **WHEN** `execute` is called with `{ mode: 'ref', ref: '#default:cyclic' }`
+- **THEN** result is `{ valid: false }` with a cycle detection error
+
+#### Scenario: No project plugins or overrides applied
+
+- **GIVEN** a project with `schemaPlugins` and `schemaOverrides` configured
+- **AND** a valid schema ref `@specd/schema-std`
+- **WHEN** `execute` is called with `{ mode: 'ref', ref: '@specd/schema-std' }`
+- **THEN** the result schema does NOT include project plugin or override modifications
+
 ### Requirement: Result type
 
 #### Scenario: Success result structure
@@ -114,4 +154,10 @@
 
 - **GIVEN** a schema file that extends `@specd/schema-std` resolved from `/path/to/schema.yaml`
 - **WHEN** `execute` is called with `mode: 'file'`
+- **THEN** `warnings` contains `extends '@specd/schema-std' resolved from /path/to/schema.yaml`
+
+#### Scenario: Ref with extends emits resolution warning
+
+- **GIVEN** a schema ref that extends `@specd/schema-std` resolved from `/path/to/schema.yaml`
+- **WHEN** `execute` is called with `{ mode: 'ref', ref: '#default:child' }`
 - **THEN** `warnings` contains `extends '@specd/schema-std' resolved from /path/to/schema.yaml`

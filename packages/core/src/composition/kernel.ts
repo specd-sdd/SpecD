@@ -259,7 +259,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       get: new GetSpec(i.specs),
       saveMetadata: new SaveSpecMetadata(i.specs),
       invalidateMetadata: new InvalidateSpecMetadata(i.specs),
-      getActiveSchema: new GetActiveSchema(resolveSchema),
+      getActiveSchema: new GetActiveSchema(resolveSchema, i.schemas, buildSchema),
       validateSchema: new ValidateSchema(i.schemas, i.schemaRef, buildSchema, resolveSchema),
       validate: new ValidateSpecs(i.specs, schemaProvider, i.parsers),
       generateMetadata: new GenerateSpecMetadata(i.specs, schemaProvider, i.parsers, i.hasher),

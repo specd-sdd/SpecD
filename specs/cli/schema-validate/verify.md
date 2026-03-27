@@ -6,7 +6,7 @@
 
 #### Scenario: No flags defaults to project resolved mode
 
-- **WHEN** the user runs `specd schema validate` without `--file` or `--raw`
+- **WHEN** the user runs `specd schema validate` without `[ref]`, `--file`, or `--raw`
 - **THEN** the command validates the project's fully-resolved schema
 
 #### Scenario: --raw triggers project raw mode
@@ -18,6 +18,11 @@
 
 - **WHEN** the user runs `specd schema validate --file ./my-schema.yaml`
 - **THEN** the command validates the specified file with extends resolution
+
+#### Scenario: \[ref] triggers ref mode
+
+- **WHEN** the user runs `specd schema validate @specd/schema-std`
+- **THEN** the command validates the referenced schema with extends resolution
 
 ### Requirement: Project mode — resolved
 
@@ -80,6 +85,29 @@
 - **THEN** exit code is 1
 - **AND** the error mentions cycle detection
 
+### Requirement: Ref mode
+
+#### Scenario: Valid schema resolved by ref
+
+- **GIVEN** `@specd/schema-std` is installed as an npm package
+- **WHEN** the user runs `specd schema validate @specd/schema-std`
+- **THEN** exit code is 0
+- **AND** output contains `[ref]` suffix
+
+#### Scenario: Ref with extends resolves chain
+
+- **GIVEN** a workspace schema `#default:my-schema` that declares `extends: @specd/schema-std`
+- **WHEN** the user runs `specd schema validate '#default:my-schema'`
+- **THEN** the extends chain is resolved
+- **AND** exit code is 0
+
+#### Scenario: Ref with invalid schema content
+
+- **GIVEN** a workspace schema with an invalid artifact ID
+- **WHEN** the user runs `specd schema validate '#default:bad-schema'`
+- **THEN** exit code is 1
+- **AND** the error mentions the invalid artifact ID
+
 ### Requirement: Text output — success
 
 #### Scenario: Project resolved mode success text
@@ -96,6 +124,11 @@
 
 - **WHEN** file mode validation succeeds
 - **THEN** stdout contains `[file]` suffix
+
+#### Scenario: Ref mode success text
+
+- **WHEN** ref mode validation succeeds
+- **THEN** stdout contains `[ref]` suffix
 
 ### Requirement: Text output — failure
 
@@ -115,6 +148,11 @@
 
 - **WHEN** the user runs `specd schema validate --format json` and validation fails
 - **THEN** the JSON output contains `result: "error"`, `errors`, `warnings`, and `mode`
+
+#### Scenario: JSON ref mode includes mode ref
+
+- **WHEN** the user runs `specd schema validate @specd/schema-std --format json` and validation succeeds
+- **THEN** the JSON output contains `"mode": "ref"`
 
 ### Requirement: Exit code
 
@@ -136,6 +174,14 @@
 - **THEN** the error mentions the file
 - **AND** exit code is 1
 
+### Requirement: Error — ref not found
+
+#### Scenario: \[ref] with nonexistent schema
+
+- **WHEN** the user runs `specd schema validate @nonexistent/schema`
+- **THEN** the error mentions the reference
+- **AND** exit code is 1
+
 ### Requirement: Error — config required in project modes
 
 #### Scenario: No specd.yaml discoverable
@@ -151,4 +197,16 @@
 
 - **WHEN** the user runs `specd schema validate --file ./schema.yaml --raw`
 - **THEN** stderr contains `--file and --raw are mutually exclusive`
+- **AND** exit code is 1
+
+#### Scenario: \[ref] and --file together
+
+- **WHEN** the user runs `specd schema validate @specd/schema-std --file ./schema.yaml`
+- **THEN** stderr contains `[ref] and --file are mutually exclusive`
+- **AND** exit code is 1
+
+#### Scenario: \[ref] and --raw together
+
+- **WHEN** the user runs `specd schema validate @specd/schema-std --raw`
+- **THEN** stderr contains `[ref] and --raw are mutually exclusive`
 - **AND** exit code is 1

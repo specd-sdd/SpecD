@@ -9,7 +9,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "`specd schema validate [--file <path>] [--raw] [--format text|json|toon] [--config <path>]`\n\n- When neither `--file` nor `--raw` is provided, the command validates the project's fully-resolved schema (merged).\n- When `--raw` is provided (without `--file`), the command validates the project's base schema without plugins or overrides.\n- When `--file` is provided, the command validates the specified external file (resolving its extends chain).\n- `--file` and `--raw` are mutually exclusive. If both are provided, the command SHALL fail with an error."
+        "`specd schema validate [ref] [--file <path>] [--raw] [--format text|json|toon] [--config <path>]`\n\n- `[ref]` — optional positional argument; a schema reference in the same format as `specd.yaml`'s `schema` field (e.g. `@specd/schema-std`, `#workspace:name`, `#name`, bare name). Resolved through `SchemaRegistry`.\n- When neither `[ref]`, `--file`, nor `--raw` is provided, the command validates the project's fully-resolved schema (merged).\n- When `--raw` is provided (without `[ref]` or `--file`), the command validates the project's base schema without plugins or overrides.\n- When `--file` is provided, the command validates the specified external file (resolving its extends chain).\n- When `[ref]` is provided, the command validates the referenced schema (resolving its extends chain, without project plugins or overrides).\n- `[ref]`, `--file`, and `--raw` are mutually exclusive. If any combination is provided, the command SHALL fail with an error."
       ]
     },
     {
@@ -31,9 +31,15 @@
       ]
     },
     {
+      "requirement": "Ref mode",
+      "rules": [
+        "When invoked with `[ref]` (without `--file` or `--raw`), the command SHALL call `ValidateSchema.execute` with `mode: 'ref'` and the provided reference string. The use case handles resolution through `SchemaRegistry`, extends chain resolution, and validation. No project plugins or overrides are applied."
+      ]
+    },
+    {
       "requirement": "Text output — success",
       "rules": [
-        "When validation succeeds and `--format` is `text`, the command SHALL write:\n\n- Project resolved mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps)`\n- Project raw mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [raw]`\n- File mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [file]`\n\nWarning lines, if any, are appended as `  warning: <text>`."
+        "When validation succeeds and `--format` is `text`, the command SHALL write:\n\n- Project resolved mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps)`\n- Project raw mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [raw]`\n- File mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [file]`\n- Ref mode: `schema valid: <name> v<version> (<N> artifacts, <M> workflow steps) [ref]`\n\nWarning lines, if any, are appended as `  warning: <text>`."
       ]
     },
     {
@@ -45,7 +51,7 @@
     {
       "requirement": "JSON output",
       "rules": [
-        "When `--format` is `json` or `toon`, the command SHALL write a structured result object:\n\nSuccess:\n\n```json\n{\n  \"result\": \"ok\",\n  \"schema\": { \"name\": \"...\", \"version\": 1 },\n  \"artifacts\": 5,\n  \"workflowSteps\": 4,\n  \"mode\": \"project\" | \"project-raw\" | \"file\",\n  \"warnings\": []\n}\n```\n\nFailure:\n\n```json\n{\n  \"result\": \"error\",\n  \"errors\": [{ \"message\": \"...\" }],\n  \"warnings\": [],\n  \"mode\": \"project\" | \"project-raw\" | \"file\"\n}\n```"
+        "When `--format` is `json` or `toon`, the command SHALL write a structured result object:\n\nSuccess:\n\n```json\n{\n  \"result\": \"ok\",\n  \"schema\": { \"name\": \"...\", \"version\": 1 },\n  \"artifacts\": 5,\n  \"workflowSteps\": 4,\n  \"mode\": \"project\" | \"project-raw\" | \"file\" | \"ref\",\n  \"warnings\": []\n}\n```\n\nFailure:\n\n```json\n{\n  \"result\": \"error\",\n  \"errors\": [{ \"message\": \"...\" }],\n  \"warnings\": [],\n  \"mode\": \"project\" | \"project-raw\" | \"file\" | \"ref\"\n}\n```"
       ]
     },
     {
@@ -61,6 +67,12 @@
       ]
     },
     {
+      "requirement": "Error — ref not found",
+      "rules": [
+        "When `[ref]` references a schema that cannot be resolved (e.g. npm package not installed, workspace schema does not exist), the validation result SHALL contain the error and exit with code 1."
+      ]
+    },
+    {
       "requirement": "Error — config required in project modes",
       "rules": [
         "When invoked without `--file` and no `specd.yaml` can be discovered, the command SHALL fail with the standard config-not-found error (as defined by the entrypoint spec)."
@@ -69,7 +81,7 @@
     {
       "requirement": "Mutually exclusive flags",
       "rules": [
-        "When both `--file` and `--raw` are provided, the command SHALL write an error: `--file and --raw are mutually exclusive` and exit with code 1."
+        "`[ref]`, `--file`, and `--raw` are mutually exclusive. If any combination of two or more is provided, the command SHALL write a descriptive error and exit with code 1:\n\n- `[ref]` + `--file`: `[ref] and --file are mutually exclusive`\n- `[ref]` + `--raw`: `[ref] and --raw are mutually exclusive`\n- `--file` + `--raw`: `--file and --raw are mutually exclusive`"
       ]
     }
   ],
@@ -82,7 +94,7 @@
     {
       "requirement": "Command signature",
       "name": "No flags defaults to project resolved mode",
-      "when": ["the user runs specd schema validate without --file or --raw"],
+      "when": ["the user runs specd schema validate without [ref], --file, or --raw"],
       "then": ["the command validates the project's fully-resolved schema"]
     },
     {
@@ -96,6 +108,12 @@
       "name": "--file triggers file mode",
       "when": ["the user runs specd schema validate --file ./my-schema.yaml"],
       "then": ["the command validates the specified file with extends resolution"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "[ref] triggers ref mode",
+      "when": ["the user runs specd schema validate @specd/schema-std"],
+      "then": ["the command validates the referenced schema with extends resolution"]
     },
     {
       "requirement": "Project mode — resolved",
@@ -154,6 +172,27 @@
       "then": ["exit code is 1", "AND the error mentions cycle detection"]
     },
     {
+      "requirement": "Ref mode",
+      "name": "Valid schema resolved by ref",
+      "given": ["@specd/schema-std is installed as an npm package"],
+      "when": ["the user runs specd schema validate @specd/schema-std"],
+      "then": ["exit code is 0", "AND output contains [ref] suffix"]
+    },
+    {
+      "requirement": "Ref mode",
+      "name": "Ref with extends resolves chain",
+      "given": ["a workspace schema #default:my-schema that declares extends: @specd/schema-std"],
+      "when": ["the user runs specd schema validate '#default:my-schema'"],
+      "then": ["the extends chain is resolved", "AND exit code is 0"]
+    },
+    {
+      "requirement": "Ref mode",
+      "name": "Ref with invalid schema content",
+      "given": ["a workspace schema with an invalid artifact ID"],
+      "when": ["the user runs specd schema validate '#default:bad-schema'"],
+      "then": ["exit code is 1", "AND the error mentions the invalid artifact ID"]
+    },
+    {
       "requirement": "Text output — success",
       "name": "Project resolved mode success text",
       "when": [
@@ -172,6 +211,12 @@
       "name": "File mode success text",
       "when": ["file mode validation succeeds"],
       "then": ["stdout contains [file] suffix"]
+    },
+    {
+      "requirement": "Text output — success",
+      "name": "Ref mode success text",
+      "when": ["ref mode validation succeeds"],
+      "then": ["stdout contains [ref] suffix"]
     },
     {
       "requirement": "Text output — failure",
@@ -194,6 +239,14 @@
       "then": ["the JSON output contains result: \"error\", errors, warnings, and mode"]
     },
     {
+      "requirement": "JSON output",
+      "name": "JSON ref mode includes mode ref",
+      "when": [
+        "the user runs specd schema validate @specd/schema-std --format json and validation succeeds"
+      ],
+      "then": ["the JSON output contains \"mode\": \"ref\""]
+    },
+    {
       "requirement": "Exit code",
       "name": "Exit 0 on valid schema",
       "when": ["validation succeeds"],
@@ -212,6 +265,12 @@
       "then": ["the error mentions the file", "AND exit code is 1"]
     },
     {
+      "requirement": "Error — ref not found",
+      "name": "[ref] with nonexistent schema",
+      "when": ["the user runs specd schema validate @nonexistent/schema"],
+      "then": ["the error mentions the reference", "AND exit code is 1"]
+    },
+    {
       "requirement": "Error — config required in project modes",
       "name": "No specd.yaml discoverable",
       "given": ["CWD is not under any directory containing specd.yaml"],
@@ -223,11 +282,23 @@
       "name": "--file and --raw together",
       "when": ["the user runs specd schema validate --file ./schema.yaml --raw"],
       "then": ["stderr contains --file and --raw are mutually exclusive", "AND exit code is 1"]
+    },
+    {
+      "requirement": "Mutually exclusive flags",
+      "name": "[ref] and --file together",
+      "when": ["the user runs specd schema validate @specd/schema-std --file ./schema.yaml"],
+      "then": ["stderr contains [ref] and --file are mutually exclusive", "AND exit code is 1"]
+    },
+    {
+      "requirement": "Mutually exclusive flags",
+      "name": "[ref] and --raw together",
+      "when": ["the user runs specd schema validate @specd/schema-std --raw"],
+      "then": ["stderr contains [ref] and --raw are mutually exclusive", "AND exit code is 1"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:30fef4a130162a00bae270798e190d14aef6867e5abce2443558708b74d81b5b",
-    "verify.md": "sha256:b1e570ecc98e8d5b572aeea7a50038cfcd24e7032c62f6c9e87b3b73d2143818"
+    "spec.md": "sha256:e07dc74773e0a1b9ae889eb6fde613bb2cfdbc4a9db960ee53bf1ee46f0ea628",
+    "verify.md": "sha256:f7f4969d3f7e16c78a62d6412634a2cb00a914041b2d5e7e552ea1b477277306"
   },
   "generatedBy": "core"
 }

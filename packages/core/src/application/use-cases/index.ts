@@ -22,7 +22,7 @@ export {
   type InvalidateSpecMetadataInput,
   type InvalidateSpecMetadataResult,
 } from './invalidate-spec-metadata.js'
-export { type GetActiveSchema } from './get-active-schema.js'
+export { type GetActiveSchema, type GetActiveSchemaInput } from './get-active-schema.js'
 export { type ResolveSchema } from './resolve-schema.js'
 export {
   type ValidateSchema,

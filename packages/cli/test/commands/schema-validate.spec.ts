@@ -211,6 +211,83 @@ describe('Failure output', () => {
   })
 })
 
+describe('Ref mode', () => {
+  it('[ref] calls validateSchema with ref mode', async () => {
+    const { kernel } = setup()
+    kernel.specs.validateSchema.execute.mockResolvedValue({
+      valid: true,
+      schema: makeSchema(),
+      warnings: [],
+    })
+
+    await run(['@specd/schema-std'])
+
+    expect(kernel.specs.validateSchema.execute).toHaveBeenCalledWith({
+      mode: 'ref',
+      ref: '@specd/schema-std',
+    })
+  })
+
+  it('ref mode success text includes [ref]', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.validateSchema.execute.mockResolvedValue({
+      valid: true,
+      schema: makeSchema({ name: 'specd-std', version: 1 }),
+      warnings: [],
+    })
+
+    await run(['@specd/schema-std'])
+
+    expect(stdout()).toContain('[ref]')
+  })
+
+  it('JSON ref mode includes mode ref', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.validateSchema.execute.mockResolvedValue({
+      valid: true,
+      schema: makeSchema({ name: 'specd-std', version: 1 }),
+      warnings: [],
+    })
+
+    await run(['@specd/schema-std', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.mode).toBe('ref')
+  })
+
+  it('ref not found exits with code 1', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.validateSchema.execute.mockResolvedValue({
+      valid: false,
+      errors: ["schema '@nonexistent/schema' not found"],
+      warnings: [],
+    })
+
+    await run(['@nonexistent/schema'])
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stdout()).toContain('schema validation failed:')
+  })
+
+  it('[ref] and --file are mutually exclusive', async () => {
+    const { stderr } = setup()
+
+    await run(['@specd/schema-std', '--file', './schema.yaml'])
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('[ref] and --file are mutually exclusive')
+  })
+
+  it('[ref] and --raw are mutually exclusive', async () => {
+    const { stderr } = setup()
+
+    await run(['@specd/schema-std', '--raw'])
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toContain('[ref] and --raw are mutually exclusive')
+  })
+})
+
 describe('Config required', () => {
   it('no config discoverable reports error', async () => {
     vi.mocked(resolveCliContext).mockRejectedValue(new Error('config not found'))
