@@ -24,6 +24,7 @@ import { registerChangeRunHooks } from './commands/change/run-hooks.js'
 import { registerChangeHookInstruction } from './commands/change/hook-instruction.js'
 import { registerChangeArtifactInstruction } from './commands/change/artifact-instruction.js'
 import { registerChangeOverlap } from './commands/change/check-overlap.js'
+import { registerChangeSpecPreview } from './commands/change/spec-preview.js'
 
 // drafts
 import { registerDraftsList } from './commands/drafts/list.js'
@@ -123,6 +124,7 @@ registerChangeRunHooks(changeCmd)
 registerChangeHookInstruction(changeCmd)
 registerChangeArtifactInstruction(changeCmd)
 registerChangeOverlap(changeCmd)
+registerChangeSpecPreview(changeCmd)
 
 // ---- drafts ----
 const draftsCmd = program
