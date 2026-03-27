@@ -248,7 +248,7 @@ schemaOverrides:
 `specd schema extend` creates a new schema package that inherits from a parent and adds to it. The parent schema stays intact; the child schema describes only the delta. This is the right approach when you want to share a schema across multiple projects but each project needs additions.
 
 ```sh
-specd schema extend @specd/schema-std --name my-workflow
+specd schema extend @specd/schema-std my-workflow
 ```
 
 The generated schema declares its parent and adds or modifies entries. Any artifact or workflow step from the parent is inherited as-is; you only declare what changes.
@@ -264,7 +264,7 @@ Use extend when:
 `specd schema fork` makes a complete copy of a schema. You own every field. Use it when you need structural changes incompatible with the parent — different artifact ordering, renamed lifecycle steps, or a workflow that looks nothing like the original.
 
 ```sh
-specd schema fork @specd/schema-std --name custom-workflow
+specd schema fork @specd/schema-std custom-workflow
 ```
 
 Use fork when:
