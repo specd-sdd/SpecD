@@ -22,12 +22,12 @@ transitions to `done`. If any fail, loops back to implementing.
 node packages/cli/dist/index.js change status <name> --format json
 ```
 
-If not in `verifying`, this is the wrong skill. Suggest based on state:
+If not in `implementing`, `verifying`, or `done`, this is the wrong skill. Suggest based on state:
 
 - `drafting` / `designing` → `/specd-design <name>`
 - `ready` → Review artifacts, then approve or continue designing with `/specd-design <name>`
-- `implementing` / `spec-approved` → `/specd-implement <name>`
-- `done` / `signed-off` → You're already past verification — check signoff gate and transition to archivable
+- `spec-approved` → `/specd-implement <name>`
+- `signed-off` → Check signoff gate and transition to archivable
 - `pending-signoff` → "Signoff pending. Run: `specd change approve signoff <name> --reason ...`"
 - `archivable` → `/specd-archive <name>`
 - `pending-spec-approval` → "Approval pending. Run: `specd change approve spec <name> --reason ...`"
@@ -36,7 +36,11 @@ If not in `verifying`, this is the wrong skill. Suggest based on state:
 
 Store `lifecycle.changePath` and `specIds` from the response.
 
-### 2. Run entry hooks
+### 2. Enter verification (or resume)
+
+**If in `implementing`** (normal entry from `/specd-implement`):
+
+Run pre-hooks and transition:
 
 ```bash
 node packages/cli/dist/index.js change run-hooks <name> verifying --phase pre
@@ -44,6 +48,28 @@ node packages/cli/dist/index.js change hook-instruction <name> verifying --phase
 ```
 
 Follow guidance.
+
+```bash
+node packages/cli/dist/index.js change transition <name> verifying --skip-hooks all
+```
+
+If it fails (incomplete tasks), show which items are still `- [ ]` and **stop**, tell the user:
+
+> Cannot transition to verifying — incomplete tasks.
+> Run `/specd-implement <name>` to finish them.
+
+**Stop — do not continue until tasks are done.**
+
+**If in `verifying`** (resuming): run pre-hooks but skip the transition:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> verifying --phase pre
+node packages/cli/dist/index.js change hook-instruction <name> verifying --phase pre --format text
+```
+
+**If in `done`**: skip directly to step 6a (transition to archivable path).
+
+Continue to step 3.
 
 ### 3. Load verification context
 
@@ -213,6 +239,20 @@ from the error message and redirect using this table:
 | `pending-spec-approval`          | "Approval pending. Run: `specd change approve spec <name> --reason ...`"         |
 
 **Stop — do not continue after redirecting.**
+
+## Returning to design
+
+If during verification you discover that the specs or design are wrong (not just the
+implementation), do not just fail scenarios — surface the root cause to the user. If
+the artifacts themselves need revision and the user agrees:
+
+```bash
+node packages/cli/dist/index.js change transition <name> designing --skip-hooks all
+```
+
+> Artifacts need revision. Run `/specd-design <name>` to update them.
+
+**Stop — do not continue verifying.**
 
 ## Guardrails
 

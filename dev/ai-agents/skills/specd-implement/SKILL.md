@@ -1,6 +1,6 @@
 ---
 name: specd-implement
-description: Implement code for a specd change — work through tasks, run hooks, transition to verifying.
+description: Implement code for a specd change — work through tasks and run hooks.
 allowed-tools: Bash(node *), Bash(pnpm *), Read, Write, Edit, Grep, Glob, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
 argument-hint: '<change-name>'
 ---
@@ -12,7 +12,7 @@ Read `.specd/skills/shared.md` before doing anything.
 ## What this does
 
 Implements the code described by the change's design and tasks artifacts.
-Works through tasks one by one, marks them done, and transitions to verifying.
+Works through tasks one by one and marks them done.
 
 ## Steps
 
@@ -22,7 +22,7 @@ Works through tasks one by one, marks them done, and transitions to verifying.
 node packages/cli/dist/index.js change status <name> --format json
 ```
 
-If not in `implementing` or `spec-approved`, this is the wrong skill. Suggest based on state:
+If not in `ready` or `implementing` or `spec-approved`, this is the wrong skill. Suggest based on state:
 
 - `drafting` / `designing` → `/specd-design <name>`
 - `ready` → Review artifacts, then approve or continue designing with `/specd-design <name>`
@@ -34,15 +34,29 @@ If not in `implementing` or `spec-approved`, this is the wrong skill. Suggest ba
 
 **Stop — do not continue.**
 
-If in `spec-approved`, transition:
+Store `lifecycle.changePath` and `specIds` from the response.
+
+If in `ready` or `spec-approved`, run pre-hooks and transition:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> implementing --phase pre
+node packages/cli/dist/index.js change hook-instruction <name> implementing --phase pre --format text
+```
+
+Follow guidance — it tells you which change artifacts to read.
 
 ```bash
 node packages/cli/dist/index.js change transition <name> implementing --skip-hooks all
 ```
 
-Store `lifecycle.changePath` and `specIds` from the response.
+If already in `implementing` (resuming), run pre-hooks but skip the transition:
 
-### 1b. Check workspace ownership
+```bash
+node packages/cli/dist/index.js change run-hooks <name> implementing --phase pre
+node packages/cli/dist/index.js change hook-instruction <name> implementing --phase pre --format text
+```
+
+### 2. Check workspace ownership
 
 ```bash
 node packages/cli/dist/index.js config show --format json
@@ -74,22 +88,13 @@ do not implement it, do not work around it, do not assume it's okay. Surface it
 to the user. The design may need revision, or the workspace ownership must change
 in `specd.yaml` before you can proceed.
 
-### 2. Load schema and find task file
+### 3. Load schema and find task file
 
 ```bash
 node packages/cli/dist/index.js schema show --format json
 ```
 
 Find artifacts with `hasTaskCompletionCheck: true` — those have trackable checkboxes.
-
-### 3. Run entry hooks
-
-```bash
-node packages/cli/dist/index.js change run-hooks <name> implementing --phase pre
-node packages/cli/dist/index.js change hook-instruction <name> implementing --phase pre --format text
-```
-
-Follow guidance — it tells you which change artifacts to read.
 
 ### 4. Load context
 
@@ -243,16 +248,6 @@ node packages/cli/dist/index.js change hook-instruction <name> implementing --ph
 
 Follow guidance. If hooks fail (tests, lint), fix and re-run until they pass.
 
-### 8. Transition to verifying
-
-```bash
-node packages/cli/dist/index.js change transition <name> verifying --skip-hooks all
-```
-
-If it fails (incomplete tasks), show which items are still `- [ ]` and continue working.
-
-When it succeeds, suggest:
-
 > Implementation complete. Run `/specd-verify <name>` to verify against scenarios.
 
 **Stop.**
@@ -261,11 +256,10 @@ When it succeeds, suggest:
 
 Create tasks at the start for session visibility. Update them as you go.
 
-1. `Load state & hooks` — mark done after step 3
+1. `Load state & hooks` — mark done after step 1
 2. `Load context & artifacts` — mark done after step 5
 3. For each task in `tasks.md`: `Implement: <task summary>` — mark done as you complete each
 4. `Run exit hooks` — mark done after step 7
-5. `Transition to verifying` — mark done after step 8
 
 Create the per-task items (step 3) after reading `tasks.md` in step 5.
 
@@ -292,6 +286,20 @@ from the error message and redirect using this table:
 | `pending-spec-approval`          | "Approval pending. Run: `specd change approve spec <name> --reason ...`"         |
 
 **Stop — do not continue after redirecting.**
+
+## Returning to design
+
+If during implementation you discover that the specs, design, or tasks need changes
+(wrong approach, missing requirement, incorrect assumption), do not try to work around
+it. Stop, explain the issue to the user, and if they agree:
+
+```bash
+node packages/cli/dist/index.js change transition <name> designing --skip-hooks all
+```
+
+> Artifacts need revision. Run `/specd-design <name>` to update them.
+
+**Stop — do not continue implementing.**
 
 ## Guardrails
 
