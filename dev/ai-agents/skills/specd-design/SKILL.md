@@ -23,7 +23,14 @@ without stopping (fast-forward mode).
 node packages/cli/dist/index.js change status <name> --format json
 ```
 
-If state is `drafting`, transition to `designing`:
+If state is `drafting` or `designing`, transition to `designing`:
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> designing --phase pre
+node packages/cli/dist/index.js change hook-instruction <name> designing --phase pre --format text
+```
+
+Follow guidance.
 
 ```bash
 node packages/cli/dist/index.js change transition <name> designing --skip-hooks all
@@ -45,7 +52,7 @@ Store `lifecycle.changePath` — artifacts are written there.
 Store `specIds` from the response — you need them for validation.
 Check `artifacts` array — if some are already `complete`, you're resuming mid-design.
 
-### 1b. Check workspace ownership
+### 2. Check workspace ownership
 
 ```bash
 node packages/cli/dist/index.js config show --format json
@@ -78,15 +85,6 @@ If during artifact writing you realize the design needs changes in a readOnly wo
 code or specs, **stop and surface it to the user** — do not write the artifact assuming
 those changes can be made. The user must either change the ownership in `specd.yaml` or
 adjust the design to work within owned/shared boundaries.
-
-### 2. Run entry hooks
-
-```bash
-node packages/cli/dist/index.js change run-hooks <name> designing --phase pre
-node packages/cli/dist/index.js change hook-instruction <name> designing --phase pre --format text
-```
-
-Follow guidance.
 
 ### 3. Load schema
 
@@ -131,7 +129,7 @@ Include impact findings in the design artifact so the implementer knows what's a
 
 #### Load exploration context
 
-Check if `<changePath>/specd-exploration.md` exists. If it does, read it — it contains
+Check if `<changePath>/.specd-exploration.md` exists. If it does, read it — it contains
 the full discovery context from `/specd-new` (problem statement, approach, decisions,
 affected areas, codebase observations, etc.). Use it to inform every artifact you write.
 
@@ -160,7 +158,7 @@ natural conversation to fill in the gaps — don't fire off a list of questions 
 questionnaire. Start with one good question based on what you can infer from the change
 name, description, and specs. Let the user's answers guide your follow-ups. Keep it
 flowing until you understand the problem, the approach, what's affected, and any
-decisions or constraints. Once you have enough, write a `specd-exploration.md` yourself
+decisions or constraints. Once you have enough, write a `<changePath>/.specd-exploration.md` yourself
 to capture what you learned, then continue with step 5.
 
 ### 5. Show context summary
@@ -325,11 +323,7 @@ node packages/cli/dist/index.js change status <name> --format json
 
 Check `lifecycle.approvals.spec`:
 
-**If `false`:** transition to implementing:
-
-```bash
-node packages/cli/dist/index.js change transition <name> implementing --skip-hooks all
-```
+**If `false`:** no approval needed — the change is ready to implement. Tell user:
 
 Suggest: `/specd-implement <name>`
 
@@ -344,7 +338,7 @@ Suggest: `/specd-implement <name>`
 
 Create tasks at the start for session visibility. Update them as you go.
 
-1. `Load state & hooks` — mark done after step 2
+1. `Load state & hooks` — mark done after step 1
 2. `Load schema & context` — mark done after step 4
 3. `Choose review mode` — mark done ONLY after the user responds (not when you ask)
 4. For each artifact: `Write <artifactId>` — mark done after validation passes

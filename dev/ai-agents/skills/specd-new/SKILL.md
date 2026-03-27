@@ -146,7 +146,7 @@ from the start.
 
 ### 7. Save exploration context
 
-Write a file `specd-exploration.md` inside the change directory (`<changePath>/specd-exploration.md`).
+Write a file `.specd-exploration.md` inside the change directory (`<changePath>/.specd-exploration.md`).
 This file is your own working memory — it must capture **everything** you learned during
 the discovery conversation so that `/specd-design` can pick up exactly where you left off,
 even in a brand-new conversation with zero prior context.
@@ -195,7 +195,16 @@ Write it in plain markdown, structured for quick scanning. This is for agent use
 user documentation — optimize for completeness and precision over polish. When in doubt
 about whether to include something: include it.
 
-### 8. Show status and stop
+### 8. Run exit hooks
+
+```bash
+node packages/cli/dist/index.js change run-hooks <name> drafting --phase post
+node packages/cli/dist/index.js change hook-instruction <name> drafting --phase post --format text
+```
+
+Follow guidance if any.
+
+### 9. Show status and stop
 
 ```bash
 node packages/cli/dist/index.js change status <name> --format json
@@ -216,7 +225,7 @@ Create tasks at the start for session visibility. Update them as you go.
 2. `Understand intent` — mark done after confirming what the user wants
 3. `Propose change` — mark done after user confirms name/description/specs
 4. `Create change` — mark done after CLI creates the change successfully
-5. `Save exploration context` — mark done after writing `specd-exploration.md`
+5. `Save exploration context` — mark done after writing `<changePath>/.specd-exploration.md`
 
 ## Guardrails
 

@@ -150,6 +150,20 @@ from the error message and redirect using this table:
 
 **Stop — do not continue after redirecting.**
 
+## Returning to design
+
+If during the pre-archive review you discover that the specs don't accurately reflect
+what was built and the divergence is significant, do not archive incorrect specs.
+Surface the issue to the user, and if they agree:
+
+```bash
+node packages/cli/dist/index.js change transition <name> designing --skip-hooks all
+```
+
+> Specs need revision before archiving. Run `/specd-design <name>` to update them.
+
+**Stop — do not archive.**
+
 ## Guardrails
 
 - **Always ask before archiving** — it's irreversible
