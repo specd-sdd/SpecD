@@ -727,23 +727,25 @@ Print the contents of the active schema as resolved from `specd.yaml`.
 ### schema fork
 
 ```
-specd schema fork <ref> [options]
+specd schema fork <ref> <name> [options]
 ```
 
-Fork a schema by copying it into the local schemas directory as a fully standalone copy. Forking is appropriate when you need to make structural changes (new artifacts, modified lifecycle steps) that are incompatible with the original schema.
+Fork a schema by copying `schema.yaml` and `templates/` into the local schemas directory as a fully standalone copy. Forking is appropriate when you need to make structural changes (new artifacts, modified lifecycle steps) that are incompatible with the original schema.
 
-`<ref>` is any valid schema reference (npm package, bare name, workspace-qualified name, or path).
+`<ref>` is any valid schema reference (npm package, bare name, workspace-qualified name, or path). `<name>` is the name for the forked schema (required) — used as the directory name and written into the forked `schema.yaml`.
 
-| Option                      | Description                                                          |
-| --------------------------- | -------------------------------------------------------------------- |
-| `--name <name>`             | Name for the forked schema. Defaults to a name derived from `<ref>`. |
-| `--workspace <name>`        | Target workspace for the forked schema. Defaults to `default`.       |
-| `--format text\|json\|toon` | Output format.                                                       |
-| `--config <path>`           | Config file path.                                                    |
+| Option               | Description                                                                                                |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `--workspace <name>` | Target workspace for the forked schema. Defaults to `default`. Mutually exclusive with `--output`.         |
+| `--output <path>`    | Explicit target directory. Created recursively if it doesn't exist. Mutually exclusive with `--workspace`. |
+| `--config <path>`    | Config file path.                                                                                          |
 
 ```bash
-# Fork the standard schema and name it locally
-specd schema fork @specd/schema-std --name my-workflow
+# Fork the standard schema into the default workspace's schemasPath
+specd schema fork @specd/schema-std my-workflow
+
+# Fork to a specific directory
+specd schema fork @specd/schema-std my-workflow --output .specd/schemas/my-workflow
 ```
 
 After forking, update `specd.yaml` to point `schema:` at the new local name.
@@ -751,19 +753,26 @@ After forking, update `specd.yaml` to point `schema:` at the new local name.
 ### schema extend
 
 ```
-specd schema extend <ref> [options]
+specd schema extend <ref> <name> [options]
 ```
 
-Create a new schema that extends an existing one. The extending schema inherits all artifacts and workflow steps from the parent and can add or override entries. Extending is appropriate for lighter customisation — adding hooks, extra artifacts, or `artifactRules` — without duplicating the parent's full definition.
+Create a new schema that extends an existing one. The extending schema inherits all artifacts and workflow steps from the parent and can add or override entries. Extending is appropriate for lighter customisation — adding hooks, extra artifacts, or `artifactRules` — without duplicating the parent's full definition. Only `schema.yaml` is created — no templates are copied (they are inherited from the parent).
 
-`<ref>` is any valid schema reference.
+`<ref>` is any valid schema reference. `<name>` is the name for the new schema (required).
 
-| Option                      | Description                              |
-| --------------------------- | ---------------------------------------- |
-| `--name <name>`             | Name for the extending schema.           |
-| `--workspace <name>`        | Target workspace. Defaults to `default`. |
-| `--format text\|json\|toon` | Output format.                           |
-| `--config <path>`           | Config file path.                        |
+| Option               | Description                                                                                                |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `--workspace <name>` | Target workspace. Defaults to `default`. Mutually exclusive with `--output`.                               |
+| `--output <path>`    | Explicit target directory. Created recursively if it doesn't exist. Mutually exclusive with `--workspace`. |
+| `--config <path>`    | Config file path.                                                                                          |
+
+```bash
+# Extend the standard schema
+specd schema extend @specd/schema-std my-custom
+
+# Extend to a specific directory
+specd schema extend @specd/schema-std my-custom --output .specd/schemas/my-custom
+```
 
 ### schema validate
 
