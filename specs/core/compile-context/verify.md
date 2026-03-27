@@ -271,3 +271,41 @@
 - **WHEN** `CompileContext.execute` is called
 - **THEN** `result.warnings` includes a warning about the unknown qualifier
 - **AND** no exception is thrown
+
+### Requirement: Materialized delta view
+
+#### Scenario: Spec with validated delta returns merged content
+
+- **GIVEN** a change with `specIds: ["core:core/config"]` and a validated delta for `spec.md`
+- **AND** `PreviewSpec` returns a `files` entry with `filename: "spec.md"` and `merged: "merged content"`
+- **WHEN** `CompileContext.execute` renders content for `core:core/config` in full mode
+- **THEN** the `ContextSpecEntry.content` equals `"merged content"`
+
+#### Scenario: Spec with no delta falls back to base content
+
+- **GIVEN** a change with `specIds: ["core:core/config"]` and no delta files
+- **AND** `PreviewSpec` returns an empty `files` array
+- **WHEN** `CompileContext.execute` renders content for `core:core/config` in full mode
+- **THEN** the `ContextSpecEntry.content` is rendered from metadata or extraction fallback as before
+
+#### Scenario: PreviewSpec failure falls back gracefully
+
+- **GIVEN** a change with `specIds: ["core:core/config"]` and a delta file
+- **AND** `PreviewSpec` throws an error during execution
+- **WHEN** `CompileContext.execute` renders content for `core:core/config`
+- **THEN** the `ContextSpecEntry.content` is rendered from metadata or extraction fallback
+- **AND** a warning is added to the result
+
+#### Scenario: Preview only applies to specIds specs
+
+- **GIVEN** a change with `specIds: ["core:core/config"]`
+- **AND** the context includes `default:_global/architecture` via include pattern
+- **WHEN** `CompileContext.execute` is called
+- **THEN** `PreviewSpec` is NOT called for `default:_global/architecture`
+- **AND** `default:_global/architecture` content is rendered from its base (metadata or fallback)
+
+#### Scenario: Summary-mode specs not previewed
+
+- **GIVEN** `contextMode: 'lazy'` and a spec matched only via include pattern (tier 2 summary)
+- **WHEN** `CompileContext.execute` is called
+- **THEN** `PreviewSpec` is NOT called for that spec — summary specs have no content to merge

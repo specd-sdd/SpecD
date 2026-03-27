@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   CompileContext,
   type CompileContextConfig,
   type CompileContextResult,
 } from '../../../src/application/use-cases/compile-context.js'
+import { type PreviewSpec } from '../../../src/application/use-cases/preview-spec.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
@@ -216,12 +217,13 @@ function makeSut(opts: {
   specRepos?: Map<string, SpecRepository>
   fileReader?: FileReader
   parsers?: ArtifactParserRegistry
+  previewSpec?: PreviewSpec
 }): {
   sut: CompileContext
   changeRepo: ChangeRepository
   schemaProvider: SchemaProvider
 } {
-  const { change, schema, specRepos, fileReader, parsers } = opts
+  const { change, schema, specRepos, fileReader, parsers, previewSpec } = opts
   const changeRepo = makeStubChangeRepo(change)
   const schemaProvider = makeStubSchemaProvider(schema ?? null)
 
@@ -232,6 +234,7 @@ function makeSut(opts: {
     fileReader ?? makeStubFileReader(),
     parsers ?? (new Map() as ArtifactParserRegistry),
     makeContentHasher(),
+    previewSpec ?? makeStubPreviewSpec(),
   )
 
   return { sut, changeRepo, schemaProvider }
@@ -256,6 +259,12 @@ function makeStubFileReader(files: Record<string, string> = {}): FileReader {
   }
 }
 
+function makeStubPreviewSpec(): PreviewSpec {
+  return {
+    execute: vi.fn().mockResolvedValue({ specId: '', changeName: '', files: [], warnings: [] }),
+  } as unknown as PreviewSpec
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -272,6 +281,7 @@ describe('CompileContext', () => {
             makeStubFileReader(),
             new Map() as ArtifactParserRegistry,
             makeContentHasher(),
+            makeStubPreviewSpec(),
           ),
       ).not.toThrow()
     })
@@ -286,6 +296,7 @@ describe('CompileContext', () => {
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
         makeContentHasher(),
+        makeStubPreviewSpec(),
       )
       await expect(
         sut.execute({
@@ -306,6 +317,7 @@ describe('CompileContext', () => {
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
         makeContentHasher(),
+        makeStubPreviewSpec(),
       )
       await expect(
         sut.execute({
@@ -1925,6 +1937,236 @@ describe('CompileContext', () => {
       const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
       expect(specEntry).toBeDefined()
       expect(specEntry!.source).toBe('specIds')
+    })
+  })
+
+  describe('Requirement: Materialized delta view via PreviewSpec', () => {
+    it('uses merged content from PreviewSpec for specs in specIds', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginContent = '# Login\n'
+      const mergedContent = '# Login (merged)\n\nNew merged content.'
+      const metadata = freshMetadata(loginContent, { description: 'Login spec.' })
+
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': metadata,
+        'auth/login/spec.md': loginContent,
+      })
+
+      const previewSpec: PreviewSpec = {
+        execute: vi.fn().mockResolvedValue({
+          specId: 'default:auth/login',
+          changeName: 'my-change',
+          files: [{ filename: 'spec.md', base: loginContent, merged: mergedContent }],
+          warnings: [],
+        }),
+      } as unknown as PreviewSpec
+
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+
+      const { sut } = makeSut({
+        change,
+        schema,
+        specRepos: new Map([['default', specRepo]]),
+        previewSpec,
+      })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { contextIncludeSpecs: ['default:auth/login'] },
+      })
+
+      const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
+      expect(specEntry).toBeDefined()
+      expect(specEntry!.content).toBe(mergedContent)
+      expect(result.warnings.filter((w) => w.type === 'preview')).toHaveLength(0)
+    })
+
+    it('falls back to metadata when PreviewSpec returns empty files', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginContent = '# Login\n'
+      const metadata = freshMetadata(loginContent, {
+        description: 'Login fallback spec.',
+      })
+
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': metadata,
+        'auth/login/spec.md': loginContent,
+      })
+
+      const previewSpec: PreviewSpec = {
+        execute: vi.fn().mockResolvedValue({
+          specId: 'default:auth/login',
+          changeName: 'my-change',
+          files: [],
+          warnings: [],
+        }),
+      } as unknown as PreviewSpec
+
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+
+      const { sut } = makeSut({
+        change,
+        schema,
+        specRepos: new Map([['default', specRepo]]),
+        previewSpec,
+      })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { contextIncludeSpecs: ['default:auth/login'] },
+      })
+
+      const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
+      expect(specEntry).toBeDefined()
+      // Falls back to metadata rendering — description present in content
+      expect(specEntry!.content).toContain('Login fallback spec.')
+    })
+
+    it('falls back with warning when PreviewSpec throws', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginContent = '# Login\n'
+      const metadata = freshMetadata(loginContent, {
+        description: 'Login throw-fallback spec.',
+      })
+
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': metadata,
+        'auth/login/spec.md': loginContent,
+      })
+
+      const previewSpec: PreviewSpec = {
+        execute: vi.fn().mockRejectedValue(new Error('preview exploded')),
+      } as unknown as PreviewSpec
+
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+
+      const { sut } = makeSut({
+        change,
+        schema,
+        specRepos: new Map([['default', specRepo]]),
+        previewSpec,
+      })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { contextIncludeSpecs: ['default:auth/login'] },
+      })
+
+      const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
+      expect(specEntry).toBeDefined()
+      // Content rendered from metadata fallback
+      expect(specEntry!.content).toContain('Login throw-fallback spec.')
+      // Preview warning emitted
+      const previewWarnings = result.warnings.filter((w) => w.type === 'preview')
+      expect(previewWarnings).toHaveLength(1)
+      expect(previewWarnings[0]!.path).toBe('default:auth/login')
+    })
+
+    it('does not call PreviewSpec for non-specIds specs', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const otherSpec = new Spec('default', SpecPath.parse('auth/other'), ['spec.md'])
+      const loginContent = '# Login\n'
+      const otherContent = '# Other\n'
+      const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
+      const otherMetadata = freshMetadata(otherContent, { description: 'Other spec.' })
+
+      const specRepo = makeSpecRepo([loginSpec, otherSpec], {
+        'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec.md': loginContent,
+        'auth/other/.specd-metadata.yaml': otherMetadata,
+        'auth/other/spec.md': otherContent,
+      })
+
+      const executeMock = vi.fn().mockResolvedValue({
+        specId: 'default:auth/login',
+        changeName: 'my-change',
+        files: [],
+        warnings: [],
+      })
+      const previewSpec: PreviewSpec = {
+        execute: executeMock,
+      } as unknown as PreviewSpec
+
+      // auth/other is only in the include pattern, NOT in specIds
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+
+      const { sut } = makeSut({
+        change,
+        schema,
+        specRepos: new Map([['default', specRepo]]),
+        previewSpec,
+      })
+
+      await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: {
+          contextMode: 'full',
+          contextIncludeSpecs: ['default:auth/*'],
+        },
+      })
+
+      // PreviewSpec should only have been called for auth/login (specIds), not auth/other
+      const callArgs = executeMock.mock.calls.map((c) => (c[0] as { specId: string }).specId)
+      expect(callArgs).toContain('default:auth/login')
+      expect(callArgs).not.toContain('default:auth/other')
+    })
+
+    it('does not call PreviewSpec for summary-mode specs', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const otherSpec = new Spec('default', SpecPath.parse('auth/other'), ['spec.md'])
+      const loginContent = '# Login\n'
+      const otherContent = '# Other\n'
+      const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
+      const otherMetadata = freshMetadata(otherContent, { description: 'Other spec.' })
+
+      const specRepo = makeSpecRepo([loginSpec, otherSpec], {
+        'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec.md': loginContent,
+        'auth/other/.specd-metadata.yaml': otherMetadata,
+        'auth/other/spec.md': otherContent,
+      })
+
+      const executeMock = vi.fn().mockResolvedValue({
+        specId: 'default:auth/login',
+        changeName: 'my-change',
+        files: [],
+        warnings: [],
+      })
+      const previewSpec: PreviewSpec = {
+        execute: executeMock,
+      } as unknown as PreviewSpec
+
+      // auth/other is only in include pattern → lazy mode → summary → no preview call
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+
+      const { sut } = makeSut({
+        change,
+        schema,
+        specRepos: new Map([['default', specRepo]]),
+        previewSpec,
+      })
+
+      await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: {
+          contextMode: 'lazy',
+          contextIncludeSpecs: ['default:auth/*'],
+        },
+      })
+
+      // PreviewSpec must not be called for auth/other (it is summary mode)
+      const callArgs = executeMock.mock.calls.map((c) => (c[0] as { specId: string }).specId)
+      expect(callArgs).not.toContain('default:auth/other')
     })
   })
 })

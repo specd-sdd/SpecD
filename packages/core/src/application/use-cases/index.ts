@@ -129,3 +129,9 @@ export {
   type GetArtifactInstructionInput,
   type GetArtifactInstructionResult,
 } from './get-artifact-instruction.js'
+export {
+  type PreviewSpec,
+  type PreviewSpecInput,
+  type PreviewSpecResult,
+  type PreviewSpecFileEntry,
+} from './preview-spec.js'

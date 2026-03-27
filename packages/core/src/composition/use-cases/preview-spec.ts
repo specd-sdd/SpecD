@@ -1,5 +1,4 @@
 import * as path from 'node:path'
-import { CompileContext } from '../../application/use-cases/compile-context.js'
 import { PreviewSpec } from '../../application/use-cases/preview-spec.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
@@ -12,14 +11,10 @@ import { type SchemaRepository } from '../../application/ports/schema-repository
 import { createSchemaRepository } from '../schema-repository.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
-import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 
-/**
- * Domain context for the primary (default) workspace used by `CompileContext`.
- */
-export interface CompileContextWorkspace {
-  /** The workspace name from `specd.yaml` (e.g. `'default'`). */
+/** Domain context for the primary (default) workspace used by `createPreviewSpec`. */
+export interface PreviewSpecWorkspace {
+  /** The workspace name from `specd.yaml`. */
   readonly workspace: string
   /** Ownership level of this workspace. */
   readonly ownership: 'owned' | 'shared' | 'readOnly'
@@ -27,65 +22,52 @@ export interface CompileContextWorkspace {
   readonly isExternal: boolean
 }
 
-/**
- * Filesystem adapter paths and pre-built port instances for
- * `createCompileContext(context, options)`.
- */
-export interface FsCompileContextOptions {
-  /** Absolute path to the `changes/` directory. */
+/** Filesystem adapter paths and pre-built port instances for `createPreviewSpec`. */
+export interface FsPreviewSpecOptions {
   readonly changesPath: string
-  /** Absolute path to the `drafts/` directory. */
   readonly draftsPath: string
-  /** Absolute path to the `discarded/` directory. */
   readonly discardedPath: string
-  /**
-   * Pre-built spec repositories keyed by workspace name.
-   *
-   * Must include entries for every workspace declared in the project config.
-   */
   readonly specRepositories: ReadonlyMap<string, SpecRepository>
-  /** Absolute path to the `node_modules` directory for schema resolution. */
   readonly nodeModulesPaths: readonly string[]
-  /** Project root directory for resolving relative schema paths. */
   readonly configDir: string
   readonly schemaRef: string
   readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
 }
 
 /**
- * Constructs a `CompileContext` use case wired to all configured workspaces.
+ * Constructs a `PreviewSpec` use case wired to all configured workspaces.
  *
  * @param config - The fully-resolved project configuration
  * @param kernelOpts - Optional kernel-level overrides
  * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
  * @returns The pre-wired use case instance
  */
-export function createCompileContext(
+export function createPreviewSpec(
   config: SpecdConfig,
   kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
-): CompileContext
+): PreviewSpec
 /**
- * Constructs a `CompileContext` use case with explicit context and options.
+ * Constructs a `PreviewSpec` use case with explicit context and options.
  *
  * @param context - Domain context for the primary workspace
  * @param options - Filesystem paths and pre-built spec repositories
  * @returns The pre-wired use case instance
  */
-export function createCompileContext(
-  context: CompileContextWorkspace,
-  options: FsCompileContextOptions,
-): CompileContext
+export function createPreviewSpec(
+  context: PreviewSpecWorkspace,
+  options: FsPreviewSpecOptions,
+): PreviewSpec
 /**
- * Constructs a `CompileContext` instance wired with filesystem adapters.
+ * Constructs a `PreviewSpec` instance wired with filesystem adapters.
  *
  * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
  * @param options - Filesystem path options; required when `configOrContext` is a context object
  * @returns The pre-wired use case instance
  */
-export function createCompileContext(
-  configOrContext: SpecdConfig | CompileContextWorkspace,
-  options?: FsCompileContextOptions | { extraNodeModulesPaths?: readonly string[] },
-): CompileContext {
+export function createPreviewSpec(
+  configOrContext: SpecdConfig | PreviewSpecWorkspace,
+  options?: FsPreviewSpecOptions | { extraNodeModulesPaths?: readonly string[] },
+): PreviewSpec {
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
     const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
@@ -116,7 +98,7 @@ export function createCompileContext(
           ),
         ]),
     ) as ReadonlyMap<string, SchemaRepository>
-    return createCompileContext(
+    return createPreviewSpec(
       {
         workspace: defaultWs.name,
         ownership: defaultWs.ownership,
@@ -137,7 +119,7 @@ export function createCompileContext(
       },
     )
   }
-  const opts = options as FsCompileContextOptions
+  const opts = options as FsPreviewSpecOptions
   const changeRepo = createChangeRepository('fs', configOrContext, {
     changesPath: opts.changesPath,
     draftsPath: opts.draftsPath,
@@ -150,17 +132,6 @@ export function createCompileContext(
   })
   const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
   const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const files = new FsFileReader()
   const parsers = createArtifactParserRegistry()
-  const hasher = new NodeContentHasher()
-  const previewSpec = new PreviewSpec(changeRepo, opts.specRepositories, schemaProvider, parsers)
-  return new CompileContext(
-    changeRepo,
-    opts.specRepositories,
-    schemaProvider,
-    files,
-    parsers,
-    hasher,
-    previewSpec,
-  )
+  return new PreviewSpec(changeRepo, opts.specRepositories, schemaProvider, parsers)
 }
