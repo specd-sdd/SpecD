@@ -25,10 +25,13 @@ function setup() {
   vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
   // Default: schema resolution returns no artifacts (skip delta enrichment)
   kernel.specs.getActiveSchema.execute.mockResolvedValue({
-    name: () => 'test',
-    version: () => 1,
-    artifacts: () => [],
-    workflow: () => [],
+    raw: false,
+    schema: {
+      name: () => 'test',
+      version: () => 1,
+      artifacts: () => [],
+      workflow: () => [],
+    },
   })
   const stdout = captureStdout()
   const stderr = captureStderr()

@@ -723,18 +723,32 @@ When neither `[ref]` nor `--file` is provided, shows the project's active schema
 
 `[ref]` accepts any valid schema reference: npm package (`@specd/schema-std`), workspace-qualified (`#workspace:name`), bare name, or path.
 
-| Option                      | Description                                                 |
-| --------------------------- | ----------------------------------------------------------- |
-| `--file <path>`             | Show a schema from a file. Mutually exclusive with `[ref]`. |
-| `--format text\|json\|toon` | Output format.                                              |
-| `--config <path>`           | Config file path.                                           |
+| Option                      | Description                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| `--file <path>`             | Show a schema from a file. Mutually exclusive with `[ref]`.                      |
+| `--raw`                     | Show raw schema data without resolving extends, plugins, or overrides.           |
+| `--templates`               | Resolve template references and show file content instead of the reference path. |
+| `--format text\|json\|toon` | Output format.                                                                   |
+| `--config <path>`           | Config file path.                                                                |
 
 ```bash
-# Show the project's active schema
+# Show the project's active schema (full output)
 specd schema show
+
+# Show with resolved template content
+specd schema show --templates
+
+# Show raw schema without resolving extends/plugins/overrides
+specd schema show --raw
+
+# Raw with resolved templates
+specd schema show --raw --templates
 
 # Show a schema by reference
 specd schema show @specd/schema-std
+
+# Show raw data from a referenced schema
+specd schema show @specd/schema-std --raw
 
 # Show a schema from a file
 specd schema show --file .specd/schemas/my-workflow/schema.yaml

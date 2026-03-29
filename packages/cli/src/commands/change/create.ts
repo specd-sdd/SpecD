@@ -54,7 +54,9 @@ JSON/TOON output schema:
 
           const specIds = parsedSpecs.map((p) => p.specId)
 
-          const schema = await kernel.specs.getActiveSchema.execute()
+          const result = await kernel.specs.getActiveSchema.execute()
+          if (result.raw) throw new Error('Unexpected raw result')
+          const schema = result.schema
 
           const { change, changePath } = await kernel.changes.create.execute({
             name,

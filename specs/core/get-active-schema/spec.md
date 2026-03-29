@@ -20,6 +20,18 @@ type GetActiveSchemaInput =
 - When called with `{ mode: 'ref', ref }`: resolves the referenced schema through `SchemaRegistry` with extends chain resolution, without applying project plugins or overrides.
 - When called with `{ mode: 'file', filePath }`: resolves the schema from the given file path with extends chain resolution, without applying project plugins or overrides.
 
+An optional `options` parameter MAY be provided alongside the input:
+
+```typescript
+interface GetActiveSchemaOptions {
+  readonly raw?: boolean
+  readonly resolveTemplates?: boolean
+}
+```
+
+- `raw` — when `true`, returns the parsed schema data without resolving `extends`, applying plugins, or merging overrides. In project mode, this returns the base schema file's parsed data.
+- `resolveTemplates` — when `true` and `raw` is also `true`, template file references in the raw schema are resolved and their content included. Ignored when `raw` is `false` or absent.
+
 ### Requirement: Delegates to ResolveSchema
 
 When called without input (project mode), the use case MUST call `resolveSchema.execute()` to obtain the active schema. It SHALL NOT resolve schemas directly or implement any resolution logic itself for this mode.
@@ -28,7 +40,21 @@ When called with `ref` or `file` input, the use case SHALL resolve the schema th
 
 ### Requirement: Returns the resolved Schema on success
 
-`execute` MUST return `Promise<Schema>` — the fully-resolved, customised schema.
+When `raw` is `false` or absent, `execute` MUST return `Promise<Schema>` — the fully-resolved, customised schema.
+
+When `raw` is `true`, `execute` MUST return `Promise<SchemaRawResult>` — the parsed but unresolved schema data. `SchemaRawResult` contains the `SchemaYamlData` and optionally resolved template contents (when `resolveTemplates` is `true`).
+
+The return type is a discriminated union:
+
+```typescript
+type GetActiveSchemaResult =
+  | { readonly raw: false; readonly schema: Schema }
+  | {
+      readonly raw: true
+      readonly data: SchemaYamlData
+      readonly templates: ReadonlyMap<string, string>
+    }
+```
 
 ### Requirement: Construction dependencies
 
@@ -42,10 +68,11 @@ All lower-level dependencies (schema ref, plugins, overrides) are provided to `R
 
 ## Constraints
 
-- For project mode, the use case contains no business logic — it is a thin delegation to `ResolveSchema`.
-- For ref and file modes, the use case orchestrates `SchemaRegistry.resolveRaw()`, extends chain resolution, template merging, and `buildSchema` — the same pattern used by `ValidateSchema` for file mode.
+- For project mode without `raw`, the use case contains no business logic — it is a thin delegation to `ResolveSchema`.
+- For ref and file modes without `raw`, the use case orchestrates `SchemaRegistry.resolveRaw()`, extends chain resolution, template merging, and `buildSchema` — the same pattern used by `ValidateSchema` for file mode.
+- For raw mode (any input mode), the use case fetches the schema file via `SchemaRegistry.resolveRaw()` and returns the `SchemaYamlData` directly, without resolving the extends chain or calling `buildSchema`.
 - The schema reference is fixed at construction time for project mode — calling `execute()` multiple times without input resolves the same reference.
-- The use case is async — it returns `Promise<Schema>`.
+- The use case is async — it returns `Promise<GetActiveSchemaResult>`.
 
 ## Spec Dependencies
 

@@ -162,30 +162,68 @@ describe('schema show', () => {
   it('prints schema name, version, artifacts, and workflow', async () => {
     const { kernel, stdout } = setup()
     kernel.specs.getActiveSchema.execute.mockResolvedValue({
-      name: () => 'specd-std',
-      version: () => 1,
-      artifacts: () => [
-        {
-          id: 'spec',
-          scope: 'change',
-          optional: false,
-          requires: [],
-          format: 'markdown',
-          delta: false,
-        },
-        {
-          id: 'design',
-          scope: 'change',
-          optional: false,
-          requires: [],
-          format: 'markdown',
-          delta: false,
-        },
-      ],
-      workflow: () => [
-        { step: 'designing', requires: [] },
-        { step: 'implementing', requires: [] },
-      ],
+      raw: false,
+      schema: {
+        name: () => 'specd-std',
+        version: () => 1,
+        kind: () => 'schema',
+        extendsRef: () => undefined,
+        metadataExtraction: () => undefined,
+        artifacts: () => [
+          {
+            id: 'spec',
+            scope: 'change',
+            optional: false,
+            requires: [],
+            format: 'markdown',
+            delta: false,
+            description: undefined,
+            output: 'spec.md',
+            template: undefined,
+            templateRef: undefined,
+            instruction: undefined,
+            deltaInstruction: undefined,
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+            taskCompletionCheck: undefined,
+            rules: undefined,
+          },
+          {
+            id: 'design',
+            scope: 'change',
+            optional: false,
+            requires: [],
+            format: 'markdown',
+            delta: false,
+            description: undefined,
+            output: 'design.md',
+            template: undefined,
+            templateRef: undefined,
+            instruction: undefined,
+            deltaInstruction: undefined,
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+            taskCompletionCheck: undefined,
+            rules: undefined,
+          },
+        ],
+        workflow: () => [
+          {
+            step: 'designing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+          {
+            step: 'implementing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      },
     })
 
     const program = makeProgram()
@@ -204,19 +242,43 @@ describe('schema show', () => {
   it('outputs valid JSON with schema object, artifacts, and workflow arrays', async () => {
     const { kernel, stdout } = setup()
     kernel.specs.getActiveSchema.execute.mockResolvedValue({
-      name: () => 'specd-std',
-      version: () => 1,
-      artifacts: () => [
-        {
-          id: 'spec',
-          scope: 'change',
-          optional: false,
-          requires: [],
-          format: 'markdown',
-          delta: false,
-        },
-      ],
-      workflow: () => [{ step: 'designing', requires: [] }],
+      raw: false,
+      schema: {
+        name: () => 'specd-std',
+        version: () => 1,
+        kind: () => 'schema',
+        extendsRef: () => undefined,
+        metadataExtraction: () => undefined,
+        artifacts: () => [
+          {
+            id: 'spec',
+            scope: 'change',
+            optional: false,
+            requires: [],
+            format: 'markdown',
+            delta: false,
+            description: undefined,
+            output: 'spec.md',
+            template: undefined,
+            templateRef: undefined,
+            instruction: undefined,
+            deltaInstruction: undefined,
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+            taskCompletionCheck: undefined,
+            rules: undefined,
+          },
+        ],
+        workflow: () => [
+          {
+            step: 'designing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      },
     })
 
     const program = makeProgram()
@@ -224,7 +286,7 @@ describe('schema show', () => {
     await program.parseAsync(['node', 'specd', 'schema', 'show', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed.schema).toEqual({ name: 'specd-std', version: 1 })
+    expect(parsed.schema).toEqual({ name: 'specd-std', version: 1, kind: 'schema' })
     expect(Array.isArray(parsed.artifacts)).toBe(true)
     expect(parsed.artifacts[0].id).toBe('spec')
     expect(parsed.artifacts[0].scope).toBe('change')
@@ -237,27 +299,62 @@ describe('schema show', () => {
   it('distinguishes optional and required artifacts in text output', async () => {
     const { kernel, stdout } = setup()
     kernel.specs.getActiveSchema.execute.mockResolvedValue({
-      name: () => 'specd-std',
-      version: () => 1,
-      artifacts: () => [
-        {
-          id: 'proposal',
-          scope: 'change',
-          optional: true,
-          requires: [],
-          format: 'markdown',
-          delta: false,
-        },
-        {
-          id: 'spec',
-          scope: 'change',
-          optional: false,
-          requires: ['proposal'],
-          format: 'markdown',
-          delta: false,
-        },
-      ],
-      workflow: () => [{ step: 'designing', requires: [] }],
+      raw: false,
+      schema: {
+        name: () => 'specd-std',
+        version: () => 1,
+        kind: () => 'schema',
+        extendsRef: () => undefined,
+        metadataExtraction: () => undefined,
+        artifacts: () => [
+          {
+            id: 'proposal',
+            scope: 'change',
+            optional: true,
+            requires: [],
+            format: 'markdown',
+            delta: false,
+            description: undefined,
+            output: 'proposal.md',
+            template: undefined,
+            templateRef: undefined,
+            instruction: undefined,
+            deltaInstruction: undefined,
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+            taskCompletionCheck: undefined,
+            rules: undefined,
+          },
+          {
+            id: 'spec',
+            scope: 'change',
+            optional: false,
+            requires: ['proposal'],
+            format: 'markdown',
+            delta: false,
+            description: undefined,
+            output: 'spec.md',
+            template: undefined,
+            templateRef: undefined,
+            instruction: undefined,
+            deltaInstruction: undefined,
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+            taskCompletionCheck: undefined,
+            rules: undefined,
+          },
+        ],
+        workflow: () => [
+          {
+            step: 'designing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      },
     })
 
     const program = makeProgram()
@@ -272,19 +369,43 @@ describe('schema show', () => {
   it('JSON artifact entries include full fields: id, scope, optional, requires, format, delta', async () => {
     const { kernel, stdout } = setup()
     kernel.specs.getActiveSchema.execute.mockResolvedValue({
-      name: () => 'specd-std',
-      version: () => 1,
-      artifacts: () => [
-        {
-          id: 'spec',
-          scope: 'change',
-          optional: false,
-          requires: ['proposal'],
-          format: 'markdown',
-          delta: true,
-        },
-      ],
-      workflow: () => [{ step: 'designing', requires: ['spec'] }],
+      raw: false,
+      schema: {
+        name: () => 'specd-std',
+        version: () => 1,
+        kind: () => 'schema',
+        extendsRef: () => undefined,
+        metadataExtraction: () => undefined,
+        artifacts: () => [
+          {
+            id: 'spec',
+            scope: 'change',
+            optional: false,
+            requires: ['proposal'],
+            format: 'markdown',
+            delta: true,
+            description: undefined,
+            output: 'spec.md',
+            template: undefined,
+            templateRef: undefined,
+            instruction: undefined,
+            deltaInstruction: undefined,
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+            taskCompletionCheck: undefined,
+            rules: undefined,
+          },
+        ],
+        workflow: () => [
+          {
+            step: 'designing',
+            requires: ['spec'],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      },
     })
 
     const program = makeProgram()
