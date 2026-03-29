@@ -330,6 +330,7 @@ function buildArtifactType(
     output: raw.output,
     ...(raw.description !== undefined ? { description: raw.description } : {}),
     ...(templateContent !== undefined ? { template: templateContent } : {}),
+    ...(raw.template !== undefined ? { templateRef: raw.template } : {}),
     ...(raw.instruction !== undefined ? { instruction: raw.instruction } : {}),
     requires: raw.requires ?? [],
     optional: raw.optional ?? false,

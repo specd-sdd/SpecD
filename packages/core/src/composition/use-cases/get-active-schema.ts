@@ -80,7 +80,7 @@ export function createGetActiveSchema(
       configOrOptions.schemaPlugins ?? [],
       configOrOptions.schemaOverrides,
     )
-    return new GetActiveSchema(resolveSchema, schemas, buildSchema)
+    return new GetActiveSchema(resolveSchema, schemas, buildSchema, schemaRef)
   }
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: configOrOptions.nodeModulesPaths,
@@ -93,5 +93,5 @@ export function createGetActiveSchema(
     configOrOptions.schemaPlugins ?? [],
     configOrOptions.schemaOverrides,
   )
-  return new GetActiveSchema(resolveSchema, schemas, buildSchema)
+  return new GetActiveSchema(resolveSchema, schemas, buildSchema, configOrOptions.schemaRef)
 }

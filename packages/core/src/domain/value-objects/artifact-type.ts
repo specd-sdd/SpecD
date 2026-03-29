@@ -39,8 +39,10 @@ export interface ArtifactTypeProps {
   readonly output: string
   /** Human-readable summary for tooling. */
   readonly description?: string
-  /** Path to a template file, relative to the schema directory. */
+  /** Resolved template file content. */
   readonly template?: string
+  /** Original template path reference as declared in the schema YAML. */
+  readonly templateRef?: string
   /** The LLM instruction used to generate this artifact. */
   readonly instruction?: string
   /**
@@ -103,6 +105,7 @@ export class ArtifactType {
   private readonly _output: string
   private readonly _description: string | undefined
   private readonly _template: string | undefined
+  private readonly _templateRef: string | undefined
   private readonly _instruction: string | undefined
   private readonly _requires: readonly string[]
   private readonly _optional: boolean
@@ -126,6 +129,7 @@ export class ArtifactType {
     this._output = props.output
     this._description = props.description
     this._template = props.template
+    this._templateRef = props.templateRef
     this._instruction = props.instruction
     this._requires = [...props.requires]
     this._optional = props.optional ?? false
@@ -159,9 +163,14 @@ export class ArtifactType {
     return this._description
   }
 
-  /** Path to a template file relative to the schema directory, or `undefined`. */
+  /** Resolved template file content, or `undefined`. */
   get template(): string | undefined {
     return this._template
+  }
+
+  /** Original template path reference as declared in the schema YAML, or `undefined`. */
+  get templateRef(): string | undefined {
+    return this._templateRef
   }
 
   /** The LLM instruction text for generating this artifact, or `undefined`. */

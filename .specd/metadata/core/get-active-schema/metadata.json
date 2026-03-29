@@ -16,7 +16,7 @@
     {
       "requirement": "Optional input",
       "rules": [
-        "`execute()` MAY be called with no arguments or with an optional `GetActiveSchemaInput`:\n\n```typescript\ntype GetActiveSchemaInput =\n  | { readonly mode: 'ref'; readonly ref: string }\n  | { readonly mode: 'file'; readonly filePath: string }\n```\n\n- When called with **no arguments** (or `undefined`): resolves the project's active schema via `ResolveSchema` — the current default behaviour.\n- When called with `{ mode: 'ref', ref }`: resolves the referenced schema through `SchemaRegistry` with extends chain resolution, without applying project plugins or overrides.\n- When called with `{ mode: 'file', filePath }`: resolves the schema from the given file path with extends chain resolution, without applying project plugins or overrides."
+        "`execute()` MAY be called with no arguments or with an optional `GetActiveSchemaInput`:\n\n```typescript\ntype GetActiveSchemaInput =\n  | { readonly mode: 'ref'; readonly ref: string }\n  | { readonly mode: 'file'; readonly filePath: string }\n```\n\n- When called with **no arguments** (or `undefined`): resolves the project's active schema via `ResolveSchema` — the current default behaviour.\n- When called with `{ mode: 'ref', ref }`: resolves the referenced schema through `SchemaRegistry` with extends chain resolution, without applying project plugins or overrides.\n- When called with `{ mode: 'file', filePath }`: resolves the schema from the given file path with extends chain resolution, without applying project plugins or overrides.\n\nAn optional `options` parameter MAY be provided alongside the input:\n\n```typescript\ninterface GetActiveSchemaOptions {\n  readonly raw?: boolean\n  readonly resolveTemplates?: boolean\n}\n```\n\n- `raw` — when `true`, returns the parsed schema data without resolving `extends`, applying plugins, or merging overrides. In project mode, this returns the base schema file's parsed data.\n- `resolveTemplates` — when `true` and `raw` is also `true`, template file references in the raw schema are resolved and their content included. Ignored when `raw` is `false` or absent."
       ]
     },
     {
@@ -27,7 +27,9 @@
     },
     {
       "requirement": "Returns the resolved Schema on success",
-      "rules": ["`execute` MUST return `Promise<Schema>` — the fully-resolved, customised schema."]
+      "rules": [
+        "When `raw` is `false` or absent, `execute` MUST return `Promise<Schema>` — the fully-resolved, customised schema.\n\nWhen `raw` is `true`, `execute` MUST return `Promise<SchemaRawResult>` — the parsed but unresolved schema data. `SchemaRawResult` contains the `SchemaYamlData` and optionally resolved template contents (when `resolveTemplates` is `true`).\n\nThe return type is a discriminated union:\n\n```typescript\ntype GetActiveSchemaResult =\n  | { readonly raw: false; readonly schema: Schema }\n  | { readonly raw: true; readonly data: SchemaYamlData; readonly templates: ReadonlyMap<string, string> }\n```"
+      ]
     },
     {
       "requirement": "Construction dependencies",
@@ -37,10 +39,11 @@
     }
   ],
   "constraints": [
-    "For project mode, the use case contains no business logic — it is a thin delegation to ResolveSchema.",
-    "For ref and file modes, the use case orchestrates SchemaRegistry.resolveRaw(), extends chain resolution, template merging, and buildSchema — the same pattern used by ValidateSchema for file mode.",
+    "For project mode without raw, the use case contains no business logic — it is a thin delegation to ResolveSchema.",
+    "For ref and file modes without raw, the use case orchestrates SchemaRegistry.resolveRaw(), extends chain resolution, template merging, and buildSchema — the same pattern used by ValidateSchema for file mode.",
+    "For raw mode (any input mode), the use case fetches the schema file via SchemaRegistry.resolveRaw() and returns the SchemaYamlData directly, without resolving the extends chain or calling buildSchema.",
     "The schema reference is fixed at construction time for project mode — calling execute() multiple times without input resolves the same reference.",
-    "The use case is async — it returns Promise<Schema>."
+    "The use case is async — it returns Promise<GetActiveSchemaResult>."
   ],
   "scenarios": [
     {
@@ -84,6 +87,37 @@
       "then": ["SchemaNotFoundError is thrown"]
     },
     {
+      "requirement": "Optional input",
+      "name": "Raw mode returns SchemaYamlData without resolving extends",
+      "given": ["a schema that declares extends: '@specd/schema-std'"],
+      "when": ["execute(undefined, { raw: true }) is called"],
+      "then": [
+        "the result has raw: true",
+        "AND data contains the parsed SchemaYamlData with the extends field intact",
+        "AND artifacts from the parent schema are NOT included"
+      ]
+    },
+    {
+      "requirement": "Optional input",
+      "name": "Raw mode with ref",
+      "given": ["@specd/schema-std is registered in the SchemaRegistry"],
+      "when": ["execute({ mode: 'ref', ref: '@specd/schema-std' }, { raw: true }) is called"],
+      "then": [
+        "the result has raw: true",
+        "AND data contains the raw parsed data from the schema package"
+      ]
+    },
+    {
+      "requirement": "Optional input",
+      "name": "Raw mode with resolveTemplates",
+      "given": ["a schema with artifacts that declare template references"],
+      "when": ["execute(undefined, { raw: true, resolveTemplates: true }) is called"],
+      "then": [
+        "the result has raw: true",
+        "AND templates map contains entries for each declared template reference"
+      ]
+    },
+    {
       "requirement": "Delegates to ResolveSchema",
       "name": "Project mode delegates to ResolveSchema",
       "given": [
@@ -112,12 +146,17 @@
     },
     {
       "requirement": "Returns the resolved Schema on success",
-      "name": "Schema resolved with extends and plugins",
-      "given": [
-        "ResolveSchema.execute() returns a valid Schema object (after resolving extends, plugins, and overrides)"
-      ],
-      "when": ["execute() is called"],
-      "then": ["the returned promise resolves to that Schema object"]
+      "name": "Default mode returns Schema with raw false",
+      "given": ["ResolveSchema.execute() returns a valid Schema object"],
+      "when": ["execute() is called without options"],
+      "then": ["the returned result has raw: false and schema is the resolved Schema object"]
+    },
+    {
+      "requirement": "Returns the resolved Schema on success",
+      "name": "Raw mode returns SchemaYamlData with raw true",
+      "given": ["SchemaRegistry.resolveRaw() returns valid data"],
+      "when": ["execute(undefined, { raw: true }) is called"],
+      "then": ["the returned result has raw: true and data is the SchemaYamlData"]
     },
     {
       "requirement": "Returns the resolved Schema on success",
@@ -151,8 +190,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:0b4e7f65f72a13aa8beedb39b583f58820b925362a33a6f57e681a19c90589dc",
-    "verify.md": "sha256:b8cd0383e72732dd449fd7cc98287f47f73e637f4f25538da03be80871a46d2c"
+    "spec.md": "sha256:969f5fe9480a7ec66da05da318e8c659a676e678e975f7113fc264768ae524ec",
+    "verify.md": "sha256:10555b5b64c11507f2b1793a5d2455e152341b3390104c67857dcb6468a7db7e"
   },
   "generatedBy": "core"
 }

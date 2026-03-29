@@ -16,6 +16,32 @@ export type GetActiveSchemaInput =
   | { readonly mode: 'file'; readonly filePath: string }
 
 /**
+ * Options for {@link GetActiveSchema.execute}.
+ */
+export interface GetActiveSchemaOptions {
+  /** When `true`, returns parsed schema data without resolving extends, plugins, or overrides. */
+  readonly raw?: boolean
+  /** When `true` and `raw` is also `true`, resolves template file references. Ignored when `raw` is falsy. */
+  readonly resolveTemplates?: boolean
+}
+
+/** Result when raw mode is disabled (default). */
+export interface GetActiveSchemaResolved {
+  readonly raw: false
+  readonly schema: Schema
+}
+
+/** Result when raw mode is enabled. */
+export interface GetActiveSchemaRaw {
+  readonly raw: true
+  readonly data: SchemaYamlData
+  readonly templates: ReadonlyMap<string, string>
+}
+
+/** Discriminated union result type for {@link GetActiveSchema.execute}. */
+export type GetActiveSchemaResult = GetActiveSchemaResolved | GetActiveSchemaRaw
+
+/**
  * Resolves and returns a schema — either the project's active schema
  * or an arbitrary schema identified by reference or file path.
  *
@@ -31,6 +57,7 @@ export class GetActiveSchema {
     data: SchemaYamlData,
     templates: ReadonlyMap<string, string>,
   ) => Schema
+  private readonly _schemaRef: string
 
   /**
    * Creates a new `GetActiveSchema` use case instance.
@@ -38,6 +65,7 @@ export class GetActiveSchema {
    * @param resolveSchema - The use case that orchestrates the full schema resolution pipeline
    * @param schemas - Registry port for resolving schema references (ref and file modes)
    * @param buildSchemaFn - Domain service for building the Schema entity (ref and file modes)
+   * @param schemaRef - The project's schema reference (used for raw project mode)
    */
   constructor(
     resolveSchema: ResolveSchema,
@@ -47,28 +75,61 @@ export class GetActiveSchema {
       data: SchemaYamlData,
       templates: ReadonlyMap<string, string>,
     ) => Schema,
+    schemaRef: string,
   ) {
     this._resolveSchema = resolveSchema
     this._schemas = schemas
     this._buildSchema = buildSchemaFn
+    this._schemaRef = schemaRef
   }
 
   /**
    * Executes the use case.
    *
    * @param input - Optional input specifying ref or file mode. When omitted, resolves the project's active schema.
-   * @returns The resolved schema
+   * @param options - Optional options for raw mode.
+   * @returns The resolved schema or raw schema data
    */
-  async execute(input?: GetActiveSchemaInput): Promise<Schema> {
+  async execute(
+    input?: GetActiveSchemaInput,
+    options?: GetActiveSchemaOptions,
+  ): Promise<GetActiveSchemaResult> {
+    if (options?.raw) {
+      return this._executeRaw(input, options.resolveTemplates ?? false)
+    }
+
     if (input === undefined) {
-      return this._resolveSchema.execute()
+      return { raw: false, schema: await this._resolveSchema.execute() }
     }
     switch (input.mode) {
       case 'ref':
-        return this._resolveByRef(input.ref)
+        return { raw: false, schema: await this._resolveByRef(input.ref) }
       case 'file':
-        return this._resolveByFile(input.filePath)
+        return { raw: false, schema: await this._resolveByFile(input.filePath) }
     }
+  }
+
+  /**
+   * Returns raw parsed schema data without resolving extends, plugins, or overrides.
+   *
+   * @param input - Optional input specifying ref or file mode
+   * @param resolveTemplates - Whether to include resolved template contents
+   * @returns The raw schema data and optionally resolved templates
+   */
+  private async _executeRaw(
+    input: GetActiveSchemaInput | undefined,
+    resolveTemplates: boolean,
+  ): Promise<GetActiveSchemaRaw> {
+    const ref =
+      input === undefined ? this._schemaRef : input.mode === 'ref' ? input.ref : input.filePath
+
+    const raw = await this._schemas.resolveRaw(ref)
+    if (raw === null) {
+      throw new SchemaNotFoundError(ref)
+    }
+
+    const templates = resolveTemplates ? raw.templates : new Map<string, string>()
+    return { raw: true, data: raw.data, templates }
   }
 
   /**
@@ -102,7 +163,7 @@ export class GetActiveSchema {
   /**
    * Resolves the extends chain and builds a Schema from raw data.
    *
-   * @param ref - The schema reference or file path (used as the Schema name)
+   * @param ref - The schema reference or file path
    * @param raw - The raw schema resolution result
    * @returns The built Schema entity
    */

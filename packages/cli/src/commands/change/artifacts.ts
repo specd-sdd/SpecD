@@ -41,9 +41,10 @@ JSON/TOON output schema:
         // Resolve schema for delta info
         let schemaArtifacts: ReadonlyMap<string, { delta: boolean; output: string }> = new Map()
         try {
-          const schema = await kernel.specs.getActiveSchema.execute()
+          const result = await kernel.specs.getActiveSchema.execute()
+          if (result.raw) throw new Error('Unexpected raw result')
           schemaArtifacts = new Map(
-            schema
+            result.schema
               .artifacts()
               .map((a: { id: string; delta: boolean; output: string }) => [
                 a.id,

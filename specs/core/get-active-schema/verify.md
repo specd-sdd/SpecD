@@ -35,6 +35,28 @@
 - **WHEN** `execute({ mode: 'file', filePath: '/tmp/nonexistent.yaml' })` is called
 - **THEN** `SchemaNotFoundError` is thrown
 
+#### Scenario: Raw mode returns SchemaYamlData without resolving extends
+
+- **GIVEN** a schema that declares `extends: '@specd/schema-std'`
+- **WHEN** `execute(undefined, { raw: true })` is called
+- **THEN** the result has `raw: true`
+- **AND** `data` contains the parsed `SchemaYamlData` with the `extends` field intact
+- **AND** artifacts from the parent schema are NOT included
+
+#### Scenario: Raw mode with ref
+
+- **GIVEN** `@specd/schema-std` is registered in the SchemaRegistry
+- **WHEN** `execute({ mode: 'ref', ref: '@specd/schema-std' }, { raw: true })` is called
+- **THEN** the result has `raw: true`
+- **AND** `data` contains the raw parsed data from the schema package
+
+#### Scenario: Raw mode with resolveTemplates
+
+- **GIVEN** a schema with artifacts that declare template references
+- **WHEN** `execute(undefined, { raw: true, resolveTemplates: true })` is called
+- **THEN** the result has `raw: true`
+- **AND** `templates` map contains entries for each declared template reference
+
 ### Requirement: Delegates to ResolveSchema
 
 #### Scenario: Project mode delegates to ResolveSchema
@@ -57,11 +79,17 @@
 
 ### Requirement: Returns the resolved Schema on success
 
-#### Scenario: Schema resolved with extends and plugins
+#### Scenario: Default mode returns Schema with raw false
 
-- **GIVEN** `ResolveSchema.execute()` returns a valid `Schema` object (after resolving extends, plugins, and overrides)
-- **WHEN** `execute()` is called
-- **THEN** the returned promise resolves to that `Schema` object
+- **GIVEN** `ResolveSchema.execute()` returns a valid `Schema` object
+- **WHEN** `execute()` is called without options
+- **THEN** the returned result has `raw: false` and `schema` is the resolved `Schema` object
+
+#### Scenario: Raw mode returns SchemaYamlData with raw true
+
+- **GIVEN** `SchemaRegistry.resolveRaw()` returns valid data
+- **WHEN** `execute(undefined, { raw: true })` is called
+- **THEN** the returned result has `raw: true` and `data` is the `SchemaYamlData`
 
 #### Scenario: Schema not found
 

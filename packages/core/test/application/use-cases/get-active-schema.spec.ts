@@ -61,7 +61,7 @@ function makeSut(
   const rawData = minimalData()
   const resolveSchema = overrides.resolveSchema ?? makeResolveSchema(rawResult(rawData))
   return {
-    sut: new GetActiveSchema(resolveSchema, registry, buildSchemaFn),
+    sut: new GetActiveSchema(resolveSchema, registry, buildSchemaFn, '@specd/schema-std'),
     buildSchemaFn,
   }
 }
@@ -74,18 +74,19 @@ describe('GetActiveSchema', () => {
       const resolveSchema = makeResolveSchema(raw)
       const registry = makeRegistry({})
       const buildFn = vi.fn()
-      const uc = new GetActiveSchema(resolveSchema, registry, buildFn)
+      const uc = new GetActiveSchema(resolveSchema, registry, buildFn, '@specd/schema-std')
 
       const result = await uc.execute()
 
-      expect(result.name()).toBe('my-schema')
+      expect(result.raw).toBe(false)
+      if (!result.raw) expect(result.schema.name()).toBe('my-schema')
     })
 
     it('throws SchemaNotFoundError when schema not found', async () => {
       const resolveSchema = makeResolveSchema(null)
       const registry = makeRegistry({})
       const buildFn = vi.fn()
-      const uc = new GetActiveSchema(resolveSchema, registry, buildFn)
+      const uc = new GetActiveSchema(resolveSchema, registry, buildFn, '@specd/schema-std')
 
       await expect(uc.execute()).rejects.toThrow(SchemaNotFoundError)
     })
@@ -105,7 +106,8 @@ describe('GetActiveSchema', () => {
 
       const result = await sut.execute({ mode: 'ref', ref: '@specd/schema-std' })
 
-      expect(result).toBe(schema)
+      expect(result.raw).toBe(false)
+      if (!result.raw) expect(result.schema).toBe(schema)
       const calledData = buildFn.mock.calls[0]![1] as SchemaYamlData
       expect(calledData.name).toBe('child')
       expect(calledData.description).toBe('parent desc')
@@ -145,7 +147,8 @@ describe('GetActiveSchema', () => {
 
       const result = await sut.execute({ mode: 'ref', ref: '@specd/schema-std' })
 
-      expect(result.name()).toBe('standalone')
+      expect(result.raw).toBe(false)
+      if (!result.raw) expect(result.schema.name()).toBe('standalone')
       // buildSchemaFn is called directly, not through ResolveSchema pipeline
       expect(buildFn).toHaveBeenCalledOnce()
     })
@@ -163,7 +166,8 @@ describe('GetActiveSchema', () => {
 
       const result = await sut.execute({ mode: 'file', filePath: '/tmp/schema.yaml' })
 
-      expect(result).toBe(schema)
+      expect(result.raw).toBe(false)
+      if (!result.raw) expect(result.schema).toBe(schema)
     })
 
     it('throws SchemaNotFoundError when file not found', async () => {

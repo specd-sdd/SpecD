@@ -9,13 +9,13 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd schema show [ref] [--file <path>] [--format text|json|toon]\n```\n\n- `[ref]` — optional positional argument; a schema reference in the same format as `specd.yaml`'s `schema` field (e.g. `@specd/schema-std`, `#workspace:name`, `#name`, bare name). Resolved through `SchemaRegistry`.\n- `--file <path>` — optional; show a schema from an external file path (absolute or relative to CWD).\n- `--format text|json|toon` — optional; output format, defaults to `text`.\n\nWhen neither `[ref]` nor `--file` is provided, the command shows the project's active (configured) schema — the current default behaviour.\n\n`[ref]` and `--file` are mutually exclusive. If both are provided, the command SHALL fail with an error: `[ref] and --file are mutually exclusive`."
+        "```\nspecd schema show [ref] [--file <path>] [--raw] [--templates] [--format text|json|toon]\n```\n\n- `[ref]` — optional positional argument; a schema reference in the same format as `specd.yaml`'s `schema` field (e.g. `@specd/schema-std`, `#workspace:name`, `#name`, bare name). Resolved through `SchemaRegistry`.\n- `--file <path>` — optional; show a schema from an external file path (absolute or relative to CWD).\n- `--raw` — optional; show the schema's parsed YAML data without resolving `extends`, applying `schemaPlugins`, or merging `schemaOverrides`. Displays what the schema file declares on its own. Works with all three modes (project, ref, file).\n- `--templates` — optional; resolve template references and show their full file content instead of just the reference path. Compatible with `--raw`.\n- `--format text|json|toon` — optional; output format, defaults to `text`.\n\nWhen neither `[ref]` nor `--file` is provided, the command shows the project's active (configured) schema — the current default behaviour.\n\n`[ref]` and `--file` are mutually exclusive. If both are provided, the command SHALL fail with an error: `[ref] and --file are mutually exclusive`."
       ]
     },
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode (default), the command prints the schema metadata followed by two sections:\n\n```\nschema: <name>  version: <N>  kind: <kind>\nextends: <ref>  (only if present)\nplugins: <count> applied  (only if schemaPlugins is non-empty — project mode only)\n\nartifacts:\n  <id>  <scope>  <optional>  requires=[<id>,...]  output=<pattern>  [<description>]\n  ...\n\nworkflow:\n  <step>  requires=[<id>,...]\n  ...\n```\n\nwhere `<optional>` is `optional` or `required`, and `requires` lists the artifact IDs or step names that must be complete before this entry is available. The `requires` field is omitted when empty. `output` is always shown. `<description>` is shown in brackets when present.\n\nThe `plugins` line is only shown when the project's active schema is displayed (no `[ref]` or `--file`), because plugins and overrides are not applied when resolving by ref or file.\n\nIn `json` or `toon` mode, the output is (encoded in the respective format):\n\n```json\n{\n  \"schema\": {\"name\": \"...\", \"version\": N, \"kind\": \"schema\", \"extends\": \"...\"},\n  \"plugins\": [\"@specd/plugin-rfc\"],\n  \"mode\": \"project\" | \"ref\" | \"file\",\n  \"artifacts\": [\n    {\n      \"id\": \"...\",\n      \"scope\": \"change|spec\",\n      \"optional\": false,\n      \"requires\": [],\n      \"format\": \"...\",\n      \"delta\": false,\n      \"description\": \"...\" | null,\n      \"output\": \"...\",\n      \"hasTaskCompletionCheck\": false\n    }\n  ],\n  \"workflow\": [\n    {\n      \"step\": \"...\",\n      \"requires\": []\n    }\n  ]\n}\n```\n\n- `mode` (string) — indicates how the schema was resolved: `\"project\"` for the active schema, `\"ref\"` when `[ref]` was provided, `\"file\"` when `--file` was provided\n- `plugins` (string array) — list of applied schema plugins; empty array when mode is `ref` or `file` (plugins are not applied)\n- `description` (string | null) — human-readable summary of the artifact's purpose; `null` when the schema does not declare one\n- `output` (string) — the filename or glob pattern for the artifact's output files (e.g. `\"proposal.md\"`, `\"specs/**/spec.md\"`)\n- `hasTaskCompletionCheck` (boolean) — `true` when the artifact declares a `taskCompletionCheck` configuration; `false` otherwise\n\nWhen resolving by `[ref]` or `--file`, the schema is resolved with its extends chain but WITHOUT the project's plugins or overrides. Only the project mode applies plugins and overrides."
+        "The command SHALL display the **complete** schema definition, not a structural summary.\n\n#### Default mode (resolved schema)\n\nIn `json` or `toon` mode, the output SHALL be a faithful serialization of the resolved `Schema` entity — all fields of every artifact, workflow step, and metadata extraction entry — wrapped in an envelope with CLI-specific metadata:\n\n```json\n{\n  \"schema\": {\"name\": \"...\", \"version\": N, \"kind\": \"...\", \"extends\": \"...\"},\n  \"mode\": \"project\" | \"ref\" | \"file\",\n  \"plugins\": [\"...\"],\n  ...all schema fields (artifacts, workflow, metadataExtraction)\n}\n```\n\n- `mode` (string) — indicates how the schema was resolved: `\"project\"` for the active schema, `\"ref\"` when `[ref]` was provided, `\"file\"` when `--file` was provided.\n- `plugins` (string array) — list of applied schema plugins; empty array when mode is `ref` or `file` (plugins are not applied).\n\nEvery field present on the `Schema` entity, its artifacts, and its workflow steps SHALL be included in the output. The command SHALL NOT filter, rename, or summarize schema fields — if the schema format adds or removes fields, the output follows automatically.\n\nThe `template` field SHALL always be shown. By default it displays the template reference as declared in the schema (e.g. `templates/proposal.md`). When `--templates` is passed, the reference is resolved and replaced with the full template file content.\n\nIn `text` mode (default), the command prints the schema metadata followed by sections for artifacts, workflow, and metadata extraction. Each artifact shows all its fields in a readable format. Workflow steps include their hooks. The exact text layout is not prescribed — it SHALL be human-readable and include all the same information as the JSON format.\n\nThe `plugins` line is only shown when the project's active schema is displayed (no `[ref]` or `--file`), because plugins and overrides are not applied when resolving by ref or file.\n\nWhen resolving by `[ref]` or `--file`, the schema is resolved with its extends chain but WITHOUT the project's plugins or overrides. Only the project mode applies plugins and overrides.\n\n#### Raw mode (--raw)\n\nWhen `--raw` is passed, the command SHALL display the parsed YAML data from the schema file without resolving `extends`, applying `schemaPlugins`, or merging `schemaOverrides`. The output represents what the schema file declares on its own.\n\nIn `json` or `toon` mode with `--raw`, the output structure matches the schema YAML structure (as `SchemaYamlData`), not the resolved `Schema` entity format. The `mode` and `plugins` fields are not included — the output is the raw data as-is.\n\nWhen `--raw --templates` is used, template file references in the raw schema are resolved and replaced with the full file content.\n\nIn project mode with `--raw`, the command shows the base schema file's parsed data (the file referenced in `specd.yaml`) without applying extends, plugins, or overrides."
       ]
     },
     {
@@ -26,10 +26,34 @@
     }
   ],
   "constraints": [
-    "This command is read-only",
-    "Artifact instruction, deltaInstruction, validations, and template are not included in the output — this command focuses on structure, not content"
+    "This command is read-only.",
+    "The command SHALL NOT filter or rename schema fields — the output is a faithful representation of the schema entity (or raw data in --raw mode). The template field shows the reference path by default; --templates resolves it to file content."
   ],
   "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "--raw flag is accepted",
+      "when": ["specd schema show --raw is run"],
+      "then": [
+        "the command does not error on the unknown flag",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--templates flag is accepted",
+      "when": ["specd schema show --templates is run"],
+      "then": [
+        "the command does not error on the unknown flag",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--raw and --templates can be combined",
+      "when": ["specd schema show --raw --templates is run"],
+      "then": ["the command does not error", "AND the process exits with code 0"]
+    },
     {
       "requirement": "Output format",
       "name": "Text output shows schema name, kind, artifacts, and workflow",
@@ -88,28 +112,35 @@
     },
     {
       "requirement": "Output format",
-      "name": "JSON output structure",
+      "name": "JSON output includes all schema fields",
+      "given": [
+        "a schema with artifacts that declare instruction, rules, validations, hooks, and metadataExtraction"
+      ],
       "when": ["specd schema show --format json is run"],
       "then": [
-        "stdout is valid JSON with schema, plugins, mode, artifacts, and workflow",
-        "AND schema has name, version, kind, and optionally extends",
-        "AND mode is \"project\"",
-        "AND each artifact entry has id, scope, optional, requires, format, and delta",
-        "AND each workflow entry has step and requires",
+        "stdout is valid JSON with schema, plugins, mode, artifacts, workflow, and metadataExtraction",
+        "AND each artifact entry includes all fields from the Schema entity (e.g. instruction, rules, validations, deltaInstruction, preHashCleanup, taskCompletionCheck)",
+        "AND each workflow entry includes hooks and requiresTaskCompletion",
         "AND the process exits with code 0"
       ]
     },
     {
       "requirement": "Output format",
-      "name": "JSON output includes description, output, and hasTaskCompletionCheck",
-      "given": [
-        "a schema with artifact tasks that has description: \"Implementation checklist\", output: \"tasks.md\", and a taskCompletionCheck declared"
-      ],
+      "name": "Template field shows reference path by default",
+      "given": ["a schema with artifact proposal that declares template: templates/proposal.md"],
       "when": ["specd schema show --format json is run"],
+      "then": ["the proposal artifact entry includes \"template\": \"templates/proposal.md\""]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Template content resolved with --templates",
+      "given": [
+        "a schema with artifact proposal that declares template: templates/proposal.md",
+        "AND the template file contains # Proposal template content"
+      ],
+      "when": ["specd schema show --templates --format json is run"],
       "then": [
-        "the tasks artifact entry includes \"description\": \"Implementation checklist\"",
-        "AND the entry includes \"output\": \"tasks.md\"",
-        "AND the entry includes \"hasTaskCompletionCheck\": true"
+        "the proposal artifact entry's template field contains the file content # Proposal template content"
       ]
     },
     {
@@ -147,6 +178,44 @@
       "then": ["the JSON output contains \"mode\": \"file\""]
     },
     {
+      "requirement": "Output format",
+      "name": "Raw mode shows unresolved schema data",
+      "given": ["a schema that declares extends: '@specd/schema-std'"],
+      "when": ["specd schema show --raw --format json is run"],
+      "then": [
+        "the JSON output contains the extends field with the unresolved reference",
+        "AND the output does NOT contain mode or plugins fields",
+        "AND artifacts from the parent schema are NOT included — only those declared in the schema file itself"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Raw mode works with ref",
+      "given": ["@specd/schema-std is installed"],
+      "when": ["specd schema show @specd/schema-std --raw --format json is run"],
+      "then": [
+        "the JSON output contains the raw parsed data from the schema package file",
+        "AND no extends chain resolution is applied"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Raw mode with --templates resolves template references",
+      "given": ["a schema with artifact proposal that declares template: templates/proposal.md"],
+      "when": ["specd schema show --raw --templates --format json is run"],
+      "then": ["the proposal artifact's template field contains the resolved file content"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Raw mode in project shows base schema without overrides",
+      "given": ["specd.yaml references @specd/schema-std and declares schemaOverrides"],
+      "when": ["specd schema show --raw --format json is run"],
+      "then": [
+        "the output shows the base schema data from @specd/schema-std",
+        "AND the schemaOverrides are NOT applied"
+      ]
+    },
+    {
       "requirement": "Error cases",
       "name": "Schema cannot be resolved",
       "given": ["specd.yaml references a schema that does not exist"],
@@ -176,8 +245,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:0f6e10ae776c56bc8abc783a2b6cd504d3dfc1c8a62d0eba4b0cd57d8cc04a47",
-    "verify.md": "sha256:b19971873aacbb1ea73bf250645e0ed65822d3968e960e7de69c28a2776e9c67"
+    "spec.md": "sha256:f9732d3b201cab5c6b59f08ebb58699ec8784ba1fbdc1029cda51c827fbaf1ff",
+    "verify.md": "sha256:666d88fe1628be7141f847fba46be45a539d0a172fb7d9cc9df8306ecf87635a"
   },
   "generatedBy": "core"
 }
