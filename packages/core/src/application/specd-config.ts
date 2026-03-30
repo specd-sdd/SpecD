@@ -9,6 +9,21 @@ import { type SchemaOperations } from '../domain/services/merge-schema-layers.js
  */
 export type SpecdContextEntry = { readonly file: string } | { readonly instruction: string }
 
+/** Per-workspace code graph configuration from `specd.yaml`. */
+export interface SpecdWorkspaceGraphConfig {
+  /**
+   * Whether `.gitignore` files are loaded and applied during file discovery.
+   * Defaults to `true`. When `false`, only `excludePaths` governs exclusion.
+   */
+  readonly respectGitignore?: boolean
+  /**
+   * Gitignore-syntax exclusion patterns applied during file discovery.
+   * Supports `!` negation. When absent, built-in defaults apply.
+   * When present, replaces built-in defaults entirely.
+   */
+  readonly excludePaths?: readonly string[]
+}
+
 /** Per-workspace configuration resolved from `specd.yaml`. */
 export interface SpecdWorkspaceConfig {
   /** The workspace name (e.g. `'default'`, `'billing'`). */
@@ -53,6 +68,8 @@ export interface SpecdWorkspaceConfig {
    * Applied only when this workspace is active in the current change.
    */
   readonly contextExcludeSpecs?: readonly string[]
+  /** Code graph configuration for this workspace. */
+  readonly graph?: SpecdWorkspaceGraphConfig
 }
 
 /** Storage paths resolved from the `storage` section of `specd.yaml`. */

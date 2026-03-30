@@ -182,6 +182,13 @@ const PrefixZodSchema = z.string().refine(
   },
 )
 
+const WorkspaceGraphZodSchema = z
+  .object({
+    respectGitignore: z.boolean().optional(),
+    excludePaths: z.array(z.string()).optional(),
+  })
+  .strict()
+
 const WorkspaceRawZodSchema = z
   .object({
     prefix: PrefixZodSchema.optional(),
@@ -191,6 +198,7 @@ const WorkspaceRawZodSchema = z
     ownership: z.enum(['owned', 'shared', 'readOnly']).optional(),
     contextIncludeSpecs: z.array(z.string()).optional(),
     contextExcludeSpecs: z.array(z.string()).optional(),
+    graph: WorkspaceGraphZodSchema.optional(),
   })
   .strict()
 
@@ -450,6 +458,18 @@ export class FsConfigLoader implements ConfigLoader {
           : {}),
         ...(ws.contextExcludeSpecs !== undefined
           ? { contextExcludeSpecs: ws.contextExcludeSpecs }
+          : {}),
+        ...(ws.graph !== undefined
+          ? {
+              graph: {
+                ...(ws.graph.respectGitignore !== undefined
+                  ? { respectGitignore: ws.graph.respectGitignore }
+                  : {}),
+                ...(ws.graph.excludePaths !== undefined
+                  ? { excludePaths: ws.graph.excludePaths }
+                  : {}),
+              },
+            }
           : {}),
       }
     })

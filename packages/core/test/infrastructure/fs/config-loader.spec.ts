@@ -900,4 +900,172 @@ storage:
       expect(defaultWs!.schemasPath).toBe(path.join(tmpDir, '.specd/schemas'))
     })
   })
+
+  // ---------------------------------------------------------------------------
+  // Requirement: Workspace graph config
+  // ---------------------------------------------------------------------------
+
+  describe('Requirement: Workspace graph config', () => {
+    it('parses graph.excludePaths and graph.respectGitignore correctly', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      respectGitignore: false
+      excludePaths:
+        - dist/
+        - "!dist/keep/"
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      const defaultWs = config.workspaces.find((w) => w.name === 'default')
+      expect(defaultWs?.graph).toBeDefined()
+      expect(defaultWs?.graph?.respectGitignore).toBe(false)
+      expect(defaultWs?.graph?.excludePaths).toEqual(['dist/', '!dist/keep/'])
+    })
+
+    it('graph field is undefined on workspace when graph block is absent', async () => {
+      const configPath = await writeConfig(minimalYaml())
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      const defaultWs = config.workspaces.find((w) => w.name === 'default')
+      expect(defaultWs?.graph).toBeUndefined()
+    })
+
+    it('rejects graph.respectGitignore with a non-boolean value', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      respectGitignore: "yes"
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph\.respectGitignore/)
+    })
+
+    it('rejects graph.excludePaths when given a bare string instead of array', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      excludePaths: "node_modules/"
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph\.excludePaths/)
+    })
+
+    it('rejects unknown fields inside the graph block', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      unknownField: true
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph/)
+    })
+  })
 })
