@@ -56,6 +56,10 @@ export async function buildWorkspaceTargets(
       name: ws.name,
       codeRoot: ws.codeRoot,
       ...(repoRoot !== undefined ? { repoRoot } : {}),
+      ...(ws.graph?.excludePaths !== undefined ? { excludePaths: ws.graph.excludePaths } : {}),
+      ...(ws.graph?.respectGitignore !== undefined
+        ? { respectGitignore: ws.graph.respectGitignore }
+        : {}),
       specs: () => resolveSpecsFromRepo(kernel.specs.repos.get(ws.name), ws.name),
     })
   }
