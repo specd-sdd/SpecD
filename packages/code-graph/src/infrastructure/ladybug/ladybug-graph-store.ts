@@ -343,49 +343,61 @@ export class LadybugGraphStore extends GraphStore {
 
     await conn.query('BEGIN TRANSACTION')
     try {
-      // Write File nodes CSV
+      // Write File nodes CSV — batched to avoid native module segfaults on large datasets
       report(`Loading ${data.files.length} files`)
       if (data.files.length > 0) {
-        const fileCsv = prefix + 'files.csv'
-        csvFiles.push(fileCsv)
-        const fileRows = ['path,language,contentHash,workspace']
-        for (const f of data.files) {
-          fileRows.push(
-            `${csvEscape(f.path)},${csvEscape(f.language)},${csvEscape(f.contentHash)},${csvEscape(f.workspace)}`,
-          )
+        const batchSize = 500
+        for (let i = 0; i < data.files.length; i += batchSize) {
+          const batch = data.files.slice(i, i + batchSize)
+          const fileCsv = prefix + `files-${i}.csv`
+          csvFiles.push(fileCsv)
+          const fileRows = ['path,language,contentHash,workspace']
+          for (const f of batch) {
+            fileRows.push(
+              `${csvEscape(f.path)},${csvEscape(f.language)},${csvEscape(f.contentHash)},${csvEscape(f.workspace)}`,
+            )
+          }
+          writeFileSync(fileCsv, fileRows.join('\n') + '\n')
+          await conn.query(`COPY File FROM "${fileCsv}" (HEADER=true, PARALLEL=false)`)
         }
-        writeFileSync(fileCsv, fileRows.join('\n') + '\n')
-        await conn.query(`COPY File FROM "${fileCsv}" (HEADER=true, PARALLEL=false)`)
       }
 
-      // Write Symbol nodes CSV
+      // Write Symbol nodes CSV — batched to avoid native module segfaults on large datasets
       report(`Loading ${data.symbols.length} symbols`)
       if (data.symbols.length > 0) {
-        const symCsv = prefix + 'symbols.csv'
-        csvFiles.push(symCsv)
-        const symRows = ['id,name,searchName,kind,filePath,line,col,comment']
-        for (const s of data.symbols) {
-          symRows.push(
-            `${csvEscape(s.id)},${csvEscape(s.name)},${csvEscape(expandSymbolName(s.name))},${csvEscape(s.kind)},${csvEscape(s.filePath)},${s.line},${s.column},${csvEscape(s.comment ?? '')}`,
-          )
+        const batchSize = 500
+        for (let i = 0; i < data.symbols.length; i += batchSize) {
+          const batch = data.symbols.slice(i, i + batchSize)
+          const symCsv = prefix + `symbols-${i}.csv`
+          csvFiles.push(symCsv)
+          const symRows = ['id,name,searchName,kind,filePath,line,col,comment']
+          for (const s of batch) {
+            symRows.push(
+              `${csvEscape(s.id)},${csvEscape(s.name)},${csvEscape(expandSymbolName(s.name))},${csvEscape(s.kind)},${csvEscape(s.filePath)},${s.line},${s.column},${csvEscape(s.comment ?? '')}`,
+            )
+          }
+          writeFileSync(symCsv, symRows.join('\n') + '\n')
+          await conn.query(`COPY Symbol FROM "${symCsv}" (HEADER=true, PARALLEL=false)`)
         }
-        writeFileSync(symCsv, symRows.join('\n') + '\n')
-        await conn.query(`COPY Symbol FROM "${symCsv}" (HEADER=true, PARALLEL=false)`)
       }
 
-      // Write Spec nodes CSV
+      // Write Spec nodes CSV — batched to avoid native module segfaults on large datasets
       report(`Loading ${data.specs.length} specs`)
       if (data.specs.length > 0) {
-        const specCsv = prefix + 'specs.csv'
-        csvFiles.push(specCsv)
-        const specRows = ['specId,path,title,description,contentHash,content,workspace']
-        for (const sp of data.specs) {
-          specRows.push(
-            `${csvEscape(sp.specId)},${csvEscape(sp.path)},${csvEscape(sp.title)},${csvEscape(sp.description)},${csvEscape(sp.contentHash)},${csvEscape(sp.content)},${csvEscape(sp.workspace)}`,
-          )
+        const batchSize = 500
+        for (let i = 0; i < data.specs.length; i += batchSize) {
+          const batch = data.specs.slice(i, i + batchSize)
+          const specCsv = prefix + `specs-${i}.csv`
+          csvFiles.push(specCsv)
+          const specRows = ['specId,path,title,description,contentHash,content,workspace']
+          for (const sp of batch) {
+            specRows.push(
+              `${csvEscape(sp.specId)},${csvEscape(sp.path)},${csvEscape(sp.title)},${csvEscape(sp.description)},${csvEscape(sp.contentHash)},${csvEscape(sp.content)},${csvEscape(sp.workspace)}`,
+            )
+          }
+          writeFileSync(specCsv, specRows.join('\n') + '\n')
+          await conn.query(`COPY Spec FROM "${specCsv}" (HEADER=true, PARALLEL=false)`)
         }
-        writeFileSync(specCsv, specRows.join('\n') + '\n')
-        await conn.query(`COPY Spec FROM "${specCsv}" (HEADER=true, PARALLEL=false)`)
       }
 
       // Write relations CSVs — one per type
