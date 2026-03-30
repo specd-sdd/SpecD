@@ -1,11 +1,6 @@
 {
   "title": "Workspace Integration",
   "description": "`@specd/code-graph` must integrate with specd's multi-workspace system to index code and specs from each workspace individually, while storing everything in a single graph database. This enables cross-workspace impact analysis and ensures file paths are globally unique across workspaces.",
-  "dependsOn": [
-    "code-graph:code-graph/symbol-model",
-    "code-graph:code-graph/indexer",
-    "code-graph:code-graph/composition"
-  ],
   "context": [
     "`@specd/code-graph` must integrate with specd's multi-workspace system to index code and specs from each workspace individually, while storing everything in a single graph database. This enables cross-workspace impact analysis and ensures file paths are globally unique across workspaces."
   ],
@@ -49,7 +44,7 @@
     {
       "requirement": "WorkspaceIndexTarget",
       "rules": [
-        "`IndexOptions` SHALL accept an array of `WorkspaceIndexTarget` objects instead of a single `workspacePath`:\n\n```typescript\ninterface IndexOptions {\n  readonly workspaces: readonly WorkspaceIndexTarget[]\n  readonly projectRoot: string\n  readonly onProgress?: IndexProgressCallback\n  readonly chunkBytes?: number\n}\n```\n\n- **`workspaces`** — one entry per workspace to index\n- **`projectRoot`** — absolute path to the monorepo/project root (for monorepo package resolution)"
+        "`IndexOptions` SHALL accept an array of `WorkspaceIndexTarget` objects instead of a single `workspacePath`:\n\n```typescript\ninterface WorkspaceIndexTarget {\n  readonly name: string\n  readonly codeRoot: string\n  readonly specs: () => Promise<DiscoveredSpec[]>\n  readonly repoRoot?: string\n  readonly excludePaths?: readonly string[]\n  readonly respectGitignore?: boolean\n}\n\ninterface IndexOptions {\n  readonly workspaces: readonly WorkspaceIndexTarget[]\n  readonly projectRoot: string\n  readonly onProgress?: IndexProgressCallback\n  readonly chunkBytes?: number\n  readonly vcsRef?: string\n}\n```\n\n- **`workspaces`** — one entry per workspace to index\n- **`projectRoot`** — absolute path to the monorepo/project root (for monorepo package resolution)\n- **`excludePaths`** — optional gitignore-syntax patterns passed through to `discoverFiles`. When absent, built-in defaults apply. When present, replaces built-in defaults entirely.\n- **`respectGitignore`** — optional boolean passed through to `discoverFiles`. Defaults to `true`.\n\nThese fields are populated by the CLI/MCP integration layer from `SpecdWorkspaceConfig.graph`. When `SpecdWorkspaceConfig.graph` is absent, the fields are omitted from `WorkspaceIndexTarget` (triggering built-in defaults in `discoverFiles`)."
       ]
     },
     {
@@ -61,7 +56,7 @@
     {
       "requirement": ".gitignore handling for codeRoot",
       "rules": [
-        "When discovering files from a `codeRoot`, `.gitignore` rules SHALL be loaded hierarchically:\n\n1. Find the git root by walking up from `codeRoot` looking for `.git/`\n2. Load `.gitignore` from the git root\n3. Load any `.gitignore` files found in subdirectories during the walk\n4. Apply rules relative to the directory containing each `.gitignore`\n\nThis handles the case where `codeRoot` is a subdirectory of a git repo (e.g. `packages/core/` within a monorepo)."
+        "When discovering files from a `codeRoot`, `.gitignore` handling is controlled by `WorkspaceIndexTarget.respectGitignore` (default `true`):\n\nWhen `respectGitignore` is `true`:\n\n1. Find the git root by walking up from `codeRoot` looking for `.git/`\n2. Load `.gitignore` from the git root\n3. Load any `.gitignore` files found in subdirectories during the walk\n4. Apply rules relative to the directory containing each `.gitignore`\n5. `.gitignore` exclusions have absolute priority — `excludePaths` cannot re-include gitignored files\n\nWhen `respectGitignore` is `false`:\n\n- `.gitignore` files are not loaded or applied\n- Only `excludePaths` patterns govern file exclusion"
       ]
     }
   ],
@@ -194,6 +189,19 @@
       ]
     },
     {
+      "requirement": "WorkspaceIndexTarget",
+      "name": "graph config fields flow from SpecdWorkspaceConfig to WorkspaceIndexTarget",
+      "given": [
+        "SpecdWorkspaceConfig.graph.excludePaths is [\".specd/*\", \"!.specd/metadata/\"]",
+        "AND SpecdWorkspaceConfig.graph.respectGitignore is false"
+      ],
+      "when": ["buildWorkspaceTargets() constructs the WorkspaceIndexTarget"],
+      "then": [
+        "WorkspaceIndexTarget.excludePaths is [\".specd/*\", \"!.specd/metadata/\"]",
+        "AND WorkspaceIndexTarget.respectGitignore is false"
+      ]
+    },
+    {
       "requirement": "Per-workspace IndexResult breakdown",
       "name": "Breakdown per workspace",
       "when": ["indexing completes for workspaces core (100 files) and cli (50 files)"],
@@ -210,11 +218,25 @@
         ".gitignore from /project SHALL be loaded and applied",
         "AND any .gitignore files in subdirectories SHALL also be applied"
       ]
+    },
+    {
+      "requirement": ".gitignore handling for codeRoot",
+      "name": "respectGitignore false disables gitignore loading",
+      "given": [
+        "a workspace with a .gitignore containing *.log",
+        "AND WorkspaceIndexTarget.respectGitignore is false"
+      ],
+      "when": ["file discovery runs for that workspace"],
+      "then": [
+        ".log files are not excluded by gitignore rules",
+        "AND no .gitignore file is read during the walk"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:d067263503c8926db85101f15e8de162a267d8c7ba3dbefb00f8d04337b041fb",
-    "verify.md": "sha256:b096c2de4fcb5da401b03b1dfb50a99f0c78078b14b422354aee6677a165fb29"
+    "spec.md": "sha256:e0f9bcf36e6456a84da9340cdac3174ae1192632be5ba29ec032b9efe54764ad",
+    "verify.md": "sha256:afed709823fa591672e23decadfc8161b4e599ebba79446e8ccda078ee5582c8"
   },
-  "generatedBy": "core"
+  "generatedBy": "core",
+  "dependsOn": ["core:core/config"]
 }

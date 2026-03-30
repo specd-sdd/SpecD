@@ -28,7 +28,7 @@
     {
       "requirement": "Returns the resolved Schema on success",
       "rules": [
-        "When `raw` is `false` or absent, `execute` MUST return `Promise<Schema>` — the fully-resolved, customised schema.\n\nWhen `raw` is `true`, `execute` MUST return `Promise<SchemaRawResult>` — the parsed but unresolved schema data. `SchemaRawResult` contains the `SchemaYamlData` and optionally resolved template contents (when `resolveTemplates` is `true`).\n\nThe return type is a discriminated union:\n\n```typescript\ntype GetActiveSchemaResult =\n  | { readonly raw: false; readonly schema: Schema }\n  | { readonly raw: true; readonly data: SchemaYamlData; readonly templates: ReadonlyMap<string, string> }\n```"
+        "When `raw` is `false` or absent, `execute` MUST return `Promise<Schema>` — the fully-resolved, customised schema.\n\nWhen `raw` is `true`, `execute` MUST return `Promise<SchemaRawResult>` — the parsed but unresolved schema data. `SchemaRawResult` contains the `SchemaYamlData` and optionally resolved template contents (when `resolveTemplates` is `true`).\n\nThe return type is a discriminated union:\n\n```typescript\ntype GetActiveSchemaResult =\n  | { readonly raw: false; readonly schema: Schema }\n  | {\n      readonly raw: true\n      readonly data: SchemaYamlData\n      readonly templates: ReadonlyMap<string, string>\n    }\n```"
       ]
     },
     {
@@ -190,7 +190,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:969f5fe9480a7ec66da05da318e8c659a676e678e975f7113fc264768ae524ec",
+    "spec.md": "sha256:4609c5b59c6e920f1be9335c4a077ae76a334a2e1f7a59d277552c156412a6a5",
     "verify.md": "sha256:10555b5b64c11507f2b1793a5d2455e152341b3390104c67857dcb6468a7db7e"
   },
   "generatedBy": "core"

@@ -140,6 +140,34 @@
 - **WHEN** a non-`default` workspace entry omits `codeRoot`
 - **THEN** specd exits with a `ConfigValidationError` at startup
 
+### Requirement: Workspace graph config
+
+#### Scenario: excludePaths replaces built-in defaults
+
+- **GIVEN** a workspace with `graph.excludePaths: ["fixtures/"]`
+- **WHEN** the config is loaded
+- **THEN** `SpecdWorkspaceConfig.graph.excludePaths` is `["fixtures/"]`
+- **AND** the built-in defaults (`node_modules/`, `dist/`, etc.) are NOT applied — only the declared patterns are used
+
+#### Scenario: graph block absent — no field on workspace config
+
+- **GIVEN** a workspace with no `graph` key
+- **WHEN** the config is loaded
+- **THEN** `SpecdWorkspaceConfig.graph` is `undefined`
+- **AND** `discoverFiles` falls back to built-in default exclusions
+
+#### Scenario: respectGitignore defaults to true
+
+- **GIVEN** a workspace with `graph: {}` (no `respectGitignore` key)
+- **WHEN** the config is loaded
+- **THEN** `SpecdWorkspaceConfig.graph.respectGitignore` is `undefined` (treated as `true` by the indexer)
+
+#### Scenario: respectGitignore set to false
+
+- **GIVEN** a workspace with `graph.respectGitignore: false`
+- **WHEN** the config is loaded
+- **THEN** `SpecdWorkspaceConfig.graph.respectGitignore` is `false`
+
 ### Requirement: Storage configuration
 
 #### Scenario: Default storage layout
@@ -394,6 +422,12 @@
 - **GIVEN** `specd.yaml` contains a workspace with `contextMode: lazy`
 - **WHEN** config is validated at startup
 - **THEN** validation fails with a `ConfigValidationError` indicating `contextMode` is not valid inside a workspace
+
+#### Scenario: graph.respectGitignore must be boolean
+
+- **GIVEN** a workspace with `graph.respectGitignore: "yes"` (string instead of boolean)
+- **WHEN** specd starts
+- **THEN** specd exits with `ConfigValidationError`
 
 ### Requirement: Project context instructions
 

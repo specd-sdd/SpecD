@@ -103,6 +103,13 @@
 - **WHEN** file discovery runs
 - **THEN** `docs/readme.md` is not in the discovered files
 
+#### Scenario: Custom excludePaths replaces built-in defaults
+
+- **GIVEN** `WorkspaceIndexTarget.excludePaths` is `["fixtures/"]`
+- **WHEN** file discovery runs
+- **THEN** only `fixtures/` is excluded by config rules
+- **AND** `node_modules/` and `dist/` (built-in defaults) are NOT automatically excluded
+
 #### Scenario: Paths prefixed with workspace name
 
 - **GIVEN** a workspace named `core` with codeRoot `/project/packages/core`
