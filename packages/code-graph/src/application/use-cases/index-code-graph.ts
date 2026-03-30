@@ -174,6 +174,10 @@ export class IndexCodeGraph {
       const relFiles = discoverFiles(
         ws.codeRoot,
         (filePath) => this.registry.getAdapterForFile(filePath) !== undefined,
+        {
+          ...(ws.excludePaths !== undefined ? { excludePaths: ws.excludePaths } : {}),
+          ...(ws.respectGitignore !== undefined ? { respectGitignore: ws.respectGitignore } : {}),
+        },
       )
 
       const breakdown = wsBreakdowns.get(ws.name)!

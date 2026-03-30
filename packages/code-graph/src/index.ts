@@ -44,6 +44,12 @@ export {
 // Search
 export { type SearchOptions } from './domain/value-objects/search-options.js'
 
+// Discovery
+export {
+  DEFAULT_EXCLUDE_PATHS,
+  type DiscoverFilesOptions,
+} from './application/use-cases/discover-files.js'
+
 // Domain services
 export { expandSymbolName } from './domain/services/expand-symbol-name.js'
 

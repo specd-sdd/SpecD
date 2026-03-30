@@ -347,4 +347,62 @@ describe('Workspace indexing', () => {
     expect(impact.directDependents).toBeGreaterThanOrEqual(1)
     expect(impact.affectedFiles).toContain('cli:src/main.ts')
   })
+
+  describe('Requirement: WorkspaceIndexTarget — excludePaths and respectGitignore', () => {
+    it('excludes files matching excludePaths from WorkspaceIndexTarget', async () => {
+      const codeRoot = createWorkspace(tempDir, 'ws-exclude', {
+        'src/index.ts': 'export function main() {}',
+        'fixtures/helper.ts': 'export function helper() {}',
+      })
+
+      provider = createCodeGraphProvider({ storagePath: tempDir })
+      await provider.open()
+
+      const result = await provider.index({
+        workspaces: [
+          {
+            name: 'ws',
+            codeRoot,
+            excludePaths: ['fixtures/'],
+            specs: async () => [],
+          },
+        ],
+        projectRoot: tempDir,
+      })
+
+      expect(result.errors).toHaveLength(0)
+      const indexed = await provider.getFile('ws:src/index.ts')
+      const excluded = await provider.getFile('ws:fixtures/helper.ts')
+      expect(indexed).toBeDefined()
+      expect(excluded).toBeUndefined()
+    })
+
+    it('indexes gitignore-excluded files when respectGitignore is false', async () => {
+      const codeRoot = createWorkspace(tempDir, 'ws-gitignore', {
+        'src/index.ts': 'export function main() {}',
+        'src/generated.ts': 'export const GEN = 1',
+        '.gitignore': 'generated.ts\n',
+      })
+
+      provider = createCodeGraphProvider({ storagePath: tempDir })
+      await provider.open()
+
+      const result = await provider.index({
+        workspaces: [
+          {
+            name: 'ws',
+            codeRoot,
+            respectGitignore: false,
+            excludePaths: [],
+            specs: async () => [],
+          },
+        ],
+        projectRoot: tempDir,
+      })
+
+      expect(result.errors).toHaveLength(0)
+      const generated = await provider.getFile('ws:src/generated.ts')
+      expect(generated).toBeDefined()
+    })
+  })
 })
