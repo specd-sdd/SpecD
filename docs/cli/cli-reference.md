@@ -688,6 +688,124 @@ Display a project-level dashboard showing schema, workspaces, spec counts, and c
 
 ---
 
+## graph
+
+Index and query the code graph for the workspace.
+
+### graph index
+
+```
+specd graph index [options]
+```
+
+Indexes the workspace's source files into the code graph. File discovery respects `.gitignore` by default and applies configurable exclusion patterns.
+
+| Option                      | Description                                                           |
+| --------------------------- | --------------------------------------------------------------------- |
+| `--workspace <name>`        | Index only the named workspace.                                       |
+| `--force`                   | Full re-index, ignoring cached file hashes.                           |
+| `--exclude-path <pattern>`  | Gitignore-syntax pattern to exclude (repeatable; merges with config). |
+| `--format text\|json\|toon` | Output format.                                                        |
+
+#### Config fields: `graph.excludePaths` and `graph.respectGitignore`
+
+Each workspace in `specd.yaml` may declare a `graph` block:
+
+```yaml
+workspaces:
+  default:
+    codeRoot: ./
+    graph:
+      respectGitignore: true # optional; default: true
+      excludePaths: # optional; gitignore-syntax, supports ! negation
+        - node_modules/
+        - dist/
+        - .specd/*
+        - '!.specd/metadata/' # re-include .specd/metadata/ despite the wildcard above
+```
+
+**`graph.excludePaths`** — when set, replaces the built-in defaults entirely. Patterns follow gitignore syntax and support `!` negation. The built-in defaults are:
+
+```
+node_modules/   .git/   .specd/   dist/   build/   coverage/   .next/   .nuxt/
+```
+
+**`graph.respectGitignore`** — when `true` (default), `.gitignore` rules are loaded hierarchically and applied with **absolute priority**: no `excludePaths` negation can re-include a file that `.gitignore` excludes. When `false`, `.gitignore` files are not loaded.
+
+#### `--exclude-path` merging
+
+CLI `--exclude-path` flags merge (append) on top of the effective exclusion list — either `graph.excludePaths` from config or the built-in defaults when config is absent. They never reduce the exclusion set. This flag may be repeated:
+
+```
+specd graph index --exclude-path "packages/generated/*" --exclude-path "tmp/"
+```
+
+---
+
+### graph search
+
+```
+specd graph search <query> [options]
+```
+
+Search for symbols or specs in the code graph.
+
+| Option                      | Description                              |
+| --------------------------- | ---------------------------------------- |
+| `--specs`                   | Search specs instead of code symbols.    |
+| `--workspace <name>`        | Restrict search to the named workspace.  |
+| `--limit <n>`               | Maximum number of results (default: 20). |
+| `--format text\|json\|toon` | Output format.                           |
+
+---
+
+### graph hotspots
+
+```
+specd graph hotspots [options]
+```
+
+List the most connected symbols in the graph ranked by coupling risk.
+
+| Option                      | Description                                                      |
+| --------------------------- | ---------------------------------------------------------------- |
+| `--min-risk <level>`        | Minimum risk level to show: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`. |
+| `--limit <n>`               | Maximum number of results (default: 20).                         |
+| `--format text\|json\|toon` | Output format.                                                   |
+
+---
+
+### graph stats
+
+```
+specd graph stats [options]
+```
+
+Print summary statistics for the current code graph.
+
+| Option                      | Description    |
+| --------------------------- | -------------- |
+| `--format text\|json\|toon` | Output format. |
+
+---
+
+### graph impact
+
+```
+specd graph impact [options]
+```
+
+Analyze the downstream or upstream impact of a symbol or file.
+
+| Option                                   | Description                                                      |
+| ---------------------------------------- | ---------------------------------------------------------------- |
+| `--symbol <id>`                          | Symbol ID to analyze (e.g. `core:src/index.ts:function:main:1`). |
+| `--file <path>`                          | File path to analyze (e.g. `core:src/index.ts`).                 |
+| `--direction upstream\|downstream\|both` | Impact direction (default: `downstream`).                        |
+| `--format text\|json\|toon`              | Output format.                                                   |
+
+---
+
 ## config
 
 Inspect and validate project configuration.
