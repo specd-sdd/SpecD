@@ -31,6 +31,14 @@
 - **WHEN** the provider is closed
 - **THEN** `process.exit(0)` is called to prevent the LadybugDB addon from keeping the process alive
 
+#### Scenario: --exclude-path merges on top of config excludePaths
+
+- **GIVEN** workspace config has `graph.excludePaths: ["dist/"]`
+- **AND** the command is run with `--exclude-path "fixtures/"`
+- **WHEN** indexing runs
+- **THEN** the effective exclusion list is `["dist/", "fixtures/"]`
+- **AND** `specd.yaml` is not modified
+
 ### Requirement: Output format
 
 #### Scenario: Text output shows summary
@@ -71,3 +79,17 @@
 - **WHEN** `specd graph index` is run
 - **THEN** the errors are included in the `errors` array of the output
 - **AND** the process exits with code 0
+
+### Requirement: CLI reference documentation
+
+#### Scenario: graph section present in CLI reference
+
+- **WHEN** `docs/cli/cli-reference.md` is inspected
+- **THEN** a `## graph` section exists covering `index`, `search`, `hotspots`, `stats`, and `impact`
+
+#### Scenario: graph index flags documented
+
+- **WHEN** the `### graph index` subsection is read
+- **THEN** `--exclude-path`, `--workspace`, `--force`, and `--format` are documented with descriptions
+- **AND** the `graph.excludePaths` and `graph.respectGitignore` config fields are explained
+- **AND** an example shows negation syntax (e.g. `!.specd/metadata/`)

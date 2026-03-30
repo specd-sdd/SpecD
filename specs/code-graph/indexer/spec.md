@@ -37,14 +37,24 @@ To force a full re-index, callers MUST call `GraphStore.clear()` before `execute
 
 The indexer SHALL discover files from each workspace's `codeRoot` independently. For each `WorkspaceIndexTarget`:
 
-1. Call `discoverFiles(codeRoot, hasAdapter)` to get paths relative to `codeRoot`
+1. Call `discoverFiles(codeRoot, hasAdapter, options)` to get paths relative to `codeRoot`
 2. Prefix each path with `{workspaceName}:` to form the globally unique `FileNode.path`
 3. Diff against the store (filtered by workspace prefix)
 
+`discoverFiles` accepts a root directory plus optional exclusion options:
+
+- **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically (git root → codeRoot → subdirectories during walk) and applied with absolute priority — no `excludePaths` pattern can re-include a file that `.gitignore` excludes. When `false`, `.gitignore` files are not loaded.
+- **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Supports `!` negation. When not provided, the following built-in defaults apply: When provided, the supplied list **replaces** the built-in defaults entirely — the built-in defaults are not merged.
+
+Evaluation order when `respectGitignore: true`:
+
+1. `.gitignore` rules (absolute priority — cannot be overridden)
+2. `excludePaths` rules (applied after; can negate each other but cannot un-ignore gitignored files)
+
 `discoverFiles` itself has no workspace knowledge — it accepts a root directory and:
 
-- Respects `.gitignore` rules hierarchically (finds git root by walking up from root)
-- Excludes the following directories regardless of `.gitignore`: `node_modules`, `.git`, `.specd`, `dist`, `build`, `coverage`, `.next`, `.nuxt`
+- Respects `.gitignore` rules hierarchically when `respectGitignore` is `true`
+- Applies `excludePaths` patterns (or built-in defaults) as an `ignore`-library instance
 - Skips symbolic links — only regular files are indexed
 - Skips files with no registered language adapter (determined by extension)
 - Returns root-relative file paths with forward-slash normalization
@@ -135,7 +145,9 @@ Spec indexing runs as an additional phase after source file indexing (Phase 1 an
 
 - The `GraphStore` must be opened before calling the use case — the indexer does not manage store lifecycle
 - Discovery always uses forward-slash-normalized workspace-relative paths
-- Hardcoded exclusion directories cannot be overridden (they are always excluded)
+- When `excludePaths` is not provided, built-in default patterns apply (node_modules/, .git/, .specd/, dist/, build/, coverage/, .next/, .nuxt/)
+- When `excludePaths` is provided, it replaces built-in defaults entirely — no merging occurs
+- When `respectGitignore` is `true`, `.gitignore` exclusions have absolute priority and cannot be overridden by `excludePaths` patterns
 - Pass 2 depends on Pass 1 completing for all files — they are not interleaved per file
 - Per-file errors are collected, not thrown — only infrastructure errors abort the run
 - Spec indexing uses the workspace's `specs()` callback exclusively — no filesystem fallback

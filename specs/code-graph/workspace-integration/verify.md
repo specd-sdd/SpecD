@@ -101,6 +101,14 @@
 - **THEN** only files with workspace `core` SHALL be considered for deletion
 - **AND** files from `cli` and `code-graph` workspaces SHALL remain untouched in the store
 
+#### Scenario: graph config fields flow from SpecdWorkspaceConfig to WorkspaceIndexTarget
+
+- **GIVEN** `SpecdWorkspaceConfig.graph.excludePaths` is `[".specd/*", "!.specd/metadata/"]`
+- **AND** `SpecdWorkspaceConfig.graph.respectGitignore` is `false`
+- **WHEN** `buildWorkspaceTargets()` constructs the `WorkspaceIndexTarget`
+- **THEN** `WorkspaceIndexTarget.excludePaths` is `[".specd/*", "!.specd/metadata/"]`
+- **AND** `WorkspaceIndexTarget.respectGitignore` is `false`
+
 ### Requirement: Per-workspace IndexResult breakdown
 
 #### Scenario: Breakdown per workspace
@@ -116,6 +124,14 @@
 - **WHEN** codeRoot is `/project/packages/core` and git root is `/project`
 - **THEN** `.gitignore` from `/project` SHALL be loaded and applied
 - **AND** any `.gitignore` files in subdirectories SHALL also be applied
+
+#### Scenario: respectGitignore false disables gitignore loading
+
+- **GIVEN** a workspace with a `.gitignore` containing `*.log`
+- **AND** `WorkspaceIndexTarget.respectGitignore` is `false`
+- **WHEN** file discovery runs for that workspace
+- **THEN** `.log` files are not excluded by gitignore rules
+- **AND** no `.gitignore` file is read during the walk
 
 ### Backward compatibility
 

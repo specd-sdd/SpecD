@@ -76,16 +76,30 @@ The in-memory `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begi
 `IndexOptions` SHALL accept an array of `WorkspaceIndexTarget` objects instead of a single `workspacePath`:
 
 ```typescript
+interface WorkspaceIndexTarget {
+  readonly name: string
+  readonly codeRoot: string
+  readonly specs: () => Promise<DiscoveredSpec[]>
+  readonly repoRoot?: string
+  readonly excludePaths?: readonly string[]
+  readonly respectGitignore?: boolean
+}
+
 interface IndexOptions {
   readonly workspaces: readonly WorkspaceIndexTarget[]
   readonly projectRoot: string
   readonly onProgress?: IndexProgressCallback
   readonly chunkBytes?: number
+  readonly vcsRef?: string
 }
 ```
 
 - **`workspaces`** — one entry per workspace to index
 - **`projectRoot`** — absolute path to the monorepo/project root (for monorepo package resolution)
+- **`excludePaths`** — optional gitignore-syntax patterns passed through to `discoverFiles`. When absent, built-in defaults apply. When present, replaces built-in defaults entirely.
+- **`respectGitignore`** — optional boolean passed through to `discoverFiles`. Defaults to `true`.
+
+These fields are populated by the CLI/MCP integration layer from `SpecdWorkspaceConfig.graph`. When `SpecdWorkspaceConfig.graph` is absent, the fields are omitted from `WorkspaceIndexTarget` (triggering built-in defaults in `discoverFiles`).
 
 ### Requirement: Per-workspace IndexResult breakdown
 
@@ -110,14 +124,20 @@ interface IndexResult {
 
 ### Requirement: .gitignore handling for codeRoot
 
-When discovering files from a `codeRoot`, `.gitignore` rules SHALL be loaded hierarchically:
+When discovering files from a `codeRoot`, `.gitignore` handling is controlled by `WorkspaceIndexTarget.respectGitignore` (default `true`):
+
+When `respectGitignore` is `true`:
 
 1. Find the git root by walking up from `codeRoot` looking for `.git/`
 2. Load `.gitignore` from the git root
 3. Load any `.gitignore` files found in subdirectories during the walk
 4. Apply rules relative to the directory containing each `.gitignore`
+5. `.gitignore` exclusions have absolute priority — `excludePaths` cannot re-include gitignored files
 
-This handles the case where `codeRoot` is a subdirectory of a git repo (e.g. `packages/core/` within a monorepo).
+When `respectGitignore` is `false`:
+
+- `.gitignore` files are not loaded or applied
+- Only `excludePaths` patterns govern file exclusion
 
 ## Constraints
 
@@ -175,6 +195,4 @@ const spec: SpecNode = {
 
 ## Spec Dependencies
 
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — FileNode, SymbolNode, SpecNode definitions
-- [`specs/code-graph/indexer/spec.md`](../indexer/spec.md) — IndexCodeGraph pipeline, IndexOptions, IndexResult
-- [`specs/code-graph/composition/spec.md`](../composition/spec.md) — factory function, CodeGraphProvider
+- `core:core/config` — `SpecdWorkspaceConfig.graph` fields (`excludePaths`, `respectGitignore`) are the source for `WorkspaceIndexTarget` exclusion options

@@ -111,6 +111,62 @@ workspaces:
 
 **Workspace-specific context filtering:** Each workspace may optionally declare `context.includeSpecs` and `context.excludeSpecs` arrays to filter which specs appear in compiled context for changes touching that workspace's specs. These follow the same glob-like pattern syntax as the project-level `context.includeSpecs` / `context.excludeSpecs` and are combined (intersected) with the project-level filters.
 
+### Requirement: Workspace graph config
+
+Each workspace entry in `specd.yaml` MAY declare an optional `graph` block controlling how the code graph indexer discovers files for that workspace:
+
+```yaml
+workspaces:
+  default:
+    codeRoot: ./
+    graph:
+      respectGitignore: true # optional; default: true
+      excludePaths: # optional; gitignore-syntax, supports negation with !
+        - .specd/*
+        - '!.specd/metadata/'
+  core:
+    codeRoot: packages/core
+    graph:
+      excludePaths:
+        - dist/
+```
+
+**`graph.respectGitignore`** (boolean, default `true`) — whether `.gitignore` files are loaded and applied during file discovery for this workspace.
+
+- When `true` (default): `.gitignore` rules are loaded hierarchically (git root → codeRoot → subdirectories during walk) and applied with **absolute priority**. No pattern in `excludePaths` can re-include a file that `.gitignore` excludes.
+- When `false`: `.gitignore` files are not loaded. Only `excludePaths` governs file exclusion.
+
+**`graph.excludePaths`** (string array, gitignore-syntax) — additional exclusion rules applied on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Patterns follow `.gitignore` format and support negation with `!`.
+
+When `graph.excludePaths` is **not** specified, the following built-in defaults apply (equivalent to the previous hardcoded behaviour):
+
+```
+node_modules/
+.git/
+.specd/
+dist/
+build/
+coverage/
+.next/
+.nuxt/
+```
+
+When `graph.excludePaths` **is** specified, it **replaces** the built-in defaults entirely. The user takes full ownership — built-in patterns are not merged. To retain standard exclusions alongside custom ones, include them explicitly:
+
+```yaml
+graph:
+  excludePaths:
+    - node_modules/
+    - .git/
+    - dist/
+    - build/
+    - coverage/
+    - .specd/*
+    - '!.specd/metadata/'
+```
+
+Patterns are evaluated relative to the workspace's `codeRoot`.
+
 ### Requirement: Storage configuration
 
 `specd.yaml` must include a `storage` section with sub-keys for `changes` and `archive`. These paths are global — a project has one changes directory and one archive directory regardless of workspaces.
@@ -427,6 +483,8 @@ Use cases that call `ConfigWriter`:
 - `schemaOverrides` has an invalid structure (unknown operation keys, wrong types)
 - `contextMode` value is not `'full'` or `'lazy'`
 - `contextMode` appears inside a workspace entry (it is project-level only)
+- `graph.respectGitignore` is present but not a boolean
+- `graph.excludePaths` is present but not an array of strings
 
 The following conditions emit **warnings** but allow startup to proceed:
 
@@ -435,21 +493,24 @@ The following conditions emit **warnings** but allow startup to proceed:
 
 ## Constraints
 
-- `specd.yaml` is the single source of truth for project configuration
+- specd.yaml is the single source of truth for project configuration
 - One schema reference per project — all workspaces share the same schema, with optional per-workspace schema overrides
-- `adapter` is required in every `specs`, `schemas`, and storage section; adapter-specific fields are nested under the adapter key
-- `storage` section is required and must contain both `changes` and `archive` sub-keys
-- All relative paths resolve from the `specd.yaml` directory; storage paths (`fs.path` in `changes` and `archive`) must remain within the repo root
-- Project-level `contextIncludeSpecs` defaults to `['default:*']`; project-level `contextExcludeSpecs` defaults to `[]`
-- Workspace-level `contextIncludeSpecs` defaults to `['*']` (all specs in that workspace); workspace-level `contextExcludeSpecs` defaults to `[]`
-- `contextMode` is optional; defaults to `'lazy'`; must be `'full'` or `'lazy'` — any other value is a startup validation error
-- `contextMode` is project-level only; it MUST NOT appear inside workspace entries
-- `llmOptimizedContext` is optional; defaults to `false`; must be a boolean — any other type is a startup validation error
-- `context` is optional; each entry is an object with exactly one key: either `file` or `instruction` — no other shapes are valid
-- `context` file paths are resolved relative to the `specd.yaml` directory; absolute paths are accepted
-- `approvals` is optional; when present it must contain at least one of `spec` or `signoff`; each is an object with required `enabled` boolean and optional `actor` string
-- `skills` is optional; when present it must be an object (the manifest body); specd does not validate skill content beyond YAML structure
-- `plugins` is optional; each entry must contain a `package` string pointing to a resolvable npm package, with optional `config` of any shape; specd validates structure but not plugin-specific config semantics
+- adapter is required in every specs, schemas, and storage section; adapter-specific fields are nested under the adapter key
+- storage section is required and must contain both changes and archive sub-keys
+- All relative paths resolve from the specd.yaml directory; storage paths (fs.path in changes and archive) must remain within the repo root
+- Project-level contextIncludeSpecs defaults to \['default:\*']; project-level contextExcludeSpecs defaults to \[]
+- Workspace-level contextIncludeSpecs defaults to \['\*'] (all specs in that workspace); workspace-level contextExcludeSpecs defaults to \[]
+- contextMode is optional; defaults to 'lazy'; must be 'full' or 'lazy' — any other value is a startup validation error
+- contextMode is project-level only; it MUST NOT appear inside workspace entries
+- llmOptimizedContext is optional; defaults to false; must be a boolean — any other type is a startup validation error
+- context is optional; each entry is an object with exactly one key: either file or instruction — no other shapes are valid
+- context file paths are resolved relative to the specd.yaml directory; absolute paths are accepted
+- approvals is optional; when present it must contain at least one of spec or signoff; each is an object with required enabled boolean and optional actor string
+- skills is optional; when present it must be an object (the manifest body); specd does not validate skill content beyond YAML structure
+- plugins is optional; each entry must contain a package string pointing to a resolvable npm package, with optional config of any shape; specd validates structure but not plugin-specific config semantics
+- graph is optional per workspace; when present, graph.respectGitignore must be boolean and graph.excludePaths must be an array of strings
+- graph.excludePaths replaces built-in defaults entirely when specified; it does not merge with them
+- graph.respectGitignore defaults to true; when true, .gitignore has absolute priority and cannot be overridden by excludePaths
 
 ## Examples
 

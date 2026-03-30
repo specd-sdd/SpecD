@@ -26,7 +26,7 @@
     {
       "requirement": "Multi-workspace file discovery",
       "rules": [
-        "The indexer SHALL discover files from each workspace's `codeRoot` independently. For each `WorkspaceIndexTarget`:\n\n1. Call `discoverFiles(codeRoot, hasAdapter)` to get paths relative to `codeRoot`\n2. Prefix each path with `{workspaceName}:` to form the globally unique `FileNode.path`\n3. Diff against the store (filtered by workspace prefix)\n\n`discoverFiles` itself has no workspace knowledge — it accepts a root directory and:\n\n- Respects `.gitignore` rules hierarchically (finds git root by walking up from root)\n- Excludes the following directories regardless of `.gitignore`: `node_modules`, `.git`, `.specd`, `dist`, `build`, `coverage`, `.next`, `.nuxt`\n- Skips symbolic links — only regular files are indexed\n- Skips files with no registered language adapter (determined by extension)\n- Returns root-relative file paths with forward-slash normalization"
+        "The indexer SHALL discover files from each workspace's `codeRoot` independently. For each `WorkspaceIndexTarget`:\n\n1. Call `discoverFiles(codeRoot, hasAdapter, options)` to get paths relative to `codeRoot`\n2. Prefix each path with `{workspaceName}:` to form the globally unique `FileNode.path`\n3. Diff against the store (filtered by workspace prefix)\n\n`discoverFiles` accepts a root directory plus optional exclusion options:\n\n- **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically (git root → codeRoot → subdirectories during walk) and applied with absolute priority — no `excludePaths` pattern can re-include a file that `.gitignore` excludes. When `false`, `.gitignore` files are not loaded.\n- **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Supports `!` negation. When not provided, the following built-in defaults apply: When provided, the supplied list **replaces** the built-in defaults entirely — the built-in defaults are not merged.\n\nEvaluation order when `respectGitignore: true`:\n\n1. `.gitignore` rules (absolute priority — cannot be overridden)\n2. `excludePaths` rules (applied after; can negate each other but cannot un-ignore gitignored files)\n\n`discoverFiles` itself has no workspace knowledge — it accepts a root directory and:\n\n- Respects `.gitignore` rules hierarchically when `respectGitignore` is `true`\n- Applies `excludePaths` patterns (or built-in defaults) as an `ignore`-library instance\n- Skips symbolic links — only regular files are indexed\n- Skips files with no registered language adapter (determined by extension)\n- Returns root-relative file paths with forward-slash normalization"
       ]
     },
     {
@@ -75,7 +75,9 @@
   "constraints": [
     "The GraphStore must be opened before calling the use case — the indexer does not manage store lifecycle",
     "Discovery always uses forward-slash-normalized workspace-relative paths",
-    "Hardcoded exclusion directories cannot be overridden (they are always excluded)",
+    "When excludePaths is not provided, built-in default patterns apply (node_modules/, .git/, .specd/, dist/, build/, coverage/, .next/, .nuxt/)",
+    "When excludePaths is provided, it replaces built-in defaults entirely — no merging occurs",
+    "When respectGitignore is true, .gitignore exclusions have absolute priority and cannot be overridden by excludePaths patterns",
     "Pass 2 depends on Pass 1 completing for all files — they are not interleaved per file",
     "Per-file errors are collected, not thrown — only infrastructure errors abort the run",
     "Spec indexing uses the workspace's specs() callback exclusively — no filesystem fallback",
@@ -213,6 +215,16 @@
       "given": ["a file docs/readme.md with no registered adapter for .md"],
       "when": ["file discovery runs"],
       "then": ["docs/readme.md is not in the discovered files"]
+    },
+    {
+      "requirement": "Multi-workspace file discovery",
+      "name": "Custom excludePaths replaces built-in defaults",
+      "given": ["WorkspaceIndexTarget.excludePaths is [\"fixtures/\"]"],
+      "when": ["file discovery runs"],
+      "then": [
+        "only fixtures/ is excluded by config rules",
+        "AND node_modules/ and dist/ (built-in defaults) are NOT automatically excluded"
+      ]
     },
     {
       "requirement": "Multi-workspace file discovery",
@@ -443,8 +455,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:165ddf41b1a183f27a0e38a2471b0877471654cb26d7e7761cd132dc5d689ac5",
-    "verify.md": "sha256:61f01039b4fc0fec65083de085413f593a4560ea12a1b789359d26bd1fb69848"
+    "spec.md": "sha256:a645d313b5d39b0b87a5fec41961637d23bf475f48a05c17a016caf9d9df385a",
+    "verify.md": "sha256:a338a1d4452a3e089db81cda5d4148eb465e9896089547100ae09a5f212cdbfa"
   },
   "generatedBy": "core"
 }

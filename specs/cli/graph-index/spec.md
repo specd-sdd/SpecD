@@ -9,10 +9,11 @@ Without an up-to-date code graph, all graph-based queries return stale or empty 
 ### Requirement: Command signature
 
 ```
-specd graph index [--workspace <name>] [--force] [--format text|json|toon]
+specd graph index [--workspace <name>] [--exclude-path <pattern>]... [--force] [--format text|json|toon]
 ```
 
 - `--workspace` — optional; index only the named workspace instead of all workspaces
+- `--exclude-path <pattern>` — optional, repeatable; gitignore-syntax pattern added on top of the workspace's `graph.excludePaths` config for this run only. Does not modify `specd.yaml`. Multiple patterns are accumulated: `--exclude-path "*.gen.ts" --exclude-path "fixtures/"`.
 - `--force` — optional flag; when present, all existing graph data is cleared before indexing
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
@@ -29,10 +30,11 @@ The command:
 3. If `--force` is passed, deletes the `.lbug`, `.lbug.wal`, and `.lbug.lock` files before opening (rather than calling `clear()`)
 4. Builds `WorkspaceIndexTarget[]` from `config.workspaces`, using `kernel.specs.repos` to provide spec sources
 5. If `--workspace` is specified, filters to only that workspace
-6. Calls `index({ workspaces, projectRoot })` to perform the indexing
-7. Outputs the `IndexResult` with per-workspace breakdown
-8. Closes the provider
-9. Exits with `process.exit(0)` — this explicit exit is required because the LadybugDB native threads keep the Node process alive
+6. For each workspace target, populates `excludePaths` and `respectGitignore` from `SpecdWorkspaceConfig.graph`. If `--exclude-path` flags are present, those patterns are **appended** to the config's `excludePaths` (or to the built-in defaults when no config `excludePaths` is set). `--exclude-path` never replaces config values — it always adds on top.
+7. Calls `index({ workspaces, projectRoot })` to perform the indexing
+8. Outputs the `IndexResult` with per-workspace breakdown
+9. Closes the provider
+10. Exits with `process.exit(0)` — this explicit exit is required because the LadybugDB native threads keep the Node process alive
 
 When output is a TTY and format is `text`, progress is displayed on stderr using `\r\x1b[K` for in-place updates (overwriting the current line).
 
@@ -59,6 +61,21 @@ In `json` or `toon` mode, the full `IndexResult` object is output as-is.
 If the provider cannot be opened or indexing fails due to an infrastructure error (I/O, database), the command exits with code 3.
 
 Per-file indexing errors (parse failures, unsupported syntax) do not cause a non-zero exit — they are reported in the `errors` array of `IndexResult` and the command exits with code 0.
+
+### Requirement: CLI reference documentation
+
+The `specd graph` command group SHALL be fully documented in `docs/cli/cli-reference.md` under a `## graph` section. The reference MUST cover all five subcommands: `index`, `search`, `hotspots`, `stats`, and `impact`.
+
+For `graph index`, the documentation MUST include:
+
+- Full command signature with all flags
+- Description of `--exclude-path` flag: repeatable, gitignore-syntax, merges on top of config's `graph.excludePaths`
+- Description of `graph.excludePaths` and `graph.respectGitignore` workspace config fields and their effect on indexing
+- The built-in default exclusion list (applied when `graph.excludePaths` is not configured)
+- Replace semantics: specifying `graph.excludePaths` replaces built-in defaults
+- Example showing how to re-include a subdirectory of an otherwise-excluded dir using negation
+
+For each other subcommand (`search`, `hotspots`, `stats`, `impact`), the documentation MUST include: command signature, flag descriptions, and at least one usage example.
 
 ## Constraints
 

@@ -9,13 +9,13 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd graph index [--workspace <name>] [--force] [--format text|json|toon]\n```\n\n- `--workspace` — optional; index only the named workspace instead of all workspaces\n- `--force` — optional flag; when present, all existing graph data is cleared before indexing\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nThe `--path` option is removed — the workspace root is derived from `SpecdConfig` via `resolveCliContext()`."
+        "```\nspecd graph index [--workspace <name>] [--exclude-path <pattern>]... [--force] [--format text|json|toon]\n```\n\n- `--workspace` — optional; index only the named workspace instead of all workspaces\n- `--exclude-path <pattern>` — optional, repeatable; gitignore-syntax pattern added on top of the workspace's `graph.excludePaths` config for this run only. Does not modify `specd.yaml`. Multiple patterns are accumulated: `--exclude-path \"*.gen.ts\" --exclude-path \"fixtures/\"`.\n- `--force` — optional flag; when present, all existing graph data is cleared before indexing\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nThe `--path` option is removed — the workspace root is derived from `SpecdConfig` via `resolveCliContext()`."
       ]
     },
     {
       "requirement": "Indexing behaviour",
       "rules": [
-        "The command uses `resolveCliContext()` to load config and kernel, then uses `withProvider` which manages the `CodeGraphProvider` lifecycle and registers `SIGINT`/`SIGTERM` signal handlers for graceful shutdown.\n\nThe command:\n\n1. Resolves CLI context via `resolveCliContext()` to get `SpecdConfig` and `Kernel`\n2. Creates a `CodeGraphProvider` from the config via `withProvider`\n3. If `--force` is passed, deletes the `.lbug`, `.lbug.wal`, and `.lbug.lock` files before opening (rather than calling `clear()`)\n4. Builds `WorkspaceIndexTarget[]` from `config.workspaces`, using `kernel.specs.repos` to provide spec sources\n5. If `--workspace` is specified, filters to only that workspace\n6. Calls `index({ workspaces, projectRoot })` to perform the indexing\n7. Outputs the `IndexResult` with per-workspace breakdown\n8. Closes the provider\n9. Exits with `process.exit(0)` — this explicit exit is required because the LadybugDB native threads keep the Node process alive\n\nWhen output is a TTY and format is `text`, progress is displayed on stderr using `\\r\\x1b[K` for in-place updates (overwriting the current line)."
+        "The command uses `resolveCliContext()` to load config and kernel, then uses `withProvider` which manages the `CodeGraphProvider` lifecycle and registers `SIGINT`/`SIGTERM` signal handlers for graceful shutdown.\n\nThe command:\n\n1. Resolves CLI context via `resolveCliContext()` to get `SpecdConfig` and `Kernel`\n2. Creates a `CodeGraphProvider` from the config via `withProvider`\n3. If `--force` is passed, deletes the `.lbug`, `.lbug.wal`, and `.lbug.lock` files before opening (rather than calling `clear()`)\n4. Builds `WorkspaceIndexTarget[]` from `config.workspaces`, using `kernel.specs.repos` to provide spec sources\n5. If `--workspace` is specified, filters to only that workspace\n6. For each workspace target, populates `excludePaths` and `respectGitignore` from `SpecdWorkspaceConfig.graph`. If `--exclude-path` flags are present, those patterns are **appended** to the config's `excludePaths` (or to the built-in defaults when no config `excludePaths` is set). `--exclude-path` never replaces config values — it always adds on top.\n7. Calls `index({ workspaces, projectRoot })` to perform the indexing\n8. Outputs the `IndexResult` with per-workspace breakdown\n9. Closes the provider\n10. Exits with `process.exit(0)` — this explicit exit is required because the LadybugDB native threads keep the Node process alive\n\nWhen output is a TTY and format is `text`, progress is displayed on stderr using `\\r\\x1b[K` for in-place updates (overwriting the current line)."
       ]
     },
     {
@@ -28,6 +28,12 @@
       "requirement": "Error cases",
       "rules": [
         "If the provider cannot be opened or indexing fails due to an infrastructure error (I/O, database), the command exits with code 3.\n\nPer-file indexing errors (parse failures, unsupported syntax) do not cause a non-zero exit — they are reported in the `errors` array of `IndexResult` and the command exits with code 0."
+      ]
+    },
+    {
+      "requirement": "CLI reference documentation",
+      "rules": [
+        "The `specd graph` command group SHALL be fully documented in `docs/cli/cli-reference.md` under a `## graph` section. The reference MUST cover all five subcommands: `index`, `search`, `hotspots`, `stats`, and `impact`.\n\nFor `graph index`, the documentation MUST include:\n\n- Full command signature with all flags\n- Description of `--exclude-path` flag: repeatable, gitignore-syntax, merges on top of config's `graph.excludePaths`\n- Description of `graph.excludePaths` and `graph.respectGitignore` workspace config fields and their effect on indexing\n- The built-in default exclusion list (applied when `graph.excludePaths` is not configured)\n- Replace semantics: specifying `graph.excludePaths` replaces built-in defaults\n- Example showing how to re-include a subdirectory of an otherwise-excluded dir using negation\n\nFor each other subcommand (`search`, `hotspots`, `stats`, `impact`), the documentation MUST include: command signature, flag descriptions, and at least one usage example."
       ]
     }
   ],
@@ -76,6 +82,19 @@
       "when": ["the provider is closed"],
       "then": [
         "process.exit(0) is called to prevent the LadybugDB addon from keeping the process alive"
+      ]
+    },
+    {
+      "requirement": "Indexing behaviour",
+      "name": "--exclude-path merges on top of config excludePaths",
+      "given": [
+        "workspace config has graph.excludePaths: [\"dist/\"]",
+        "AND the command is run with --exclude-path \"fixtures/\""
+      ],
+      "when": ["indexing runs"],
+      "then": [
+        "the effective exclusion list is [\"dist/\", \"fixtures/\"]",
+        "AND specd.yaml is not modified"
       ]
     },
     {
@@ -131,11 +150,27 @@
         "the errors are included in the errors array of the output",
         "AND the process exits with code 0"
       ]
+    },
+    {
+      "requirement": "CLI reference documentation",
+      "name": "graph section present in CLI reference",
+      "when": ["docs/cli/cli-reference.md is inspected"],
+      "then": ["a ## graph section exists covering index, search, hotspots, stats, and impact"]
+    },
+    {
+      "requirement": "CLI reference documentation",
+      "name": "graph index flags documented",
+      "when": ["the ### graph index subsection is read"],
+      "then": [
+        "--exclude-path, --workspace, --force, and --format are documented with descriptions",
+        "AND the graph.excludePaths and graph.respectGitignore config fields are explained",
+        "AND an example shows negation syntax (e.g. !.specd/metadata/)"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:ba80dda3d32ab7f958da35d8ac15ff6325eba92bad9b6111a4216e2906f00f12",
-    "verify.md": "sha256:1b97f3a2dbbe003f59a58467cbe7c36661420bb1c40251758e30cd5c103025d9"
+    "spec.md": "sha256:ff12cf1314398d88cd5181b7a37ef87149100cbf257458e9645abaa5b588ccd4",
+    "verify.md": "sha256:0476f52ed41995abf82cd60d6b82e464040386698ea9361bdda187e9173599af"
   },
   "generatedBy": "core"
 }
