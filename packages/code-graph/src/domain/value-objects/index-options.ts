@@ -27,6 +27,17 @@ export interface WorkspaceIndexTarget {
   readonly specs: () => Promise<DiscoveredSpec[]>
   /** Optional repository root, used as boundary when searching for package manifests. */
   readonly repoRoot?: string
+  /**
+   * Gitignore-syntax exclusion patterns applied during file discovery.
+   * When set, replaces built-in default exclusions entirely.
+   * When absent, built-in defaults (`node_modules/`, `.git/`, etc.) apply.
+   */
+  readonly excludePaths?: readonly string[]
+  /**
+   * Whether `.gitignore` files are loaded and applied during file discovery.
+   * Defaults to `true`. When `false`, only `excludePaths` governs exclusion.
+   */
+  readonly respectGitignore?: boolean
 }
 
 /**
