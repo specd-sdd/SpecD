@@ -93,7 +93,7 @@ schemaOverrides:
           post:
             - id: designing-docs
               instruction: >-
-                Add instructions to update documentation in docs/ if needed on the design.md.
+                You MUST add instructions to update documentation in docs/ if needed on the design.md.
             - id: check-global-specs-compliance
               instruction: >-
                 Cross-reference this design against the global specs (default:_global/*):
