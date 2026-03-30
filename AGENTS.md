@@ -13,30 +13,43 @@ specd/
 ├── packages/
 │   ├── core/              # @specd/core — domain, application, infrastructure
 │   ├── cli/               # @specd/cli — CLI adapter
-│   ├── mcp/               # @specd/mcp — MCP server adapter
-│   ├── skills/            # @specd/skills — canonical skill definitions
+│   ├── code-graph/        # @specd/code-graph — code graph indexing and analysis
+│   ├── mcp/               # @specd/mcp — MCP server adapter (stub)
+│   ├── skills/            # @specd/skills — skill registry API
 │   ├── schema-std/        # @specd/schema-std — default schema
-│   ├── schema-openspec/   # @specd/schema-openspec — OpenSpec-compatible schema
+│   ├── schema-openspec/   # @specd/schema-openspec — OpenSpec-compatible schema (stub)
 │   └── plugins/
-│       ├── claude/        # @specd/plugin-claude
-│       ├── copilot/       # @specd/plugin-copilot
-│       └── codex/         # @specd/plugin-codex
+│       ├── claude/        # @specd/plugin-claude (stub)
+│       ├── copilot/       # @specd/plugin-copilot (stub)
+│       └── codex/         # @specd/plugin-codex (stub)
 ├── specs/
-│   ├── _global/           # Global constraints — apply to ALL packages
+│   ├── _global/           # Global constraints — apply to ALL packages (7 specs)
 │   │   ├── architecture/  # spec.md + verify.md
 │   │   ├── conventions/   # spec.md + verify.md
 │   │   ├── commits/       # spec.md + verify.md
 │   │   ├── testing/       # spec.md + verify.md
 │   │   ├── docs/          # spec.md + verify.md
 │   │   ├── eslint/        # spec.md + verify.md
-│   │   ├── spec-layout/   # spec.md + verify.md
-│   │   ├── schema-format/ # spec.md + verify.md — schema YAML structure
-│   │   └── config/        # spec.md + verify.md — specd.yaml structure
-│   └── core/              # Package specs for @specd/core
+│   │   └── spec-layout/   # spec.md + verify.md
+│   ├── core/              # Package specs for @specd/core (77 specs)
+│   ├── cli/               # Package specs for @specd/cli (55 specs)
+│   └── code-graph/        # Package specs for @specd/code-graph (10 specs)
+├── docs/
+│   ├── adr/               # 19 Architecture Decision Records
+│   ├── guide/             # Getting started, workflow, schemas, workspaces, config, selectors
+│   ├── cli/               # CLI reference
+│   ├── core/              # Core API docs (domain model, ports, services, use cases, errors)
+│   ├── config/            # Config reference + examples
+│   └── schemas/           # Schema format reference + examples
 └── .specd/
-    ├── INITIAL-PROPOSAL.md  # Full design proposal and rationale
-    ├── PLAN.md              # Implementation plan
-    └── WORKSPACE-DESIGN.md  # Workspace design notes
+    ├── archive/           # Archived changes (by year/month)
+    ├── changes/           # Active changes
+    ├── drafts/            # Draft changes
+    ├── discarded/         # Discarded changes
+    ├── metadata/          # Spec metadata (177 files)
+    ├── schemas/           # Custom schemas
+    ├── skills/            # Shared skill notes
+    └── code-graph.lbug    # Persisted code graph index
 ```
 
 ---
@@ -60,7 +73,11 @@ Before writing any code, you MUST read the following specs in full. They are bin
 
 Each `spec.md` has a paired `verify.md` in the same directory with WHEN/THEN scenarios. Read it if you need to verify expected behaviour or understand edge cases for a requirement.
 
-**Package specs:** before working on a specific package, also read `specs/<package>/` if it exists (e.g. `specs/core/` when working on `@specd/core`). These are binding for that package.
+**Package specs:** before working on a specific package, also read `specs/<package>/` if it exists. Spec workspaces with specs:
+
+- `specs/core/` (77 specs) — when working on `@specd/core`
+- `specs/cli/` (55 specs) — when working on `@specd/cli`
+- `specs/code-graph/` (10 specs) — when working on `@specd/code-graph`
 
 ---
 
@@ -68,7 +85,8 @@ Each `spec.md` has a paired `verify.md` in the same directory with WHEN/THEN sce
 
 ```
 plugin-* → skills → core
-cli      → core
+cli      → core, code-graph, skills, plugin-*, schema-std
+code-graph → core
 mcp      → core
 schema-* → (no specd deps)
 ```
@@ -79,7 +97,7 @@ No circular workspace dependencies.
 
 ## Key Design Decisions
 
-See [`.specd/INITIAL-PROPOSAL.md`](.specd/INITIAL-PROPOSAL.md) for full design rationale. Key decisions:
+Key decisions:
 
 - Rich domain entities — entities defend their own invariants
 - Pure functions for stateless domain services (e.g. `mergeSpecs`, `hashFiles`)

@@ -24,10 +24,11 @@ Key differences from earlier SDD tools:
 SpecD is in active development and usable from source in this monorepo.
 
 - `@specd/core` has substantial implementation (domain entities, use cases, composition layer, fs adapters, validation, tests).
-- `@specd/cli` is implemented and exposes the main command groups (`change`, `spec`, `project`, `schema`, `skills`, `drafts`, `discarded`, `archive`, `config`).
+- `@specd/cli` is implemented and exposes the main command groups (`change`, `spec`, `project`, `schema`, `skills`, `graph`, `drafts`, `discarded`, `archive`, `config`).
+- `@specd/code-graph` is implemented with multi-language indexing (TypeScript, Go, Python, PHP), impact analysis, and hotspot detection.
 - `@specd/schema-std` ships a real `schema.yaml` and templates.
 - `@specd/mcp`, `@specd/schema-openspec`, and `@specd/plugin-*` are still placeholders/scaffolding.
-- `@specd/skills` API exists but currently returns an empty registry.
+- `@specd/skills` is being redesigned.
 
 Publishing/install flows are not finalized yet; use workspace commands for now.
 
@@ -90,17 +91,18 @@ Teams with microservice architectures can manage cross-cutting specs (authentica
 
 ## Packages
 
-| Package                  | Description                                                                                      | Status     |
-| ------------------------ | ------------------------------------------------------------------------------------------------ | ---------- |
-| `@specd/core`            | Domain library: entities, value objects, use cases, ports, composition, infrastructure adapters. | Functional |
-| `@specd/cli`             | CLI adapter around `@specd/core` with command registration and formatting/output modes.          | Functional |
-| `@specd/mcp`             | MCP server adapter package.                                                                      | Scaffolded |
-| `@specd/skills`          | Skill registry API used by plugins and CLI skill commands.                                       | Scaffolded |
-| `@specd/schema-std`      | Standard SpecD schema package with `schema.yaml` and template files.                             | Functional |
-| `@specd/schema-openspec` | OpenSpec-compatible schema package.                                                              | Scaffolded |
-| `@specd/plugin-claude`   | Claude plugin package.                                                                           | Scaffolded |
-| `@specd/plugin-copilot`  | GitHub Copilot plugin package.                                                                   | Scaffolded |
-| `@specd/plugin-codex`    | OpenAI Codex plugin package.                                                                     | Scaffolded |
+| Package                  | Description                                                                                      | Status      |
+| ------------------------ | ------------------------------------------------------------------------------------------------ | ----------- |
+| `@specd/core`            | Domain library: entities, value objects, use cases, ports, composition, infrastructure adapters. | Functional  |
+| `@specd/cli`             | CLI adapter around `@specd/core` with command registration and formatting/output modes.          | Functional  |
+| `@specd/code-graph`      | Code graph indexing and analysis: multi-language symbols, impact analysis, hotspots.             | Functional  |
+| `@specd/mcp`             | MCP server adapter package.                                                                      | Scaffolded  |
+| `@specd/skills`          | Skill registry API used by plugins and CLI skill commands.                                       | Redesigning |
+| `@specd/schema-std`      | Standard SpecD schema package with `schema.yaml` and template files.                             | Functional  |
+| `@specd/schema-openspec` | OpenSpec-compatible schema package.                                                              | Scaffolded  |
+| `@specd/plugin-claude`   | Claude plugin package.                                                                           | Scaffolded  |
+| `@specd/plugin-copilot`  | GitHub Copilot plugin package.                                                                   | Scaffolded  |
+| `@specd/plugin-codex`    | OpenAI Codex plugin package.                                                                     | Scaffolded  |
 
 ## Getting started (workspace)
 
@@ -132,6 +134,7 @@ Example command groups currently wired:
 - `specd project ...`
 - `specd config show`
 - `specd schema show`
+- `specd graph ...`
 - `specd skills ...`
 
 `project init` can generate a local `specd.yaml`. A minimal config looks like:
