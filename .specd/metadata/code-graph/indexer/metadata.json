@@ -501,8 +501,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:14e3b39f23d2e4d09aef15a61194ee93c09f01eea9778db78ff495fc3b480678",
-    "verify.md": "sha256:9a17beb57aeb762ceb2063d6f5185b152c1c4b05bfb20ee96b1c0ff13a6d74b2"
+    "spec.md": "sha256:a47c8de6b6c2f0ed26c760fa390b1c8ccf4e9870a1bf47e7ce280a331ce93713",
+    "verify.md": "sha256:b20b6c800c7831fe135ffacf464d2a0936a1628017c74156daed6d0870b916ca"
   },
   "generatedBy": "core"
 }
