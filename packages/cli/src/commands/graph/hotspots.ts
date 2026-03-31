@@ -1,5 +1,5 @@
 import { Command, Option } from 'commander'
-import { type HotspotOptions, type RiskLevel } from '@specd/code-graph'
+import { DEFAULT_HOTSPOT_KINDS, type HotspotOptions, type RiskLevel } from '@specd/code-graph'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
@@ -16,6 +16,10 @@ function collect(value: string, previous: string[]): string[] {
   return [...previous, value]
 }
 
+const DEFAULT_HOTSPOT_KIND_LIST = (DEFAULT_HOTSPOT_KINDS ?? ['class', 'method', 'function']).join(
+  ',',
+)
+
 /**
  * Registers the `graph hotspots` command.
  * @param parent - The parent commander command.
@@ -26,11 +30,17 @@ export function registerGraphHotspots(parent: Command): void {
     .allowExcessArguments(false)
     .description(
       'Rank symbols by impact score (callers, importers, cross-workspace deps).\n' +
-        'Defaults (no flags): score > 0, risk >= MEDIUM, limit 20.\n' +
-        'Any filter flag removes all defaults — only explicit constraints apply.',
+        `Defaults (no flags): kinds ${DEFAULT_HOTSPOT_KIND_LIST}, score > 0, risk >= MEDIUM, limit 20.\n` +
+        'Default view excludes importer-only symbols unless widened with --include-importer-only.\n' +
+        'Each option overrides only its own default.',
     )
     .option('--workspace <name>', 'filter by workspace')
-    .addOption(new Option('--kind <kinds>', 'filter by symbol kind (comma-separated)'))
+    .addOption(
+      new Option(
+        '--kind <kinds>',
+        `filter by symbol kind (comma-separated); replaces default kinds ${DEFAULT_HOTSPOT_KIND_LIST}`,
+      ),
+    )
     .option('--file <path>', 'filter by file path')
     .option(
       '--exclude-path <pattern>',
@@ -44,13 +54,19 @@ export function registerGraphHotspots(parent: Command): void {
       collect,
       [],
     )
-    .option('--limit <n>', 'max results (default 20 when no filters)')
-    .option('--min-score <n>', 'minimum score threshold (default 1 when no filters)')
+    .option('--limit <n>', 'max results (default 20)')
+    .option('--min-score <n>', 'minimum score threshold (default 1)')
+    .option(
+      '--include-importer-only',
+      'include symbols with no direct callers whose score comes only from file importers',
+    )
     .addOption(
-      new Option(
-        '--min-risk <level>',
-        'minimum risk level (default MEDIUM when no filters)',
-      ).choices(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+      new Option('--min-risk <level>', 'minimum risk level (default MEDIUM)').choices([
+        'LOW',
+        'MEDIUM',
+        'HIGH',
+        'CRITICAL',
+      ]),
     )
     .option('--config <path>', 'path to specd.yaml')
     .option('--path <path>', 'repository root for bootstrap mode')
@@ -76,6 +92,13 @@ Exclude examples:
   specd graph hotspots --exclude-path "*:test/*"
   specd graph hotspots --exclude-workspace cli --exclude-workspace mcp
   specd graph hotspots --exclude-path "*.spec.ts" --min-risk HIGH
+
+  Default hotspot view:
+  Uses kinds ${DEFAULT_HOTSPOT_KIND_LIST}
+  Keeps risk >= MEDIUM and limit 20 unless you override them
+  Excludes symbols with no direct callers even if their file is widely imported
+  Passing --kind replaces the default kind set instead of merging with it
+  Passing --include-importer-only explicitly widens the query to importer-only symbols
 `,
     )
     .action(
@@ -90,6 +113,7 @@ Exclude examples:
         limit?: string
         minScore?: string
         minRisk?: string
+        includeImporterOnly?: boolean
         format: string
       }) => {
         const fmt = parseFormat(opts.format)
@@ -115,25 +139,7 @@ Exclude examples:
         )
 
         await withProvider(config, opts.format, async (provider) => {
-          const hasAnyFilter = !!(
-            opts.workspace ||
-            kinds !== undefined ||
-            opts.file ||
-            opts.excludePath.length > 0 ||
-            opts.excludeWorkspace.length > 0 ||
-            opts.limit !== undefined ||
-            opts.minScore !== undefined ||
-            opts.minRisk !== undefined
-          )
-
-          // When no filters are provided, apply safe defaults.
-          // Any filter removes all defaults — only explicit constraints apply.
-          const base: HotspotOptions = hasAnyFilter
-            ? { minScore: 0, minRisk: 'LOW', limit: Infinity }
-            : {}
-
           const options: HotspotOptions = {
-            ...base,
             ...(opts.workspace ? { workspace: opts.workspace } : undefined),
             ...(kinds !== undefined ? { kinds } : undefined),
             ...(opts.file ? { filePath: opts.file } : undefined),
@@ -146,6 +152,7 @@ Exclude examples:
               ? { minScore: parseInt(opts.minScore, 10) }
               : undefined),
             ...(opts.minRisk !== undefined ? { minRisk: opts.minRisk as RiskLevel } : undefined),
+            ...(opts.includeImporterOnly === true ? { includeImporterOnly: true } : undefined),
           }
 
           const result = await provider.getHotspots(options)

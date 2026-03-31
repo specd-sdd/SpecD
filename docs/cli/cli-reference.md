@@ -777,21 +777,26 @@ specd graph hotspots [options]
 
 List the most connected symbols in the graph ranked by coupling risk. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-| Option                       | Description                                                                            |
-| ---------------------------- | -------------------------------------------------------------------------------------- |
-| `--workspace <name>`         | Restrict hotspots to the named workspace.                                              |
-| `--kind <list>`              | Filter hotspots by comma-separated symbol kinds, for example `class,method`.           |
-| `--file <path>`              | Restrict hotspots to a file path.                                                      |
-| `--exclude-path <pattern>`   | Exclude symbols whose file path matches the wildcard pattern. Repeatable.              |
-| `--exclude-workspace <name>` | Exclude hotspots from the named workspace. Repeatable.                                 |
-| `--limit <n>`                | Maximum number of results. When omitted and no filters are set, defaults to `20`.      |
-| `--min-score <n>`            | Minimum score threshold. When omitted and no filters are set, defaults to `1`.         |
-| `--min-risk <level>`         | Minimum risk level to show. When omitted and no filters are set, defaults to `MEDIUM`. |
-| `--config <path>`            | Config file path. Mutually exclusive with `--path`.                                    |
-| `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                         |
-| `--format text\|json\|toon`  | Output format.                                                                         |
+| Option                       | Description                                                                                                 |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `--workspace <name>`         | Restrict hotspots to the named workspace.                                                                   |
+| `--kind <list>`              | Filter hotspots by comma-separated symbol kinds, for example `class,method`. Replaces the default kind set. |
+| `--file <path>`              | Restrict hotspots to a file path.                                                                           |
+| `--exclude-path <pattern>`   | Exclude symbols whose file path matches the wildcard pattern. Repeatable.                                   |
+| `--exclude-workspace <name>` | Exclude hotspots from the named workspace. Repeatable.                                                      |
+| `--limit <n>`                | Maximum number of results. When omitted, defaults to `20`.                                                  |
+| `--min-score <n>`            | Minimum score threshold. When omitted, defaults to `1`.                                                     |
+| `--include-importer-only`    | Include symbols with no direct callers whose score comes only from file importers.                          |
+| `--min-risk <level>`         | Minimum risk level to show. When omitted, defaults to `MEDIUM`.                                             |
+| `--config <path>`            | Config file path. Mutually exclusive with `--path`.                                                         |
+| `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                                              |
+| `--format text\|json\|toon`  | Output format.                                                                                              |
 
-`--kind` accepts a single comma-separated list and validates every token against the supported symbol kinds. Invalid values fail the command before querying the graph.
+By default, `graph hotspots` shows only `class`, `method`, and `function` symbols, applies `min-score=1`, `min-risk=MEDIUM`, and `limit=20`, and excludes importer-only symbols that have no direct callers.
+
+`--kind` accepts a single comma-separated list and validates every token against the supported symbol kinds. Invalid values fail the command before querying the graph. When you pass `--kind`, that list fully replaces the default kind set instead of merging with it.
+
+Overriding `--min-risk`, `--limit`, or `--min-score` does not disable the other defaults. Use `--include-importer-only` when you explicitly want importer-only symbols to appear.
 
 ---
 

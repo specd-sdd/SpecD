@@ -13,7 +13,7 @@
     {
       "requirement": "Batch hotspot scoring",
       "rules": [
-        "`computeHotspots(store: GraphStore, options?: HotspotOptions): Promise<HotspotResult>` SHALL compute a hotspot score for every symbol in the graph using exactly two batch queries:\n\n1. **Caller query** — returns one row per (symbol, caller) pair with both the symbol's `filePath` and the caller's `filePath`\n2. **Importer count query** — returns the number of files that import each file\n\nThe score formula is:\n\n```text\nscore = (sameWorkspaceCallers * 3) + (crossWorkspaceCallers * 5) + fileImporters\n```\n\nWhere:\n\n- **sameWorkspaceCallers** — callers whose filePath shares the same workspace prefix as the symbol\n- **crossWorkspaceCallers** — callers whose filePath has a different workspace prefix (weighted higher because cross-workspace calls are implicit contracts with wider blast radius)\n- **fileImporters** — number of files that IMPORT the file containing this symbol\n\nWorkspace is extracted from filePath as the prefix before the first `:` (e.g. `core` from `core:src/index.ts`)."
+        "`computeHotspots(store: GraphStore, options?: HotspotOptions): Promise<HotspotResult>` SHALL compute a hotspot score for every symbol in the graph using exactly two batch queries:\n\n1. **Caller query** — returns one row per (symbol, caller) pair with both the symbol's `filePath` and the caller's `filePath`\n2. **Importer count query** — returns the number of files that import each file\n\nThe scoring model uses three signals:\n\n- **sameWorkspaceCallers** — callers whose `filePath` shares the same workspace prefix as the symbol\n- **crossWorkspaceCallers** — callers whose `filePath` has a different workspace prefix\n- **fileImporters** — number of files that `IMPORT` the file containing the symbol\n\nWorkspace is extracted from `filePath` as the prefix before the first `:` (e.g. `core` from `core:src/index.ts`).\n\nThe exact numeric weighting of these signals is intentionally not fixed by this spec. It is defined by the implementation design and may be tuned without further spec churn, provided these observable semantics hold:\n\n- symbol-level caller evidence is the primary ranking signal\n- cross-workspace caller evidence contributes at least as strongly as same-workspace caller evidence\n- file-level importer data is a secondary signal that refines symbol ranking rather than replacing symbol-level evidence"
       ]
     },
     {
@@ -25,13 +25,13 @@
     {
       "requirement": "Smart defaults with automatic removal",
       "rules": [
-        "When invoked with **no filter flags**, the command applies safe defaults:\n\n- **score > 0** — symbols with no callers and no importers are excluded\n- **risk >= MEDIUM** — LOW-risk symbols are filtered out\n- **limit 20** — only the top 20 results are returned\n\nWhen **any** filter flag is provided (`--workspace`, `--kind`, `--file`, `--exclude-path`, `--exclude-workspace`, `--limit`, `--min-score`, `--min-risk`), **all** defaults are removed (minScore → 0, minRisk → LOW, limit → unlimited). Only explicitly provided constraints apply. This prevents defaults from silently hiding results that the user's filter was intended to surface.\n\nExamples:\n\n- `specd graph hotspots` → defaults apply (score > 0, risk >= MEDIUM, limit 20)\n- `specd graph hotspots --min-risk HIGH` → only risk >= HIGH, no score or limit constraint\n- `specd graph hotspots --workspace core` → all symbols in core, no score/risk/limit constraint\n- `specd graph hotspots --min-risk HIGH --limit 5` → risk >= HIGH, limit 5, no score constraint"
+        "Hotspot computation applies product defaults per option:\n\n- **kinds = \\[`class`, `method`, `function`]** — the default hotspot view focuses on callable or structural symbols\n- **score > 0** — symbols with no caller signal and no importer signal are excluded\n- **risk >= MEDIUM** — LOW-risk symbols are filtered out\n- **limit 20** — only the top 20 results are returned\n- **no importer-only entries** — a symbol with zero direct callers MUST NOT appear in the default result solely because its containing file has many importers\n\nExplicit options override only their own defaults:\n\n- omitted `kinds` → use the default hotspot kinds\n- explicit `kinds` → fully replace the default kind set; do not merge with it\n- omitted `minRisk` → use `MEDIUM`\n- explicit `minRisk` → use only the requested risk threshold\n- omitted `limit` → use `20`\n- explicit `limit` → use only the requested limit\n- omitted `workspace`, `filePath`, `excludePaths`, `excludeWorkspaces` → no extra filter\n- explicit `workspace`, `filePath`, `excludePaths`, `excludeWorkspaces` → add only the requested scope restriction\n\nImporter-only exclusion remains active unless the user explicitly widens the result set with `includeImporterOnly = true`.\n\nIn other words, changing `minRisk`, `limit`, or `workspace` MUST NOT silently remove the default kind set or re-enable importer-only symbols.\n\nExamples:\n\n- `specd graph hotspots` → defaults apply (kinds = `class,method,function`, no importer-only entries, risk >= MEDIUM, limit 20)\n- `specd graph hotspots --min-risk HIGH` → risk >= HIGH, while default kinds, importer-only exclusion, and limit 20 remain active\n- `specd graph hotspots --limit 50` → limit 50, while default kinds, importer-only exclusion, and risk >= MEDIUM remain active\n- `specd graph hotspots --kind interface` → only `interface` symbols, with the rest of the default ranking policy still active\n- `specd graph hotspots --include-importer-only --kind interface` → explicit broad query; importer-only `interface` symbols may appear"
       ]
     },
     {
       "requirement": "Filtering",
       "rules": [
-        "`HotspotOptions` supports these optional filters:\n\n- **workspace** — only include symbols whose filePath starts with this workspace prefix\n- **kind** — only include symbols of this SymbolKind\n- **filePath** — only include symbols in this file\n- **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive). Uses `matchesExclude` from `domain/services/matches-exclude.ts`\n- **excludeWorkspaces** — array of workspace names to exclude. Uses `matchesExclude` from `domain/services/matches-exclude.ts`\n- **limit** — maximum results to return (default 20)\n- **minScore** — minimum score threshold (default 1, i.e. > 0)\n- **minRisk** — minimum risk level threshold (default MEDIUM)\n\nExcludes are applied alongside the existing include filters before the limit is applied."
+        "`HotspotOptions` supports these optional filters:\n\n- **workspace** — only include symbols whose `filePath` starts with this workspace prefix\n- **kinds** — only include symbols whose kind is in the provided `SymbolKind[]`\n- **filePath** — only include symbols in this file\n- **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive). Uses `matchesExclude` from `domain/services/matches-exclude.ts`\n- **excludeWorkspaces** — array of workspace names to exclude. Uses `matchesExclude` from `domain/services/matches-exclude.ts`\n- **limit** — maximum results to return (default 20)\n- **minScore** — minimum score threshold (default 1, i.e. > 0)\n- **minRisk** — minimum risk level threshold (default MEDIUM)\n- **includeImporterOnly** — include symbols with zero direct callers whose score comes only from file importer counts (default false)\n\nExcludes are applied alongside the existing include filters before the limit is applied."
       ]
     },
     {
@@ -49,7 +49,8 @@
   ],
   "constraints": [
     "Exactly 2 graph queries — no N+1 per-symbol queries",
-    "Score formula weights are fixed: same-ws = 3, cross-ws = 5, importers = 1",
+    "Exact numeric weights are not fixed by this spec; design and implementation may tune them",
+    "File-level importer counts are a secondary ranking signal, not a standalone default inclusion path",
     "Risk level thresholds reuse the existing computeRiskLevel function",
     "Workspace is the prefix before the first : in filePath",
     "No spec coverage logic — deferred to issue 19"
@@ -63,22 +64,28 @@
     },
     {
       "requirement": "Batch hotspot scoring",
-      "name": "Cross-workspace scoring",
-      "when": [
-        "symbol X in workspace A is called by 2 symbols in workspace A and 1 symbol in workspace B",
-        "AND X's file has 3 importers"
+      "name": "Cross-workspace caller signal outranks same-workspace caller signal",
+      "given": [
+        "two symbols have the same number of same-workspace callers and the same file importer count",
+        "AND one of them also has a cross-workspace caller"
       ],
+      "when": ["computeHotspots ranks them"],
       "then": [
-        "X's score = (2 * 3) + (1 * 5) + 3 = 14",
-        "AND X's crossWorkspaceCallers = 1",
-        "AND X's directCallers = 2"
+        "the symbol with cross-workspace caller evidence ranks at least as high as the same-workspace-only symbol"
       ]
     },
     {
       "requirement": "Batch hotspot scoring",
-      "name": "File importer contribution",
-      "when": ["a symbol has 0 callers but its file has 5 importers"],
-      "then": ["score = 5 and the symbol is included (score > 0)"]
+      "name": "Direct caller evidence outranks importer-only signal in the default view",
+      "given": [
+        "symbol A has direct caller evidence",
+        "AND symbol B has zero direct callers but its file has many importers"
+      ],
+      "when": ["hotspots are computed with the default view"],
+      "then": [
+        "symbol A is eligible for ranking based on its symbol-level evidence",
+        "AND symbol B is not included solely because of file importer count"
+      ]
     },
     {
       "requirement": "Risk level",
@@ -88,15 +95,54 @@
     },
     {
       "requirement": "Smart defaults with automatic removal",
-      "name": "Default filters exclude zero-score symbols",
-      "when": ["a symbol has no callers and its file has no importers"],
-      "then": ["it is excluded from the default result (score = 0 < minScore default of 1)"]
+      "name": "Default kind set focuses the hotspot view",
+      "when": ["computeHotspots is called with no explicit kind filter"],
+      "then": ["only class, method, and function symbols are eligible for the default hotspot view"]
     },
     {
       "requirement": "Smart defaults with automatic removal",
-      "name": "--all removes all default filters",
-      "when": ["computeHotspots is called with minScore: 0, minRisk: 'LOW', limit: Infinity"],
-      "then": ["all symbols are included regardless of score or risk"]
+      "name": "Default view excludes importer-only symbols",
+      "when": [
+        "a symbol has zero direct callers and its file has many importers",
+        "AND computeHotspots is called with default options"
+      ],
+      "then": ["that symbol is excluded from the default result"]
+    },
+    {
+      "requirement": "Smart defaults with automatic removal",
+      "name": "Explicit kind filter removes default kind set",
+      "when": ["computeHotspots is called with an explicit kind filter outside the default set"],
+      "then": [
+        "the explicit kind filter is applied as requested",
+        "AND the default kind set is not merged in"
+      ]
+    },
+    {
+      "requirement": "Smart defaults with automatic removal",
+      "name": "Explicit minRisk changes only the risk threshold",
+      "when": ["computeHotspots is called with minRisk: 'HIGH'"],
+      "then": [
+        "the effective risk threshold is HIGH",
+        "AND the default kind set and importer-only exclusion still apply"
+      ]
+    },
+    {
+      "requirement": "Smart defaults with automatic removal",
+      "name": "Explicit limit changes only the result size",
+      "when": ["computeHotspots is called with limit: 50"],
+      "then": [
+        "the effective limit is 50",
+        "AND the default kind set and importer-only exclusion still apply"
+      ]
+    },
+    {
+      "requirement": "Smart defaults with automatic removal",
+      "name": "Explicit importer-only inclusion widens the query",
+      "when": ["computeHotspots is called with includeImporterOnly: true"],
+      "then": [
+        "importer-only symbols may be included",
+        "AND the score and risk thresholds still follow minScore and minRisk independently"
+      ]
     },
     {
       "requirement": "Filtering",
@@ -112,9 +158,9 @@
     },
     {
       "requirement": "Filtering",
-      "name": "Kind filter",
-      "when": ["kind is set to \"function\""],
-      "then": ["only symbols with kind \"function\" are returned"]
+      "name": "Multi-kind filter",
+      "when": ["kinds is set to ['class', 'method']"],
+      "then": ["only symbols with kind class or method are returned"]
     },
     {
       "requirement": "Output",
@@ -136,8 +182,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:76c89d2ab25d8e0209af2d8886d1cb85d654cd87499852e02e5cc13f8d46ae47",
-    "verify.md": "sha256:42653c31070fe568422ff4e70c6b23f5c034d3b9518ace283351fc0dd4999b8b"
+    "spec.md": "sha256:78d1f65899aa5dae2e20f2cc69af0f8f909904baa3473172086e6d0f2e21b16e",
+    "verify.md": "sha256:a87e57dd3e5898c25214b9b80f224c5ebe4f3e9c745d206ca0f965e5dab6f4de"
   },
   "generatedBy": "core"
 }

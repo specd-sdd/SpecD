@@ -4,16 +4,34 @@
 
 ### Requirement: Command signature
 
-#### Scenario: Default hotspot filters apply only when no explicit filter flags are provided
+#### Scenario: Default hotspot filters apply when no explicit overrides are provided
 
 - **WHEN** `specd graph hotspots` is run with no explicit filter flags
-- **THEN** the command queries hotspots with `minScore > 0`, `minRisk >= MEDIUM`, and `limit = 20`
+- **THEN** the command queries hotspots with default kinds `class,method,function`, importer-only symbols excluded, `minScore > 0`, `minRisk >= MEDIUM`, and `limit = 20`
 
-#### Scenario: Explicit filter removes implicit defaults
+#### Scenario: Explicit limit changes only the limit
 
 - **WHEN** `specd graph hotspots --limit 50` is run
 - **THEN** the command uses the explicit `limit = 50`
-- **AND** it does not also force the implicit `minScore > 0` or `minRisk >= MEDIUM` defaults
+- **AND** it preserves the implicit default kind set, importer-only exclusion, and `minRisk >= MEDIUM`
+
+#### Scenario: Explicit min-risk changes only the risk threshold
+
+- **WHEN** `specd graph hotspots --min-risk HIGH` is run
+- **THEN** the command uses the explicit `minRisk = HIGH`
+- **AND** it preserves the implicit default kind set, importer-only exclusion, and limit `20`
+
+#### Scenario: Explicit min-score changes only the score threshold
+
+- **WHEN** `specd graph hotspots --min-score 0` is run
+- **THEN** the command uses the explicit `minScore = 0`
+- **AND** it preserves the implicit default kind set and importer-only exclusion
+
+#### Scenario: Explicit importer-only inclusion widens the query
+
+- **WHEN** `specd graph hotspots --include-importer-only` is run
+- **THEN** importer-only symbols may be returned
+- **AND** the command keeps the default kind set unless `--kind` is also provided
 
 ### Requirement: Context resolution
 
@@ -45,6 +63,18 @@
 - **WHEN** `specd graph hotspots --kind class,method,function` is run
 - **THEN** the command trims and validates the three tokens
 - **AND** it passes all three kinds to the hotspot query layer
+
+#### Scenario: Omitted --kind uses the default hotspot kind set
+
+- **WHEN** `specd graph hotspots` is run without `--kind`
+- **THEN** the command uses the default kind set `class,method,function`
+
+#### Scenario: Explicit --kind replaces the default set
+
+- **WHEN** `specd graph hotspots --kind interface` is run
+- **THEN** the command queries only `interface` symbols
+- **AND** it does not merge in `class`, `method`, or `function`
+- **AND** it preserves the default risk threshold and limit unless they are also overridden
 
 #### Scenario: Invalid kind token fails before querying
 
@@ -96,10 +126,21 @@
 
 ### Requirement: CLI reference documentation
 
-#### Scenario: CLI reference documents graph hotspots bootstrap semantics
+#### Scenario: Command help documents default and explicit kind semantics
+
+- **WHEN** `specd graph hotspots --help` is inspected
+- **THEN** the help text documents `--kind` as a comma-separated list
+- **AND** it documents the default kind set used when `--kind` is omitted
+- **AND** it explains that an explicit `--kind` value fully replaces the default set
+- **AND** it documents `--include-importer-only` as the explicit widening switch
+
+#### Scenario: CLI reference documents graph hotspots bootstrap and kind semantics
 
 - **WHEN** `docs/cli/cli-reference.md` is inspected
 - **THEN** the `graph hotspots` documentation includes the command signature
 - **AND** it documents `--kind` as a comma-separated list
+- **AND** it documents the default kind set used when `--kind` is omitted
+- **AND** it explains that an explicit `--kind` value fully replaces the default set
+- **AND** it documents `--include-importer-only` as the explicit widening switch
 - **AND** it documents `--config` and `--path`
 - **AND** it states that `--path` and no-config fallback are bootstrap-only modes rather than the normal configured mode
