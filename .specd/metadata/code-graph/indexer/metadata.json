@@ -32,7 +32,7 @@
     {
       "requirement": "Two-pass extraction with in-memory index",
       "rules": [
-        "Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:\n\n- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter implements `extractNamespace` and `buildQualifiedName`, build a qualified name map for that language. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.\n- **Pass 2 (Resolve imports + CALLS, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations. Accumulate all relations.\n- **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.\n- **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.\n- **Rebuild FTS indexes** — After bulk load, call `GraphStore.rebuildFtsIndexes()` to drop and recreate full-text search indexes. This is required because LadybugDB FTS indexes are not automatically updated on insert.\n\nThis two-pass approach ensures all symbols exist in the index before import/call resolution, while avoiding any store queries during extraction."
+        "Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:\n\n- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter implements `extractNamespace` and `buildQualifiedName`, build a qualified name map for that language. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.\n- **Pass 2 (Resolve imports + CALLS, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations for code-file analysis. Accumulate all relations.\n- **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.\n- **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.\n- **Rebuild FTS indexes** — After bulk load, call `GraphStore.rebuildFtsIndexes()` to drop and recreate full-text search indexes. This is required because LadybugDB FTS indexes are not automatically updated on insert.\n\nThis two-pass approach ensures all symbols exist in the index before import/call resolution, while avoiding any store queries during extraction."
       ]
     },
     {
@@ -276,6 +276,52 @@
       ]
     },
     {
+      "requirement": "Single-pass extraction with in-memory index",
+      "name": "PHP import resolved via symbol index (no PSR-4 fallback needed)",
+      "given": [
+        "a PHP file containing use App\\Models\\User",
+        "AND App\\Models\\User is already present in the in-memory symbol index from Pass 1"
+      ],
+      "when": ["Pass 2 runs"],
+      "then": [
+        "an IMPORTS relation is emitted using the symbol index entry",
+        "AND resolveQualifiedNameToPath is not called"
+      ]
+    },
+    {
+      "requirement": "Single-pass extraction with in-memory index",
+      "name": "PHP import resolved via resolveQualifiedNameToPath when not in symbol index",
+      "given": [
+        "a PHP file containing use App\\Services\\Mailer",
+        "AND App\\Services\\Mailer is NOT present in the in-memory symbol index",
+        "AND the PHP adapter's resolveQualifiedNameToPath resolves it to {codeRoot}/src/Services/Mailer.php"
+      ],
+      "when": ["Pass 2 runs"],
+      "then": [
+        "a file-to-file IMPORTS relation is emitted from the importing file to src/Services/Mailer.php"
+      ]
+    },
+    {
+      "requirement": "Single-pass extraction with in-memory index",
+      "name": "PHP import unresolvable via both mechanisms produces no relation",
+      "given": [
+        "a PHP file containing use Vendor\\External\\Class",
+        "AND the qualified name is not in the symbol index",
+        "AND resolveQualifiedNameToPath returns undefined for that name"
+      ],
+      "when": ["Pass 2 runs"],
+      "then": ["no IMPORTS relation is created for that import and no error is thrown"]
+    },
+    {
+      "requirement": "Single-pass extraction with in-memory index",
+      "name": "DEPENDS_ON relations from dynamic loaders accumulated in Pass 2",
+      "given": [
+        "a PHP file from which extractRelations returns DEPENDS_ON relations for dynamic loader calls"
+      ],
+      "when": ["Pass 2 runs"],
+      "then": ["those DEPENDS_ON relations are accumulated and passed to bulk load"]
+    },
+    {
       "requirement": "Chunked processing",
       "name": "Files grouped by byte budget",
       "given": ["workspaces with files totaling 50 MB and a chunk budget of 20 MB"],
@@ -455,8 +501,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:a645d313b5d39b0b87a5fec41961637d23bf475f48a05c17a016caf9d9df385a",
-    "verify.md": "sha256:a338a1d4452a3e089db81cda5d4148eb465e9896089547100ae09a5f212cdbfa"
+    "spec.md": "sha256:14e3b39f23d2e4d09aef15a61194ee93c09f01eea9778db78ff495fc3b480678",
+    "verify.md": "sha256:9a17beb57aeb762ceb2063d6f5185b152c1c4b05bfb20ee96b1c0ff13a6d74b2"
   },
   "generatedBy": "core"
 }

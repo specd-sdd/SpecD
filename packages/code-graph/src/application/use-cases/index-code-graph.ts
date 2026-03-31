@@ -65,6 +65,21 @@ class SymbolIndex {
     if (!filePrefix) return all
     return all.filter((s) => s.filePath.startsWith(filePrefix))
   }
+
+  /**
+   * Finds all symbols whose file path starts with the given prefix.
+   * @param filePrefix - The file path prefix to filter results.
+   * @returns Every matching symbol across indexed files.
+   */
+  findByFilePrefix(filePrefix: string): SymbolNode[] {
+    const matches: SymbolNode[] = []
+    for (const [filePath, symbols] of this.byFile.entries()) {
+      if (filePath.startsWith(filePrefix)) {
+        matches.push(...symbols)
+      }
+    }
+    return matches
+  }
 }
 
 /**
@@ -365,6 +380,7 @@ export class IndexCodeGraph {
     }
 
     // ── Pass 2: Resolve imports + extract relations (50-80%) ──
+    const workspaceByName = new Map(options.workspaces.map((ws) => [ws.name, ws]))
     processed = 0
     for (const chunk of chunks) {
       for (const [prefixedPath, absPath] of chunk) {
@@ -382,19 +398,41 @@ export class IndexCodeGraph {
           const adapter = this.registry.getAdapterForFile(relPath)
           if (!adapter) continue
 
+          const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+          const ws = workspaceByName.get(wsName)
+
           const symbols = symbolIndex.findByFile(prefixedPath)
+          const relationSymbols = adapter.languages().includes('php')
+            ? symbolIndex.findByFilePrefix(`${wsName}:`)
+            : symbols
           const imports = adapter.extractImportedNames(prefixedPath, content)
-          const importMap = this.resolveImports(
+          const { importMap, fileImports } = this.resolveImports(
             imports,
             prefixedPath,
             adapter,
             symbolIndex,
             qualifiedNames,
             packageToWorkspace,
+            ws?.codeRoot,
+            ws?.repoRoot,
           )
-          const relations = adapter.extractRelations(prefixedPath, content, symbols, importMap)
+          const relations = adapter.extractRelations(
+            prefixedPath,
+            content,
+            relationSymbols,
+            importMap,
+          )
 
           allRelations.push(...relations)
+          for (const targetPath of fileImports) {
+            allRelations.push(
+              createRelation({
+                source: prefixedPath,
+                target: targetPath,
+                type: RelationType.Imports,
+              }),
+            )
+          }
         } catch (err) {
           errors.push({ filePath: prefixedPath, message: String(err) })
         }
@@ -555,7 +593,9 @@ export class IndexCodeGraph {
    * @param index - The in-memory symbol index.
    * @param qualifiedNames - Map of qualified names to symbol ids.
    * @param packageToWorkspace - Map of package names to workspace name prefixes.
-   * @returns A map of local import names to resolved symbol ids.
+   * @param codeRoot - Optional absolute path to the workspace code root, used for PSR-4 fallback.
+   * @param repoRoot - Optional absolute path to the repository root, used for PSR-4 fallback.
+   * @returns An importMap of local import names to resolved symbol ids, and fileImports of resolved absolute paths.
    */
   private resolveImports(
     imports: ImportDeclaration[],
@@ -564,8 +604,11 @@ export class IndexCodeGraph {
     index: SymbolIndex,
     qualifiedNames: Map<string, string>,
     packageToWorkspace: Map<string, string>,
-  ): Map<string, string> {
+    codeRoot?: string,
+    repoRoot?: string,
+  ): { importMap: Map<string, string>; fileImports: string[] } {
     const importMap = new Map<string, string>()
+    const fileImports: string[] = []
     const knownPackages = [...packageToWorkspace.keys()]
 
     for (const imp of imports) {
@@ -603,10 +646,19 @@ export class IndexCodeGraph {
             }
           }
         }
+
+        // PSR-4 fallback for namespace-based imports not resolved via symbol index
+        if (adapter.resolveQualifiedNameToPath && codeRoot) {
+          const resolvedPath = adapter.resolveQualifiedNameToPath(imp.specifier, codeRoot, repoRoot)
+          if (resolvedPath) {
+            fileImports.push(resolvedPath)
+            continue
+          }
+        }
       }
     }
 
-    return importMap
+    return { importMap, fileImports }
   }
 }
 

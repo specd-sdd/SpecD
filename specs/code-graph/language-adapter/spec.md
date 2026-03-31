@@ -14,7 +14,7 @@ Different programming languages have fundamentally different syntax for function
 - **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.
 - **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found
 - **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution
-- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS) from the file. The `importMap` maps local import names to resolved symbol IDs (e.g. `"validateUser"` → `"auth:src/auth.ts:function:validateUser:10"`), built by the indexer during Pass 2
+- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS, DEPENDS_ON) from the file. The `importMap` maps local import names to resolved symbol IDs (e.g. `"validateUser"` → `"auth:src/auth.ts:function:validateUser:10"`), built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.
 
 Both extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects.
 
@@ -132,7 +132,63 @@ Unlike extraction methods, `getPackageIdentity` performs I/O (reads a manifest f
 | -------- | ----------------------------------------- |
 | PHP      | `App\Models` + `User` → `App\Models\User` |
 
+- **`resolveQualifiedNameToPath?(qualifiedName: string, codeRoot: string, repoRoot?: string): string | undefined`** — given a fully qualified class/type name and the workspace's `codeRoot`, resolves it to an absolute file path by reading the language's autoloader configuration. This complements the in-memory qualified name map built from indexed symbols: it handles classes not present in the indexed codebase (e.g. library code excluded from indexing). Performs I/O (reads the autoloader manifest); the PSR-4 map SHOULD be cached per `codeRoot` to avoid repeated reads. Returns `undefined` if the qualified name cannot be resolved.
+
+| Language | Autoloader config                                       | Resolution rule                                                                              |
+| -------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| PHP      | `composer.json` `autoload.psr-4` + `autoload-dev.psr-4` | Longest-prefix match on namespace → directory; appends remaining segments as `ClassName.php` |
+
 When these methods are not implemented, the indexer skips the corresponding resolution step for that language. The indexer MUST NOT contain any language-specific resolution logic — all specifier parsing, path resolution, and qualified name construction is delegated to adapters.
+
+### Requirement: PHP require/include dependencies
+
+The PHP adapter MUST detect `require`, `require_once`, `include`, and `include_once` expressions and emit `IMPORTS` relations when the path argument is a resolvable string literal.
+
+Rules:
+
+- When the argument is a plain string literal (e.g. `require_once 'lib/helper.php'`), resolve the path relative to the importing file's directory and emit an `IMPORTS` relation from the current file to the resolved path.
+- When the argument is a dynamic expression (concatenation, a PHP constant such as `APPPATH` or `__DIR__ . '/...'`, a variable), the expression MUST be silently dropped — no relation is created, no error is thrown.
+- The resolved path is not validated against the filesystem at extraction time — the indexer's existing file-existence check during Pass 2 handles missing targets.
+
+This covers legacy PHP codebases (pre-namespace) and framework bootstrappers that load files via include paths rather than autoloaders (CakePHP 1.x, CodeIgniter 1.x–3.x, Zend 1.x, Drupal 7, WordPress).
+
+### Requirement: PHP dynamic loader dependencies
+
+The PHP adapter MUST detect framework-specific dynamic loader calls and emit file-level `IMPORTS` relations when the loader target can be resolved to a file path.
+
+Supported call patterns include:
+
+- CakePHP: `$this->loadModel('X')`, `loadModel('X')`, `App::uses('X', 'Y')`, `App::import('Model', 'X')`, `ClassRegistry::init('X')`
+- CakePHP additional loaders: `$this->loadController('X')`, `$this->loadComponent('X')`
+- CodeIgniter: `$this->load->model('X')`, `$this->load->library('X')`, `$this->load->helper('X')`
+- Yii/Zend/Drupal/TYPO3/Magento families as configured in adapter resolver registry
+
+Rules:
+
+- When loader arguments are string literals and resolver rules can map them to a concrete target file, emit `IMPORTS` from source file to resolved target file.
+- When arguments are non-literal or the target cannot be resolved, silently drop the relation (no fallback `DEPENDS_ON` edge for file dependencies).
+- Generic method names (e.g. `->get('x')`) MUST NOT be detected unless a resolver explicitly declares them for a framework-specific signature.
+
+### Requirement: PHP loaded-instance call extraction
+
+The PHP adapter MUST perform method-local heuristic extraction of `CALLS` from dynamically loaded instances.
+
+Rules:
+
+- Within a single method/function body, track aliases bound to resolved loaded dependencies (e.g. `$this->Article`, `$Article`, simple local assignments).
+- For member calls on those aliases (e.g. `$this->Article->save()`, `$model->find()`), emit `CALLS` only when both caller and callee symbols are resolvable.
+- Do not perform interprocedural propagation in this requirement (no cross-method alias flow).
+- Ambiguous alias targets SHOULD be dropped to avoid noisy false positives.
+
+### Requirement: PHP loader resolver extensibility
+
+Loader support in the PHP adapter MUST be registry-based and extensible.
+
+Rules:
+
+- Framework-specific loader detection/resolution MUST be implemented as resolver entries (or resolver modules) with a shared contract.
+- Adding a new loader API (e.g. `loadController`, `loadComponent`, or framework-specific factories) MUST be achievable by adding resolver definitions, without changing the core extraction flow.
+- Resolver behavior must be unit-tested per pattern to prevent regressions in existing loader coverage.
 
 ### Requirement: Tree-sitter query patterns
 
@@ -156,11 +212,16 @@ The TypeScript adapter MUST be registered by default when the registry is create
 
 - `LanguageAdapter` is an interface, not an abstract class — adapters are stateless
 - Extraction methods are synchronous and pure — they receive content, not file handles
-- `getPackageIdentity` is the only method that performs I/O — it is optional and searches for a manifest file upwards from `codeRoot`
+- `getPackageIdentity` and `resolveQualifiedNameToPath?` are the only methods that perform I/O — both are optional and search for a manifest file on disk
 - Resolution methods (`resolvePackageFromSpecifier`, `resolveRelativeImportPath`, `buildQualifiedName`) are synchronous and pure
+- `resolveQualifiedNameToPath?` SHOULD cache the parsed autoloader map per `codeRoot` to avoid repeated disk reads during a single indexing run
 - The indexer MUST NOT contain language-specific resolution logic — all of it is delegated to adapters
 - Unrecognized file extensions are silently skipped
 - Unresolvable call targets are silently dropped
+- Dynamic loader calls with non-literal arguments are silently dropped
+- Unresolvable dynamic loader targets are silently dropped for file dependency modeling
+- `require`/`include` expressions with non-literal or dynamic path arguments are silently dropped
+- Loader API support is registry-based and extensible (no hardcoded single-loader assumptions)
 - Tree-sitter query patterns are internal — not part of the public API
 - The TypeScript adapter is always registered by default
 - No dependency on `@specd/core`
