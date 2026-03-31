@@ -145,6 +145,48 @@ export abstract class GraphStore {
   abstract getImportees(filePath: string): Promise<Relation[]>
 
   /**
+   * Returns all hierarchy relations where the given type is the target of EXTENDS.
+   * @param symbolId - The type symbol identifier to find extenders for.
+   * @returns An array of EXTENDS relations targeting this symbol.
+   */
+  abstract getExtenders(symbolId: string): Promise<Relation[]>
+
+  /**
+   * Returns all hierarchy relations where the given type is the source of EXTENDS.
+   * @param symbolId - The type symbol identifier to find extended targets for.
+   * @returns An array of EXTENDS relations originating from this symbol.
+   */
+  abstract getExtendedTargets(symbolId: string): Promise<Relation[]>
+
+  /**
+   * Returns all hierarchy relations where the given contract is the target of IMPLEMENTS.
+   * @param symbolId - The contract symbol identifier to find implementors for.
+   * @returns An array of IMPLEMENTS relations targeting this symbol.
+   */
+  abstract getImplementors(symbolId: string): Promise<Relation[]>
+
+  /**
+   * Returns all hierarchy relations where the given type is the source of IMPLEMENTS.
+   * @param symbolId - The type symbol identifier to find implemented targets for.
+   * @returns An array of IMPLEMENTS relations originating from this symbol.
+   */
+  abstract getImplementedTargets(symbolId: string): Promise<Relation[]>
+
+  /**
+   * Returns all hierarchy relations where the given method is the target of OVERRIDES.
+   * @param symbolId - The method symbol identifier to find overriding methods for.
+   * @returns An array of OVERRIDES relations targeting this symbol.
+   */
+  abstract getOverriders(symbolId: string): Promise<Relation[]>
+
+  /**
+   * Returns all hierarchy relations where the given method is the source of OVERRIDES.
+   * @param symbolId - The method symbol identifier to find overridden targets for.
+   * @returns An array of OVERRIDES relations originating from this symbol.
+   */
+  abstract getOverriddenTargets(symbolId: string): Promise<Relation[]>
+
+  /**
    * Returns all dependency relations for a given spec.
    * @param specId - The spec id to find dependencies for.
    * @returns An array of dependency relations originating from this spec.

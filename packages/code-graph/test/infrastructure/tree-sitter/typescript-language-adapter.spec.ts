@@ -143,6 +143,42 @@ describe('TypeScriptLanguageAdapter', () => {
       const imports = relations.filter((r) => r.type === RelationType.Imports)
       expect(imports).toHaveLength(0)
     })
+
+    it('creates EXTENDS, IMPLEMENTS, and OVERRIDES for local declarations', () => {
+      const code = `
+        interface Persistable {
+          save(): void
+        }
+        class BaseService {
+          save(): void {}
+        }
+        class UserService extends BaseService implements Persistable {
+          save(): void {}
+        }
+      `
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
+
+      expect(relations.some((r) => r.type === RelationType.Extends)).toBe(true)
+      expect(relations.some((r) => r.type === RelationType.Implements)).toBe(true)
+
+      const overrides = relations.filter((r) => r.type === RelationType.Overrides)
+      expect(overrides).toHaveLength(1)
+    })
+
+    it('creates EXTENDS for imported base classes', () => {
+      const code = `import { BaseService } from './base.js'; class UserService extends BaseService {}`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const relations = adapter.extractRelations(
+        'main.ts',
+        code,
+        symbols,
+        new Map([['BaseService', 'src/base.ts:class:BaseService:1:0']]),
+      )
+
+      const extendsRelation = relations.find((relation) => relation.type === RelationType.Extends)
+      expect(extendsRelation?.target).toBe('src/base.ts:class:BaseService:1:0')
+    })
   })
 
   describe('extractImportedNames', () => {

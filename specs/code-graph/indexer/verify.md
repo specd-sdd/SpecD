@@ -118,46 +118,18 @@
 - **THEN** `FileNode.path` is `core:src/index.ts`
 - **AND** `FileNode.workspace` is `core`
 
-### Requirement: Single-pass extraction with in-memory index
+### Requirement: Two-pass extraction with in-memory index
 
-#### Scenario: Pass 2 can resolve cross-file calls
+#### Scenario: Symbols from all workspaces available before relation resolution
 
-- **GIVEN** file A defines `createUser` and file B calls `createUser` via import
-- **WHEN** indexing runs with two passes
-- **THEN** Pass 1 registers `createUser` in the in-memory `SymbolIndex`
-- **AND** Pass 2 resolves the call from file B to the `createUser` symbol and creates a `CALLS` relation
-
-#### Scenario: Pass 1 completes for ALL workspaces before Pass 2
-
-- **GIVEN** workspaces `core` and `cli` with files where `cli` imports from `core`
-- **WHEN** indexing runs
-- **THEN** all files from both workspaces have their symbols registered in the `SymbolIndex` (Pass 1) before any `CALLS`/`IMPORTS` resolution (Pass 2) begins
-
-#### Scenario: Cross-workspace import resolution in Pass 2
-
-- **GIVEN** workspace `cli` has a file importing `createKernel` from `@specd/core`
-- **AND** workspace `core` has a file defining `createKernel`
-- **AND** the monorepo map resolves `@specd/core` to the `core` workspace prefix
-- **WHEN** Pass 2 resolves imports
-- **THEN** the import resolves to the `createKernel` symbol in workspace `core`
-
-#### Scenario: Bulk load writes all data at once
-
-- **GIVEN** two workspaces with 10 files total
-- **WHEN** both passes complete
-- **THEN** `GraphStore.bulkLoad()` is called once with all accumulated files, symbols, and relations from both workspaces
-
-#### Scenario: PHP import resolved via symbol index (no PSR-4 fallback needed)
-
-- **GIVEN** a PHP file containing `use App\Models\User`
-- **AND** `App\Models\User` is already present in the in-memory symbol index from Pass 1
+- **GIVEN** two workspaces contain symbols that import/call each other
 - **WHEN** Pass 2 runs
-- **THEN** an `IMPORTS` relation is emitted using the symbol index entry
-- **AND** `resolveQualifiedNameToPath` is not called
+- **THEN** cross-workspace relations can be resolved from the in-memory `SymbolIndex`
+- **AND** no store query is needed during extraction
 
-#### Scenario: PHP import resolved via resolveQualifiedNameToPath when not in symbol index
+#### Scenario: PHP unresolved qualified name falls back to path resolution
 
-- **GIVEN** a PHP file containing `use App\Services\Mailer`
+- **GIVEN** a PHP file importing `App\Services\Mailer`
 - **AND** `App\Services\Mailer` is NOT present in the in-memory symbol index
 - **AND** the PHP adapter's `resolveQualifiedNameToPath` resolves it to `{codeRoot}/src/Services/Mailer.php`
 - **WHEN** Pass 2 runs
@@ -176,6 +148,13 @@
 - **GIVEN** a PHP file from which `extractRelations` returns `DEPENDS_ON` relations for dynamic loader calls
 - **WHEN** Pass 2 runs
 - **THEN** those `DEPENDS_ON` relations are accumulated and passed to bulk load
+
+#### Scenario: Hierarchy relations are accumulated in Pass 2
+
+- **GIVEN** an adapter returns `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for a file
+- **WHEN** Pass 2 runs
+- **THEN** those hierarchy relations are accumulated with the other extracted relations
+- **AND** they are included in the single bulk load
 
 ### Requirement: Chunked processing
 

@@ -122,6 +122,24 @@
 - **WHEN** `findSymbols({ comment: 'validates' })` is called
 - **THEN** only the symbol with "validates user input" in its comment is returned
 
+#### Scenario: getExtenders returns incoming EXTENDS relations
+
+- **GIVEN** type B and type C both extend type A
+- **WHEN** `getExtenders(A.id)` is called
+- **THEN** `EXTENDS` relations are returned with sources B and C
+
+#### Scenario: getImplementors returns incoming IMPLEMENTS relations
+
+- **GIVEN** types B and C both implement contract A
+- **WHEN** `getImplementors(A.id)` is called
+- **THEN** `IMPLEMENTS` relations are returned with sources B and C
+
+#### Scenario: getOverriders returns incoming OVERRIDES relations
+
+- **GIVEN** methods B and C both override method A
+- **WHEN** `getOverriders(A.id)` is called
+- **THEN** `OVERRIDES` relations are returned with sources B and C
+
 ### Requirement: Graph statistics
 
 #### Scenario: Statistics include all expected fields
@@ -141,6 +159,12 @@
 - **WHEN** `getStatistics()` is called
 - **THEN** `lastIndexedRef` SHALL be `"abc1234"`
 
+#### Scenario: Statistics include hierarchy relation counts
+
+- **GIVEN** the store contains persisted `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations
+- **WHEN** `getStatistics()` is called
+- **THEN** `relationCounts` includes counts for all three hierarchy relation types
+
 ### Requirement: LadybugDB adapter
 
 #### Scenario: Database created on first open
@@ -153,6 +177,12 @@
 
 - **WHEN** `findSymbols({ name: "'; DROP TABLE symbols; --" })` is called
 - **THEN** the query executes safely and returns no results (no injection)
+
+#### Scenario: LadybugDB adapter persists hierarchy relations
+
+- **GIVEN** hierarchy relations are passed to the store
+- **WHEN** they are bulk loaded or queried back
+- **THEN** `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` behave like first-class persisted edge types
 
 ### Requirement: Bulk operations
 

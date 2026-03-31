@@ -4,18 +4,21 @@
 
 ### Requirement: LanguageAdapter interface
 
-#### Scenario: Extraction is pure
+#### Scenario: Adapter declares supported language identifiers
 
-- **GIVEN** a `LanguageAdapter` instance
-- **WHEN** `extractSymbols()` is called twice with the same `filePath` and `content`
-- **THEN** both calls return identical results
+- **WHEN** `languages()` is called on the TypeScript adapter
+- **THEN** it returns `['typescript', 'tsx', 'javascript', 'jsx']`
 
-#### Scenario: extractRelations emits concrete file/symbol relations when resolvable
+#### Scenario: Adapter declares extension map
 
-- **GIVEN** a PHP file containing resolvable dependencies
+- **WHEN** `extensions()` is called on the TypeScript adapter
+- **THEN** it returns mappings for `.ts`, `.tsx`, `.js`, and `.jsx`
+
+#### Scenario: extractRelations may emit hierarchy relations
+
+- **GIVEN** a file containing resolvable inheritance or implementation declarations
 - **WHEN** `extractRelations()` is called
-- **THEN** concrete `IMPORTS` and/or `CALLS` relations are returned
-- **AND** no error is thrown for dropped unresolved dynamic expressions
+- **THEN** the result may include `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations alongside the existing relation types
 
 ### Requirement: Language detection
 
@@ -143,6 +146,39 @@
 - **GIVEN** a call expression `init()` at module top level (not inside any function or class)
 - **WHEN** `extractRelations()` is called
 - **THEN** no `CALLS` relation is created for that call
+
+### Requirement: Hierarchy extraction
+
+#### Scenario: Class inheritance emits EXTENDS
+
+- **GIVEN** a supported language file declaring a type that inherits from a resolvable base type
+- **WHEN** `extractRelations()` is called
+- **THEN** an `EXTENDS` relation is emitted
+
+#### Scenario: Interface or contract fulfillment emits IMPLEMENTS
+
+- **GIVEN** a supported language file declaring a type that fulfills a resolvable contract-like type
+- **WHEN** `extractRelations()` is called
+- **THEN** an `IMPLEMENTS` relation is emitted
+
+#### Scenario: Overriding method emits OVERRIDES
+
+- **GIVEN** a supported language file declaring a method that can be matched deterministically to an inherited or contract method
+- **WHEN** `extractRelations()` is called
+- **THEN** an `OVERRIDES` relation is emitted
+
+#### Scenario: Normalizable inheritance-adjacent construct maps to the base model
+
+- **GIVEN** a supported language construct that is not classical inheritance but preserves useful semantics when normalized
+- **WHEN** `extractRelations()` is called
+- **THEN** the emitted relation uses one of `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES`
+
+#### Scenario: Unresolvable hierarchy target is silently dropped
+
+- **GIVEN** a hierarchy declaration whose target cannot be resolved deterministically
+- **WHEN** `extractRelations()` is called
+- **THEN** no hierarchy relation is emitted
+- **AND** no error is thrown
 
 ### Requirement: Adapter registry
 

@@ -80,6 +80,21 @@ class SymbolIndex {
     }
     return matches
   }
+
+  /**
+   * Returns every file-to-symbol slice currently stored in the index.
+   * @returns Array of file path and symbol list pairs.
+   */
+  entries(): Array<[string, SymbolNode[]]> {
+    return [...this.byFile.entries()]
+  }
+}
+
+/**
+ * Groups method symbols by their inferred declaring type for override derivation.
+ */
+interface MethodOwnershipIndex {
+  readonly methodsByOwnerId: ReadonlyMap<string, ReadonlyMap<string, readonly string[]>>
 }
 
 /**
@@ -313,6 +328,7 @@ export class IndexCodeGraph {
     const allFiles: FileNode[] = []
     const allSymbols: SymbolNode[] = []
     const allRelations: Relation[] = []
+    const fileLanguages = new Map(existingFiles.map((file) => [file.path, file.language]))
 
     let processed = 0
     for (const chunk of chunks) {
@@ -356,6 +372,7 @@ export class IndexCodeGraph {
               workspace: wsName,
             }),
           )
+          fileLanguages.set(prefixedPath, language)
           allSymbols.push(...symbols)
           filesIndexed++
 
@@ -378,6 +395,8 @@ export class IndexCodeGraph {
         symbolIndex.addFile(prefixedPath, existing)
       }
     }
+
+    const ownershipIndex = this.buildMethodOwnershipIndex(symbolIndex, fileLanguages)
 
     // ── Pass 2: Resolve imports + extract relations (50-80%) ──
     const workspaceByName = new Map(options.workspaces.map((ws) => [ws.name, ws]))
@@ -551,6 +570,15 @@ export class IndexCodeGraph {
       })
     }
 
+    const crossFileOverrides = await this.deriveCrossFileOverrideRelations(
+      allSymbols,
+      ownershipIndex,
+      allRelations,
+    )
+    if (crossFileOverrides.length > 0) {
+      await this.store.addRelations(crossFileOverrides)
+    }
+
     // Rebuild FTS indexes after data changes
     progress(96, 'Rebuilding search indexes')
     await this.store.rebuildFtsIndexes()
@@ -659,6 +687,193 @@ export class IndexCodeGraph {
     }
 
     return { importMap, fileImports }
+  }
+
+  /**
+   * Builds a lightweight method-to-owner index from the extracted symbols.
+   * @param index - The in-memory symbol index.
+   * @param fileLanguages - Language id for each indexed file path.
+   * @returns Owner-to-method mapping for languages with class-scoped methods.
+   */
+  private buildMethodOwnershipIndex(
+    index: SymbolIndex,
+    fileLanguages: ReadonlyMap<string, string>,
+  ): MethodOwnershipIndex {
+    const methodsByOwnerId = new Map<string, Map<string, string[]>>()
+    const supportedLanguages = new Set(['typescript', 'tsx', 'javascript', 'jsx', 'python', 'php'])
+
+    for (const [filePath, fileSymbols] of index.entries()) {
+      const language = fileLanguages.get(filePath)
+      if (!language || !supportedLanguages.has(language)) continue
+
+      const sortedSymbols = [...fileSymbols].sort((left, right) => {
+        if (left.line !== right.line) return left.line - right.line
+        return left.column - right.column
+      })
+
+      let currentOwnerId: string | undefined
+      for (const symbol of sortedSymbols) {
+        if (symbol.kind === 'class' || symbol.kind === 'interface') {
+          currentOwnerId = symbol.id
+          continue
+        }
+
+        if (symbol.kind !== 'method' || !currentOwnerId) continue
+
+        const methodsByName = methodsByOwnerId.get(currentOwnerId) ?? new Map<string, string[]>()
+        const methodIds = methodsByName.get(symbol.name) ?? []
+        methodIds.push(symbol.id)
+        methodsByName.set(symbol.name, methodIds)
+        methodsByOwnerId.set(currentOwnerId, methodsByName)
+      }
+    }
+
+    return { methodsByOwnerId }
+  }
+
+  /**
+   * Derives additive cross-file `OVERRIDES` relations using persisted hierarchy edges.
+   * @param changedSymbols - Symbols from files reprocessed in this indexing run.
+   * @param ownershipIndex - Method ownership information reconstructed from symbols.
+   * @param existingRelations - Relations already emitted by adapters in this run.
+   * @returns Additional override relations to persist.
+   */
+  private async deriveCrossFileOverrideRelations(
+    changedSymbols: readonly SymbolNode[],
+    ownershipIndex: MethodOwnershipIndex,
+    existingRelations: readonly Relation[],
+  ): Promise<Relation[]> {
+    const changedTypeIds = new Set(
+      changedSymbols
+        .filter((symbol) => symbol.kind === 'class' || symbol.kind === 'interface')
+        .map((symbol) => symbol.id),
+    )
+    if (changedTypeIds.size === 0) return []
+
+    const seen = new Set(
+      existingRelations
+        .filter((relation) => relation.type === RelationType.Overrides)
+        .map((relation) => `${relation.source}:${relation.type}:${relation.target}`),
+    )
+    const derived: Relation[] = []
+
+    for (const typeId of changedTypeIds) {
+      const relatedTypeIds = new Set<string>([
+        ...(await this.collectHierarchyTargets(typeId)),
+        ...(await this.collectHierarchyDependents(typeId)),
+      ])
+
+      for (const relatedTypeId of relatedTypeIds) {
+        this.addCrossFileOverridePairs(typeId, relatedTypeId, ownershipIndex, seen, derived)
+        this.addCrossFileOverridePairs(relatedTypeId, typeId, ownershipIndex, seen, derived)
+      }
+    }
+
+    return derived
+  }
+
+  /**
+   * Collects transitive hierarchy targets for a given type symbol.
+   * @param typeId - Type symbol id.
+   * @returns Reachable ancestor and contract type ids.
+   */
+  private async collectHierarchyTargets(typeId: string): Promise<Set<string>> {
+    const targets = new Set<string>()
+    const queue = [typeId]
+    const visited = new Set(queue)
+
+    while (queue.length > 0) {
+      const current = queue.shift()
+      if (!current) continue
+
+      const relations = [
+        ...(await this.store.getExtendedTargets(current)),
+        ...(await this.store.getImplementedTargets(current)),
+      ]
+
+      for (const relation of relations) {
+        if (targets.has(relation.target)) continue
+        targets.add(relation.target)
+        if (!visited.has(relation.target)) {
+          visited.add(relation.target)
+          queue.push(relation.target)
+        }
+      }
+    }
+
+    return targets
+  }
+
+  /**
+   * Collects transitive hierarchy dependents for a given type symbol.
+   * @param typeId - Type symbol id.
+   * @returns Reachable child and implementing type ids.
+   */
+  private async collectHierarchyDependents(typeId: string): Promise<Set<string>> {
+    const dependents = new Set<string>()
+    const queue = [typeId]
+    const visited = new Set(queue)
+
+    while (queue.length > 0) {
+      const current = queue.shift()
+      if (!current) continue
+
+      const relations = [
+        ...(await this.store.getExtenders(current)),
+        ...(await this.store.getImplementors(current)),
+      ]
+
+      for (const relation of relations) {
+        if (dependents.has(relation.source)) continue
+        dependents.add(relation.source)
+        if (!visited.has(relation.source)) {
+          visited.add(relation.source)
+          queue.push(relation.source)
+        }
+      }
+    }
+
+    return dependents
+  }
+
+  /**
+   * Adds matching method-name override pairs between two related owner types.
+   * @param sourceOwnerId - Candidate overriding type symbol id.
+   * @param targetOwnerId - Candidate overridden type symbol id.
+   * @param ownershipIndex - Method ownership information.
+   * @param seen - Deduplication set for override edges.
+   * @param derived - Accumulator for new relations.
+   */
+  private addCrossFileOverridePairs(
+    sourceOwnerId: string,
+    targetOwnerId: string,
+    ownershipIndex: MethodOwnershipIndex,
+    seen: Set<string>,
+    derived: Relation[],
+  ): void {
+    const sourceMethods = ownershipIndex.methodsByOwnerId.get(sourceOwnerId)
+    const targetMethods = ownershipIndex.methodsByOwnerId.get(targetOwnerId)
+    if (!sourceMethods || !targetMethods) return
+
+    for (const [methodName, sourceMethodIds] of sourceMethods.entries()) {
+      const targetMethodIds = targetMethods.get(methodName)
+      if (!targetMethodIds) continue
+
+      for (const sourceMethodId of sourceMethodIds) {
+        for (const targetMethodId of targetMethodIds) {
+          const key = `${sourceMethodId}:${RelationType.Overrides}:${targetMethodId}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          derived.push(
+            createRelation({
+              source: sourceMethodId,
+              target: targetMethodId,
+              type: RelationType.Overrides,
+            }),
+          )
+        }
+      }
+    }
   }
 }
 

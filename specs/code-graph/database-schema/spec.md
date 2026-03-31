@@ -63,6 +63,9 @@ The database SHALL define the following relationship tables:
 | EXPORTS      | File   | Symbol | Indexer Pass 1      |
 | DEPENDS_ON   | Spec   | Spec   | Spec indexing phase |
 | COVERS       | Spec   | File   | Deferred to v2+     |
+| EXTENDS      | Symbol | Symbol | Indexer Pass 2      |
+| IMPLEMENTS   | Symbol | Symbol | Indexer Pass 2      |
+| OVERRIDES    | Symbol | Symbol | Indexer Pass 2      |
 
 Relationships have no properties — they are pure edges.
 
@@ -82,7 +85,7 @@ FTS indexes are created once during `open()` after schema DDL. If the index alre
 
 ### Requirement: Schema versioning
 
-The schema SHALL be versioned with an integer `SCHEMA_VERSION` constant. The current version is **5**. When the database is opened:
+The schema SHALL be versioned with an integer `SCHEMA_VERSION` constant. The current version is **6**. When the database is opened:
 
 1. Execute the DDL statements (all use `IF NOT EXISTS` — safe to re-run)
 2. Create FTS indexes if they do not exist
@@ -103,9 +106,10 @@ The database file SHALL be stored at `{storagePath}/.specd/code-graph.lbug`. The
 - FTS indexes are rebuilt on `--force` re-index (dropped with the database)
 - Relationship tables have no properties — metadata is not persisted on edges
 - The `COVERS` relationship table exists in the schema but is not populated until v2+
+- `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are first-class persisted relationship tables in schema version 6
 
 ## Spec Dependencies
 
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — node types and field definitions
+- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — node types, field definitions, hierarchy relation types
 - [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — `GraphStore` port and `LadybugGraphStore` adapter
 - [`specs/code-graph/workspace-integration/spec.md`](../workspace-integration/spec.md) — workspace-prefixed paths and specId format

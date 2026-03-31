@@ -5,6 +5,7 @@ import { type RiskLevel } from './risk-level.js'
 
 export const DEFAULT_HOTSPOT_KINDS: readonly SymbolKind[] = [
   SymbolKindEnum.Class,
+  SymbolKindEnum.Interface,
   SymbolKindEnum.Method,
   SymbolKindEnum.Function,
 ] as const

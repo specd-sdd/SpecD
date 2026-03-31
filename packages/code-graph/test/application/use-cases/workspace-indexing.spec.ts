@@ -356,6 +356,64 @@ describe('Workspace indexing', () => {
     expect(impact.affectedFiles).toContain('cli:src/main.ts')
   })
 
+  it('persists hierarchy relations emitted during Pass 2 indexing', async () => {
+    const coreRoot = createWorkspace(tempDir, 'core', {
+      'src/base.ts': [
+        'export interface Persistable {',
+        '  save(): void',
+        '}',
+        '',
+        'export class BaseService {',
+        '  save(): void {}',
+        '}',
+      ].join('\n'),
+      'src/user.ts': [
+        "import { Persistable, BaseService } from './base.js'",
+        '',
+        'export class UserService extends BaseService implements Persistable {',
+        '  save(): void {}',
+        '}',
+      ].join('\n'),
+    })
+
+    provider = createCodeGraphProvider({ storagePath: tempDir })
+    await provider.open()
+
+    const result = await provider.index({
+      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
+      projectRoot: tempDir,
+    })
+
+    expect(result.errors).toHaveLength(0)
+
+    const store = (provider as unknown as { store: GraphStore }).store
+    const baseClass = (await provider.findSymbols({ name: 'BaseService' })).find(
+      (symbol) => symbol.filePath === 'core:src/base.ts',
+    )
+    const contract = (await provider.findSymbols({ name: 'Persistable' })).find(
+      (symbol) => symbol.filePath === 'core:src/base.ts',
+    )
+    const baseMethod = (await provider.findSymbols({ name: 'save' })).find(
+      (symbol) => symbol.filePath === 'core:src/base.ts',
+    )
+
+    expect(baseClass).toBeDefined()
+    expect(contract).toBeDefined()
+    expect(baseMethod).toBeDefined()
+
+    const extenders = await store.getExtenders(baseClass!.id)
+    const implementors = await store.getImplementors(contract!.id)
+    const overriders = await store.getOverriders(baseMethod!.id)
+    const stats = await provider.getStatistics()
+
+    expect(extenders).toHaveLength(1)
+    expect(implementors).toHaveLength(1)
+    expect(overriders).toHaveLength(1)
+    expect(stats.relationCounts[RelationType.Extends]).toBe(1)
+    expect(stats.relationCounts[RelationType.Implements]).toBe(1)
+    expect(stats.relationCounts[RelationType.Overrides]).toBe(1)
+  })
+
   it('PHP workspace: namespace import emits IMPORTS relation to the model file', async () => {
     const phpRoot = createWorkspace(tempDir, 'php-app', {
       'composer.json': JSON.stringify({
@@ -388,6 +446,48 @@ describe('Workspace indexing', () => {
     const expectedTarget = 'php-app:src/Models/User.php'
     const rel = importees.find((r) => r.target === expectedTarget)
     expect(rel).toBeDefined()
+  })
+
+  it('recomputes cross-file overrides when only the base file changes', async () => {
+    const coreRoot = createWorkspace(tempDir, 'core', {
+      'src/base.ts': ['export class BaseService {', '  save(): void {}', '}'].join('\n'),
+      'src/user.ts': [
+        "import { BaseService } from './base.js'",
+        '',
+        'export class UserService extends BaseService {',
+        '  save(): void {}',
+        '}',
+      ].join('\n'),
+    })
+
+    provider = createCodeGraphProvider({ storagePath: tempDir })
+    await provider.open()
+
+    const options = {
+      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
+      projectRoot: tempDir,
+    }
+
+    await provider.index(options)
+
+    writeFileSync(
+      join(coreRoot, 'src/base.ts'),
+      ['export class BaseService {', '', '  save(): void {}', '}'].join('\n'),
+    )
+
+    const second = await provider.index(options)
+    expect(second.errors).toHaveLength(0)
+
+    const store = (provider as unknown as { store: GraphStore }).store
+    const baseMethod = (await provider.findSymbols({ name: 'save' })).find(
+      (symbol) => symbol.filePath === 'core:src/base.ts',
+    )
+
+    expect(baseMethod).toBeDefined()
+
+    const overriders = await store.getOverriders(baseMethod!.id)
+    expect(overriders).toHaveLength(1)
+    expect(overriders[0]?.source).toContain('core:src/user.ts:method:save:')
   })
 
   it('PHP workspace: loaded model member call emits CALLS across files', async () => {

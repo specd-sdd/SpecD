@@ -24,6 +24,12 @@
 - **THEN** symbol A is eligible for ranking based on its symbol-level evidence
 - **AND** symbol B is not included solely because of file importer count
 
+#### Scenario: Hierarchy centrality contributes to hotspot ranking
+
+- **GIVEN** a base type or contract has persisted `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES` dependents
+- **WHEN** hotspots are computed
+- **THEN** that hierarchy evidence contributes to the symbol's score
+
 ### Requirement: Risk level
 
 #### Scenario: Default filters exclude LOW risk
@@ -36,7 +42,7 @@
 #### Scenario: Default kind set focuses the hotspot view
 
 - **WHEN** `computeHotspots` is called with no explicit kind filter
-- **THEN** only `class`, `method`, and `function` symbols are eligible for the default hotspot view
+- **THEN** only `class`, `method`, `function`, and `interface` symbols are eligible for the default hotspot view
 
 #### Scenario: Default view excludes importer-only symbols
 

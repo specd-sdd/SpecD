@@ -65,16 +65,21 @@ No other values are permitted. Language adapters MUST map language-specific cons
 
 Relations between nodes SHALL be represented as typed edges. Each relation has a `source`, `target`, and `type`. The following relation types are defined:
 
-| Type         | Source | Target | Meaning                                | Phase |
-| ------------ | ------ | ------ | -------------------------------------- | ----- |
-| `IMPORTS`    | File   | File   | Source file imports from target file   | v1.5  |
-| `DEFINES`    | File   | Symbol | File contains the symbol's declaration | v2    |
-| `CALLS`      | Symbol | Symbol | Source symbol invokes target symbol    | v2    |
-| `EXPORTS`    | File   | Symbol | File exports the symbol as public API  | v2    |
-| `DEPENDS_ON` | Spec   | Spec   | Spec depends on target spec            | v1.5  |
-| `COVERS`     | Spec   | File   | Spec covers the target file            | v2+   |
+| Type         | Source | Target | Meaning                                                   | Phase |
+| ------------ | ------ | ------ | --------------------------------------------------------- | ----- |
+| `IMPORTS`    | File   | File   | Source file imports from target file                      | v1.5  |
+| `DEFINES`    | File   | Symbol | File contains the symbol's declaration                    | v2    |
+| `CALLS`      | Symbol | Symbol | Source symbol invokes target symbol                       | v2    |
+| `EXPORTS`    | File   | Symbol | File exports the symbol as public API                     | v2    |
+| `DEPENDS_ON` | Spec   | Spec   | Spec depends on target spec                               | v1.5  |
+| `COVERS`     | Spec   | File   | Spec covers the target file                               | v2+   |
+| `EXTENDS`    | Symbol | Symbol | Source type extends or inherits from target type          | v2    |
+| `IMPLEMENTS` | Symbol | Symbol | Source type fulfills or implements target contract/type   | v2    |
+| `OVERRIDES`  | Symbol | Symbol | Source method overrides or concretely fulfills target one | v2    |
 
-Relations are directional. `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`, and `DEPENDS_ON` are populated by the indexer. `COVERS` is populated by spec-to-code mapping (deferred to v2+).
+Relations are directional. `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`, `DEPENDS_ON`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are populated by the indexer. `COVERS` is populated by spec-to-code mapping (deferred to v2+).
+
+The hierarchy model for this iteration is intentionally limited to `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. Language-specific constructs MAY be normalized into one of those relations when doing so preserves useful impact, hotspot, and code-understanding semantics. Constructs that cannot be normalized without materially distorting their meaning are omitted rather than introducing new base relation types in this iteration.
 
 ### Requirement: Relation value object
 
@@ -86,6 +91,18 @@ A `Relation` SHALL be a value object containing:
 - **`metadata`** (`Record<string, unknown> | undefined`) — optional adapter-specific metadata (e.g. import specifier, call site line number).
 
 Two `Relation` values are equal if `source`, `target`, and `type` all match.
+
+### Requirement: Hierarchy relation semantics
+
+Hierarchy relations SHALL use the following normalization rules:
+
+- `EXTENDS` connects one type symbol to another type symbol when the source inherits behavior or structure from the target.
+- `IMPLEMENTS` connects one type symbol to another contract-bearing symbol when the source fulfills the target's required shape or behavior.
+- `OVERRIDES` connects one method symbol to another method symbol when the source method replaces, concretizes, or fulfills the target method through inheritance or contract implementation.
+
+`OVERRIDES` is a first-class persisted relation in this model; it is not deferred to derived traversal logic.
+
+Adapters MAY normalize inheritance-adjacent constructs from supported languages into these relations when the normalized edge remains useful for code understanding, impact discovery, hotspot analysis, and affected-spec discovery.
 
 ### Requirement: Import declaration
 
@@ -121,6 +138,7 @@ Specific error subclasses include:
 - `embedding` on `FileNode` is deferred to v2+ — adapters MUST NOT populate it until the embedding pipeline is implemented
 - `COVERS` relations are deferred to v2+ — the type exists in the model but is not populated by any v1.5/v2 process
 - `DEPENDS_ON` relations are populated by the indexer in v1.5, reading from `.specd-metadata.yaml` or `spec.md`
+- `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are first-class persisted relations in v2 and are part of the base graph vocabulary for supported languages
 
 ## Examples
 

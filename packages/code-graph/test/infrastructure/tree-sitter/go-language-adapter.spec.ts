@@ -74,6 +74,41 @@ describe('GoLanguageAdapter', () => {
       const defines = relations.filter((r) => r.type === RelationType.Defines)
       expect(defines).toHaveLength(symbols.length)
     })
+
+    it('creates EXTENDS for embedded local interfaces', () => {
+      const code = `
+package main
+
+type Reader interface {
+    Read()
+}
+
+type ReadWriter interface {
+    Reader
+    Write()
+}
+      `
+      const symbols = adapter.extractSymbols('main.go', code)
+      const relations = adapter.extractRelations('main.go', code, symbols, new Map())
+      expect(relations.some((relation) => relation.type === RelationType.Extends)).toBe(true)
+    })
+
+    it('creates IMPLEMENTS when a struct satisfies a local interface by method set', () => {
+      const code = `
+package main
+
+type Reader interface {
+    Read()
+}
+
+type FileReader struct {}
+
+func (f *FileReader) Read() {}
+      `
+      const symbols = adapter.extractSymbols('main.go', code)
+      const relations = adapter.extractRelations('main.go', code, symbols, new Map())
+      expect(relations.some((relation) => relation.type === RelationType.Implements)).toBe(true)
+    })
   })
 
   describe('extractImportedNames', () => {

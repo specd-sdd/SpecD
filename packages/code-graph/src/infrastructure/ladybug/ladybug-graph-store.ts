@@ -570,17 +570,7 @@ export class LadybugGraphStore extends GraphStore {
    * @returns An array of caller relations.
    */
   async getCallers(symbolId: string): Promise<Relation[]> {
-    this.ensureOpen()
-    const rows = await exec(
-      this.conn!,
-      `MATCH (caller:Symbol)-[:CALLS]->(s:Symbol {id: '${this.escape(symbolId)}'}) RETURN caller.id AS source`,
-    )
-    return rows.map((r) => ({
-      source: r['source'] as string,
-      target: symbolId,
-      type: RT.Calls as RelationType,
-      metadata: undefined,
-    }))
+    return this.getIncomingSymbolRelations(RT.Calls, symbolId)
   }
 
   /**
@@ -589,17 +579,7 @@ export class LadybugGraphStore extends GraphStore {
    * @returns An array of callee relations.
    */
   async getCallees(symbolId: string): Promise<Relation[]> {
-    this.ensureOpen()
-    const rows = await exec(
-      this.conn!,
-      `MATCH (s:Symbol {id: '${this.escape(symbolId)}'})-[:CALLS]->(callee:Symbol) RETURN callee.id AS target`,
-    )
-    return rows.map((r) => ({
-      source: symbolId,
-      target: r['target'] as string,
-      type: RT.Calls as RelationType,
-      metadata: undefined,
-    }))
+    return this.getOutgoingSymbolRelations(RT.Calls, symbolId)
   }
 
   /**
@@ -638,6 +618,60 @@ export class LadybugGraphStore extends GraphStore {
       type: RT.Imports as RelationType,
       metadata: undefined,
     }))
+  }
+
+  /**
+   * Returns all incoming EXTENDS relations targeting the given type symbol.
+   * @param symbolId - The type symbol identifier.
+   * @returns Incoming EXTENDS relations.
+   */
+  async getExtenders(symbolId: string): Promise<Relation[]> {
+    return this.getIncomingSymbolRelations(RT.Extends, symbolId)
+  }
+
+  /**
+   * Returns all outgoing EXTENDS relations originating from the given type symbol.
+   * @param symbolId - The type symbol identifier.
+   * @returns Outgoing EXTENDS relations.
+   */
+  async getExtendedTargets(symbolId: string): Promise<Relation[]> {
+    return this.getOutgoingSymbolRelations(RT.Extends, symbolId)
+  }
+
+  /**
+   * Returns all incoming IMPLEMENTS relations targeting the given contract symbol.
+   * @param symbolId - The contract symbol identifier.
+   * @returns Incoming IMPLEMENTS relations.
+   */
+  async getImplementors(symbolId: string): Promise<Relation[]> {
+    return this.getIncomingSymbolRelations(RT.Implements, symbolId)
+  }
+
+  /**
+   * Returns all outgoing IMPLEMENTS relations originating from the given type symbol.
+   * @param symbolId - The type symbol identifier.
+   * @returns Outgoing IMPLEMENTS relations.
+   */
+  async getImplementedTargets(symbolId: string): Promise<Relation[]> {
+    return this.getOutgoingSymbolRelations(RT.Implements, symbolId)
+  }
+
+  /**
+   * Returns all incoming OVERRIDES relations targeting the given method symbol.
+   * @param symbolId - The method symbol identifier.
+   * @returns Incoming OVERRIDES relations.
+   */
+  async getOverriders(symbolId: string): Promise<Relation[]> {
+    return this.getIncomingSymbolRelations(RT.Overrides, symbolId)
+  }
+
+  /**
+   * Returns all outgoing OVERRIDES relations originating from the given method symbol.
+   * @param symbolId - The method symbol identifier.
+   * @returns Outgoing OVERRIDES relations.
+   */
+  async getOverriddenTargets(symbolId: string): Promise<Relation[]> {
+    return this.getOutgoingSymbolRelations(RT.Overrides, symbolId)
   }
 
   /**
@@ -990,7 +1024,17 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const conn = this.conn!
 
-    const relTypes = ['IMPORTS', 'DEFINES', 'CALLS', 'EXPORTS', 'DEPENDS_ON', 'COVERS']
+    const relTypes = [
+      'IMPORTS',
+      'DEFINES',
+      'CALLS',
+      'EXPORTS',
+      'DEPENDS_ON',
+      'COVERS',
+      'EXTENDS',
+      'IMPLEMENTS',
+      'OVERRIDES',
+    ]
     for (const type of relTypes) {
       try {
         await conn.query(`MATCH ()-[r:${type}]->() DELETE r`)
@@ -1044,7 +1088,68 @@ export class LadybugGraphStore extends GraphStore {
           `MATCH (a:Spec {specId: '${this.escape(rel.source)}'}), (b:File {path: '${this.escape(rel.target)}'}) CREATE (a)-[:COVERS]->(b)`,
         )
         break
+      case RT.Extends:
+        await conn.query(
+          `MATCH (a:Symbol {id: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:EXTENDS]->(b)`,
+        )
+        break
+      case RT.Implements:
+        await conn.query(
+          `MATCH (a:Symbol {id: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:IMPLEMENTS]->(b)`,
+        )
+        break
+      case RT.Overrides:
+        await conn.query(
+          `MATCH (a:Symbol {id: '${this.escape(rel.source)}'}), (b:Symbol {id: '${this.escape(rel.target)}'}) CREATE (a)-[:OVERRIDES]->(b)`,
+        )
+        break
     }
+  }
+
+  /**
+   * Returns incoming symbol-to-symbol relations for the requested relationship type.
+   * @param relationType - The relationship type to query.
+   * @param symbolId - The target symbol identifier.
+   * @returns An array of incoming relations of the requested type.
+   */
+  private async getIncomingSymbolRelations(
+    relationType: RelationType,
+    symbolId: string,
+  ): Promise<Relation[]> {
+    this.ensureOpen()
+    const rows = await exec(
+      this.conn!,
+      `MATCH (source:Symbol)-[r:${relationType}]->(target:Symbol {id: '${this.escape(symbolId)}'}) RETURN source.id AS source`,
+    )
+    return rows.map((row) => ({
+      source: row['source'] as string,
+      target: symbolId,
+      type: relationType,
+      metadata: undefined,
+    }))
+  }
+
+  /**
+   * Returns outgoing symbol-to-symbol relations for the requested relationship type.
+   * @param relationType - The relationship type to query.
+   * @param symbolId - The source symbol identifier.
+   * @returns An array of outgoing relations of the requested type.
+   */
+  private async getOutgoingSymbolRelations(
+    relationType: RelationType,
+    symbolId: string,
+  ): Promise<Relation[]> {
+    this.ensureOpen()
+    const rows = await exec(
+      this.conn!,
+      `MATCH (source:Symbol {id: '${this.escape(symbolId)}'})-[r:${relationType}]->(target:Symbol) RETURN target.id AS target`,
+    )
+    return rows.map((row) => ({
+      source: symbolId,
+      target: row['target'] as string,
+      type: relationType,
+      metadata: undefined,
+    }))
   }
 
   /**

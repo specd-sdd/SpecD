@@ -33,13 +33,19 @@
     {
       "requirement": "Relation types",
       "rules": [
-        "Relations between nodes SHALL be represented as typed edges. Each relation has a `source`, `target`, and `type`. The following relation types are defined:\n\n| Type         | Source | Target | Meaning                                | Phase |\n| ------------ | ------ | ------ | -------------------------------------- | ----- |\n| `IMPORTS`    | File   | File   | Source file imports from target file   | v1.5  |\n| `DEFINES`    | File   | Symbol | File contains the symbol's declaration | v2    |\n| `CALLS`      | Symbol | Symbol | Source symbol invokes target symbol    | v2    |\n| `EXPORTS`    | File   | Symbol | File exports the symbol as public API  | v2    |\n| `DEPENDS_ON` | Spec   | Spec   | Spec depends on target spec            | v1.5  |\n| `COVERS`     | Spec   | File   | Spec covers the target file            | v2+   |\n\nRelations are directional. `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`, and `DEPENDS_ON` are populated by the indexer. `COVERS` is populated by spec-to-code mapping (deferred to v2+)."
+        "Relations between nodes SHALL be represented as typed edges. Each relation has a `source`, `target`, and `type`. The following relation types are defined:\n\n| Type         | Source | Target | Meaning                                                   | Phase |\n| ------------ | ------ | ------ | --------------------------------------------------------- | ----- |\n| `IMPORTS`    | File   | File   | Source file imports from target file                      | v1.5  |\n| `DEFINES`    | File   | Symbol | File contains the symbol's declaration                    | v2    |\n| `CALLS`      | Symbol | Symbol | Source symbol invokes target symbol                       | v2    |\n| `EXPORTS`    | File   | Symbol | File exports the symbol as public API                     | v2    |\n| `DEPENDS_ON` | Spec   | Spec   | Spec depends on target spec                               | v1.5  |\n| `COVERS`     | Spec   | File   | Spec covers the target file                               | v2+   |\n| `EXTENDS`    | Symbol | Symbol | Source type extends or inherits from target type          | v2    |\n| `IMPLEMENTS` | Symbol | Symbol | Source type fulfills or implements target contract/type   | v2    |\n| `OVERRIDES`  | Symbol | Symbol | Source method overrides or concretely fulfills target one | v2    |\n\nRelations are directional. `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`, `DEPENDS_ON`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are populated by the indexer. `COVERS` is populated by spec-to-code mapping (deferred to v2+).\n\nThe hierarchy model for this iteration is intentionally limited to `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. Language-specific constructs MAY be normalized into one of those relations when doing so preserves useful impact, hotspot, and code-understanding semantics. Constructs that cannot be normalized without materially distorting their meaning are omitted rather than introducing new base relation types in this iteration."
       ]
     },
     {
       "requirement": "Relation value object",
       "rules": [
         "A `Relation` SHALL be a value object containing:\n\n- **`source`** (`string`) — the id or path of the source node.\n- **`target`** (`string`) — the id or path of the target node.\n- **`type`** (`RelationType`) — one of the relation types defined above.\n- **`metadata`** (`Record<string, unknown> | undefined`) — optional adapter-specific metadata (e.g. import specifier, call site line number).\n\nTwo `Relation` values are equal if `source`, `target`, and `type` all match."
+      ]
+    },
+    {
+      "requirement": "Hierarchy relation semantics",
+      "rules": [
+        "Hierarchy relations SHALL use the following normalization rules:\n\n- `EXTENDS` connects one type symbol to another type symbol when the source inherits behavior or structure from the target.\n- `IMPLEMENTS` connects one type symbol to another contract-bearing symbol when the source fulfills the target's required shape or behavior.\n- `OVERRIDES` connects one method symbol to another method symbol when the source method replaces, concretizes, or fulfills the target method through inheritance or contract implementation.\n\n`OVERRIDES` is a first-class persisted relation in this model; it is not deferred to derived traversal logic.\n\nAdapters MAY normalize inheritance-adjacent constructs from supported languages into these relations when the normalized edge remains useful for code understanding, impact discovery, hotspot analysis, and affected-spec discovery."
       ]
     },
     {
@@ -68,7 +74,8 @@
     "Depends on @specd/core as a runtime dependency",
     "embedding on FileNode is deferred to v2+ — adapters MUST NOT populate it until the embedding pipeline is implemented",
     "COVERS relations are deferred to v2+ — the type exists in the model but is not populated by any v1.5/v2 process",
-    "DEPENDS_ON relations are populated by the indexer in v1.5, reading from .specd-metadata.yaml or spec.md"
+    "DEPENDS_ON relations are populated by the indexer in v1.5, reading from .specd-metadata.yaml or spec.md",
+    "EXTENDS, IMPLEMENTS, and OVERRIDES are first-class persisted relations in v2 and are part of the base graph vocabulary for supported languages"
   ],
   "scenarios": [
     {
@@ -197,6 +204,15 @@
       "then": ["a DEPENDS_ON relation exists from spec A's specId to core:core/config"]
     },
     {
+      "requirement": "Relation types",
+      "name": "Hierarchy relation types are part of the closed set",
+      "when": ["the relation type set is inspected"],
+      "then": [
+        "it includes EXTENDS, IMPLEMENTS, and OVERRIDES",
+        "AND adding any additional hierarchy relation type still requires a spec change"
+      ]
+    },
+    {
       "requirement": "Relation value object",
       "name": "Relation equality by source, target, and type",
       "given": [
@@ -204,6 +220,49 @@
       ],
       "when": ["equality is checked"],
       "then": ["they are considered equal"]
+    },
+    {
+      "requirement": "Hierarchy relation semantics",
+      "name": "Base type inheritance uses EXTENDS",
+      "given": ["a source type inherits from a resolvable base type"],
+      "when": ["hierarchy relations are built"],
+      "then": ["an EXTENDS relation connects the source type symbol to the base type symbol"]
+    },
+    {
+      "requirement": "Hierarchy relation semantics",
+      "name": "Contract fulfillment uses IMPLEMENTS",
+      "given": ["a source type fulfills a resolvable contract-like declaration"],
+      "when": ["hierarchy relations are built"],
+      "then": ["an IMPLEMENTS relation connects the source type symbol to the contract symbol"]
+    },
+    {
+      "requirement": "Hierarchy relation semantics",
+      "name": "Method replacement uses OVERRIDES",
+      "given": [
+        "a method deterministically replaces or fulfills a resolvable inherited or contract method"
+      ],
+      "when": ["hierarchy relations are built"],
+      "then": [
+        "an OVERRIDES relation connects the source method symbol to the target method symbol"
+      ]
+    },
+    {
+      "requirement": "Hierarchy relation semantics",
+      "name": "Inheritance-adjacent construct that maps cleanly is normalized",
+      "given": [
+        "a supported language exposes an inheritance-adjacent construct that preserves useful impact and hotspot semantics when normalized"
+      ],
+      "when": ["the adapter emits hierarchy relations"],
+      "then": ["the construct is represented as one of EXTENDS, IMPLEMENTS, or OVERRIDES"]
+    },
+    {
+      "requirement": "Hierarchy relation semantics",
+      "name": "Inheritance-adjacent construct that does not map cleanly is omitted",
+      "given": [
+        "a supported language exposes a construct whose semantics would be materially distorted by normalization"
+      ],
+      "when": ["hierarchy relations are built"],
+      "then": ["no hierarchy relation is emitted for that construct in this iteration"]
     },
     {
       "requirement": "Immutability",
@@ -230,8 +289,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:3757c73831e009dce61fc2a74be9cae10d411324edbb8bb0806b18320a019091",
-    "verify.md": "sha256:478e00f2daf6e6528d609fb71ba094aee98b8473b7b41f8f0159f52096f80070"
+    "spec.md": "sha256:d76ea86d86c1dc2ca136de6ff432843bb8a9f26f48347ffd564de6daefe358e0",
+    "verify.md": "sha256:49cc36fccd9b8aff9d8f48c429e46df5584de386b85592855d3277ecadec1eb8"
   },
   "generatedBy": "core"
 }

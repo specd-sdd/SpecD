@@ -125,6 +125,18 @@ interface LoaderResolver {
 }
 
 /**
+ * Represents a local PHP class-like declaration and the methods it owns.
+ */
+interface PhpTypeInfo {
+  readonly name: string
+  readonly symbolId: string
+  readonly kind: 'class' | 'interface' | 'type'
+  readonly extendsNames: readonly string[]
+  readonly implementsNames: readonly string[]
+  readonly methodsByName: ReadonlyMap<string, string>
+}
+
+/**
  * Maps CakePHP loader package names to a concrete target kind when possible.
  * @param packageName - The package or directory argument passed to the loader.
  * @returns The inferred Cake target kind, or undefined when unsupported.
@@ -856,6 +868,9 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const dynamicBindings = this.collectDynamicLoaderBindings(filePath, content, symbols)
     relations.push(...this.extractDynamicLoaderRelations(filePath, dynamicBindings))
     relations.push(
+      ...this.extractHierarchyRelations(filePath, content, currentFileSymbols, importMap),
+    )
+    relations.push(
       ...this.extractLoadedInstanceCalls(
         filePath,
         content,
@@ -866,6 +881,180 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     )
 
     return relations
+  }
+
+  /**
+   * Extracts deterministic PHP hierarchy relations from class and interface declarations.
+   * @param filePath - Source file path.
+   * @param content - PHP source text.
+   * @param symbols - Symbols declared in the current file.
+   * @param importMap - Resolved imported type names.
+   * @returns Hierarchy relations.
+   */
+  private extractHierarchyRelations(
+    filePath: string,
+    content: string,
+    symbols: SymbolNode[],
+    importMap: Map<string, string>,
+  ): Relation[] {
+    const infos = this.collectPhpTypeInfo(filePath, content, symbols)
+    const infoByName = new Map(infos.map((info) => [info.name, info]))
+    const relations: Relation[] = []
+    const seen = new Set<string>()
+
+    for (const info of infos) {
+      for (const parentName of info.extendsNames) {
+        const importedId = importMap.get(parentName)
+        const localTarget = infoByName.get(parentName)
+        const targetId = importedId ?? localTarget?.symbolId
+        if (!targetId) continue
+
+        const key = `${info.symbolId}:${RelationType.Extends}:${targetId}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          relations.push(
+            createRelation({
+              source: info.symbolId,
+              target: targetId,
+              type: RelationType.Extends,
+            }),
+          )
+        }
+
+        if (localTarget) {
+          this.addPhpOverrideRelations(info, localTarget, relations, seen)
+        }
+      }
+
+      for (const contractName of info.implementsNames) {
+        const importedId = importMap.get(contractName)
+        const localTarget = infoByName.get(contractName)
+        const targetId = importedId ?? localTarget?.symbolId
+        if (!targetId) continue
+
+        const key = `${info.symbolId}:${RelationType.Implements}:${targetId}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          relations.push(
+            createRelation({
+              source: info.symbolId,
+              target: targetId,
+              type: RelationType.Implements,
+            }),
+          )
+        }
+
+        if (localTarget) {
+          this.addPhpOverrideRelations(info, localTarget, relations, seen)
+        }
+      }
+    }
+
+    return relations
+  }
+
+  /**
+   * Collects local PHP class, interface, and trait declarations for hierarchy extraction.
+   * @param filePath - Source file path.
+   * @param content - PHP source text.
+   * @param symbols - Symbols declared in the current file.
+   * @returns Local class-like declarations.
+   */
+  private collectPhpTypeInfo(
+    filePath: string,
+    content: string,
+    symbols: SymbolNode[],
+  ): PhpTypeInfo[] {
+    const infos: PhpTypeInfo[] = []
+    const lines = content.split('\n')
+    const typeRegex =
+      /\b(class|interface|trait)\s+([A-Za-z_][A-Za-z0-9_]*)\b(?:\s+extends\s+([A-Za-z0-9_\\,\s]+?))?(?:\s+implements\s+([A-Za-z0-9_\\,\s]+?))?\s*\{/g
+
+    for (const match of content.matchAll(typeRegex)) {
+      const rawKind = match[1]
+      const name = match[2]
+      if (!rawKind || !name) continue
+      const line = content.slice(0, match.index ?? 0).split('\n').length
+      const kind =
+        rawKind === 'class'
+          ? SymbolKind.Class
+          : rawKind === 'interface'
+            ? SymbolKind.Interface
+            : SymbolKind.Type
+      const symbolId = symbols.find(
+        (symbol) =>
+          symbol.filePath === filePath &&
+          symbol.kind === kind &&
+          symbol.name === name &&
+          symbol.line === line,
+      )?.id
+      if (!symbolId) continue
+
+      let endLine = lines.length
+      let braceDepth = 0
+      for (let idx = line - 1; idx < lines.length; idx++) {
+        const current = lines[idx] ?? ''
+        braceDepth += (current.match(/\{/g) ?? []).length
+        braceDepth -= (current.match(/\}/g) ?? []).length
+        if (idx >= line && braceDepth === 0) {
+          endLine = idx + 1
+          break
+        }
+      }
+
+      const methodsByName = new Map<string, string>()
+      for (const symbol of symbols) {
+        if (symbol.filePath !== filePath || symbol.kind !== SymbolKind.Method) continue
+        if (symbol.line <= line || symbol.line > endLine) continue
+        methodsByName.set(symbol.name, symbol.id)
+      }
+
+      infos.push({
+        name,
+        symbolId,
+        kind,
+        extendsNames: (match[3] ?? '')
+          .split(',')
+          .map((entry) => getPhpClassTail(entry.trim()))
+          .filter((entry) => entry.length > 0),
+        implementsNames: (match[4] ?? '')
+          .split(',')
+          .map((entry) => getPhpClassTail(entry.trim()))
+          .filter((entry) => entry.length > 0),
+        methodsByName,
+      })
+    }
+
+    return infos
+  }
+
+  /**
+   * Emits PHP method-level `OVERRIDES` relations for matching local declarations.
+   * @param source - Child declaration info.
+   * @param target - Base or contract declaration info.
+   * @param relations - Accumulator array for discovered relations.
+   * @param seen - Deduplication set.
+   */
+  private addPhpOverrideRelations(
+    source: PhpTypeInfo,
+    target: PhpTypeInfo,
+    relations: Relation[],
+    seen: Set<string>,
+  ): void {
+    for (const [methodName, methodId] of source.methodsByName.entries()) {
+      const targetMethodId = target.methodsByName.get(methodName)
+      if (!targetMethodId) continue
+      const key = `${methodId}:${RelationType.Overrides}:${targetMethodId}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      relations.push(
+        createRelation({
+          source: methodId,
+          target: targetMethodId,
+          type: RelationType.Overrides,
+        }),
+      )
+    }
   }
 
   /**

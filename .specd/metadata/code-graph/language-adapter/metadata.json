@@ -9,7 +9,7 @@
     {
       "requirement": "LanguageAdapter interface",
       "rules": [
-        "`LanguageAdapter` SHALL be an interface (not an abstract class, since adapters are stateless and have no shared state to inherit) with the following methods:\n\n- **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)\n- **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.\n- **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found\n- **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution\n- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS, DEPENDS\\_ON) from the file. The `importMap` maps local import names to resolved symbol IDs (e.g. `\"validateUser\"` → `\"auth:src/auth.ts:function:validateUser:10\"`), built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.\n\nBoth extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects."
+        "`LanguageAdapter` SHALL be an interface (not an abstract class, since adapters are stateless and have no shared state to inherit) with the following methods:\n\n- **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)\n- **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.\n- **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found\n- **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution\n- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS, DEPENDS\\_ON, EXTENDS, IMPLEMENTS, OVERRIDES) from the file. The `importMap` maps local import names to resolved symbol IDs (e.g. `\"validateUser\"` → `\"auth:src/auth.ts:function:validateUser:10\"`), built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.\n\nBoth extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects."
       ]
     },
     {
@@ -34,6 +34,12 @@
       "requirement": "Call resolution",
       "rules": [
         "For `CALLS` relations, the adapter MUST extract call expressions from the AST and resolve them:\n\n- **Caller**: the innermost enclosing function, method, or arrow function containing the call expression. Calls at module top level are silently dropped.\n- **Callee**: resolved via the import map passed to `extractRelations`. If the called identifier is in the import map, the callee is the resolved symbol. If the identifier matches a locally defined symbol, the callee is that local symbol.\n\nCalls to identifiers that cannot be resolved (e.g. global built-ins, member expressions like `obj.method()`, dynamic expressions) SHALL be silently dropped — no relation is created, no error is thrown."
+      ]
+    },
+    {
+      "requirement": "Hierarchy extraction",
+      "rules": [
+        "Adapters SHALL extract hierarchy relations when the language exposes them deterministically.\n\nRules:\n\n- Emit `EXTENDS` when a type declaration inherits from another resolvable type.\n- Emit `IMPLEMENTS` when a type declaration fulfills a resolvable contract or interface-like declaration.\n- Emit `OVERRIDES` when a method declaration can be matched deterministically to a base or contract method it replaces or fulfills.\n- Adapters for already supported languages MAY normalize inheritance-adjacent constructs into `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES` when that preserves useful impact, hotspot, and code-understanding semantics.\n- Constructs that cannot be normalized without materially distorting their meaning MUST be dropped in this iteration rather than introducing a new base relation type.\n- Unresolvable hierarchy targets are silently dropped."
       ]
     },
     {
@@ -100,24 +106,29 @@
     "Loader API support is registry-based and extensible (no hardcoded single-loader assumptions)",
     "Tree-sitter query patterns are internal — not part of the public API",
     "The TypeScript adapter is always registered by default",
+    "Hierarchy relations are emitted only when their targets can be resolved deterministically",
     "No dependency on @specd/core"
   ],
   "scenarios": [
     {
       "requirement": "LanguageAdapter interface",
-      "name": "Extraction is pure",
-      "given": ["a LanguageAdapter instance"],
-      "when": ["extractSymbols() is called twice with the same filePath and content"],
-      "then": ["both calls return identical results"]
+      "name": "Adapter declares supported language identifiers",
+      "when": ["languages() is called on the TypeScript adapter"],
+      "then": ["it returns ['typescript', 'tsx', 'javascript', 'jsx']"]
     },
     {
       "requirement": "LanguageAdapter interface",
-      "name": "extractRelations emits concrete file/symbol relations when resolvable",
-      "given": ["a PHP file containing resolvable dependencies"],
+      "name": "Adapter declares extension map",
+      "when": ["extensions() is called on the TypeScript adapter"],
+      "then": ["it returns mappings for .ts, .tsx, .js, and .jsx"]
+    },
+    {
+      "requirement": "LanguageAdapter interface",
+      "name": "extractRelations may emit hierarchy relations",
+      "given": ["a file containing resolvable inheritance or implementation declarations"],
       "when": ["extractRelations() is called"],
       "then": [
-        "concrete IMPORTS and/or CALLS relations are returned",
-        "AND no error is thrown for dropped unresolved dynamic expressions"
+        "the result may include EXTENDS, IMPLEMENTS, and OVERRIDES relations alongside the existing relation types"
       ]
     },
     {
@@ -264,6 +275,49 @@
       "given": ["a call expression init() at module top level (not inside any function or class)"],
       "when": ["extractRelations() is called"],
       "then": ["no CALLS relation is created for that call"]
+    },
+    {
+      "requirement": "Hierarchy extraction",
+      "name": "Class inheritance emits EXTENDS",
+      "given": [
+        "a supported language file declaring a type that inherits from a resolvable base type"
+      ],
+      "when": ["extractRelations() is called"],
+      "then": ["an EXTENDS relation is emitted"]
+    },
+    {
+      "requirement": "Hierarchy extraction",
+      "name": "Interface or contract fulfillment emits IMPLEMENTS",
+      "given": [
+        "a supported language file declaring a type that fulfills a resolvable contract-like type"
+      ],
+      "when": ["extractRelations() is called"],
+      "then": ["an IMPLEMENTS relation is emitted"]
+    },
+    {
+      "requirement": "Hierarchy extraction",
+      "name": "Overriding method emits OVERRIDES",
+      "given": [
+        "a supported language file declaring a method that can be matched deterministically to an inherited or contract method"
+      ],
+      "when": ["extractRelations() is called"],
+      "then": ["an OVERRIDES relation is emitted"]
+    },
+    {
+      "requirement": "Hierarchy extraction",
+      "name": "Normalizable inheritance-adjacent construct maps to the base model",
+      "given": [
+        "a supported language construct that is not classical inheritance but preserves useful semantics when normalized"
+      ],
+      "when": ["extractRelations() is called"],
+      "then": ["the emitted relation uses one of EXTENDS, IMPLEMENTS, or OVERRIDES"]
+    },
+    {
+      "requirement": "Hierarchy extraction",
+      "name": "Unresolvable hierarchy target is silently dropped",
+      "given": ["a hierarchy declaration whose target cannot be resolved deterministically"],
+      "when": ["extractRelations() is called"],
+      "then": ["no hierarchy relation is emitted", "AND no error is thrown"]
     },
     {
       "requirement": "Adapter registry",
@@ -664,8 +718,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:bcf1e1e2c74882095b1e21fbe9327a75e6442bb07c6bb944cd7c1d147074b405",
-    "verify.md": "sha256:bf1169e39ac5182aa0a6147e38c8b66087b3ea2c1387dbc1e8353cc534c4225d"
+    "spec.md": "sha256:33e954e3d4cf7f44c3c5ce8317c33a4b351baecd4a30a68eddfbd15d4cc98d0c",
+    "verify.md": "sha256:7d09d79242fef77b6d597d052377ba9e01e777b1a8588bc8676f864fdd120627"
   },
   "generatedBy": "core"
 }

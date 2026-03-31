@@ -17,6 +17,8 @@ Source files change constantly and the code graph must be kept in sync without r
 5. **Clean** — remove deleted files from the store
 6. **Persist VCS ref** — if `IndexOptions.vcsRef` is provided, store it as the `lastIndexedRef` meta key after successful indexing
 
+Extraction and storage include hierarchy relations (`EXTENDS`, `IMPLEMENTS`, `OVERRIDES`) alongside existing file, symbol, and dependency relations.
+
 The use case accepts a `GraphStore` (already opened) and an `AdapterRegistry` via constructor injection.
 
 ### Requirement: Incremental indexing
@@ -64,12 +66,12 @@ Evaluation order when `respectGitignore: true`:
 Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:
 
 - **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter implements `extractNamespace` and `buildQualifiedName`, build a qualified name map for that language. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.
-- **Pass 2 (Resolve imports + CALLS, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations for code-file analysis. Accumulate all relations.
+- **Pass 2 (Resolve imports + CALLS + hierarchy, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map and call `extractRelations` with it to get `IMPORTS`, `CALLS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for code-file analysis. Accumulate all relations.
 - **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.
 - **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.
 - **Rebuild FTS indexes** — After bulk load, call `GraphStore.rebuildFtsIndexes()` to drop and recreate full-text search indexes. This is required because LadybugDB FTS indexes are not automatically updated on insert.
 
-This two-pass approach ensures all symbols exist in the index before import/call resolution, while avoiding any store queries during extraction.
+This two-pass approach ensures all symbols exist in the index before import, call, and hierarchy resolution, while avoiding any store queries during extraction.
 
 ### Requirement: Chunked processing
 
@@ -189,7 +191,9 @@ await store.close()
 
 ## Spec Dependencies
 
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `FileNode`, `SymbolNode`, `Relation`
-- [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — `GraphStore` port, upsert/remove operations
-- [`specs/code-graph/language-adapter/spec.md`](../language-adapter/spec.md) — `LanguageAdapter`, `AdapterRegistry`
-- [`specs/code-graph/staleness-detection/spec.md`](../staleness-detection/spec.md) — `vcsRef` in `IndexOptions` and `IndexResult`
+- [`specs/code-graph/language-adapter/spec.md`](../language-adapter/spec.md) — adapter extraction and resolution rules
+- [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — `GraphStore` persistence port
+- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, hierarchy relation types
+- [`specs/code-graph/workspace-integration/spec.md`](../workspace-integration/spec.md) — workspace-prefixed paths and multi-workspace indexing
+- [`specs/core/config/spec.md`](../../core/config/spec.md) — workspace configuration and storage paths
+- [`specs/code-graph/database-schema/spec.md`](../database-schema/spec.md) — persisted relationship tables for hierarchy edges

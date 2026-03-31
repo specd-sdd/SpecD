@@ -194,6 +194,121 @@ export function graphStoreContractTests(
       expect(stats.symbolCount).toBe(1)
       expect(stats.languages).toContain('typescript')
       expect(stats.lastIndexedRef).toBeNull()
+      expect(stats.relationCounts[RelationType.Extends]).toBe(0)
+      expect(stats.relationCounts[RelationType.Implements]).toBe(0)
+      expect(stats.relationCounts[RelationType.Overrides]).toBe(0)
+    })
+
+    it('returns incoming EXTENDS relations via getExtenders', async () => {
+      const file = createFileNode({
+        path: 'src/types.ts',
+        language: 'typescript',
+        contentHash: 'sha256:abc',
+        workspace: '/project',
+      })
+      const base = createSymbolNode({
+        name: 'BaseType',
+        kind: SymbolKind.Class,
+        filePath: 'src/types.ts',
+        line: 1,
+        column: 0,
+      })
+      const child = createSymbolNode({
+        name: 'ChildType',
+        kind: SymbolKind.Class,
+        filePath: 'src/types.ts',
+        line: 5,
+        column: 0,
+      })
+      await store.upsertFile(
+        file,
+        [base, child],
+        [
+          createRelation({ source: file.path, target: base.id, type: RelationType.Defines }),
+          createRelation({ source: file.path, target: child.id, type: RelationType.Defines }),
+          createRelation({ source: child.id, target: base.id, type: RelationType.Extends }),
+        ],
+      )
+
+      const extenders = await store.getExtenders(base.id)
+      expect(extenders).toHaveLength(1)
+      expect(extenders[0]?.source).toBe(child.id)
+    })
+
+    it('returns incoming IMPLEMENTS relations via getImplementors', async () => {
+      const file = createFileNode({
+        path: 'src/contracts.ts',
+        language: 'typescript',
+        contentHash: 'sha256:def',
+        workspace: '/project',
+      })
+      const contract = createSymbolNode({
+        name: 'Persistable',
+        kind: SymbolKind.Interface,
+        filePath: file.path,
+        line: 1,
+        column: 0,
+      })
+      const impl = createSymbolNode({
+        name: 'Repo',
+        kind: SymbolKind.Class,
+        filePath: file.path,
+        line: 6,
+        column: 0,
+      })
+      await store.upsertFile(
+        file,
+        [contract, impl],
+        [
+          createRelation({ source: file.path, target: contract.id, type: RelationType.Defines }),
+          createRelation({ source: file.path, target: impl.id, type: RelationType.Defines }),
+          createRelation({ source: impl.id, target: contract.id, type: RelationType.Implements }),
+        ],
+      )
+
+      const implementors = await store.getImplementors(contract.id)
+      expect(implementors).toHaveLength(1)
+      expect(implementors[0]?.source).toBe(impl.id)
+    })
+
+    it('returns incoming OVERRIDES relations via getOverriders', async () => {
+      const file = createFileNode({
+        path: 'src/methods.ts',
+        language: 'typescript',
+        contentHash: 'sha256:ghi',
+        workspace: '/project',
+      })
+      const baseMethod = createSymbolNode({
+        name: 'save',
+        kind: SymbolKind.Method,
+        filePath: file.path,
+        line: 2,
+        column: 2,
+      })
+      const childMethod = createSymbolNode({
+        name: 'save',
+        kind: SymbolKind.Method,
+        filePath: file.path,
+        line: 8,
+        column: 2,
+      })
+      await store.upsertFile(
+        file,
+        [baseMethod, childMethod],
+        [
+          createRelation({ source: file.path, target: baseMethod.id, type: RelationType.Defines }),
+          createRelation({ source: file.path, target: childMethod.id, type: RelationType.Defines }),
+          createRelation({
+            source: childMethod.id,
+            target: baseMethod.id,
+            type: RelationType.Overrides,
+          }),
+        ],
+      )
+
+      const overriders = await store.getOverriders(baseMethod.id)
+      expect(overriders).toHaveLength(1)
+      expect(overriders[0]?.source).toBe(childMethod.id)
     })
 
     it('lastIndexedRef defaults to null', async () => {

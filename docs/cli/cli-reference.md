@@ -792,7 +792,7 @@ List the most connected symbols in the graph ranked by coupling risk. Context re
 | `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                                              |
 | `--format text\|json\|toon`  | Output format.                                                                                              |
 
-By default, `graph hotspots` shows only `class`, `method`, and `function` symbols, applies `min-score=1`, `min-risk=MEDIUM`, and `limit=20`, and excludes importer-only symbols that have no direct callers.
+By default, `graph hotspots` shows only `class`, `interface`, `method`, and `function` symbols, applies `min-score=1`, `min-risk=MEDIUM`, and `limit=20`, and excludes importer-only symbols that have no direct callers.
 
 `--kind` accepts a single comma-separated list and validates every token against the supported symbol kinds. Invalid values fail the command before querying the graph. When you pass `--kind`, that list fully replaces the default kind set instead of merging with it.
 

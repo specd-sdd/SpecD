@@ -24,6 +24,26 @@ export class InMemoryGraphStore extends GraphStore {
     super(':memory:')
   }
 
+  /**
+   * Returns all relations of a specific type where the source matches the provided id.
+   * @param relationType - The relation type to filter by.
+   * @param source - The source identifier to match.
+   * @returns Matching relations originating from the source.
+   */
+  private getRelationsBySource(relationType: RelationType, source: string): Relation[] {
+    return this.relations.filter((r) => r.type === relationType && r.source === source)
+  }
+
+  /**
+   * Returns all relations of a specific type where the target matches the provided id.
+   * @param relationType - The relation type to filter by.
+   * @param target - The target identifier to match.
+   * @returns Matching relations targeting the symbol.
+   */
+  private getRelationsByTarget(relationType: RelationType, target: string): Relation[] {
+    return this.relations.filter((r) => r.type === relationType && r.target === target)
+  }
+
   private ensureOpen(): void {
     if (!this._isOpen) {
       throw new StoreNotOpenError()
@@ -130,22 +150,52 @@ export class InMemoryGraphStore extends GraphStore {
 
   async getCallers(symbolId: string): Promise<Relation[]> {
     this.ensureOpen()
-    return this.relations.filter((r) => r.type === RelationType.Calls && r.target === symbolId)
+    return this.getRelationsByTarget(RelationType.Calls, symbolId)
   }
 
   async getCallees(symbolId: string): Promise<Relation[]> {
     this.ensureOpen()
-    return this.relations.filter((r) => r.type === RelationType.Calls && r.source === symbolId)
+    return this.getRelationsBySource(RelationType.Calls, symbolId)
   }
 
   async getImporters(filePath: string): Promise<Relation[]> {
     this.ensureOpen()
-    return this.relations.filter((r) => r.type === RelationType.Imports && r.target === filePath)
+    return this.getRelationsByTarget(RelationType.Imports, filePath)
   }
 
   async getImportees(filePath: string): Promise<Relation[]> {
     this.ensureOpen()
-    return this.relations.filter((r) => r.type === RelationType.Imports && r.source === filePath)
+    return this.getRelationsBySource(RelationType.Imports, filePath)
+  }
+
+  async getExtenders(symbolId: string): Promise<Relation[]> {
+    this.ensureOpen()
+    return this.getRelationsByTarget(RelationType.Extends, symbolId)
+  }
+
+  async getExtendedTargets(symbolId: string): Promise<Relation[]> {
+    this.ensureOpen()
+    return this.getRelationsBySource(RelationType.Extends, symbolId)
+  }
+
+  async getImplementors(symbolId: string): Promise<Relation[]> {
+    this.ensureOpen()
+    return this.getRelationsByTarget(RelationType.Implements, symbolId)
+  }
+
+  async getImplementedTargets(symbolId: string): Promise<Relation[]> {
+    this.ensureOpen()
+    return this.getRelationsBySource(RelationType.Implements, symbolId)
+  }
+
+  async getOverriders(symbolId: string): Promise<Relation[]> {
+    this.ensureOpen()
+    return this.getRelationsByTarget(RelationType.Overrides, symbolId)
+  }
+
+  async getOverriddenTargets(symbolId: string): Promise<Relation[]> {
+    this.ensureOpen()
+    return this.getRelationsBySource(RelationType.Overrides, symbolId)
   }
 
   async getExportedSymbols(filePath: string): Promise<SymbolNode[]> {
@@ -159,12 +209,12 @@ export class InMemoryGraphStore extends GraphStore {
 
   async getSpecDependencies(specId: string): Promise<Relation[]> {
     this.ensureOpen()
-    return this.relations.filter((r) => r.type === RelationType.DependsOn && r.source === specId)
+    return this.getRelationsBySource(RelationType.DependsOn, specId)
   }
 
   async getSpecDependents(specId: string): Promise<Relation[]> {
     this.ensureOpen()
-    return this.relations.filter((r) => r.type === RelationType.DependsOn && r.target === specId)
+    return this.getRelationsByTarget(RelationType.DependsOn, specId)
   }
 
   async findSymbols(query: SymbolQuery): Promise<SymbolNode[]> {

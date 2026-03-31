@@ -213,7 +213,7 @@ describe('graph hotspots', () => {
     }
 
     const help = getStdout()
-    expect(help).toContain('Defaults (no flags): kinds class,method,function')
+    expect(help).toContain('Defaults (no flags): kinds class,interface,method,function')
     expect(help).toContain('Default view excludes importer-only symbols unless widened with')
     expect(help).toContain('--include-importer-only')
     expect(help).toContain('Passing --kind replaces the default kind set')
@@ -224,7 +224,7 @@ describe('graph hotspots', () => {
     const docs = await readFile('../../docs/cli/cli-reference.md', 'utf8')
 
     expect(docs).toContain(
-      'By default, `graph hotspots` shows only `class`, `method`, and `function` symbols',
+      'By default, `graph hotspots` shows only `class`, `interface`, `method`, and `function` symbols',
     )
     expect(docs).toContain('When you pass `--kind`, that list fully replaces the default kind set')
     expect(docs).toContain(

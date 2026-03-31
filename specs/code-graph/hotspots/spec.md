@@ -8,16 +8,14 @@ Identify which symbols in the code graph have the highest impact — the most ca
 
 ### Requirement: Batch hotspot scoring
 
-`computeHotspots(store: GraphStore, options?: HotspotOptions): Promise<HotspotResult>` SHALL compute a hotspot score for every symbol in the graph using exactly two batch queries:
+`computeHotspots(store: GraphStore, options?: HotspotOptions): Promise<HotspotResult>` SHALL compute a hotspot score for every symbol in the graph using batch graph queries rather than per-symbol lookups.
 
-1. **Caller query** — returns one row per (symbol, caller) pair with both the symbol's `filePath` and the caller's `filePath`
-2. **Importer count query** — returns the number of files that import each file
-
-The scoring model uses three signals:
+The scoring model uses four signal families:
 
 - **sameWorkspaceCallers** — callers whose `filePath` shares the same workspace prefix as the symbol
 - **crossWorkspaceCallers** — callers whose `filePath` has a different workspace prefix
-- **fileImporters** — number of files that `IMPORT` the file containing the symbol
+- **fileImporters** — number of files that import the file containing the symbol
+- **hierarchy dependents** — persisted hierarchy relations that make the symbol structurally central, including inheritors, implementors, and overriding methods
 
 Workspace is extracted from `filePath` as the prefix before the first `:` (e.g. `core` from `core:src/index.ts`).
 
@@ -26,6 +24,7 @@ The exact numeric weighting of these signals is intentionally not fixed by this 
 - symbol-level caller evidence is the primary ranking signal
 - cross-workspace caller evidence contributes at least as strongly as same-workspace caller evidence
 - file-level importer data is a secondary signal that refines symbol ranking rather than replacing symbol-level evidence
+- hierarchy-derived structural centrality contributes to ranking when the symbol is a base type, a widely implemented contract, or a method with overriding dependents
 
 ### Requirement: Risk level
 
@@ -35,8 +34,8 @@ Each entry's `riskLevel` SHALL be computed using the existing `computeRiskLevel(
 
 Hotspot computation applies product defaults per option:
 
-- **kinds = \[`class`, `method`, `function`]** — the default hotspot view focuses on callable or structural symbols
-- **score > 0** — symbols with no caller signal and no importer signal are excluded
+- **kinds = \[`class`, `method`, `function`, `interface`]** — the default hotspot view focuses on callable or structural symbols
+- **score > 0** — symbols with no caller signal, importer signal, or hierarchy signal are excluded
 - **risk >= MEDIUM** — LOW-risk symbols are filtered out
 - **limit 20** — only the top 20 results are returned
 - **no importer-only entries** — a symbol with zero direct callers MUST NOT appear in the default result solely because its containing file has many importers
@@ -58,7 +57,7 @@ In other words, changing `minRisk`, `limit`, or `workspace` MUST NOT silently re
 
 Examples:
 
-- `specd graph hotspots` → defaults apply (kinds = `class,method,function`, no importer-only entries, risk >= MEDIUM, limit 20)
+- `specd graph hotspots` → defaults apply (kinds = `class,method,function,interface`, no importer-only entries, risk >= MEDIUM, limit 20)
 - `specd graph hotspots --min-risk HIGH` → risk >= HIGH, while default kinds, importer-only exclusion, and limit 20 remain active
 - `specd graph hotspots --limit 50` → limit 50, while default kinds, importer-only exclusion, and risk >= MEDIUM remain active
 - `specd graph hotspots --kind interface` → only `interface` symbols, with the rest of the default ranking policy still active
@@ -111,6 +110,6 @@ Each `HotspotEntry` contains:
 
 ## Spec Dependencies
 
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `SymbolNode`, `SymbolKind`
+- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `SymbolNode`, `SymbolKind`, hierarchy relations
 - [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — `GraphStore` query methods
-- [`specs/code-graph/traversal/spec.md`](../traversal/spec.md) — `computeRiskLevel`, `RiskLevel`
+- [`specs/code-graph/traversal/spec.md`](../traversal/spec.md) — `computeRiskLevel`, `RiskLevel`, hierarchy-aware impact semantics
