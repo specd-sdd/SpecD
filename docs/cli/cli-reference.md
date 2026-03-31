@@ -306,7 +306,7 @@ If other active changes target the same specs, the archive is blocked by default
 
 | Option                      | Description                                                      |
 | --------------------------- | ---------------------------------------------------------------- |
-| `--no-hooks`                | Skip archiving hooks.                                            |
+| `--skip-hooks <phases>`     | Skip archive hook phases. Valid values: `pre`, `post`, `all`.    |
 | `--allow-overlap`           | Permit archiving despite spec overlap with other active changes. |
 | `--format text\|json\|toon` | Output format.                                                   |
 | `--config <path>`           | Config file path.                                                |

@@ -1,19 +1,9 @@
 {
   "title": "Hook Execution Model",
-  "description": "Workflow steps declare hooks via `instruction:` and `run:` entries, but the schema format only defines their YAML structure — not who executes each type, when execution happens, or what failure means in each context. Without a unified execution model, hook behaviour is scattered across use cases and undocumented agent conventions. This spec defines the complete hook execution model: the two hook types and their consumers, hook execution for transitions and archives, failure semantics for each phase, hook ordering rules, the `--no-hooks` pattern for manual control, and the boundary between compile-time and runtime concerns.",
-  "dependsOn": [
-    "core:core/workflow-model",
-    "core:core/schema-format",
-    "core:core/hook-runner-port",
-    "core:core/transition-change",
-    "core:core/archive-change",
-    "core:core/run-step-hooks",
-    "core:core/get-hook-instructions",
-    "core:core/config",
-    "cli:cli/change-transition"
-  ],
+  "description": "Workflow steps declare hooks via `instruction:` and `run:` entries, but the schema format only defines their YAML structure — not who executes each type, when execution happens, or what failure means in each context. Without a unified execution model, hook behaviour is scattered across use cases and undocumented agent conventions. This spec defines the complete hook execution model: the two hook types and their consumers, hook execution for transitions and archives, failure semantics for each phase, hook ordering rules, the `--skip-hooks` pattern for manual control, and the boundary between compile-time and runtime concerns.",
+  "dependsOn": ["cli:cli/change-archive"],
   "context": [
-    "Workflow steps declare hooks via `instruction:` and `run:` entries, but the schema format only defines their YAML structure — not who executes each type, when execution happens, or what failure means in each context. Without a unified execution model, hook behaviour is scattered across use cases and undocumented agent conventions. This spec defines the complete hook execution model: the two hook types and their consumers, hook execution for transitions and archives, failure semantics for each phase, hook ordering rules, the `--no-hooks` pattern for manual control, and the boundary between compile-time and runtime concerns."
+    "Workflow steps declare hooks via `instruction:` and `run:` entries, but the schema format only defines their YAML structure — not who executes each type, when execution happens, or what failure means in each context. Without a unified execution model, hook behaviour is scattered across use cases and undocumented agent conventions. This spec defines the complete hook execution model: the two hook types and their consumers, hook execution for transitions and archives, failure semantics for each phase, hook ordering rules, the `--skip-hooks` pattern for manual control, and the boundary between compile-time and runtime concerns."
   ],
   "rules": [
     {
@@ -37,7 +27,7 @@
     {
       "requirement": "Manual hook control with skipHooks",
       "rules": [
-        "When `skipHooks` is `true`, `TransitionChange` and `ArchiveChange` skip all `run:` hook execution. This gives the caller (typically an LLM agent) manual control over hook timing:\n\n1. Call `specd change hook-instruction <name> <step> --phase pre` to read `instruction:` hooks\n2. Call `specd change run-hooks <name> <step> --phase pre` to execute `run:` pre-hooks\n3. Call `specd change transition <name> <step> --no-hooks` to transition without auto-hooks\n4. Call `specd change run-hooks <name> <step> --phase post` to execute `run:` post-hooks\n5. Call `specd change hook-instruction <name> <step> --phase post` to read post-step instructions\n\nThe `--no-hooks` CLI flag maps to `skipHooks: true` in the use case input. The agent is responsible for invoking hooks at the appropriate time."
+        "Manual hook control uses phase selectors rather than a separate boolean flag.\n\n- `TransitionChange` accepts `skipHookPhases` values `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, and `'all'`.\n- `ArchiveChange` accepts `skipHookPhases` values `'pre'`, `'post'`, and `'all'`.\n\nWhen the selector set contains all phases for the current use case, `TransitionChange` or `ArchiveChange` skips every `run:` hook. This gives the caller (typically an LLM agent) manual control over hook timing:\n\n1. Call `specd change hook-instruction <name> <step> --phase pre` to read `instruction:` hooks\n2. Call `specd change run-hooks <name> <step> --phase pre` to execute `run:` pre-hooks\n3. Call the lifecycle command with `--skip-hooks ...` to perform the transition or archive without the skipped auto-hooks\n4. Call `specd change run-hooks <name> <step> --phase post` to execute `run:` post-hooks\n5. Call `specd change hook-instruction <name> <step> --phase post` to read post-step instructions\n\nThe `--skip-hooks` CLI flag maps to the `skipHookPhases` selector set in the corresponding use case input. The agent is responsible for invoking hooks at the appropriate time."
       ]
     },
     {
@@ -136,23 +126,31 @@
     },
     {
       "requirement": "Two execution modes for run hooks",
-      "name": "Archiving hooks executed by ArchiveChange directly",
-      "given": ["the archiving step with run: pre-hooks"],
-      "when": ["the agent runs specd change archive"],
-      "then": [
-        "ArchiveChange calls HookRunner.run() directly for each run: hook",
-        "AND the agent does not need to call specd change run-hooks"
-      ]
+      "name": "Transition skips all hooks",
+      "given": ["a change transition command"],
+      "when": ["the agent runs specd change transition <name> implementing --skip-hooks all"],
+      "then": ["the transition command skips all transition hook execution"]
     },
     {
       "requirement": "Two execution modes for run hooks",
-      "name": "Implementing hooks executed by agent via CLI",
-      "given": ["the implementing step with run: pre-hooks"],
-      "when": ["the agent enters the implementing step"],
-      "then": [
-        "the agent must call specd change run-hooks <name> implementing --phase pre",
-        "AND hook execution is handled by the RunStepHooks use case"
-      ]
+      "name": "Archive skips all hooks",
+      "given": ["an archive command"],
+      "when": ["the agent runs specd change archive <name> --skip-hooks all"],
+      "then": ["the archive command skips all archive hook execution"]
+    },
+    {
+      "requirement": "Two execution modes for run hooks",
+      "name": "Archive skips only pre hooks",
+      "given": ["the archiving step has both pre and post run: hooks"],
+      "when": ["the agent runs specd change archive <name> --skip-hooks pre"],
+      "then": ["pre hooks are skipped", "AND post hooks remain enabled"]
+    },
+    {
+      "requirement": "Two execution modes for run hooks",
+      "name": "Archive skips only post hooks",
+      "given": ["the archiving step has both pre and post run: hooks"],
+      "when": ["the agent runs specd change archive <name> --skip-hooks post"],
+      "then": ["post hooks are skipped", "AND pre hooks remain enabled"]
     },
     {
       "requirement": "Pre-hook failure semantics",
@@ -230,8 +228,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9237c4de6cdaa43e35d75faa9d5cd5567a1b58afebb365b6756ec96a99ac1be9",
-    "verify.md": "sha256:f736d6375aea5a68467898f284b1320e759a4fa30d586643cf381c60da0317ce"
+    "spec.md": "sha256:65679e99b1289e78354fb5591f1e522d0f6523682f95823dafc0f107cfaa2553",
+    "verify.md": "sha256:f344ff65a1fd9d9064b4a3d11655cc6ac2945b23d015b6f507ab578728e83e65"
   },
   "generatedBy": "core"
 }

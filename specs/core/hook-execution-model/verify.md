@@ -43,19 +43,31 @@
 
 ### Requirement: Two execution modes for run hooks
 
-#### Scenario: Archiving hooks executed by ArchiveChange directly
+#### Scenario: Transition skips all hooks
 
-- **GIVEN** the archiving step with `run:` pre-hooks
-- **WHEN** the agent runs `specd change archive`
-- **THEN** `ArchiveChange` calls `HookRunner.run()` directly for each `run:` hook
-- **AND** the agent does not need to call `specd change run-hooks`
+- **GIVEN** a change transition command
+- **WHEN** the agent runs `specd change transition <name> implementing --skip-hooks all`
+- **THEN** the transition command skips all transition hook execution
 
-#### Scenario: Implementing hooks executed by agent via CLI
+#### Scenario: Archive skips all hooks
 
-- **GIVEN** the implementing step with `run:` pre-hooks
-- **WHEN** the agent enters the implementing step
-- **THEN** the agent must call `specd change run-hooks <name> implementing --phase pre`
-- **AND** hook execution is handled by the `RunStepHooks` use case
+- **GIVEN** an archive command
+- **WHEN** the agent runs `specd change archive <name> --skip-hooks all`
+- **THEN** the archive command skips all archive hook execution
+
+#### Scenario: Archive skips only pre hooks
+
+- **GIVEN** the archiving step has both pre and post `run:` hooks
+- **WHEN** the agent runs `specd change archive <name> --skip-hooks pre`
+- **THEN** pre hooks are skipped
+- **AND** post hooks remain enabled
+
+#### Scenario: Archive skips only post hooks
+
+- **GIVEN** the archiving step has both pre and post `run:` hooks
+- **WHEN** the agent runs `specd change archive <name> --skip-hooks post`
+- **THEN** post hooks are skipped
+- **AND** pre hooks remain enabled
 
 ### Requirement: Pre-hook failure semantics
 

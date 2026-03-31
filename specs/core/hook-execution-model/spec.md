@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Workflow steps declare hooks via `instruction:` and `run:` entries, but the schema format only defines their YAML structure — not who executes each type, when execution happens, or what failure means in each context. Without a unified execution model, hook behaviour is scattered across use cases and undocumented agent conventions. This spec defines the complete hook execution model: the two hook types and their consumers, hook execution for transitions and archives, failure semantics for each phase, hook ordering rules, the `--no-hooks` pattern for manual control, and the boundary between compile-time and runtime concerns.
+Workflow steps declare hooks via `instruction:` and `run:` entries, but the schema format only defines their YAML structure — not who executes each type, when execution happens, or what failure means in each context. Without a unified execution model, hook behaviour is scattered across use cases and undocumented agent conventions. This spec defines the complete hook execution model: the two hook types and their consumers, hook execution for transitions and archives, failure semantics for each phase, hook ordering rules, the `--skip-hooks` pattern for manual control, and the boundary between compile-time and runtime concerns.
 
 ## Requirements
 
@@ -34,15 +34,20 @@ Both use cases delegate hook execution to `RunStepHooks`, which handles hook col
 
 ### Requirement: Manual hook control with skipHooks
 
-When `skipHooks` is `true`, `TransitionChange` and `ArchiveChange` skip all `run:` hook execution. This gives the caller (typically an LLM agent) manual control over hook timing:
+Manual hook control uses phase selectors rather than a separate boolean flag.
+
+- `TransitionChange` accepts `skipHookPhases` values `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, and `'all'`.
+- `ArchiveChange` accepts `skipHookPhases` values `'pre'`, `'post'`, and `'all'`.
+
+When the selector set contains all phases for the current use case, `TransitionChange` or `ArchiveChange` skips every `run:` hook. This gives the caller (typically an LLM agent) manual control over hook timing:
 
 1. Call `specd change hook-instruction <name> <step> --phase pre` to read `instruction:` hooks
 2. Call `specd change run-hooks <name> <step> --phase pre` to execute `run:` pre-hooks
-3. Call `specd change transition <name> <step> --no-hooks` to transition without auto-hooks
+3. Call the lifecycle command with `--skip-hooks ...` to perform the transition or archive without the skipped auto-hooks
 4. Call `specd change run-hooks <name> <step> --phase post` to execute `run:` post-hooks
 5. Call `specd change hook-instruction <name> <step> --phase post` to read post-step instructions
 
-The `--no-hooks` CLI flag maps to `skipHooks: true` in the use case input. The agent is responsible for invoking hooks at the appropriate time.
+The `--skip-hooks` CLI flag maps to the `skipHookPhases` selector set in the corresponding use case input. The agent is responsible for invoking hooks at the appropriate time.
 
 ### Requirement: Pre-hook failure semantics
 
@@ -110,12 +115,12 @@ Unknown variable paths are left unexpanded (the original `{{key.path}}` token is
      e. returns result with change and any postHookFailures
 ```
 
-### Manual hook control (--no-hooks)
+### Manual transition hook control (--skip-hooks)
 
 ```
 1. specd change hook-instruction <name> implementing --phase pre   → get pre instructions
 2. specd change run-hooks <name> implementing --phase pre          → execute run: pre-hooks
-3. specd change transition <name> implementing --no-hooks          → transition only
+3. specd change transition <name> implementing --skip-hooks all    → transition only
 4. specd change run-hooks <name> implementing --phase post         → execute run: post-hooks
 5. specd change hook-instruction <name> implementing --phase post  → get post instructions
 ```
@@ -132,12 +137,12 @@ Unknown variable paths are left unexpanded (the original `{{key.path}}` token is
      e. generates metadata
 ```
 
-### Archiving with --no-hooks
+### Manual archive hook control (--skip-hooks)
 
 ```
-1. specd change run-hooks <name> archiving --phase pre   → execute pre-archive hooks
-2. specd change archive <name> --no-hooks                → archive without hooks
-3. specd change run-hooks <name> archiving --phase post   → execute post-archive hooks
+1. specd change run-hooks <name> archiving --phase pre       → execute pre-archive hooks
+2. specd change archive <name> --skip-hooks all              → archive without auto-hooks
+3. specd change run-hooks <name> archiving --phase post      → execute post-archive hooks
 ```
 
 ## Spec Dependencies
@@ -150,4 +155,5 @@ Unknown variable paths are left unexpanded (the original `{{key.path}}` token is
 - [`specs/core/run-step-hooks/spec.md`](../run-step-hooks/spec.md) — shared hook execution engine
 - [`specs/core/get-hook-instructions/spec.md`](../get-hook-instructions/spec.md) — `instruction:` hook query
 - [`specs/core/config/spec.md`](../config/spec.md) — project-level hooks via `schemaOverrides`
-- [`specs/cli/change-transition/spec.md`](../../cli/change-transition/spec.md) — `--no-hooks` flag
+- [`specs/cli/change-transition/spec.md`](../../cli/change-transition/spec.md) — transition `--skip-hooks` selectors
+- [`specs/cli/change-archive/spec.md`](../../cli/change-archive/spec.md) — archive `--skip-hooks` selectors
