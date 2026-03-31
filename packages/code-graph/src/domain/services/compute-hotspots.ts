@@ -86,7 +86,7 @@ export async function computeHotspots(
   // restrictive defaults so queries don't silently lose results.
   const hasScopeFilter =
     options?.workspace !== undefined ||
-    options?.kind !== undefined ||
+    (options?.kinds?.length ?? 0) > 0 ||
     options?.filePath !== undefined ||
     (options?.excludePaths?.length ?? 0) > 0 ||
     (options?.excludeWorkspaces?.length ?? 0) > 0 ||
@@ -103,10 +103,12 @@ export async function computeHotspots(
     // to avoid a full symbol table scan
     const allSymbols = await store.findSymbols({
       ...(options?.workspace ? { filePath: `${options.workspace}:*` } : undefined),
-      ...(options?.kind ? { kind: options.kind } : undefined),
     })
     for (const symbol of allSymbols) {
       if (symbolMap.has(symbol.id)) continue // already processed
+      if (options?.kinds && options.kinds.length > 0 && !options.kinds.includes(symbol.kind)) {
+        continue
+      }
       const fileImporters = importerCounts.get(symbol.filePath) ?? 0
       if (fileImporters === 0 && minScore > 0) continue
 
@@ -133,7 +135,8 @@ export async function computeHotspots(
     if (e.score < minScore) return false
     if (RISK_ORDER[e.riskLevel] < minRiskOrder) return false
     if (options?.workspace && !e.symbol.filePath.startsWith(options.workspace + ':')) return false
-    if (options?.kind && e.symbol.kind !== options.kind) return false
+    if (options?.kinds && options.kinds.length > 0 && !options.kinds.includes(e.symbol.kind))
+      return false
     if (options?.filePath && e.symbol.filePath !== options.filePath) return false
     if (matchesExclude(e.symbol.filePath, options?.excludePaths, options?.excludeWorkspaces))
       return false

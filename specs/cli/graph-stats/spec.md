@@ -9,24 +9,33 @@ Without a quick overview of the code graph's contents, users and agents cannot t
 ### Requirement: Command signature
 
 ```
-specd graph stats [--path <path>] [--format text|json|toon]
+specd graph stats [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
-- `--path` — optional; workspace root, defaults to the current working directory
+- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
+- `--path <path>` — optional; repo-root bootstrap mode
 - `--format text|json|toon` — optional; output format, defaults to `text`
+
+`--config` and `--path` are mutually exclusive.
+
+`--path` and no-config fallback are bootstrap mechanisms for setup and repository exploration, not the intended steady-state mode for configured projects.
 
 ### Requirement: Statistics retrieval
 
 The command:
 
-1. Creates a `CodeGraphProvider` with the resolved path
-2. Opens the provider
-3. Calls `getStatistics()` to retrieve the `GraphStatistics` object
-4. Resolves the current VCS ref via `createVcsAdapter(projectRoot)` and `vcs.ref()`. If VCS detection fails or `ref()` throws, `currentRef` is `null`.
-5. Compares `currentRef` against `statistics.lastIndexedRef` to determine staleness
-6. Outputs the statistics with staleness information
-7. Closes the provider
-8. Exits with `process.exit(0)` — required because the LadybugDB native addon keeps the Node process alive
+1. Validates that `--config` and `--path` are not both present
+2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
+3. Creates a `CodeGraphProvider` from the resolved graph context
+4. Opens the provider
+5. Calls `getStatistics()` to retrieve the `GraphStatistics` object
+6. Resolves the current VCS ref via `createVcsAdapter(projectRoot)` and `vcs.ref()`. If VCS detection fails or `ref()` throws, `currentRef` is `null`.
+7. Compares `currentRef` against `statistics.lastIndexedRef` to determine staleness
+8. Outputs the statistics with staleness information
+9. Closes the provider
+10. Exits with `process.exit(0)` — required because the LadybugDB native addon keeps the Node process alive
+
+In bootstrap mode, the command SHALL behave as if there were a single `default` workspace whose `codeRoot` is the resolved VCS root.
 
 ### Requirement: Output format
 
@@ -70,6 +79,7 @@ If the provider cannot be opened or statistics retrieval fails due to an infrast
 - The CLI does not compute statistics — it delegates entirely to `@specd/code-graph`
 - `process.exit(0)` is called explicitly after closing the provider
 - Zero-value relation counts are omitted from text output for readability
+- Context resolution SHALL use the shared graph CLI model rather than command-local path semantics
 
 ## Examples
 
@@ -101,5 +111,6 @@ Last indexed: 2026-03-13T09:00:00.000Z
 ## Spec Dependencies
 
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`specs/core/config/spec.md`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
 - [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — CodeGraphProvider, GraphStatistics
 - [`specs/code-graph/staleness-detection/spec.md`](../../code-graph/staleness-detection/spec.md) — staleness semantics, warn-not-block policy

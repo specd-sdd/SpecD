@@ -9,33 +9,45 @@ The code graph contains symbols with names and comments, and specs with titles, 
 ### Requirement: Command signature
 
 ```text
-specd graph search <query> [--symbols] [--specs] [--kind <kind>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--format text|json|toon]
+specd graph search <query> [--symbols] [--specs] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
 - `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)
 - `--symbols` — optional; search only symbols
 - `--specs` — optional; search only specs
-- `--kind <kind>` — optional; filter symbols by kind (`function|class|method|variable|type|interface|enum`)
+- `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `function,class,method`
 - `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)
 - `--workspace <name>` — optional; filter both symbols and specs to a single workspace
 - `--exclude-path <pattern>` — optional, repeatable; exclude symbols/specs whose file path matches glob pattern (supports `*` wildcards, case-insensitive)
 - `--exclude-workspace <name>` — optional, repeatable; exclude results from the given workspace
 - `--limit <n>` — optional; maximum results per category, defaults to `10`
 - `--spec-content` — optional; include full spec content in output. Only valid with `--format json` or `--format toon` — exits with code 1 if used with text format
+- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
+- `--path <path>` — optional; repo-root bootstrap mode
 - `--format text|json|toon` — optional; output format, defaults to `text`
+
+`--config` and `--path` are mutually exclusive.
 
 When neither `--symbols` nor `--specs` is provided, both categories are searched.
 
 All filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-workspace`) are applied at the store level before LIMIT — not as post-query filters. The CLI passes them via `SearchOptions` to `CodeGraphProvider.searchSymbols` / `CodeGraphProvider.searchSpecs`.
 
+`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects.
+
 ### Requirement: Search behaviour
 
-The command uses `resolveCliContext()` to load config and creates a `CodeGraphProvider` via `withProvider`. It delegates to:
+The command uses the shared graph CLI context model to resolve explicit config, autodetected config, or bootstrap mode before creating a `CodeGraphProvider` via `withProvider`.
+
+It delegates to:
 
 - `provider.searchSymbols(options)` — full-text search on `Symbol.name` and `Symbol.comment`, with filters applied at the store level
 - `provider.searchSpecs(options)` — full-text search on `Spec.title`, `Spec.description`, and `Spec.content`, with filters applied at the store level
 
 Both use LadybugDB's FTS extension with BM25 scoring. Results are returned ordered by score descending — highest relevance first.
+
+The `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.
+
+The validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value.
 
 ### Requirement: Output format
 
@@ -145,5 +157,6 @@ Symbols (10):
 ## Spec Dependencies
 
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`specs/core/config/spec.md`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
 - [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — CodeGraphProvider facade
 - [`specs/code-graph/database-schema/spec.md`](../../code-graph/database-schema/spec.md) — FTS indexes

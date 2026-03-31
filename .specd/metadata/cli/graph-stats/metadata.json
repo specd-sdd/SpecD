@@ -1,11 +1,7 @@
 {
   "title": "Graph Stats",
   "description": "Without a quick overview of the code graph's contents, users and agents cannot tell whether the graph is populated, how large it is, or when it was last updated. The `specd graph stats` command displays summary statistics from the code graph so users can assess coverage and freshness at a glance.",
-  "dependsOn": [
-    "cli:cli/entrypoint",
-    "code-graph:code-graph/composition",
-    "code-graph:code-graph/staleness-detection"
-  ],
+  "dependsOn": ["core:core/config"],
   "context": [
     "Without a quick overview of the code graph's contents, users and agents cannot tell whether the graph is populated, how large it is, or when it was last updated. The `specd graph stats` command displays summary statistics from the code graph so users can assess coverage and freshness at a glance."
   ],
@@ -13,13 +9,13 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd graph stats [--path <path>] [--format text|json|toon]\n```\n\n- `--path` — optional; workspace root, defaults to the current working directory\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd graph stats [--config <path> | --path <path>] [--format text|json|toon]\n```\n\n- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\n`--config` and `--path` are mutually exclusive.\n\n`--path` and no-config fallback are bootstrap mechanisms for setup and repository exploration, not the intended steady-state mode for configured projects."
       ]
     },
     {
       "requirement": "Statistics retrieval",
       "rules": [
-        "The command:\n\n1. Creates a `CodeGraphProvider` with the resolved path\n2. Opens the provider\n3. Calls `getStatistics()` to retrieve the `GraphStatistics` object\n4. Resolves the current VCS ref via `createVcsAdapter(projectRoot)` and `vcs.ref()`. If VCS detection fails or `ref()` throws, `currentRef` is `null`.\n5. Compares `currentRef` against `statistics.lastIndexedRef` to determine staleness\n6. Outputs the statistics with staleness information\n7. Closes the provider\n8. Exits with `process.exit(0)` — required because the LadybugDB native addon keeps the Node process alive"
+        "The command:\n\n1. Validates that `--config` and `--path` are not both present\n2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n3. Creates a `CodeGraphProvider` from the resolved graph context\n4. Opens the provider\n5. Calls `getStatistics()` to retrieve the `GraphStatistics` object\n6. Resolves the current VCS ref via `createVcsAdapter(projectRoot)` and `vcs.ref()`. If VCS detection fails or `ref()` throws, `currentRef` is `null`.\n7. Compares `currentRef` against `statistics.lastIndexedRef` to determine staleness\n8. Outputs the statistics with staleness information\n9. Closes the provider\n10. Exits with `process.exit(0)` — required because the LadybugDB native addon keeps the Node process alive\n\nIn bootstrap mode, the command SHALL behave as if there were a single `default` workspace whose `codeRoot` is the resolved VCS root."
       ]
     },
     {
@@ -38,15 +34,48 @@
   "constraints": [
     "The CLI does not compute statistics — it delegates entirely to @specd/code-graph",
     "process.exit(0) is called explicitly after closing the provider",
-    "Zero-value relation counts are omitted from text output for readability"
+    "Zero-value relation counts are omitted from text output for readability",
+    "Context resolution SHALL use the shared graph CLI model rather than command-local path semantics"
   ],
   "scenarios": [
     {
+      "requirement": "Command signature",
+      "name": "Explicit config path bypasses discovery",
+      "given": ["the current directory would autodiscover a different specd.yaml"],
+      "when": ["specd graph stats --config /tmp/other/specd.yaml is run"],
+      "then": ["the command uses /tmp/other/specd.yaml directly"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Explicit path enters bootstrap mode",
+      "given": ["a specd.yaml exists under the current repository"],
+      "when": ["specd graph stats --path /tmp/repo is run"],
+      "then": [
+        "config discovery is ignored",
+        "AND the command opens the graph for a synthetic single workspace default rooted at /tmp/repo"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Mutually exclusive context flags fail fast",
+      "when": ["specd graph stats --config ./specd.yaml --path . is run"],
+      "then": ["the command exits with code 1 before any graph provider is opened"]
+    },
+    {
       "requirement": "Statistics retrieval",
-      "name": "Command retrieves statistics and resolves VCS ref",
-      "when": ["graph stats is executed"],
+      "name": "Command retrieves statistics and resolves VCS ref in configured mode",
+      "when": ["graph stats is executed with discovered or explicit config"],
       "then": [
         "the command SHALL create a provider, open it, call getStatistics(), resolve the current VCS ref, output results, close the provider, and exit with code 0"
+      ]
+    },
+    {
+      "requirement": "Statistics retrieval",
+      "name": "Missing config falls back to bootstrap mode",
+      "given": ["no specd.yaml is found by autodiscovery"],
+      "when": ["graph stats is executed inside a repository"],
+      "then": [
+        "the command SHALL resolve the VCS root and open the graph in bootstrap mode as workspace default"
       ]
     },
     {
@@ -106,8 +135,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b4cca44e86deef352cd0475401dc2f26080180c23aaee0a99c0e8d7a28449c90",
-    "verify.md": "sha256:26b675c4ef4c5b191eb3a04316c2b4b272d240453eb11c2e78db70f3cd586998"
+    "spec.md": "sha256:7541397dd428048909225fcac7c7bd6f0b73b46b126001e8b26d9437723050c7",
+    "verify.md": "sha256:ea7c43de140dcd142525770f33fe6f1730390193a26e5f180cd801e57726301d"
   },
   "generatedBy": "core"
 }

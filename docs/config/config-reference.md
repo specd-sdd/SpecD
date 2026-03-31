@@ -20,6 +20,17 @@ SpecD locates its configuration using the following strategy, in order:
 
 The walk never crosses the git repo root. In a monorepo where each package has its own `specd.yaml`, the package-level file is used when running SpecD from within that package — the root-level file is not considered.
 
+## Bootstrap mode exceptions
+
+Some `graph` CLI commands also support a repository bootstrap mode for code-graph bootstrapping before a project has been configured:
+
+- `--path <repo-root>` forces bootstrap mode and is mutually exclusive with `--config`
+- when no config is discovered, those commands fall back to bootstrap mode automatically
+
+In bootstrap mode, SpecD behaves as if the repository were a single synthetic `default` workspace with `codeRoot` set to the VCS root. Any discovered `specd.yaml` is ignored when `--path` is provided explicitly.
+
+Bootstrap mode is intended for initial indexing and exploratory graph queries. It is not the normal production mode for configured projects. Once a repository has a `specd.yaml`, standard configured execution should be preferred.
+
 ## Top-level fields
 
 | Field                 | Type    | Required | Default      | Description                                                                                                    |

@@ -186,9 +186,39 @@ describe('computeHotspots', () => {
       ],
     )
 
-    const result = await computeHotspots(store, { kind: SymbolKind.Class, minRisk: 'LOW' })
+    const result = await computeHotspots(store, { kinds: [SymbolKind.Class], minRisk: 'LOW' })
     expect(result.entries).toHaveLength(1)
     expect(result.entries[0]!.symbol.kind).toBe('class')
+  })
+
+  it('filters by multiple kinds', async () => {
+    const fn = sym('myFn', 'ws-a:a.ts', 1, SymbolKind.Function)
+    const cls = sym('MyClass', 'ws-a:a.ts', 5, SymbolKind.Class)
+    const variable = sym('state', 'ws-a:a.ts', 9, SymbolKind.Variable)
+    const caller = sym('caller', 'ws-a:c.ts', 1)
+
+    await store.upsertFile(file('ws-a:a.ts'), [fn, cls, variable], [])
+    await store.upsertFile(
+      file('ws-a:c.ts'),
+      [caller],
+      [
+        createRelation({ source: caller.id, target: fn.id, type: RelationType.Calls }),
+        createRelation({ source: caller.id, target: cls.id, type: RelationType.Calls }),
+        createRelation({ source: caller.id, target: variable.id, type: RelationType.Calls }),
+      ],
+    )
+
+    const result = await computeHotspots(store, {
+      kinds: [SymbolKind.Class, SymbolKind.Function],
+      minRisk: 'LOW',
+    })
+    expect(result).toHaveProperty('entries')
+    expect(result.entries.every((entry) => entry.symbol.kind !== SymbolKind.Variable)).toBe(true)
+    expect(result.entries.map((entry) => entry.symbol.kind)).toEqual([
+      'function',
+      'class',
+      'function',
+    ])
   })
 
   it('respects limit', async () => {

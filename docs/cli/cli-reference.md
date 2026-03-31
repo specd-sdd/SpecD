@@ -698,12 +698,14 @@ Index and query the code graph for the workspace.
 specd graph index [options]
 ```
 
-Indexes the workspace's source files into the code graph. File discovery respects `.gitignore` by default and applies configurable exclusion patterns.
+Indexes workspace source files into the code graph. When a `specd.yaml` is supplied with `--config` or discovered automatically, indexing uses the configured workspaces. When no config is available, or when `--path` is provided, the command enters bootstrap mode and indexes a synthetic `default` workspace rooted at the repository root. Bootstrap mode is intended for initial graph bootstrapping, not normal configured project operation.
 
 | Option                      | Description                                                           |
 | --------------------------- | --------------------------------------------------------------------- |
 | `--workspace <name>`        | Index only the named workspace.                                       |
 | `--force`                   | Full re-index, ignoring cached file hashes.                           |
+| `--config <path>`           | Config file path. Mutually exclusive with `--path`.                   |
+| `--path <path>`             | Repository root bootstrap path. Ignores any discovered config.        |
 | `--exclude-path <pattern>`  | Gitignore-syntax pattern to exclude (repeatable; merges with config). |
 | `--format text\|json\|toon` | Output format.                                                        |
 
@@ -748,14 +750,22 @@ specd graph index --exclude-path "packages/generated/*" --exclude-path "tmp/"
 specd graph search <query> [options]
 ```
 
-Search for symbols or specs in the code graph.
+Search for symbols or specs in the code graph. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-| Option                      | Description                              |
-| --------------------------- | ---------------------------------------- |
-| `--specs`                   | Search specs instead of code symbols.    |
-| `--workspace <name>`        | Restrict search to the named workspace.  |
-| `--limit <n>`               | Maximum number of results (default: 20). |
-| `--format text\|json\|toon` | Output format.                           |
+| Option                       | Description                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------- |
+| `--symbols`                  | Search only symbols.                                                            |
+| `--specs`                    | Search only specs.                                                              |
+| `--kind <list>`              | Filter symbol results by comma-separated kinds, for example `class,method`.     |
+| `--config <path>`            | Config file path. Mutually exclusive with `--path`.                             |
+| `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                  |
+| `--file <path>`              | Restrict symbol results to file paths matching the wildcard pattern.            |
+| `--workspace <name>`         | Restrict results to the named workspace.                                        |
+| `--exclude-path <pattern>`   | Exclude symbols/specs whose file path matches the wildcard pattern. Repeatable. |
+| `--exclude-workspace <name>` | Exclude results from the named workspace. Repeatable.                           |
+| `--limit <n>`                | Maximum number of results per category (default: 10).                           |
+| `--spec-content`             | Include full spec content in `json` or `toon` output.                           |
+| `--format text\|json\|toon`  | Output format.                                                                  |
 
 ---
 
@@ -765,13 +775,23 @@ Search for symbols or specs in the code graph.
 specd graph hotspots [options]
 ```
 
-List the most connected symbols in the graph ranked by coupling risk.
+List the most connected symbols in the graph ranked by coupling risk. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-| Option                      | Description                                                      |
-| --------------------------- | ---------------------------------------------------------------- |
-| `--min-risk <level>`        | Minimum risk level to show: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`. |
-| `--limit <n>`               | Maximum number of results (default: 20).                         |
-| `--format text\|json\|toon` | Output format.                                                   |
+| Option                       | Description                                                                            |
+| ---------------------------- | -------------------------------------------------------------------------------------- |
+| `--workspace <name>`         | Restrict hotspots to the named workspace.                                              |
+| `--kind <list>`              | Filter hotspots by comma-separated symbol kinds, for example `class,method`.           |
+| `--file <path>`              | Restrict hotspots to a file path.                                                      |
+| `--exclude-path <pattern>`   | Exclude symbols whose file path matches the wildcard pattern. Repeatable.              |
+| `--exclude-workspace <name>` | Exclude hotspots from the named workspace. Repeatable.                                 |
+| `--limit <n>`                | Maximum number of results. When omitted and no filters are set, defaults to `20`.      |
+| `--min-score <n>`            | Minimum score threshold. When omitted and no filters are set, defaults to `1`.         |
+| `--min-risk <level>`         | Minimum risk level to show. When omitted and no filters are set, defaults to `MEDIUM`. |
+| `--config <path>`            | Config file path. Mutually exclusive with `--path`.                                    |
+| `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                         |
+| `--format text\|json\|toon`  | Output format.                                                                         |
+
+`--kind` accepts a single comma-separated list and validates every token against the supported symbol kinds. Invalid values fail the command before querying the graph.
 
 ---
 
@@ -781,11 +801,13 @@ List the most connected symbols in the graph ranked by coupling risk.
 specd graph stats [options]
 ```
 
-Print summary statistics for the current code graph.
+Print summary statistics for the current code graph. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-| Option                      | Description    |
-| --------------------------- | -------------- |
-| `--format text\|json\|toon` | Output format. |
+| Option                      | Description                                                    |
+| --------------------------- | -------------------------------------------------------------- |
+| `--config <path>`           | Config file path. Mutually exclusive with `--path`.            |
+| `--path <path>`             | Repository root bootstrap path. Ignores any discovered config. |
+| `--format text\|json\|toon` | Output format.                                                 |
 
 ---
 
@@ -795,14 +817,18 @@ Print summary statistics for the current code graph.
 specd graph impact [options]
 ```
 
-Analyze the downstream or upstream impact of a symbol or file.
+Analyze the downstream or upstream impact of a symbol or file. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-| Option                                   | Description                                                      |
-| ---------------------------------------- | ---------------------------------------------------------------- |
-| `--symbol <id>`                          | Symbol ID to analyze (e.g. `core:src/index.ts:function:main:1`). |
-| `--file <path>`                          | File path to analyze (e.g. `core:src/index.ts`).                 |
-| `--direction upstream\|downstream\|both` | Impact direction (default: `downstream`).                        |
-| `--format text\|json\|toon`              | Output format.                                                   |
+| Option                                   | Description                                                    |
+| ---------------------------------------- | -------------------------------------------------------------- |
+| `--symbol <name>`                        | Symbol name to analyze.                                        |
+| `--file <path>`                          | File path to analyze.                                          |
+| `--changes <files...>`                   | Analyze impact of a set of changed files.                      |
+| `--direction upstream\|downstream\|both` | Impact direction (default: `upstream`).                        |
+| `--depth <n>`                            | Maximum traversal depth (default: `3`).                        |
+| `--config <path>`                        | Config file path. Mutually exclusive with `--path`.            |
+| `--path <path>`                          | Repository root bootstrap path. Ignores any discovered config. |
+| `--format text\|json\|toon`              | Output format.                                                 |
 
 ---
 

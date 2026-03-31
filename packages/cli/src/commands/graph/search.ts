@@ -1,8 +1,9 @@
 import { Command, Option } from 'commander'
-import { type SearchOptions, SymbolKind } from '@specd/code-graph'
+import { type SearchOptions } from '@specd/code-graph'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
-import { resolveCliContext } from '../../helpers/cli-context.js'
+import { parseGraphKinds } from './parse-graph-kinds.js'
+import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 
 /**
@@ -26,9 +27,9 @@ export function registerGraphSearch(parent: Command): void {
     .description('Full-text search across symbols and specs')
     .option('--symbols', 'search only symbols')
     .option('--specs', 'search only specs')
-    .addOption(
-      new Option('--kind <kind>', 'filter symbols by kind').choices(Object.values(SymbolKind)),
-    )
+    .addOption(new Option('--kind <kinds>', 'filter symbols by kind (comma-separated)'))
+    .option('--config <path>', 'path to specd.yaml')
+    .option('--path <path>', 'repository root for bootstrap mode')
     .option('--file <path>', 'filter symbols by file path (supports * wildcards)')
     .option('--workspace <name>', 'filter results by workspace')
     .option(
@@ -80,6 +81,8 @@ Exclude examples:
           symbols?: boolean
           specs?: boolean
           kind?: string
+          config?: string
+          path?: string
           file?: string
           workspace?: string
           excludePath: string[]
@@ -97,25 +100,33 @@ Exclude examples:
         if (Number.isNaN(limit) || limit <= 0) {
           cliError('--limit must be a positive integer', opts.format)
         }
-        if (
-          opts.kind &&
-          !['function', 'class', 'method', 'variable', 'type', 'interface', 'enum'].includes(
-            opts.kind,
-          )
-        ) {
-          cliError(
-            `--kind must be one of: function, class, method, variable, type, interface, enum (got '${opts.kind}')`,
-            opts.format,
-          )
+        if (opts.config !== undefined && opts.path !== undefined) {
+          cliError('--config and --path are mutually exclusive', opts.format, 1)
         }
         const searchBoth = !opts.symbols && !opts.specs
-        const { config } = await resolveCliContext()
+        const kinds = (() => {
+          try {
+            return parseGraphKinds(opts.kind)
+          } catch (err) {
+            cliError(err instanceof Error ? err.message : 'invalid --kind value', opts.format, 1)
+          }
+        })()
+        const { config } = await resolveGraphCliContext({
+          configPath: opts.config,
+          repoPath: opts.path,
+        }).catch((err: unknown) =>
+          cliError(
+            err instanceof Error ? err.message : 'failed to resolve graph context',
+            opts.format,
+            1,
+          ),
+        )
 
         await withProvider(config, opts.format, async (provider) => {
           const searchOptions: SearchOptions = {
             query,
             limit,
-            ...(opts.kind ? { kind: opts.kind as SymbolKind } : undefined),
+            ...(kinds !== undefined ? { kinds } : undefined),
             ...(opts.file ? { filePattern: opts.file } : undefined),
             ...(opts.workspace ? { workspace: opts.workspace } : undefined),
             ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),

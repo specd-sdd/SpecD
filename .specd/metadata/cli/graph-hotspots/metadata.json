@@ -1,0 +1,189 @@
+{
+  "title": "Graph Hotspots",
+  "description": "Users and agents need a fast way to identify the most structurally coupled symbols in the code graph before changing code, writing specs, or exploring an unfamiliar area. The `specd graph hotspots` command provides that ranking, including filtering and output options that make the result usable both for day-to-day inspection and for bootstrap work against repositories that do not yet have a full `specd.yaml`.",
+  "dependsOn": ["cli:cli/entrypoint", "core:core/config", "code-graph:code-graph/composition"],
+  "context": [
+    "Users and agents need a fast way to identify the most structurally coupled symbols in the code graph before changing code, writing specs, or exploring an unfamiliar area. The `specd graph hotspots` command provides that ranking, including filtering and output options that make the result usable both for day-to-day inspection and for bootstrap work against repositories that do not yet have a full `specd.yaml`."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```text\nspecd graph hotspots [--workspace <name>] [--kind <kinds>] [--file <path>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--min-score <n>] [--min-risk LOW|MEDIUM|HIGH|CRITICAL] [--config <path> | --path <path>] [--format text|json|toon]\n```\n\n- `--workspace <name>` — optional; filter results to a single workspace\n- `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `class,method,enum`\n- `--file <path>` — optional; filter to a single file path\n- `--exclude-path <pattern>` — optional, repeatable; exclude symbols whose file path matches the glob pattern\n- `--exclude-workspace <name>` — optional, repeatable; exclude results from the named workspace\n- `--limit <n>` — optional; maximum number of entries returned\n- `--min-score <n>` — optional; minimum hotspot score\n- `--min-risk <level>` — optional; minimum risk level\n- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\n`--config` and `--path` are mutually exclusive.\n\nWhen no explicit filter flags are passed, the command SHALL apply its default filters: `minScore > 0`, `minRisk >= MEDIUM`, and `limit = 20`. Any explicit filter flag SHALL remove those implicit defaults, so only the explicitly requested constraints apply."
+      ]
+    },
+    {
+      "requirement": "Context resolution",
+      "rules": [
+        "The command SHALL use the shared graph CLI context model:\n\n- If `--config <path>` is passed, that config file SHALL be used directly.\n- If `--path <path>` is passed, the command SHALL enter bootstrap mode, ignore config discovery, and treat the resolved repository root as a synthetic single-workspace project.\n- If neither flag is passed, the command SHALL first try config autodiscovery.\n- If autodiscovery succeeds, the discovered config SHALL be used.\n- If autodiscovery does not find config, the command SHALL fall back to bootstrap mode using the resolved repository root.\n\nBootstrap mode exists for setup and exploration, not as the intended steady-state mode for configured projects.\n\nIn bootstrap mode, the command SHALL behave as if there were a `default` workspace whose `codeRoot` is the resolved VCS root."
+      ]
+    },
+    {
+      "requirement": "Kind filter semantics",
+      "rules": [
+        "The `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values.\n\nIf any token is invalid, the command SHALL fail with a CLI error and SHALL NOT execute the query.\n\nThe validated kind list SHALL be passed through to the hotspot query layer as a multi-kind filter rather than being collapsed to a single last value."
+      ]
+    },
+    {
+      "requirement": "Hotspot retrieval",
+      "rules": [
+        "The command SHALL resolve graph context, create a `CodeGraphProvider`, and delegate hotspot computation to `provider.getHotspots(...)`.\n\nThe command SHALL pass all requested filters through to the provider, including workspace, kind list, file path, exclusion filters, limit, score threshold, and minimum risk."
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "rules": [
+        "In `text` mode, the command SHALL print a ranked table with:\n\n- total returned entries and total symbol count\n- per-entry score\n- per-entry risk level\n- per-entry cross-workspace caller count\n- per-entry kind\n- per-entry symbol name\n- workspace-qualified file location\n\nIf no entries match, the command SHALL output `No hotspots found.`\n\nIn `json` or `toon` mode, the command SHALL output an object containing `totalSymbols` and `entries`. Each entry SHALL include the symbol payload, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, and the derived `workspace` field."
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "rules": [
+        "If both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting any graph access.\n\nIf the provider cannot be opened or hotspot retrieval fails due to an infrastructure error, the command SHALL exit with code 3."
+      ]
+    },
+    {
+      "requirement": "CLI reference documentation",
+      "rules": [
+        "The CLI reference in `docs/cli/cli-reference.md` SHALL document `graph hotspots`, including:\n\n- command signature\n- `--kind` as a comma-separated list\n- `--config` and `--path` behavior\n- the fact that `--path` and no-config fallback are bootstrap-only modes, not the normal configured mode"
+      ]
+    }
+  ],
+  "constraints": [
+    "The CLI SHALL delegate hotspot computation to @specd/code-graph",
+    "--kind validation SHALL use the same allowed kind set as the code graph symbol model",
+    "Bootstrap mode SHALL not reinterpret --config; it is selected only by --path or by missing config"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Default hotspot filters apply only when no explicit filter flags are provided",
+      "when": ["specd graph hotspots is run with no explicit filter flags"],
+      "then": ["the command queries hotspots with minScore > 0, minRisk >= MEDIUM, and limit = 20"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Explicit filter removes implicit defaults",
+      "when": ["specd graph hotspots --limit 50 is run"],
+      "then": [
+        "the command uses the explicit limit = 50",
+        "AND it does not also force the implicit minScore > 0 or minRisk >= MEDIUM defaults"
+      ]
+    },
+    {
+      "requirement": "Context resolution",
+      "name": "Explicit config path bypasses discovery",
+      "given": ["the current directory would autodiscover a different specd.yaml"],
+      "when": ["specd graph hotspots --config /tmp/other/specd.yaml is run"],
+      "then": [
+        "the command uses /tmp/other/specd.yaml directly",
+        "AND config autodiscovery is skipped"
+      ]
+    },
+    {
+      "requirement": "Context resolution",
+      "name": "Bootstrap mode via explicit path ignores config discovery",
+      "given": ["a specd.yaml exists under the current repository"],
+      "when": ["specd graph hotspots --path /tmp/repo is run"],
+      "then": [
+        "the command ignores config discovery",
+        "AND it behaves as if /tmp/repo were a synthetic single-workspace project with workspace default"
+      ]
+    },
+    {
+      "requirement": "Context resolution",
+      "name": "Missing config falls back to bootstrap mode",
+      "given": ["no specd.yaml is found by autodiscovery"],
+      "when": ["specd graph hotspots is run inside a repository"],
+      "then": [
+        "the command falls back to bootstrap mode",
+        "AND the resolved VCS root becomes the synthetic workspace default code root"
+      ]
+    },
+    {
+      "requirement": "Kind filter semantics",
+      "name": "Comma-separated kind list is preserved as multiple kinds",
+      "when": ["specd graph hotspots --kind class,method,function is run"],
+      "then": [
+        "the command trims and validates the three tokens",
+        "AND it passes all three kinds to the hotspot query layer"
+      ]
+    },
+    {
+      "requirement": "Kind filter semantics",
+      "name": "Invalid kind token fails before querying",
+      "when": ["specd graph hotspots --kind class,unknownKind is run"],
+      "then": ["the command exits with a CLI error", "AND hotspot retrieval is not attempted"]
+    },
+    {
+      "requirement": "Hotspot retrieval",
+      "name": "All requested filters are delegated to the provider",
+      "when": [
+        "specd graph hotspots --workspace core --kind class,method --file \"src/*\" --exclude-path \"test/*\" --exclude-workspace cli --limit 15 --min-score 3 --min-risk HIGH is run"
+      ],
+      "then": [
+        "the provider receives the workspace, kind list, file, exclusion filters, limit, score threshold, and risk threshold exactly as requested"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Text output shows ranked hotspot table",
+      "given": ["hotspot results exist"],
+      "when": ["specd graph hotspots is run in text mode"],
+      "then": [
+        "stdout shows the total returned entry count and total symbol count",
+        "AND each row includes score, risk level, cross-workspace caller count, kind, symbol name, and workspace-qualified file location"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Empty result set in text mode",
+      "given": ["no hotspots match the active filters"],
+      "when": ["specd graph hotspots is run in text mode"],
+      "then": ["stdout shows No hotspots found."]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output includes derived workspace field",
+      "when": ["specd graph hotspots --format json is run"],
+      "then": [
+        "stdout is a JSON object containing totalSymbols and entries",
+        "AND each entry includes symbol, score, directCallers, crossWorkspaceCallers, fileImporters, riskLevel, and workspace"
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Mutually exclusive context flags fail fast",
+      "when": ["specd graph hotspots --config ./specd.yaml --path . is run"],
+      "then": ["the command exits with a CLI error before any graph provider is opened"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Infrastructure error exits with code 3",
+      "given": [
+        "the provider cannot be opened or hotspot retrieval fails due to an infrastructure error"
+      ],
+      "when": ["specd graph hotspots is run"],
+      "then": [
+        "stderr contains a fatal: prefixed error message",
+        "AND the process exits with code 3"
+      ]
+    },
+    {
+      "requirement": "CLI reference documentation",
+      "name": "CLI reference documents graph hotspots bootstrap semantics",
+      "when": ["docs/cli/cli-reference.md is inspected"],
+      "then": [
+        "the graph hotspots documentation includes the command signature",
+        "AND it documents --kind as a comma-separated list",
+        "AND it documents --config and --path",
+        "AND it states that --path and no-config fallback are bootstrap-only modes rather than the normal configured mode"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:9ca3e3b31ab64e67fc244a7f56ed19321a11886df1820401c76a556cf7169afa",
+    "verify.md": "sha256:4f4b4c5cff591d10ee73814408e9956e3226a77e45bd783f680105f2a2c9c158"
+  },
+  "generatedBy": "core"
+}

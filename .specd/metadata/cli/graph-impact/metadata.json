@@ -1,7 +1,7 @@
 {
   "title": "Graph Impact",
   "description": "Before modifying code, developers and agents need to understand the blast radius — which other files and symbols depend on the change. The `specd graph impact` command runs impact analysis on a file, symbol, or set of changed files, reporting risk level, dependency counts, and affected files.",
-  "dependsOn": ["cli:cli/entrypoint", "code-graph:code-graph/composition"],
+  "dependsOn": ["core:core/config"],
   "context": [
     "Before modifying code, developers and agents need to understand the blast radius — which other files and symbols depend on the change. The `specd graph impact` command runs impact analysis on a file, symbol, or set of changed files, reporting risk level, dependency counts, and affected files."
   ],
@@ -9,25 +9,25 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```text\nspecd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction upstream|downstream|both] [--depth <n>] [--path <path>] [--format text|json|toon]\n```\n\nExactly one of `--file`, `--symbol`, or `--changes` must be provided.\n\n- `--file` — analyze impact of a single file\n- `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed\n- `--changes` — detect impact of changes to multiple files (variadic; accepts multiple space-separated paths)\n- `--direction` — optional; analysis direction, defaults to `upstream`. Values:\n  - `upstream` — find symbols and files that depend on the target\n  - `downstream` — find symbols and files that the target depends on\n  - `both` — combined upstream and downstream analysis\n- `--depth` — optional; maximum traversal depth, defaults to `3`. Must be a positive integer. Passed through to `analyzeImpact`/`analyzeFileImpact` as `maxDepth`\n- `--path` — optional; workspace root, defaults to the current working directory\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```text\nspecd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]\n```\n\nExactly one of `--file`, `--symbol`, or `--changes` must be provided.\n\n- `--file` — analyze impact of a single file\n- `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed\n- `--changes` — detect impact of changes to multiple files (variadic; accepts multiple space-separated paths)\n- `--direction` — optional; analysis direction, defaults to `upstream`. Values:\n  - `upstream` — find symbols and files that depend on the target\n  - `downstream` — find symbols and files that the target depends on\n  - `both` — combined upstream and downstream analysis\n- `--depth` — optional; maximum traversal depth, defaults to `3`. Must be a positive integer. Passed through to `analyzeImpact`/`analyzeFileImpact` as `maxDepth`\n- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\n`--config` and `--path` are mutually exclusive.\n\n`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects."
       ]
     },
     {
       "requirement": "File impact analysis",
       "rules": [
-        "When `--file` is provided:\n\n1. Creates a `CodeGraphProvider` with the resolved path\n2. Opens the provider\n3. Calls `analyzeFileImpact(file, direction)` to compute the impact\n4. Outputs the `FileImpactResult` including per-symbol breakdown\n5. Closes the provider and exits"
+        "When `--file` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Creates a `CodeGraphProvider` from the resolved graph context\n3. Opens the provider\n4. Calls `analyzeFileImpact(file, direction)` to compute the impact\n5. Outputs the `FileImpactResult` including per-symbol breakdown\n6. Closes the provider and exits\n\nIn bootstrap mode, the command SHALL behave as if there were a single `default` workspace whose `codeRoot` is the resolved VCS root."
       ]
     },
     {
       "requirement": "Symbol impact analysis",
       "rules": [
-        "When `--symbol` is provided:\n\n1. Searches for symbols matching the name via `findSymbols({ name })`\n2. If no symbol is found, outputs `No symbol found matching \"<name>\".`\n3. If one symbol is found, calls `analyzeImpact(symbolId, direction)` and outputs the result\n4. If multiple symbols match, analyzes each one and outputs all results"
+        "When `--symbol` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Searches for symbols matching the name via `findSymbols({ name })`\n3. If no symbol is found, outputs `No symbol found matching \"<name>\".`\n4. If one symbol is found, calls `analyzeImpact(symbolId, direction)` and outputs the result\n5. If multiple symbols match, analyzes each one and outputs all results"
       ]
     },
     {
       "requirement": "Change detection",
       "rules": [
-        "When `--changes` is provided:\n\n1. Calls `detectChanges(files)` with the list of file paths\n2. Outputs the summary and affected files"
+        "When `--changes` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Calls `detectChanges(files)` with the list of file paths\n3. Outputs the summary and affected files"
       ]
     },
     {
@@ -39,7 +39,7 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "Exactly one of `--file`, `--symbol`, or `--changes` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file, --symbol, or --changes`.\n\nIf the provider cannot be opened, the command exits with code 3."
+        "Exactly one of `--file`, `--symbol`, or `--changes` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file, --symbol, or --changes`.\n\nIf both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting graph access.\n\nIf the provider cannot be opened, the command exits with code 3."
       ]
     }
   ],
@@ -49,9 +49,27 @@
     "All file paths are workspace-relative, not absolute",
     "--direction only applies to --file and --symbol, not to --changes",
     "--depth applies to all selectors (--file, --symbol, --changes)",
-    "--depth must be a positive integer; invalid values exit with code 1"
+    "--depth must be a positive integer; invalid values exit with code 1",
+    "Context resolution SHALL use the shared graph CLI model rather than command-local path semantics"
   ],
   "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Explicit config path bypasses discovery",
+      "given": ["the current directory would autodiscover a different specd.yaml"],
+      "when": ["specd graph impact --file src/auth.ts --config /tmp/other/specd.yaml is run"],
+      "then": ["the command uses /tmp/other/specd.yaml directly"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Explicit path enters bootstrap mode",
+      "given": ["a specd.yaml exists under the current repository"],
+      "when": ["specd graph impact --file src/auth.ts --path /tmp/repo is run"],
+      "then": [
+        "config discovery is ignored",
+        "AND the command analyzes impact against a synthetic single workspace default rooted at /tmp/repo"
+      ]
+    },
     {
       "requirement": "File impact analysis",
       "name": "Upstream file analysis with defaults",
@@ -62,6 +80,15 @@
         "AND the analysis direction is upstream",
         "AND the default depth is 3",
         "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "File impact analysis",
+      "name": "Missing config falls back to bootstrap mode",
+      "given": ["no specd.yaml is found by autodiscovery"],
+      "when": ["specd graph impact --file src/auth.ts is run inside a repository"],
+      "then": [
+        "the command resolves the VCS root and analyzes against bootstrap mode workspace default"
       ]
     },
     {
@@ -216,6 +243,12 @@
     },
     {
       "requirement": "Error cases",
+      "name": "Mutually exclusive context flags fail fast",
+      "when": ["specd graph impact --file src/auth.ts --config ./specd.yaml --path . is run"],
+      "then": ["the command exits with code 1 before any graph provider is opened"]
+    },
+    {
+      "requirement": "Error cases",
       "name": "Invalid depth value",
       "when": ["specd graph impact --file src/auth.ts --depth 0 is run"],
       "then": [
@@ -244,8 +277,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:857835550fcba98c002143ca7a9b7156a8c4e8ece8677261979a46e1931bc006",
-    "verify.md": "sha256:1e613aac9b6020fe1a17c09077d8fde3ecf33ee75446538a82fdb63b6713f065"
+    "spec.md": "sha256:3be9909d42d760fc431f6425dc3aaad7251b50a9c1355d7b19618f0f97bba184",
+    "verify.md": "sha256:7097217b805647e442c228ee4294f501016da3f51298206fc0a9b60c862787ee"
   },
   "generatedBy": "core"
 }

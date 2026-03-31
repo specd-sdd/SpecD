@@ -19,7 +19,7 @@ export interface HotspotEntry {
  */
 export interface HotspotOptions {
   readonly workspace?: string
-  readonly kind?: SymbolKind
+  readonly kinds?: readonly SymbolKind[]
   readonly filePath?: string
   readonly limit?: number
   readonly minScore?: number
