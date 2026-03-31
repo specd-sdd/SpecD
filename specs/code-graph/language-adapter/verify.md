@@ -10,6 +10,13 @@
 - **WHEN** `extractSymbols()` is called twice with the same `filePath` and `content`
 - **THEN** both calls return identical results
 
+#### Scenario: extractRelations emits concrete file/symbol relations when resolvable
+
+- **GIVEN** a PHP file containing resolvable dependencies
+- **WHEN** `extractRelations()` is called
+- **THEN** concrete `IMPORTS` and/or `CALLS` relations are returned
+- **AND** no error is thrown for dropped unresolved dynamic expressions
+
 ### Requirement: Language detection
 
 #### Scenario: Unrecognized extension skipped
@@ -57,12 +64,6 @@
 #### Scenario: JSDoc comment extracted with symbol
 
 - **GIVEN** content containing:
-
-  ```typescript
-  /** Creates a user in the system. */
-  export function createUser(name: string) {}
-  ```
-
 - **WHEN** `extractSymbols()` is called
 - **THEN** the `createUser` symbol has `comment: '/** Creates a user in the system. */'`
 
@@ -266,3 +267,128 @@
 
 - **WHEN** `buildQualifiedName('App\\Models', 'User')` is called on the PHP adapter
 - **THEN** it returns `'App\\Models\\User'`
+
+#### Scenario: PSR-4 resolves qualified name to file path
+
+- **GIVEN** a `codeRoot` containing `composer.json` with `autoload.psr-4: { "App\\": "src/" }`
+- **WHEN** `resolveQualifiedNameToPath('App\\Models\\User', codeRoot)` is called on the PHP adapter
+- **THEN** it returns the absolute path `{codeRoot}/src/Models/User.php`
+
+#### Scenario: PSR-4 uses longest prefix match
+
+- **GIVEN** `composer.json` with `autoload.psr-4: { "App\\": "src/", "App\\Models\\": "src/models/" }`
+- **WHEN** `resolveQualifiedNameToPath('App\\Models\\User', codeRoot)` is called
+- **THEN** it returns `{codeRoot}/src/models/User.php` (longer prefix wins)
+
+#### Scenario: Qualified name with no matching prefix returns undefined
+
+- **GIVEN** `composer.json` with `autoload.psr-4: { "App\\": "src/" }`
+- **WHEN** `resolveQualifiedNameToPath('Vendor\\Lib\\Foo', codeRoot)` is called
+- **THEN** it returns `undefined`
+
+#### Scenario: No composer.json returns undefined
+
+- **GIVEN** a `codeRoot` with no `composer.json` at or above it (bounded by `repoRoot`)
+- **WHEN** `resolveQualifiedNameToPath('App\\Models\\User', codeRoot)` is called
+- **THEN** it returns `undefined` and no error is thrown
+
+#### Scenario: PSR-4 map cached across calls
+
+- **GIVEN** a `codeRoot` with a valid `composer.json`
+- **WHEN** `resolveQualifiedNameToPath` is called twice with different qualified names
+- **THEN** `composer.json` is read from disk only once
+
+### Requirement: PHP require/include dependencies
+
+#### Scenario: require_once with relative string literal emits IMPORTS
+
+- **GIVEN** a PHP file at `app/controllers/PostsController.php` containing `require_once '../models/Post.php'`
+- **WHEN** `extractRelations()` is called
+- **THEN** an `IMPORTS` relation is returned from `app/controllers/PostsController.php` to `app/models/Post.php`
+
+#### Scenario: include with relative path emits IMPORTS
+
+- **GIVEN** a PHP file containing `include 'helpers/url_helper.php'`
+- **WHEN** `extractRelations()` is called
+- **THEN** an `IMPORTS` relation is returned pointing to `helpers/url_helper.php` relative to the file's directory
+
+#### Scenario: require with PHP constant expression silently dropped
+
+- **GIVEN** a PHP file containing `require_once APPPATH . 'models/Post.php'`
+- **WHEN** `extractRelations()` is called
+- **THEN** no `IMPORTS` relation is created for that expression and no error is thrown
+
+#### Scenario: require with variable silently dropped
+
+- **GIVEN** a PHP file containing `require_once $path`
+- **WHEN** `extractRelations()` is called
+- **THEN** no relation is created for that expression and no error is thrown
+
+#### Scenario: require_once alongside use statements both processed
+
+- **GIVEN** a PHP file containing both `use App\Models\User;` and `require_once 'bootstrap.php'`
+- **WHEN** `extractRelations()` is called with a populated importMap
+- **THEN** an `IMPORTS` relation for `bootstrap.php` is returned
+- **AND** an `IMPORTS` relation for the resolved `User` class is also returned (via importMap)
+
+### Requirement: PHP dynamic loader dependencies
+
+#### Scenario: loadModel emits IMPORTS when target resolves
+
+- **GIVEN** a PHP file containing `$this->loadModel('User')`
+- **AND** resolver rules can map `User` to a concrete file
+- **WHEN** `extractRelations()` is called
+- **THEN** an `IMPORTS` relation is returned to that target file
+
+#### Scenario: CodeIgniter load->model emits IMPORTS when target resolves
+
+- **GIVEN** a PHP file containing `$this->load->model('User_model')`
+- **AND** resolver rules can map `User_model` to a concrete file
+- **WHEN** `extractRelations()` is called
+- **THEN** an `IMPORTS` relation is returned
+
+#### Scenario: App::uses emits IMPORTS when target resolves
+
+- **GIVEN** a PHP file containing `App::uses('Controller', 'Controller')`
+- **AND** resolver rules can map the class to a concrete file
+- **WHEN** `extractRelations()` is called
+- **THEN** an `IMPORTS` relation is returned
+
+#### Scenario: Dynamic argument silently dropped
+
+- **GIVEN** a PHP file containing `$this->loadModel($modelName)`
+- **WHEN** `extractRelations()` is called
+- **THEN** no relation is created for that call and no error is thrown
+
+#### Scenario: Unresolvable target silently dropped
+
+- **GIVEN** a PHP file containing a known loader call with literal argument
+- **AND** resolver rules cannot map it to a target file
+- **WHEN** `extractRelations()` is called
+- **THEN** no relation is created for that call and no error is thrown
+
+#### Scenario: Additional Cake loaders are supported
+
+- **GIVEN** a PHP file containing `$this->loadController('Admin')` and `$this->loadComponent('Auth')`
+- **WHEN** `extractRelations()` is called
+- **THEN** loader resolver rules are applied to both calls
+
+### Requirement: PHP loaded-instance call extraction
+
+#### Scenario: Member call on loaded alias emits CALLS
+
+- **GIVEN** a method containing `loadModel('Article')` and later `$this->Article->save()`
+- **WHEN** `extractRelations()` runs with resolvable caller and callee symbols
+- **THEN** a `CALLS` relation is emitted from caller symbol to callee symbol
+
+#### Scenario: Local variable alias emits CALLS
+
+- **GIVEN** a method containing `$model = $this->Article` and later `$model->find()`
+- **WHEN** both symbols are resolvable
+- **THEN** a `CALLS` relation is emitted
+
+#### Scenario: Cross-method alias propagation is not performed
+
+- **GIVEN** alias assignment in one method and method call in another
+- **WHEN** `extractRelations()` runs
+- **THEN** no `CALLS` relation is emitted from cross-method alias propagation

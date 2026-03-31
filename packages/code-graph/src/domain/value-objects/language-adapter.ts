@@ -102,4 +102,20 @@ export interface LanguageAdapter {
    * @returns The qualified name string.
    */
   buildQualifiedName?(namespace: string, symbolName: string): string
+
+  /**
+   * Resolves a fully qualified class/type name to an absolute file path
+   * by reading the language's autoloader configuration (e.g. composer.json PSR-4).
+   * Complements the in-memory qualified name map: handles classes not present
+   * in the indexed codebase. Performs I/O. SHOULD cache the parsed map per codeRoot.
+   * @param qualifiedName - Fully qualified name (e.g. `App\Models\User`)
+   * @param codeRoot - Absolute path to the workspace's code root.
+   * @param repoRoot - Optional repo root to bound the manifest search.
+   * @returns Absolute file path, or undefined if unresolvable.
+   */
+  resolveQualifiedNameToPath?(
+    qualifiedName: string,
+    codeRoot: string,
+    repoRoot?: string,
+  ): string | undefined
 }

@@ -147,6 +147,36 @@
 - **WHEN** both passes complete
 - **THEN** `GraphStore.bulkLoad()` is called once with all accumulated files, symbols, and relations from both workspaces
 
+#### Scenario: PHP import resolved via symbol index (no PSR-4 fallback needed)
+
+- **GIVEN** a PHP file containing `use App\Models\User`
+- **AND** `App\Models\User` is already present in the in-memory symbol index from Pass 1
+- **WHEN** Pass 2 runs
+- **THEN** an `IMPORTS` relation is emitted using the symbol index entry
+- **AND** `resolveQualifiedNameToPath` is not called
+
+#### Scenario: PHP import resolved via resolveQualifiedNameToPath when not in symbol index
+
+- **GIVEN** a PHP file containing `use App\Services\Mailer`
+- **AND** `App\Services\Mailer` is NOT present in the in-memory symbol index
+- **AND** the PHP adapter's `resolveQualifiedNameToPath` resolves it to `{codeRoot}/src/Services/Mailer.php`
+- **WHEN** Pass 2 runs
+- **THEN** a file-to-file `IMPORTS` relation is emitted from the importing file to `src/Services/Mailer.php`
+
+#### Scenario: PHP import unresolvable via both mechanisms produces no relation
+
+- **GIVEN** a PHP file containing `use Vendor\External\Class`
+- **AND** the qualified name is not in the symbol index
+- **AND** `resolveQualifiedNameToPath` returns `undefined` for that name
+- **WHEN** Pass 2 runs
+- **THEN** no `IMPORTS` relation is created for that import and no error is thrown
+
+#### Scenario: DEPENDS_ON relations from dynamic loaders accumulated in Pass 2
+
+- **GIVEN** a PHP file from which `extractRelations` returns `DEPENDS_ON` relations for dynamic loader calls
+- **WHEN** Pass 2 runs
+- **THEN** those `DEPENDS_ON` relations are accumulated and passed to bulk load
+
 ### Requirement: Chunked processing
 
 #### Scenario: Files grouped by byte budget

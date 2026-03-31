@@ -9,7 +9,7 @@
     {
       "requirement": "LanguageAdapter interface",
       "rules": [
-        "`LanguageAdapter` SHALL be an interface (not an abstract class, since adapters are stateless and have no shared state to inherit) with the following methods:\n\n- **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)\n- **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.\n- **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found\n- **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution\n- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS) from the file. The `importMap` maps local import names to resolved symbol IDs (e.g. `\"validateUser\"` → `\"auth:src/auth.ts:function:validateUser:10\"`), built by the indexer during Pass 2\n\nBoth extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects."
+        "`LanguageAdapter` SHALL be an interface (not an abstract class, since adapters are stateless and have no shared state to inherit) with the following methods:\n\n- **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)\n- **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.\n- **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found\n- **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution\n- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS, DEPENDS\\_ON) from the file. The `importMap` maps local import names to resolved symbol IDs (e.g. `\"validateUser\"` → `\"auth:src/auth.ts:function:validateUser:10\"`), built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.\n\nBoth extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects."
       ]
     },
     {
@@ -45,7 +45,31 @@
     {
       "requirement": "Import specifier resolution",
       "rules": [
-        "`LanguageAdapter` MAY provide optional methods for resolving import specifiers to file paths. This moves all language-specific resolution logic out of the indexer:\n\n- **`resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined`** — given a non-relative import specifier and the list of known package names, returns which package the specifier refers to. Each language has its own rules:\n\n| Language   | Specifier example                | Package extraction rule                               |\n| ---------- | -------------------------------- | ----------------------------------------------------- |\n| TypeScript | `@specd/core`                    | Scoped: first two segments. Bare: first segment.      |\n| Go         | `github.com/acme/auth/models`    | Longest matching prefix from known packages.          |\n| Python     | `acme_auth.models`               | First segment, normalized (hyphens ↔ underscores).    |\n| PHP        | (uses qualified names, not this) | Not applicable — PHP resolves via `extractNamespace`. |\n\n- **`resolveRelativeImportPath?(fromFile: string, specifier: string): string | string[]`** — given the importing file path and a relative specifier, returns one or more candidate file paths. Returns multiple candidates when the specifier is ambiguous (e.g. could be a file or a directory with an index file). The indexer tries each candidate in order against the symbol index. Each language has its own rules for extension mapping and path resolution:\n\n| Language   | Resolution rules                                                                               |\n| ---------- | ---------------------------------------------------------------------------------------------- |\n| TypeScript | `.js` → `.ts`, extensionless → `[.ts, /index.ts]`, `.jsx` → `.tsx`, `../` traversal            |\n| Python     | `.` = current package, `..` = parent, module → `[.py, /__init__.py]`, bare dot → `__init__.py` |\n| Go         | Not applicable — Go imports are never relative                                                 |\n| PHP        | Not applicable — PHP imports are never relative                                                |\n\n- **`buildQualifiedName?(namespace: string, symbolName: string): string`** — builds a fully qualified name from a namespace and symbol name. Used by languages like PHP where imports are resolved via namespace-qualified names rather than package names.\n\n| Language | Example                                   |\n| -------- | ----------------------------------------- |\n| PHP      | `App\\Models` + `User` → `App\\Models\\User` |\n\nWhen these methods are not implemented, the indexer skips the corresponding resolution step for that language. The indexer MUST NOT contain any language-specific resolution logic — all specifier parsing, path resolution, and qualified name construction is delegated to adapters."
+        "`LanguageAdapter` MAY provide optional methods for resolving import specifiers to file paths. This moves all language-specific resolution logic out of the indexer:\n\n- **`resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined`** — given a non-relative import specifier and the list of known package names, returns which package the specifier refers to. Each language has its own rules:\n\n| Language   | Specifier example                | Package extraction rule                               |\n| ---------- | -------------------------------- | ----------------------------------------------------- |\n| TypeScript | `@specd/core`                    | Scoped: first two segments. Bare: first segment.      |\n| Go         | `github.com/acme/auth/models`    | Longest matching prefix from known packages.          |\n| Python     | `acme_auth.models`               | First segment, normalized (hyphens ↔ underscores).    |\n| PHP        | (uses qualified names, not this) | Not applicable — PHP resolves via `extractNamespace`. |\n\n- **`resolveRelativeImportPath?(fromFile: string, specifier: string): string | string[]`** — given the importing file path and a relative specifier, returns one or more candidate file paths. Returns multiple candidates when the specifier is ambiguous (e.g. could be a file or a directory with an index file). The indexer tries each candidate in order against the symbol index. Each language has its own rules for extension mapping and path resolution:\n\n| Language   | Resolution rules                                                                               |\n| ---------- | ---------------------------------------------------------------------------------------------- |\n| TypeScript | `.js` → `.ts`, extensionless → `[.ts, /index.ts]`, `.jsx` → `.tsx`, `../` traversal            |\n| Python     | `.` = current package, `..` = parent, module → `[.py, /__init__.py]`, bare dot → `__init__.py` |\n| Go         | Not applicable — Go imports are never relative                                                 |\n| PHP        | Not applicable — PHP imports are never relative                                                |\n\n- **`buildQualifiedName?(namespace: string, symbolName: string): string`** — builds a fully qualified name from a namespace and symbol name. Used by languages like PHP where imports are resolved via namespace-qualified names rather than package names.\n\n| Language | Example                                   |\n| -------- | ----------------------------------------- |\n| PHP      | `App\\Models` + `User` → `App\\Models\\User` |\n\n- **`resolveQualifiedNameToPath?(qualifiedName: string, codeRoot: string, repoRoot?: string): string | undefined`** — given a fully qualified class/type name and the workspace's `codeRoot`, resolves it to an absolute file path by reading the language's autoloader configuration. This complements the in-memory qualified name map built from indexed symbols: it handles classes not present in the indexed codebase (e.g. library code excluded from indexing). Performs I/O (reads the autoloader manifest); the PSR-4 map SHOULD be cached per `codeRoot` to avoid repeated reads. Returns `undefined` if the qualified name cannot be resolved.\n\n| Language | Autoloader config   | Resolution rule                                                  |\n| -------- | ------------------- | ---------------------------------------------------------------- |\n| PHP      | `composer.json` `autoload.psr-4` + `autoload-dev.psr-4` | Longest-prefix match on namespace → directory; appends remaining segments as `ClassName.php` |\n\nWhen these methods are not implemented, the indexer skips the corresponding resolution step for that language. The indexer MUST NOT contain any language-specific resolution logic — all specifier parsing, path resolution, and qualified name construction is delegated to adapters."
+      ]
+    },
+    {
+      "requirement": "PHP require/include dependencies",
+      "rules": [
+        "The PHP adapter MUST detect `require`, `require_once`, `include`, and `include_once` expressions and emit `IMPORTS` relations when the path argument is a resolvable string literal.\n\nRules:\n\n- When the argument is a plain string literal (e.g. `require_once 'lib/helper.php'`), resolve the path relative to the importing file's directory and emit an `IMPORTS` relation from the current file to the resolved path.\n- When the argument is a dynamic expression (concatenation, a PHP constant such as `APPPATH` or `__DIR__ . '/...'`, a variable), the expression MUST be silently dropped — no relation is created, no error is thrown.\n- The resolved path is not validated against the filesystem at extraction time — the indexer's existing file-existence check during Pass 2 handles missing targets.\n\nThis covers legacy PHP codebases (pre-namespace) and framework bootstrappers that load files via include paths rather than autoloaders (CakePHP 1.x, CodeIgniter 1.x–3.x, Zend 1.x, Drupal 7, WordPress)."
+      ]
+    },
+    {
+      "requirement": "PHP dynamic loader dependencies",
+      "rules": [
+        "The PHP adapter MUST detect framework-specific dynamic loader calls and emit file-level `IMPORTS` relations when the loader target can be resolved to a file path.\n\nSupported call patterns include:\n\n- CakePHP: `$this->loadModel('X')`, `loadModel('X')`, `App::uses('X', 'Y')`, `App::import('Model', 'X')`, `ClassRegistry::init('X')`\n- CakePHP additional loaders: `$this->loadController('X')`, `$this->loadComponent('X')`\n- CodeIgniter: `$this->load->model('X')`, `$this->load->library('X')`, `$this->load->helper('X')`\n- Yii/Zend/Drupal/TYPO3/Magento families as configured in adapter resolver registry\n\nRules:\n\n- When loader arguments are string literals and resolver rules can map them to a concrete target file, emit `IMPORTS` from source file to resolved target file.\n- When arguments are non-literal or the target cannot be resolved, silently drop the relation (no fallback `DEPENDS_ON` edge for file dependencies).\n- Generic method names (e.g. `->get('x')`) MUST NOT be detected unless a resolver explicitly declares them for a framework-specific signature."
+      ]
+    },
+    {
+      "requirement": "PHP loaded-instance call extraction",
+      "rules": [
+        "The PHP adapter MUST perform method-local heuristic extraction of `CALLS` from dynamically loaded instances.\n\nRules:\n\n- Within a single method/function body, track aliases bound to resolved loaded dependencies (e.g. `$this->Article`, `$Article`, simple local assignments).\n- For member calls on those aliases (e.g. `$this->Article->save()`, `$model->find()`), emit `CALLS` only when both caller and callee symbols are resolvable.\n- Do not perform interprocedural propagation in this requirement (no cross-method alias flow).\n- Ambiguous alias targets SHOULD be dropped to avoid noisy false positives."
+      ]
+    },
+    {
+      "requirement": "PHP loader resolver extensibility",
+      "rules": [
+        "Loader support in the PHP adapter MUST be registry-based and extensible.\n\nRules:\n\n- Framework-specific loader detection/resolution MUST be implemented as resolver entries (or resolver modules) with a shared contract.\n- Adding a new loader API (e.g. `loadController`, `loadComponent`, or framework-specific factories) MUST be achievable by adding resolver definitions, without changing the core extraction flow.\n- Resolver behavior must be unit-tested per pattern to prevent regressions in existing loader coverage."
       ]
     },
     {
@@ -64,11 +88,16 @@
   "constraints": [
     "LanguageAdapter is an interface, not an abstract class — adapters are stateless",
     "Extraction methods are synchronous and pure — they receive content, not file handles",
-    "getPackageIdentity is the only method that performs I/O — it is optional and searches for a manifest file upwards from codeRoot",
+    "getPackageIdentity and resolveQualifiedNameToPath? are the only methods that perform I/O — both are optional and search for a manifest file on disk",
     "Resolution methods (resolvePackageFromSpecifier, resolveRelativeImportPath, buildQualifiedName) are synchronous and pure",
+    "resolveQualifiedNameToPath? SHOULD cache the parsed autoloader map per codeRoot to avoid repeated disk reads during a single indexing run",
     "The indexer MUST NOT contain language-specific resolution logic — all of it is delegated to adapters",
     "Unrecognized file extensions are silently skipped",
     "Unresolvable call targets are silently dropped",
+    "Dynamic loader calls with non-literal arguments are silently dropped",
+    "Unresolvable dynamic loader targets are silently dropped for file dependency modeling",
+    "require/include expressions with non-literal or dynamic path arguments are silently dropped",
+    "Loader API support is registry-based and extensible (no hardcoded single-loader assumptions)",
     "Tree-sitter query patterns are internal — not part of the public API",
     "The TypeScript adapter is always registered by default",
     "No dependency on @specd/core"
@@ -80,6 +109,16 @@
       "given": ["a LanguageAdapter instance"],
       "when": ["extractSymbols() is called twice with the same filePath and content"],
       "then": ["both calls return identical results"]
+    },
+    {
+      "requirement": "LanguageAdapter interface",
+      "name": "extractRelations emits concrete file/symbol relations when resolvable",
+      "given": ["a PHP file containing resolvable dependencies"],
+      "when": ["extractRelations() is called"],
+      "then": [
+        "concrete IMPORTS and/or CALLS relations are returned",
+        "AND no error is thrown for dropped unresolved dynamic expressions"
+      ]
     },
     {
       "requirement": "Language detection",
@@ -380,11 +419,175 @@
       "name": "PHP qualified name construction",
       "when": ["buildQualifiedName('App\\\\Models', 'User') is called on the PHP adapter"],
       "then": ["it returns 'App\\\\Models\\\\User'"]
+    },
+    {
+      "requirement": "Import specifier resolution",
+      "name": "PSR-4 resolves qualified name to file path",
+      "given": [
+        "a codeRoot containing composer.json with autoload.psr-4: { \"App\\\\\": \"src/\" }"
+      ],
+      "when": [
+        "resolveQualifiedNameToPath('App\\\\Models\\\\User', codeRoot) is called on the PHP adapter"
+      ],
+      "then": ["it returns the absolute path {codeRoot}/src/Models/User.php"]
+    },
+    {
+      "requirement": "Import specifier resolution",
+      "name": "PSR-4 uses longest prefix match",
+      "given": [
+        "composer.json with autoload.psr-4: { \"App\\\\\": \"src/\", \"App\\\\Models\\\\\": \"src/models/\" }"
+      ],
+      "when": ["resolveQualifiedNameToPath('App\\\\Models\\\\User', codeRoot) is called"],
+      "then": ["it returns {codeRoot}/src/models/User.php (longer prefix wins)"]
+    },
+    {
+      "requirement": "Import specifier resolution",
+      "name": "Qualified name with no matching prefix returns undefined",
+      "given": ["composer.json with autoload.psr-4: { \"App\\\\\": \"src/\" }"],
+      "when": ["resolveQualifiedNameToPath('Vendor\\\\Lib\\\\Foo', codeRoot) is called"],
+      "then": ["it returns undefined"]
+    },
+    {
+      "requirement": "Import specifier resolution",
+      "name": "No composer.json returns undefined",
+      "given": ["a codeRoot with no composer.json at or above it (bounded by repoRoot)"],
+      "when": ["resolveQualifiedNameToPath('App\\\\Models\\\\User', codeRoot) is called"],
+      "then": ["it returns undefined and no error is thrown"]
+    },
+    {
+      "requirement": "Import specifier resolution",
+      "name": "PSR-4 map cached across calls",
+      "given": ["a codeRoot with a valid composer.json"],
+      "when": ["resolveQualifiedNameToPath is called twice with different qualified names"],
+      "then": ["composer.json is read from disk only once"]
+    },
+    {
+      "requirement": "PHP require/include dependencies",
+      "name": "require_once with relative string literal emits IMPORTS",
+      "given": [
+        "a PHP file at app/controllers/PostsController.php containing require_once '../models/Post.php'"
+      ],
+      "when": ["extractRelations() is called"],
+      "then": [
+        "an IMPORTS relation is returned from app/controllers/PostsController.php to app/models/Post.php"
+      ]
+    },
+    {
+      "requirement": "PHP require/include dependencies",
+      "name": "include with relative path emits IMPORTS",
+      "given": ["a PHP file containing include 'helpers/url_helper.php'"],
+      "when": ["extractRelations() is called"],
+      "then": [
+        "an IMPORTS relation is returned pointing to helpers/url_helper.php relative to the file's directory"
+      ]
+    },
+    {
+      "requirement": "PHP require/include dependencies",
+      "name": "require with PHP constant expression silently dropped",
+      "given": ["a PHP file containing require_once APPPATH . 'models/Post.php'"],
+      "when": ["extractRelations() is called"],
+      "then": ["no IMPORTS relation is created for that expression and no error is thrown"]
+    },
+    {
+      "requirement": "PHP require/include dependencies",
+      "name": "require with variable silently dropped",
+      "given": ["a PHP file containing require_once $path"],
+      "when": ["extractRelations() is called"],
+      "then": ["no relation is created for that expression and no error is thrown"]
+    },
+    {
+      "requirement": "PHP require/include dependencies",
+      "name": "require_once alongside use statements both processed",
+      "given": [
+        "a PHP file containing both use App\\Models\\User; and require_once 'bootstrap.php'"
+      ],
+      "when": ["extractRelations() is called with a populated importMap"],
+      "then": [
+        "an IMPORTS relation for bootstrap.php is returned",
+        "AND an IMPORTS relation for the resolved User class is also returned (via importMap)"
+      ]
+    },
+    {
+      "requirement": "PHP dynamic loader dependencies",
+      "name": "loadModel emits IMPORTS when target resolves",
+      "given": [
+        "a PHP file containing $this->loadModel('User')",
+        "AND resolver rules can map User to a concrete file"
+      ],
+      "when": ["extractRelations() is called"],
+      "then": ["an IMPORTS relation is returned to that target file"]
+    },
+    {
+      "requirement": "PHP dynamic loader dependencies",
+      "name": "CodeIgniter load->model emits IMPORTS when target resolves",
+      "given": [
+        "a PHP file containing $this->load->model('User_model')",
+        "AND resolver rules can map User_model to a concrete file"
+      ],
+      "when": ["extractRelations() is called"],
+      "then": ["an IMPORTS relation is returned"]
+    },
+    {
+      "requirement": "PHP dynamic loader dependencies",
+      "name": "App::uses emits IMPORTS when target resolves",
+      "given": [
+        "a PHP file containing App::uses('Controller', 'Controller')",
+        "AND resolver rules can map the class to a concrete file"
+      ],
+      "when": ["extractRelations() is called"],
+      "then": ["an IMPORTS relation is returned"]
+    },
+    {
+      "requirement": "PHP dynamic loader dependencies",
+      "name": "Dynamic argument silently dropped",
+      "given": ["a PHP file containing $this->loadModel($modelName)"],
+      "when": ["extractRelations() is called"],
+      "then": ["no relation is created for that call and no error is thrown"]
+    },
+    {
+      "requirement": "PHP dynamic loader dependencies",
+      "name": "Unresolvable target silently dropped",
+      "given": [
+        "a PHP file containing a known loader call with literal argument",
+        "AND resolver rules cannot map it to a target file"
+      ],
+      "when": ["extractRelations() is called"],
+      "then": ["no relation is created for that call and no error is thrown"]
+    },
+    {
+      "requirement": "PHP dynamic loader dependencies",
+      "name": "Additional Cake loaders are supported",
+      "given": [
+        "a PHP file containing $this->loadController('Admin') and $this->loadComponent('Auth')"
+      ],
+      "when": ["extractRelations() is called"],
+      "then": ["loader resolver rules are applied to both calls"]
+    },
+    {
+      "requirement": "PHP loaded-instance call extraction",
+      "name": "Member call on loaded alias emits CALLS",
+      "given": ["a method containing loadModel('Article') and later $this->Article->save()"],
+      "when": ["extractRelations() runs with resolvable caller and callee symbols"],
+      "then": ["a CALLS relation is emitted from caller symbol to callee symbol"]
+    },
+    {
+      "requirement": "PHP loaded-instance call extraction",
+      "name": "Local variable alias emits CALLS",
+      "given": ["a method containing $model = $this->Article and later $model->find()"],
+      "when": ["both symbols are resolvable"],
+      "then": ["a CALLS relation is emitted"]
+    },
+    {
+      "requirement": "PHP loaded-instance call extraction",
+      "name": "Cross-method alias propagation is not performed",
+      "given": ["alias assignment in one method and method call in another"],
+      "when": ["extractRelations() runs"],
+      "then": ["no CALLS relation is emitted from cross-method alias propagation"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:16e8d57c34fa05a0d98ea524c7bc0a667982562d54a07b569cee1260b5bd92d2",
-    "verify.md": "sha256:0cd4bf89790b18a869b03b21325c490dff51128dd2dc6df6ef413febedb6fc01"
+    "spec.md": "sha256:8a81fd5e3ece7fb76f4230d52655cacc54ce0b6f8abeabcc7171be9a31c4b608",
+    "verify.md": "sha256:caf326e1b118929fd87e85d1c806f16aa5a7df7b88548a634a9e3c3f3f3d7e1d"
   },
   "generatedBy": "core"
 }

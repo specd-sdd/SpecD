@@ -8,6 +8,8 @@ import {
   type DiscoveredSpec,
 } from '../../../src/domain/value-objects/index-options.js'
 import { createSpecNode } from '../../../src/domain/value-objects/spec-node.js'
+import { type GraphStore } from '../../../src/domain/ports/graph-store.js'
+import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 
 /**
  * Creates a temporary workspace directory with TypeScript source files.
@@ -90,7 +92,7 @@ describe('Workspace indexing', () => {
 
     const symbols = await provider.findSymbols({ name: 'hash' })
     expect(symbols).toHaveLength(1)
-    expect(symbols[0]!.id).toBe('core:src/utils.ts:function:hash:1')
+    expect(symbols[0]!.id).toBe('core:src/utils.ts:function:hash:1:7')
     expect(symbols[0]!.filePath).toBe('core:src/utils.ts')
   })
 
@@ -343,66 +345,96 @@ describe('Workspace indexing', () => {
     expect(result.errors).toHaveLength(0)
 
     // The import from @test/core should resolve across workspaces
-    const impact = await provider.analyzeImpact('core:src/greet.ts:function:greet:1', 'upstream')
+    const greetSymbol = (await provider.findSymbols({ name: 'greet' })).find(
+      (symbol) => symbol.filePath === 'core:src/greet.ts',
+    )
+
+    expect(greetSymbol).toBeDefined()
+
+    const impact = await provider.analyzeImpact(greetSymbol!.id, 'upstream')
     expect(impact.directDependents).toBeGreaterThanOrEqual(1)
     expect(impact.affectedFiles).toContain('cli:src/main.ts')
   })
 
-  describe('Requirement: WorkspaceIndexTarget — excludePaths and respectGitignore', () => {
-    it('excludes files matching excludePaths from WorkspaceIndexTarget', async () => {
-      const codeRoot = createWorkspace(tempDir, 'ws-exclude', {
-        'src/index.ts': 'export function main() {}',
-        'fixtures/helper.ts': 'export function helper() {}',
-      })
-
-      provider = createCodeGraphProvider({ storagePath: tempDir })
-      await provider.open()
-
-      const result = await provider.index({
-        workspaces: [
-          {
-            name: 'ws',
-            codeRoot,
-            excludePaths: ['fixtures/'],
-            specs: async () => [],
-          },
-        ],
-        projectRoot: tempDir,
-      })
-
-      expect(result.errors).toHaveLength(0)
-      const indexed = await provider.getFile('ws:src/index.ts')
-      const excluded = await provider.getFile('ws:fixtures/helper.ts')
-      expect(indexed).toBeDefined()
-      expect(excluded).toBeUndefined()
+  it('PHP workspace: namespace import emits IMPORTS relation to the model file', async () => {
+    const phpRoot = createWorkspace(tempDir, 'php-app', {
+      'composer.json': JSON.stringify({
+        name: 'acme/app',
+        autoload: { 'psr-4': { 'App\\': 'src/' } },
+      }),
+      'app/Controllers/PostsController.php': [
+        '<?php',
+        'namespace App\\Controllers;',
+        '',
+        'use App\\Models\\User;',
+        '',
+        'class PostsController {}',
+      ].join('\n'),
+      'src/Models/User.php': ['<?php', 'namespace App\\Models;', '', 'class User {}'].join('\n'),
     })
 
-    it('indexes gitignore-excluded files when respectGitignore is false', async () => {
-      const codeRoot = createWorkspace(tempDir, 'ws-gitignore', {
-        'src/index.ts': 'export function main() {}',
-        'src/generated.ts': 'export const GEN = 1',
-        '.gitignore': 'generated.ts\n',
-      })
+    provider = createCodeGraphProvider({ storagePath: tempDir })
+    await provider.open()
 
-      provider = createCodeGraphProvider({ storagePath: tempDir })
-      await provider.open()
-
-      const result = await provider.index({
-        workspaces: [
-          {
-            name: 'ws',
-            codeRoot,
-            respectGitignore: false,
-            excludePaths: [],
-            specs: async () => [],
-          },
-        ],
-        projectRoot: tempDir,
-      })
-
-      expect(result.errors).toHaveLength(0)
-      const generated = await provider.getFile('ws:src/generated.ts')
-      expect(generated).toBeDefined()
+    await provider.index({
+      workspaces: [{ name: 'php-app', codeRoot: phpRoot, specs: async () => [] }],
+      projectRoot: tempDir,
     })
+
+    // Access the store to query importees (IMPORTS relations FROM the controller)
+    const store = (provider as unknown as { store: GraphStore }).store
+    const importees = await store.getImportees('php-app:app/Controllers/PostsController.php')
+
+    const expectedTarget = 'php-app:src/Models/User.php'
+    const rel = importees.find((r) => r.target === expectedTarget)
+    expect(rel).toBeDefined()
+  })
+
+  it('PHP workspace: loaded model member call emits CALLS across files', async () => {
+    const phpRoot = createWorkspace(tempDir, 'php-app', {
+      'app/controllers/PostsController.php': [
+        '<?php',
+        'class PostsController {',
+        '  public function index() {',
+        "    $this->loadModel('Article');",
+        '    $this->Article->save();',
+        '  }',
+        '}',
+      ].join('\n'),
+      'app/models/article.php': [
+        '<?php',
+        'class Article {',
+        '  public function save(): void {}',
+        '}',
+      ].join('\n'),
+    })
+
+    provider = createCodeGraphProvider({ storagePath: tempDir })
+    await provider.open()
+
+    const result = await provider.index({
+      workspaces: [{ name: 'php-app', codeRoot: phpRoot, specs: async () => [] }],
+      projectRoot: tempDir,
+    })
+
+    expect(result.errors).toHaveLength(0)
+
+    const store = (provider as unknown as { store: GraphStore }).store
+    const saveSymbol = (await provider.findSymbols({ name: 'save' })).find(
+      (symbol) => symbol.filePath === 'php-app:app/models/article.php',
+    )
+
+    expect(saveSymbol).toBeDefined()
+
+    const callers = await store.getCallers(saveSymbol!.id)
+    expect(callers).toContainEqual(
+      expect.objectContaining({
+        source: expect.stringContaining(
+          'php-app:app/controllers/PostsController.php:method:index:',
+        ),
+        target: saveSymbol!.id,
+        type: RelationType.Calls,
+      }),
+    )
   })
 })

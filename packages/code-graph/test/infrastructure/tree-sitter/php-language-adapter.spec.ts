@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
@@ -169,6 +169,352 @@ describe('PhpLanguageAdapter', () => {
       const subDir = join(tempDir, 'src')
       mkdirSync(subDir)
       expect(adapter.getPackageIdentity(subDir, tempDir)).toBe('acme/auth')
+    })
+  })
+
+  describe('resolveQualifiedNameToPath', () => {
+    let tempDir: string
+
+    afterEach(() => {
+      if (tempDir) rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    it('resolves qualified name to absolute path via PSR-4', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-psr4-'))
+      writeFileSync(
+        join(tempDir, 'composer.json'),
+        JSON.stringify({ autoload: { 'psr-4': { 'App\\': 'src/' } } }),
+      )
+      const result = adapter.resolveQualifiedNameToPath('App\\Models\\User', tempDir)
+      expect(result).toBe(join(tempDir, 'src', 'Models', 'User.php'))
+    })
+
+    it('longest prefix wins', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-psr4-'))
+      writeFileSync(
+        join(tempDir, 'composer.json'),
+        JSON.stringify({
+          autoload: { 'psr-4': { 'App\\': 'src/', 'App\\Models\\': 'src/models/' } },
+        }),
+      )
+      const result = adapter.resolveQualifiedNameToPath('App\\Models\\User', tempDir)
+      expect(result).toBe(join(tempDir, 'src', 'models', 'User.php'))
+    })
+
+    it('returns undefined when no matching prefix', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-psr4-'))
+      writeFileSync(
+        join(tempDir, 'composer.json'),
+        JSON.stringify({ autoload: { 'psr-4': { 'App\\': 'src/' } } }),
+      )
+      expect(adapter.resolveQualifiedNameToPath('Vendor\\Lib\\Foo', tempDir)).toBeUndefined()
+    })
+
+    it('returns undefined when no composer.json', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-psr4-'))
+      expect(adapter.resolveQualifiedNameToPath('App\\Models\\User', tempDir)).toBeUndefined()
+    })
+
+    it('caches PSR-4 map across calls', () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'php-psr4-'))
+      writeFileSync(
+        join(tempDir, 'composer.json'),
+        JSON.stringify({ autoload: { 'psr-4': { 'App\\': 'src/' } } }),
+      )
+      const freshAdapter = new PhpLanguageAdapter()
+      const r1 = freshAdapter.resolveQualifiedNameToPath('App\\Models\\User', tempDir)
+      const r2 = freshAdapter.resolveQualifiedNameToPath('App\\Http\\Controller', tempDir)
+      expect(r1).toBe(join(tempDir, 'src', 'Models', 'User.php'))
+      expect(r2).toBe(join(tempDir, 'src', 'Http', 'Controller.php'))
+    })
+  })
+
+  describe('extractRelations — require/include', () => {
+    it('require_once with relative string literal emits IMPORTS', () => {
+      const filePath = '/var/www/app/controllers/PostsController.php'
+      const content = `<?php\nrequire_once '../models/Post.php';`
+      const relations = adapter.extractRelations(filePath, content, [], new Map())
+      const importsRels = relations.filter((r) => r.type === RelationType.Imports)
+      expect(importsRels).toHaveLength(1)
+      // path.resolve('/var/www/app/controllers', '../models/Post.php') = '/var/www/app/models/Post.php'
+      expect(importsRels[0]!.target).toBe('/var/www/app/models/Post.php')
+    })
+
+    it('include with relative path emits IMPORTS', () => {
+      const filePath = '/var/www/app/bootstrap.php'
+      const content = `<?php\ninclude 'helpers/url_helper.php';`
+      const relations = adapter.extractRelations(filePath, content, [], new Map())
+      const importsRels = relations.filter((r) => r.type === RelationType.Imports)
+      expect(importsRels).toHaveLength(1)
+      expect(importsRels[0]!.target).toBe('/var/www/app/helpers/url_helper.php')
+    })
+
+    it('require with variable is silently dropped', () => {
+      const content = `<?php\nrequire_once $path;`
+      const relations = adapter.extractRelations('ctrl.php', content, [], new Map())
+      expect(relations.filter((r) => r.type === RelationType.Imports)).toHaveLength(0)
+    })
+
+    it('require with concatenation is silently dropped', () => {
+      const content = `<?php\nrequire_once APPPATH . 'models/Post.php';`
+      const relations = adapter.extractRelations('ctrl.php', content, [], new Map())
+      expect(relations.filter((r) => r.type === RelationType.Imports)).toHaveLength(0)
+    })
+
+    it('require_once alongside use statements produces require relation', () => {
+      const filePath = '/var/www/app/controllers/PostsController.php'
+      const content = `<?php\nuse App\\Models\\User;\nrequire_once 'bootstrap.php';`
+      const importMap = new Map([['User', 'myws:src/Models/User.php:class:User:1']])
+      const relations = adapter.extractRelations(filePath, content, [], importMap)
+      const importsRels = relations.filter((r) => r.type === RelationType.Imports)
+      expect(importsRels.some((r) => r.target === '/var/www/app/controllers/bootstrap.php')).toBe(
+        true,
+      )
+      expect(importsRels.some((r) => r.target === 'myws:src/Models/User.php')).toBe(true)
+    })
+  })
+
+  describe('extractRelations — dynamic loaders', () => {
+    it('$this->loadModel emits IMPORTS when target resolves', () => {
+      const filePath = 'php-app:app/controllers/posts_controller.php'
+      const content = `<?php\nclass PostsController {\n  public function index() {\n    $this->loadModel('User');\n  }\n}`
+      const targetPath = 'php-app:app/models/user.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass User { public function save(): void {} }`,
+      )
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: filePath,
+          target: targetPath,
+          type: RelationType.Imports,
+        }),
+      )
+    })
+
+    it('App::uses emits IMPORTS when target resolves', () => {
+      const filePath = 'php-app:app/controllers/posts_controller.php'
+      const content = `<?php\nApp::uses('Controller', 'Controller');`
+      const targetPath = 'php-app:app/controllers/controller_controller.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Controller { public function beforeFilter(): void {} }`,
+      )
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: filePath,
+          target: targetPath,
+          type: RelationType.Imports,
+        }),
+      )
+    })
+
+    it('$this->load->model emits IMPORTS when target resolves', () => {
+      const filePath = 'ci:application/controllers/posts.php'
+      const content = `<?php\nclass CI_Controller {\n  public function index() {\n    $this->load->model('User_model');\n  }\n}`
+      const targetPath = 'ci:application/models/user_model.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass User_model { public function find(): void {} }`,
+      )
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: filePath,
+          target: targetPath,
+          type: RelationType.Imports,
+        }),
+      )
+    })
+
+    it('Yii::import emits IMPORTS when target resolves', () => {
+      const filePath = 'yii:protected/controllers/PostController.php'
+      const content = `<?php\nYii::import('application.models.User');`
+      const targetPath = 'yii:protected/models/User.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass User { public function save(): void {} }`,
+      )
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: filePath,
+          target: targetPath,
+          type: RelationType.Imports,
+        }),
+      )
+    })
+
+    it('dynamic variable argument is silently dropped', () => {
+      const content = `<?php\nclass C { public function f() { $this->loadModel($modelName); } }`
+      const relations = adapter.extractRelations('ctrl.php', content, [], new Map())
+      expect(relations.filter((r) => r.type === RelationType.Imports)).toHaveLength(0)
+    })
+
+    it('unrelated ->get() is not detected', () => {
+      const content = `<?php\nclass Foo {\n  public function bar() {\n    $this->get('someService');\n  }\n}`
+      const relations = adapter.extractRelations('foo.php', content, [], new Map())
+      expect(relations.filter((r) => r.type === RelationType.Imports)).toHaveLength(0)
+    })
+
+    it('multiple loaders in same file all detected', () => {
+      const filePath = 'ci:application/controllers/ctrl.php'
+      const content = `<?php\nclass Ctrl {\n  public function index() {\n    $this->loadModel('Post');\n    $this->load->library('email');\n  }\n}`
+      const allSymbols = [
+        ...adapter.extractSymbols(
+          'ci:application/models/post.php',
+          `<?php\nclass Post { public function save(): void {} }`,
+        ),
+        ...adapter.extractSymbols(
+          'ci:application/libraries/email.php',
+          `<?php\nclass Email { public function send(): void {} }`,
+        ),
+      ]
+      const relations = adapter.extractRelations(filePath, content, allSymbols, new Map())
+      expect(relations.filter((r) => r.type === RelationType.Imports)).toHaveLength(2)
+    })
+
+    it('uses() global function emits IMPORTS when target resolves', () => {
+      const filePath = 'php-app:app/controllers/posts_controller.php'
+      const content = `<?php\nuses('Sanitize');`
+      const targetPath = 'php-app:app/models/sanitize.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Sanitize { public function clean(): void {} }`,
+      )
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: filePath,
+          target: targetPath,
+          type: RelationType.Imports,
+        }),
+      )
+    })
+  })
+
+  describe('extractRelations — loaded-instance calls', () => {
+    it('emits CALLS for a loaded model alias used in the same method', () => {
+      const filePath = 'php-app:app/controllers/posts_controller.php'
+      const controllerContent = [
+        '<?php',
+        'class PostsController {',
+        '  public function index() {',
+        "    $this->loadModel('Article');",
+        '    $this->Article->save();',
+        '  }',
+        '}',
+      ].join('\n')
+      const controllerSymbols = adapter.extractSymbols(filePath, controllerContent)
+      const targetPath = 'php-app:app/models/article.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Article { public function save(): void {} }`,
+      )
+      const relations = adapter.extractRelations(
+        filePath,
+        controllerContent,
+        [...controllerSymbols, ...targetSymbols],
+        new Map(),
+      )
+      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: caller?.id,
+          target: callee?.id,
+          type: RelationType.Calls,
+        }),
+      )
+    })
+
+    it('emits CALLS for a local variable alias assigned from a loaded model', () => {
+      const filePath = 'php-app:app/controllers/posts_controller.php'
+      const controllerContent = [
+        '<?php',
+        'class PostsController {',
+        '  public function index() {',
+        "    $this->loadModel('Article');",
+        '    $model = $this->Article;',
+        '    $model->find();',
+        '  }',
+        '}',
+      ].join('\n')
+      const controllerSymbols = adapter.extractSymbols(filePath, controllerContent)
+      const targetPath = 'php-app:app/models/article.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Article { public function find(): void {} }`,
+      )
+      const relations = adapter.extractRelations(
+        filePath,
+        controllerContent,
+        [...controllerSymbols, ...targetSymbols],
+        new Map(),
+      )
+      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: caller?.id,
+          target: callee?.id,
+          type: RelationType.Calls,
+        }),
+      )
+    })
+
+    it('drops unresolved alias calls', () => {
+      const filePath = 'php-app:app/controllers/posts_controller.php'
+      const controllerContent = [
+        '<?php',
+        'class PostsController {',
+        '  public function index() {',
+        "    $this->loadModel('Article');",
+        '    $this->Article->missing();',
+        '  }',
+        '}',
+      ].join('\n')
+      const controllerSymbols = adapter.extractSymbols(filePath, controllerContent)
+      const targetSymbols = adapter.extractSymbols(
+        'php-app:app/models/article.php',
+        `<?php\nclass Article { public function save(): void {} }`,
+      )
+      const relations = adapter.extractRelations(
+        filePath,
+        controllerContent,
+        [...controllerSymbols, ...targetSymbols],
+        new Map(),
+      )
+      expect(relations.filter((relation) => relation.type === RelationType.Calls)).toHaveLength(0)
+    })
+
+    it('does not propagate aliases across methods', () => {
+      const filePath = 'php-app:app/controllers/posts_controller.php'
+      const controllerContent = [
+        '<?php',
+        'class PostsController {',
+        '  public function first() {',
+        "    $this->loadModel('Article');",
+        '  }',
+        '  public function second() {',
+        '    $this->Article->save();',
+        '  }',
+        '}',
+      ].join('\n')
+      const controllerSymbols = adapter.extractSymbols(filePath, controllerContent)
+      const targetSymbols = adapter.extractSymbols(
+        'php-app:app/models/article.php',
+        `<?php\nclass Article { public function save(): void {} }`,
+      )
+      const relations = adapter.extractRelations(
+        filePath,
+        controllerContent,
+        [...controllerSymbols, ...targetSymbols],
+        new Map(),
+      )
+      expect(relations.filter((relation) => relation.type === RelationType.Calls)).toHaveLength(0)
     })
   })
 })
