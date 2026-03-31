@@ -275,6 +275,24 @@ describe('PhpLanguageAdapter', () => {
   })
 
   describe('extractRelations — dynamic loaders', () => {
+    it('CakePHP uses property emits IMPORTS when target resolves', () => {
+      const filePath = 'php-app:app/controllers/posts_controller.php'
+      const content = `<?php\nclass PostsController {\n  var $uses = array('Article');\n}`
+      const targetPath = 'php-app:app/models/article.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Article { public function save(): void {} }`,
+      )
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: filePath,
+          target: targetPath,
+          type: RelationType.Imports,
+        }),
+      )
+    })
+
     it('$this->loadModel emits IMPORTS when target resolves', () => {
       const filePath = 'php-app:app/controllers/posts_controller.php'
       const content = `<?php\nclass PostsController {\n  public function index() {\n    $this->loadModel('User');\n  }\n}`
@@ -393,9 +411,115 @@ describe('PhpLanguageAdapter', () => {
         }),
       )
     })
+
+    it('bare loadController emits IMPORTS when target resolves', () => {
+      const filePath = 'php-app:app/controllers/posts_controller.php'
+      const content = `<?php\nclass PostsController {\n  public function index() {\n    loadController('Admin');\n  }\n}`
+      const targetPath = 'php-app:app/controllers/admin_controller.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass AdminController { public function index(): void {} }`,
+      )
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: filePath,
+          target: targetPath,
+          type: RelationType.Imports,
+        }),
+      )
+    })
+
+    it('bare loadComponent emits IMPORTS when target resolves', () => {
+      const filePath = 'php-app:app/controllers/posts_controller.php'
+      const content = `<?php\nclass PostsController {\n  public function index() {\n    loadComponent('Auth');\n  }\n}`
+      const targetPath = 'php-app:app/controllers/components/auth.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass AuthComponent { public function startup(): void {} }`,
+      )
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: filePath,
+          target: targetPath,
+          type: RelationType.Imports,
+        }),
+      )
+    })
+
+    it('Laravel app class literal emits IMPORTS when target resolves', () => {
+      const filePath = 'laravel:app/Http/Controllers/PostController.php'
+      const content = `<?php\nclass PostController {\n  public function index() {\n    app(App\\Services\\Mailer::class);\n  }\n}`
+      const targetPath = 'laravel:app/App/Services/Mailer.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Mailer { public function send(): void {} }`,
+      )
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: filePath,
+          target: targetPath,
+          type: RelationType.Imports,
+        }),
+      )
+    })
+
+    it('Symfony get class literal emits IMPORTS when target resolves', () => {
+      const filePath = 'symfony:src/Controller/PostController.php'
+      const content = `<?php\nclass PostController {\n  public function index() {\n    $this->get(App\\Service\\Mailer::class);\n  }\n}`
+      const targetPath = 'symfony:src/App/Service/Mailer.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Mailer { public function send(): void {} }`,
+      )
+      const relations = adapter.extractRelations(filePath, content, targetSymbols, new Map())
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: filePath,
+          target: targetPath,
+          type: RelationType.Imports,
+        }),
+      )
+    })
   })
 
   describe('extractRelations — loaded-instance calls', () => {
+    it('emits CALLS for a CakePHP uses property used inside a method', () => {
+      const filePath = 'php-app:app/controllers/posts_controller.php'
+      const controllerContent = [
+        '<?php',
+        'class PostsController {',
+        "  var $uses = array('Article');",
+        '  public function index() {',
+        '    $this->Article->save();',
+        '  }',
+        '}',
+      ].join('\n')
+      const controllerSymbols = adapter.extractSymbols(filePath, controllerContent)
+      const targetPath = 'php-app:app/models/article.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Article { public function save(): void {} }`,
+      )
+      const relations = adapter.extractRelations(
+        filePath,
+        controllerContent,
+        [...controllerSymbols, ...targetSymbols],
+        new Map(),
+      )
+      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: caller?.id,
+          target: callee?.id,
+          type: RelationType.Calls,
+        }),
+      )
+    })
+
     it('emits CALLS for a loaded model alias used in the same method', () => {
       const filePath = 'php-app:app/controllers/posts_controller.php'
       const controllerContent = [
@@ -447,6 +571,178 @@ describe('PhpLanguageAdapter', () => {
       const targetSymbols = adapter.extractSymbols(
         targetPath,
         `<?php\nclass Article { public function find(): void {} }`,
+      )
+      const relations = adapter.extractRelations(
+        filePath,
+        controllerContent,
+        [...controllerSymbols, ...targetSymbols],
+        new Map(),
+      )
+      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: caller?.id,
+          target: callee?.id,
+          type: RelationType.Calls,
+        }),
+      )
+    })
+
+    it('emits CALLS for an explicitly constructed instance after loadModel', () => {
+      const filePath = 'php-app:app/controllers/posts_controller.php'
+      const controllerContent = [
+        '<?php',
+        'class PostsController {',
+        '  public function index() {',
+        "    $this->loadModel('Article');",
+        '    $article = new Article();',
+        '    $article->save();',
+        '  }',
+        '}',
+      ].join('\n')
+      const controllerSymbols = adapter.extractSymbols(filePath, controllerContent)
+      const targetPath = 'php-app:app/models/article.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Article { public function save(): void {} }`,
+      )
+      const relations = adapter.extractRelations(
+        filePath,
+        controllerContent,
+        [...controllerSymbols, ...targetSymbols],
+        new Map(),
+      )
+      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: caller?.id,
+          target: callee?.id,
+          type: RelationType.Calls,
+        }),
+      )
+    })
+
+    it('emits CALLS for Yii createObject class literal assignment', () => {
+      const filePath = 'yii:protected/controllers/PostController.php'
+      const controllerContent = [
+        '<?php',
+        'class PostController {',
+        '  public function index() {',
+        '    $mailer = Yii::createObject(App\\Services\\Mailer::class);',
+        '    $mailer->send();',
+        '  }',
+        '}',
+      ].join('\n')
+      const controllerSymbols = adapter.extractSymbols(filePath, controllerContent)
+      const targetPath = 'yii:app/App/Services/Mailer.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Mailer { public function send(): void {} }`,
+      )
+      const relations = adapter.extractRelations(
+        filePath,
+        controllerContent,
+        [...controllerSymbols, ...targetSymbols],
+        new Map(),
+      )
+      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: caller?.id,
+          target: callee?.id,
+          type: RelationType.Calls,
+        }),
+      )
+    })
+
+    it('emits CALLS for Laravel app class literal assignment', () => {
+      const filePath = 'laravel:app/Http/Controllers/PostController.php'
+      const controllerContent = [
+        '<?php',
+        'class PostController {',
+        '  public function index() {',
+        '    $mailer = app(App\\Services\\Mailer::class);',
+        '    $mailer->send();',
+        '  }',
+        '}',
+      ].join('\n')
+      const controllerSymbols = adapter.extractSymbols(filePath, controllerContent)
+      const targetPath = 'laravel:app/App/Services/Mailer.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Mailer { public function send(): void {} }`,
+      )
+      const relations = adapter.extractRelations(
+        filePath,
+        controllerContent,
+        [...controllerSymbols, ...targetSymbols],
+        new Map(),
+      )
+      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: caller?.id,
+          target: callee?.id,
+          type: RelationType.Calls,
+        }),
+      )
+    })
+
+    it('emits CALLS for Symfony get class literal assignment', () => {
+      const filePath = 'symfony:src/Controller/PostController.php'
+      const controllerContent = [
+        '<?php',
+        'class PostController {',
+        '  public function index() {',
+        '    $mailer = $this->get(App\\Service\\Mailer::class);',
+        '    $mailer->send();',
+        '  }',
+        '}',
+      ].join('\n')
+      const controllerSymbols = adapter.extractSymbols(filePath, controllerContent)
+      const targetPath = 'symfony:src/App/Service/Mailer.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Mailer { public function send(): void {} }`,
+      )
+      const relations = adapter.extractRelations(
+        filePath,
+        controllerContent,
+        [...controllerSymbols, ...targetSymbols],
+        new Map(),
+      )
+      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      expect(relations).toContainEqual(
+        expect.objectContaining({
+          source: caller?.id,
+          target: callee?.id,
+          type: RelationType.Calls,
+        }),
+      )
+    })
+
+    it('emits CALLS for Zend loader followed by explicit new', () => {
+      const filePath = 'zend:app/controllers/PostController.php'
+      const controllerContent = [
+        '<?php',
+        'class PostController {',
+        '  public function index() {',
+        "    Zend_Loader::loadClass('Foo_Bar');",
+        '    $service = new Foo_Bar();',
+        '    $service->run();',
+        '  }',
+        '}',
+      ].join('\n')
+      const controllerSymbols = adapter.extractSymbols(filePath, controllerContent)
+      const targetPath = 'zend:src/Foo_Bar.php'
+      const targetSymbols = adapter.extractSymbols(
+        targetPath,
+        `<?php\nclass Foo_Bar { public function run(): void {} }`,
       )
       const relations = adapter.extractRelations(
         filePath,

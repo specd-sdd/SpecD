@@ -437,4 +437,116 @@ describe('Workspace indexing', () => {
       }),
     )
   })
+
+  it('PHP workspace: Cake uses property preserves IMPORTS and CALLS across indexing', async () => {
+    const phpRoot = createWorkspace(tempDir, 'php-app', {
+      'app/controllers/PostsController.php': [
+        '<?php',
+        'class PostsController {',
+        "  var $uses = array('Article');",
+        '  public function index() {',
+        '    $this->Article->save();',
+        '  }',
+        '}',
+      ].join('\n'),
+      'app/models/article.php': [
+        '<?php',
+        'class Article {',
+        '  public function save(): void {}',
+        '}',
+      ].join('\n'),
+    })
+
+    provider = createCodeGraphProvider({ storagePath: tempDir })
+    await provider.open()
+
+    const result = await provider.index({
+      workspaces: [{ name: 'php-app', codeRoot: phpRoot, specs: async () => [] }],
+      projectRoot: tempDir,
+    })
+
+    expect(result.errors).toHaveLength(0)
+
+    const store = (provider as unknown as { store: GraphStore }).store
+    const importees = await store.getImportees('php-app:app/controllers/PostsController.php')
+    expect(importees).toContainEqual(
+      expect.objectContaining({
+        source: 'php-app:app/controllers/PostsController.php',
+        target: 'php-app:app/models/article.php',
+        type: RelationType.Imports,
+      }),
+    )
+
+    const saveSymbol = (await provider.findSymbols({ name: 'save' })).find(
+      (symbol) => symbol.filePath === 'php-app:app/models/article.php',
+    )
+    expect(saveSymbol).toBeDefined()
+
+    const callers = await store.getCallers(saveSymbol!.id)
+    expect(callers).toContainEqual(
+      expect.objectContaining({
+        source: expect.stringContaining(
+          'php-app:app/controllers/PostsController.php:method:index:',
+        ),
+        target: saveSymbol!.id,
+        type: RelationType.Calls,
+      }),
+    )
+  })
+
+  it('PHP workspace: Laravel class literal acquisition preserves IMPORTS and CALLS across indexing', async () => {
+    const phpRoot = createWorkspace(tempDir, 'laravel', {
+      'app/Http/Controllers/PostController.php': [
+        '<?php',
+        'class PostController {',
+        '  public function index() {',
+        '    $mailer = app(App\\Services\\Mailer::class);',
+        '    $mailer->send();',
+        '  }',
+        '}',
+      ].join('\n'),
+      'app/App/Services/Mailer.php': [
+        '<?php',
+        'class Mailer {',
+        '  public function send(): void {}',
+        '}',
+      ].join('\n'),
+    })
+
+    provider = createCodeGraphProvider({ storagePath: tempDir })
+    await provider.open()
+
+    const result = await provider.index({
+      workspaces: [{ name: 'laravel', codeRoot: phpRoot, specs: async () => [] }],
+      projectRoot: tempDir,
+    })
+
+    expect(result.errors).toHaveLength(0)
+
+    const store = (provider as unknown as { store: GraphStore }).store
+    const importees = await store.getImportees('laravel:app/Http/Controllers/PostController.php')
+    expect(importees).toContainEqual(
+      expect.objectContaining({
+        source: 'laravel:app/Http/Controllers/PostController.php',
+        target: 'laravel:app/App/Services/Mailer.php',
+        type: RelationType.Imports,
+      }),
+    )
+
+    const sendSymbol = (await provider.findSymbols({ name: 'send' })).find(
+      (symbol) => symbol.filePath === 'laravel:app/App/Services/Mailer.php',
+    )
+    expect(sendSymbol).toBeDefined()
+
+    const callers = await store.getCallers(sendSymbol!.id)
+    expect(callers).toContainEqual(
+      expect.objectContaining({
+        source: expect.stringContaining(
+          'laravel:app/Http/Controllers/PostController.php:method:index:',
+        ),
+        target: sendSymbol!.id,
+        type: RelationType.Calls,
+      }),
+    )
+  })
 })

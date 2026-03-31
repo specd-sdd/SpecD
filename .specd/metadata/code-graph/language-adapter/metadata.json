@@ -57,13 +57,13 @@
     {
       "requirement": "PHP dynamic loader dependencies",
       "rules": [
-        "The PHP adapter MUST detect framework-specific dynamic loader calls and emit file-level `IMPORTS` relations when the loader target can be resolved to a file path.\n\nSupported call patterns include:\n\n- CakePHP: `$this->loadModel('X')`, `loadModel('X')`, `App::uses('X', 'Y')`, `App::import('Model', 'X')`, `ClassRegistry::init('X')`\n- CakePHP additional loaders: `$this->loadController('X')`, `$this->loadComponent('X')`\n- CodeIgniter: `$this->load->model('X')`, `$this->load->library('X')`, `$this->load->helper('X')`\n- Yii/Zend/Drupal/TYPO3/Magento families as configured in adapter resolver registry\n\nRules:\n\n- When loader arguments are string literals and resolver rules can map them to a concrete target file, emit `IMPORTS` from source file to resolved target file.\n- When arguments are non-literal or the target cannot be resolved, silently drop the relation (no fallback `DEPENDS_ON` edge for file dependencies).\n- Generic method names (e.g. `->get('x')`) MUST NOT be detected unless a resolver explicitly declares them for a framework-specific signature."
+        "The PHP adapter MUST detect framework-specific dependency acquisition patterns and emit file-level `IMPORTS` relations when the referenced target can be resolved to a file path.\n\nSupported pattern families include:\n\n- CakePHP:\n  - `$this->loadModel('X')`, `loadModel('X')`\n  - `$this->loadController('X')`, `loadController('X')`\n  - `$this->loadComponent('X')`, `loadComponent('X')`\n  - `App::uses('X', 'Y')`, `App::import('Model', 'X')`, `ClassRegistry::init('X')`\n  - class-property dependency declarations such as `var $uses = array(...)`, `public $uses = [...]`, and `protected $uses = [...]` when they use literal string entries\n- CodeIgniter:\n  - `$this->load->model('X')`, `$this->load->library('X')`, `$this->load->helper('X')`\n- Yii:\n  - `Yii::import('...')`, `Yii::createObject('...')` when the target class or path is expressed as a literal and can be resolved\n- Zend:\n  - `Zend_Loader::loadClass('...')`\n- Other PHP framework or container families:\n  - explicit dependency acquisition APIs using class literals, qualified class names, or deterministic naming conventions MAY be supported when resolver rules can map them to concrete files without executing application code\n\nRules:\n\n- When dependency-acquisition arguments are string literals or class literals and resolver rules can map them to a concrete target file, emit `IMPORTS` from source file to resolved target file.\n- When dependency declarations appear as class properties with literal entries, the adapter MUST treat them as file-level dependency signals for the declaring class.\n- Generic method names (for example `->get('x')`) MUST NOT be detected unless a resolver explicitly declares a framework-specific signature with deterministic target resolution.\n- When arguments are non-literal, container-driven without an explicit class target, or the target cannot be resolved, silently drop the relation (no fallback `DEPENDS_ON` edge for file dependencies)."
       ]
     },
     {
       "requirement": "PHP loaded-instance call extraction",
       "rules": [
-        "The PHP adapter MUST perform method-local heuristic extraction of `CALLS` from dynamically loaded instances.\n\nRules:\n\n- Within a single method/function body, track aliases bound to resolved loaded dependencies (e.g. `$this->Article`, `$Article`, simple local assignments).\n- For member calls on those aliases (e.g. `$this->Article->save()`, `$model->find()`), emit `CALLS` only when both caller and callee symbols are resolvable.\n- Do not perform interprocedural propagation in this requirement (no cross-method alias flow).\n- Ambiguous alias targets SHOULD be dropped to avoid noisy false positives."
+        "The PHP adapter MUST perform deterministic heuristic extraction of `CALLS` from framework-managed or explicitly constructed PHP instances when their targets can be resolved statically.\n\nRules:\n\n- Within a single method or function body, track aliases bound to resolved loaded dependencies, framework-managed properties, and simple local assignments.\n- Class-property dependency declarations (for example CakePHP `uses`) MUST make the corresponding framework-managed aliases available to methods of the declaring class.\n- Bare loader forms and receiver-based loader forms that resolve the same dependency kind MUST feed the same alias and call-resolution flow.\n- For member calls on those aliases (for example `$this->Article->save()`, `$model->find()`, `$this->email->send()`), emit `CALLS` only when both caller and callee symbols are resolvable.\n- Explicit instance construction flows such as `new X()` or class-literal service acquisition MAY emit `CALLS` when the constructed or resolved class target is statically known and the subsequent method call can be mapped to a concrete symbol.\n- Do not perform interprocedural propagation in this requirement (no cross-method alias flow, no whole-program inference).\n- Ambiguous alias targets, runtime-only service identifiers, and unresolved member calls MUST be dropped to avoid noisy false positives."
       ]
     },
     {
@@ -539,6 +539,33 @@
     },
     {
       "requirement": "PHP dynamic loader dependencies",
+      "name": "CakePHP uses property emits IMPORTS when literals resolve",
+      "given": [
+        "a controller class declaring var $uses = array('Article', 'Category')",
+        "AND resolver rules can map both entries to concrete files"
+      ],
+      "when": ["extractRelations() is called"],
+      "then": ["IMPORTS relations are returned for both resolved targets"]
+    },
+    {
+      "requirement": "PHP dynamic loader dependencies",
+      "name": "Bare Cake loaders are supported",
+      "given": ["a PHP file containing loadController('Admin') and loadComponent('Auth')"],
+      "when": ["extractRelations() is called"],
+      "then": ["loader resolver rules are applied to both calls"]
+    },
+    {
+      "requirement": "PHP dynamic loader dependencies",
+      "name": "Class-literal framework acquisition emits IMPORTS when target resolves",
+      "given": [
+        "a PHP file containing a framework acquisition call with an explicit class target",
+        "AND resolver rules can map that class target to a concrete file"
+      ],
+      "when": ["extractRelations() is called"],
+      "then": ["an IMPORTS relation is returned to that target file"]
+    },
+    {
+      "requirement": "PHP dynamic loader dependencies",
       "name": "Dynamic argument silently dropped",
       "given": ["a PHP file containing $this->loadModel($modelName)"],
       "when": ["extractRelations() is called"],
@@ -556,12 +583,13 @@
     },
     {
       "requirement": "PHP dynamic loader dependencies",
-      "name": "Additional Cake loaders are supported",
+      "name": "Runtime-only service identifier is not treated as a deterministic dependency",
       "given": [
-        "a PHP file containing $this->loadController('Admin') and $this->loadComponent('Auth')"
+        "a PHP file containing a framework service lookup identified only by a string service ID",
+        "AND resolver rules do not define a deterministic file target for that service ID"
       ],
       "when": ["extractRelations() is called"],
-      "then": ["loader resolver rules are applied to both calls"]
+      "then": ["no IMPORTS relation is created from that lookup"]
     },
     {
       "requirement": "PHP loaded-instance call extraction",
@@ -579,6 +607,56 @@
     },
     {
       "requirement": "PHP loaded-instance call extraction",
+      "name": "CakePHP uses property makes framework-managed alias available to methods",
+      "given": [
+        "a class declaring var $uses = array('Article')",
+        "AND one of its methods calls $this->Article->save()"
+      ],
+      "when": ["caller and callee symbols are resolvable"],
+      "then": ["a CALLS relation is emitted from that method to Article::save"]
+    },
+    {
+      "requirement": "PHP loaded-instance call extraction",
+      "name": "Bare loader form feeds the same alias resolution as receiver-based form",
+      "given": [
+        "a method containing loadComponent('Auth')",
+        "AND the same method later calls $this->Auth->login()"
+      ],
+      "when": ["caller and callee symbols are resolvable"],
+      "then": ["a CALLS relation is emitted"]
+    },
+    {
+      "requirement": "PHP loaded-instance call extraction",
+      "name": "Explicit instance construction after framework loading emits CALLS",
+      "given": [
+        "a method containing loadModel('Article')",
+        "AND the same method later assigns $article = new Article() and calls $article->save()"
+      ],
+      "when": ["caller and callee symbols are resolvable"],
+      "then": ["a CALLS relation is emitted"]
+    },
+    {
+      "requirement": "PHP loaded-instance call extraction",
+      "name": "Class-literal service acquisition emits CALLS when target is statically known",
+      "given": [
+        "a method assigns a framework-managed service acquisition with an explicit class target to a local variable",
+        "AND the same method later calls a method on that variable"
+      ],
+      "when": ["the service class and callee method symbols are resolvable"],
+      "then": ["a CALLS relation is emitted"]
+    },
+    {
+      "requirement": "PHP loaded-instance call extraction",
+      "name": "Runtime-only service identifier is not promoted to CALLS",
+      "given": [
+        "a method fetches a service using only a runtime string identifier",
+        "AND no deterministic class target can be resolved"
+      ],
+      "when": ["a method call is later made on the fetched value"],
+      "then": ["no CALLS relation is emitted from that dynamic lookup"]
+    },
+    {
+      "requirement": "PHP loaded-instance call extraction",
       "name": "Cross-method alias propagation is not performed",
       "given": ["alias assignment in one method and method call in another"],
       "when": ["extractRelations() runs"],
@@ -586,8 +664,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:d3cc02005fa89fa49763c2ca1f3f7ca89d296a11b3a881b5f6e8255cefbda3db",
-    "verify.md": "sha256:6d9210bcee96d403b39df4a59608a671d6bc48f80dc9cfdf7328298ca48782bc"
+    "spec.md": "sha256:49c47598adaa1f872daed3dad0e1f84dafcf56d277d0873801f60a7df64d65e4",
+    "verify.md": "sha256:6f4f37ffbff84d6b299733563ca030bf38c65dd7a56a49635b402a372529d839"
   },
   "generatedBy": "core"
 }
