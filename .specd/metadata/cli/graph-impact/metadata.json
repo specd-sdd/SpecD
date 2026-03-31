@@ -9,7 +9,6 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "### Requirement: Command signature",
         "```text\nspecd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction upstream|downstream|both] [--depth <n>] [--path <path>] [--format text|json|toon]\n```\n\nExactly one of `--file`, `--symbol`, or `--changes` must be provided.\n\n- `--file` — analyze impact of a single file\n- `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed\n- `--changes` — detect impact of changes to multiple files (variadic; accepts multiple space-separated paths)\n- `--direction` — optional; analysis direction, defaults to `upstream`. Values:\n  - `upstream` — find symbols and files that depend on the target\n  - `downstream` — find symbols and files that the target depends on\n  - `both` — combined upstream and downstream analysis\n- `--depth` — optional; maximum traversal depth, defaults to `3`. Must be a positive integer. Passed through to `analyzeImpact`/`analyzeFileImpact` as `maxDepth`\n- `--path` — optional; workspace root, defaults to the current working directory\n- `--format text|json|toon` — optional; output format, defaults to `text`"
       ]
     },
@@ -34,7 +33,6 @@
     {
       "requirement": "Output format",
       "rules": [
-        "### Requirement: Output format",
         "**File impact** in `text` mode:\n\n```text\nImpact analysis for src/auth.ts (depth=5)\n  Risk level:       HIGH\n  Direct deps:      6\n  Indirect deps:    3\n  Transitive deps:  1\n  Affected files:   8\n\nAffected files:\n  src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)\n  src/session.ts: createSession:8 (d=2)\n\nPer-symbol breakdown:\n  src/auth.ts:function:validate:10:0  risk=HIGH direct=4\n  src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2\n```\n\nWhen affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).\n\nWhen `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.\n\n**Symbol impact** in `text` mode:\n\n```text\nImpact analysis for function createKernel (packages/core/src/composition/kernel.ts:147) (depth=5)\n  Risk level:       CRITICAL\n  Direct deps:      1\n  Indirect deps:    1\n  Transitive deps:  38\n  Affected files:   40\n\nAffected files:\n  packages/cli/src/kernel.ts: wireKernel:5 (d=1)\n  ...\n```\n\nWhen multiple symbols match, each analysis is listed sequentially.\n\n**Change detection** in `text` mode outputs the summary string from `ChangeDetectionResult.summary` followed by the affected files list.\n\nIn `json` or `toon` mode, the full result object is output as-is. The `AffectedSymbol` entries in JSON include the `depth` field."
       ]
     },
@@ -246,7 +244,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:5038215b390477e68796decb8f731811d177da5dc6a94734d6ac73598b28861d",
+    "spec.md": "sha256:857835550fcba98c002143ca7a9b7156a8c4e8ece8677261979a46e1931bc006",
     "verify.md": "sha256:1e613aac9b6020fe1a17c09077d8fde3ecf33ee75446538a82fdb63b6713f065"
   },
   "generatedBy": "core"
