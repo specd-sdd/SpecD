@@ -28,14 +28,14 @@
       "requirement": "Impact analysis",
       "rules": [
         "### Requirement: Impact analysis",
-        "`analyzeImpact(store: GraphStore, target: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute the blast radius of modifying the target symbol. The optional `maxDepth` parameter (default: 3) controls how deep the traversal goes — it is passed through to `getUpstream`/`getDownstream` and limits the IMPORTS BFS loop.\n\nThe function produces an `ImpactResult` containing:\n\n- **`target`** — the symbol being analyzed\n- **`directDependents`** — count of depth-1 results (WILL BREAK)\n- **`indirectDependents`** — count of depth-2 results (LIKELY AFFECTED)\n- **`transitiveDependents`** — count of depth-3+ results (MAY NEED TESTING)\n- **`riskLevel`** — computed from dependent counts: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`\n- **`affectedFiles`** — unique file paths containing any affected symbol\n- **`affectedSymbols`** — array of `AffectedSymbol` entries with depth information\n- **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)\n\n`AffectedSymbol` SHALL contain:\n\n- **`id`** (`string`) — the symbol identifier\n- **`name`** (`string`) — the symbol's declared name\n- **`filePath`** (`string`) — workspace-prefixed file path\n- **`line`** (`number`) — 1-based line number\n- **`depth`** (`number`) — distance from the target: 1 = direct dependent, 2 = indirect, 3+ = transitive\n\nRisk level thresholds:\n\n| Level      | Condition                                                |\n| ---------- | -------------------------------------------------------- |\n| `LOW`      | 0–2 direct dependents, no indirect                       |\n| `MEDIUM`   | 3–5 direct dependents, or any indirect                   |\n| `HIGH`     | 6+ direct dependents, or 10+ total dependents            |\n| `CRITICAL` | 20+ total dependents, or target is in 3+ execution flows |"
+        "`analyzeImpact(store: GraphStore, target: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute the blast radius of modifying the target symbol. The optional `maxDepth` parameter (default: 3) controls how deep the traversal goes — it is passed through to `getUpstream`/`getDownstream` and limits the IMPORTS BFS loop.\n\nThe function produces an `ImpactResult` containing:\n\n- **`target`** — the symbol being analyzed\n- **`directDependents`** — count of depth-1 results (WILL BREAK)\n- **`indirectDependents`** — count of depth-2 results (LIKELY AFFECTED)\n- **`transitiveDependents`** — count of depth-3+ results (MAY NEED TESTING)\n- **`riskLevel`** — computed from dependent counts: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`\n- **`affectedFiles`** — unique file paths containing any affected symbol\n- **`affectedSymbols`** — array of `AffectedSymbol` entries with depth information\n- **`affectedProcesses`** — execution flows that include the target or any affected symbol (when process data is available)\n\n`AffectedSymbol` SHALL contain:\n\n- **`id`** (`string`) — the symbol identifier\n- **`name`** (`string`) — the symbol's declared name\n- **`filePath`** (`string`) — workspace-prefixed file path\n- **`line`** (`number`) — 1-based line number\n- **`depth`** (`number`) — distance from the target: 1 = direct dependent, 2 = indirect, 3+ = transitive\n\nImpact analysis MUST include hierarchy relations in addition to existing call/import reachability:\n\n- changing a type symbol MUST affect symbols connected through `EXTENDS` and `IMPLEMENTS` according to traversal direction\n- changing a method symbol MUST affect symbols connected through `OVERRIDES` according to traversal direction\n- hierarchy-derived affected symbols participate in depth counts, risk calculation, and affected-file aggregation the same way as other affected symbols\n\nRisk level thresholds:\n\n| Level      | Condition                                                |\n| ---------- | -------------------------------------------------------- |\n| `LOW`      | 0–2 direct dependents, no indirect                       |\n| `MEDIUM`   | 3–5 direct dependents, or any indirect                   |\n| `HIGH`     | 6+ direct dependents, or 10+ total dependents            |\n| `CRITICAL` | 20+ total dependents, or target is in 3+ execution flows |"
       ]
     },
     {
       "requirement": "File impact",
       "rules": [
         "### Requirement: File impact",
-        "`analyzeFileImpact(store: GraphStore, filePath: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<FileImpactResult>` SHALL compute aggregate impact for all symbols defined in the given file. The optional `maxDepth` parameter (default: 3) is passed through to each per-symbol `analyzeImpact` call and limits the file-level IMPORTS BFS.\n\nIt:\n\n1. Retrieves all symbols in the file via `findSymbols({ filePath })`\n2. Runs `analyzeImpact` for each symbol with the given `maxDepth`\n3. Merges results: deduplicates affected symbols (keeping the shallowest depth), takes the maximum risk level, unions affected files\n\n`FileImpactResult` extends `ImpactResult` with:\n\n- **`symbols`** — array of per-symbol `ImpactResult` entries\n- **`riskLevel`** — the maximum risk level across all symbols in the file"
+        "`analyzeFileImpact(store: GraphStore, filePath: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<FileImpactResult>` SHALL compute aggregate impact for all symbols defined in the given file. The optional `maxDepth` parameter (default: 3) is passed through to each per-symbol `analyzeImpact` call and limits the file-level IMPORTS BFS.\n\nIt:\n\n1. Retrieves all symbols in the file via `findSymbols({ filePath })`\n2. Runs `analyzeImpact` for each symbol with the given `maxDepth`\n3. Merges results: deduplicates affected symbols (keeping the shallowest depth), takes the maximum risk level, unions affected files\n\n`FileImpactResult` extends `ImpactResult` with:\n\n- **`symbols`** — array of per-symbol `ImpactResult` entries\n- **`riskLevel`** — the maximum risk level across all symbols in the file\n\nWhen symbols in the file participate in `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES`, their hierarchy-derived impact MUST be reflected in the aggregate result."
       ]
     },
     {
@@ -174,6 +174,23 @@
       ]
     },
     {
+      "requirement": "Impact analysis",
+      "name": "Base type change affects inheritors and implementors",
+      "given": ["a type symbol with persisted EXTENDS and IMPLEMENTS dependents"],
+      "when": ["analyzeImpact(store, target.id, 'upstream') is called"],
+      "then": [
+        "those hierarchy-dependent symbols are included in affectedSymbols",
+        "AND their files contribute to affectedFiles"
+      ]
+    },
+    {
+      "requirement": "Impact analysis",
+      "name": "Base method change affects overriding methods",
+      "given": ["a method symbol with persisted OVERRIDES dependents"],
+      "when": ["analyzeImpact(store, target.id, 'upstream') is called"],
+      "then": ["overriding methods are included in affectedSymbols"]
+    },
+    {
       "requirement": "File impact",
       "name": "Aggregate risk is maximum across symbols",
       "given": ["file src/auth.ts contains symbols X (LOW risk) and Y (HIGH risk)"],
@@ -196,6 +213,13 @@
         "each per-symbol analyzeImpact call uses maxDepth: 5",
         "AND the file-level IMPORTS BFS also uses depth limit 5"
       ]
+    },
+    {
+      "requirement": "File impact",
+      "name": "Hierarchy-derived impact is aggregated at file level",
+      "given": ["a file defines a base type or base method with hierarchy dependents"],
+      "when": ["analyzeFileImpact(store, filePath, 'upstream') is called"],
+      "then": ["those hierarchy-derived affected symbols are included in the aggregate result"]
     },
     {
       "requirement": "Change detection",
@@ -228,8 +252,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:075aeca64fea362ade7f6dd94dab5d0603b91f40b8d10853c85bbceb5760acde",
-    "verify.md": "sha256:916e057411a82aabe8f72aabd6d13e5bd662769caf1c48028ffff9ce64b7ca84"
+    "spec.md": "sha256:5d3eadd0ddfa093728ccac203c46f90b8695e2b021f58b6db8bfcf7763f53d2e",
+    "verify.md": "sha256:89a2a70346865ea34a5cad67dab5fa960af807ed65f4a13135bfc79105f878bf"
   },
   "generatedBy": "core"
 }

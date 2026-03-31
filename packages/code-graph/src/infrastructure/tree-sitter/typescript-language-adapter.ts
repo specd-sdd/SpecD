@@ -92,6 +92,41 @@ function collectByKind(node: SgNode, kinds: Set<string>, results: SgNode[]): voi
 }
 
 /**
+ * Removes generic arguments and namespace qualifiers from a type reference.
+ * @param reference - Raw type reference text.
+ * @returns The normalized type name.
+ */
+function normalizeTypeReference(reference: string): string {
+  const withoutGenerics = reference.replace(/<[^>]+>/g, '').trim()
+  const tail = withoutGenerics.split('.').at(-1) ?? withoutGenerics
+  return tail.replace(/\[\]$/g, '').trim()
+}
+
+/**
+ * Parses a comma-separated list of type references from a heritage clause.
+ * @param clauseText - Clause text following `extends` or `implements`.
+ * @returns Normalized type names.
+ */
+function parseTypeNames(clauseText: string | undefined): string[] {
+  if (!clauseText) return []
+  return clauseText
+    .split(',')
+    .map((entry) => normalizeTypeReference(entry))
+    .filter((entry) => entry.length > 0)
+}
+
+/**
+ * Represents a local class or interface declaration and the methods it owns.
+ */
+interface TypeDeclarationInfo {
+  readonly name: string
+  readonly symbolId: string
+  readonly methodsByName: ReadonlyMap<string, string>
+  readonly extendsNames: readonly string[]
+  readonly implementsNames: readonly string[]
+}
+
+/**
  * Language adapter for TypeScript, TSX, JavaScript, and JSX files.
  * Uses tree-sitter via ast-grep to extract symbols and relations from source code.
  */
@@ -370,9 +405,176 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
 
     this.extractExportRelations(root, filePath, symbols, relations)
     this.extractImportRelations(root, filePath, relations)
+    this.extractHierarchyRelations(root, symbols, importMap, relations)
     this.extractCallRelations(root, symbols, importMap, relations)
 
     return relations
+  }
+
+  /**
+   * Extracts `EXTENDS`, `IMPLEMENTS`, and local `OVERRIDES` relations.
+   * @param root - The parsed source root.
+   * @param symbols - Symbols declared in the current file.
+   * @param importMap - Resolved imported type names.
+   * @param relations - Accumulator array for discovered relations.
+   */
+  private extractHierarchyRelations(
+    root: SgNode,
+    symbols: SymbolNode[],
+    importMap: Map<string, string>,
+    relations: Relation[],
+  ): void {
+    const declarations = this.collectTypeDeclarations(root, symbols)
+    const declarationsByName = new Map(
+      declarations.map((declaration) => [declaration.name, declaration]),
+    )
+    const seen = new Set<string>()
+
+    for (const declaration of declarations) {
+      for (const parentName of declaration.extendsNames) {
+        const targetId = importMap.get(parentName) ?? declarationsByName.get(parentName)?.symbolId
+        if (!targetId) continue
+
+        const key = `${declaration.symbolId}:${RelationType.Extends}:${targetId}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          relations.push(
+            createRelation({
+              source: declaration.symbolId,
+              target: targetId,
+              type: RelationType.Extends,
+            }),
+          )
+        }
+
+        const localTarget = declarationsByName.get(parentName)
+        if (localTarget) {
+          this.addOverrideRelations(
+            declaration,
+            localTarget,
+            RelationType.Overrides,
+            relations,
+            seen,
+          )
+        }
+      }
+
+      for (const contractName of declaration.implementsNames) {
+        const targetId =
+          importMap.get(contractName) ?? declarationsByName.get(contractName)?.symbolId
+        if (!targetId) continue
+
+        const key = `${declaration.symbolId}:${RelationType.Implements}:${targetId}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          relations.push(
+            createRelation({
+              source: declaration.symbolId,
+              target: targetId,
+              type: RelationType.Implements,
+            }),
+          )
+        }
+
+        const localTarget = declarationsByName.get(contractName)
+        if (localTarget) {
+          this.addOverrideRelations(
+            declaration,
+            localTarget,
+            RelationType.Overrides,
+            relations,
+            seen,
+          )
+        }
+      }
+    }
+  }
+
+  /**
+   * Builds local class/interface metadata needed for hierarchy extraction.
+   * @param root - Parsed source root.
+   * @param symbols - Symbols declared in the current file.
+   * @returns Local type declarations with method ownership and heritage data.
+   */
+  private collectTypeDeclarations(root: SgNode, symbols: SymbolNode[]): TypeDeclarationInfo[] {
+    const declarations: TypeDeclarationInfo[] = []
+    const nodes: SgNode[] = []
+    collectByKind(
+      root,
+      new Set(['class_declaration', 'abstract_class_declaration', 'interface_declaration']),
+      nodes,
+    )
+
+    for (const node of nodes) {
+      const name = getName(node)
+      if (!name) continue
+
+      const lineStart = node.range().start.line + 1
+      const lineEnd = node.range().end.line + 1
+      const symbolId = symbols.find(
+        (symbol) =>
+          symbol.name === name &&
+          symbol.line === lineStart &&
+          (symbol.kind === SymbolKind.Class || symbol.kind === SymbolKind.Interface),
+      )?.id
+      if (!symbolId) continue
+
+      const header = node.text().split('{')[0] ?? node.text()
+      const extendsMatch = header.match(/\bextends\s+([^{]+?)(?:\bimplements\b|$)/)
+      const implementsMatch = header.match(/\bimplements\s+([^{]+)$/)
+      const methodsByName = new Map<string, string>()
+
+      for (const symbol of symbols) {
+        if (symbol.kind !== SymbolKind.Method) continue
+        if (symbol.line <= lineStart || symbol.line > lineEnd) continue
+        methodsByName.set(symbol.name, symbol.id)
+      }
+
+      declarations.push({
+        name,
+        symbolId,
+        methodsByName,
+        extendsNames:
+          nodeKind(node) === 'interface_declaration'
+            ? parseTypeNames(extendsMatch?.[1])
+            : parseTypeNames(extendsMatch?.[1]).slice(0, 1),
+        implementsNames:
+          nodeKind(node) === 'interface_declaration' ? [] : parseTypeNames(implementsMatch?.[1]),
+      })
+    }
+
+    return declarations
+  }
+
+  /**
+   * Emits method-level `OVERRIDES` relations for matching local declarations.
+   * @param source - Child declaration info.
+   * @param target - Base or contract declaration info.
+   * @param relationType - The hierarchy relation type to emit.
+   * @param relations - Accumulator array for discovered relations.
+   * @param seen - Deduplication set.
+   */
+  private addOverrideRelations(
+    source: TypeDeclarationInfo,
+    target: TypeDeclarationInfo,
+    relationType: RelationType,
+    relations: Relation[],
+    seen: Set<string>,
+  ): void {
+    for (const [methodName, methodId] of source.methodsByName.entries()) {
+      const targetMethodId = target.methodsByName.get(methodName)
+      if (!targetMethodId) continue
+      const key = `${methodId}:${relationType}:${targetMethodId}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      relations.push(
+        createRelation({
+          source: methodId,
+          target: targetMethodId,
+          type: relationType,
+        }),
+      )
+    }
   }
 
   /**

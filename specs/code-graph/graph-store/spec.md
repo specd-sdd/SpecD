@@ -40,6 +40,12 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 - **`getCallees(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `source` matches
 - **`getImporters(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `target` matches
 - **`getImportees(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `source` matches
+- **`getExtenders(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `target` matches
+- **`getExtendedTargets(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `source` matches
+- **`getImplementors(symbolId: string): Promise<Relation[]>`** — all `IMPLEMENTS` relations where `target` matches
+- **`getImplementedTargets(symbolId: string): Promise<Relation[]>`** — all `IMPLEMENTS` relations where `source` matches
+- **`getOverriders(symbolId: string): Promise<Relation[]>`** — all `OVERRIDES` relations where `target` matches
+- **`getOverriddenTargets(symbolId: string): Promise<Relation[]>`** — all `OVERRIDES` relations where `source` matches
 - **`getSpec(specId: string): Promise<SpecNode | undefined>`** — retrieve a spec node by id
 - **`getSpecDependencies(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `source` matches
 - **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches
@@ -54,7 +60,7 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 - **`fileCount`** — total number of `FileNode` entries
 - **`symbolCount`** — total number of `SymbolNode` entries
 - **`specCount`** — total number of `SpecNode` entries
-- **`relationCounts`** — a `Record<RelationType, number>` with counts per relation type
+- **`relationCounts`** — a `Record<RelationType, number>` with counts per relation type, including `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
 - **`languages`** — array of distinct language identifiers across all files
 - **`lastIndexedAt`** — ISO 8601 timestamp of the most recent `upsertFile` call
 - **`lastIndexedRef`** — VCS ref (commit hash, changeset ID) at the time of the last index, or `null` if no ref was stored. This value is persisted as a meta key alongside `lastIndexedAt` and is read-only from the statistics interface.
@@ -66,7 +72,7 @@ The concrete `LadybugGraphStore` adapter SHALL use LadybugDB as the storage engi
 The adapter MUST:
 
 - Create the `.specd/` directory and database file on first `open()` if they do not exist
-- Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text and a `searchName STRING` column for FTS-optimized name search (computed from the symbol name using `expandSymbolName`).
+- Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`, including `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text and a `searchName STRING` column for FTS-optimized name search (computed from the symbol name using `expandSymbolName`).
 - Use parameterized Cypher queries for all operations (no string interpolation of user data)
 - Support schema migration: if the database schema version does not match the expected version, migrate on `open()`
 
@@ -125,6 +131,6 @@ All filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are 
 
 ## Spec Dependencies
 
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `RelationType`, `CodeGraphError`
+- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `RelationType`, `CodeGraphError`, hierarchy relation semantics
 - [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — ports as abstract classes, adapters in infrastructure
 - [`specs/code-graph/staleness-detection/spec.md`](../staleness-detection/spec.md) — `lastIndexedRef` field definition and staleness semantics

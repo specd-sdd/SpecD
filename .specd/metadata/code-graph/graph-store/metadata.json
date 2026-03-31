@@ -1,11 +1,7 @@
 {
   "title": "Graph Store",
   "description": "The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. The graph store defines the persistence port and its LadybugDB adapter, providing the storage backbone for indexing, querying, and traversal operations.",
-  "dependsOn": [
-    "code-graph:code-graph/symbol-model",
-    "default:_global/architecture",
-    "code-graph:code-graph/staleness-detection"
-  ],
+  "dependsOn": ["code-graph:code-graph/symbol-model"],
   "context": [
     "The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. The graph store defines the persistence port and its LadybugDB adapter, providing the storage backbone for indexing, querying, and traversal operations."
   ],
@@ -43,19 +39,19 @@
     {
       "requirement": "Query methods",
       "rules": [
-        "`GraphStore` SHALL provide the following query methods:\n\n- **`getFile(path: string): Promise<FileNode | undefined>`** — retrieve a file node by path\n- **`getSymbol(id: string): Promise<SymbolNode | undefined>`** — retrieve a symbol by id\n- **`getCallers(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `target` matches\n- **`getCallees(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `source` matches\n- **`getImporters(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `target` matches\n- **`getImportees(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `source` matches\n- **`getSpec(specId: string): Promise<SpecNode | undefined>`** — retrieve a spec node by id\n- **`getSpecDependencies(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `source` matches\n- **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches\n- **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, or file path\n\n`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kind` (SymbolKind), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive)."
+        "`GraphStore` SHALL provide the following query methods:\n\n- **`getFile(path: string): Promise<FileNode | undefined>`** — retrieve a file node by path\n- **`getSymbol(id: string): Promise<SymbolNode | undefined>`** — retrieve a symbol by id\n- **`getCallers(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `target` matches\n- **`getCallees(symbolId: string): Promise<Relation[]>`** — all `CALLS` relations where `source` matches\n- **`getImporters(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `target` matches\n- **`getImportees(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `source` matches\n- **`getExtenders(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `target` matches\n- **`getExtendedTargets(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `source` matches\n- **`getImplementors(symbolId: string): Promise<Relation[]>`** — all `IMPLEMENTS` relations where `target` matches\n- **`getImplementedTargets(symbolId: string): Promise<Relation[]>`** — all `IMPLEMENTS` relations where `source` matches\n- **`getOverriders(symbolId: string): Promise<Relation[]>`** — all `OVERRIDES` relations where `target` matches\n- **`getOverriddenTargets(symbolId: string): Promise<Relation[]>`** — all `OVERRIDES` relations where `source` matches\n- **`getSpec(specId: string): Promise<SpecNode | undefined>`** — retrieve a spec node by id\n- **`getSpecDependencies(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `source` matches\n- **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches\n- **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, or file path\n\n`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kind` (SymbolKind), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive)."
       ]
     },
     {
       "requirement": "Graph statistics",
       "rules": [
-        "`GraphStore` SHALL provide `getStatistics(): Promise<GraphStatistics>` returning:\n\n- **`fileCount`** — total number of `FileNode` entries\n- **`symbolCount`** — total number of `SymbolNode` entries\n- **`specCount`** — total number of `SpecNode` entries\n- **`relationCounts`** — a `Record<RelationType, number>` with counts per relation type\n- **`languages`** — array of distinct language identifiers across all files\n- **`lastIndexedAt`** — ISO 8601 timestamp of the most recent `upsertFile` call\n- **`lastIndexedRef`** — VCS ref (commit hash, changeset ID) at the time of the last index, or `null` if no ref was stored. This value is persisted as a meta key alongside `lastIndexedAt` and is read-only from the statistics interface."
+        "`GraphStore` SHALL provide `getStatistics(): Promise<GraphStatistics>` returning:\n\n- **`fileCount`** — total number of `FileNode` entries\n- **`symbolCount`** — total number of `SymbolNode` entries\n- **`specCount`** — total number of `SpecNode` entries\n- **`relationCounts`** — a `Record<RelationType, number>` with counts per relation type, including `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`\n- **`languages`** — array of distinct language identifiers across all files\n- **`lastIndexedAt`** — ISO 8601 timestamp of the most recent `upsertFile` call\n- **`lastIndexedRef`** — VCS ref (commit hash, changeset ID) at the time of the last index, or `null` if no ref was stored. This value is persisted as a meta key alongside `lastIndexedAt` and is read-only from the statistics interface."
       ]
     },
     {
       "requirement": "LadybugDB adapter",
       "rules": [
-        "The concrete `LadybugGraphStore` adapter SHALL use LadybugDB as the storage engine. It stores the graph in a single file at `{storagePath}/.specd/code-graph.lbug`. LadybugDB provides a Cypher-compatible query interface over a local file-based graph database.\n\nThe adapter MUST:\n\n- Create the `.specd/` directory and database file on first `open()` if they do not exist\n- Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text and a `searchName STRING` column for FTS-optimized name search (computed from the symbol name using `expandSymbolName`).\n- Use parameterized Cypher queries for all operations (no string interpolation of user data)\n- Support schema migration: if the database schema version does not match the expected version, migrate on `open()`\n\nThe adapter uses CSV-based bulk loading (`COPY FROM`) for large datasets via the `bulkLoad()` method. Relations are loaded in batches of 500 to prevent LadybugDB from blocking. The `IGNORE_ERRORS=true` flag is used for relation COPY operations to silently skip rows referencing non-existent nodes (dangling imports to external files)."
+        "The concrete `LadybugGraphStore` adapter SHALL use LadybugDB as the storage engine. It stores the graph in a single file at `{storagePath}/.specd/code-graph.lbug`. LadybugDB provides a Cypher-compatible query interface over a local file-based graph database.\n\nThe adapter MUST:\n\n- Create the `.specd/` directory and database file on first `open()` if they do not exist\n- Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`, including `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text and a `searchName STRING` column for FTS-optimized name search (computed from the symbol name using `expandSymbolName`).\n- Use parameterized Cypher queries for all operations (no string interpolation of user data)\n- Support schema migration: if the database schema version does not match the expected version, migrate on `open()`\n\nThe adapter uses CSV-based bulk loading (`COPY FROM`) for large datasets via the `bulkLoad()` method. Relations are loaded in batches of 500 to prevent LadybugDB from blocking. The `IGNORE_ERRORS=true` flag is used for relation COPY operations to silently skip rows referencing non-existent nodes (dangling imports to external files)."
       ]
     },
     {
@@ -224,6 +220,27 @@
       "then": ["only the symbol with \"validates user input\" in its comment is returned"]
     },
     {
+      "requirement": "Query methods",
+      "name": "getExtenders returns incoming EXTENDS relations",
+      "given": ["type B and type C both extend type A"],
+      "when": ["getExtenders(A.id) is called"],
+      "then": ["EXTENDS relations are returned with sources B and C"]
+    },
+    {
+      "requirement": "Query methods",
+      "name": "getImplementors returns incoming IMPLEMENTS relations",
+      "given": ["types B and C both implement contract A"],
+      "when": ["getImplementors(A.id) is called"],
+      "then": ["IMPLEMENTS relations are returned with sources B and C"]
+    },
+    {
+      "requirement": "Query methods",
+      "name": "getOverriders returns incoming OVERRIDES relations",
+      "given": ["methods B and C both override method A"],
+      "when": ["getOverriders(A.id) is called"],
+      "then": ["OVERRIDES relations are returned with sources B and C"]
+    },
+    {
       "requirement": "Graph statistics",
       "name": "Statistics include all expected fields",
       "when": ["getStatistics() is called on a populated store"],
@@ -246,6 +263,13 @@
       "then": ["lastIndexedRef SHALL be \"abc1234\""]
     },
     {
+      "requirement": "Graph statistics",
+      "name": "Statistics include hierarchy relation counts",
+      "given": ["the store contains persisted EXTENDS, IMPLEMENTS, and OVERRIDES relations"],
+      "when": ["getStatistics() is called"],
+      "then": ["relationCounts includes counts for all three hierarchy relation types"]
+    },
+    {
       "requirement": "LadybugDB adapter",
       "name": "Database created on first open",
       "given": ["no .specd/ directory exists at storagePath"],
@@ -257,6 +281,13 @@
       "name": "Parameterized queries prevent injection",
       "when": ["findSymbols({ name: \"'; DROP TABLE symbols; --\" }) is called"],
       "then": ["the query executes safely and returns no results (no injection)"]
+    },
+    {
+      "requirement": "LadybugDB adapter",
+      "name": "LadybugDB adapter persists hierarchy relations",
+      "given": ["hierarchy relations are passed to the store"],
+      "when": ["they are bulk loaded or queried back"],
+      "then": ["EXTENDS, IMPLEMENTS, and OVERRIDES behave like first-class persisted edge types"]
     },
     {
       "requirement": "Bulk operations",
@@ -281,8 +312,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b94ec20e33c26a59205183b488e70cd1e0b9ed0ae5369c38734b6426570bb087",
-    "verify.md": "sha256:0249ae9bc0e0ca986f1c10824ede8161bc7538cceb2a034bc88e8923b23b8a97"
+    "spec.md": "sha256:b67782ce2018200d9b5082fab259452a9b40ebdb130d6f8dded192d672a2fd37",
+    "verify.md": "sha256:564f0425914928d193b52ff4e9b29d128df5920e99a0f1b46b58648cdd5e20c4"
   },
   "generatedBy": "core"
 }

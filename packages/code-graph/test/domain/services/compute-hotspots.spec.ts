@@ -196,10 +196,11 @@ describe('computeHotspots', () => {
 
     const result = await computeHotspots(store)
 
-    expect(DEFAULT_HOTSPOT_KINDS).toEqual(['class', 'method', 'function'])
+    expect(DEFAULT_HOTSPOT_KINDS).toEqual(['class', 'interface', 'method', 'function'])
     expect(result.entries.map((entry) => entry.symbol.kind).sort()).toEqual([
       SymbolKind.Class,
       SymbolKind.Function,
+      SymbolKind.Interface,
       SymbolKind.Method,
     ])
   })
@@ -318,5 +319,47 @@ describe('computeHotspots', () => {
     expect(result.totalSymbols).toBe(5)
     expect(result.entries.every((entry) => entry.symbol.filePath.startsWith('ws-a:'))).toBe(true)
     expect(result.entries.some((entry) => entry.symbol.name === 'inA')).toBe(true)
+  })
+
+  it('promotes interfaces with implementors even without direct callers', async () => {
+    const contract = sym('Persistable', 'ws-a:types.ts', 1, SymbolKind.Interface)
+    const impl = sym('UserService', 'ws-a:user.ts', 1, SymbolKind.Class)
+
+    await store.upsertFile(file('ws-a:types.ts'), [contract], [])
+    await store.upsertFile(
+      file('ws-a:user.ts'),
+      [impl],
+      [createRelation({ source: impl.id, target: contract.id, type: RelationType.Implements })],
+    )
+
+    const result = await computeHotspots(store, { minRisk: 'LOW', minScore: 0 })
+    const entry = result.entries.find((candidate) => candidate.symbol.id === contract.id)
+
+    expect(entry).toBeDefined()
+    expect(entry!.score).toBeGreaterThan(0)
+  })
+
+  it('promotes base methods with overriders even without callers', async () => {
+    const baseMethod = sym('save', 'ws-a:base.ts', 1, SymbolKind.Method)
+    const childMethod = sym('save', 'ws-a:user.ts', 1, SymbolKind.Method)
+
+    await store.upsertFile(file('ws-a:base.ts'), [baseMethod], [])
+    await store.upsertFile(
+      file('ws-a:user.ts'),
+      [childMethod],
+      [
+        createRelation({
+          source: childMethod.id,
+          target: baseMethod.id,
+          type: RelationType.Overrides,
+        }),
+      ],
+    )
+
+    const result = await computeHotspots(store, { minRisk: 'LOW', minScore: 0 })
+    const entry = result.entries.find((candidate) => candidate.symbol.id === baseMethod.id)
+
+    expect(entry).toBeDefined()
+    expect(entry!.score).toBeGreaterThan(0)
   })
 })

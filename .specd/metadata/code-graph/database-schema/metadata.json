@@ -19,7 +19,7 @@
     {
       "requirement": "Relationship tables",
       "rules": [
-        "The database SHALL define the following relationship tables:\n\n| Relationship | From   | To     | Populated by        |\n| ------------ | ------ | ------ | ------------------- |\n| IMPORTS      | File   | File   | Indexer Pass 2      |\n| DEFINES      | File   | Symbol | Indexer Pass 1      |\n| CALLS        | Symbol | Symbol | Indexer Pass 2      |\n| EXPORTS      | File   | Symbol | Indexer Pass 1      |\n| DEPENDS\\_ON   | Spec   | Spec   | Spec indexing phase |\n| COVERS       | Spec   | File   | Deferred to v2+     |\n\nRelationships have no properties — they are pure edges."
+        "The database SHALL define the following relationship tables:\n\n| Relationship | From   | To     | Populated by        |\n| ------------ | ------ | ------ | ------------------- |\n| IMPORTS      | File   | File   | Indexer Pass 2      |\n| DEFINES      | File   | Symbol | Indexer Pass 1      |\n| CALLS        | Symbol | Symbol | Indexer Pass 2      |\n| EXPORTS      | File   | Symbol | Indexer Pass 1      |\n| DEPENDS\\_ON   | Spec   | Spec   | Spec indexing phase |\n| COVERS       | Spec   | File   | Deferred to v2+     |\n| EXTENDS      | Symbol | Symbol | Indexer Pass 2      |\n| IMPLEMENTS   | Symbol | Symbol | Indexer Pass 2      |\n| OVERRIDES    | Symbol | Symbol | Indexer Pass 2      |\n\nRelationships have no properties — they are pure edges."
       ]
     },
     {
@@ -31,7 +31,7 @@
     {
       "requirement": "Schema versioning",
       "rules": [
-        "The schema SHALL be versioned with an integer `SCHEMA_VERSION` constant. The current version is **5**. When the database is opened:\n\n1. Execute the DDL statements (all use `IF NOT EXISTS` — safe to re-run)\n2. Create FTS indexes if they do not exist\n3. Store the schema version in the `Meta` table\n\nSchema version changes require a `--force` re-index to rebuild the database from scratch. There is no incremental migration between versions — the `.lbug` file is deleted and recreated."
+        "The schema SHALL be versioned with an integer `SCHEMA_VERSION` constant. The current version is **6**. When the database is opened:\n\n1. Execute the DDL statements (all use `IF NOT EXISTS` — safe to re-run)\n2. Create FTS indexes if they do not exist\n3. Store the schema version in the `Meta` table\n\nSchema version changes require a `--force` re-index to rebuild the database from scratch. There is no incremental migration between versions — the `.lbug` file is deleted and recreated."
       ]
     },
     {
@@ -48,7 +48,8 @@
     "content on Spec may be large (full spec text) — no size limit enforced",
     "FTS indexes are rebuilt on --force re-index (dropped with the database)",
     "Relationship tables have no properties — metadata is not persisted on edges",
-    "The COVERS relationship table exists in the schema but is not populated until v2+"
+    "The COVERS relationship table exists in the schema but is not populated until v2+",
+    "EXTENDS, IMPLEMENTS, and OVERRIDES are first-class persisted relationship tables in schema version 6"
   ],
   "scenarios": [
     {
@@ -113,15 +114,15 @@
     },
     {
       "requirement": "Schema versioning",
-      "name": "Schema version 5",
+      "name": "Schema version 6",
       "when": ["a fresh database is opened"],
-      "then": ["the schema version stored in the Meta table is 5"]
+      "then": ["the schema version stored in the Meta table is 6"]
     },
     {
       "requirement": "Schema versioning",
       "name": "Old schema requires force re-index",
-      "given": ["a database created with schema version 4"],
-      "when": ["the application opens it expecting version 5"],
+      "given": ["a database created with schema version 5"],
+      "when": ["the application opens it expecting version 6"],
       "then": ["a --force re-index is required to rebuild"]
     },
     {
@@ -136,11 +137,17 @@
       "name": "COVERS table exists but is empty",
       "when": ["the database schema is initialized"],
       "then": ["the COVERS relationship table exists", "AND it contains no rows (v2+ feature)"]
+    },
+    {
+      "requirement": "Relationship tables",
+      "name": "Hierarchy relationship tables exist",
+      "when": ["the database schema is initialized"],
+      "then": ["EXTENDS, IMPLEMENTS, and OVERRIDES relationship tables exist"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:941cf2e5e5fee2edb29a6c1d2685c5eda701ba13ad2fcfec98399fb96dba1af4",
-    "verify.md": "sha256:7aacc9d30c8eee224a1f67b8a4c1696331bb54d6e708cb05495ab0a866917aec"
+    "spec.md": "sha256:61bea83d6172188237869ac5854bf864a064137f824d309f9be30970d39b11ce",
+    "verify.md": "sha256:fc562e724cd325d39763156565589b07e8678d2ae3d9f84bc3194c187ca8b688"
   },
   "generatedBy": "core"
 }

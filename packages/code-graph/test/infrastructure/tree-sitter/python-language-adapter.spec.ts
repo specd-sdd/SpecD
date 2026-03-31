@@ -79,6 +79,43 @@ describe('PythonLanguageAdapter', () => {
       const imports = relations.filter((r) => r.type === RelationType.Imports)
       expect(imports).toHaveLength(0)
     })
+
+    it('creates EXTENDS and OVERRIDES for local class hierarchies', () => {
+      const code = `
+class Base:
+    def save(self):
+        pass
+
+class User(Base):
+    def save(self):
+        pass
+      `
+      const symbols = adapter.extractSymbols('main.py', code)
+      const relations = adapter.extractRelations('main.py', code, symbols, new Map())
+
+      expect(relations.some((relation) => relation.type === RelationType.Extends)).toBe(true)
+      expect(relations.some((relation) => relation.type === RelationType.Overrides)).toBe(true)
+    })
+
+    it('creates IMPLEMENTS for imported protocol-like bases', () => {
+      const code = `
+class User(Persistable):
+    def save(self):
+        pass
+      `
+      const symbols = adapter.extractSymbols('main.py', code)
+      const relations = adapter.extractRelations(
+        'main.py',
+        code,
+        symbols,
+        new Map([['Persistable', 'contracts.py:interface:Persistable:1:0']]),
+      )
+
+      const implementsRelation = relations.find(
+        (relation) => relation.type === RelationType.Implements,
+      )
+      expect(implementsRelation?.target).toBe('contracts.py:interface:Persistable:1:0')
+    })
   })
 
   describe('extractImportedNames', () => {

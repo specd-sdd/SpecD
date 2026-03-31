@@ -14,7 +14,7 @@ Different programming languages have fundamentally different syntax for function
 - **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.
 - **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found
 - **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution
-- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS, DEPENDS_ON) from the file. The `importMap` maps local import names to resolved symbol IDs (e.g. `"validateUser"` → `"auth:src/auth.ts:function:validateUser:10"`), built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.
+- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS, DEPENDS_ON, EXTENDS, IMPLEMENTS, OVERRIDES) from the file. The `importMap` maps local import names to resolved symbol IDs (e.g. `"validateUser"` → `"auth:src/auth.ts:function:validateUser:10"`), built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.
 
 Both extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects.
 
@@ -82,6 +82,19 @@ For `CALLS` relations, the adapter MUST extract call expressions from the AST an
 - **Callee**: resolved via the import map passed to `extractRelations`. If the called identifier is in the import map, the callee is the resolved symbol. If the identifier matches a locally defined symbol, the callee is that local symbol.
 
 Calls to identifiers that cannot be resolved (e.g. global built-ins, member expressions like `obj.method()`, dynamic expressions) SHALL be silently dropped — no relation is created, no error is thrown.
+
+### Requirement: Hierarchy extraction
+
+Adapters SHALL extract hierarchy relations when the language exposes them deterministically.
+
+Rules:
+
+- Emit `EXTENDS` when a type declaration inherits from another resolvable type.
+- Emit `IMPLEMENTS` when a type declaration fulfills a resolvable contract or interface-like declaration.
+- Emit `OVERRIDES` when a method declaration can be matched deterministically to a base or contract method it replaces or fulfills.
+- Adapters for already supported languages MAY normalize inheritance-adjacent constructs into `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES` when that preserves useful impact, hotspot, and code-understanding semantics.
+- Constructs that cannot be normalized without materially distorting their meaning MUST be dropped in this iteration rather than introducing a new base relation type.
+- Unresolvable hierarchy targets are silently dropped.
 
 ### Requirement: Package identity extraction
 
@@ -224,22 +237,23 @@ The TypeScript adapter MUST be registered by default when the registry is create
 
 ## Constraints
 
-- `LanguageAdapter` is an interface, not an abstract class — adapters are stateless
+- LanguageAdapter is an interface, not an abstract class — adapters are stateless
 - Extraction methods are synchronous and pure — they receive content, not file handles
-- `getPackageIdentity` and `resolveQualifiedNameToPath?` are the only methods that perform I/O — both are optional and search for a manifest file on disk
-- Resolution methods (`resolvePackageFromSpecifier`, `resolveRelativeImportPath`, `buildQualifiedName`) are synchronous and pure
-- `resolveQualifiedNameToPath?` SHOULD cache the parsed autoloader map per `codeRoot` to avoid repeated disk reads during a single indexing run
+- getPackageIdentity and resolveQualifiedNameToPath? are the only methods that perform I/O — both are optional and search for a manifest file on disk
+- Resolution methods (resolvePackageFromSpecifier, resolveRelativeImportPath, buildQualifiedName) are synchronous and pure
+- resolveQualifiedNameToPath? SHOULD cache the parsed autoloader map per codeRoot to avoid repeated disk reads during a single indexing run
 - The indexer MUST NOT contain language-specific resolution logic — all of it is delegated to adapters
 - Unrecognized file extensions are silently skipped
 - Unresolvable call targets are silently dropped
 - Dynamic loader calls with non-literal arguments are silently dropped
 - Unresolvable dynamic loader targets are silently dropped for file dependency modeling
-- `require`/`include` expressions with non-literal or dynamic path arguments are silently dropped
+- require/include expressions with non-literal or dynamic path arguments are silently dropped
 - Loader API support is registry-based and extensible (no hardcoded single-loader assumptions)
 - Tree-sitter query patterns are internal — not part of the public API
 - The TypeScript adapter is always registered by default
-- No dependency on `@specd/core`
+- Hierarchy relations are emitted only when their targets can be resolved deterministically
+- No dependency on @specd/core
 
 ## Spec Dependencies
 
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `SymbolNode`, `Relation`, `SymbolKind`, `RelationType`
+- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `SymbolNode`, `Relation`, `RelationType`, hierarchy edge semantics

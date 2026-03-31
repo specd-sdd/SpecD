@@ -59,6 +59,12 @@ The function produces an `ImpactResult` containing:
 - **`line`** (`number`) — 1-based line number
 - **`depth`** (`number`) — distance from the target: 1 = direct dependent, 2 = indirect, 3+ = transitive
 
+Impact analysis MUST include hierarchy relations in addition to existing call/import reachability:
+
+- changing a type symbol MUST affect symbols connected through `EXTENDS` and `IMPLEMENTS` according to traversal direction
+- changing a method symbol MUST affect symbols connected through `OVERRIDES` according to traversal direction
+- hierarchy-derived affected symbols participate in depth counts, risk calculation, and affected-file aggregation the same way as other affected symbols
+
 Risk level thresholds:
 
 | Level      | Condition                                                |
@@ -84,6 +90,8 @@ It:
 
 - **`symbols`** — array of per-symbol `ImpactResult` entries
 - **`riskLevel`** — the maximum risk level across all symbols in the file
+
+When symbols in the file participate in `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES`, their hierarchy-derived impact MUST be reflected in the aggregate result.
 
 ### Requirement: Change detection
 
@@ -118,5 +126,5 @@ All traversal operations SHALL be stateless pure functions defined in `domain/se
 
 ## Spec Dependencies
 
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `SymbolNode`, `Relation`, `RelationType`
+- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `SymbolNode`, `Relation`, `RelationType`, hierarchy relations
 - [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — `GraphStore` query methods

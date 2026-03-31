@@ -75,6 +75,43 @@ describe('PhpLanguageAdapter', () => {
       const defines = relations.filter((r) => r.type === RelationType.Defines)
       expect(defines).toHaveLength(symbols.length)
     })
+
+    it('creates EXTENDS, IMPLEMENTS, and OVERRIDES for local declarations', () => {
+      const code = `<?php
+interface Persistable {
+  public function save(): void;
+}
+
+class BaseService {
+  public function save(): void {}
+}
+
+class UserService extends BaseService implements Persistable {
+  public function save(): void {}
+}`
+      const symbols = adapter.extractSymbols('main.php', code)
+      const relations = adapter.extractRelations('main.php', code, symbols, new Map())
+
+      expect(relations.some((relation) => relation.type === RelationType.Extends)).toBe(true)
+      expect(relations.some((relation) => relation.type === RelationType.Implements)).toBe(true)
+      expect(relations.some((relation) => relation.type === RelationType.Overrides)).toBe(true)
+    })
+
+    it('creates EXTENDS for imported base classes', () => {
+      const code = `<?php
+use App\\BaseService;
+
+class UserService extends BaseService {}`
+      const symbols = adapter.extractSymbols('main.php', code)
+      const relations = adapter.extractRelations(
+        'main.php',
+        code,
+        symbols,
+        new Map([['BaseService', 'src/BaseService.php:class:BaseService:1:0']]),
+      )
+      const extendsRelation = relations.find((relation) => relation.type === RelationType.Extends)
+      expect(extendsRelation?.target).toBe('src/BaseService.php:class:BaseService:1:0')
+    })
   })
 
   describe('extractImportedNames', () => {

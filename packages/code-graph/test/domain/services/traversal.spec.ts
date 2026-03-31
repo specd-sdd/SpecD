@@ -117,6 +117,79 @@ describe('Traversal services', () => {
       expect(result.totalCount).toBe(1)
       expect(result.truncated).toBe(true)
     })
+
+    it('includes extenders, implementors, and overriders as upstream dependents', async () => {
+      const baseClass = createSymbolNode({
+        name: 'BaseService',
+        kind: SymbolKind.Class,
+        filePath: 'types.ts',
+        line: 1,
+        column: 0,
+      })
+      const contract = createSymbolNode({
+        name: 'Persistable',
+        kind: SymbolKind.Interface,
+        filePath: 'types.ts',
+        line: 5,
+        column: 0,
+      })
+      const baseMethod = createSymbolNode({
+        name: 'save',
+        kind: SymbolKind.Method,
+        filePath: 'types.ts',
+        line: 2,
+        column: 2,
+      })
+      const childClass = createSymbolNode({
+        name: 'UserService',
+        kind: SymbolKind.Class,
+        filePath: 'user.ts',
+        line: 1,
+        column: 0,
+      })
+      const childMethod = createSymbolNode({
+        name: 'save',
+        kind: SymbolKind.Method,
+        filePath: 'user.ts',
+        line: 2,
+        column: 2,
+      })
+
+      await store.upsertFile(
+        file('types.ts'),
+        [baseClass, contract, baseMethod],
+        [createRelation({ source: 'types.ts', target: baseClass.id, type: RelationType.Defines })],
+      )
+      await store.upsertFile(
+        file('user.ts'),
+        [childClass, childMethod],
+        [
+          createRelation({
+            source: childClass.id,
+            target: baseClass.id,
+            type: RelationType.Extends,
+          }),
+          createRelation({
+            source: childClass.id,
+            target: contract.id,
+            type: RelationType.Implements,
+          }),
+          createRelation({
+            source: childMethod.id,
+            target: baseMethod.id,
+            type: RelationType.Overrides,
+          }),
+        ],
+      )
+
+      const classUpstream = await getUpstream(store, baseClass.id)
+      const interfaceUpstream = await getUpstream(store, contract.id)
+      const methodUpstream = await getUpstream(store, baseMethod.id)
+
+      expect(classUpstream.levels.get(1)?.map((symbol) => symbol.name)).toContain('UserService')
+      expect(interfaceUpstream.levels.get(1)?.map((symbol) => symbol.name)).toContain('UserService')
+      expect(methodUpstream.levels.get(1)?.map((symbol) => symbol.name)).toContain('save')
+    })
   })
 
   describe('getDownstream', () => {
@@ -133,6 +206,43 @@ describe('Traversal services', () => {
 
       const result = await getDownstream(store, caller.id)
       expect(result.totalCount).toBe(1)
+    })
+
+    it('includes hierarchy targets as downstream dependencies', async () => {
+      const childClass = createSymbolNode({
+        name: 'UserService',
+        kind: SymbolKind.Class,
+        filePath: 'user.ts',
+        line: 1,
+        column: 0,
+      })
+      const baseClass = createSymbolNode({
+        name: 'BaseService',
+        kind: SymbolKind.Class,
+        filePath: 'types.ts',
+        line: 1,
+        column: 0,
+      })
+
+      await store.upsertFile(
+        file('types.ts'),
+        [baseClass],
+        [createRelation({ source: 'types.ts', target: baseClass.id, type: RelationType.Defines })],
+      )
+      await store.upsertFile(
+        file('user.ts'),
+        [childClass],
+        [
+          createRelation({
+            source: childClass.id,
+            target: baseClass.id,
+            type: RelationType.Extends,
+          }),
+        ],
+      )
+
+      const result = await getDownstream(store, childClass.id)
+      expect(result.levels.get(1)?.map((symbol) => symbol.name)).toContain('BaseService')
     })
   })
 
@@ -243,6 +353,41 @@ describe('Traversal services', () => {
       expect(result.affectedSymbols[0]!.depth).toBe(1)
       expect(result.indirectDependents).toBe(0)
       expect(result.transitiveDependents).toBe(0)
+    })
+
+    it('treats hierarchy dependents as direct impact', async () => {
+      const baseClass = createSymbolNode({
+        name: 'BaseService',
+        kind: SymbolKind.Class,
+        filePath: 'base.ts',
+        line: 1,
+        column: 0,
+      })
+      const childClass = createSymbolNode({
+        name: 'UserService',
+        kind: SymbolKind.Class,
+        filePath: 'user.ts',
+        line: 1,
+        column: 0,
+      })
+
+      await store.upsertFile(file('base.ts'), [baseClass], [])
+      await store.upsertFile(
+        file('user.ts'),
+        [childClass],
+        [
+          createRelation({
+            source: childClass.id,
+            target: baseClass.id,
+            type: RelationType.Extends,
+          }),
+        ],
+      )
+
+      const result = await analyzeImpact(store, baseClass.id, 'upstream')
+      expect(result.directDependents).toBe(1)
+      expect(result.affectedFiles).toContain('user.ts')
+      expect(result.affectedSymbols.map((symbol) => symbol.name)).toContain('UserService')
     })
   })
 

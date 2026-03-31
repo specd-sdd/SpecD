@@ -9,11 +9,17 @@ describe('RelationType', () => {
     expect(RelationType.Exports).toBe('EXPORTS')
     expect(RelationType.DependsOn).toBe('DEPENDS_ON')
     expect(RelationType.Covers).toBe('COVERS')
+    expect(RelationType.Extends).toBe('EXTENDS')
+    expect(RelationType.Implements).toBe('IMPLEMENTS')
+    expect(RelationType.Overrides).toBe('OVERRIDES')
   })
 
   it('isRelationType returns true for valid types', () => {
     expect(isRelationType('IMPORTS')).toBe(true)
     expect(isRelationType('CALLS')).toBe(true)
+    expect(isRelationType('EXTENDS')).toBe(true)
+    expect(isRelationType('IMPLEMENTS')).toBe(true)
+    expect(isRelationType('OVERRIDES')).toBe(true)
   })
 
   it('isRelationType returns false for invalid types', () => {

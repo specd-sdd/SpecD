@@ -5,6 +5,9 @@ export const RelationType = {
   Exports: 'EXPORTS',
   DependsOn: 'DEPENDS_ON',
   Covers: 'COVERS',
+  Extends: 'EXTENDS',
+  Implements: 'IMPLEMENTS',
+  Overrides: 'OVERRIDES',
 } as const
 
 /**

@@ -45,6 +45,26 @@ function isMethod(node: SgNode): boolean {
 }
 
 /**
+ * Normalizes a Python base-class reference to its terminal name.
+ * @param reference - Raw base-class expression.
+ * @returns The normalized local/import name.
+ */
+function normalizePythonTypeName(reference: string): string {
+  return reference.trim().split('.').at(-1) ?? reference.trim()
+}
+
+/**
+ * Represents a Python class declaration and the methods defined within it.
+ */
+interface PythonClassInfo {
+  readonly name: string
+  readonly symbolId: string
+  readonly kind: 'class' | 'interface'
+  readonly baseNames: readonly string[]
+  readonly methodsByName: ReadonlyMap<string, string>
+}
+
+/**
  * Language adapter for Python files using tree-sitter via ast-grep.
  * Extracts functions, classes, methods, and module-level assignments.
  */
@@ -129,8 +149,135 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     }
 
     this.extractImportRelations(root, filePath, relations)
+    this.extractHierarchyRelations(content, filePath, symbols, importMap, relations)
     this.extractCallRelations(root, filePath, symbols, importMap, relations)
     return relations
+  }
+
+  /**
+   * Extracts deterministic hierarchy relations from Python class declarations.
+   * @param content - The source content.
+   * @param filePath - The current file path.
+   * @param symbols - Previously extracted symbols.
+   * @param importMap - Map of imported name to resolved symbol id.
+   * @param relations - Array to push relations into.
+   */
+  private extractHierarchyRelations(
+    content: string,
+    filePath: string,
+    symbols: SymbolNode[],
+    importMap: Map<string, string>,
+    relations: Relation[],
+  ): void {
+    const classes = this.collectClassInfo(content, filePath, symbols)
+    const classesByName = new Map(classes.map((entry) => [entry.name, entry]))
+    const seen = new Set<string>()
+
+    for (const cls of classes) {
+      for (const baseName of cls.baseNames) {
+        const importedId = importMap.get(baseName)
+        const localBase = classesByName.get(baseName)
+        const targetId = importedId ?? localBase?.symbolId
+        if (!targetId) continue
+
+        const isInterfaceTarget =
+          localBase?.kind === SymbolKind.Interface || importedId?.includes(':interface:')
+        const relationType = isInterfaceTarget ? RelationType.Implements : RelationType.Extends
+        const hierarchyKey = `${cls.symbolId}:${relationType}:${targetId}`
+        if (!seen.has(hierarchyKey)) {
+          seen.add(hierarchyKey)
+          relations.push(
+            createRelation({
+              source: cls.symbolId,
+              target: targetId,
+              type: relationType,
+            }),
+          )
+        }
+
+        if (localBase) {
+          for (const [methodName, methodId] of cls.methodsByName.entries()) {
+            const targetMethodId = localBase.methodsByName.get(methodName)
+            if (!targetMethodId) continue
+            const overrideKey = `${methodId}:${RelationType.Overrides}:${targetMethodId}`
+            if (seen.has(overrideKey)) continue
+            seen.add(overrideKey)
+            relations.push(
+              createRelation({
+                source: methodId,
+                target: targetMethodId,
+                type: RelationType.Overrides,
+              }),
+            )
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Collects local Python class metadata needed for hierarchy extraction.
+   * @param content - The source content.
+   * @param filePath - The current file path.
+   * @param symbols - Previously extracted symbols.
+   * @returns Class declarations with bases and owned methods.
+   */
+  private collectClassInfo(
+    content: string,
+    filePath: string,
+    symbols: SymbolNode[],
+  ): PythonClassInfo[] {
+    const infos: PythonClassInfo[] = []
+    const classRegex = /^class\s+([A-Za-z_][A-Za-z0-9_]*)(?:\(([^)]*)\))?:/gm
+    const symbolMap = new Map(
+      symbols
+        .filter((symbol) => symbol.filePath === filePath)
+        .map((symbol) => [`${symbol.kind}:${symbol.name}:${symbol.line}`, symbol.id]),
+    )
+    const lines = content.split('\n')
+
+    for (const match of content.matchAll(classRegex)) {
+      const name = match[1]
+      if (!name) continue
+      const line = content.slice(0, match.index ?? 0).split('\n').length
+      const symbolId = symbolMap.get(`${SymbolKind.Class}:${name}:${line}`)
+      if (!symbolId) continue
+
+      const headerLine = lines[line - 1] ?? ''
+      const indent = headerLine.match(/^\s*/)?.[0].length ?? 0
+      let endLine = lines.length
+      for (let idx = line; idx < lines.length; idx++) {
+        const current = lines[idx] ?? ''
+        if (current.trim().length === 0) continue
+        const currentIndent = current.match(/^\s*/)?.[0].length ?? 0
+        if (currentIndent <= indent) {
+          endLine = idx
+          break
+        }
+      }
+
+      const methodsByName = new Map<string, string>()
+      for (const symbol of symbols) {
+        if (symbol.filePath !== filePath || symbol.kind !== SymbolKind.Method) continue
+        if (symbol.line <= line || symbol.line > endLine) continue
+        methodsByName.set(symbol.name, symbol.id)
+      }
+
+      const baseNames = (match[2] ?? '')
+        .split(',')
+        .map((entry) => normalizePythonTypeName(entry))
+        .filter((entry) => entry.length > 0)
+
+      infos.push({
+        name,
+        symbolId,
+        kind: baseNames.includes('Protocol') ? SymbolKind.Interface : SymbolKind.Class,
+        baseNames,
+        methodsByName,
+      })
+    }
+
+    return infos
   }
 
   /**

@@ -100,6 +100,19 @@
 - **THEN** only depth-1 symbols are returned
 - **AND** `indirectDependents` and `transitiveDependents` are 0
 
+#### Scenario: Base type change affects inheritors and implementors
+
+- **GIVEN** a type symbol with persisted `EXTENDS` and `IMPLEMENTS` dependents
+- **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
+- **THEN** those hierarchy-dependent symbols are included in `affectedSymbols`
+- **AND** their files contribute to `affectedFiles`
+
+#### Scenario: Base method change affects overriding methods
+
+- **GIVEN** a method symbol with persisted `OVERRIDES` dependents
+- **WHEN** `analyzeImpact(store, target.id, 'upstream')` is called
+- **THEN** overriding methods are included in `affectedSymbols`
+
 ### Requirement: File impact
 
 #### Scenario: Aggregate risk is maximum across symbols
@@ -120,6 +133,12 @@
 - **WHEN** `analyzeFileImpact(store, 'src/auth.ts', 'upstream', 5)` is called
 - **THEN** each per-symbol `analyzeImpact` call uses `maxDepth: 5`
 - **AND** the file-level IMPORTS BFS also uses depth limit 5
+
+#### Scenario: Hierarchy-derived impact is aggregated at file level
+
+- **GIVEN** a file defines a base type or base method with hierarchy dependents
+- **WHEN** `analyzeFileImpact(store, filePath, 'upstream')` is called
+- **THEN** those hierarchy-derived affected symbols are included in the aggregate result
 
 ### Requirement: Change detection
 

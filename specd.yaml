@@ -25,6 +25,17 @@ workspaces:
       fs:
         path: specs/_global
     ownership: owned
+    graph:
+      excludePaths:
+        - node_modules/
+        - .git/
+        - .specd/
+        - dist/
+        - build/
+        - coverage/
+        - .next/
+        - .nuxt/
+        - packages/
 
   core:
     prefix: core

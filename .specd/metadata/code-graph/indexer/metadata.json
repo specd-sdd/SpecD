@@ -2,10 +2,12 @@
   "title": "Indexer",
   "description": "Source files change constantly and the code graph must be kept in sync without re-parsing the entire workspace every time. The indexer orchestrates the pipeline from file discovery through parsing to graph storage, using content hashing for incremental updates and language adapters for extraction. It is the primary write path into the code graph.",
   "dependsOn": [
-    "code-graph:code-graph/symbol-model",
-    "code-graph:code-graph/graph-store",
     "code-graph:code-graph/language-adapter",
-    "code-graph:code-graph/staleness-detection"
+    "code-graph:code-graph/graph-store",
+    "code-graph:code-graph/symbol-model",
+    "code-graph:code-graph/workspace-integration",
+    "core:core/config",
+    "code-graph:code-graph/database-schema"
   ],
   "context": [
     "Source files change constantly and the code graph must be kept in sync without re-parsing the entire workspace every time. The indexer orchestrates the pipeline from file discovery through parsing to graph storage, using content hashing for incremental updates and language adapters for extraction. It is the primary write path into the code graph."
@@ -14,7 +16,7 @@
     {
       "requirement": "IndexCodeGraph use case",
       "rules": [
-        "`IndexCodeGraph` SHALL be the primary entry point for building and updating the code graph. It is an application-layer use case that orchestrates:\n\n1. **Discover** — walk the workspace to find source files\n2. **Diff** — compare content hashes with the store to identify new, changed, and deleted files\n3. **Extract** — run the appropriate language adapter on each new/changed file\n4. **Store** — upsert extracted data into the `GraphStore`\n5. **Clean** — remove deleted files from the store\n6. **Persist VCS ref** — if `IndexOptions.vcsRef` is provided, store it as the `lastIndexedRef` meta key after successful indexing\n\nThe use case accepts a `GraphStore` (already opened) and an `AdapterRegistry` via constructor injection."
+        "`IndexCodeGraph` SHALL be the primary entry point for building and updating the code graph. It is an application-layer use case that orchestrates:\n\n1. **Discover** — walk the workspace to find source files\n2. **Diff** — compare content hashes with the store to identify new, changed, and deleted files\n3. **Extract** — run the appropriate language adapter on each new/changed file\n4. **Store** — upsert extracted data into the `GraphStore`\n5. **Clean** — remove deleted files from the store\n6. **Persist VCS ref** — if `IndexOptions.vcsRef` is provided, store it as the `lastIndexedRef` meta key after successful indexing\n\nExtraction and storage include hierarchy relations (`EXTENDS`, `IMPLEMENTS`, `OVERRIDES`) alongside existing file, symbol, and dependency relations.\n\nThe use case accepts a `GraphStore` (already opened) and an `AdapterRegistry` via constructor injection."
       ]
     },
     {
@@ -32,7 +34,7 @@
     {
       "requirement": "Two-pass extraction with in-memory index",
       "rules": [
-        "Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:\n\n- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter implements `extractNamespace` and `buildQualifiedName`, build a qualified name map for that language. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.\n- **Pass 2 (Resolve imports + CALLS, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map and call `extractRelations` with it to get `IMPORTS` and `CALLS` relations for code-file analysis. Accumulate all relations.\n- **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.\n- **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.\n- **Rebuild FTS indexes** — After bulk load, call `GraphStore.rebuildFtsIndexes()` to drop and recreate full-text search indexes. This is required because LadybugDB FTS indexes are not automatically updated on insert.\n\nThis two-pass approach ensures all symbols exist in the index before import/call resolution, while avoiding any store queries during extraction."
+        "Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:\n\n- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter implements `extractNamespace` and `buildQualifiedName`, build a qualified name map for that language. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.\n- **Pass 2 (Resolve imports + CALLS + hierarchy, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map and call `extractRelations` with it to get `IMPORTS`, `CALLS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for code-file analysis. Accumulate all relations.\n- **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.\n- **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.\n- **Rebuild FTS indexes** — After bulk load, call `GraphStore.rebuildFtsIndexes()` to drop and recreate full-text search indexes. This is required because LadybugDB FTS indexes are not automatically updated on insert.\n\nThis two-pass approach ensures all symbols exist in the index before import, call, and hierarchy resolution, while avoiding any store queries during extraction."
       ]
     },
     {
@@ -237,62 +239,20 @@
       "then": ["FileNode.path is core:src/index.ts", "AND FileNode.workspace is core"]
     },
     {
-      "requirement": "Single-pass extraction with in-memory index",
-      "name": "Pass 2 can resolve cross-file calls",
-      "given": ["file A defines createUser and file B calls createUser via import"],
-      "when": ["indexing runs with two passes"],
-      "then": [
-        "Pass 1 registers createUser in the in-memory SymbolIndex",
-        "AND Pass 2 resolves the call from file B to the createUser symbol and creates a CALLS relation"
-      ]
-    },
-    {
-      "requirement": "Single-pass extraction with in-memory index",
-      "name": "Pass 1 completes for ALL workspaces before Pass 2",
-      "given": ["workspaces core and cli with files where cli imports from core"],
-      "when": ["indexing runs"],
-      "then": [
-        "all files from both workspaces have their symbols registered in the SymbolIndex (Pass 1) before any CALLS/IMPORTS resolution (Pass 2) begins"
-      ]
-    },
-    {
-      "requirement": "Single-pass extraction with in-memory index",
-      "name": "Cross-workspace import resolution in Pass 2",
-      "given": [
-        "workspace cli has a file importing createKernel from @specd/core",
-        "AND workspace core has a file defining createKernel",
-        "AND the monorepo map resolves @specd/core to the core workspace prefix"
-      ],
-      "when": ["Pass 2 resolves imports"],
-      "then": ["the import resolves to the createKernel symbol in workspace core"]
-    },
-    {
-      "requirement": "Single-pass extraction with in-memory index",
-      "name": "Bulk load writes all data at once",
-      "given": ["two workspaces with 10 files total"],
-      "when": ["both passes complete"],
-      "then": [
-        "GraphStore.bulkLoad() is called once with all accumulated files, symbols, and relations from both workspaces"
-      ]
-    },
-    {
-      "requirement": "Single-pass extraction with in-memory index",
-      "name": "PHP import resolved via symbol index (no PSR-4 fallback needed)",
-      "given": [
-        "a PHP file containing use App\\Models\\User",
-        "AND App\\Models\\User is already present in the in-memory symbol index from Pass 1"
-      ],
+      "requirement": "Two-pass extraction with in-memory index",
+      "name": "Symbols from all workspaces available before relation resolution",
+      "given": ["two workspaces contain symbols that import/call each other"],
       "when": ["Pass 2 runs"],
       "then": [
-        "an IMPORTS relation is emitted using the symbol index entry",
-        "AND resolveQualifiedNameToPath is not called"
+        "cross-workspace relations can be resolved from the in-memory SymbolIndex",
+        "AND no store query is needed during extraction"
       ]
     },
     {
-      "requirement": "Single-pass extraction with in-memory index",
-      "name": "PHP import resolved via resolveQualifiedNameToPath when not in symbol index",
+      "requirement": "Two-pass extraction with in-memory index",
+      "name": "PHP unresolved qualified name falls back to path resolution",
       "given": [
-        "a PHP file containing use App\\Services\\Mailer",
+        "a PHP file importing App\\Services\\Mailer",
         "AND App\\Services\\Mailer is NOT present in the in-memory symbol index",
         "AND the PHP adapter's resolveQualifiedNameToPath resolves it to {codeRoot}/src/Services/Mailer.php"
       ],
@@ -302,7 +262,7 @@
       ]
     },
     {
-      "requirement": "Single-pass extraction with in-memory index",
+      "requirement": "Two-pass extraction with in-memory index",
       "name": "PHP import unresolvable via both mechanisms produces no relation",
       "given": [
         "a PHP file containing use Vendor\\External\\Class",
@@ -313,13 +273,23 @@
       "then": ["no IMPORTS relation is created for that import and no error is thrown"]
     },
     {
-      "requirement": "Single-pass extraction with in-memory index",
+      "requirement": "Two-pass extraction with in-memory index",
       "name": "DEPENDS_ON relations from dynamic loaders accumulated in Pass 2",
       "given": [
         "a PHP file from which extractRelations returns DEPENDS_ON relations for dynamic loader calls"
       ],
       "when": ["Pass 2 runs"],
       "then": ["those DEPENDS_ON relations are accumulated and passed to bulk load"]
+    },
+    {
+      "requirement": "Two-pass extraction with in-memory index",
+      "name": "Hierarchy relations are accumulated in Pass 2",
+      "given": ["an adapter returns EXTENDS, IMPLEMENTS, and OVERRIDES relations for a file"],
+      "when": ["Pass 2 runs"],
+      "then": [
+        "those hierarchy relations are accumulated with the other extracted relations",
+        "AND they are included in the single bulk load"
+      ]
     },
     {
       "requirement": "Chunked processing",
@@ -501,8 +471,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:a47c8de6b6c2f0ed26c760fa390b1c8ccf4e9870a1bf47e7ce280a331ce93713",
-    "verify.md": "sha256:b20b6c800c7831fe135ffacf464d2a0936a1628017c74156daed6d0870b916ca"
+    "spec.md": "sha256:2d58a20e73e348c97a274e208594959f1c38402c3f0a96e160feed0f0548b81c",
+    "verify.md": "sha256:725f2423f11cb014146e1b6c436ca22a5eac6bdd713a2d92f6630551c6f9c6f8"
   },
   "generatedBy": "core"
 }

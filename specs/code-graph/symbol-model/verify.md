@@ -110,6 +110,12 @@
 - **WHEN** relations are built from the `SpecNode`
 - **THEN** a `DEPENDS_ON` relation exists from spec A's `specId` to `core:core/config`
 
+#### Scenario: Hierarchy relation types are part of the closed set
+
+- **WHEN** the relation type set is inspected
+- **THEN** it includes `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
+- **AND** adding any additional hierarchy relation type still requires a spec change
+
 ### Requirement: Relation value object
 
 #### Scenario: Relation equality by source, target, and type
@@ -117,6 +123,38 @@
 - **GIVEN** two `Relation` values with the same `source`, `target`, and `type` but different `metadata`
 - **WHEN** equality is checked
 - **THEN** they are considered equal
+
+### Requirement: Hierarchy relation semantics
+
+#### Scenario: Base type inheritance uses EXTENDS
+
+- **GIVEN** a source type inherits from a resolvable base type
+- **WHEN** hierarchy relations are built
+- **THEN** an `EXTENDS` relation connects the source type symbol to the base type symbol
+
+#### Scenario: Contract fulfillment uses IMPLEMENTS
+
+- **GIVEN** a source type fulfills a resolvable contract-like declaration
+- **WHEN** hierarchy relations are built
+- **THEN** an `IMPLEMENTS` relation connects the source type symbol to the contract symbol
+
+#### Scenario: Method replacement uses OVERRIDES
+
+- **GIVEN** a method deterministically replaces or fulfills a resolvable inherited or contract method
+- **WHEN** hierarchy relations are built
+- **THEN** an `OVERRIDES` relation connects the source method symbol to the target method symbol
+
+#### Scenario: Inheritance-adjacent construct that maps cleanly is normalized
+
+- **GIVEN** a supported language exposes an inheritance-adjacent construct that preserves useful impact and hotspot semantics when normalized
+- **WHEN** the adapter emits hierarchy relations
+- **THEN** the construct is represented as one of `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES`
+
+#### Scenario: Inheritance-adjacent construct that does not map cleanly is omitted
+
+- **GIVEN** a supported language exposes a construct whose semantics would be materially distorted by normalization
+- **WHEN** hierarchy relations are built
+- **THEN** no hierarchy relation is emitted for that construct in this iteration
 
 ### Requirement: Immutability
 

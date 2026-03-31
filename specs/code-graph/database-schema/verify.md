@@ -56,15 +56,15 @@
 
 ### Requirement: Schema versioning
 
-#### Scenario: Schema version 5
+#### Scenario: Schema version 6
 
 - **WHEN** a fresh database is opened
-- **THEN** the schema version stored in the Meta table is `5`
+- **THEN** the schema version stored in the Meta table is `6`
 
 #### Scenario: Old schema requires force re-index
 
-- **GIVEN** a database created with schema version 4
-- **WHEN** the application opens it expecting version 5
+- **GIVEN** a database created with schema version 5
+- **WHEN** the application opens it expecting version 6
 - **THEN** a `--force` re-index is required to rebuild
 
 ### Requirement: Relationship tables
@@ -80,3 +80,8 @@
 - **WHEN** the database schema is initialized
 - **THEN** the COVERS relationship table exists
 - **AND** it contains no rows (v2+ feature)
+
+#### Scenario: Hierarchy relationship tables exist
+
+- **WHEN** the database schema is initialized
+- **THEN** `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relationship tables exist
