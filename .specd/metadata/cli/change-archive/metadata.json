@@ -1,12 +1,7 @@
 {
   "title": "Change Archive",
   "description": "Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd change archive <name>` finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.",
-  "dependsOn": [
-    "cli:cli/entrypoint",
-    "core:core/change",
-    "core:core/archive-change",
-    "core:core/hook-execution-model"
-  ],
+  "dependsOn": ["core:core/change", "core:core/archive-change", "core:core/hook-execution-model"],
   "context": [
     "Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd change archive <name>` finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive."
   ],
@@ -14,7 +9,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change archive <name> [--no-hooks] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to archive\n- `--no-hooks` — optional flag; skips `run:` hook execution, allowing the caller to manage hooks separately via `specd change run-hooks`\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd change archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to archive\n- `--skip-hooks <phases>` — optional; comma-separated list of archive hook phases to skip. Valid values: `pre`, `post`, `all`. When `all` is specified, all hook execution is skipped. When omitted, both phases execute.\n- `--allow-overlap` — optional flag; permits archiving despite spec overlap with other active changes\n- `--format text|json|toon` — optional; output format, defaults to `text`"
       ]
     },
     {
@@ -32,7 +27,7 @@
     {
       "requirement": "Hook execution",
       "rules": [
-        "By default, the `ArchiveChange` use case executes `run:` hooks for the `archiving` workflow step (pre-hooks before file modifications, post-hooks after the archive). When `--no-hooks` is passed, hook execution is skipped — the caller is responsible for invoking hooks via `specd change run-hooks`."
+        "By default, the `ArchiveChange` use case executes `run:` hooks for the `archiving` workflow step (pre-hooks before file modifications, post-hooks after the archive). When `--skip-hooks` is passed with specific phases, only those phases are skipped. When `--skip-hooks all` is passed, all hook execution is skipped — the caller is responsible for invoking hooks via `specd change run-hooks`.\n\nThe CLI maps the `--skip-hooks` option to an archive hook-phase selector set on `ArchiveChangeInput`."
       ]
     },
     {
@@ -66,6 +61,15 @@
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
     },
     {
+      "requirement": "Command signature",
+      "name": "Skip hooks accepts archive phases",
+      "when": ["specd change archive my-change --skip-hooks pre,post is run"],
+      "then": [
+        "the command accepts the invocation",
+        "AND it forwards both archive hook phases to the use case"
+      ]
+    },
+    {
       "requirement": "Prerequisites",
       "name": "Change not in archivable state",
       "given": ["a change my-change in done state (not yet archivable)"],
@@ -85,6 +89,27 @@
         "AND the change directory is moved to the archive path",
         "AND the process exits with code 0"
       ]
+    },
+    {
+      "requirement": "Hook execution",
+      "name": "Skip all archive hooks",
+      "when": ["specd change archive my-change --skip-hooks all is run"],
+      "then": [
+        "the command skips all archive hook execution",
+        "AND the archive still delegates the rest of the work to ArchiveChange"
+      ]
+    },
+    {
+      "requirement": "Hook execution",
+      "name": "Skip only pre-archive hooks",
+      "when": ["specd change archive my-change --skip-hooks pre is run"],
+      "then": ["pre-archive hooks are skipped", "AND post-archive hooks remain enabled"]
+    },
+    {
+      "requirement": "Hook execution",
+      "name": "Skip only post-archive hooks",
+      "when": ["specd change archive my-change --skip-hooks post is run"],
+      "then": ["post-archive hooks are skipped", "AND pre-archive hooks remain enabled"]
     },
     {
       "requirement": "Post-archive hooks",
@@ -119,8 +144,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:279c254a38306169d3ca40226be83c2cc65741375fce9398548c93b4f3e22ff3",
-    "verify.md": "sha256:9bdfc08eee69a987836597dc57debc5d5bfc26e5e9d227d50ce59b6cef863acb"
+    "spec.md": "sha256:9aa25641f0b7a7749f67ea22176e3d8a84780314804dc17011d384c0728b21cd",
+    "verify.md": "sha256:59ece8d04b620fc2a42ac449881362ef5e8fe85e1130e620b2261baaf2497051"
   },
   "generatedBy": "core"
 }

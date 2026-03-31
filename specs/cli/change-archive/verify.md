@@ -9,6 +9,12 @@
 - **WHEN** `specd change archive` is run without a name
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
+#### Scenario: Skip hooks accepts archive phases
+
+- **WHEN** `specd change archive my-change --skip-hooks pre,post` is run
+- **THEN** the command accepts the invocation
+- **AND** it forwards both archive hook phases to the use case
+
 ### Requirement: Prerequisites
 
 #### Scenario: Change not in archivable state
@@ -27,6 +33,26 @@
 - **THEN** spec deltas are merged into the permanent spec directories
 - **AND** the change directory is moved to the archive path
 - **AND** the process exits with code 0
+
+### Requirement: Hook execution
+
+#### Scenario: Skip all archive hooks
+
+- **WHEN** `specd change archive my-change --skip-hooks all` is run
+- **THEN** the command skips all archive hook execution
+- **AND** the archive still delegates the rest of the work to `ArchiveChange`
+
+#### Scenario: Skip only pre-archive hooks
+
+- **WHEN** `specd change archive my-change --skip-hooks pre` is run
+- **THEN** pre-archive hooks are skipped
+- **AND** post-archive hooks remain enabled
+
+#### Scenario: Skip only post-archive hooks
+
+- **WHEN** `specd change archive my-change --skip-hooks post` is run
+- **THEN** post-archive hooks are skipped
+- **AND** pre-archive hooks remain enabled
 
 ### Requirement: Post-archive hooks
 

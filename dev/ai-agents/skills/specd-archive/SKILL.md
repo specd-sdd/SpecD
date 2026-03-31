@@ -68,7 +68,7 @@ Follow guidance — review deltas to ensure specs match what was built.
 ### 5. Archive
 
 ```bash
-node packages/cli/dist/index.js change archive <name> --no-hooks --format json
+node packages/cli/dist/index.js change archive <name> --skip-hooks all --format json
 ```
 
 If the command fails with a `SpecOverlapError` (spec overlap detected), other active
@@ -84,7 +84,7 @@ specs those changes are working against. When this happens:
 If the user confirms, re-run the command with `--allow-overlap`:
 
 ```bash
-node packages/cli/dist/index.js change archive <name> --no-hooks --allow-overlap --format json
+node packages/cli/dist/index.js change archive <name> --skip-hooks all --allow-overlap --format json
 ```
 
 ### 6. Post-archive hooks

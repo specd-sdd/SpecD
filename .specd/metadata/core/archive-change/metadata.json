@@ -30,7 +30,7 @@
     {
       "requirement": "Input",
       "rules": [
-        "`ArchiveChange.execute` receives:\n\n- `name` — the change name to archive\n- `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`\n- `allowOverlap` (boolean, optional, default `false`) — when `true`, the use case skips the overlap check and permits archiving even when other active changes target the same specs"
+        "`ArchiveChange.execute` receives:\n\n- `name` — the change name to archive\n- `skipHookPhases` (ReadonlySet<ArchiveHookPhaseSelector>, optional, default empty set) — which archive hook phases to skip. Valid values: `'pre'`, `'post'`, `'all'`. When `'all'` is in the set, all archive hook execution is skipped. When the set is empty (default), both phases execute.\n- `allowOverlap` (boolean, optional, default `false`) — when `true`, the use case skips the overlap check and permits archiving even when other active changes target the same specs"
       ]
     },
     {
@@ -60,7 +60,7 @@
     {
       "requirement": "Pre-archive hooks",
       "rules": [
-        "After the archivable guard passes, when `skipHooks` is `false` (default), `ArchiveChange` must execute pre-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'pre' })`.\n\nIf any pre-archive `run:` hook fails, `ArchiveChange` must throw `HookFailedError` with the hook command, exit code, and stderr. No files are modified before a failed pre-archive hook.\n\nWhen `skipHooks` is `true`, pre-archive hook execution is skipped entirely."
+        "After the archivable guard passes, when `'all'` and `'pre'` are both absent from `skipHookPhases`, `ArchiveChange` must execute pre-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'pre' })`.\n\nIf any pre-archive `run:` hook fails, `ArchiveChange` must throw `HookFailedError` with the hook command, exit code, and stderr. No files are modified before a failed pre-archive hook.\n\nWhen `'all'` or `'pre'` is in `skipHookPhases`, pre-archive hook execution is skipped entirely."
       ]
     },
     {
@@ -78,7 +78,7 @@
     {
       "requirement": "Post-archive hooks",
       "rules": [
-        "After `archiveRepository.archive()` succeeds, when `skipHooks` is `false`, `ArchiveChange` must execute post-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'post' })`.\n\nPost-archive hook failures do not roll back the archive — the change has already been moved and the index updated. Instead, `ArchiveChange` collects failures and returns them in the result so the CLI can present them to the user.\n\nWhen `skipHooks` is `true`, post-archive hook execution is skipped entirely."
+        "After `archiveRepository.archive()` succeeds, when `'all'` and `'post'` are both absent from `skipHookPhases`, `ArchiveChange` must execute post-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'post' })`.\n\nPost-archive hook failures do not roll back the archive. Every failed hook command must be appended to `postHookFailures` in declaration order.\n\nWhen `'all'` or `'post'` is in `skipHookPhases`, post-archive hook execution is skipped entirely."
       ]
     },
     {
@@ -241,6 +241,16 @@
       ]
     },
     {
+      "requirement": "Pre-archive hooks",
+      "name": "skipHookPhases pre skips only pre hooks",
+      "given": ["a change in archivable state", "AND skipHookPhases is new Set(['pre'])"],
+      "when": ["ArchiveChange.execute is called"],
+      "then": [
+        "pre-archive hooks are skipped",
+        "AND post-archive hooks still execute after the archive"
+      ]
+    },
+    {
       "requirement": "Delta merge and spec sync",
       "name": "Delta artifact merged into base spec",
       "given": [
@@ -348,6 +358,16 @@
       ]
     },
     {
+      "requirement": "Post-archive hooks",
+      "name": "skipHookPhases post skips only post hooks",
+      "given": ["a change in archivable state", "AND skipHookPhases is new Set(['post'])"],
+      "when": ["ArchiveChange.execute is called"],
+      "then": [
+        "post-archive hooks are skipped",
+        "AND pre-archive hooks still execute before file modifications"
+      ]
+    },
+    {
       "requirement": "Spec metadata generation",
       "name": "Metadata generated for modified specs after archive",
       "given": ["a change with specIds [\"default:auth/login\"] is archived"],
@@ -399,8 +419,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:342400d116af5c6520487093482af9bd9c3e1243ddb13f9eaea854de26360c92",
-    "verify.md": "sha256:318d1c0e9a72bd6552aa60f25a871a79b76ea6015f1e1de6744b2e3ea2e60ca7"
+    "spec.md": "sha256:f30d680b937f7ab9cf878add09325ad56dfe860851e447bdd31e1a2f340f4e78",
+    "verify.md": "sha256:a42b98dc2f815f5ebd2ea5f4b56c9ca2946f7a0d201f5c70fc255a70c9a32526"
   },
   "generatedBy": "core"
 }

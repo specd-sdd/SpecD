@@ -1,9 +1,12 @@
 import { type Command } from 'commander'
 import * as path from 'node:path'
+import { type ArchiveHookPhaseSelector, SpecOverlapError } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { SpecOverlapError } from '@specd/core'
 import { handleError, cliError } from '../../handle-error.js'
+import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
+
+const VALID_ARCHIVE_HOOK_PHASES = new Set<ArchiveHookPhaseSelector>(['pre', 'post', 'all'])
 
 /**
  * Registers the `change archive` subcommand on the given parent command.
@@ -15,7 +18,7 @@ export function registerChangeArchive(parent: Command): void {
     .command('archive <name>')
     .allowExcessArguments(false)
     .description('Move a completed change to the archive, removing it from the active change list.')
-    .option('--no-hooks', 'skip run: hook execution')
+    .option('--skip-hooks <phases>', 'skip archive hook phases (pre,post,all)')
     .option('--allow-overlap', 'permit archiving despite spec overlap with other active changes')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -29,14 +32,19 @@ JSON/TOON output schema:
     .action(
       async (
         name: string,
-        opts: { format: string; config?: string; hooks: boolean; allowOverlap?: true },
+        opts: { format: string; config?: string; skipHooks?: string; allowOverlap?: true },
       ) => {
         try {
+          const skipHookPhases =
+            opts.skipHooks !== undefined
+              ? parseCommaSeparatedValues(opts.skipHooks, VALID_ARCHIVE_HOOK_PHASES, '--skip-hooks')
+              : new Set<ArchiveHookPhaseSelector>()
+
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
           const result = await kernel.changes.archive.execute({
             name,
-            skipHooks: !opts.hooks,
+            skipHookPhases,
             ...(opts.allowOverlap === true ? { allowOverlap: true } : {}),
           })
 

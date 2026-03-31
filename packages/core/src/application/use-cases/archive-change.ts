@@ -24,17 +24,21 @@ import { type GenerateSpecMetadata } from './generate-spec-metadata.js'
 import { type SaveSpecMetadata } from './save-spec-metadata.js'
 import { type RunStepHooks } from './run-step-hooks.js'
 
+/** Selectors for granular hook-phase skipping during archiving. */
+export type ArchiveHookPhaseSelector = 'pre' | 'post' | 'all'
+
 /** Input for the {@link ArchiveChange} use case. */
 export interface ArchiveChangeInput {
   /** The change name to archive. */
   readonly name: string
   /**
-   * When `true`, skips all `run:` hook execution. The caller is responsible
-   * for invoking hooks separately via `RunStepHooks`.
+   * Which archive hook phases to skip.
    *
-   * Defaults to `false`.
+   * When `'all'` is present, all archive hook execution is skipped.
+   *
+   * Defaults to an empty set.
    */
-  readonly skipHooks?: boolean
+  readonly skipHookPhases?: ReadonlySet<ArchiveHookPhaseSelector>
   /**
    * When `true`, skips the overlap check and permits archiving even when
    * other active changes target the same specs.
@@ -178,8 +182,8 @@ export class ArchiveChange {
     }
 
     // --- Pre-archive hooks (delegated to RunStepHooks) ---
-    const skipHooks = input.skipHooks ?? false
-    if (!skipHooks) {
+    const skip = input.skipHookPhases ?? new Set<ArchiveHookPhaseSelector>()
+    if (!skip.has('all') && !skip.has('pre')) {
       const preResult = await this._runStepHooks.execute({
         name: input.name,
         step: 'archiving',
@@ -281,7 +285,7 @@ export class ArchiveChange {
 
     // --- Post-archive hooks (delegated to RunStepHooks) ---
     const postHookFailures: string[] = []
-    if (!skipHooks) {
+    if (!skip.has('all') && !skip.has('post')) {
       const postResult = await this._runStepHooks.execute({
         name: input.name,
         step: 'archiving',

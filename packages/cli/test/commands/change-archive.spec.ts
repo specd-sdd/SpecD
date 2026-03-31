@@ -137,7 +137,7 @@ describe('change archive', () => {
     expect(stderr()).toMatch(/error:/)
   })
 
-  it('passes skipHooks: true when --no-hooks is set', async () => {
+  it('passes skipHookPhases with all when --skip-hooks all is set', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.archive.execute.mockResolvedValue({
       archivedChange: {
@@ -151,14 +151,46 @@ describe('change archive', () => {
 
     const program = makeProgram()
     registerChangeArchive(program.command('change'))
-    await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat', '--no-hooks'])
+    await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat', '--skip-hooks', 'all'])
 
-    const call = kernel.changes.archive.execute.mock.calls[0]![0] as { skipHooks?: boolean }
-    expect(call.skipHooks).toBe(true)
+    const call = kernel.changes.archive.execute.mock.calls[0]![0] as {
+      skipHookPhases?: Set<string>
+    }
+    expect(call.skipHookPhases).toEqual(new Set(['all']))
     expect(stdout()).toContain('archived change feat')
   })
 
-  it('passes skipHooks: false by default (no --no-hooks flag)', async () => {
+  it('passes skipHookPhases with pre and post values', async () => {
+    const { kernel } = setup()
+    kernel.changes.archive.execute.mockResolvedValue({
+      archivedChange: {
+        name: 'feat',
+        archivedName: '2026-01-15-feat',
+        archivedAt: new Date('2026-01-15T10:00:00Z'),
+      },
+      archiveDirPath: '/project/.specd/archive/2026-01/feat',
+      postHookFailures: [],
+    })
+
+    const program = makeProgram()
+    registerChangeArchive(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'archive',
+      'feat',
+      '--skip-hooks',
+      'pre,post',
+    ])
+
+    const call = kernel.changes.archive.execute.mock.calls[0]![0] as {
+      skipHookPhases?: Set<string>
+    }
+    expect(call.skipHookPhases).toEqual(new Set(['pre', 'post']))
+  })
+
+  it('passes empty skipHookPhases by default (no --skip-hooks flag)', async () => {
     const { kernel } = setup()
     kernel.changes.archive.execute.mockResolvedValue({
       archivedChange: {
@@ -174,7 +206,9 @@ describe('change archive', () => {
     registerChangeArchive(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'archive', 'feat'])
 
-    const call = kernel.changes.archive.execute.mock.calls[0]![0] as { skipHooks?: boolean }
-    expect(call.skipHooks).toBe(false)
+    const call = kernel.changes.archive.execute.mock.calls[0]![0] as {
+      skipHookPhases?: Set<string>
+    }
+    expect(call.skipHookPhases).toEqual(new Set())
   })
 })

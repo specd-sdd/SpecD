@@ -9,11 +9,12 @@ Once a change is fully approved, its spec deltas need to be promoted into the pe
 ### Requirement: Command signature
 
 ```
-specd change archive <name> [--no-hooks] [--format text|json|toon]
+specd change archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]
 ```
 
 - `<name>` — required positional; the name of the change to archive
-- `--no-hooks` — optional flag; skips `run:` hook execution, allowing the caller to manage hooks separately via `specd change run-hooks`
+- `--skip-hooks <phases>` — optional; comma-separated list of archive hook phases to skip. Valid values: `pre`, `post`, `all`. When `all` is specified, all hook execution is skipped. When omitted, both phases execute.
+- `--allow-overlap` — optional flag; permits archiving despite spec overlap with other active changes
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 ### Requirement: Prerequisites
@@ -30,7 +31,9 @@ The command delegates to the `ArchiveChange` use case, which:
 
 ### Requirement: Hook execution
 
-By default, the `ArchiveChange` use case executes `run:` hooks for the `archiving` workflow step (pre-hooks before file modifications, post-hooks after the archive). When `--no-hooks` is passed, hook execution is skipped — the caller is responsible for invoking hooks via `specd change run-hooks`.
+By default, the `ArchiveChange` use case executes `run:` hooks for the `archiving` workflow step (pre-hooks before file modifications, post-hooks after the archive). When `--skip-hooks` is passed with specific phases, only those phases are skipped. When `--skip-hooks all` is passed, all hook execution is skipped — the caller is responsible for invoking hooks via `specd change run-hooks`.
+
+The CLI maps the `--skip-hooks` option to an archive hook-phase selector set on `ArchiveChangeInput`.
 
 ### Requirement: Post-archive hooks
 
@@ -41,16 +44,7 @@ After a successful archive, if any post-archive hooks failed, the CLI exits with
 On success, output depends on `--format`:
 
 - `text` (default): prints to stdout:
-
-  ```
-  archived change <name> → <archive-path>
-  ```
-
 - `json` or `toon`: outputs the following to stdout (encoded in the respective format):
-
-  ```json
-  { "result": "ok", "name": "<name>", "archivePath": "<archive-path>" }
-  ```
 
 where `<archive-path>` is the path to the archived change directory relative to the project root.
 
@@ -69,13 +63,14 @@ where `<archive-path>` is the path to the archived change directory relative to 
 
 ```
 specd change archive add-oauth-login
-specd change archive add-oauth-login --no-hooks
+specd change archive add-oauth-login --skip-hooks all
+specd change archive add-oauth-login --skip-hooks pre
 # → archived change add-oauth-login → .specd/archive/2026-02/add-oauth-login
 ```
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`specs/cli/entrypoint/spec.md`](../../cli/entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`specs/core/change/spec.md`](../../core/change/spec.md) — archivable state, archive semantics
-- [`specs/core/archive-change/spec.md`](../../core/archive-change/spec.md) — skipHooks, hook delegation
-- [`specs/core/hook-execution-model/spec.md`](../../core/hook-execution-model/spec.md) — --no-hooks pattern
+- [`specs/core/archive-change/spec.md`](../../core/archive-change/spec.md) — archive hook phase selectors and hook delegation
+- [`specs/core/hook-execution-model/spec.md`](../../core/hook-execution-model/spec.md) — `--skip-hooks` manual-control pattern

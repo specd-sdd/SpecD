@@ -106,6 +106,14 @@
 - **THEN** no shell command is run for the instruction entry
 - **AND** execution proceeds to the next hook
 
+#### Scenario: skipHookPhases pre skips only pre hooks
+
+- **GIVEN** a change in `archivable` state
+- **AND** `skipHookPhases` is `new Set(['pre'])`
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** pre-archive hooks are skipped
+- **AND** post-archive hooks still execute after the archive
+
 ### Requirement: Delta merge and spec sync
 
 #### Scenario: Delta artifact merged into base spec
@@ -188,6 +196,14 @@
 - **WHEN** `ArchiveChange.execute` is called
 - **THEN** the archive is not rolled back
 - **AND** the result's `postHookFailures` includes the failed hook
+
+#### Scenario: skipHookPhases post skips only post hooks
+
+- **GIVEN** a change in `archivable` state
+- **AND** `skipHookPhases` is `new Set(['post'])`
+- **WHEN** `ArchiveChange.execute` is called
+- **THEN** post-archive hooks are skipped
+- **AND** pre-archive hooks still execute before file modifications
 
 ### Requirement: Spec metadata generation
 

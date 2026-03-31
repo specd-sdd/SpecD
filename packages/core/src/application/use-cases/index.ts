@@ -67,6 +67,7 @@ export { type DiscardChange, type DiscardChangeInput } from './discard-change.js
 export { type ApproveSpec, type ApproveSpecInput } from './approve-spec.js'
 export { type ApproveSignoff, type ApproveSignoffInput } from './approve-signoff.js'
 export {
+  type ArchiveHookPhaseSelector,
   type ArchiveChange,
   type ArchiveChangeInput,
   type ArchiveChangeResult,

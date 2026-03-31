@@ -674,7 +674,7 @@ describe('ArchiveChange', () => {
     })
   })
 
-  describe('given skipHooks is true', () => {
+  describe('given archive hook phases are skipped', () => {
     it('still performs delta merge and spec sync', async () => {
       const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
       const schema = makeSchema([artifactType])
@@ -714,7 +714,7 @@ describe('ArchiveChange', () => {
         makeGenerateMetadata(),
         makeSaveMetadata(),
       )
-      const result = await uc.execute({ name: 'my-change', skipHooks: true })
+      const result = await uc.execute({ name: 'my-change', skipHookPhases: new Set(['all']) })
 
       expect(specRepo.saved.get('spec.md')).toBe('# Synced content')
       expect(result.archivedChange).toBeDefined()
@@ -759,7 +759,7 @@ describe('ArchiveChange', () => {
         makeGenerateMetadata(),
         makeSaveMetadata(),
       )
-      const result = await uc.execute({ name: 'my-change', skipHooks: true })
+      const result = await uc.execute({ name: 'my-change', skipHookPhases: new Set(['all']) })
 
       expect(result.archiveDirPath).toBeDefined()
       expect(typeof result.archiveDirPath).toBe('string')
@@ -806,7 +806,7 @@ describe('ArchiveChange', () => {
         makeGenerateMetadata(),
         makeSaveMetadata(),
       )
-      const result = await uc.execute({ name: 'my-change', skipHooks: true })
+      const result = await uc.execute({ name: 'my-change', skipHookPhases: new Set(['all']) })
 
       expect(result.postHookFailures).toEqual([])
     })
@@ -832,10 +832,74 @@ describe('ArchiveChange', () => {
         makeGenerateMetadata(),
         makeSaveMetadata(),
       )
-      const result = await uc.execute({ name: 'my-change', skipHooks: true })
+      const result = await uc.execute({ name: 'my-change', skipHookPhases: new Set(['all']) })
 
       expect(executeSpy).not.toHaveBeenCalled()
       expect(result.archivedChange).toBeDefined()
+      expect(result.postHookFailures).toEqual([])
+    })
+
+    it('skips only pre hooks when skipHookPhases contains pre', async () => {
+      const executeSpy = vi.fn()
+
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          executeSpy(input)
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([makeArchivableChange('my-change')]),
+        new Map(),
+        makeArchiveRepository(),
+        runStepHooks,
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+      )
+      const result = await uc.execute({ name: 'my-change', skipHookPhases: new Set(['pre']) })
+
+      expect(executeSpy).toHaveBeenCalledTimes(1)
+      expect(executeSpy).toHaveBeenCalledWith({
+        name: 'my-change',
+        step: 'archiving',
+        phase: 'post',
+      })
+      expect(result.archivedChange).toBeDefined()
+    })
+
+    it('skips only post hooks when skipHookPhases contains post', async () => {
+      const executeSpy = vi.fn()
+
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
+          executeSpy(input)
+          return { hooks: [], success: true, failedHook: null }
+        },
+      })
+
+      const uc = new ArchiveChange(
+        makeChangeRepository([makeArchivableChange('my-change')]),
+        new Map(),
+        makeArchiveRepository(),
+        runStepHooks,
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+      )
+      const result = await uc.execute({ name: 'my-change', skipHookPhases: new Set(['post']) })
+
+      expect(executeSpy).toHaveBeenCalledTimes(1)
+      expect(executeSpy).toHaveBeenCalledWith({
+        name: 'my-change',
+        step: 'archiving',
+        phase: 'pre',
+      })
       expect(result.postHookFailures).toEqual([])
     })
   })

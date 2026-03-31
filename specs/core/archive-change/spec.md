@@ -42,7 +42,7 @@ Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not recei
 `ArchiveChange.execute` receives:
 
 - `name` — the change name to archive
-- `skipHooks` (boolean, optional, default `false`) — when `true`, the use case skips all `run:` hook execution; the caller is responsible for invoking hooks separately via `RunStepHooks`
+- `skipHookPhases` (ReadonlySet<ArchiveHookPhaseSelector>, optional, default empty set) — which archive hook phases to skip. Valid values: `'pre'`, `'post'`, `'all'`. When `'all'` is in the set, all archive hook execution is skipped. When the set is empty (default), both phases execute.
 - `allowOverlap` (boolean, optional, default `false`) — when `true`, the use case skips the overlap check and permits archiving even when other active changes target the same specs
 
 ### Requirement: Schema name guard
@@ -88,11 +88,11 @@ If `allowOverlap` is `true`, the overlap check is skipped entirely — the use c
 
 ### Requirement: Pre-archive hooks
 
-After the archivable guard passes, when `skipHooks` is `false` (default), `ArchiveChange` must execute pre-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'pre' })`.
+After the archivable guard passes, when `'all'` and `'pre'` are both absent from `skipHookPhases`, `ArchiveChange` must execute pre-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'pre' })`.
 
 If any pre-archive `run:` hook fails, `ArchiveChange` must throw `HookFailedError` with the hook command, exit code, and stderr. No files are modified before a failed pre-archive hook.
 
-When `skipHooks` is `true`, pre-archive hook execution is skipped entirely.
+When `'all'` or `'pre'` is in `skipHookPhases`, pre-archive hook execution is skipped entirely.
 
 ### Requirement: Delta merge and spec sync
 
@@ -135,11 +135,11 @@ The `FsArchiveRepository` implementation additionally moves the change directory
 
 ### Requirement: Post-archive hooks
 
-After `archiveRepository.archive()` succeeds, when `skipHooks` is `false`, `ArchiveChange` must execute post-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'post' })`.
+After `archiveRepository.archive()` succeeds, when `'all'` and `'post'` are both absent from `skipHookPhases`, `ArchiveChange` must execute post-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'post' })`.
 
-Post-archive hook failures do not roll back the archive — the change has already been moved and the index updated. Instead, `ArchiveChange` collects failures and returns them in the result so the CLI can present them to the user.
+Post-archive hook failures do not roll back the archive. Every failed hook command must be appended to `postHookFailures` in declaration order.
 
-When `skipHooks` is `true`, post-archive hook execution is skipped entirely.
+When `'all'` or `'post'` is in `skipHookPhases`, post-archive hook execution is skipped entirely.
 
 ### Requirement: Spec metadata generation
 
