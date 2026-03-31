@@ -261,7 +261,7 @@ export class InMemoryGraphStore extends GraphStore {
     for (const sym of this.symbols.values()) {
       const text = `${expandSymbolName(sym.name)} ${sym.comment ?? ''}`.toLowerCase()
       if (!terms.some((t) => text.includes(t))) continue
-      if (options.kind && sym.kind !== options.kind) continue
+      if (options.kinds && options.kinds.length > 0 && !options.kinds.includes(sym.kind)) continue
       if (options.filePattern) {
         const regex = new RegExp(
           options.filePattern.replaceAll('.', '\\.').replaceAll('*', '.*'),

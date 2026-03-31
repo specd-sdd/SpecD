@@ -12,18 +12,28 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
   resolveCliContext: vi.fn(),
 }))
 
+vi.mock('../../src/commands/graph/resolve-graph-cli-context.js', () => ({
+  resolveGraphCliContext: vi.fn(),
+}))
+
 vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
-import { resolveCliContext } from '../../src/helpers/cli-context.js'
+import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
 import { registerGraphImpact } from '../../src/commands/graph/impact.js'
 
 function setup() {
   const config = makeMockConfig()
-  const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+  vi.mocked(resolveGraphCliContext).mockResolvedValue({
+    mode: 'configured',
+    config,
+    configFilePath: '/project/specd.yaml',
+    kernel: null,
+    projectRoot: '/project',
+    vcsRoot: '/project',
+  })
 
   const mockProvider = {
     analyzeImpact: vi.fn(),
@@ -38,7 +48,7 @@ function setup() {
   const getStdout = captureStdout()
   const getStderr = captureStderr()
   mockProcessExit()
-  return { config, kernel, mockProvider, getStdout, getStderr }
+  return { config, mockProvider, getStdout, getStderr }
 }
 
 function makeImpactProgram() {
@@ -165,6 +175,72 @@ describe('graph impact', () => {
     })
   })
 
+  describe('context resolution', () => {
+    it('passes explicit config path to graph context resolution', async () => {
+      const { mockProvider } = setup()
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'src/auth.ts',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedProcesses: [],
+        symbols: [],
+      })
+
+      const program = makeImpactProgram()
+      await program.parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'src/auth.ts',
+        '--config',
+        '/tmp/other/specd.yaml',
+      ])
+
+      expect(resolveGraphCliContext).toHaveBeenCalledWith({
+        configPath: '/tmp/other/specd.yaml',
+        repoPath: undefined,
+      })
+    })
+
+    it('passes explicit bootstrap path to graph context resolution', async () => {
+      const { mockProvider } = setup()
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'src/auth.ts',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedProcesses: [],
+        symbols: [],
+      })
+
+      const program = makeImpactProgram()
+      await program.parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'src/auth.ts',
+        '--path',
+        '/tmp/repo',
+      ])
+
+      expect(resolveGraphCliContext).toHaveBeenCalledWith({
+        configPath: undefined,
+        repoPath: '/tmp/repo',
+      })
+    })
+  })
+
   describe('text output depth indicators', () => {
     it('shows (depth=N) in header when non-default', async () => {
       const { mockProvider, getStdout } = setup()
@@ -256,6 +332,30 @@ describe('graph impact', () => {
       }
 
       expect(getStderr()).toContain('provide exactly one of --file, --symbol, or --changes')
+    })
+
+    it('rejects --config and --path together', async () => {
+      const { getStderr } = setup()
+
+      const program = makeImpactProgram()
+      try {
+        await program.parseAsync([
+          'node',
+          'specd',
+          'graph',
+          'impact',
+          '--file',
+          'src/auth.ts',
+          '--config',
+          './specd.yaml',
+          '--path',
+          '.',
+        ])
+      } catch {
+        /* ExitSentinel from process.exit(1) */
+      }
+
+      expect(getStderr()).toContain('--config and --path are mutually exclusive')
     })
   })
 })

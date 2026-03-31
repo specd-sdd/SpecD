@@ -1,7 +1,9 @@
 import { Command, Option } from 'commander'
-import { type HotspotOptions, type RiskLevel, SymbolKind } from '@specd/code-graph'
+import { type HotspotOptions, type RiskLevel } from '@specd/code-graph'
 import { output, parseFormat } from '../../formatter.js'
-import { resolveCliContext } from '../../helpers/cli-context.js'
+import { cliError } from '../../handle-error.js'
+import { parseGraphKinds } from './parse-graph-kinds.js'
+import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 
 /**
@@ -28,9 +30,7 @@ export function registerGraphHotspots(parent: Command): void {
         'Any filter flag removes all defaults — only explicit constraints apply.',
     )
     .option('--workspace <name>', 'filter by workspace')
-    .addOption(
-      new Option('--kind <kind>', 'filter by symbol kind').choices(Object.values(SymbolKind)),
-    )
+    .addOption(new Option('--kind <kinds>', 'filter by symbol kind (comma-separated)'))
     .option('--file <path>', 'filter by file path')
     .option(
       '--exclude-path <pattern>',
@@ -52,6 +52,8 @@ export function registerGraphHotspots(parent: Command): void {
         'minimum risk level (default MEDIUM when no filters)',
       ).choices(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
     )
+    .option('--config <path>', 'path to specd.yaml')
+    .option('--path <path>', 'repository root for bootstrap mode')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .addHelpText(
       'after',
@@ -80,6 +82,8 @@ Exclude examples:
       async (opts: {
         workspace?: string
         kind?: string
+        config?: string
+        path?: string
         file?: string
         excludePath: string[]
         excludeWorkspace: string[]
@@ -89,12 +93,31 @@ Exclude examples:
         format: string
       }) => {
         const fmt = parseFormat(opts.format)
-        const { config } = await resolveCliContext()
+        if (opts.config !== undefined && opts.path !== undefined) {
+          cliError('--config and --path are mutually exclusive', opts.format, 1)
+        }
+        const kinds = (() => {
+          try {
+            return parseGraphKinds(opts.kind)
+          } catch (err) {
+            cliError(err instanceof Error ? err.message : 'invalid --kind value', opts.format, 1)
+          }
+        })()
+        const { config } = await resolveGraphCliContext({
+          configPath: opts.config,
+          repoPath: opts.path,
+        }).catch((err: unknown) =>
+          cliError(
+            err instanceof Error ? err.message : 'failed to resolve graph context',
+            opts.format,
+            1,
+          ),
+        )
 
         await withProvider(config, opts.format, async (provider) => {
           const hasAnyFilter = !!(
             opts.workspace ||
-            opts.kind ||
+            kinds !== undefined ||
             opts.file ||
             opts.excludePath.length > 0 ||
             opts.excludeWorkspace.length > 0 ||
@@ -112,7 +135,7 @@ Exclude examples:
           const options: HotspotOptions = {
             ...base,
             ...(opts.workspace ? { workspace: opts.workspace } : undefined),
-            ...(opts.kind ? { kind: opts.kind as SymbolKind } : undefined),
+            ...(kinds !== undefined ? { kinds } : undefined),
             ...(opts.file ? { filePath: opts.file } : undefined),
             ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),
             ...(opts.excludeWorkspace.length > 0

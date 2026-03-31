@@ -26,6 +26,19 @@
 - **WHEN** `specd graph search "hook" --limit 3` is run
 - **THEN** at most 3 symbols and 3 specs are returned
 
+#### Scenario: Explicit config path bypasses discovery
+
+- **GIVEN** the current directory would autodiscover a different `specd.yaml`
+- **WHEN** `specd graph search "kernel" --config /tmp/other/specd.yaml` is run
+- **THEN** the command uses `/tmp/other/specd.yaml` directly
+
+#### Scenario: Explicit path enters bootstrap mode
+
+- **GIVEN** a `specd.yaml` exists under the current repository
+- **WHEN** `specd graph search "kernel" --path /tmp/repo` is run
+- **THEN** config discovery is ignored
+- **AND** the command searches a synthetic single workspace `default` rooted at `/tmp/repo`
+
 ### Requirement: Search behaviour
 
 #### Scenario: Results ranked by BM25 relevance
@@ -51,6 +64,24 @@
 
 - **WHEN** `specd graph search "xyznonexistent"` is run
 - **THEN** `No results found.` is output
+
+#### Scenario: Missing config falls back to bootstrap mode
+
+- **GIVEN** no `specd.yaml` is found by autodiscovery
+- **WHEN** `specd graph search "kernel"` is run inside a repository
+- **THEN** the command searches in bootstrap mode against the resolved VCS root as workspace `default`
+
+#### Scenario: Multiple kinds are passed through to the query layer
+
+- **WHEN** `specd graph search "transition" --kind class,method,function` is run
+- **THEN** the command trims and validates all three kind tokens
+- **AND** the provider receives the full kind list rather than only the last token
+
+#### Scenario: Invalid kind token fails before query execution
+
+- **WHEN** `specd graph search "transition" --kind method,unknownKind` is run
+- **THEN** the command exits with code 1
+- **AND** the search query is not executed
 
 ### Requirement: Output format
 
@@ -86,10 +117,10 @@
 
 ### Requirement: Command signature (filters)
 
-#### Scenario: Filter by symbol kind
+#### Scenario: Filter by multiple symbol kinds
 
-- **WHEN** `specd graph search "transition" --kind method` is run
-- **THEN** only symbols with kind `method` are returned
+- **WHEN** `specd graph search "transition" --kind class,method` is run
+- **THEN** only symbols with kind `class` or `method` are returned
 - **AND** symbols of other kinds are excluded
 
 #### Scenario: Filter by file path wildcard

@@ -4,9 +4,11 @@ import { rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createVcsAdapter } from '@specd/core'
 import { output, parseFormat } from '../../formatter.js'
-import { resolveCliContext } from '../../helpers/cli-context.js'
+import { cliError } from '../../handle-error.js'
+import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { buildWorkspaceTargets } from './build-workspace-targets.js'
+import { type WorkspaceIndexTarget } from '@specd/code-graph'
 
 /**
  * Registers the `graph index` command.
@@ -19,6 +21,8 @@ export function registerGraphIndex(parent: Command): void {
     .description('Index the workspace into the code graph')
     .option('--workspace <name>', 'index only the named workspace')
     .option('--force', 'full re-index, ignoring cached hashes')
+    .option('--config <path>', 'path to specd.yaml')
+    .option('--path <path>', 'repository root for bootstrap mode')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option(
       '--exclude-path <pattern>',
@@ -48,13 +52,28 @@ JSON/TOON output schema:
       async (opts: {
         workspace?: string
         force?: boolean
+        config?: string
+        path?: string
         format: string
         excludePath: string[]
       }) => {
         const fmt = parseFormat(opts.format)
         const isTTY = process.stderr.isTTY === true && fmt === 'text'
+        if (opts.config !== undefined && opts.path !== undefined) {
+          cliError('--config and --path are mutually exclusive', opts.format, 1)
+        }
 
-        const { config, kernel } = await resolveCliContext()
+        const context = await resolveGraphCliContext({
+          configPath: opts.config,
+          repoPath: opts.path,
+        }).catch((err: unknown) =>
+          cliError(
+            err instanceof Error ? err.message : 'failed to resolve graph context',
+            opts.format,
+            1,
+          ),
+        )
+        const { config } = context
 
         // --force: delete DB files before opening to clear stale locks and WAL
         if (opts.force) {
@@ -74,7 +93,10 @@ JSON/TOON output schema:
             process.stderr.write(`\r\x1b[K  ${bar} ${String(clamped).padStart(3)}% ${phase}`)
           }
 
-          const rawWorkspaces = await buildWorkspaceTargets(config, kernel, opts.workspace)
+          const rawWorkspaces: WorkspaceIndexTarget[] =
+            context.mode === 'configured'
+              ? await buildWorkspaceTargets(config, context.kernel!, opts.workspace)
+              : buildBootstrapWorkspaceTargets(context.vcsRoot, opts.workspace)
 
           const workspaces =
             opts.excludePath.length > 0
@@ -151,4 +173,25 @@ JSON/TOON output schema:
         })
       },
     )
+}
+
+/**
+ * Builds the synthetic workspace targets used in graph bootstrap mode.
+ *
+ * @param vcsRoot - Resolved repository root.
+ * @param workspaceFilter - Optional workspace filter from the CLI.
+ * @returns Synthetic workspace targets for bootstrap indexing.
+ */
+function buildBootstrapWorkspaceTargets(
+  vcsRoot: string,
+  workspaceFilter?: string,
+): WorkspaceIndexTarget[] {
+  const target: WorkspaceIndexTarget = {
+    name: 'default',
+    codeRoot: vcsRoot,
+    repoRoot: vcsRoot,
+    specs: () => Promise.resolve([]),
+  }
+
+  return workspaceFilter !== undefined && workspaceFilter !== 'default' ? [] : [target]
 }

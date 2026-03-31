@@ -8,10 +8,8 @@ Before modifying code, developers and agents need to understand the blast radius
 
 ### Requirement: Command signature
 
-### Requirement: Command signature
-
 ```text
-specd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction upstream|downstream|both] [--depth <n>] [--path <path>] [--format text|json|toon]
+specd graph impact [--file <path>] [--symbol <name>] [--changes <files...>] [--direction upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
 Exactly one of `--file`, `--symbol`, or `--changes` must be provided.
@@ -24,36 +22,44 @@ Exactly one of `--file`, `--symbol`, or `--changes` must be provided.
   - `downstream` — find symbols and files that the target depends on
   - `both` — combined upstream and downstream analysis
 - `--depth` — optional; maximum traversal depth, defaults to `3`. Must be a positive integer. Passed through to `analyzeImpact`/`analyzeFileImpact` as `maxDepth`
-- `--path` — optional; workspace root, defaults to the current working directory
+- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
+- `--path <path>` — optional; repo-root bootstrap mode
 - `--format text|json|toon` — optional; output format, defaults to `text`
+
+`--config` and `--path` are mutually exclusive.
+
+`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects.
 
 ### Requirement: File impact analysis
 
 When `--file` is provided:
 
-1. Creates a `CodeGraphProvider` with the resolved path
-2. Opens the provider
-3. Calls `analyzeFileImpact(file, direction)` to compute the impact
-4. Outputs the `FileImpactResult` including per-symbol breakdown
-5. Closes the provider and exits
+1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
+2. Creates a `CodeGraphProvider` from the resolved graph context
+3. Opens the provider
+4. Calls `analyzeFileImpact(file, direction)` to compute the impact
+5. Outputs the `FileImpactResult` including per-symbol breakdown
+6. Closes the provider and exits
+
+In bootstrap mode, the command SHALL behave as if there were a single `default` workspace whose `codeRoot` is the resolved VCS root.
 
 ### Requirement: Symbol impact analysis
 
 When `--symbol` is provided:
 
-1. Searches for symbols matching the name via `findSymbols({ name })`
-2. If no symbol is found, outputs `No symbol found matching "<name>".`
-3. If one symbol is found, calls `analyzeImpact(symbolId, direction)` and outputs the result
-4. If multiple symbols match, analyzes each one and outputs all results
+1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
+2. Searches for symbols matching the name via `findSymbols({ name })`
+3. If no symbol is found, outputs `No symbol found matching "<name>".`
+4. If one symbol is found, calls `analyzeImpact(symbolId, direction)` and outputs the result
+5. If multiple symbols match, analyzes each one and outputs all results
 
 ### Requirement: Change detection
 
 When `--changes` is provided:
 
-1. Calls `detectChanges(files)` with the list of file paths
-2. Outputs the summary and affected files
-
-### Requirement: Output format
+1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
+2. Calls `detectChanges(files)` with the list of file paths
+3. Outputs the summary and affected files
 
 ### Requirement: Output format
 
@@ -105,9 +111,9 @@ In `json` or `toon` mode, the full result object is output as-is. The `AffectedS
 
 Exactly one of `--file`, `--symbol`, or `--changes` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file, --symbol, or --changes`.
 
-If the provider cannot be opened, the command exits with code 3.
+If both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting graph access.
 
-## Constraints
+If the provider cannot be opened, the command exits with code 3.
 
 ## Constraints
 
@@ -117,6 +123,7 @@ If the provider cannot be opened, the command exits with code 3.
 - `--direction` only applies to `--file` and `--symbol`, not to `--changes`
 - `--depth` applies to all selectors (`--file`, `--symbol`, `--changes`)
 - `--depth` must be a positive integer; invalid values exit with code 1
+- Context resolution SHALL use the shared graph CLI model rather than command-local path semantics
 
 ## Examples
 
@@ -151,4 +158,6 @@ $ specd graph impact --file src/auth.ts --format json
 ## Spec Dependencies
 
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — CodeGraphProvider, ImpactResult, FileImpactResult, ChangeDetectionResult
+- [`specs/core/config/spec.md`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+- [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — CodeGraphProvider facade
+- [`specs/code-graph/traversal/spec.md`](../../code-graph/traversal/spec.md) — impact analysis semantics

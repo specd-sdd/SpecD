@@ -7,7 +7,7 @@ import { type SymbolKind } from './symbol-kind.js'
 export interface SearchOptions {
   readonly query: string
   readonly limit?: number
-  readonly kind?: SymbolKind
+  readonly kinds?: readonly SymbolKind[]
   readonly filePattern?: string
   readonly workspace?: string
   readonly excludePaths?: readonly string[]

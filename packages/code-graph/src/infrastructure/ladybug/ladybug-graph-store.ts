@@ -858,8 +858,11 @@ export class LadybugGraphStore extends GraphStore {
     const top = options.limit ?? 20
 
     const conditions: string[] = []
-    if (options.kind) {
-      conditions.push(`node.kind = '${this.escape(options.kind)}'`)
+    if (options.kinds && options.kinds.length > 0) {
+      const kindCondition = options.kinds
+        .map((kind) => `node.kind = '${this.escape(kind)}'`)
+        .join(' OR ')
+      conditions.push(`(${kindCondition})`)
     }
     if (options.filePattern) {
       const regex = options.filePattern.replaceAll('.', '\\.').replaceAll('*', '.*')

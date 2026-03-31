@@ -29,6 +29,13 @@
 - **WHEN** `specd --config /path/to/specd.yaml <command>` is invoked
 - **THEN** specd uses the specified file exactly as-is — discovery and `specd.local.yaml` lookup are both skipped
 
+#### Scenario: Command-specific bootstrap mode does not redefine --config
+
+- **GIVEN** a command family defines a bootstrap mode that can operate without loading project config
+- **WHEN** the user passes `--config /path/to/specd.yaml`
+- **THEN** `--config` still means an explicit config file path override
+- **AND** bootstrap mode is not selected by reinterpreting `--config` as a repository root
+
 ### Requirement: Local config override
 
 #### Scenario: Local file takes full precedence

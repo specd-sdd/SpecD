@@ -1,11 +1,7 @@
 {
   "title": "Graph Search",
   "description": "The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides full-text search across both, ranked by relevance using BM25 scoring.",
-  "dependsOn": [
-    "cli:cli/entrypoint",
-    "code-graph:code-graph/composition",
-    "code-graph:code-graph/database-schema"
-  ],
+  "dependsOn": ["core:core/config"],
   "context": [
     "The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides full-text search across both, ranked by relevance using BM25 scoring."
   ],
@@ -13,13 +9,13 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```text\nspecd graph search <query> [--symbols] [--specs] [--kind <kind>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--format text|json|toon]\n```\n\n- `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)\n- `--symbols` — optional; search only symbols\n- `--specs` — optional; search only specs\n- `--kind <kind>` — optional; filter symbols by kind (`function|class|method|variable|type|interface|enum`)\n- `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)\n- `--workspace <name>` — optional; filter both symbols and specs to a single workspace\n- `--exclude-path <pattern>` — optional, repeatable; exclude symbols/specs whose file path matches glob pattern (supports `*` wildcards, case-insensitive)\n- `--exclude-workspace <name>` — optional, repeatable; exclude results from the given workspace\n- `--limit <n>` — optional; maximum results per category, defaults to `10`\n- `--spec-content` — optional; include full spec content in output. Only valid with `--format json` or `--format toon` — exits with code 1 if used with text format\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen neither `--symbols` nor `--specs` is provided, both categories are searched.\n\nAll filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-workspace`) are applied at the store level before LIMIT — not as post-query filters. The CLI passes them via `SearchOptions` to `CodeGraphProvider.searchSymbols` / `CodeGraphProvider.searchSpecs`."
+        "```text\nspecd graph search <query> [--symbols] [--specs] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]\n```\n\n- `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)\n- `--symbols` — optional; search only symbols\n- `--specs` — optional; search only specs\n- `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `function,class,method`\n- `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)\n- `--workspace <name>` — optional; filter both symbols and specs to a single workspace\n- `--exclude-path <pattern>` — optional, repeatable; exclude symbols/specs whose file path matches glob pattern (supports `*` wildcards, case-insensitive)\n- `--exclude-workspace <name>` — optional, repeatable; exclude results from the given workspace\n- `--limit <n>` — optional; maximum results per category, defaults to `10`\n- `--spec-content` — optional; include full spec content in output. Only valid with `--format json` or `--format toon` — exits with code 1 if used with text format\n- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\n`--config` and `--path` are mutually exclusive.\n\nWhen neither `--symbols` nor `--specs` is provided, both categories are searched.\n\nAll filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-workspace`) are applied at the store level before LIMIT — not as post-query filters. The CLI passes them via `SearchOptions` to `CodeGraphProvider.searchSymbols` / `CodeGraphProvider.searchSpecs`.\n\n`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects."
       ]
     },
     {
       "requirement": "Search behaviour",
       "rules": [
-        "The command uses `resolveCliContext()` to load config and creates a `CodeGraphProvider` via `withProvider`. It delegates to:\n\n- `provider.searchSymbols(options)` — full-text search on `Symbol.name` and `Symbol.comment`, with filters applied at the store level\n- `provider.searchSpecs(options)` — full-text search on `Spec.title`, `Spec.description`, and `Spec.content`, with filters applied at the store level\n\nBoth use LadybugDB's FTS extension with BM25 scoring. Results are returned ordered by score descending — highest relevance first."
+        "The command uses the shared graph CLI context model to resolve explicit config, autodetected config, or bootstrap mode before creating a `CodeGraphProvider` via `withProvider`.\n\nIt delegates to:\n\n- `provider.searchSymbols(options)` — full-text search on `Symbol.name` and `Symbol.comment`, with filters applied at the store level\n- `provider.searchSpecs(options)` — full-text search on `Spec.title`, `Spec.description`, and `Spec.content`, with filters applied at the store level\n\nBoth use LadybugDB's FTS extension with BM25 scoring. Results are returned ordered by score descending — highest relevance first.\n\nThe `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.\n\nThe validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value."
       ]
     },
     {
@@ -66,6 +62,23 @@
       "then": ["at most 3 symbols and 3 specs are returned"]
     },
     {
+      "requirement": "Command signature",
+      "name": "Explicit config path bypasses discovery",
+      "given": ["the current directory would autodiscover a different specd.yaml"],
+      "when": ["specd graph search \"kernel\" --config /tmp/other/specd.yaml is run"],
+      "then": ["the command uses /tmp/other/specd.yaml directly"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Explicit path enters bootstrap mode",
+      "given": ["a specd.yaml exists under the current repository"],
+      "when": ["specd graph search \"kernel\" --path /tmp/repo is run"],
+      "then": [
+        "config discovery is ignored",
+        "AND the command searches a synthetic single workspace default rooted at /tmp/repo"
+      ]
+    },
+    {
       "requirement": "Search behaviour",
       "name": "Results ranked by BM25 relevance",
       "given": [
@@ -98,6 +111,30 @@
       "name": "No results",
       "when": ["specd graph search \"xyznonexistent\" is run"],
       "then": ["No results found. is output"]
+    },
+    {
+      "requirement": "Search behaviour",
+      "name": "Missing config falls back to bootstrap mode",
+      "given": ["no specd.yaml is found by autodiscovery"],
+      "when": ["specd graph search \"kernel\" is run inside a repository"],
+      "then": [
+        "the command searches in bootstrap mode against the resolved VCS root as workspace default"
+      ]
+    },
+    {
+      "requirement": "Search behaviour",
+      "name": "Multiple kinds are passed through to the query layer",
+      "when": ["specd graph search \"transition\" --kind class,method,function is run"],
+      "then": [
+        "the command trims and validates all three kind tokens",
+        "AND the provider receives the full kind list rather than only the last token"
+      ]
+    },
+    {
+      "requirement": "Search behaviour",
+      "name": "Invalid kind token fails before query execution",
+      "when": ["specd graph search \"transition\" --kind method,unknownKind is run"],
+      "then": ["the command exits with code 1", "AND the search query is not executed"]
     },
     {
       "requirement": "Output format",
@@ -142,10 +179,10 @@
     },
     {
       "requirement": "Command signature (filters)",
-      "name": "Filter by symbol kind",
-      "when": ["specd graph search \"transition\" --kind method is run"],
+      "name": "Filter by multiple symbol kinds",
+      "when": ["specd graph search \"transition\" --kind class,method is run"],
       "then": [
-        "only symbols with kind method are returned",
+        "only symbols with kind class or method are returned",
         "AND symbols of other kinds are excluded"
       ]
     },
@@ -166,8 +203,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8b5a07e6a29af6522be0d22e14c43fe25d715d994a888e8f8de17c34907d8546",
-    "verify.md": "sha256:61fcd84a1d03d186f468bd409c16945a5d1689085dae8645b287399b836d1828"
+    "spec.md": "sha256:3561e86b48c326fb49493c7b665699fc7c5039590fccd8559d169018bd0879ef",
+    "verify.md": "sha256:4397008902f60bf7761bf8734e69bc3ec2ec36a734f5ffe805fc5fa4508d65f8"
   },
   "generatedBy": "core"
 }

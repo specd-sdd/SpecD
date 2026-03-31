@@ -1,7 +1,8 @@
 import { Command } from 'commander'
 import { createVcsAdapter } from '@specd/core'
 import { output, parseFormat } from '../../formatter.js'
-import { resolveCliContext } from '../../helpers/cli-context.js'
+import { cliError } from '../../handle-error.js'
+import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 
 /**
@@ -13,6 +14,8 @@ export function registerGraphStats(parent: Command): void {
     .command('stats')
     .allowExcessArguments(false)
     .description('Show code graph statistics')
+    .option('--config <path>', 'path to specd.yaml')
+    .option('--path <path>', 'repository root for bootstrap mode')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .addHelpText(
       'after',
@@ -31,9 +34,21 @@ JSON/TOON output schema:
   }
 `,
     )
-    .action(async (opts: { format: string }) => {
+    .action(async (opts: { config?: string; path?: string; format: string }) => {
       const fmt = parseFormat(opts.format)
-      const { config } = await resolveCliContext()
+      if (opts.config !== undefined && opts.path !== undefined) {
+        cliError('--config and --path are mutually exclusive', opts.format, 1)
+      }
+      const { config } = await resolveGraphCliContext({
+        configPath: opts.config,
+        repoPath: opts.path,
+      }).catch((err: unknown) =>
+        cliError(
+          err instanceof Error ? err.message : 'failed to resolve graph context',
+          opts.format,
+          1,
+        ),
+      )
 
       await withProvider(config, opts.format, async (provider) => {
         const stats = await provider.getStatistics()

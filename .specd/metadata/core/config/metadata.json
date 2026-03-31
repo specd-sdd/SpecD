@@ -16,7 +16,7 @@
     {
       "requirement": "Config file location and format",
       "rules": [
-        "`specd.yaml` must be a valid YAML file. specd discovers it using the following strategy, in order:\n\n1. **`--config` flag** — if the CLI is invoked with `--config path/to/specd.yaml`, that path is used directly; no discovery takes place.\n2. **Walk up from CWD, bounded by the git repo root** — specd walks up from the current working directory, checking each directory for `specd.yaml`. The walk stops at the **first match** (nearest to CWD) or at the git repo root (the nearest ancestor directory containing `.git/`), whichever comes first. If no `specd.yaml` is found before or at the repo root, specd exits with an error.\n3. **CWD only, when not inside a git repo** — if no `.git/` ancestor exists (e.g. the user is running specd from outside any repository, as in a coordinator script), specd checks only the current working directory and stops there. It does not walk further up.\n\nThe search never goes above the git repo root. This prevents accidentally picking up a `specd.yaml` from a parent repository in nested or sibling monorepo layouts. In a monorepo where each package has its own `specd.yaml`, the package-level file is used when running specd from within that package — the root-level file is not considered."
+        "`specd.yaml` must be a valid YAML file. specd discovers it using the following strategy, in order:\n\n1. **`--config` flag** — if the CLI is invoked with `--config path/to/specd.yaml`, that path is used directly; no discovery takes place.\n2. **Walk up from CWD, bounded by the git repo root** — specd walks up from the current working directory, checking each directory for `specd.yaml`. The walk stops at the **first match** (nearest to CWD) or at the git repo root (the nearest ancestor directory containing `.git/`), whichever comes first. If no `specd.yaml` is found before or at the repo root, specd exits with an error.\n3. **CWD only, when not inside a git repo** — if no `.git/` ancestor exists (e.g. the user is running specd from outside any repository, as in a coordinator script), specd checks only the current working directory and stops there. It does not walk further up.\n\nThe search never goes above the git repo root. This prevents accidentally picking up a `specd.yaml` from a parent repository in nested or sibling monorepo layouts. In a monorepo where each package has its own `specd.yaml`, the package-level file is used when running specd from within that package — the root-level file is not considered.\n\nSome command families may explicitly define a bootstrap mode that intentionally operates without loading project config. When they do, this requirement still governs normal configured operation and the meaning of `--config` remains unchanged: it is always an explicit config file path override, never a repository root selector.\n\nBootstrap mode, when defined by a command spec, is for setup and early repository exploration rather than the intended steady-state mode for configured projects. Such command specs MUST document when bootstrap mode is entered, how repository root is resolved, and how it differs from configured operation."
       ]
     },
     {
@@ -183,6 +183,18 @@
       "when": ["specd --config /path/to/specd.yaml <command> is invoked"],
       "then": [
         "specd uses the specified file exactly as-is — discovery and specd.local.yaml lookup are both skipped"
+      ]
+    },
+    {
+      "requirement": "Config file location and format",
+      "name": "Command-specific bootstrap mode does not redefine --config",
+      "given": [
+        "a command family defines a bootstrap mode that can operate without loading project config"
+      ],
+      "when": ["the user passes --config /path/to/specd.yaml"],
+      "then": [
+        "--config still means an explicit config file path override",
+        "AND bootstrap mode is not selected by reinterpreting --config as a repository root"
       ]
     },
     {
@@ -812,8 +824,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:070b14b18210facfc8f1ceafa26c9706922c7e9134a58c12ff9d4ca476d23aff",
-    "verify.md": "sha256:40b705c73d2d59326b7180cdbaa160125dd490d07487d86c6abda15acfac9105"
+    "spec.md": "sha256:18c0953d68c6b79a1da5bdeab6f9d604c556c5de1435f43bc4e8e8fd33c474a3",
+    "verify.md": "sha256:075b09b58c5ad8fcd2f276a91da1a83ff77f0822e0323932c8052cd768f97594"
   },
   "generatedBy": "core"
 }

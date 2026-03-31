@@ -2,7 +2,7 @@ import { Command, Option } from 'commander'
 import { createCodeGraphProvider } from '@specd/code-graph'
 import { cliError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
-import { resolveCliContext } from '../../helpers/cli-context.js'
+import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 
 /**
@@ -94,6 +94,8 @@ export function registerGraphImpact(parent: Command): void {
         .default('upstream'),
     )
     .option('--depth <n>', 'max traversal depth (positive integer)', '3')
+    .option('--config <path>', 'path to specd.yaml')
+    .option('--path <path>', 'repository root for bootstrap mode')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .addHelpText(
       'after',
@@ -124,6 +126,8 @@ JSON/TOON output schema:
         changes?: string[]
         direction: string
         depth: string
+        config?: string
+        path?: string
         format: string
       }) => {
         const fmt = parseFormat(opts.format)
@@ -137,8 +141,20 @@ JSON/TOON output schema:
         if (selectorCount !== 1) {
           cliError('provide exactly one of --file, --symbol, or --changes', opts.format, 1)
         }
+        if (opts.config !== undefined && opts.path !== undefined) {
+          cliError('--config and --path are mutually exclusive', opts.format, 1)
+        }
 
-        const { config } = await resolveCliContext()
+        const { config } = await resolveGraphCliContext({
+          configPath: opts.config,
+          repoPath: opts.path,
+        }).catch((err: unknown) =>
+          cliError(
+            err instanceof Error ? err.message : 'failed to resolve graph context',
+            opts.format,
+            1,
+          ),
+        )
 
         await withProvider(config, opts.format, async (provider) => {
           if (opts.symbol) {

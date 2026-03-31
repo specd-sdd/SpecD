@@ -4,12 +4,33 @@
 
 ### Requirement: Indexing behaviour
 
-#### Scenario: Successful indexing with defaults
+#### Scenario: Successful indexing with autodetected config
 
-- **GIVEN** the current working directory is a valid workspace with TypeScript files
+- **GIVEN** the current working directory resolves to a project with `specd.yaml`
 - **WHEN** `specd graph index` is run
-- **THEN** stdout shows `Indexed N file(s) in Xms` followed by the summary lines
+- **THEN** the command uses the discovered config to build workspace index targets
+- **AND** stdout shows `Indexed N file(s) in Xms` followed by the summary lines
 - **AND** the process exits with code 0
+
+#### Scenario: Explicit config path bypasses discovery
+
+- **GIVEN** the current directory would autodiscover a different `specd.yaml`
+- **WHEN** `specd graph index --config /tmp/other/specd.yaml` is run
+- **THEN** the command uses `/tmp/other/specd.yaml` directly
+- **AND** indexing targets come from that config rather than from autodiscovery
+
+#### Scenario: Explicit path enters bootstrap mode
+
+- **GIVEN** a `specd.yaml` exists under the current repository
+- **WHEN** `specd graph index --path /tmp/repo` is run
+- **THEN** config discovery is ignored
+- **AND** indexing runs against a synthetic single workspace `default` rooted at `/tmp/repo`
+
+#### Scenario: Missing config falls back to bootstrap mode
+
+- **GIVEN** no `specd.yaml` is found by autodiscovery
+- **WHEN** `specd graph index` is run inside a repository
+- **THEN** the command indexes the resolved VCS root in bootstrap mode as workspace `default`
 
 #### Scenario: Force flag clears existing data
 
@@ -17,13 +38,6 @@
 - **WHEN** `specd graph index --force` is run
 - **THEN** the `.lbug`, `.lbug.wal`, and `.lbug.lock` files are deleted before opening the provider
 - **AND** `filesRemoved` in the output reflects the previously indexed files
-
-#### Scenario: Custom path
-
-- **GIVEN** `/tmp/my-project` is a valid workspace
-- **WHEN** `specd graph index --path /tmp/my-project` is run
-- **THEN** the provider is created with `/tmp/my-project` as the workspace path
-- **AND** indexing operates on files within that directory
 
 #### Scenario: Process exits explicitly
 
@@ -66,6 +80,13 @@
 
 ### Requirement: Error cases
 
+#### Scenario: Mutually exclusive context flags fail fast
+
+- **WHEN** `specd graph index --config ./specd.yaml --path .` is run
+- **THEN** stderr contains a CLI error about incompatible flags
+- **AND** no graph provider is opened
+- **AND** the process exits with code 1
+
 #### Scenario: Infrastructure error exits with code 3
 
 - **GIVEN** the provider cannot be opened (e.g. database I/O error)
@@ -90,6 +111,7 @@
 #### Scenario: graph index flags documented
 
 - **WHEN** the `### graph index` subsection is read
-- **THEN** `--exclude-path`, `--workspace`, `--force`, and `--format` are documented with descriptions
+- **THEN** `--exclude-path`, `--workspace`, `--force`, `--config`, `--path`, and `--format` are documented with descriptions
 - **AND** the `graph.excludePaths` and `graph.respectGitignore` config fields are explained
+- **AND** the bootstrap-only nature of `--path` and no-config fallback is stated
 - **AND** an example shows negation syntax (e.g. `!.specd/metadata/`)

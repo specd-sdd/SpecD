@@ -2,6 +2,21 @@
 
 ## Requirements
 
+### Requirement: Command signature
+
+#### Scenario: Explicit config path bypasses discovery
+
+- **GIVEN** the current directory would autodiscover a different `specd.yaml`
+- **WHEN** `specd graph impact --file src/auth.ts --config /tmp/other/specd.yaml` is run
+- **THEN** the command uses `/tmp/other/specd.yaml` directly
+
+#### Scenario: Explicit path enters bootstrap mode
+
+- **GIVEN** a `specd.yaml` exists under the current repository
+- **WHEN** `specd graph impact --file src/auth.ts --path /tmp/repo` is run
+- **THEN** config discovery is ignored
+- **AND** the command analyzes impact against a synthetic single workspace `default` rooted at `/tmp/repo`
+
 ### Requirement: File impact analysis
 
 #### Scenario: Upstream file analysis with defaults
@@ -12,6 +27,12 @@
 - **AND** the analysis direction is `upstream`
 - **AND** the default depth is 3
 - **AND** the process exits with code 0
+
+#### Scenario: Missing config falls back to bootstrap mode
+
+- **GIVEN** no `specd.yaml` is found by autodiscovery
+- **WHEN** `specd graph impact --file src/auth.ts` is run inside a repository
+- **THEN** the command resolves the VCS root and analyzes against bootstrap mode workspace `default`
 
 #### Scenario: Downstream file analysis
 
@@ -129,6 +150,11 @@
 - **WHEN** `specd graph impact --file src/auth.ts --symbol validate` is run
 - **THEN** stderr contains `error: provide exactly one of --file, --symbol, or --changes`
 - **AND** the process exits with code 1
+
+#### Scenario: Mutually exclusive context flags fail fast
+
+- **WHEN** `specd graph impact --file src/auth.ts --config ./specd.yaml --path .` is run
+- **THEN** the command exits with code 1 before any graph provider is opened
 
 #### Scenario: Invalid depth value
 
