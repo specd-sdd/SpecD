@@ -15,7 +15,7 @@
 
 - **GIVEN** the workspace has been previously indexed
 - **WHEN** `specd graph index --force` is run
-- **THEN** `clear()` is called on the provider before indexing
+- **THEN** the `.lbug`, `.lbug.wal`, and `.lbug.lock` files are deleted before opening the provider
 - **AND** `filesRemoved` in the output reflects the previously indexed files
 
 #### Scenario: Custom path

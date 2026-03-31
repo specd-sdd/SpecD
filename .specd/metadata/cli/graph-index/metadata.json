@@ -61,7 +61,7 @@
       "given": ["the workspace has been previously indexed"],
       "when": ["specd graph index --force is run"],
       "then": [
-        "clear() is called on the provider before indexing",
+        "the .lbug, .lbug.wal, and .lbug.lock files are deleted before opening the provider",
         "AND filesRemoved in the output reflects the previously indexed files"
       ]
     },
@@ -170,7 +170,7 @@
   ],
   "contentHashes": {
     "spec.md": "sha256:ff12cf1314398d88cd5181b7a37ef87149100cbf257458e9645abaa5b588ccd4",
-    "verify.md": "sha256:0476f52ed41995abf82cd60d6b82e464040386698ea9361bdda187e9173599af"
+    "verify.md": "sha256:ec40fda34455cd12c785ac9577c63df3820208c068f9ae90d4439d56bf5f8db6"
   },
   "generatedBy": "core"
 }
