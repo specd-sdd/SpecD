@@ -354,6 +354,26 @@
 - **WHEN** `extractRelations()` is called
 - **THEN** an `IMPORTS` relation is returned
 
+#### Scenario: CakePHP uses property emits IMPORTS when literals resolve
+
+- **GIVEN** a controller class declaring `var $uses = array('Article', 'Category')`
+- **AND** resolver rules can map both entries to concrete files
+- **WHEN** `extractRelations()` is called
+- **THEN** `IMPORTS` relations are returned for both resolved targets
+
+#### Scenario: Bare Cake loaders are supported
+
+- **GIVEN** a PHP file containing `loadController('Admin')` and `loadComponent('Auth')`
+- **WHEN** `extractRelations()` is called
+- **THEN** loader resolver rules are applied to both calls
+
+#### Scenario: Class-literal framework acquisition emits IMPORTS when target resolves
+
+- **GIVEN** a PHP file containing a framework acquisition call with an explicit class target
+- **AND** resolver rules can map that class target to a concrete file
+- **WHEN** `extractRelations()` is called
+- **THEN** an `IMPORTS` relation is returned to that target file
+
 #### Scenario: Dynamic argument silently dropped
 
 - **GIVEN** a PHP file containing `$this->loadModel($modelName)`
@@ -367,11 +387,12 @@
 - **WHEN** `extractRelations()` is called
 - **THEN** no relation is created for that call and no error is thrown
 
-#### Scenario: Additional Cake loaders are supported
+#### Scenario: Runtime-only service identifier is not treated as a deterministic dependency
 
-- **GIVEN** a PHP file containing `$this->loadController('Admin')` and `$this->loadComponent('Auth')`
+- **GIVEN** a PHP file containing a framework service lookup identified only by a string service ID
+- **AND** resolver rules do not define a deterministic file target for that service ID
 - **WHEN** `extractRelations()` is called
-- **THEN** loader resolver rules are applied to both calls
+- **THEN** no `IMPORTS` relation is created from that lookup
 
 ### Requirement: PHP loaded-instance call extraction
 
@@ -386,6 +407,41 @@
 - **GIVEN** a method containing `$model = $this->Article` and later `$model->find()`
 - **WHEN** both symbols are resolvable
 - **THEN** a `CALLS` relation is emitted
+
+#### Scenario: CakePHP uses property makes framework-managed alias available to methods
+
+- **GIVEN** a class declaring `var $uses = array('Article')`
+- **AND** one of its methods calls `$this->Article->save()`
+- **WHEN** caller and callee symbols are resolvable
+- **THEN** a `CALLS` relation is emitted from that method to `Article::save`
+
+#### Scenario: Bare loader form feeds the same alias resolution as receiver-based form
+
+- **GIVEN** a method containing `loadComponent('Auth')`
+- **AND** the same method later calls `$this->Auth->login()`
+- **WHEN** caller and callee symbols are resolvable
+- **THEN** a `CALLS` relation is emitted
+
+#### Scenario: Explicit instance construction after framework loading emits CALLS
+
+- **GIVEN** a method containing `loadModel('Article')`
+- **AND** the same method later assigns `$article = new Article()` and calls `$article->save()`
+- **WHEN** caller and callee symbols are resolvable
+- **THEN** a `CALLS` relation is emitted
+
+#### Scenario: Class-literal service acquisition emits CALLS when target is statically known
+
+- **GIVEN** a method assigns a framework-managed service acquisition with an explicit class target to a local variable
+- **AND** the same method later calls a method on that variable
+- **WHEN** the service class and callee method symbols are resolvable
+- **THEN** a `CALLS` relation is emitted
+
+#### Scenario: Runtime-only service identifier is not promoted to CALLS
+
+- **GIVEN** a method fetches a service using only a runtime string identifier
+- **AND** no deterministic class target can be resolved
+- **WHEN** a method call is later made on the fetched value
+- **THEN** no `CALLS` relation is emitted from that dynamic lookup
 
 #### Scenario: Cross-method alias propagation is not performed
 

@@ -79,14 +79,30 @@ function toPhpFileStem(value: string): string {
 }
 
 /**
- * Returns candidate alias names for a dynamically loaded dependency.
- * @param value - The raw loader argument.
- * @returns Alias strings used by the call extractor.
+ * Returns the canonical class-like tail for a PHP dependency reference.
+ * @param value - Raw loader or class-literal value.
+ * @returns The normalized class tail.
  */
-function defaultAliasNames(value: string): string[] {
-  const base =
-    value.replaceAll('\\', '/').replaceAll('.', '/').split('/').filter(Boolean).at(-1) ?? value
-  return [`$this->${base}`, `$${base}`]
+function getPhpClassTail(value: string): string {
+  return (
+    value
+      .replace(/^\\+/, '')
+      .replace(/::class$/, '')
+      .replaceAll('/', '\\')
+      .split('\\')
+      .filter(Boolean)
+      .at(-1) ?? value
+  )
+}
+
+/**
+ * Builds the unique alias names associated with a PHP dependency reference.
+ * @param value - Raw loader or class-literal value.
+ * @returns Unique alias names.
+ */
+function buildAliasNames(value: string): string[] {
+  const base = getPhpClassTail(value)
+  return Array.from(new Set([`$this->${base}`, `$${base}`]))
 }
 
 /**
@@ -97,6 +113,7 @@ interface LoaderBinding {
   readonly value: string
   readonly targetPath: string | undefined
   readonly aliasNames: string[]
+  readonly scope: 'file' | 'class' | 'method'
 }
 
 /**
@@ -136,14 +153,15 @@ function escapeRegExp(value: string): string {
  * @returns True when the scope contains the binding declaration.
  */
 function bindingAppearsInScope(scopeText: string, binding: LoaderBinding): boolean {
+  if (binding.scope !== 'method') return true
   const quotedValue = `['"]${escapeRegExp(binding.value)}['"]`
   switch (binding.via) {
     case 'loadModel':
       return new RegExp(`(?:\\$this->)?loadModel\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
     case 'loadController':
-      return new RegExp(`\\$this->loadController\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
+      return new RegExp(`(?:\\$this->)?loadController\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
     case 'loadComponent':
-      return new RegExp(`\\$this->loadComponent\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
+      return new RegExp(`(?:\\$this->)?loadComponent\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
     case 'App::import':
       return new RegExp(`App::import\\([^\\n]*${quotedValue}`).test(scopeText)
     case 'ClassRegistry::init':
@@ -153,9 +171,23 @@ function bindingAppearsInScope(scopeText: string, binding: LoaderBinding): boole
     case 'load.library':
       return new RegExp(`\\$this->load->library\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
     case 'Yii::createObject':
-      return new RegExp(`Yii::createObject\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
+      return new RegExp(
+        `Yii::createObject\\(\\s*(?:${quotedValue}|${escapeRegExp(binding.value)}::class)\\s*\\)`,
+      ).test(scopeText)
     case 'Zend_Loader::loadClass':
       return new RegExp(`Zend_Loader::loadClass\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
+    case 'app':
+      return new RegExp(
+        `\\bapp\\(\\s*(?:${quotedValue}|${escapeRegExp(binding.value)}::class)\\s*\\)`,
+      ).test(scopeText)
+    case 'resolve':
+      return new RegExp(
+        `\\bresolve\\(\\s*(?:${quotedValue}|${escapeRegExp(binding.value)}::class)\\s*\\)`,
+      ).test(scopeText)
+    case '$this->get':
+      return new RegExp(
+        `\\$this->get\\(\\s*(?:${quotedValue}|${escapeRegExp(binding.value)}::class)\\s*\\)`,
+      ).test(scopeText)
     case 'uses':
       return new RegExp(`\\buses\\(\\s*${quotedValue}\\s*\\)`).test(scopeText)
     default:
@@ -303,6 +335,123 @@ function resolveGenericPhpTarget(
 }
 
 /**
+ * Resolves an explicit class literal or qualified class reference to a PHP file.
+ * @param filePath - Source file path.
+ * @param value - Explicit class reference or qualified class name.
+ * @param symbols - Indexed symbol pool.
+ * @returns The resolved target path, or undefined.
+ */
+function resolveFrameworkClassLiteralTarget(
+  filePath: string,
+  value: string,
+  symbols: SymbolNode[],
+): string | undefined {
+  const normalized = value
+    .replace(/^\\+/, '')
+    .replace(/::class$/, '')
+    .trim()
+  if (!normalized || !/[A-Z_\\]/.test(normalized)) return undefined
+  return resolveGenericPhpTarget(filePath, normalized, symbols)
+}
+
+/**
+ * Parses a literal PHP array body into string entries.
+ * @param body - Array body text from `array(...)` or `[...]`.
+ * @returns Literal string entries.
+ */
+function parseLiteralPhpArrayEntries(body: string): string[] {
+  const entries: string[] = []
+  const regex = /['"]([^'"]+)['"]/g
+  for (const match of body.matchAll(regex)) {
+    const value = match[1]?.trim()
+    if (value) entries.push(value)
+  }
+  return entries
+}
+
+/**
+ * Extracts CakePHP class-property `uses` declarations as loader bindings.
+ * @param filePath - Source file path.
+ * @param content - PHP source text.
+ * @param symbols - Symbol pool used for target resolution.
+ * @returns Class-scoped loader bindings.
+ */
+function extractCakeUsesPropertyBindings(
+  filePath: string,
+  content: string,
+  symbols: SymbolNode[],
+): LoaderBinding[] {
+  const bindings: LoaderBinding[] = []
+  const regex =
+    /\b(?:var|public|protected)\s+\$uses\s*=\s*(?:array\(([\s\S]*?)\)|\[([\s\S]*?)\])\s*;/g
+  for (const match of content.matchAll(regex)) {
+    const entries = parseLiteralPhpArrayEntries(match[1] ?? match[2] ?? '')
+    for (const value of entries) {
+      bindings.push({
+        via: 'usesProperty',
+        value,
+        targetPath: resolveCakeTarget(filePath, value, 'model', symbols),
+        aliasNames: buildAliasNames(value),
+        scope: 'class',
+      })
+    }
+  }
+  return bindings
+}
+
+/**
+ * Derives local aliases assigned from already-known aliases within the same scope.
+ * @param scopeText - Method or function body text.
+ * @param aliases - Mutable alias map.
+ * @returns Nothing.
+ */
+function seedAssignedAliases(scopeText: string, aliases: Map<string, string>): void {
+  for (const [alias, targetPath] of Array.from(aliases.entries())) {
+    const escapedAlias = escapeRegExp(alias)
+    const assignmentRegex = new RegExp(
+      `(\\$[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*${escapedAlias}\\b`,
+      'g',
+    )
+    for (const match of scopeText.matchAll(assignmentRegex)) {
+      if (match[1]) aliases.set(match[1], targetPath)
+    }
+  }
+}
+
+/**
+ * Derives method-local aliases created from deterministic construction or acquisition flows.
+ * @param scopeText - Method or function body text.
+ * @param bindingsByValue - Map of normalized binding values to target paths.
+ * @returns Newly discovered local aliases.
+ */
+function extractExplicitConstructedInstanceAliases(
+  scopeText: string,
+  bindingsByValue: ReadonlyMap<string, string>,
+): Map<string, string> {
+  const aliases = new Map<string, string>()
+  const patterns = [
+    /(\$[A-Za-z_][A-Za-z0-9_]*)\s*=\s*new\s+\\?([A-Za-z_][A-Za-z0-9_\\]*)\s*\(/g,
+    /(\$[A-Za-z_][A-Za-z0-9_]*)\s*=\s*Yii::createObject\(\s*\\?([A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
+    /(\$[A-Za-z_][A-Za-z0-9_]*)\s*=\s*app\(\s*\\?([A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
+    /(\$[A-Za-z_][A-Za-z0-9_]*)\s*=\s*resolve\(\s*\\?([A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
+    /(\$[A-Za-z_][A-Za-z0-9_]*)\s*=\s*\$this->get\(\s*\\?([A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
+  ] as const
+
+  for (const pattern of patterns) {
+    for (const match of scopeText.matchAll(pattern)) {
+      const alias = match[1]
+      const value = match[2]
+      if (!alias || !value) continue
+      const normalized = getPhpClassTail(value)
+      const targetPath = bindingsByValue.get(value) ?? bindingsByValue.get(normalized)
+      if (targetPath) aliases.set(alias, targetPath)
+    }
+  }
+
+  return aliases
+}
+
+/**
  * Creates a regex-driven loader resolver.
  * @param params - Resolver configuration.
  * @param params.id - Stable resolver id.
@@ -311,6 +460,7 @@ function resolveGenericPhpTarget(
  * @param params.resolveTarget - Target resolution function.
  * @param params.aliases - Alias derivation function.
  * @param params.valueIndex - Match group index for the captured value.
+ * @param params.scope - Lexical scope where the binding applies.
  * @returns A loader resolver.
  */
 function createRegexResolver(params: {
@@ -320,6 +470,7 @@ function createRegexResolver(params: {
   resolveTarget: (filePath: string, value: string, symbols: SymbolNode[]) => string | undefined
   aliases?: (value: string) => string[]
   valueIndex?: number
+  scope?: 'file' | 'class' | 'method'
 }): LoaderResolver {
   const valueIndex = params.valueIndex ?? 2
   return {
@@ -333,7 +484,8 @@ function createRegexResolver(params: {
           via: params.via,
           value,
           targetPath: params.resolveTarget(filePath, value, symbols),
-          aliasNames: (params.aliases ?? defaultAliasNames)(value),
+          aliasNames: (params.aliases ?? buildAliasNames)(value),
+          scope: params.scope ?? 'method',
         })
       }
       return bindings
@@ -362,32 +514,68 @@ const LOADER_RESOLVERS: ReadonlyArray<LoaderResolver> = [
           via: 'loadModel',
           value,
           targetPath: resolveCakeTarget(filePath, value, 'model', symbols),
-          aliasNames: defaultAliasNames(value),
+          aliasNames: buildAliasNames(value),
+          scope: 'method',
+        })
+      }
+      return bindings
+    },
+  },
+  {
+    id: 'cake-load-controller',
+    scan(filePath: string, content: string, symbols: SymbolNode[]): LoaderBinding[] {
+      const bindings: LoaderBinding[] = []
+      const regex =
+        /\$this->loadController\(\s*(['"])([^'"]+)\1\s*\)|\bloadController\(\s*(['"])([^'"]+)\3\s*\)/g
+      for (const match of content.matchAll(regex)) {
+        const matchText = match[0] ?? ''
+        const matchIndex = match.index ?? 0
+        const prefix = content.slice(Math.max(0, matchIndex - 2), matchIndex)
+        if (!matchText.startsWith('$this->') && (prefix === '->' || prefix === '::')) continue
+        const value = match[2] ?? match[4]
+        if (!value) continue
+        bindings.push({
+          via: 'loadController',
+          value,
+          targetPath: resolveCakeTarget(filePath, value, 'controller', symbols),
+          aliasNames: buildAliasNames(value),
+          scope: 'method',
+        })
+      }
+      return bindings
+    },
+  },
+  {
+    id: 'cake-load-component',
+    scan(filePath: string, content: string, symbols: SymbolNode[]): LoaderBinding[] {
+      const bindings: LoaderBinding[] = []
+      const regex =
+        /\$this->loadComponent\(\s*(['"])([^'"]+)\1\s*\)|\bloadComponent\(\s*(['"])([^'"]+)\3\s*\)/g
+      for (const match of content.matchAll(regex)) {
+        const matchText = match[0] ?? ''
+        const matchIndex = match.index ?? 0
+        const prefix = content.slice(Math.max(0, matchIndex - 2), matchIndex)
+        if (!matchText.startsWith('$this->') && (prefix === '->' || prefix === '::')) continue
+        const value = match[2] ?? match[4]
+        if (!value) continue
+        bindings.push({
+          via: 'loadComponent',
+          value,
+          targetPath: resolveCakeTarget(filePath, value, 'component', symbols),
+          aliasNames: buildAliasNames(value),
+          scope: 'method',
         })
       }
       return bindings
     },
   },
   createRegexResolver({
-    id: 'cake-load-controller',
-    regex: /\$this->loadController\(\s*(['"])([^'"]+)\1\s*\)/g,
-    via: 'loadController',
-    resolveTarget: (filePath, value, symbols) =>
-      resolveCakeTarget(filePath, value, 'controller', symbols),
-  }),
-  createRegexResolver({
-    id: 'cake-load-component',
-    regex: /\$this->loadComponent\(\s*(['"])([^'"]+)\1\s*\)/g,
-    via: 'loadComponent',
-    resolveTarget: (filePath, value, symbols) =>
-      resolveCakeTarget(filePath, value, 'component', symbols),
-  }),
-  createRegexResolver({
     id: 'cake-app-uses',
     regex: /\bApp::uses\(\s*(['"])([^'"]+)\1\s*,\s*(['"])([^'"]+)\3\s*\)/g,
     via: 'App::uses',
     valueIndex: 2,
     resolveTarget: () => undefined,
+    scope: 'file',
   }),
   {
     id: 'cake-global-uses',
@@ -404,7 +592,8 @@ const LOADER_RESOLVERS: ReadonlyArray<LoaderResolver> = [
           via: 'uses',
           value,
           targetPath: resolveCakeTarget(filePath, value, 'model', symbols),
-          aliasNames: defaultAliasNames(value),
+          aliasNames: buildAliasNames(value),
+          scope: 'file',
         })
       }
       return bindings
@@ -432,7 +621,8 @@ const LOADER_RESOLVERS: ReadonlyArray<LoaderResolver> = [
           via: 'App::import',
           value,
           targetPath,
-          aliasNames: defaultAliasNames(value),
+          aliasNames: buildAliasNames(value),
+          scope: 'file',
         })
       }
       return bindings
@@ -473,17 +663,52 @@ const LOADER_RESOLVERS: ReadonlyArray<LoaderResolver> = [
     via: 'Yii::import',
     resolveTarget: resolveYiiImportTarget,
   }),
-  createRegexResolver({
+  {
     id: 'yii-create-object',
-    regex: /\bYii::createObject\(\s*(['"])([^'"]+)\1\s*\)/g,
-    via: 'Yii::createObject',
-    resolveTarget: resolveGenericPhpTarget,
+    scan(filePath: string, content: string, symbols: SymbolNode[]): LoaderBinding[] {
+      const bindings: LoaderBinding[] = []
+      const regex =
+        /\bYii::createObject\(\s*(?:(['"])([^'"]+)\1|(\\?[A-Za-z_][A-Za-z0-9_\\]*)::class)\s*\)/g
+      for (const match of content.matchAll(regex)) {
+        const value = match[2] ?? match[3]
+        if (!value) continue
+        bindings.push({
+          via: 'Yii::createObject',
+          value,
+          targetPath: resolveFrameworkClassLiteralTarget(filePath, value, symbols),
+          aliasNames: buildAliasNames(value),
+          scope: 'method',
+        })
+      }
+      return bindings
+    },
+  },
+  createRegexResolver({
+    id: 'laravel-app-class',
+    regex: /\bapp\(\s*(\\?[A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
+    via: 'app',
+    valueIndex: 1,
+    resolveTarget: resolveFrameworkClassLiteralTarget,
+  }),
+  createRegexResolver({
+    id: 'laravel-resolve-class',
+    regex: /\bresolve\(\s*(\\?[A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
+    via: 'resolve',
+    valueIndex: 1,
+    resolveTarget: resolveFrameworkClassLiteralTarget,
+  }),
+  createRegexResolver({
+    id: 'symfony-get-class',
+    regex: /\$this->get\(\s*(\\?[A-Za-z_][A-Za-z0-9_\\]*)::class\s*\)/g,
+    via: '$this->get',
+    valueIndex: 1,
+    resolveTarget: resolveFrameworkClassLiteralTarget,
   }),
   createRegexResolver({
     id: 'zend-loader',
     regex: /\bZend_Loader::loadClass\(\s*(['"])([^'"]+)\1\s*\)/g,
     via: 'Zend_Loader::loadClass',
-    resolveTarget: resolveGenericPhpTarget,
+    resolveTarget: resolveFrameworkClassLiteralTarget,
   }),
   createRegexResolver({
     id: 'drupal-service',
@@ -925,11 +1150,17 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const bindings: LoaderBinding[] = []
     for (const resolver of LOADER_RESOLVERS) {
       for (const binding of resolver.scan(filePath, content, symbols)) {
-        const key = `${binding.via}:${binding.value}:${binding.targetPath ?? 'unresolved'}`
+        const key = `${binding.via}:${binding.scope}:${binding.value}:${binding.targetPath ?? 'unresolved'}`
         if (seen.has(key)) continue
         seen.add(key)
         bindings.push(binding)
       }
+    }
+    for (const binding of extractCakeUsesPropertyBindings(filePath, content, symbols)) {
+      const key = `${binding.via}:${binding.scope}:${binding.value}:${binding.targetPath ?? 'unresolved'}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      bindings.push(binding)
     }
     const appUsesRegex = /\bApp::uses\(\s*(['"])([^'"]+)\1\s*,\s*(['"])([^'"]+)\3\s*\)/g
     for (const match of content.matchAll(appUsesRegex)) {
@@ -945,7 +1176,8 @@ export class PhpLanguageAdapter implements LanguageAdapter {
         via: 'App::uses',
         value,
         targetPath,
-        aliasNames: defaultAliasNames(value),
+        aliasNames: buildAliasNames(value),
+        scope: 'file',
       })
     }
     return bindings
@@ -1005,24 +1237,27 @@ export class PhpLanguageAdapter implements LanguageAdapter {
 
         const scopeText = node.text()
         const aliases = new Map<string, string>()
+        const bindingsByValue = new Map<string, string>()
         for (const binding of bindings) {
           if (!binding.targetPath) continue
+          bindingsByValue.set(binding.value, binding.targetPath)
+          bindingsByValue.set(getPhpClassTail(binding.value), binding.targetPath)
           if (!bindingAppearsInScope(scopeText, binding)) continue
           for (const alias of binding.aliasNames) {
             aliases.set(alias, binding.targetPath)
           }
         }
 
-        for (const [alias, targetPath] of Array.from(aliases.entries())) {
-          const escapedAlias = escapeRegExp(alias)
-          const assignmentRegex = new RegExp(
-            `(\\$[A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*${escapedAlias}\\b`,
-            'g',
-          )
-          for (const match of scopeText.matchAll(assignmentRegex)) {
-            if (match[1]) aliases.set(match[1], targetPath)
-          }
+        seedAssignedAliases(scopeText, aliases)
+
+        for (const [alias, targetPath] of extractExplicitConstructedInstanceAliases(
+          scopeText,
+          bindingsByValue,
+        )) {
+          aliases.set(alias, targetPath)
         }
+
+        seedAssignedAliases(scopeText, aliases)
 
         const orderedAliases = Array.from(aliases.keys())
           .sort((a, b) => b.length - a.length)

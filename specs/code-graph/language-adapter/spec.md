@@ -154,31 +154,45 @@ This covers legacy PHP codebases (pre-namespace) and framework bootstrappers tha
 
 ### Requirement: PHP dynamic loader dependencies
 
-The PHP adapter MUST detect framework-specific dynamic loader calls and emit file-level `IMPORTS` relations when the loader target can be resolved to a file path.
+The PHP adapter MUST detect framework-specific dependency acquisition patterns and emit file-level `IMPORTS` relations when the referenced target can be resolved to a file path.
 
-Supported call patterns include:
+Supported pattern families include:
 
-- CakePHP: `$this->loadModel('X')`, `loadModel('X')`, `App::uses('X', 'Y')`, `App::import('Model', 'X')`, `ClassRegistry::init('X')`
-- CakePHP additional loaders: `$this->loadController('X')`, `$this->loadComponent('X')`
-- CodeIgniter: `$this->load->model('X')`, `$this->load->library('X')`, `$this->load->helper('X')`
-- Yii/Zend/Drupal/TYPO3/Magento families as configured in adapter resolver registry
+- CakePHP:
+  - `$this->loadModel('X')`, `loadModel('X')`
+  - `$this->loadController('X')`, `loadController('X')`
+  - `$this->loadComponent('X')`, `loadComponent('X')`
+  - `App::uses('X', 'Y')`, `App::import('Model', 'X')`, `ClassRegistry::init('X')`
+  - class-property dependency declarations such as `var $uses = array(...)`, `public $uses = [...]`, and `protected $uses = [...]` when they use literal string entries
+- CodeIgniter:
+  - `$this->load->model('X')`, `$this->load->library('X')`, `$this->load->helper('X')`
+- Yii:
+  - `Yii::import('...')`, `Yii::createObject('...')` when the target class or path is expressed as a literal and can be resolved
+- Zend:
+  - `Zend_Loader::loadClass('...')`
+- Other PHP framework or container families:
+  - explicit dependency acquisition APIs using class literals, qualified class names, or deterministic naming conventions MAY be supported when resolver rules can map them to concrete files without executing application code
 
 Rules:
 
-- When loader arguments are string literals and resolver rules can map them to a concrete target file, emit `IMPORTS` from source file to resolved target file.
-- When arguments are non-literal or the target cannot be resolved, silently drop the relation (no fallback `DEPENDS_ON` edge for file dependencies).
-- Generic method names (e.g. `->get('x')`) MUST NOT be detected unless a resolver explicitly declares them for a framework-specific signature.
+- When dependency-acquisition arguments are string literals or class literals and resolver rules can map them to a concrete target file, emit `IMPORTS` from source file to resolved target file.
+- When dependency declarations appear as class properties with literal entries, the adapter MUST treat them as file-level dependency signals for the declaring class.
+- Generic method names (for example `->get('x')`) MUST NOT be detected unless a resolver explicitly declares a framework-specific signature with deterministic target resolution.
+- When arguments are non-literal, container-driven without an explicit class target, or the target cannot be resolved, silently drop the relation (no fallback `DEPENDS_ON` edge for file dependencies).
 
 ### Requirement: PHP loaded-instance call extraction
 
-The PHP adapter MUST perform method-local heuristic extraction of `CALLS` from dynamically loaded instances.
+The PHP adapter MUST perform deterministic heuristic extraction of `CALLS` from framework-managed or explicitly constructed PHP instances when their targets can be resolved statically.
 
 Rules:
 
-- Within a single method/function body, track aliases bound to resolved loaded dependencies (e.g. `$this->Article`, `$Article`, simple local assignments).
-- For member calls on those aliases (e.g. `$this->Article->save()`, `$model->find()`), emit `CALLS` only when both caller and callee symbols are resolvable.
-- Do not perform interprocedural propagation in this requirement (no cross-method alias flow).
-- Ambiguous alias targets SHOULD be dropped to avoid noisy false positives.
+- Within a single method or function body, track aliases bound to resolved loaded dependencies, framework-managed properties, and simple local assignments.
+- Class-property dependency declarations (for example CakePHP `uses`) MUST make the corresponding framework-managed aliases available to methods of the declaring class.
+- Bare loader forms and receiver-based loader forms that resolve the same dependency kind MUST feed the same alias and call-resolution flow.
+- For member calls on those aliases (for example `$this->Article->save()`, `$model->find()`, `$this->email->send()`), emit `CALLS` only when both caller and callee symbols are resolvable.
+- Explicit instance construction flows such as `new X()` or class-literal service acquisition MAY emit `CALLS` when the constructed or resolved class target is statically known and the subsequent method call can be mapped to a concrete symbol.
+- Do not perform interprocedural propagation in this requirement (no cross-method alias flow, no whole-program inference).
+- Ambiguous alias targets, runtime-only service identifiers, and unresolved member calls MUST be dropped to avoid noisy false positives.
 
 ### Requirement: PHP loader resolver extensibility
 
