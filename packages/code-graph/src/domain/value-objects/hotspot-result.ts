@@ -1,6 +1,13 @@
 import { type SymbolNode } from './symbol-node.js'
 import { type SymbolKind } from './symbol-kind.js'
+import { SymbolKind as SymbolKindEnum } from './symbol-kind.js'
 import { type RiskLevel } from './risk-level.js'
+
+export const DEFAULT_HOTSPOT_KINDS: readonly SymbolKind[] = [
+  SymbolKindEnum.Class,
+  SymbolKindEnum.Method,
+  SymbolKindEnum.Function,
+] as const
 
 /**
  * A single entry in the hotspot ranking.
@@ -24,6 +31,7 @@ export interface HotspotOptions {
   readonly limit?: number
   readonly minScore?: number
   readonly minRisk?: RiskLevel
+  readonly includeImporterOnly?: boolean
   readonly excludePaths?: readonly string[]
   readonly excludeWorkspaces?: readonly string[]
 }

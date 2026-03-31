@@ -9,16 +9,17 @@ Users and agents need a fast way to identify the most structurally coupled symbo
 ### Requirement: Command signature
 
 ```text
-specd graph hotspots [--workspace <name>] [--kind <kinds>] [--file <path>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--min-score <n>] [--min-risk LOW|MEDIUM|HIGH|CRITICAL] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph hotspots [--workspace <name>] [--kind <kinds>] [--file <path>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--min-score <n>] [--include-importer-only] [--min-risk LOW|MEDIUM|HIGH|CRITICAL] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
 - `--workspace <name>` — optional; filter results to a single workspace
-- `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `class,method,enum`
+- `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `class,method,function`
 - `--file <path>` — optional; filter to a single file path
 - `--exclude-path <pattern>` — optional, repeatable; exclude symbols whose file path matches the glob pattern
 - `--exclude-workspace <name>` — optional, repeatable; exclude results from the named workspace
 - `--limit <n>` — optional; maximum number of entries returned
 - `--min-score <n>` — optional; minimum hotspot score
+- `--include-importer-only` — optional; include symbols with no direct callers whose score comes only from file importers
 - `--min-risk <level>` — optional; minimum risk level
 - `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
 - `--path <path>` — optional; repo-root bootstrap mode
@@ -26,7 +27,16 @@ specd graph hotspots [--workspace <name>] [--kind <kinds>] [--file <path>] [--ex
 
 `--config` and `--path` are mutually exclusive.
 
-When no explicit filter flags are passed, the command SHALL apply its default filters: `minScore > 0`, `minRisk >= MEDIUM`, and `limit = 20`. Any explicit filter flag SHALL remove those implicit defaults, so only the explicitly requested constraints apply.
+When no explicit option is passed, the command SHALL apply its default hotspot policy: `kinds = class,method,function`, importer-only symbols excluded, `minScore > 0`, `minRisk >= MEDIUM`, and `limit = 20`.
+
+Explicit options SHALL override only their own defaults:
+
+- `--kind` replaces only the default kind set
+- `--min-risk` replaces only the default risk threshold
+- `--limit` replaces only the default result limit
+- `--workspace`, `--file`, `--exclude-path`, and `--exclude-workspace` add their requested scope restrictions without disabling the other defaults
+- `--min-score` changes only the score threshold
+- `--include-importer-only` widens the query and may re-enable importer-only symbols
 
 ### Requirement: Context resolution
 
@@ -49,6 +59,14 @@ The `--kind` option SHALL accept exactly one comma-separated list value. Each to
 If any token is invalid, the command SHALL fail with a CLI error and SHALL NOT execute the query.
 
 The validated kind list SHALL be passed through to the hotspot query layer as a multi-kind filter rather than being collapsed to a single last value.
+
+When `--kind` is omitted, the command SHALL use the default hotspot kind set: `class`, `method`, and `function`.
+
+When `--kind` is provided explicitly, it SHALL fully replace the default kind set rather than merge with it.
+
+The default ranking SHALL therefore exclude `variable` and `interface` unless the user explicitly includes them through `--kind`.
+
+Providing `--kind` alone SHALL NOT disable the default risk threshold, score threshold, or limit.
 
 ### Requirement: Hotspot retrieval
 
@@ -80,10 +98,13 @@ If the provider cannot be opened or hotspot retrieval fails due to an infrastruc
 
 ### Requirement: CLI reference documentation
 
-The CLI reference in `docs/cli/cli-reference.md` SHALL document `graph hotspots`, including:
+The CLI help text for `specd graph hotspots` and the existing reference documentation in `docs/cli/cli-reference.md` SHALL document `graph hotspots`, including:
 
 - command signature
 - `--kind` as a comma-separated list
+- the default kind set (`class`, `method`, `function`) when `--kind` is omitted
+- the fact that an explicit `--kind` value fully replaces the default kind set
+- the fact that `--include-importer-only` is the explicit widening switch for importer-only symbols
 - `--config` and `--path` behavior
 - the fact that `--path` and no-config fallback are bootstrap-only modes, not the normal configured mode
 

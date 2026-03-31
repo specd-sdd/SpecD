@@ -1,5 +1,6 @@
 import { type GraphStore } from '../ports/graph-store.js'
 import {
+  DEFAULT_HOTSPOT_KINDS,
   type HotspotEntry,
   type HotspotOptions,
   type HotspotResult,
@@ -16,6 +17,38 @@ import { matchesExclude } from './matches-exclude.js'
 function extractWorkspace(filePath: string): string {
   const idx = filePath.indexOf(':')
   return idx === -1 ? filePath : filePath.substring(0, idx)
+}
+
+/**
+ * Returns whether a symbol has any direct caller evidence.
+ * @param sameWs - Same-workspace caller count.
+ * @param crossWs - Cross-workspace caller count.
+ * @returns True when the symbol has at least one direct caller.
+ */
+function hasDirectCallerEvidence(sameWs: number, crossWs: number): boolean {
+  return sameWs + crossWs > 0
+}
+
+/**
+ * Resolves effective hotspot defaults field by field.
+ * @param options - Optional hotspot filters.
+ * @returns Effective ranking defaults and whether importer-only entries are allowed.
+ */
+function resolveEffectiveHotspotDefaults(options?: HotspotOptions): {
+  kinds: readonly string[]
+  minScore: number
+  minRisk: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  limit: number
+  includeImporterOnly: boolean
+} {
+  const minScore = options?.minScore ?? 1
+  return {
+    kinds: options?.kinds ?? DEFAULT_HOTSPOT_KINDS,
+    minScore,
+    minRisk: options?.minRisk ?? 'MEDIUM',
+    limit: options?.limit ?? 20,
+    includeImporterOnly: options?.includeImporterOnly === true,
+  }
 }
 
 /**
@@ -60,6 +93,15 @@ export async function computeHotspots(
   const stats = await store.getStatistics()
   const totalSymbols = stats.symbolCount
 
+  const {
+    kinds: effectiveKinds,
+    minScore,
+    minRisk,
+    limit,
+    includeImporterOnly,
+  } = resolveEffectiveHotspotDefaults(options)
+  const minRiskOrder = RISK_ORDER[minRisk]
+
   // Build entries for all symbols that have callers or importers
   const entries: HotspotEntry[] = []
 
@@ -67,7 +109,10 @@ export async function computeHotspots(
   for (const { symbol, sameWs, crossWs } of symbolMap.values()) {
     const fileImporters = importerCounts.get(symbol.filePath) ?? 0
     const totalCallers = sameWs + crossWs
-    const score = sameWs * 3 + crossWs * 5 + fileImporters
+    const hasDirectEvidence = hasDirectCallerEvidence(sameWs, crossWs)
+    const score = !hasDirectEvidence
+      ? 0
+      : sameWs * 2 + crossWs * 4 + Math.min(fileImporters, totalCallers)
     const riskLevel = computeRiskLevel(totalCallers, totalCallers + fileImporters, 0)
 
     // directCallers tracks same-workspace callers; crossWorkspaceCallers tracks
@@ -82,23 +127,8 @@ export async function computeHotspots(
     })
   }
 
-  // When any filter or threshold option is explicitly provided, drop the
-  // restrictive defaults so queries don't silently lose results.
-  const hasScopeFilter =
-    options?.workspace !== undefined ||
-    (options?.kinds?.length ?? 0) > 0 ||
-    options?.filePath !== undefined ||
-    (options?.excludePaths?.length ?? 0) > 0 ||
-    (options?.excludeWorkspaces?.length ?? 0) > 0 ||
-    options?.limit !== undefined ||
-    options?.minScore !== undefined ||
-    options?.minRisk !== undefined
-
-  // Also include symbols that have no callers but may have file importers,
-  // or all symbols when minScore is 0
-  const minScore = options?.minScore ?? (hasScopeFilter ? 0 : 1)
-  const needAllSymbols = minScore === 0 || importerCounts.size > 0
-  if (needAllSymbols) {
+  // Only widen to importer-only symbols when explicitly requested.
+  if (includeImporterOnly) {
     // Scope the query to the requested workspace/kind when possible
     // to avoid a full symbol table scan
     const allSymbols = await store.findSymbols({
@@ -106,7 +136,11 @@ export async function computeHotspots(
     })
     for (const symbol of allSymbols) {
       if (symbolMap.has(symbol.id)) continue // already processed
-      if (options?.kinds && options.kinds.length > 0 && !options.kinds.includes(symbol.kind)) {
+      if (
+        effectiveKinds !== undefined &&
+        effectiveKinds.length > 0 &&
+        !effectiveKinds.includes(symbol.kind)
+      ) {
         continue
       }
       const fileImporters = importerCounts.get(symbol.filePath) ?? 0
@@ -127,15 +161,15 @@ export async function computeHotspots(
   }
 
   // Apply filters
-  const minRisk = options?.minRisk ?? (hasScopeFilter ? 'LOW' : 'MEDIUM')
-  const limit = options?.limit ?? (hasScopeFilter ? Infinity : 20)
-  const minRiskOrder = RISK_ORDER[minRisk]
-
   let filtered = entries.filter((e) => {
     if (e.score < minScore) return false
     if (RISK_ORDER[e.riskLevel] < minRiskOrder) return false
     if (options?.workspace && !e.symbol.filePath.startsWith(options.workspace + ':')) return false
-    if (options?.kinds && options.kinds.length > 0 && !options.kinds.includes(e.symbol.kind))
+    if (
+      effectiveKinds !== undefined &&
+      effectiveKinds.length > 0 &&
+      !effectiveKinds.includes(e.symbol.kind)
+    )
       return false
     if (options?.filePath && e.symbol.filePath !== options.filePath) return false
     if (matchesExclude(e.symbol.filePath, options?.excludePaths, options?.excludeWorkspaces))

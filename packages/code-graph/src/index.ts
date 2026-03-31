@@ -36,6 +36,7 @@ export { type ImpactResult, type FileImpactResult } from './domain/value-objects
 export { type ChangeDetectionResult } from './domain/value-objects/change-detection-result.js'
 export { type RiskLevel } from './domain/value-objects/risk-level.js'
 export {
+  DEFAULT_HOTSPOT_KINDS,
   type HotspotEntry,
   type HotspotOptions,
   type HotspotResult,

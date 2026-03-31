@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   captureStderr,
@@ -96,19 +97,13 @@ describe('graph hotspots', () => {
     expect(mockProvider.getHotspots).toHaveBeenCalledWith({})
   })
 
-  it('removes implicit defaults when an explicit filter is provided', async () => {
+  it('lets an explicit limit override only the limit', async () => {
     const { mockProvider } = setup()
 
     const program = makeHotspotsProgram()
     await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--limit', '50'])
 
-    expect(mockProvider.getHotspots).toHaveBeenCalledWith(
-      expect.objectContaining({
-        limit: 50,
-        minScore: 0,
-        minRisk: 'LOW',
-      }),
-    )
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith({ limit: 50 })
   })
 
   it('passes all parsed kinds to hotspot retrieval', async () => {
@@ -122,6 +117,46 @@ describe('graph hotspots', () => {
         kinds: ['class', 'method'],
       }),
     )
+  })
+
+  it('lets an explicit --kind replace the default kind set', async () => {
+    const { mockProvider } = setup()
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--kind', 'interface'])
+
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kinds: ['interface'],
+      }),
+    )
+  })
+
+  it('lets an explicit min-risk override only the risk threshold', async () => {
+    const { mockProvider } = setup()
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--min-risk', 'HIGH'])
+
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith({ minRisk: 'HIGH' })
+  })
+
+  it('lets min-score override only the score threshold', async () => {
+    const { mockProvider } = setup()
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--min-score', '0'])
+
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith({ minScore: 0 })
+  })
+
+  it('widens the query only when include-importer-only is explicit', async () => {
+    const { mockProvider } = setup()
+
+    const program = makeHotspotsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--include-importer-only'])
+
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith({ includeImporterOnly: true })
   })
 
   it('rejects invalid kind values before querying', async () => {
@@ -165,5 +200,38 @@ describe('graph hotspots', () => {
     }
 
     expect(getStderr()).toContain('--config and --path are mutually exclusive')
+  })
+
+  it('documents default kind and importer-only behavior in help output', async () => {
+    const { getStdout } = setup()
+
+    const program = makeHotspotsProgram()
+    try {
+      await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--help'])
+    } catch {
+      /* Commander exit override */
+    }
+
+    const help = getStdout()
+    expect(help).toContain('Defaults (no flags): kinds class,method,function')
+    expect(help).toContain('Default view excludes importer-only symbols unless widened with')
+    expect(help).toContain('--include-importer-only')
+    expect(help).toContain('Passing --kind replaces the default kind set')
+    expect(help).toContain('Each option overrides only its own default')
+  })
+
+  it('keeps the CLI reference aligned with hotspot default kind semantics', async () => {
+    const docs = await readFile('../../docs/cli/cli-reference.md', 'utf8')
+
+    expect(docs).toContain(
+      'By default, `graph hotspots` shows only `class`, `method`, and `function` symbols',
+    )
+    expect(docs).toContain('When you pass `--kind`, that list fully replaces the default kind set')
+    expect(docs).toContain(
+      'Use `--include-importer-only` when you explicitly want importer-only symbols to appear',
+    )
+    expect(docs).toContain(
+      'Overriding `--min-risk`, `--limit`, or `--min-score` does not disable the other defaults',
+    )
   })
 })
