@@ -15,6 +15,25 @@ Writes ONE artifact for the change, validates it, and stops. If the user says
 "all at once", or passes `--ff`, writes ALL remaining artifacts
 without stopping (fast-forward mode).
 
+## Execution discipline
+
+These rules constrain **how** you execute the workflow; they do not change the
+schema or lifecycle semantics.
+
+- Treat the current artifact from `change artifact-instruction` as the **only**
+  writable scope. Do not prepare or write files for later artifacts.
+- Execute artifact work **sequentially**. Avoid large shell commands that create
+  or write multiple artifact files in one shot.
+- Do not manually create change artifact directory structure with `mkdir` unless
+  the current artifact cannot be written otherwise. Prefer writing the target file
+  directly and let normal file creation happen as part of that write.
+- If the current artifact requires scope changes (for example `change edit --add-spec`
+  before writing spec deltas), perform those CLI writes first, then re-check state
+  sequentially before writing artifact files.
+- In **one-at-a-time** mode, once the current artifact is validated, stop immediately.
+  Do not fetch the next artifact, do not modify scope for the next artifact, and do
+  not write any additional files until the user explicitly tells you to continue.
+
 ## Steps
 
 ### 1. Load change state
@@ -239,6 +258,15 @@ node packages/cli/dist/index.js spec list --format text --summary
 
 If new specs should be added or existing ones removed, surface to the user.
 
+**Operational guardrails while writing**
+
+- Keep writes tightly scoped to the current artifact. Do not batch-create files for
+  multiple specs or future artifacts in one shell command.
+- If you must add spec scope with `change edit --add-spec`, do it as a separate,
+  sequential CLI step before writing the affected spec artifact files.
+- After any scope-changing CLI write, re-read change state or artifact instruction
+  sequentially before continuing with artifact file writes.
+
 ### 9. Validate
 
 Check the artifact's `scope` (from the schema JSON loaded in step 3):
@@ -264,7 +292,8 @@ If validation fails: fix and re-validate. Do not proceed until it passes.
 
 > `<artifactId>` done. Review it, request changes, or continue?
 
-Wait for user response. Then go to step 7.
+Wait for user response. Stop completely until the user replies. Do not call tools for
+the next artifact while waiting. Then go to step 7.
 
 **Fast-forward mode:** show a one-line summary and go to step 7.
 
