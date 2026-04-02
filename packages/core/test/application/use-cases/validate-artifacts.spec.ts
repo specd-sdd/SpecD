@@ -563,13 +563,31 @@ describe('ValidateArtifacts', () => {
         },
       ]
       const change = makeChangeWithArtifacts('c', [proposalArt, designArt], { history })
-      const invalidateSpy = vi.spyOn(change, 'invalidate')
 
       const files = new Map([
         ['proposal.md', proposalContent],
         ['design.md', designContent],
       ])
       const repo = makeChangeRepository([change])
+      let invalidateCall:
+        | [cause: string, actor: unknown, driftedIds: Set<string> | undefined]
+        | undefined
+      const originalMutate = repo.mutate.bind(repo)
+      vi.spyOn(repo, 'mutate').mockImplementation(async (name, fn) => {
+        return originalMutate(name, async (freshChange) => {
+          const invalidateSpy = vi.spyOn(freshChange, 'invalidate')
+          const result = await fn(freshChange)
+          if (invalidateSpy.mock.calls.length > 0) {
+            const [cause, actor, driftedIds] = invalidateSpy.mock.calls[0] as [
+              string,
+              unknown,
+              Set<string> | undefined,
+            ]
+            invalidateCall = [cause, actor, driftedIds]
+          }
+          return result
+        })
+      })
       Object.assign(repo, {
         async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
           const c = files.get(filename)
@@ -591,8 +609,8 @@ describe('ValidateArtifacts', () => {
         specPath: 'default:auth',
       })
 
-      expect(invalidateSpy).toHaveBeenCalledOnce()
-      const [cause, , driftedIds] = invalidateSpy.mock.calls[0]!
+      expect(invalidateCall).toBeDefined()
+      const [cause, , driftedIds] = invalidateCall!
       expect(cause).toBe('artifact-change')
       expect(driftedIds).toBeInstanceOf(Set)
       expect(driftedIds).toEqual(new Set(['design']))
@@ -690,6 +708,42 @@ describe('ValidateArtifacts', () => {
       const artifact = saved?.getArtifact('specs')
       expect(artifact?.status).toBe('complete')
       expect(artifact?.getFile('specs')?.validatedHash).toBe(sha256(content))
+    })
+
+    it('persists completion updates through ChangeRepository.mutate', async () => {
+      const specsType = makeArtifactType('specs', { format: 'markdown' })
+      const schema = makeSchema([specsType])
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          ['specs', new ArtifactFile({ key: 'specs', filename: 'spec.md', status: 'in-progress' })],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+      const repo = makeChangeRepository([change])
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      Object.assign(repo, {
+        async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
+          return filename === 'spec.md' ? new SpecArtifact(filename, 'spec content') : null
+        },
+      })
+
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+      })
+
+      expect(mutateSpy).toHaveBeenCalledOnce()
+      expect(mutateSpy).toHaveBeenCalledWith('c', expect.any(Function))
     })
 
     it('applies preHashCleanup before computing hash', async () => {

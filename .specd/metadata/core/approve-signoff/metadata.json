@@ -38,7 +38,7 @@
     {
       "requirement": "Persistence and return value",
       "rules": [
-        "After recording the signoff and transitioning state, the use case MUST persist the change via `ChangeRepository.save()` and return the updated `Change` entity."
+        "After computing artifact hashes, the use case MUST record the signoff and lifecycle transition through `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case records the signoff on that instance, transitions it to `signed-off`, and returns the updated change. This ensures the signoff event, artifact hashes, and lifecycle transition are persisted atomically with respect to other mutations of the same change.\n\n`ApproveSignoff.execute` returns the updated `Change` entity produced by that serialized mutation."
       ]
     },
     {
@@ -119,11 +119,12 @@
     },
     {
       "requirement": "Persistence and return value",
-      "name": "Change is saved and returned",
+      "name": "Change is saved and returned through serialized mutation",
       "given": ["a successful signoff"],
       "when": ["execute() returns"],
       "then": [
-        "ChangeRepository.save() has been called with the updated change",
+        "ChangeRepository.mutate(input.name, fn) has been called",
+        "AND the callback records the signoff and transitions the fresh persisted change to signed-off",
         "AND the returned Change has state signed-off"
       ]
     },
@@ -135,8 +136,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:4247c9d7ad3e2317352640621f157d0d22091628994a0a6f8c5614a54385058a",
-    "verify.md": "sha256:56080344c82ebcbdd47bd1b736d4f2db72d10fd6138afcdf952f33b5077db135"
+    "spec.md": "sha256:b7b3badf1a7cb82bd1f0409f87eac92e554a0de4b7541b55f263e7d1cbcd67ec",
+    "verify.md": "sha256:4ed226e8c1498516f5298178ceaab2db136a359fa7708d48c57fedd774586a27"
   },
   "generatedBy": "core"
 }

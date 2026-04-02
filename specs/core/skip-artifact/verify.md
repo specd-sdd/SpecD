@@ -43,9 +43,10 @@
 
 ### Requirement: Persistence and output
 
-#### Scenario: Change is persisted and returned
+#### Scenario: Change is persisted and returned through serialized mutation
 
 - **GIVEN** a successful skip operation
 - **WHEN** `execute` completes
-- **THEN** `ChangeRepository.save` is called with the updated change
+- **THEN** `ChangeRepository.mutate(input.name, fn)` is called with the target change name
+- **AND** the callback records the skip and marks the artifact skipped on the fresh persisted `Change`
 - **AND** the returned value is the `Change` entity

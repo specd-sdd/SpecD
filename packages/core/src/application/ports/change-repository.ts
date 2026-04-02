@@ -39,10 +39,32 @@ export abstract class ChangeRepository extends Repository {
    * validation. A hash mismatch indicates drift and resets the artifact
    * status to `in-progress`.
    *
+   * This is a snapshot read only. Callers that need a concurrency-safe
+   * read-modify-write section for an existing persisted change must use
+   * {@link mutate} instead of pairing `get()` with a later `save()`.
+   *
    * @param name - The change name (e.g. `"add-oauth-login"`)
    * @returns The change with current artifact state, or `null` if not found
    */
   abstract get(name: string): Promise<Change | null>
+
+  /**
+   * Runs a serialized persisted mutation for one existing change.
+   *
+   * The repository acquires exclusive mutation access for `name`, reloads the
+   * freshest persisted `Change`, invokes `fn(change)`, persists the updated
+   * manifest if `fn` succeeds, and then releases the exclusive access.
+   *
+   * This is the only concurrency-safe read-modify-write API for an existing
+   * change. Exclusive access is scoped per change name; unrelated change names
+   * may mutate concurrently.
+   *
+   * @param name - The change name to mutate
+   * @param fn - Callback that applies the mutation on the fresh persisted change
+   * @returns The callback result after the manifest has been persisted
+   * @throws {ChangeNotFoundError} If no change with the given name exists
+   */
+  abstract mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T>
 
   /**
    * Lists all active (non-drafted, non-discarded) changes, sorted by creation order.
@@ -76,6 +98,10 @@ export abstract class ChangeRepository extends Repository {
    * hashes, and approvals.
    *
    * Does not write artifact file content. Use `saveArtifact()` for that.
+   *
+   * This is a low-level manifest persistence primitive. Atomic writing prevents
+   * partial-file corruption, but `save()` alone does not serialize a caller's
+   * earlier snapshot read.
    *
    * @param change - The change whose manifest should be persisted
    */

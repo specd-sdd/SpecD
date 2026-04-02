@@ -1,7 +1,6 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
-import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { ArtifactNotFoundError } from '../errors/artifact-not-found-error.js'
 import { ArtifactNotOptionalError } from '../../domain/errors/artifact-not-optional-error.js'
 
@@ -46,24 +45,20 @@ export class SkipArtifact {
    * @throws {ArtifactNotOptionalError} If the artifact is not optional
    */
   async execute(input: SkipArtifactInput): Promise<Change> {
-    const change = await this._changes.get(input.name)
-    if (change === null) {
-      throw new ChangeNotFoundError(input.name)
-    }
-
-    const artifact = change.getArtifact(input.artifactId)
-    if (artifact === null) {
-      throw new ArtifactNotFoundError(input.artifactId, input.name)
-    }
-
-    if (!artifact.optional) {
-      throw new ArtifactNotOptionalError(input.artifactId)
-    }
-
     const actor = await this._actor.identity()
-    change.recordArtifactSkipped(input.artifactId, actor, input.reason)
-    artifact.markSkipped()
-    await this._changes.save(change)
-    return change
+    return this._changes.mutate(input.name, (change) => {
+      const artifact = change.getArtifact(input.artifactId)
+      if (artifact === null) {
+        throw new ArtifactNotFoundError(input.artifactId, input.name)
+      }
+
+      if (!artifact.optional) {
+        throw new ArtifactNotOptionalError(input.artifactId)
+      }
+
+      change.recordArtifactSkipped(input.artifactId, actor, input.reason)
+      artifact.markSkipped()
+      return change
+    })
   }
 }

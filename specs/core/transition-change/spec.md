@@ -112,7 +112,11 @@ If no workflow step exists for the source state, or the schema cannot be resolve
 
 ### Requirement: Persistence
 
-After a successful transition, the use case MUST persist the updated change via `ChangeRepository.save`.
+After routing, persisted-state checks, and successful pre-transition hooks, the use case MUST apply the final change-state mutation through `ChangeRepository.mutate(name, fn)` rather than persisting a previously loaded snapshot.
+
+Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`. The use case MUST apply any persisted-state-dependent transition mutations on that instance — including approval invalidation for redesign, artifact validation clearing for `verifying -> implementing`, and the lifecycle transition itself — before returning the updated change.
+
+When the callback resolves, the repository persists the updated change manifest. This ensures the final lifecycle mutation is serialized with other concurrent mutations of the same change.
 
 ### Requirement: Result type
 

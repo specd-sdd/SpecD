@@ -3,7 +3,6 @@ import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
-import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-error.js'
 import { computeArtifactHash, buildCleanupMap } from './_shared/compute-artifact-hash.js'
 
@@ -64,18 +63,13 @@ export class ApproveSignoff {
       throw new ApprovalGateDisabledError('signoff')
     }
 
-    const change = await this._changes.get(input.name)
-    if (change === null) {
-      throw new ChangeNotFoundError(input.name)
-    }
-
-    const artifactHashes = await this._computeArtifactHashes(change)
-
     const actor = await this._actor.identity()
-    change.recordSignoff(input.reason, artifactHashes, actor)
-    change.transition('signed-off', actor)
-    await this._changes.save(change)
-    return change
+    return this._changes.mutate(input.name, async (change) => {
+      const artifactHashes = await this._computeArtifactHashes(change)
+      change.recordSignoff(input.reason, artifactHashes, actor)
+      change.transition('signed-off', actor)
+      return change
+    })
   }
 
   /**

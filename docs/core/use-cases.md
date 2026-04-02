@@ -128,6 +128,8 @@ interface TransitionBlocker {
 
 Performs a lifecycle state transition on a change. Enforces approval-gate routing, workflow `requires`, task completion gating (via `requiresTaskCompletion`), and executes `run:` hooks at step boundaries.
 
+The final persisted lifecycle update is applied through `ChangeRepository.mutate(...)` so hook execution and routing stay outside the lock while the manifest mutation runs against fresh state.
+
 Smart routing applies at two points:
 
 - `ready → implementing` is redirected to `ready → pending-spec-approval` when `approvalsSpec` is `true`.
@@ -194,6 +196,8 @@ type TransitionProgressEvent =
 
 Edits the spec scope of an existing change by adding or removing spec IDs. Any modification to `specIds` triggers approval invalidation.
 
+The effective `specIds` update is persisted through `ChangeRepository.mutate(...)`; scaffold cleanup and creation remain outside that serialized manifest mutation.
+
 **Constructor:** `new EditChange(changes: ChangeRepository, specs: ReadonlyMap<string, SpecRepository>, actor: ActorResolver)`
 
 **Input:**
@@ -226,6 +230,8 @@ interface EditChangeResult {
 
 Shelves a change to `drafts/`, appending a `drafted` event. The change retains its full lifecycle state and can be restored at any time.
 
+Persistence is performed through `ChangeRepository.mutate(...)`, so the drafted event is recorded against the latest persisted change state.
+
 **Constructor:** `new DraftChange(changes: ChangeRepository, actor: ActorResolver)`
 
 **Input:**
@@ -249,6 +255,8 @@ Shelves a change to `drafts/`, appending a `drafted` event. The change retains i
 
 Recovers a drafted change back to `changes/`, appending a `restored` event.
 
+Persistence is performed through `ChangeRepository.mutate(...)`, so restoration always runs against fresh persisted state.
+
 **Constructor:** `new RestoreChange(changes: ChangeRepository, actor: ActorResolver)`
 
 **Input:**
@@ -270,6 +278,8 @@ Recovers a drafted change back to `changes/`, appending a `restored` event.
 ### DiscardChange
 
 Permanently abandons a change, appending a `discarded` event and moving the directory to `discarded/`. This operation cannot be undone.
+
+Persistence is performed through `ChangeRepository.mutate(...)`, which serializes the manifest update before the repository relocates the change directory.
 
 **Constructor:** `new DiscardChange(changes: ChangeRepository, actor: ActorResolver)`
 
@@ -294,6 +304,8 @@ Permanently abandons a change, appending a `discarded` event and moving the dire
 ### SkipArtifact
 
 Explicitly marks an optional artifact as skipped on a change. Only optional artifacts can be skipped.
+
+The skip event and updated artifact status are persisted through `ChangeRepository.mutate(...)`.
 
 **Constructor:** `new SkipArtifact(changes: ChangeRepository, actor: ActorResolver)`
 
@@ -395,6 +407,8 @@ Retrieves a single archived change by name.
 
 Records a spec approval and transitions the change to `spec-approved`. Requires the spec approval gate to be enabled. Artifact hashes are computed internally from the change's artifacts on disk, applying schema-defined pre-hash cleanup rules.
 
+Once prerequisites are ready, the approval event and state transition are persisted through `ChangeRepository.mutate(...)` on fresh change state.
+
 **Constructor:** `new ApproveSpec(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, hasher: ContentHasher)`
 
 **Input:**
@@ -420,6 +434,8 @@ Records a spec approval and transitions the change to `spec-approved`. Requires 
 ### ApproveSignoff
 
 Records a sign-off and transitions the change to `signed-off`. Requires the signoff gate to be enabled. Artifact hashes are computed internally.
+
+Once prerequisites are ready, the sign-off event and state transition are persisted through `ChangeRepository.mutate(...)` on fresh change state.
 
 **Constructor:** `new ApproveSignoff(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, hasher: ContentHasher)`
 
@@ -448,6 +464,8 @@ Records a sign-off and transitions the change to `signed-off`. Requires the sign
 ### ArchiveChange
 
 Finalises a completed change: runs pre-archive hooks, merges delta artifacts into the project specs, moves the change to the archive, runs post-archive hooks, and regenerates spec metadata. The change must be in `archivable` state.
+
+Only the initial persisted move into `archiving` is serialized through `ChangeRepository.mutate(...)`; overlap checks, hooks, spec sync, archive storage, and metadata generation remain outside that critical section.
 
 This use case is the most port-intensive — it composes `RunStepHooks`, `GenerateSpecMetadata`, and `SaveSpecMetadata` alongside five direct ports.
 
@@ -504,6 +522,8 @@ interface ArchiveChangeResult {
 Validates a change's artifact files against the active schema and marks them complete. This is the only path through which an artifact can reach `'complete'` status.
 
 Also enforces approval invalidation: if any artifact's content has changed since an approval was recorded, an `invalidated` event is appended.
+
+Validation and file reads happen outside the lock; the final persisted invalidation, `markComplete(...)`, and `setSpecDependsOn(...)` updates are applied through `ChangeRepository.mutate(...)` on a fresh reload.
 
 **Constructor:**
 
@@ -759,6 +779,8 @@ interface SpecContextEntry {
 ### UpdateSpecDeps
 
 Updates the declared `dependsOn` dependencies for a single spec within a change. Dependencies are stored in `change.specDependsOn` and used by `CompileContext` as the highest-priority source for `dependsOn` resolution.
+
+After input validation, the persisted `specDependsOn` update is applied through `ChangeRepository.mutate(...)`.
 
 **Constructor:** `new UpdateSpecDeps(changes: ChangeRepository)`
 

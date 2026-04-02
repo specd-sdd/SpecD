@@ -54,6 +54,10 @@ export interface FsChangeRepositoryOptions {
  * @param context - Domain context shared across all adapter types
  * @param options - Filesystem adapter options
  * @returns A fully constructed `ChangeRepository` bound to the given workspace
+ *
+ * `FsChangeRepository` derives any internal lock paths for `mutate()` from the
+ * storage paths it already receives here, so this factory signature does not
+ * widen when serialized mutation support is added.
  */
 export function createChangeRepository(
   type: 'fs',

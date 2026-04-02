@@ -118,6 +118,28 @@ describe('ApproveSignoff', () => {
 
       expect(repo.store.get('my-change')?.state).toBe('signed-off')
     })
+
+    it('persists through ChangeRepository.mutate', async () => {
+      const change = makePendingSignoffChange('my-change')
+      const repo = makeChangeRepository([change])
+      vi.spyOn(repo, 'artifact').mockResolvedValue(null)
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = new ApproveSignoff(
+        repo,
+        makeActorResolver(),
+        makeSchemaProvider(makeSchema()),
+        makeContentHasher(),
+      )
+
+      await uc.execute({
+        name: 'my-change',
+        reason: 'ok',
+        ...defaultInput,
+      })
+
+      expect(mutateSpy).toHaveBeenCalledOnce()
+      expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
+    })
   })
 
   describe('given the signoff gate is disabled', () => {

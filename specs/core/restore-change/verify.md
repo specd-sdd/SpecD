@@ -31,7 +31,9 @@
 
 ### Requirement: Persistence
 
-#### Scenario: Change is saved to repository
+#### Scenario: Change is persisted through serialized mutation
 
 - **WHEN** `RestoreChange.execute` completes successfully
-- **THEN** `ChangeRepository.save` was called with the updated `Change` instance
+- **THEN** `ChangeRepository.mutate(input.name, fn)` is called
+- **AND** the callback records the restored event on the fresh persisted `Change`
+- **AND** the resulting change is relocated back to the active changes area by the repository

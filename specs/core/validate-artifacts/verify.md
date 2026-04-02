@@ -232,8 +232,16 @@
 
 ### Requirement: Save after validation
 
-#### Scenario: Save called even when some artifacts fail
+#### Scenario: Partial progress is persisted through serialized mutation
 
-- **GIVEN** one artifact passes validation (markComplete called) and one fails
+- **GIVEN** one artifact passes validation (`markComplete` is called) and one artifact fails
 - **WHEN** `ValidateArtifacts.execute` completes
-- **THEN** `changeRepository.save(change)` is called — partial progress is persisted
+- **THEN** `ChangeRepository.mutate(input.name, fn)` is used to persist the updated change
+- **AND** the persisted manifest keeps the successful `validatedHash` updates together with the failure result
+
+#### Scenario: Validation side effects run against the fresh persisted change
+
+- **GIVEN** another operation updates the same change before validation persistence begins
+- **WHEN** `ValidateArtifacts.execute` enters its persistence step
+- **THEN** the mutation callback receives a freshly reloaded `Change`
+- **AND** validation updates are applied on top of that fresh state instead of overwriting it with an older snapshot

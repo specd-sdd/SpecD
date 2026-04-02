@@ -99,7 +99,7 @@
     {
       "requirement": "Persistence",
       "rules": [
-        "After a successful transition, the use case MUST persist the updated change via `ChangeRepository.save`."
+        "After routing, persisted-state checks, and successful pre-transition hooks, the use case MUST apply the final change-state mutation through `ChangeRepository.mutate(name, fn)` rather than persisting a previously loaded snapshot.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`. The use case MUST apply any persisted-state-dependent transition mutations on that instance — including approval invalidation for redesign, artifact validation clearing for `verifying -> implementing`, and the lifecycle transition itself — before returning the updated change.\n\nWhen the callback resolves, the repository persists the updated change manifest. This ensures the final lifecycle mutation is serialized with other concurrent mutations of the same change."
       ]
     },
     {
@@ -427,14 +427,17 @@
     },
     {
       "requirement": "Persistence",
-      "name": "Change is saved after successful transition",
+      "name": "Change is saved after successful transition through serialized mutation",
       "when": ["TransitionChange.execute completes successfully"],
-      "then": ["ChangeRepository.save was called with the updated Change instance"]
+      "then": [
+        "ChangeRepository.mutate(input.name, fn) was called for the final persisted mutation",
+        "AND the callback applied any redesign invalidation, validation clearing, and lifecycle transition on the fresh persisted Change"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:217f268ee2b3f5d6fad3d093aa4846b2ee03afe679d3cb7fd059f89121fe5b54",
-    "verify.md": "sha256:5eba8b94e28dbb3ae47e0199594bcbbbd8bf310f0e41a1f7d3e294d11bacb00f"
+    "spec.md": "sha256:40899b6b9bb72759f39033bdf582730d57fa2c564f6bb9ffc4b002e605bd81dc",
+    "verify.md": "sha256:4ccba3b6819ba82cd22cf2461ae1ab7da9a15c635680cc83c4e3c4bd2aa68e9a"
   },
   "generatedBy": "core"
 }

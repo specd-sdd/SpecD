@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { DiscardChange } from '../../../src/application/use-cases/discard-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { makeChangeRepository, makeActorResolver, makeChange } from './helpers.js'
@@ -56,6 +56,18 @@ describe('DiscardChange', () => {
 
       const saved = repo.store.get('my-change')
       expect(saved?.history.some((e) => e.type === 'discarded')).toBe(true)
+    })
+
+    it('persists through ChangeRepository.mutate', async () => {
+      const change = makeChange('my-change')
+      const repo = makeChangeRepository([change])
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = new DiscardChange(repo, makeActorResolver())
+
+      await uc.execute({ name: 'my-change', reason: 'no longer needed' })
+
+      expect(mutateSpy).toHaveBeenCalledOnce()
+      expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
     })
   })
 

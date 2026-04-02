@@ -65,7 +65,7 @@
 - **GIVEN** a change with `specIds: ['auth/login']`
 - **WHEN** `execute` is called with `addSpecIds: ['billing/invoices']`
 - **THEN** `change.updateSpecIds` is called with the new spec list and the resolved actor
-- **AND** the change is persisted via `ChangeRepository.save`
+- **AND** the change is persisted via `ChangeRepository.mutate(input.name, fn)`
 - **AND** `invalidated` is `true`
 
 #### Scenario: Removing a spec triggers invalidation
@@ -73,8 +73,15 @@
 - **GIVEN** a change with `specIds: ['auth/login', 'billing/invoices']`
 - **WHEN** `execute` is called with `removeSpecIds: ['billing/invoices']`
 - **THEN** `change.updateSpecIds` is called with `['auth/login']` and the resolved actor
-- **AND** the change is persisted
+- **AND** the change is persisted through the repository mutation callback
 - **AND** `invalidated` is `true`
+
+#### Scenario: Effective change is applied on the freshest persisted spec list
+
+- **GIVEN** another operation updates the same change before the edit persistence step starts
+- **WHEN** `EditChange.execute` performs its effective update
+- **THEN** the mutation callback receives the freshest persisted `specIds`
+- **AND** the edit is applied on top of that state instead of overwriting it with an older snapshot
 
 ### Requirement: Directory cleanup on removal
 

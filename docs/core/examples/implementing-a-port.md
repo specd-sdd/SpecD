@@ -36,6 +36,17 @@ export class InMemoryChangeRepository extends ChangeRepository {
     return this._changes.get(name) ?? null
   }
 
+  async mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T> {
+    const change = this._changes.get(name)
+    if (change === undefined) {
+      throw new Error(`Change not found: ${name}`)
+    }
+
+    const result = await fn(change)
+    this._changes.set(change.name, change)
+    return result
+  }
+
   async list(): Promise<Change[]> {
     return [...this._changes.values()].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
   }
@@ -111,7 +122,7 @@ export class InMemoryChangeRepository extends ChangeRepository {
 
 **Conflict detection is the repository's responsibility.** `ArtifactConflictError` is thrown by the repository when it detects a concurrent write. The use case does not do this check — only the repository has access to both the on-disk state and the `originalHash`.
 
-**`save` vs `saveArtifact` are independent.** `save` persists the manifest (lifecycle state, artifact hashes, approvals). `saveArtifact` persists artifact file content. Use cases call them separately. Your repository must handle both independently.
+**`get` vs `mutate` vs `save` vs `saveArtifact` each have a different job.** `get` is a snapshot read. `mutate` is the concurrency-safe read-modify-write path for an existing persisted change. `save` is the low-level manifest write used for initial persistence or when the repository already has exclusive access. `saveArtifact` persists artifact file content. Your repository must keep those responsibilities distinct.
 
 ---
 

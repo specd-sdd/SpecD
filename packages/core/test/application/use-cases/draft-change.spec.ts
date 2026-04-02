@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { DraftChange } from '../../../src/application/use-cases/draft-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { makeChangeRepository, makeActorResolver, makeChange } from './helpers.js'
@@ -47,6 +47,18 @@ describe('DraftChange', () => {
       await uc.execute({ name: 'my-change' })
 
       expect(repo.store.get('my-change')?.isDrafted).toBe(true)
+    })
+
+    it('persists through ChangeRepository.mutate', async () => {
+      const change = makeChange('my-change')
+      const repo = makeChangeRepository([change])
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = new DraftChange(repo, makeActorResolver())
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(mutateSpy).toHaveBeenCalledOnce()
+      expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
     })
   })
 

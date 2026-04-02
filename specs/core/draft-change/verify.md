@@ -35,7 +35,9 @@
 
 ### Requirement: Persistence
 
-#### Scenario: Change is saved to repository
+#### Scenario: Change is persisted through serialized mutation
 
 - **WHEN** `DraftChange.execute` completes successfully
-- **THEN** `ChangeRepository.save` was called with the updated `Change` instance
+- **THEN** `ChangeRepository.mutate(input.name, fn)` is called
+- **AND** the callback records the drafted event on the fresh persisted `Change`
+- **AND** the resulting change is relocated to the drafts area by the repository

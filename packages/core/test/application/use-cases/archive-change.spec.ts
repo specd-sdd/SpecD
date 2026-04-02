@@ -1842,16 +1842,17 @@ describe('ArchiveChange', () => {
   describe('archiving state transition', () => {
     it('transitions change to archiving before pre-hooks execute', async () => {
       const change = makeArchivableChange('my-change')
+      const repo = makeChangeRepository([change])
       let stateAtHookTime: string | undefined
       const hookSpy = makeRunStepHooks({
         execute: async (_input: RunStepHooksInput): Promise<RunStepHooksResult> => {
-          stateAtHookTime = change.state
+          stateAtHookTime = repo.store.get('my-change')?.state
           return { hooks: [], success: true, failedHook: null }
         },
       })
 
       const uc = new ArchiveChange(
-        makeChangeRepository([change]),
+        repo,
         new Map(),
         makeArchiveRepository(),
         hookSpy,
@@ -1864,6 +1865,29 @@ describe('ArchiveChange', () => {
 
       await uc.execute({ name: 'my-change' })
       expect(stateAtHookTime).toBe('archiving')
+    })
+
+    it('persists the initial archiving transition through ChangeRepository.mutate', async () => {
+      const change = makeArchivableChange('my-change')
+      const repo = makeChangeRepository([change])
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+
+      const uc = new ArchiveChange(
+        repo,
+        new Map(),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeGenerateMetadata(),
+        makeSaveMetadata(),
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(mutateSpy).toHaveBeenCalledOnce()
+      expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
     })
   })
 

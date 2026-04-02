@@ -68,7 +68,7 @@
     {
       "requirement": "Persistence and output",
       "rules": [
-        "After computing the new dependency list, the use case MUST:\n\n1. Call `change.setSpecDependsOn(specId, result)` to update the change entity\n2. Persist the change via `ChangeRepository.save`\n3. Return an `UpdateSpecDepsResult` containing `specId` and the resulting `dependsOn` array"
+        "After computing the new dependency list, the use case MUST update and persist the change through `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.setSpecDependsOn(specId, result)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest.\n\n`UpdateSpecDeps.execute` then returns an `UpdateSpecDepsResult` containing `specId` and the resulting `dependsOn` array."
       ]
     }
   ],
@@ -148,12 +148,12 @@
     },
     {
       "requirement": "Persistence and output",
-      "name": "Change is persisted and result returned",
+      "name": "Change is persisted and result returned through serialized mutation",
       "given": ["a successful update operation"],
       "when": ["execute completes"],
       "then": [
         "change.setSpecDependsOn is called with the spec ID and computed dependency list",
-        "AND ChangeRepository.save is called",
+        "AND ChangeRepository.mutate(input.name, fn) is called",
         "AND the returned UpdateSpecDepsResult contains both specId and dependsOn"
       ]
     },
@@ -166,8 +166,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e7f7b22005291b9dde2d9e21febb3d72d399803344f51d4321d6ef44eedf98f2",
-    "verify.md": "sha256:63bdd375e985f436928bd5eacfaa2fabc028319be4fb5087795e069fbd8e0310"
+    "spec.md": "sha256:b010d2691f57b06c40a60068f5efb993149afedabce5ff95fe9f4302e7004181",
+    "verify.md": "sha256:15bbba08c660285c413d097a255aa7ac304fd023d923639a95716a23a66f2b7e"
   },
   "generatedBy": "core"
 }

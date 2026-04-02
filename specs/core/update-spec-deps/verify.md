@@ -76,12 +76,12 @@
 
 ### Requirement: Persistence and output
 
-#### Scenario: Change is persisted and result returned
+#### Scenario: Change is persisted and result returned through serialized mutation
 
 - **GIVEN** a successful update operation
 - **WHEN** `execute` completes
 - **THEN** `change.setSpecDependsOn` is called with the spec ID and computed dependency list
-- **AND** `ChangeRepository.save` is called
+- **AND** `ChangeRepository.mutate(input.name, fn)` is called
 - **AND** the returned `UpdateSpecDepsResult` contains both `specId` and `dependsOn`
 
 #### Scenario: Dependencies with no prior state

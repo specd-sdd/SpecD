@@ -241,7 +241,8 @@
 
 ### Requirement: Persistence
 
-#### Scenario: Change is saved after successful transition
+#### Scenario: Change is saved after successful transition through serialized mutation
 
 - **WHEN** `TransitionChange.execute` completes successfully
-- **THEN** `ChangeRepository.save` was called with the updated `Change` instance
+- **THEN** `ChangeRepository.mutate(input.name, fn)` was called for the final persisted mutation
+- **AND** the callback applied any redesign invalidation, validation clearing, and lifecycle transition on the fresh persisted `Change`

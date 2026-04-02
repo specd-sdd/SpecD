@@ -70,7 +70,10 @@ describe('EditChange', () => {
       await uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay'] })
 
       expect(unscaffoldSpy).toHaveBeenCalledOnce()
-      expect(unscaffoldSpy).toHaveBeenCalledWith(change, ['billing/pay'])
+      expect(unscaffoldSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'my-change', specIds: ['auth/login'] }),
+        ['billing/pay'],
+      )
     })
 
     it('calls unscaffold with all removed spec IDs when removing multiple', async () => {
@@ -84,7 +87,10 @@ describe('EditChange', () => {
       await uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay', 'core/config'] })
 
       expect(unscaffoldSpy).toHaveBeenCalledOnce()
-      expect(unscaffoldSpy).toHaveBeenCalledWith(change, ['billing/pay', 'core/config'])
+      expect(unscaffoldSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'my-change', specIds: ['auth/login'] }),
+        ['billing/pay', 'core/config'],
+      )
     })
   })
 
@@ -124,6 +130,18 @@ describe('EditChange', () => {
       const saved = repo.store.get('my-change')
       expect(saved).toBeDefined()
       expect(saved!.specIds).toContain('billing/pay')
+    })
+
+    it('persists the specIds update through ChangeRepository.mutate', async () => {
+      const change = makeChange('my-change', { specIds: ['auth/login'] })
+      const repo = makeChangeRepository([change])
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = new EditChange(repo, new Map(), makeActorResolver())
+
+      await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
+
+      expect(mutateSpy).toHaveBeenCalledOnce()
+      expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
     })
   })
 

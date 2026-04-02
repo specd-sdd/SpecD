@@ -15,7 +15,7 @@
     {
       "requirement": "Change lookup",
       "rules": [
-        "The use case MUST load the change by `name` via `ChangeRepository.get`. If no change with the given name exists, it MUST throw `ChangeNotFoundError`."
+        "The use case MUST throw `ChangeNotFoundError` when no change with the given name exists.\n\nSnapshot reads via `ChangeRepository.get(name)` MAY be used for read-only early returns, but any effective update to an existing persisted change's `specIds` MUST be performed through `ChangeRepository.mutate(name, fn)` so the mutation runs against fresh persisted state."
       ]
     },
     {
@@ -50,7 +50,9 @@
     },
     {
       "requirement": "Approval invalidation on effective change",
-      "rules": ["### Requirement: Approval invalidation on effective change"]
+      "rules": [
+        "When the resulting `specIds` differ from the current set, the use case MUST resolve the current actor identity, then update the change inside `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the use case MUST call `change.updateSpecIds(specIds, actor)` on the fresh persisted `Change`. This is the operation that invalidates active approvals and appends the corresponding history events for a spec-scope change.\n\nThe repository MUST persist the updated change before `EditChange.execute` returns an `invalidated: true` result."
+      ]
     },
     {
       "requirement": "Directory cleanup on removal",
@@ -147,7 +149,7 @@
       "when": ["execute is called with addSpecIds: ['billing/invoices']"],
       "then": [
         "change.updateSpecIds is called with the new spec list and the resolved actor",
-        "AND the change is persisted via ChangeRepository.save",
+        "AND the change is persisted via ChangeRepository.mutate(input.name, fn)",
         "AND invalidated is true"
       ]
     },
@@ -158,8 +160,20 @@
       "when": ["execute is called with removeSpecIds: ['billing/invoices']"],
       "then": [
         "change.updateSpecIds is called with ['auth/login'] and the resolved actor",
-        "AND the change is persisted",
+        "AND the change is persisted through the repository mutation callback",
         "AND invalidated is true"
+      ]
+    },
+    {
+      "requirement": "Approval invalidation on effective change",
+      "name": "Effective change is applied on the freshest persisted spec list",
+      "given": [
+        "another operation updates the same change before the edit persistence step starts"
+      ],
+      "when": ["EditChange.execute performs its effective update"],
+      "then": [
+        "the mutation callback receives the freshest persisted specIds",
+        "AND the edit is applied on top of that state instead of overwriting it with an older snapshot"
       ]
     },
     {
@@ -198,8 +212,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:21b51c580fe176040fccf3850dafd2824272d8efbc76d81e1d684d9af70cda1e",
-    "verify.md": "sha256:dc567acef5dd4a47598e73e8e4592f910da0410ed27ff11b07415f0769f9699f"
+    "spec.md": "sha256:1d5fdb6e08ce2e2f5b9fa929ed409f18fde80c6075a6fa22c40afe14eca86002",
+    "verify.md": "sha256:7f65213521d276eb7fb94f6f2e52615f95534c56d9139e15d0d14cfdf5505035"
   },
   "generatedBy": "core"
 }

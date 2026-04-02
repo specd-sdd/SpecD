@@ -141,7 +141,11 @@ Each `ValidationFailure` must include the artifact ID, the rule or error descrip
 
 ### Requirement: Save after validation
 
-After all artifacts have been evaluated, `ValidateArtifacts` must call `changeRepository.save(change)` to persist any `markComplete` calls (updated `validatedHash` values) and any invalidation events appended to history. The save must happen even if some artifacts failed — partial progress must be persisted.
+After all artifacts have been evaluated, `ValidateArtifacts` MUST persist any `markComplete` calls (updated `validatedHash` values), invalidation events appended to history, and `setSpecDependsOn` updates through `ChangeRepository.mutate(name, fn)` rather than through an unsynchronized `get() -> save()` sequence.
+
+The mutation callback MUST operate on the fresh persisted `Change` instance provided by `mutate()`. All change-state mutations performed by validation — including approval invalidation, artifact completion, and dependency extraction side effects — MUST happen against that fresh instance before the repository persists it.
+
+The mutation MUST still persist partial progress when some artifacts fail. Validation returns a result object rather than rolling back successful `markComplete` updates for other artifacts.
 
 ## Constraints
 

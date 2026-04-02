@@ -12,7 +12,7 @@ Sometimes a change becomes obsolete or is superseded, and the team needs a way t
 
 - `name` (string, required) — the change to permanently discard
 - `reason` (string, required) — mandatory explanation for discarding
-- `supersededBy` (string[], optional) — names of changes that supersede this one
+- `supersededBy` (string\[], optional) — names of changes that supersede this one
 
 ### Requirement: Change must exist
 
@@ -34,7 +34,11 @@ The use case MUST call `change.discard(reason, actor, supersededBy)` to append a
 
 ### Requirement: Persistence
 
-After appending the discarded event, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` instance. The repository implementation is responsible for relocating the change directory to `discarded/`.
+After appending the discarded event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.
+
+Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.discard(reason, actor, supersededBy)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs any required directory relocation to `discarded/`.
+
+`DiscardChange.execute` returns the updated `Change` instance produced by that serialized mutation.
 
 ### Requirement: Dependencies
 
