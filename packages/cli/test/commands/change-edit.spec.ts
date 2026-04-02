@@ -223,7 +223,9 @@ describe('change edit', () => {
         {
           name: 'default',
           specsPath: '/project/specs',
+          specsAdapter: { adapter: 'fs', config: { path: '/project/specs' } },
           schemasPath: null,
+          schemasAdapter: null,
           codeRoot: '/project',
           ownership: 'owned' as const,
           isExternal: false,
@@ -231,7 +233,9 @@ describe('change edit', () => {
         {
           name: 'platform',
           specsPath: '/external/platform/specs',
+          specsAdapter: { adapter: 'fs', config: { path: '/external/platform/specs' } },
           schemasPath: null,
+          schemasAdapter: null,
           codeRoot: '/external/platform',
           ownership: 'readOnly' as const,
           isExternal: true,

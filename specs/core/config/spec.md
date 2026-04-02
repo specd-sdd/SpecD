@@ -207,6 +207,12 @@ All four sub-keys (`changes`, `drafts`, `discarded`, `archive`) are required. `a
 
 **`archive` index** — the archive directory contains a `.specd-index.jsonl` file that caches metadata from individual manifests for fast listing. This file is a **derived cache**, not a source of truth — the manifests inside each archived change directory are authoritative. `specd init` gitignores `.specd-index.jsonl` inside the archive directory (via a local `.gitignore`), so the index is never committed. When the index is missing (e.g. after a fresh clone) or stale (e.g. after pulling new archives from other developers), it is automatically rebuilt from the manifest files on disk. Staleness is detected by comparing manifest paths on disk against paths recorded in the index.
 
+### Requirement: Named storage adapters
+
+Workspace storage configuration SHALL support named storage adapter selection rather than assuming only the built-in filesystem composition path.
+
+When a workspace selects a named storage adapter, any adapter-specific config block for that adapter SHALL be passed through as adapter-owned configuration. Referencing an adapter name that is not present in the merged built-in plus external storage registries MUST fail with a clear error.
+
 ### Requirement: Graph config path
 
 `specd.yaml` MAY declare a top-level `configPath` field for derived graph persistence and temporary graph artifacts.

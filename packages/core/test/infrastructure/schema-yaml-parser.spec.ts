@@ -207,6 +207,35 @@ workflow:
     const data = parseSchemaYaml('#test', yaml)
     expect(data.workflow![0]!.hooks.pre[0]!.id).toBe('review-specs')
   })
+
+  it('accepts explicit external hook entries with nested config', () => {
+    const yaml = `
+kind: schema
+name: test
+version: 1
+artifacts:
+  - id: spec
+    scope: spec
+    output: spec.md
+workflow:
+  - step: designing
+    hooks:
+      pre:
+        - id: docker-test
+          external:
+            type: docker
+            config:
+              image: node:20
+              command: pnpm test
+`
+    const data = parseSchemaYaml('#test', yaml)
+    expect(data.workflow![0]!.hooks.pre[0]).toEqual({
+      id: 'docker-test',
+      type: 'external',
+      externalType: 'docker',
+      config: { image: 'node:20', command: 'pnpm test' },
+    })
+  })
 })
 
 describe('parseSchemaYaml — id on preHashCleanup', () => {

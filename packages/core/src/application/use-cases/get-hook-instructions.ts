@@ -116,7 +116,7 @@ export class GetHookInstructions {
     if (input.only !== undefined) {
       const match = instrHooks.find((h) => h.id === input.only)
       if (match === undefined) {
-        const runMatch = schemaHooks.find((h) => h.id === input.only && h.type === 'run')
+        const runMatch = schemaHooks.find((h) => h.id === input.only)
         if (runMatch !== undefined) {
           throw new HookNotFoundError(input.only, 'wrong-type')
         }

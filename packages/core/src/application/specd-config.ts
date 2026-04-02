@@ -24,6 +24,20 @@ export interface SpecdWorkspaceGraphConfig {
   readonly excludePaths?: readonly string[]
 }
 
+/**
+ * Named adapter binding preserved from `specd.yaml`.
+ *
+ * `config` is adapter-owned opaque data. The built-in `fs` loader continues to
+ * resolve absolute paths onto the legacy `*Path` fields for compatibility, but
+ * the kernel uses these bindings to select the concrete factory implementation.
+ */
+export interface SpecdAdapterBinding {
+  /** Registered adapter name, e.g. `"fs"`. */
+  readonly adapter: string
+  /** Adapter-owned configuration payload preserved from YAML. */
+  readonly config: Record<string, unknown>
+}
+
 /** Per-workspace configuration resolved from `specd.yaml`. */
 export interface SpecdWorkspaceConfig {
   /** The workspace name (e.g. `'default'`, `'billing'`). */
@@ -37,6 +51,8 @@ export interface SpecdWorkspaceConfig {
   readonly prefix?: string
   /** Absolute path to the specs root for this workspace. */
   readonly specsPath: string
+  /** Named adapter binding for the workspace specs repository. */
+  readonly specsAdapter: SpecdAdapterBinding
   /**
    * Absolute path to the schemas directory for this workspace.
    *
@@ -45,6 +61,8 @@ export interface SpecdWorkspaceConfig {
    * `SchemaNotFoundError`).
    */
   readonly schemasPath: string | null
+  /** Named adapter binding for the workspace schema repository. */
+  readonly schemasAdapter: SpecdAdapterBinding | null
   /** Absolute path to the implementation code root for this workspace. */
   readonly codeRoot: string
   /** Ownership relationship this project has with this workspace's specs. */
@@ -76,12 +94,20 @@ export interface SpecdWorkspaceConfig {
 export interface SpecdStorageConfig {
   /** Absolute path to the `changes/` directory. */
   readonly changesPath: string
+  /** Named adapter binding for the active changes repository. */
+  readonly changesAdapter: SpecdAdapterBinding
   /** Absolute path to the `drafts/` directory. */
   readonly draftsPath: string
+  /** Named adapter binding for the shelved drafts repository. */
+  readonly draftsAdapter: SpecdAdapterBinding
   /** Absolute path to the `discarded/` directory. */
   readonly discardedPath: string
+  /** Named adapter binding for the discarded changes repository. */
+  readonly discardedAdapter: SpecdAdapterBinding
   /** Absolute path to the archive root directory. */
   readonly archivePath: string
+  /** Named adapter binding for the archive repository. */
+  readonly archiveAdapter: SpecdAdapterBinding
   /**
    * Optional pattern controlling the archive directory structure.
    *

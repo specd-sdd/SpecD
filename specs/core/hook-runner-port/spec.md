@@ -47,6 +47,12 @@ The `HookVariables` type MUST contain:
 
 The port executes only `run:` hooks (deterministic shell commands). `instruction:` hooks are not executed by this port — they are injected as text into the agent context by a different mechanism. The port SHALL NOT handle or interpret `instruction:` hook types.
 
+### Requirement: HookRunner is shell-only
+
+`HookRunner` SHALL remain the internal shell runner for built-in `run:` hooks only. It MUST NOT become the contract for externally dispatched hook backends.
+
+External hooks use a separate runner abstraction with its own dispatch rules and accepted-type declaration.
+
 ### Requirement: Lifecycle execution guarantees
 
 The port itself does not enforce lifecycle semantics, but callers rely on the following guarantees:

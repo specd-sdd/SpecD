@@ -24,6 +24,12 @@
       ]
     },
     {
+      "requirement": "ArtifactParserRegistry is additively extensible",
+      "rules": [
+        "`ArtifactParserRegistry` SHALL support additive extension through kernel composition. Built-in parsers remain available, and external parser registrations extend the registry by format name.\n\nReferencing a parser format that is not present in the merged registry MUST fail with a clear error."
+      ]
+    },
+    {
       "requirement": "Parse contract",
       "rules": [
         "The `parse` method MUST accept a `content: string` parameter and return an `ArtifactAST` containing a single `root` node. The AST MUST be a normalised, format-independent tree structure."
@@ -114,6 +120,26 @@
       "given": ["an ArtifactParserRegistry instance"],
       "when": ["queried with \"markdown\", \"json\", \"yaml\", or \"plaintext\""],
       "then": ["each key returns the corresponding ArtifactParser adapter"]
+    },
+    {
+      "requirement": "ArtifactParserRegistry is additively extensible",
+      "name": "External parser registration preserves built-ins",
+      "given": [
+        "built-in parsers for markdown, yaml, json, and plaintext",
+        "AND an external parser is registered for toml"
+      ],
+      "when": ["the parser registry is exposed from the kernel"],
+      "then": [
+        "toml is available alongside the built-ins",
+        "AND existing built-in format lookups continue to work unchanged"
+      ]
+    },
+    {
+      "requirement": "ArtifactParserRegistry is additively extensible",
+      "name": "Unknown parser format fails clearly",
+      "given": ["no built-in or external parser is registered for graphql"],
+      "when": ["a caller requests the parser for graphql"],
+      "then": ["the operation fails with a clear unknown-format error"]
     },
     {
       "requirement": "Parse contract",
@@ -250,8 +276,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:30a115804362dab7c6846da0bef357bb4972a99b8288fc16599dbf58c5646824",
-    "verify.md": "sha256:8e1395d3f5448c9e0cfe3a64aee100f8ce5c9204ee1cd0b5db842e8120797f31"
+    "spec.md": "sha256:a27cf3ca5aacdc7d5e9043d9d0b3b446ff394ac20682510c6f1780b6a56c87c4",
+    "verify.md": "sha256:ea39277bf69e7cbf5e6084d6cfa1e3a8c93d5851229687d8fb90290396c42ad2"
   },
   "generatedBy": "core"
 }

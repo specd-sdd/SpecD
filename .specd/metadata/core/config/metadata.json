@@ -50,6 +50,12 @@
       ]
     },
     {
+      "requirement": "Named storage adapters",
+      "rules": [
+        "Workspace storage configuration SHALL support named storage adapter selection rather than assuming only the built-in filesystem composition path.\n\nWhen a workspace selects a named storage adapter, any adapter-specific config block for that adapter SHALL be passed through as adapter-owned configuration. Referencing an adapter name that is not present in the merged built-in plus external storage registries MUST fail with a clear error."
+      ]
+    },
+    {
       "requirement": "Graph config path",
       "rules": [
         "`specd.yaml` MAY declare a top-level `configPath` field for derived graph persistence and temporary graph artifacts.\n\n```yaml\nconfigPath: .specd/config\n```\n\nWhen omitted, `configPath` defaults to `.specd/config` relative to the directory containing `specd.yaml`.\n\n`configPath` is project-level only. It MUST resolve inside the project repo root and is used for tool-owned graph artifacts rather than authored project content.\n\nThe following derived directories are defined from it:\n\n- **`{configPath}/graph`** — graph persistence root used by code-graph backends\n- **`{configPath}/tmp`** — temporary scratch directory for graph/indexing artifacts\n\n`configPath` does not replace the `storage` section for changes, drafts, discarded changes, or archives. Those remain governed by `storage.*`."
@@ -406,6 +412,29 @@
       "name": "Unknown adapter",
       "when": ["storage.changes.adapter is set to an unrecognised value (e.g. \"s3\")"],
       "then": ["specd exits with a validation error listing supported adapters"]
+    },
+    {
+      "requirement": "Named storage adapters",
+      "name": "Workspace selects a registered named adapter",
+      "given": [
+        "a workspace storage config sets adapter: git",
+        "AND the merged storage registry contains a git storage factory"
+      ],
+      "when": ["the config is loaded and prepared for kernel composition"],
+      "then": [
+        "the selected adapter name is preserved as git",
+        "AND the adapter-specific git: block is passed through as adapter-owned configuration"
+      ]
+    },
+    {
+      "requirement": "Named storage adapters",
+      "name": "Workspace selects an unknown adapter",
+      "given": [
+        "a workspace storage config sets adapter: custom-remote",
+        "AND no built-in or external storage registration provides custom-remote"
+      ],
+      "when": ["config validation or kernel composition resolves the workspace storage"],
+      "then": ["specd fails with a clear unknown-adapter error"]
     },
     {
       "requirement": "Graph config path",
@@ -850,8 +879,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:f754e52dac73245c685b58199ccd87adc47e88fed45820cef647f4637c7a5e5e",
-    "verify.md": "sha256:bcdce0c74797af564394ff326d23d63c8eccaa2daf77a2ff7422018e42ebb53c"
+    "spec.md": "sha256:71db68ff32edcaee1baa31c9ec8c4fbc20f66e4a0834c016fcbd85023c6f54ac",
+    "verify.md": "sha256:c3d740a7ac92e6d4a4d30fd547c36dc0496e3274496c5ed46ceb3b2b6a0ddd5a"
   },
   "generatedBy": "core"
 }

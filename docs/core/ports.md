@@ -8,6 +8,16 @@ All ports are exported from `@specd/core`.
 
 ---
 
+## Kernel composition surface
+
+The primary composition entrypoint remains `createKernel(config, options)`. `options` now supports additive registrations for storage factories, artifact parsers, VCS providers, actor providers, and external hook runners.
+
+Built kernels expose the final merged registry as `kernel.registry`, so callers can inspect which built-in and additive capabilities are available after construction.
+
+For incremental setup, `@specd/core` also exports `createKernelBuilder(config, base?)`. The builder accumulates the same additive registrations as `KernelOptions` and delegates `build()` to `createKernel(...)` with equivalent semantics.
+
+---
+
 ## Repository base class
 
 `Repository` is the abstract base class for `SpecRepository`, `ChangeRepository`, `ArchiveRepository`, and `SchemaRepository`. It encapsulates three invariants shared by every repository: workspace identity, ownership level, and locality.
@@ -421,6 +431,30 @@ interface HookResult {
 - `pre-*` hooks — guaranteed. A non-zero exit code causes the use case to throw `HookFailedError`, aborting the operation.
 - `post-*` hooks on CLI-owned operations (`archive`, `validate`) — guaranteed. The operation has already completed; failures are surfaced as warnings, not errors.
 - `post-*` hooks on agent-driven operations — not supported in v1. Use `instruction:` hooks instead.
+
+`HookRunner` is shell-only. It does not execute `instruction:` hooks and it does not dispatch explicit external hooks.
+
+---
+
+## ExternalHookRunner
+
+Port for executing explicit external workflow hooks declared as `external: { type, config }`.
+
+Unlike `HookRunner`, external runners must declare the hook types they accept up front. The kernel builds an accepted-type index and dispatches each external hook to the matching runner. Unknown external hook types are rejected at runtime with a clear error.
+
+```typescript
+import {
+  type ExternalHookRunner,
+  type ExternalHookDefinition,
+  type HookResult,
+  type TemplateVariables,
+} from '@specd/core'
+
+interface ExternalHookRunner {
+  readonly acceptedTypes: readonly string[]
+  run(definition: ExternalHookDefinition, variables: TemplateVariables): Promise<HookResult>
+}
+```
 
 ---
 

@@ -240,6 +240,19 @@ The order of entries in `workflow` is the intended progression of the change lif
 
 Project-level hook additions are no longer declared via a `workflow` section in `specd.yaml`. Instead, they are expressed as `schemaOverrides` targeting `workflow[].hooks` — see [`specs/core/config/spec.md`](../config/spec.md).
 
+### Requirement: Explicit external hook entries
+
+Workflow hook entries SHALL support an explicit external hook form in addition to `instruction:` and shell `run:` entries.
+
+An external hook entry MUST include:
+
+- `id`
+- an `external` object
+- `external.type`
+- `external.config` as the opaque payload for the selected external hook backend
+
+Unknown external hook types MUST be rejected when resolved against the merged built-in plus external runner registries. They are not ignored and are not treated as no-ops.
+
 ### Requirement: Schema plugin kind
 
 A schema file with `kind: schema-plugin` is a partial schema that provides only merge operations for composing with a base schema. A plugin must declare:

@@ -104,6 +104,38 @@ describe('buildSchema', () => {
     expect(schema.workflowStep('implementing')).not.toBeNull()
   })
 
+  it('accepts explicit external hook entries in workflow steps', () => {
+    const data = {
+      kind: 'schema' as const,
+      name: 'test',
+      version: 1,
+      artifacts: [{ id: 'spec', scope: 'spec' as const, output: 'spec.md' }],
+      workflow: [
+        {
+          step: 'implementing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: {
+            pre: [
+              {
+                id: 'docker-test',
+                type: 'external' as const,
+                externalType: 'docker',
+                config: { image: 'node:20' },
+              },
+            ],
+            post: [],
+          },
+        },
+      ],
+    }
+
+    const schema = buildSchema('#test', data, new Map())
+    expect(schema.workflowStep('implementing')?.hooks.pre[0]).toEqual(
+      data.workflow[0]!.hooks.pre[0],
+    )
+  })
+
   it('rejects duplicate validation IDs within the same artifact', () => {
     const data = {
       kind: 'schema' as const,

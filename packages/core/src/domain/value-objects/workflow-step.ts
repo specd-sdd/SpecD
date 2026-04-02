@@ -3,6 +3,7 @@
  *
  * `run:` hooks execute a shell command deterministically.
  * `instruction:` hooks inject text into the compiled agent instruction block.
+ * `external:` hooks dispatch opaque config to a registered external runner.
  */
 export type HookEntry =
   | {
@@ -24,6 +25,16 @@ export type HookEntry =
       readonly type: 'instruction'
       /** The instruction text to inject into the compiled context block. */
       readonly text: string
+    }
+  | {
+      /** Unique identifier for this hook entry within its array. */
+      readonly id: string
+      /** Discriminant: this is an explicit external hook. */
+      readonly type: 'external'
+      /** Registered external hook type name used for runtime dispatch. */
+      readonly externalType: string
+      /** Runner-owned opaque config payload declared in workflow YAML. */
+      readonly config: Record<string, unknown>
     }
 
 /**

@@ -10,16 +10,22 @@ function makeConfig(workspaceNames: string[]): SpecdConfig {
     workspaces: workspaceNames.map((name) => ({
       name,
       specsPath: `/project/specs/${name}`,
+      specsAdapter: { adapter: 'fs', config: { path: `/project/specs/${name}` } },
       schemasPath: null,
+      schemasAdapter: null,
       codeRoot: '/project',
       ownership: 'owned' as const,
       isExternal: false,
     })),
     storage: {
       changesPath: '/project/.specd/changes',
+      changesAdapter: { adapter: 'fs', config: { path: '/project/.specd/changes' } },
       draftsPath: '/project/.specd/drafts',
+      draftsAdapter: { adapter: 'fs', config: { path: '/project/.specd/drafts' } },
       discardedPath: '/project/.specd/discarded',
+      discardedAdapter: { adapter: 'fs', config: { path: '/project/.specd/discarded' } },
       archivePath: '/project/.specd/archive',
+      archiveAdapter: { adapter: 'fs', config: { path: '/project/.specd/archive' } },
     },
     approvals: { spec: false, signoff: false },
   }

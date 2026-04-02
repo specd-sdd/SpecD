@@ -10,6 +10,12 @@ specd must work across git, hg, and svn repositories (and outside VCS entirely) 
 
 `createVcsAdapter` MUST probe for VCS presence in the following order: git, hg, svn. The first probe that succeeds determines the returned adapter. Subsequent probes MUST NOT execute once a match is found.
 
+### Requirement: External providers run before built-in probes
+
+`createVcsAdapter` SHALL support additive external VCS providers. When external providers are registered, they SHALL be probed in registration order before the built-in git, hg, and svn probes.
+
+If no external or built-in provider matches, the factory SHALL continue to fall back to `NullVcsAdapter`.
+
 ### Requirement: Fallback to NullVcsAdapter
 
 When no VCS is detected (all probes fail), `createVcsAdapter` MUST return a `NullVcsAdapter`. It SHALL NOT throw.

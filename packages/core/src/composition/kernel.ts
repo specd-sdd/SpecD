@@ -41,7 +41,12 @@ import { type ChangeRepository } from '../application/ports/change-repository.js
 import { type SchemaRegistry } from '../application/ports/schema-registry.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SpecdConfig } from '../application/specd-config.js'
-import { createKernelInternals } from './kernel-internals.js'
+import { createBuiltinKernelRegistry, createKernelInternals } from './kernel-internals.js'
+import {
+  createKernelRegistryView,
+  type KernelRegistryInput,
+  type KernelRegistryView,
+} from './kernel-registries.js'
 import { LazySchemaProvider } from './lazy-schema-provider.js'
 
 /**
@@ -53,6 +58,8 @@ import { LazySchemaProvider } from './lazy-schema-provider.js'
  * `schemaRef`, `schemaRepositories`) are injected at construction time.
  */
 export interface Kernel {
+  /** Final merged registry view exposed to consumers and builders. */
+  registry: KernelRegistryView
   /** The schema registry for resolving arbitrary schema references. */
   schemas: SchemaRegistry
   /** Use cases that operate on changes. */
@@ -145,7 +152,7 @@ export interface Kernel {
 }
 
 /** Options for {@link createKernel}. */
-export interface KernelOptions {
+export interface KernelOptions extends KernelRegistryInput {
   /**
    * Additional `node_modules` directories appended to the schema search path,
    * after the project's own `node_modules`. Pass the CLI installation's
@@ -168,7 +175,8 @@ export interface KernelOptions {
  * @returns A fully-wired kernel with all use cases
  */
 export async function createKernel(config: SpecdConfig, options?: KernelOptions): Promise<Kernel> {
-  const i = await createKernelInternals(config, options)
+  const registry = createKernelRegistryView(createBuiltinKernelRegistry(), options)
+  const i = await createKernelInternals(config, registry, options)
 
   // Shared ResolveSchema + LazySchemaProvider — resolves once with plugins and overrides
   const resolveSchema = new ResolveSchema(
@@ -180,12 +188,19 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const schemaProvider = new LazySchemaProvider(resolveSchema)
 
   // Shared RunStepHooks instance — used by TransitionChange, ArchiveChange, and exposed directly
-  const runStepHooks = new RunStepHooks(i.changes, i.archive, i.hooks, schemaProvider)
+  const runStepHooks = new RunStepHooks(
+    i.changes,
+    i.archive,
+    i.hooks,
+    i.registry.externalHookRunners,
+    schemaProvider,
+  )
 
   // PreviewSpec — used by CompileContext and exposed as changes.preview
   const previewSpec = new PreviewSpec(i.changes, i.specs, schemaProvider, i.parsers)
 
   return {
+    registry,
     schemas: i.schemas,
     changes: {
       repo: i.changes,

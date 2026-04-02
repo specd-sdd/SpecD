@@ -6,10 +6,12 @@ import {
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
+import { ExternalHookTypeNotRegisteredError } from '../../../src/application/errors/external-hook-type-not-registered-error.js'
 import { StepNotValidError } from '../../../src/domain/errors/step-not-valid-error.js'
 import { HookNotFoundError } from '../../../src/domain/errors/hook-not-found-error.js'
 import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
 import { type HookEntry } from '../../../src/domain/value-objects/workflow-step.js'
+import { type ExternalHookRunner } from '../../../src/application/ports/external-hook-runner.js'
 import {
   type HookRunner,
   type TemplateVariables,
@@ -29,12 +31,14 @@ function makeUseCase(opts: {
   changes?: ReturnType<typeof makeChangeRepository>
   archive?: ReturnType<typeof makeArchiveRepository>
   hookRunner?: HookRunner
+  externalHookRunners?: ReadonlyMap<string, ExternalHookRunner>
   schema?: ReturnType<typeof makeSchema> | null
 }): RunStepHooks {
   return new RunStepHooks(
     opts.changes ?? makeChangeRepository(),
     opts.archive ?? makeArchiveRepository(),
     opts.hookRunner ?? makeHookRunner(),
+    opts.externalHookRunners ?? new Map(),
     makeSchemaProvider(opts.schema === undefined ? makeSchema() : opts.schema),
   )
 }
@@ -163,6 +167,59 @@ describe('RunStepHooks', () => {
       expect(commands).toEqual(['pnpm lint'])
       expect(result.hooks).toHaveLength(1)
       expect(result.hooks[0]!.id).toBe('lint')
+    })
+
+    it('dispatches explicit external hooks through accepted-type runners', async () => {
+      const change = makeChange('my-change')
+      const dockerHook: HookEntry = {
+        id: 'docker-test',
+        type: 'external',
+        externalType: 'docker',
+        config: { image: 'node:20', command: 'pnpm test' },
+      }
+      const runner = {
+        acceptedTypes: ['docker'],
+        run: vi.fn(async (_definition, _variables) => new HookResult(0, 'ok', '')),
+      }
+
+      const uc = makeUseCase({
+        changes: makeChangeRepository([change]),
+        schema: makeSchemaWithHooks([dockerHook]),
+        externalHookRunners: new Map([['docker', runner]]),
+      })
+
+      const result = await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' })
+
+      expect(runner.run).toHaveBeenCalledWith(
+        {
+          id: 'docker-test',
+          type: 'docker',
+          config: { image: 'node:20', command: 'pnpm test' },
+        },
+        expect.objectContaining({
+          change: expect.objectContaining({ name: 'my-change' }),
+        }),
+      )
+      expect(result.hooks[0]!.command).toBe('external:docker')
+    })
+
+    it('fails clearly when an external hook type is not registered', async () => {
+      const change = makeChange('my-change')
+      const dockerHook: HookEntry = {
+        id: 'docker-test',
+        type: 'external',
+        externalType: 'docker',
+        config: { image: 'node:20' },
+      }
+
+      const uc = makeUseCase({
+        changes: makeChangeRepository([change]),
+        schema: makeSchemaWithHooks([dockerHook]),
+      })
+
+      await expect(
+        uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' }),
+      ).rejects.toThrow(ExternalHookTypeNotRegisteredError)
     })
 
     it('--only filter finds matching run hook', async () => {

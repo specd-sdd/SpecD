@@ -115,6 +115,19 @@ const HookEntryZodSchema = z.union([
   z
     .object({ id: z.string(), instruction: z.string() })
     .transform((h): HookEntry => ({ id: h.id, type: 'instruction', text: h.instruction })),
+  z
+    .object({
+      id: z.string(),
+      external: z.object({ type: z.string(), config: z.record(z.unknown()) }),
+    })
+    .transform(
+      (h): HookEntry => ({
+        id: h.id,
+        type: 'external',
+        externalType: h.external.type,
+        config: h.external.config,
+      }),
+    ),
 ])
 
 const WorkflowStepZodSchema = z

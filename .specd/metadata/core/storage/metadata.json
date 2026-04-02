@@ -55,6 +55,12 @@
       ]
     },
     {
+      "requirement": "Named storage factories",
+      "rules": [
+        "Kernel composition SHALL support named storage factories for repository-backed capabilities. A storage factory SHALL be selected by adapter name and SHALL be responsible for creating the repository implementation needed for that storage mode.\n\nWhen storage selection requires workspace-specific VCS or null-VCS handling, that responsibility SHALL remain within the selected storage factory rather than leaking into unrelated composition paths."
+      ]
+    },
+    {
       "requirement": "Archive pattern date variables are zero-padded",
       "rules": [
         "`{{month}}` and `{{day}}` must be zero-padded to two digits. `{{year}}` is four digits. This ensures lexicographic sort produces chronological order."
@@ -230,6 +236,28 @@
       ]
     },
     {
+      "requirement": "Named storage factories",
+      "name": "Repository capability selects a factory by adapter name",
+      "given": ["registered storage factories for fs and git"],
+      "when": ["kernel composition resolves a workspace configured with adapter: git"],
+      "then": [
+        "the git storage factory is used to create that repository-backed capability",
+        "AND the fs factory remains available for workspaces still configured with fs"
+      ]
+    },
+    {
+      "requirement": "Named storage factories",
+      "name": "Workspace-specific VCS handling stays inside the selected factory",
+      "given": [
+        "a storage mode whose repository creation needs VCS detection or null-VCS fallback"
+      ],
+      "when": ["the named storage factory is invoked"],
+      "then": [
+        "the factory owns that VCS or null-VCS decision internally",
+        "AND unrelated kernel composition paths do not hardcode storage-specific VCS handling"
+      ]
+    },
+    {
       "requirement": "Archive pattern date variables are zero-padded",
       "name": "January archive",
       "when": ["a change is archived on January 5th"],
@@ -246,8 +274,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:50220a061755925c1ee39839056ac4430d2d08c0f63c9b388a5eff9d34809143",
-    "verify.md": "sha256:9797f7538ee77bd5fcda12537eb52fe29761919d339906aba456053f5b1a9399"
+    "spec.md": "sha256:33b820e81616ea8fd8a9fff3f2d23768214840beedb41a063bb2c046f9191edf",
+    "verify.md": "sha256:3c2c783958565220339bca71d52581ea591f407ccddcb812d469991cd5433cee"
   },
   "generatedBy": "core"
 }

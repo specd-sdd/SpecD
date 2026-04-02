@@ -468,11 +468,14 @@ Each entry is one of:
 
 - `{ id: 'my-id', instruction: 'text' }` — injected into the AI context when this step is compiled. Used to guide agent behaviour during this phase.
 - `{ id: 'my-id', run: 'shell command' }` — executed at the phase boundary. Supports template variables.
+- `{ id: 'my-id', external: { type: 'docker', config: { ... } } }` — dispatched to a registered external hook runner whose accepted types include `docker`.
+
+Explicit external hooks are part of the workflow model, not ad hoc shell escapes. The `type` field selects the runner; `config` is opaque runner-owned data. Unknown external hook types are errors.
 
 **Hook failure behaviour:**
 
-- **`pre` hook failure** — if a `run:` hook exits non-zero, the step is aborted. The agent should offer to fix the problem before retrying.
-- **`post` hook failure** — the step has already completed; it is not rolled back. After each failing `run:` hook, the user is prompted to continue with the remaining hooks or stop.
+- **`pre` hook failure** — if a `run:` or `external:` hook fails, the step is aborted. The agent should offer to fix the problem before retrying.
+- **`post` hook failure** — the step has already completed; it is not rolled back. After each failing executable hook, the user is prompted to continue with the remaining hooks or stop.
 
 ### Template variables in `run:` hooks
 
@@ -503,6 +506,12 @@ workflow:
       post:
         - id: run-tests
           run: 'pnpm test'
+        - id: docker-smoke
+          external:
+            type: docker
+            config:
+              image: node:20
+              command: pnpm test:smoke
         - id: confirm-tests
           instruction: |
             Confirm all tests pass before marking implementing complete.

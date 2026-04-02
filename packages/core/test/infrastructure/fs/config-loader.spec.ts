@@ -104,6 +104,63 @@ configPath: ../outside
     })
   })
 
+  describe('Requirement: Named storage adapters', () => {
+    it('preserves named fs adapter bindings with resolved absolute paths', async () => {
+      const configPath = await writeConfig(minimalYaml())
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.workspaces[0]?.specsAdapter).toEqual({
+        adapter: 'fs',
+        config: { path: path.join(tmpDir, 'specs') },
+      })
+      expect(config.storage.archiveAdapter).toEqual({
+        adapter: 'fs',
+        config: { path: path.join(tmpDir, '.specd', 'archive') },
+      })
+    })
+
+    it('preserves non-fs adapter names and opaque config for kernel-time validation', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: git
+      git:
+        remote: origin
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.workspaces[0]?.specsAdapter).toEqual({
+        adapter: 'git',
+        config: { remote: 'origin' },
+      })
+    })
+  })
+
   describe('Requirement: Project-level contextIncludeSpecs/contextExcludeSpecs', () => {
     it('reads project-level contextIncludeSpecs into SpecdConfig', async () => {
       const configPath = await writeConfig(

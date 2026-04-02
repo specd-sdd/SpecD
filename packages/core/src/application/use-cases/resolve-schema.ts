@@ -156,9 +156,11 @@ export class ResolveSchema {
 /**
  * Normalizes a single raw YAML hook entry to the domain `HookEntry` format.
  *
- * YAML format uses `{ id, run }` or `{ id, instruction }`, but the domain
- * expects `{ id, type: 'run', command }` or `{ id, type: 'instruction', text }`.
- * Entries that already have a `type` field are returned as-is.
+ * YAML format uses `{ id, run }`, `{ id, instruction }`, or
+ * `{ id, external: { type, config } }`, but the domain expects
+ * `{ id, type: 'run', command }`, `{ id, type: 'instruction', text }`, or
+ * `{ id, type: 'external', externalType, config }`. Entries that already have
+ * a `type` field are returned as-is.
  *
  * @param hook - A raw hook entry from schema overrides
  * @returns The normalized hook entry in domain format
@@ -167,6 +169,15 @@ function normalizeHookEntry(hook: Record<string, unknown>): Record<string, unkno
   if ('type' in hook) return hook
   if ('run' in hook) return { id: hook.id, type: 'run', command: hook.run }
   if ('instruction' in hook) return { id: hook.id, type: 'instruction', text: hook.instruction }
+  if ('external' in hook) {
+    const external = hook.external as Record<string, unknown>
+    return {
+      id: hook.id,
+      type: 'external',
+      externalType: external.type,
+      config: external.config,
+    }
+  }
   return hook
 }
 

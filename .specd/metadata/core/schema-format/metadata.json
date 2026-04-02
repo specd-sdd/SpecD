@@ -84,6 +84,12 @@
       ]
     },
     {
+      "requirement": "Explicit external hook entries",
+      "rules": [
+        "Workflow hook entries SHALL support an explicit external hook form in addition to `instruction:` and shell `run:` entries.\n\nAn external hook entry MUST include:\n\n- `id`\n- an `external` object\n- `external.type`\n- `external.config` as the opaque payload for the selected external hook backend\n\nUnknown external hook types MUST be rejected when resolved against the merged built-in plus external runner registries. They are not ignored and are not treated as no-ops."
+      ]
+    },
+    {
       "requirement": "Schema plugin kind",
       "rules": [
         "A schema file with `kind: schema-plugin` is a partial schema that provides only merge operations for composing with a base schema. A plugin must declare:\n\n- `kind: schema-plugin` (required)\n- `name` (string, required) — plugin identifier\n- `version` (integer, required) — plugin version\n- `description` (string, optional) — human-readable summary\n\nA plugin must not declare `artifacts`, `workflow`, `metadataExtraction`, or `extends` — these are validation errors. The plugin's customisation intent is expressed via `schemaOverrides`-style operations when referenced in `specd.yaml`'s `schemaPlugins`. The plugin file itself contains the operations inline under top-level operation keys (`create`, `remove`, `set`, `append`, `prepend`).\n\nPlugins are resolved using the same reference conventions as schemas (npm, workspace-qualified, bare name, path)."
@@ -686,6 +692,28 @@
       "then": ["SchemaRegistry.resolve() must throw a SchemaValidationError"]
     },
     {
+      "requirement": "Explicit external hook entries",
+      "name": "External hook entry declares nested type and opaque config",
+      "given": ["a workflow hook entry with id and an external object containing type and config"],
+      "when": ["schema validation parses the workflow step"],
+      "then": [
+        "the entry is accepted as an explicit external hook entry",
+        "AND it remains distinct from instruction: and shell run: entries"
+      ]
+    },
+    {
+      "requirement": "Explicit external hook entries",
+      "name": "Unknown external hook type is rejected",
+      "given": [
+        "a workflow external hook entry whose type is absent from the merged external hook runner registry"
+      ],
+      "when": ["the workflow is resolved for execution"],
+      "then": [
+        "specd fails with a clear unknown external hook type error",
+        "AND the hook is not treated as a no-op"
+      ]
+    },
+    {
       "requirement": "Artifact definition",
       "name": "preHashCleanup entry requires id",
       "when": ["a preHashCleanup entry omits the id field"],
@@ -777,8 +805,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:ea4c419dcfd122402c1644eceba91a35ab57afbba50bcb0eb6133c832fa728c7",
-    "verify.md": "sha256:46a3e0debf621bdb0e9939da47b7e8ff85a5cf1bbb71a213564c70d656e5f1f9"
+    "spec.md": "sha256:2fe96d887b64b36d5eb472735c9383560b950ec8d492e31ef775a7bfe7bd6063",
+    "verify.md": "sha256:3ecc790c8855dd834c7dd7bcfe2c8112995cd5221a58948667ec2e9792180735"
   },
   "generatedBy": "core"
 }

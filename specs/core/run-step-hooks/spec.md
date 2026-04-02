@@ -65,6 +65,18 @@ For the matched step and phase, `RunStepHooks` MUST collect `run:` hooks from `w
 
 All hooks — whether from the base schema, plugins, or overrides — are already merged into the schema's workflow steps by `ResolveSchema`. There is no separate project-level hook collection.
 
+### Requirement: External hook dispatch
+
+`RunStepHooks` SHALL support explicit external hook entries in addition to shell `run:` hooks.
+
+For an external hook entry, `RunStepHooks` MUST:
+
+- read the hook's `external.type` and `external.config`
+- resolve a registered external hook runner whose accepted-type declaration includes that type
+- dispatch execution through that external runner
+
+If no registered external runner accepts the hook's `external.type`, `RunStepHooks` MUST fail with a clear error.
+
 ### Requirement: Hook filtering with --only
 
 When `only` is provided, `RunStepHooks` MUST filter the collected hook list to the single hook whose `id` matches the value. If no hook matches the ID, it MUST throw `HookNotFoundError` with reason `'not-found'`. If the ID matches an `instruction:` hook instead of a `run:` hook, it MUST throw `HookNotFoundError` with reason `'wrong-type'`.
@@ -120,7 +132,8 @@ When no hooks match (empty `run:` hook list for the step+phase, or the step has 
 
 - [`specs/core/hook-execution-model/spec.md`](../hook-execution-model/spec.md) — hook types, execution modes, failure semantics, ordering
 - [`specs/core/hook-runner-port/spec.md`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `workflow[].hooks` structure, `run:` and `instruction:` entries
+- [`specs/core/external-hook-runner-port/spec.md`](../external-hook-runner-port/spec.md) — external hook runner contract and accepted-type dispatch
+- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `workflow[].hooks` structure, `run:`, `instruction:`, and explicit external entries
 - [`specs/core/config/spec.md`](../config/spec.md) — project-level workflow hooks from `specd.yaml`
 - [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `schemaName`, `workspaces`
 - [`specs/core/template-variables/spec.md`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces

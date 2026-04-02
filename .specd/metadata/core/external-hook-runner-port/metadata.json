@@ -1,0 +1,93 @@
+{
+  "title": "External Hook Runner Port",
+  "description": "Workflow hooks that dispatch to external execution backends such as Docker or HTTP cannot be forced through the internal shell-oriented `HookRunner` without conflating two different execution models. `ExternalHookRunner` defines the application-layer contract for runners that execute explicit external hook entries, declare which external hook types they accept, and return deterministic hook results for the workflow runtime.",
+  "dependsOn": ["core:core/hook-execution-model", "core:core/schema-format"],
+  "context": [
+    "Workflow hooks that dispatch to external execution backends such as Docker or HTTP cannot be forced through the internal shell-oriented `HookRunner` without conflating two different execution models. `ExternalHookRunner` defines the application-layer contract for runners that execute explicit external hook entries, declare which external hook types they accept, and return deterministic hook results for the workflow runtime."
+  ],
+  "rules": [
+    {
+      "requirement": "External hook runners declare accepted types",
+      "rules": [
+        "An `ExternalHookRunner` SHALL declare which explicit external hook types it accepts. The declaration SHALL be machine-readable so the runtime can determine whether a given runner can handle a hook entry before dispatching it.\n\nThe accepted-type declaration MUST be treated as the source of truth for dispatch. Runtime dispatch MUST NOT guess based solely on registration name or implementation class."
+      ]
+    },
+    {
+      "requirement": "External hook runners execute explicit external hooks",
+      "rules": [
+        "An `ExternalHookRunner` SHALL execute explicit external hook entries using:\n\n- the nested `external.type`\n- the nested `external.config` payload\n- the workflow template variables for the current execution context\n\nThe runner contract SHALL be separate from `HookRunner`, which remains responsible for shell `run:` hooks only."
+      ]
+    },
+    {
+      "requirement": "Unknown external hook types are errors",
+      "rules": [
+        "If no registered external hook runner declares support for a given external hook type, the runtime MUST fail with a clear error. Unknown external hook types are not ignored and are not treated as no-ops."
+      ]
+    },
+    {
+      "requirement": "Runner results are workflow-compatible",
+      "rules": [
+        "External hook execution SHALL produce results compatible with workflow hook execution semantics so that pre-phase failures, post-phase reporting, and CLI/user-facing behavior can be handled consistently alongside shell hook execution."
+      ]
+    }
+  ],
+  "constraints": [
+    "ExternalHookRunner is an application-layer port",
+    "The port is separate from HookRunner; the two contracts must not be conflated",
+    "Accepted external hook types must be declared explicitly",
+    "Unknown external hook types are hard errors"
+  ],
+  "scenarios": [
+    {
+      "requirement": "External hook runners declare accepted types",
+      "name": "Accepted types are exposed for dispatch",
+      "given": ["a runner implementation that supports docker and http"],
+      "when": ["the runtime inspects the runner before dispatch"],
+      "then": [
+        "it can read those accepted types directly from the runner",
+        "AND dispatch decisions do not depend only on the runner's registration name"
+      ]
+    },
+    {
+      "requirement": "External hook runners execute explicit external hooks",
+      "name": "Runner receives the full external hook payload",
+      "given": [
+        "an explicit external hook entry with external.type set to docker, nested opaque config, and template variables"
+      ],
+      "when": ["the external runner executes it"],
+      "then": [
+        "the runner receives the hook type, the nested opaque config payload, and the resolved workflow variables",
+        "AND shell-only HookRunner responsibilities are not reused for that call"
+      ]
+    },
+    {
+      "requirement": "Unknown external hook types are errors",
+      "name": "No runner accepts the hook type",
+      "given": [
+        "an explicit external hook entry of type webhook",
+        "AND no registered external hook runner declares support for webhook"
+      ],
+      "when": ["the runtime attempts dispatch"],
+      "then": [
+        "execution fails with a clear unknown external hook type error",
+        "AND the hook is not ignored"
+      ]
+    },
+    {
+      "requirement": "Runner results are workflow-compatible",
+      "name": "External runner result can be reported like other hook results",
+      "given": [
+        "an external hook execution that produces success status, exit code, stdout, and stderr"
+      ],
+      "when": ["the workflow runtime records the result"],
+      "then": [
+        "pre-phase failure handling and post-phase reporting can use it without a separate result model"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:6a83e99a0b00e4c2eca53b374596c640e0818d12fa3b5f80d3217c256d54b96e",
+    "verify.md": "sha256:9a0c211e0f2e4768e700c8a502c547b6e12a48bfd226db2c439c9437e78fd701"
+  },
+  "generatedBy": "core"
+}

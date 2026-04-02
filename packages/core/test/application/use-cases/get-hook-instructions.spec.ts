@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { GetHookInstructions } from '../../../src/application/use-cases/get-hook-instructions.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
+import { HookNotFoundError } from '../../../src/domain/errors/hook-not-found-error.js'
 import { TemplateExpander } from '../../../src/application/template-expander.js'
 import { type HookEntry } from '../../../src/domain/value-objects/workflow-step.js'
 import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
@@ -118,5 +119,43 @@ describe('GetHookInstructions — archive fallback', () => {
     await expect(
       uc.execute({ name: 'my-change', step: 'implementing', phase: 'post' }),
     ).rejects.toThrow(ChangeNotFoundError)
+  })
+
+  it('treats explicit external hooks as wrong-type for instruction lookup', async () => {
+    const change = makeChange('my-change')
+    const schema = makeSchema({
+      workflow: [
+        {
+          step: 'implementing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: {
+            pre: [
+              {
+                id: 'docker-test',
+                type: 'external',
+                externalType: 'docker',
+                config: { image: 'node:20' },
+              },
+            ],
+            post: [],
+          },
+        },
+      ],
+    })
+
+    const uc = makeUseCase({
+      changes: makeChangeRepository([change]),
+      schema,
+    })
+
+    await expect(
+      uc.execute({
+        name: 'my-change',
+        step: 'implementing',
+        phase: 'pre',
+        only: 'docker-test',
+      }),
+    ).rejects.toThrow(HookNotFoundError)
   })
 })

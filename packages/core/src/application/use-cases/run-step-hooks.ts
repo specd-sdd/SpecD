@@ -4,9 +4,11 @@ import { StepNotValidError } from '../../domain/errors/step-not-valid-error.js'
 import { HookNotFoundError } from '../../domain/errors/hook-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ArchiveRepository } from '../ports/archive-repository.js'
-import { type HookRunner, type TemplateVariables } from '../ports/hook-runner.js'
+import { type ExternalHookRunner } from '../ports/external-hook-runner.js'
+import { type HookResult, type HookRunner, type TemplateVariables } from '../ports/hook-runner.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
+import { ExternalHookTypeNotRegisteredError } from '../errors/external-hook-type-not-registered-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 
 /** Valid `ChangeState` values for step validation. */
@@ -46,7 +48,7 @@ export interface RunStepHooksResult {
 }
 
 /**
- * Executes `run:` hooks for a given workflow step and phase.
+ * Executes executable hooks for a given workflow step and phase.
  *
  * Resolves hooks from the schema, builds template variables from the
  * active change, and executes them via `HookRunner` with fail-fast
@@ -56,6 +58,7 @@ export class RunStepHooks {
   private readonly _changes: ChangeRepository
   private readonly _archive: ArchiveRepository
   private readonly _hooks: HookRunner
+  private readonly _externalHookRunners: ReadonlyMap<string, ExternalHookRunner>
   private readonly _schemaProvider: SchemaProvider
 
   /**
@@ -64,22 +67,25 @@ export class RunStepHooks {
    * @param changes - Repository for loading change entities
    * @param archive - Repository for loading archived changes (fallback for post-archive hooks)
    * @param hooks - Hook runner for executing shell commands
+   * @param externalHookRunners - External hook runners indexed by accepted type
    * @param schemaProvider - Provider for the fully-resolved schema
    */
   constructor(
     changes: ChangeRepository,
     archive: ArchiveRepository,
     hooks: HookRunner,
+    externalHookRunners: ReadonlyMap<string, ExternalHookRunner>,
     schemaProvider: SchemaProvider,
   ) {
     this._changes = changes
     this._archive = archive
     this._hooks = hooks
+    this._externalHookRunners = externalHookRunners
     this._schemaProvider = schemaProvider
   }
 
   /**
-   * Executes `run:` hooks for the given step and phase.
+   * Executes executable hooks for the given step and phase.
    *
    * @param input - The step name, phase, and optional hook filter
    * @param onProgress - Optional callback for hook execution progress events
@@ -117,9 +123,7 @@ export class RunStepHooks {
         if (input.only !== undefined) {
           const match = runHooks.find((h) => h.id === input.only)
           if (match === undefined) {
-            const instrMatch = workflowStep.hooks[input.phase].find(
-              (h) => h.id === input.only && h.type === 'instruction',
-            )
+            const instrMatch = workflowStep.hooks[input.phase].find((h) => h.id === input.only)
             if (instrMatch !== undefined) {
               throw new HookNotFoundError(input.only, 'wrong-type')
             }
@@ -163,17 +167,14 @@ export class RunStepHooks {
       return { hooks: [], success: true, failedHook: null }
     }
 
-    // Collect run: hooks from schema
+    // Collect executable hooks from schema
     let runHooks = this._collectHooks(workflowStep.hooks[input.phase])
 
     // --only filter
     if (input.only !== undefined) {
       const match = runHooks.find((h) => h.id === input.only)
       if (match === undefined) {
-        // Check if it's an instruction hook
-        const instrMatch = workflowStep.hooks[input.phase].find(
-          (h) => h.id === input.only && h.type === 'instruction',
-        )
+        const instrMatch = workflowStep.hooks[input.phase].find((h) => h.id === input.only)
         if (instrMatch !== undefined) {
           throw new HookNotFoundError(input.only, 'wrong-type')
         }
@@ -196,15 +197,18 @@ export class RunStepHooks {
   }
 
   /**
-   * Collects `run:` hooks from schema for the given phase.
+   * Collects executable hooks from schema for the given phase.
    *
    * @param schemaHooks - Schema-level hooks for this step and phase
-   * @returns Schema hooks filtered to `type === 'run'`
+   * @returns Schema hooks filtered to executable types
    */
   private _collectHooks(
     schemaHooks: readonly HookEntry[],
-  ): readonly Extract<HookEntry, { type: 'run' }>[] {
-    return schemaHooks.filter((h): h is Extract<HookEntry, { type: 'run' }> => h.type === 'run')
+  ): readonly Extract<HookEntry, { type: 'run' | 'external' }>[] {
+    return schemaHooks.filter(
+      (h): h is Extract<HookEntry, { type: 'run' | 'external' }> =>
+        h.type === 'run' || h.type === 'external',
+    )
   }
 
   /**
@@ -217,7 +221,7 @@ export class RunStepHooks {
    * @returns Per-hook execution results with overall success status
    */
   private async _executeHooks(
-    runHooks: readonly Extract<HookEntry, { type: 'run' }>[],
+    runHooks: readonly Extract<HookEntry, { type: 'run' | 'external' }>[],
     variables: TemplateVariables,
     phase: 'pre' | 'post',
     onProgress?: OnHookProgress,
@@ -226,11 +230,15 @@ export class RunStepHooks {
     let failedHook: RunStepHookEntry | null = null
 
     for (const hook of runHooks) {
-      onProgress?.({ type: 'hook-start', hookId: hook.id, command: hook.command })
-      const result = await this._hooks.run(hook.command, variables)
+      const command = hook.type === 'run' ? hook.command : `external:${hook.externalType}`
+      onProgress?.({ type: 'hook-start', hookId: hook.id, command })
+      const result =
+        hook.type === 'run'
+          ? await this._hooks.run(hook.command, variables)
+          : await this._runExternalHook(hook, variables)
       const entry: RunStepHookEntry = {
         id: hook.id,
-        command: hook.command,
+        command,
         exitCode: result.exitCode(),
         stdout: result.stdout(),
         stderr: result.stderr(),
@@ -257,5 +265,24 @@ export class RunStepHooks {
       success: results.every((r) => r.success),
       failedHook,
     }
+  }
+
+  /**
+   * Executes an explicit external hook through the accepted-type runner index.
+   *
+   * @param hook - The explicit external hook entry
+   * @param variables - Template variables for runtime expansion
+   * @returns The workflow-compatible hook result
+   * @throws {@link ExternalHookTypeNotRegisteredError} When no runner accepts the hook type
+   */
+  private async _runExternalHook(
+    hook: Extract<HookEntry, { type: 'external' }>,
+    variables: TemplateVariables,
+  ): Promise<HookResult> {
+    const runner = this._externalHookRunners.get(hook.externalType)
+    if (runner === undefined) {
+      throw new ExternalHookTypeNotRegisteredError(hook.externalType, hook.id)
+    }
+    return runner.run({ id: hook.id, type: hook.externalType, config: hook.config }, variables)
   }
 }

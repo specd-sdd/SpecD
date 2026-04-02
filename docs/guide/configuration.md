@@ -212,6 +212,26 @@ Each directory holds changes in a different state:
 
 All paths resolve relative to the `specd.yaml` directory and must stay within the repository root.
 
+### Adapter bindings and kernel extensions
+
+Every workspace and storage declaration is a named adapter binding:
+
+```yaml
+specs:
+  adapter: fs
+  fs:
+    path: specs/
+```
+
+The built-in path is `fs`, but `createKernel(config, options)` and `createKernelBuilder(config)` can register additive storage factories under other adapter names. The config loader preserves the selected adapter name and its opaque config block; the kernel then validates that the named factory exists in the merged registry.
+
+That split is deliberate:
+
+- `FsConfigLoader` resolves and validates `fs` paths
+- the kernel validates whether non-built-in adapter names are actually registered
+
+Use this when you need a custom storage backend without forking the core workflow model.
+
 By default, `specd project init` adds `drafts/` and `discarded/` to `.gitignore`. Teams who want to commit drafts — for example, to share in-progress work across machines — can remove those entries.
 
 ### Organising the archive

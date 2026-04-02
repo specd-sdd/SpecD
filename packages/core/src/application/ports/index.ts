@@ -14,6 +14,7 @@ export {
   type Schema,
 } from './schema-registry.js'
 export { type HookRunner, type HookResult, type TemplateVariables } from './hook-runner.js'
+export { type ExternalHookDefinition, type ExternalHookRunner } from './external-hook-runner.js'
 export { type ActorResolver } from './actor-resolver.js'
 export { type VcsAdapter } from './vcs-adapter.js'
 export { type FileReader } from './file-reader.js'

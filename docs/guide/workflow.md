@@ -324,8 +324,9 @@ Hooks let you attach automated actions or AI guidance to lifecycle transitions. 
 | -------------- | ---------------------------------------------------------------------------------------- |
 | `run:`         | A shell command executed in the project root. Non-zero exit code blocks a pre hook.      |
 | `instruction:` | An AI context block injected into the agent context for the step. Not directly runnable. |
+| `external:`    | An explicit external hook dispatched to a registered external hook runner by `type`.     |
 
-An `instruction:` hook provides guidance to an AI agent about what to do in that step. It is informational — it does not execute code. A `run:` hook executes a shell command and its exit code determines success or failure.
+An `instruction:` hook provides guidance to an AI agent about what to do in that step. It is informational — it does not execute code. A `run:` hook executes a shell command through the internal `HookRunner`. An `external:` hook is routed to a separate `ExternalHookRunner` selected by `external.type`.
 
 ```yaml
 workflow:
@@ -334,10 +335,22 @@ workflow:
       pre:
         - id: run-lint
           run: pnpm lint
+        - id: docker-test
+          external:
+            type: docker
+            config:
+              image: node:20
+              command: pnpm test
       post:
         - id: notify
           run: echo "Implementation started for {{change.name}}"
 ```
+
+External hooks use the same workflow phase semantics as shell hooks:
+
+- a failing `pre` external hook blocks the transition
+- a failing `post` external hook does not roll the state back
+- an unknown `external.type` is a hard error, not a silent skip
 
 ### Template variables
 

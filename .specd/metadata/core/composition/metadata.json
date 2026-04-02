@@ -43,6 +43,12 @@
       ]
     },
     {
+      "requirement": "Composition layer exposes a kernel builder",
+      "rules": [
+        "The composition layer SHALL expose a fluent kernel builder entry point in addition to `createKernel(config, options)`. The builder SHALL accumulate the same additive registrations supported by `KernelOptions` and SHALL build kernels with behavior equivalent to the lower-level construction path.\n\nThe builder is part of the public composition surface. It MUST NOT introduce a second, incompatible extensibility model."
+      ]
+    },
+    {
       "requirement": "ConfigLoader is an application port",
       "rules": [
         "`ConfigLoader` is defined in `application/ports/config-loader.ts` as an interface. It has a single method `load(): Promise<SpecdConfig>`. The `FsConfigLoader` implementation reads `specd.yaml` and `specd.local.yaml`, with local values taking precedence. Future implementations (`EnvConfigLoader`, `CompositeConfigLoader`) add new config sources without touching the kernel or any delivery layer."
@@ -151,6 +157,25 @@
       ]
     },
     {
+      "requirement": "Composition layer exposes a kernel builder",
+      "name": "Builder is a public alternative to createKernel",
+      "when": ["the public composition exports are inspected"],
+      "then": [
+        "a fluent kernel builder entry point is available alongside createKernel",
+        "AND using it remains within the composition layer's public surface"
+      ]
+    },
+    {
+      "requirement": "Composition layer exposes a kernel builder",
+      "name": "Builder preserves createKernel semantics",
+      "given": ["the same resolved config and the same additive registrations"],
+      "when": ["a kernel is built through the builder and through createKernel(config, options)"],
+      "then": [
+        "both kernels expose the same merged capability set",
+        "AND both preserve the same use-case wiring semantics"
+      ]
+    },
+    {
       "requirement": "ConfigLoader is an application port",
       "name": "FsConfigLoader reads specd.yaml",
       "when": ["FsConfigLoader.load() is called in a directory containing specd.yaml"],
@@ -170,8 +195,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:1776094560648cd3368e35e51142384fe22052f7eb4291f42f359af5b0e21a5c",
-    "verify.md": "sha256:84efd4bbed5752ac2e1d91e89ba24579fa6098fc33f9c294320c4e1ff6cb92a5"
+    "spec.md": "sha256:01ae7a806b7d3155c07e66ac44fff54a5503f3393524e442c7b84c1ce5fcb7cc",
+    "verify.md": "sha256:99fc9c6e3dac335d05ab97153d325eeff63f093367c2cc37716e7d5414856029"
   },
   "generatedBy": "core"
 }

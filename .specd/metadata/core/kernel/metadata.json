@@ -94,6 +94,24 @@
       ]
     },
     {
+      "requirement": "KernelOptions supports additive registries",
+      "rules": [
+        "`KernelOptions` SHALL support additive registration of external capabilities before kernel construction. At minimum, it SHALL include extension points for:\n\n- storage factories\n- VCS providers\n- actor providers\n- artifact parsers\n- external hook runners\n\nThese registrations SHALL extend the built-in capability set rather than replacing it."
+      ]
+    },
+    {
+      "requirement": "Kernel exposes merged registries",
+      "rules": [
+        "The `Kernel` interface SHALL expose the merged built-in plus external registries used during construction. The exposed registry view SHALL let consumers inspect which storages, parsers, providers, and external hook runners are available from the built kernel.\n\nThe exposed registries MUST reflect the final additive capability set actually used during construction — not just the raw external registrations supplied by the caller."
+      ]
+    },
+    {
+      "requirement": "Kernel rejects invalid registry references",
+      "rules": [
+        "Kernel composition MUST reject conflicting registrations and unknown registry references with clear errors.\n\nConflicting registrations include attempts to overwrite an existing built-in or already-registered external entry for the same registry category. Unknown references include configuration or workflow data that names an adapter, parser, provider, or external hook type that is not present in the merged registry set."
+      ]
+    },
+    {
       "requirement": "Kernel entry mapping",
       "rules": [
         "The following table is the exhaustive mapping between kernel paths and use case classes. Each entry is a binding contract — consumers access use cases exclusively through these paths.\n\n#### kernel.changes\n\n| Kernel path                      | Use case class           | Spec                                                            | Description                                             |\n| -------------------------------- | ------------------------ | --------------------------------------------------------------- | ------------------------------------------------------- |\n| `changes.repo`                   | `ChangeRepository`       | —                                                               | Underlying repository for adapter-level queries         |\n| `changes.create`                 | `CreateChange`           | [create-change](../create-change/spec.md)                       | Creates a new change                                    |\n| `changes.status`                 | `GetStatus`              | [get-status](../get-status/spec.md)                             | Reports lifecycle state and artifact statuses           |\n| `changes.transition`             | `TransitionChange`       | [transition-change](../transition-change/spec.md)               | Performs a lifecycle state transition                   |\n| `changes.draft`                  | `DraftChange`            | [draft-change](../draft-change/spec.md)                         | Shelves a change to drafts                              |\n| `changes.restore`                | `RestoreChange`          | [restore-change](../restore-change/spec.md)                     | Recovers a drafted change                               |\n| `changes.discard`                | `DiscardChange`          | [discard-change](../discard-change/spec.md)                     | Permanently abandons a change                           |\n| `changes.archive`                | `ArchiveChange`          | [archive-change](../archive-change/spec.md)                     | Finalises a change: merges deltas, moves to archive     |\n| `changes.validate`               | `ValidateArtifacts`      | [validate-artifacts](../validate-artifacts/spec.md)             | Validates artifact files against the active schema      |\n| `changes.compile`                | `CompileContext`         | [compile-context](../compile-context/spec.md)                   | Assembles the context block for a lifecycle step        |\n| `changes.list`                   | `ListChanges`            | [list-changes](../list-changes/spec.md)                         | Lists all active changes                                |\n| `changes.listDrafts`             | `ListDrafts`             | [list-drafts](../list-drafts/spec.md)                           | Lists all drafted changes                               |\n| `changes.listDiscarded`          | `ListDiscarded`          | [list-discarded](../list-discarded/spec.md)                     | Lists all discarded changes                             |\n| `changes.edit`                   | `EditChange`             | [edit-change](../edit-change/spec.md)                           | Edits the spec scope of a change                        |\n| `changes.skipArtifact`           | `SkipArtifact`           | [skip-artifact](../skip-artifact/spec.md)                       | Explicitly skips an optional artifact                   |\n| `changes.updateSpecDeps`         | `UpdateSpecDeps`         | [update-spec-deps](../update-spec-deps/spec.md)                 | Updates declared dependencies for a spec                |\n| `changes.listArchived`           | `ListArchived`           | [list-archived](../list-archived/spec.md)                       | Lists all archived changes                              |\n| `changes.getArchived`            | `GetArchivedChange`      | [get-archived-change](../get-archived-change/spec.md)           | Retrieves a single archived change by name              |\n| `changes.runStepHooks`           | `RunStepHooks`           | [run-step-hooks](../run-step-hooks/spec.md)                     | Executes run: hooks for a step and phase                |\n| `changes.getHookInstructions`    | `GetHookInstructions`    | [get-hook-instructions](../get-hook-instructions/spec.md)       | Returns instruction: hook text for a step and phase     |\n| `changes.getArtifactInstruction` | `GetArtifactInstruction` | [get-artifact-instruction](../get-artifact-instruction/spec.md) | Returns artifact instruction block with rules and delta |\n| `changes.detectOverlap`          | `DetectOverlap`          | [spec-overlap](../spec-overlap/spec.md)                         | Detects specs targeted by multiple active changes       |\n\n#### kernel.specs\n\n| Kernel path                | Use case class                        | Spec                                                            | Description                                                 |\n| -------------------------- | ------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |\n| `specs.repos`              | `ReadonlyMap<string, SpecRepository>` | —                                                               | Spec repositories keyed by workspace name                   |\n| `specs.approveSpec`        | `ApproveSpec`                         | [approve-spec](../approve-spec/spec.md)                         | Records a spec approval and transitions state               |\n| `specs.approveSignoff`     | `ApproveSignoff`                      | [approve-signoff](../approve-signoff/spec.md)                   | Records a sign-off and transitions state                    |\n| `specs.list`               | `ListSpecs`                           | [list-specs](../list-specs/spec.md)                             | Lists all specs across all workspaces                       |\n| `specs.get`                | `GetSpec`                             | [get-spec](../get-spec/spec.md)                                 | Loads a spec and all artifact files                         |\n| `specs.saveMetadata`       | `SaveSpecMetadata`                    | [save-spec-metadata](../save-spec-metadata/spec.md)             | Writes a `.specd-metadata.yaml` file                        |\n| `specs.invalidateMetadata` | `InvalidateSpecMetadata`              | [invalidate-spec-metadata](../invalidate-spec-metadata/spec.md) | Invalidates a spec's metadata                               |\n| `specs.getActiveSchema`    | `GetActiveSchema`                     | [get-active-schema](../get-active-schema/spec.md)               | Resolves and returns the active schema                      |\n| `specs.validate`           | `ValidateSpecs`                       | [validate-specs](../validate-specs/spec.md)                     | Validates spec artifacts against schema rules               |\n| `specs.generateMetadata`   | `GenerateSpecMetadata`                | [generate-metadata](../generate-metadata/spec.md)               | Generates deterministic metadata from extraction rules      |\n| `specs.getContext`         | `GetSpecContext`                      | [get-spec-context](../get-spec-context/spec.md)                 | Builds structured context entries with dependency traversal |\n| `specs.resolveSchema`      | `ResolveSchema`                       | [resolve-schema](../resolve-schema/spec.md)                     | Resolves base schema with extends, plugins, and overrides   |\n\n#### kernel.project\n\n| Kernel path                  | Use case class       | Spec                                                    | Description                                     |\n| ---------------------------- | -------------------- | ------------------------------------------------------- | ----------------------------------------------- |\n| `project.init`               | `InitProject`        | [init-project](../init-project/spec.md)                 | Initialises a new specd project                 |\n| `project.recordSkillInstall` | `RecordSkillInstall` | [record-skill-install](../record-skill-install/spec.md) | Records that skills were installed for an agent |\n| `project.getSkillsManifest`  | `GetSkillsManifest`  | [get-skills-manifest](../get-skills-manifest/spec.md)   | Reads the installed skills manifest             |\n| `project.getProjectContext`  | `GetProjectContext`  | [get-project-context](../get-project-context/spec.md)   | Compiles the project-level context block        |\n\nAdding, removing, or renaming an entry in this table is a contract change and must be reflected in both the `Kernel` interface and `createKernel`."
@@ -292,6 +310,54 @@
       "then": ["the schema registry searches only the project's own node_modules"]
     },
     {
+      "requirement": "KernelOptions supports additive registries",
+      "name": "External registrations extend built-ins",
+      "given": [
+        "built-in storages, parsers, VCS providers, actor providers, and external hook runners are available"
+      ],
+      "when": [
+        "createKernel(config, options) is called with additional registrations in one or more categories"
+      ],
+      "then": [
+        "the built kernel uses a merged capability set that includes both the built-ins and the newly registered entries",
+        "AND omitting a category from KernelOptions leaves that built-in category unchanged"
+      ]
+    },
+    {
+      "requirement": "Kernel exposes merged registries",
+      "name": "Exposed registries reflect the merged construction set",
+      "given": ["external registrations were provided during kernel construction"],
+      "when": ["the built kernel's registry view is inspected"],
+      "then": [
+        "it exposes the final merged set of storage factories, parsers, providers, and external hook runners actually used for construction",
+        "AND the view includes built-ins as well as accepted external registrations"
+      ]
+    },
+    {
+      "requirement": "Kernel rejects invalid registry references",
+      "name": "Conflicting registration names fail before kernel construction",
+      "given": [
+        "an external registration uses a name already claimed by a built-in or previously-registered external entry in the same registry category"
+      ],
+      "when": ["createKernel(config, options) processes the registrations"],
+      "then": [
+        "kernel construction fails with a clear conflict error",
+        "AND the conflicting registration does not overwrite the existing entry"
+      ]
+    },
+    {
+      "requirement": "Kernel rejects invalid registry references",
+      "name": "Unknown registry reference in config or workflow fails clearly",
+      "given": [
+        "configuration or workflow data names an adapter, parser, provider, or external hook type that is absent from the merged registry set"
+      ],
+      "when": ["the kernel resolves that reference"],
+      "then": [
+        "specd fails with a clear unknown-reference error",
+        "AND the reference is not ignored or deferred silently"
+      ]
+    },
+    {
       "requirement": "Kernel is a plain object, not a class",
       "name": "Kernel has no methods or lifecycle",
       "when": ["the kernel object is inspected"],
@@ -310,8 +376,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:3cfb0de52dd0dc902357cf79063d7912767035393ccda3c02fa4132beb02e700",
-    "verify.md": "sha256:edcf31b0d297a69ab330bdb95bd84017e7e6079afa75f76cdfbda8cc47a4bd05"
+    "spec.md": "sha256:5457dd9a528039b4144b617b4b09f26857fc45c186abe3f3b5dc7353cbd1578a",
+    "verify.md": "sha256:76a5b15df36a1c258916549759640e5f009f26420a4944a72611386b8a7aba97"
   },
   "generatedBy": "core"
 }

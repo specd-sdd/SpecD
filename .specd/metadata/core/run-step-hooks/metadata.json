@@ -1,15 +1,7 @@
 {
   "title": "RunStepHooks",
   "description": "Agent-driven workflow steps declare `run:` hooks that need to be executed at step boundaries, but the agent cannot call `HookRunner` directly — it interacts with specd through CLI commands. `RunStepHooks` is the use case that bridges this gap: given a change name, step name, and phase, it resolves the relevant `run:` hooks from the schema and project configuration, executes them via `HookRunner` with the correct failure semantics, and returns per-hook results for the CLI to report. It also serves as a shared hook execution engine for other use cases (`TransitionChange`, `ArchiveChange`) that need to run workflow hooks.",
-  "dependsOn": [
-    "core:core/hook-execution-model",
-    "core:core/hook-runner-port",
-    "core:core/schema-format",
-    "core:core/config",
-    "core:core/change",
-    "core:core/template-variables",
-    "core:core/archive-repository-port"
-  ],
+  "dependsOn": ["core:core/external-hook-runner-port"],
   "context": [
     "Agent-driven workflow steps declare `run:` hooks that need to be executed at step boundaries, but the agent cannot call `HookRunner` directly — it interacts with specd through CLI commands. `RunStepHooks` is the use case that bridges this gap: given a change name, step name, and phase, it resolves the relevant `run:` hooks from the schema and project configuration, executes them via `HookRunner` with the correct failure semantics, and returns per-hook results for the CLI to report. It also serves as a shared hook execution engine for other use cases (`TransitionChange`, `ArchiveChange`) that need to run workflow hooks."
   ],
@@ -54,6 +46,12 @@
       "requirement": "Hook collection",
       "rules": [
         "For the matched step and phase, `RunStepHooks` MUST collect `run:` hooks from `workflow[step].hooks[phase]` — only entries with `type: 'run'`, in declaration order.\n\n`instruction:` entries (type `'instruction'`) MUST be skipped — they are not executable.\n\nAll hooks — whether from the base schema, plugins, or overrides — are already merged into the schema's workflow steps by `ResolveSchema`. There is no separate project-level hook collection."
+      ]
+    },
+    {
+      "requirement": "External hook dispatch",
+      "rules": [
+        "`RunStepHooks` SHALL support explicit external hook entries in addition to shell `run:` hooks.\n\nFor an external hook entry, `RunStepHooks` MUST:\n\n- read the hook's `external.type` and `external.config`\n- resolve a registered external hook runner whose accepted-type declaration includes that type\n- dispatch execution through that external runner\n\nIf no registered external runner accepts the hook's `external.type`, `RunStepHooks` MUST fail with a clear error."
       ]
     },
     {
@@ -147,6 +145,29 @@
         "the collection contains only lint and test in that order",
         "AND guidance is not in the collection"
       ]
+    },
+    {
+      "requirement": "External hook dispatch",
+      "name": "External hook is dispatched to the runner selected by accepted type",
+      "given": [
+        "a workflow phase includes an explicit external hook whose external.type is docker",
+        "AND one registered external hook runner declares support for docker"
+      ],
+      "when": ["RunStepHooks.execute(...) collects and runs hooks for that phase"],
+      "then": [
+        "the hook is executed through that external runner",
+        "AND the runner receives the hook type, nested opaque config, and template variables for the change"
+      ]
+    },
+    {
+      "requirement": "External hook dispatch",
+      "name": "Unknown external hook type fails clearly",
+      "given": [
+        "a workflow phase includes an explicit external hook whose external.type is docker",
+        "AND no registered external hook runner declares support for docker"
+      ],
+      "when": ["RunStepHooks.execute(...) runs that phase"],
+      "then": ["it fails with a clear error", "AND the hook is not silently skipped"]
     },
     {
       "requirement": "Hook filtering with --only",
@@ -290,8 +311,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8e9443686096d4a0338603c721f7395f432107363aed43d08e2abc8675952fc2",
-    "verify.md": "sha256:19c43ce719162862f3d049bb63811124544564f96581d2888ab01e2e50339f34"
+    "spec.md": "sha256:396ff2e9e4cfd0eabbef4d5257c84a7bd60ceefc3f1a563201543cba841a197a",
+    "verify.md": "sha256:dd06a6dc5801df14f7900c1f7327c4e3b7524c58f48b532fe9a555884101c3c8"
   },
   "generatedBy": "core"
 }
