@@ -35,15 +35,19 @@ The command:
 2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
 3. In configured mode, derives `WorkspaceIndexTarget[]` from `SpecdConfig.workspaces` and uses `kernel.specs.repos` to provide spec sources
 4. In bootstrap mode, indexes the resolved repository root as a synthetic single `default` workspace whose `codeRoot` is the VCS root
-5. If `--force` is passed, deletes the `.lbug`, `.lbug.wal`, and `.lbug.lock` files before opening (rather than calling `clear()`)
-6. If `--workspace` is specified, filters to only that workspace
-7. For each workspace target, populates `excludePaths` and `respectGitignore` from `SpecdWorkspaceConfig.graph`. If `--exclude-path` flags are present, those patterns are **appended** to the config's `excludePaths` (or to the built-in defaults when no config `excludePaths` is set). `--exclude-path` never replaces config values — it always adds on top.
-8. Calls `index({ workspaces, projectRoot })` to perform the indexing
-9. Outputs the `IndexResult` with per-workspace breakdown
-10. Closes the provider
-11. Exits with `process.exit(0)` — this explicit exit is required because the LadybugDB native threads keep the Node process alive
+5. Acquires the shared graph indexing lock before opening the provider for mutation work
+6. If `--force` is passed, invokes the graph-store recreation capability before indexing so the backend starts from empty persisted state without the CLI knowing backend-specific files or directories
+7. If `--workspace` is specified, filters to only that workspace
+8. For each workspace target, populates `excludePaths` and `respectGitignore` from `SpecdWorkspaceConfig.graph`. If `--exclude-path` flags are present, those patterns are **appended** to the config's `excludePaths` (or to the built-in defaults when no config `excludePaths` is set). `--exclude-path` never replaces config values — it always adds on top.
+9. Calls `index({ workspaces, projectRoot })` to perform the indexing
+10. Outputs the `IndexResult` with per-workspace breakdown
+11. Releases the shared graph indexing lock during normal shutdown and signal-driven shutdown paths
+12. Closes the provider
+13. Exits with `process.exit(0)` — this explicit exit is required because the LadybugDB native threads keep the Node process alive
 
 When output is a TTY and format is `text`, progress is displayed on stderr using `\r\x1b[K` for in-place updates (overwriting the current line).
+
+The indexing lock is a CLI-level coordination mechanism that prevents overlapping graph commands from reaching backend lock failures first. If another indexing run already holds the lock, `graph index` fails fast with a user-facing retry-later message instead of attempting to mutate the backend concurrently.
 
 ### Requirement: Output format
 
@@ -90,7 +94,8 @@ For each other subcommand (`search`, `hotspots`, `stats`, `impact`), the documen
 
 - The CLI does not contain indexing logic — it delegates entirely to `@specd/code-graph`
 - `process.exit(0)` is called explicitly after closing the provider to prevent LadybugDB native threads from keeping the process alive
-- `--force` deletes the database files (`.lbug`, `.lbug.wal`, `.lbug.lock`) before opening; without it, indexing is incremental
+- `--force` delegates destructive backend recreation to the graph-store contract; the CLI does not delete backend-specific files directly
+- `graph index` owns the shared graph indexing lock and must release it on normal exit and signal-driven shutdown
 - The `withProvider` helper manages lifecycle and registers `SIGINT`/`SIGTERM` signal handlers
 - Workspace targets and spec sources are derived from `SpecdConfig` and `Kernel`, not from CLI arguments
 
@@ -133,3 +138,4 @@ $ specd graph index --format json
 - [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`specs/core/config/spec.md`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
 - [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — CodeGraphProvider, IndexResult
+- [`specs/code-graph/graph-store/spec.md`](../../code-graph/graph-store/spec.md) — abstract recreation semantics used by `--force`

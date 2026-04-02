@@ -35,6 +35,7 @@ describe('createKernelInternals', () => {
 
     const config: SpecdConfig = {
       projectRoot: tmpDir,
+      configPath: path.join(tmpDir, '.specd', 'config'),
       schemaRef: '@specd/schema-std',
       workspaces: [
         {

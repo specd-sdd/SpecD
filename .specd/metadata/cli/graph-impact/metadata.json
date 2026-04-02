@@ -1,7 +1,12 @@
 {
   "title": "Graph Impact",
   "description": "Before modifying code, developers and agents need to understand the blast radius — which other files and symbols depend on the change. The `specd graph impact` command runs impact analysis on a file, symbol, or set of changed files, reporting risk level, dependency counts, and affected files.",
-  "dependsOn": ["core:core/config"],
+  "dependsOn": [
+    "cli:cli/entrypoint",
+    "core:core/config",
+    "code-graph:code-graph/composition",
+    "code-graph:code-graph/traversal"
+  ],
   "context": [
     "Before modifying code, developers and agents need to understand the blast radius — which other files and symbols depend on the change. The `specd graph impact` command runs impact analysis on a file, symbol, or set of changed files, reporting risk level, dependency counts, and affected files."
   ],
@@ -31,6 +36,12 @@
       ]
     },
     {
+      "requirement": "Concurrent indexing guard",
+      "rules": [
+        "Before attempting to open the provider or execute graph-backed analysis, `graph impact` SHALL check the shared graph indexing lock used by `graph index`.\n\nIf indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.\n\nThis guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph."
+      ]
+    },
+    {
       "requirement": "Output format",
       "rules": [
         "**File impact** in `text` mode:\n\n```text\nImpact analysis for src/auth.ts (depth=5)\n  Risk level:       HIGH\n  Direct deps:      6\n  Indirect deps:    3\n  Transitive deps:  1\n  Affected files:   8\n\nAffected files:\n  src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)\n  src/session.ts: createSession:8 (d=2)\n\nPer-symbol breakdown:\n  src/auth.ts:function:validate:10:0  risk=HIGH direct=4\n  src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2\n```\n\nWhen affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).\n\nWhen `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.\n\n**Symbol impact** in `text` mode:\n\n```text\nImpact analysis for function createKernel (packages/core/src/composition/kernel.ts:147) (depth=5)\n  Risk level:       CRITICAL\n  Direct deps:      1\n  Indirect deps:    1\n  Transitive deps:  38\n  Affected files:   40\n\nAffected files:\n  packages/cli/src/kernel.ts: wireKernel:5 (d=1)\n  ...\n```\n\nWhen multiple symbols match, each analysis is listed sequentially.\n\n**Change detection** in `text` mode outputs the summary string from `ChangeDetectionResult.summary` followed by the affected files list.\n\nIn `json` or `toon` mode, the full result object is output as-is. The `AffectedSymbol` entries in JSON include the `depth` field."
@@ -39,7 +50,7 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "Exactly one of `--file`, `--symbol`, or `--changes` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file, --symbol, or --changes`.\n\nIf both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting graph access.\n\nIf the provider cannot be opened, the command exits with code 3."
+        "Exactly one of `--file`, `--symbol`, or `--changes` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file, --symbol, or --changes`.\n\nIf both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting graph access.\n\nIf the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.\n\nIf the provider cannot be opened, the command exits with code 3."
       ]
     }
   ],
@@ -50,7 +61,8 @@
     "--direction only applies to --file and --symbol, not to --changes",
     "--depth applies to all selectors (--file, --symbol, --changes)",
     "--depth must be a positive integer; invalid values exit with code 1",
-    "Context resolution SHALL use the shared graph CLI model rather than command-local path semantics"
+    "Context resolution SHALL use the shared graph CLI model rather than command-local path semantics",
+    "The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress"
   ],
   "scenarios": [
     {
@@ -172,6 +184,16 @@
       "then": ["stdout shows the summary with Risk: LOW"]
     },
     {
+      "requirement": "Concurrent indexing guard",
+      "name": "Impact analysis fails fast while the indexing lock is present",
+      "given": ["a graph index process currently holds the shared graph indexing lock"],
+      "when": ["specd graph impact --file src/auth.ts is run"],
+      "then": [
+        "the command exits with code 3 before opening the provider",
+        "AND it prints a short retry-later message explaining that the graph is currently being indexed"
+      ]
+    },
+    {
       "requirement": "Output format",
       "name": "Text output shows risk level and counts",
       "given": [
@@ -277,8 +299,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:3be9909d42d760fc431f6425dc3aaad7251b50a9c1355d7b19618f0f97bba184",
-    "verify.md": "sha256:7097217b805647e442c228ee4294f501016da3f51298206fc0a9b60c862787ee"
+    "spec.md": "sha256:0f4b9b22e756505e3230f1af1317553908e9c65344faef5d2c3bc51d5d461091",
+    "verify.md": "sha256:b97b8d9d046fc1a8511c9d183c5fc590d39cba609fcc18d172b18231024eeae2"
   },
   "generatedBy": "core"
 }

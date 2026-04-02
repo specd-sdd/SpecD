@@ -5,6 +5,7 @@ import { type SpecdConfig } from '@specd/core'
 function makeConfig(workspaceNames: string[]): SpecdConfig {
   return {
     projectRoot: '/project',
+    configPath: '/project/.specd/config',
     schemaRef: '@specd/schema-std',
     workspaces: workspaceNames.map((name) => ({
       name,

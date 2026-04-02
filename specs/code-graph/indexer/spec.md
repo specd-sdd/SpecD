@@ -63,21 +63,28 @@ Evaluation order when `respectGitignore: true`:
 
 ### Requirement: Two-pass extraction with in-memory index
 
-Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:
+Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` rather than store queries during analysis:
 
-- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter implements `extractNamespace` and `buildQualifiedName`, build a qualified name map for that language. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.
-- **Pass 2 (Resolve imports + CALLS + hierarchy, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map and call `extractRelations` with it to get `IMPORTS`, `CALLS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for code-file analysis. Accumulate all relations.
+- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, and build `DEFINES` and `EXPORTS` relations. When an adapter provides `extractSymbolsWithNamespace()`, the indexer MAY use it to obtain symbols and namespace information from a single parse; otherwise it uses the adapter's separate extraction methods. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter provides namespace and qualified-name support, build the qualified name map for that language. No store queries are needed during extraction.
+- **Pass 2 (Resolve imports + CALLS + hierarchy, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map and call `extractRelations()` with it to get `IMPORTS`, `CALLS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for code-file analysis.
 - **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.
-- **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.
-- **Rebuild FTS indexes** — After bulk load, call `GraphStore.rebuildFtsIndexes()` to drop and recreate full-text search indexes. This is required because LadybugDB FTS indexes are not automatically updated on insert.
+- **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once with the files, symbols, specs, and relations accumulated for the run. Concrete backends MAY use native bulk import mechanisms internally, but the indexer remains coupled only to the abstract graph-store contract.
+- **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()` so the active backend can bring its search indexes into a query-ready state when needed.
 
-This two-pass approach ensures all symbols exist in the index before import, call, and hierarchy resolution, while avoiding any store queries during extraction.
+This two-pass approach ensures all symbols exist in the index before import, call, and hierarchy resolution, while avoiding store queries during analysis.
 
 ### Requirement: Chunked processing
 
-Files are grouped into chunks where each chunk's total source size does not exceed a configurable byte budget (default: 20 MB). Each chunk is processed sequentially — file content strings from completed chunks are eligible for garbage collection, bounding peak memory usage.
+Files are grouped into chunks where each chunk's total source size does not exceed a configurable byte budget (default: 20 MB). Each chunk is processed sequentially so that content and intermediate extraction state from completed chunks are eligible for garbage collection, bounding peak memory usage.
 
 The chunk budget is configurable via `IndexOptions.chunkBytes`.
+
+Implementations MAY spill intermediate indexing artifacts to disk instead of retaining the full run in memory. When they do:
+
+- staged artifacts MUST live under the graph temporary directory derived from project configuration
+- staged artifacts MUST be scoped to the current indexing run
+- staged artifacts MUST be cleaned up after successful completion
+- staged artifacts SHOULD be cleaned up after failure when the process remains alive long enough to do so
 
 ### Requirement: Progress reporting
 
@@ -191,9 +198,8 @@ await store.close()
 
 ## Spec Dependencies
 
-- [`specs/code-graph/language-adapter/spec.md`](../language-adapter/spec.md) — adapter extraction and resolution rules
-- [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — `GraphStore` persistence port
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, hierarchy relation types
-- [`specs/code-graph/workspace-integration/spec.md`](../workspace-integration/spec.md) — workspace-prefixed paths and multi-workspace indexing
-- [`specs/core/config/spec.md`](../../core/config/spec.md) — workspace configuration and storage paths
-- [`specs/code-graph/database-schema/spec.md`](../database-schema/spec.md) — persisted relationship tables for hierarchy edges
+- [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — abstract graph-store contract used by the indexer
+- [`specs/code-graph/language-adapter/spec.md`](../language-adapter/spec.md) — adapter extraction and resolution capabilities
+- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — files, symbols, specs, relations, and result types
+- [`specs/code-graph/workspace-integration/spec.md`](../workspace-integration/spec.md) — workspace-prefixed path and spec identity rules
+- [`specs/core/config/spec.md`](../../core/config/spec.md) — graph discovery config and config-derived graph/temp directories

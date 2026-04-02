@@ -1,5 +1,5 @@
 import { describe, afterEach, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { LadybugGraphStore } from '../../../src/infrastructure/ladybug/ladybug-graph-store.js'
@@ -133,5 +133,19 @@ describe('LadybugGraphStore hierarchy persistence', () => {
     expect(SCHEMA_DDL).toContain('CREATE REL TABLE IF NOT EXISTS EXTENDS')
     expect(SCHEMA_DDL).toContain('CREATE REL TABLE IF NOT EXISTS IMPLEMENTS')
     expect(SCHEMA_DDL).toContain('CREATE REL TABLE IF NOT EXISTS OVERRIDES')
+  })
+
+  it('stores graph data under graph/ and recreates backend state destructively', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-test-'))
+
+    const store = new LadybugGraphStore(tempDir)
+    await store.open()
+    await store.close()
+
+    expect(existsSync(join(tempDir, 'graph', 'code-graph.lbug'))).toBe(true)
+
+    await store.recreate()
+
+    expect(existsSync(join(tempDir, 'graph'))).toBe(false)
   })
 })

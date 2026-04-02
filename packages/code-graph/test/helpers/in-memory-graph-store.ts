@@ -381,4 +381,13 @@ export class InMemoryGraphStore extends GraphStore {
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
   }
+
+  async recreate(): Promise<void> {
+    this.files.clear()
+    this.symbols.clear()
+    this.specs.clear()
+    this.relations = []
+    this._lastIndexedAt = undefined
+    this._lastIndexedRef = null
+  }
 }

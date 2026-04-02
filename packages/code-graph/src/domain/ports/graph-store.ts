@@ -278,4 +278,10 @@ export abstract class GraphStore {
    * @returns A promise that resolves when the store is cleared.
    */
   abstract clear(): Promise<void>
+
+  /**
+   * Recreates the backend's persisted graph storage from scratch.
+   * @returns A promise that resolves when persistent state has been reset.
+   */
+  abstract recreate(): Promise<void>
 }

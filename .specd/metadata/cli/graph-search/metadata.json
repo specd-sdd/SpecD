@@ -1,9 +1,9 @@
 {
   "title": "Graph Search",
-  "description": "The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides full-text search across both, ranked by relevance using BM25 scoring.",
-  "dependsOn": ["core:core/config"],
+  "description": "The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides relevance-ranked search across both through the abstract code-graph search capabilities.",
+  "dependsOn": ["code-graph:code-graph/graph-store"],
   "context": [
-    "The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides full-text search across both, ranked by relevance using BM25 scoring."
+    "The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides relevance-ranked search across both through the abstract code-graph search capabilities."
   ],
   "rules": [
     {
@@ -15,7 +15,7 @@
     {
       "requirement": "Search behaviour",
       "rules": [
-        "The command uses the shared graph CLI context model to resolve explicit config, autodetected config, or bootstrap mode before creating a `CodeGraphProvider` via `withProvider`.\n\nIt delegates to:\n\n- `provider.searchSymbols(options)` — full-text search on `Symbol.name` and `Symbol.comment`, with filters applied at the store level\n- `provider.searchSpecs(options)` — full-text search on `Spec.title`, `Spec.description`, and `Spec.content`, with filters applied at the store level\n\nBoth use LadybugDB's FTS extension with BM25 scoring. Results are returned ordered by score descending — highest relevance first.\n\nThe `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.\n\nThe validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value."
+        "The command uses the shared graph CLI context model to resolve explicit config, autodetected config, or bootstrap mode before creating a `CodeGraphProvider` via `withProvider`.\n\nIt delegates to:\n\n- `provider.searchSymbols(options)` — search across symbol search text and symbol comments, with filters applied at the store level\n- `provider.searchSpecs(options)` — search across spec title, description, and content, with filters applied at the store level\n\nThe concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first.\n\nThe `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.\n\nThe validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value.\n\nBefore attempting to open the provider, the command SHALL check the shared graph indexing lock used by `graph index`. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message instead of surfacing backend lock errors."
       ]
     },
     {
@@ -33,7 +33,8 @@
   ],
   "constraints": [
     "The CLI does not contain search logic — it delegates to CodeGraphProvider.searchSymbols and CodeGraphProvider.searchSpecs",
-    "FTS indexes must be built during indexing — search on an empty graph returns no results",
+    "Search depends on the active graph-store backend having prepared its search indexes during indexing or store maintenance",
+    "The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress",
     "The process.exit(0) pattern is required after closing the provider"
   ],
   "scenarios": [
@@ -80,43 +81,41 @@
     },
     {
       "requirement": "Search behaviour",
-      "name": "Results ranked by BM25 relevance",
+      "name": "Results ranked by relevance",
       "given": [
-        "specs hook-execution-model (contains \"hook execution\" many times) and architecture (contains \"hook\" once)"
+        "specs hook-execution-model (contains hook execution many times) and architecture (contains hook once)"
       ],
-      "when": ["specd graph search \"hook execution\" is run"],
+      "when": ["specd graph search \\\"hook execution\\\" is run"],
       "then": [
         "hook-execution-model appears before architecture",
-        "AND hook-execution-model has a higher score"
+        "AND the higher-ranked result has the stronger relevance score"
       ]
     },
     {
       "requirement": "Search behaviour",
-      "name": "Stemming matches word variants",
-      "given": ["a symbol with comment containing \"executing\""],
-      "when": ["specd graph search \"execution\" is run"],
-      "then": ["the symbol is returned (porter stemmer matches \"executing\" to \"execution\")"]
+      "name": "Search matches symbol comments",
+      "given": ["a symbol with comment containing executing the workflow hook"],
+      "when": ["specd graph search \\\"execution\\\" is run"],
+      "then": ["the symbol may be returned by the active backend's search implementation"]
     },
     {
       "requirement": "Search behaviour",
       "name": "Multi-word query matches across fields",
-      "given": [
-        "a spec with title \"Workspace Integration\" and content containing \"import resolution\""
-      ],
-      "when": ["specd graph search \"workspace import\" is run"],
+      "given": ["a spec with title Workspace Integration and content containing import resolution"],
+      "when": ["specd graph search \\\"workspace import\\\" is run"],
       "then": ["the spec is returned"]
     },
     {
       "requirement": "Search behaviour",
       "name": "No results",
-      "when": ["specd graph search \"xyznonexistent\" is run"],
+      "when": ["specd graph search \\\"xyznonexistent\\\" is run"],
       "then": ["No results found. is output"]
     },
     {
       "requirement": "Search behaviour",
       "name": "Missing config falls back to bootstrap mode",
       "given": ["no specd.yaml is found by autodiscovery"],
-      "when": ["specd graph search \"kernel\" is run inside a repository"],
+      "when": ["specd graph search \\\"kernel\\\" is run inside a repository"],
       "then": [
         "the command searches in bootstrap mode against the resolved VCS root as workspace default"
       ]
@@ -124,7 +123,7 @@
     {
       "requirement": "Search behaviour",
       "name": "Multiple kinds are passed through to the query layer",
-      "when": ["specd graph search \"transition\" --kind class,method,function is run"],
+      "when": ["specd graph search \\\"transition\\\" --kind class,method,function is run"],
       "then": [
         "the command trims and validates all three kind tokens",
         "AND the provider receives the full kind list rather than only the last token"
@@ -133,8 +132,18 @@
     {
       "requirement": "Search behaviour",
       "name": "Invalid kind token fails before query execution",
-      "when": ["specd graph search \"transition\" --kind method,unknownKind is run"],
+      "when": ["specd graph search \\\"transition\\\" --kind method,unknownKind is run"],
       "then": ["the command exits with code 1", "AND the search query is not executed"]
+    },
+    {
+      "requirement": "Search behaviour",
+      "name": "Search fails fast while indexing lock is present",
+      "given": ["a graph index process currently holds the shared graph indexing lock"],
+      "when": ["specd graph search \\\"kernel\\\" is run"],
+      "then": [
+        "the command exits with code 3 before opening the provider",
+        "AND it prints a short retry-later message explaining that the graph is currently being indexed"
+      ]
     },
     {
       "requirement": "Output format",
@@ -203,8 +212,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:3561e86b48c326fb49493c7b665699fc7c5039590fccd8559d169018bd0879ef",
-    "verify.md": "sha256:4397008902f60bf7761bf8734e69bc3ec2ec36a734f5ffe805fc5fa4508d65f8"
+    "spec.md": "sha256:b6ca96e5dc3b404d0b195aca62f1ab685656094ebe862ffa97f2507716bb8ac1",
+    "verify.md": "sha256:6c7d7c85e4fb25ff0f38353e3aa41c5867b0b959d12c0da45368fc2caef477a2"
   },
   "generatedBy": "core"
 }

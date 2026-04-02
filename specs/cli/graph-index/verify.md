@@ -32,12 +32,30 @@
 - **WHEN** `specd graph index` is run inside a repository
 - **THEN** the command indexes the resolved VCS root in bootstrap mode as workspace `default`
 
-#### Scenario: Force flag clears existing data
+#### Scenario: Force flag recreates backend state through the graph-store contract
 
 - **GIVEN** the workspace has been previously indexed
 - **WHEN** `specd graph index --force` is run
-- **THEN** the `.lbug`, `.lbug.wal`, and `.lbug.lock` files are deleted before opening the provider
-- **AND** `filesRemoved` in the output reflects the previously indexed files
+- **THEN** the command invokes the graph-store recreation capability before indexing
+- **AND** the CLI does not delete backend-specific database files directly
+
+#### Scenario: Indexing acquires the shared graph lock before mutation work
+
+- **WHEN** `specd graph index` starts an indexing run
+- **THEN** it acquires the shared graph indexing lock before opening the provider for mutation work
+
+#### Scenario: Indexing releases the shared graph lock on shutdown
+
+- **GIVEN** `specd graph index` acquired the shared graph indexing lock
+- **WHEN** the command finishes normally or handles shutdown via signal
+- **THEN** the lock is released before the process exits
+
+#### Scenario: Competing indexing run fails fast while the lock is held
+
+- **GIVEN** another `graph index` process already holds the shared graph indexing lock
+- **WHEN** a second `specd graph index` is started
+- **THEN** it exits with code 3
+- **AND** it prints a short retry-later message explaining that the graph is currently being indexed
 
 #### Scenario: Process exits explicitly
 

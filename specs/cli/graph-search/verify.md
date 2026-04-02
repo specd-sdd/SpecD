@@ -41,47 +41,54 @@
 
 ### Requirement: Search behaviour
 
-#### Scenario: Results ranked by BM25 relevance
+#### Scenario: Results ranked by relevance
 
-- **GIVEN** specs `hook-execution-model` (contains "hook execution" many times) and `architecture` (contains "hook" once)
-- **WHEN** `specd graph search "hook execution"` is run
+- **GIVEN** specs `hook-execution-model` (contains `hook execution` many times) and `architecture` (contains `hook` once)
+- **WHEN** `specd graph search \"hook execution\"` is run
 - **THEN** `hook-execution-model` appears before `architecture`
-- **AND** `hook-execution-model` has a higher score
+- **AND** the higher-ranked result has the stronger relevance score
 
-#### Scenario: Stemming matches word variants
+#### Scenario: Search matches symbol comments
 
-- **GIVEN** a symbol with comment containing "executing"
-- **WHEN** `specd graph search "execution"` is run
-- **THEN** the symbol is returned (porter stemmer matches "executing" to "execution")
+- **GIVEN** a symbol with comment containing `executing the workflow hook`
+- **WHEN** `specd graph search \"execution\"` is run
+- **THEN** the symbol may be returned by the active backend's search implementation
 
 #### Scenario: Multi-word query matches across fields
 
-- **GIVEN** a spec with title "Workspace Integration" and content containing "import resolution"
-- **WHEN** `specd graph search "workspace import"` is run
+- **GIVEN** a spec with title `Workspace Integration` and content containing `import resolution`
+- **WHEN** `specd graph search \"workspace import\"` is run
 - **THEN** the spec is returned
 
 #### Scenario: No results
 
-- **WHEN** `specd graph search "xyznonexistent"` is run
+- **WHEN** `specd graph search \"xyznonexistent\"` is run
 - **THEN** `No results found.` is output
 
 #### Scenario: Missing config falls back to bootstrap mode
 
 - **GIVEN** no `specd.yaml` is found by autodiscovery
-- **WHEN** `specd graph search "kernel"` is run inside a repository
+- **WHEN** `specd graph search \"kernel\"` is run inside a repository
 - **THEN** the command searches in bootstrap mode against the resolved VCS root as workspace `default`
 
 #### Scenario: Multiple kinds are passed through to the query layer
 
-- **WHEN** `specd graph search "transition" --kind class,method,function` is run
+- **WHEN** `specd graph search \"transition\" --kind class,method,function` is run
 - **THEN** the command trims and validates all three kind tokens
 - **AND** the provider receives the full kind list rather than only the last token
 
 #### Scenario: Invalid kind token fails before query execution
 
-- **WHEN** `specd graph search "transition" --kind method,unknownKind` is run
+- **WHEN** `specd graph search \"transition\" --kind method,unknownKind` is run
 - **THEN** the command exits with code 1
 - **AND** the search query is not executed
+
+#### Scenario: Search fails fast while indexing lock is present
+
+- **GIVEN** a `graph index` process currently holds the shared graph indexing lock
+- **WHEN** `specd graph search \"kernel\"` is run
+- **THEN** the command exits with code 3 before opening the provider
+- **AND** it prints a short retry-later message explaining that the graph is currently being indexed
 
 ### Requirement: Output format
 

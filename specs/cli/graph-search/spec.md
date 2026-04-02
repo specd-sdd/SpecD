@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides full-text search across both, ranked by relevance using BM25 scoring.
+The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides relevance-ranked search across both through the abstract code-graph search capabilities.
 
 ## Requirements
 
@@ -40,14 +40,16 @@ The command uses the shared graph CLI context model to resolve explicit config, 
 
 It delegates to:
 
-- `provider.searchSymbols(options)` — full-text search on `Symbol.name` and `Symbol.comment`, with filters applied at the store level
-- `provider.searchSpecs(options)` — full-text search on `Spec.title`, `Spec.description`, and `Spec.content`, with filters applied at the store level
+- `provider.searchSymbols(options)` — search across symbol search text and symbol comments, with filters applied at the store level
+- `provider.searchSpecs(options)` — search across spec title, description, and content, with filters applied at the store level
 
-Both use LadybugDB's FTS extension with BM25 scoring. Results are returned ordered by score descending — highest relevance first.
+The concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first.
 
 The `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.
 
 The validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value.
+
+Before attempting to open the provider, the command SHALL check the shared graph indexing lock used by `graph index`. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message instead of surfacing backend lock errors.
 
 ### Requirement: Output format
 
@@ -81,7 +83,8 @@ If the provider cannot be opened, the command exits with code 3 (same as other g
 ## Constraints
 
 - The CLI does not contain search logic — it delegates to `CodeGraphProvider.searchSymbols` and `CodeGraphProvider.searchSpecs`
-- FTS indexes must be built during indexing — search on an empty graph returns no results
+- Search depends on the active graph-store backend having prepared its search indexes during indexing or store maintenance
+- The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress
 - The `process.exit(0)` pattern is required after closing the provider
 
 ## Examples
@@ -156,7 +159,7 @@ Symbols (10):
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
 - [`specs/core/config/spec.md`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
-- [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — CodeGraphProvider facade
-- [`specs/code-graph/database-schema/spec.md`](../../code-graph/database-schema/spec.md) — FTS indexes
+- [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — `CodeGraphProvider` facade
+- [`specs/code-graph/graph-store/spec.md`](../../code-graph/graph-store/spec.md) — abstract graph-store search capabilities

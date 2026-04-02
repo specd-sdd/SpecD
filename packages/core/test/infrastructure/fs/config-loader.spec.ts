@@ -67,6 +67,43 @@ ${extra}
 // ---------------------------------------------------------------------------
 
 describe('FsConfigLoader', () => {
+  describe('Requirement: configPath', () => {
+    it('defaults configPath to .specd/config under the config directory', async () => {
+      const configPath = await writeConfig(minimalYaml())
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.configPath).toBe(path.join(tmpDir, '.specd', 'config'))
+    })
+
+    it('resolves an explicit configPath relative to specd.yaml', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+configPath: .specd/custom-config
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.configPath).toBe(path.join(tmpDir, '.specd', 'custom-config'))
+    })
+
+    it('rejects configPath values outside the repo root', async () => {
+      execSync('git init', { cwd: tmpDir, stdio: 'ignore' })
+      const configPath = await writeConfig(
+        minimalYaml(`
+configPath: ../outside
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+
+      await expect(loader.load()).rejects.toThrow(/configPath resolves outside repo root/)
+    })
+  })
+
   describe('Requirement: Project-level contextIncludeSpecs/contextExcludeSpecs', () => {
     it('reads project-level contextIncludeSpecs into SpecdConfig', async () => {
       const configPath = await writeConfig(

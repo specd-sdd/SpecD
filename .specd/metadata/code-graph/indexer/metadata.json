@@ -2,12 +2,11 @@
   "title": "Indexer",
   "description": "Source files change constantly and the code graph must be kept in sync without re-parsing the entire workspace every time. The indexer orchestrates the pipeline from file discovery through parsing to graph storage, using content hashing for incremental updates and language adapters for extraction. It is the primary write path into the code graph.",
   "dependsOn": [
-    "code-graph:code-graph/language-adapter",
     "code-graph:code-graph/graph-store",
+    "code-graph:code-graph/language-adapter",
     "code-graph:code-graph/symbol-model",
     "code-graph:code-graph/workspace-integration",
-    "core:core/config",
-    "code-graph:code-graph/database-schema"
+    "core:core/config"
   ],
   "context": [
     "Source files change constantly and the code graph must be kept in sync without re-parsing the entire workspace every time. The indexer orchestrates the pipeline from file discovery through parsing to graph storage, using content hashing for incremental updates and language adapters for extraction. It is the primary write path into the code graph."
@@ -34,13 +33,13 @@
     {
       "requirement": "Two-pass extraction with in-memory index",
       "rules": [
-        "Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` instead of store queries:\n\n- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, build `DEFINES` and `EXPORTS` relations. Accumulate all `FileNode`, `SymbolNode`, and relations in memory arrays. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter implements `extractNamespace` and `buildQualifiedName`, build a qualified name map for that language. No store queries are needed. The `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begins.\n- **Pass 2 (Resolve imports + CALLS + hierarchy, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map and call `extractRelations` with it to get `IMPORTS`, `CALLS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for code-file analysis. Accumulate all relations.\n- **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.\n- **Bulk load** — After all passes complete, call `GraphStore.bulkLoad()` once with all accumulated files, symbols, specs, and relations. This uses CSV `COPY FROM` internally for speed.\n- **Rebuild FTS indexes** — After bulk load, call `GraphStore.rebuildFtsIndexes()` to drop and recreate full-text search indexes. This is required because LadybugDB FTS indexes are not automatically updated on insert.\n\nThis two-pass approach ensures all symbols exist in the index before import, call, and hierarchy resolution, while avoiding any store queries during extraction."
+        "Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` rather than store queries during analysis:\n\n- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, and build `DEFINES` and `EXPORTS` relations. When an adapter provides `extractSymbolsWithNamespace()`, the indexer MAY use it to obtain symbols and namespace information from a single parse; otherwise it uses the adapter's separate extraction methods. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter provides namespace and qualified-name support, build the qualified name map for that language. No store queries are needed during extraction.\n- **Pass 2 (Resolve imports + CALLS + hierarchy, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName → workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map and call `extractRelations()` with it to get `IMPORTS`, `CALLS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for code-file analysis.\n- **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.\n- **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once with the files, symbols, specs, and relations accumulated for the run. Concrete backends MAY use native bulk import mechanisms internally, but the indexer remains coupled only to the abstract graph-store contract.\n- **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()` so the active backend can bring its search indexes into a query-ready state when needed.\n\nThis two-pass approach ensures all symbols exist in the index before import, call, and hierarchy resolution, while avoiding store queries during analysis."
       ]
     },
     {
       "requirement": "Chunked processing",
       "rules": [
-        "Files are grouped into chunks where each chunk's total source size does not exceed a configurable byte budget (default: 20 MB). Each chunk is processed sequentially — file content strings from completed chunks are eligible for garbage collection, bounding peak memory usage.\n\nThe chunk budget is configurable via `IndexOptions.chunkBytes`."
+        "Files are grouped into chunks where each chunk's total source size does not exceed a configurable byte budget (default: 20 MB). Each chunk is processed sequentially so that content and intermediate extraction state from completed chunks are eligible for garbage collection, bounding peak memory usage.\n\nThe chunk budget is configurable via `IndexOptions.chunkBytes`.\n\nImplementations MAY spill intermediate indexing artifacts to disk instead of retaining the full run in memory. When they do:\n\n- staged artifacts MUST live under the graph temporary directory derived from project configuration\n- staged artifacts MUST be scoped to the current indexing run\n- staged artifacts MUST be cleaned up after successful completion\n- staged artifacts SHOULD be cleaned up after failure when the process remains alive long enough to do so"
       ]
     },
     {
@@ -250,6 +249,16 @@
     },
     {
       "requirement": "Two-pass extraction with in-memory index",
+      "name": "Combined namespace and symbol extraction uses one adapter fast path",
+      "given": ["a language adapter implements extractSymbolsWithNamespace()"],
+      "when": ["Pass 1 processes a file from that language"],
+      "then": [
+        "the indexer may obtain symbols and namespace information from that single adapter call",
+        "AND it does not need a separate namespace-only extraction step for that file"
+      ]
+    },
+    {
+      "requirement": "Two-pass extraction with in-memory index",
       "name": "PHP unresolved qualified name falls back to path resolution",
       "given": [
         "a PHP file importing App\\Services\\Mailer",
@@ -265,7 +274,7 @@
       "requirement": "Two-pass extraction with in-memory index",
       "name": "PHP import unresolvable via both mechanisms produces no relation",
       "given": [
-        "a PHP file containing use Vendor\\External\\Class",
+        "a PHP file containing use Vendor\\\\External\\\\Class",
         "AND the qualified name is not in the symbol index",
         "AND resolveQualifiedNameToPath returns undefined for that name"
       ],
@@ -307,6 +316,19 @@
       "given": ["IndexOptions.chunkBytes is set to 5 MB"],
       "when": ["indexing runs"],
       "then": ["chunks do not exceed 5 MB of source content"]
+    },
+    {
+      "requirement": "Chunked processing",
+      "name": "Staged artifacts use the configured graph temp directory",
+      "given": [
+        "the implementation spills intermediate indexing artifacts to disk",
+        "AND project config resolves a graph temp directory from configPath"
+      ],
+      "when": ["indexing runs"],
+      "then": [
+        "run-scoped staged artifacts are written under that graph temp directory",
+        "AND they are cleaned after a successful run"
+      ]
     },
     {
       "requirement": "Progress reporting",
@@ -471,8 +493,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:2d58a20e73e348c97a274e208594959f1c38402c3f0a96e160feed0f0548b81c",
-    "verify.md": "sha256:725f2423f11cb014146e1b6c436ca22a5eac6bdd713a2d92f6630551c6f9c6f8"
+    "spec.md": "sha256:91cd32c1a4e8bf7f6aef9ece82d4566c134be0099db593dd16f2cd028b8e7e2d",
+    "verify.md": "sha256:9ca397cec016ecc3a31fb000e533d6ac3cbe1fa395bb1ad6f5ab77ac30b865a4"
   },
   "generatedBy": "core"
 }

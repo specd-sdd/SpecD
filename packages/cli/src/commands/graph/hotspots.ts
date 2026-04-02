@@ -5,6 +5,7 @@ import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
+import { assertGraphIndexUnlocked } from './graph-index-lock.js'
 
 /**
  * Collects repeatable option values into an array.
@@ -137,6 +138,7 @@ Exclude examples:
             1,
           ),
         )
+        assertGraphIndexUnlocked(config)
 
         await withProvider(config, opts.format, async (provider) => {
           const options: HotspotOptions = {

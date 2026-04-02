@@ -17,14 +17,16 @@ export function createBootstrapGraphConfig(params: {
   readonly projectRoot: string
   readonly vcsRoot: string
 }): SpecdConfig {
+  const configPath = join(params.projectRoot, '.specd', 'config')
   return {
     projectRoot: params.projectRoot,
+    configPath,
     schemaRef: '@specd/schema-std',
     workspaces: [
       {
         name: 'default',
         specsPath: join(params.projectRoot, 'specs'),
-        schemasPath: join(params.projectRoot, '.specd', 'schemas'),
+        schemasPath: join(configPath, 'schemas'),
         codeRoot: params.vcsRoot,
         ownership: 'owned',
         isExternal: false,

@@ -97,6 +97,15 @@
 - **WHEN** `specd graph impact --changes src/isolated.ts` is run
 - **THEN** stdout shows the summary with `Risk: LOW`
 
+### Requirement: Concurrent indexing guard
+
+#### Scenario: Impact analysis fails fast while the indexing lock is present
+
+- **GIVEN** a `graph index` process currently holds the shared graph indexing lock
+- **WHEN** `specd graph impact --file src/auth.ts` is run
+- **THEN** the command exits with code 3 before opening the provider
+- **AND** it prints a short retry-later message explaining that the graph is currently being indexed
+
 ### Requirement: Output format
 
 #### Scenario: Text output shows risk level and counts

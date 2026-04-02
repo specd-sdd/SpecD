@@ -37,6 +37,14 @@ The command:
 
 In bootstrap mode, the command SHALL behave as if there were a single `default` workspace whose `codeRoot` is the resolved VCS root.
 
+### Requirement: Concurrent indexing guard
+
+Before attempting to open the provider, `graph stats` SHALL check the shared graph indexing lock used by `graph index`.
+
+If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.
+
+This guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph.
+
 ### Requirement: Output format
 
 In `text` mode (default), the output is a labelled summary:
@@ -72,6 +80,8 @@ In `json` or `toon` mode, the full `GraphStatistics` object is output as-is, wit
 
 ### Requirement: Error cases
 
+If the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.
+
 If the provider cannot be opened or statistics retrieval fails due to an infrastructure error, the command exits with code 3.
 
 ## Constraints
@@ -80,6 +90,7 @@ If the provider cannot be opened or statistics retrieval fails due to an infrast
 - `process.exit(0)` is called explicitly after closing the provider
 - Zero-value relation counts are omitted from text output for readability
 - Context resolution SHALL use the shared graph CLI model rather than command-local path semantics
+- The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress
 
 ## Examples
 

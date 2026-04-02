@@ -50,6 +50,12 @@
       ]
     },
     {
+      "requirement": "Graph config path",
+      "rules": [
+        "`specd.yaml` MAY declare a top-level `configPath` field for derived graph persistence and temporary graph artifacts.\n\n```yaml\nconfigPath: .specd/config\n```\n\nWhen omitted, `configPath` defaults to `.specd/config` relative to the directory containing `specd.yaml`.\n\n`configPath` is project-level only. It MUST resolve inside the project repo root and is used for tool-owned graph artifacts rather than authored project content.\n\nThe following derived directories are defined from it:\n\n- **`{configPath}/graph`** — graph persistence root used by code-graph backends\n- **`{configPath}/tmp`** — temporary scratch directory for graph/indexing artifacts\n\n`configPath` does not replace the `storage` section for changes, drafts, discarded changes, or archives. Those remain governed by `storage.*`."
+      ]
+    },
+    {
       "requirement": "Template variables",
       "rules": [
         "Some configuration values support template variables that specd expands at use time. The following sets of variables are defined:\n\nThe following variables are available in **`archivePattern`**:\n\n| Variable                  | Value                                                                                                   |\n| ------------------------- | ------------------------------------------------------------------------------------------------------- |\n| `{{change.name}}`         | The change's slug name                                                                                  |\n| `{{change.archivedName}}` | The change's full archived directory name (e.g. `2024-01-15-add-auth-flow`) — the default pattern value |\n| `{{change.workspace}}`    | The primary workspace of the change                                                                     |\n| `{{year}}`                | Four-digit current year (e.g. `2024`)                                                                   |\n| `{{date}}`                | ISO date at archive time (e.g. `2024-01-15`)                                                            |\n\nThe following variables are available in **`schemaOverrides` workflow hook `run` commands** and in **schema-level workflow hook `run` commands**:\n\n| Variable               | Value                                                        |\n| ---------------------- | ------------------------------------------------------------ |\n| `{{change.name}}`      | The change's slug name                                       |\n| `{{change.workspace}}` | The primary workspace of the change                          |\n| `{{change.path}}`      | Absolute path to the change directory                        |\n| `{{project.root}}`     | Absolute path to the project root (where `specd.yaml` lives) |"
@@ -400,6 +406,26 @@
       "name": "Unknown adapter",
       "when": ["storage.changes.adapter is set to an unrecognised value (e.g. \"s3\")"],
       "then": ["specd exits with a validation error listing supported adapters"]
+    },
+    {
+      "requirement": "Graph config path",
+      "name": "configPath defaults to repo-local graph config directory",
+      "given": ["specd.yaml omits configPath"],
+      "when": ["the config is loaded"],
+      "then": [
+        "configPath resolves to .specd/config relative to the config file",
+        "AND the derived graph directories are .specd/config/graph and .specd/config/tmp"
+      ]
+    },
+    {
+      "requirement": "Graph config path",
+      "name": "Explicit configPath stays project-level",
+      "given": ["specd.yaml declares configPath: .specd/state"],
+      "when": ["the config is loaded"],
+      "then": [
+        "the derived graph directories are .specd/state/graph and .specd/state/tmp",
+        "AND storage.changes, storage.drafts, storage.discarded, and storage.archive remain governed by the separate storage section"
+      ]
     },
     {
       "requirement": "Template variables",
@@ -824,8 +850,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:d077aad69259b445fd73131363231a83a5b102478ee583515c08e0bdd078c552",
-    "verify.md": "sha256:075b09b58c5ad8fcd2f276a91da1a83ff77f0822e0323932c8052cd768f97594"
+    "spec.md": "sha256:2ea149efa931c219437562b702b4249c5f1b44b8e68dce86d760fb546daf9e55",
+    "verify.md": "sha256:bcdce0c74797af564394ff326d23d63c8eccaa2daf77a2ff7422018e42ebb53c"
   },
   "generatedBy": "core"
 }

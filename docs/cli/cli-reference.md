@@ -703,7 +703,7 @@ Indexes workspace source files into the code graph. When a `specd.yaml` is suppl
 | Option                      | Description                                                           |
 | --------------------------- | --------------------------------------------------------------------- |
 | `--workspace <name>`        | Index only the named workspace.                                       |
-| `--force`                   | Full re-index, ignoring cached file hashes.                           |
+| `--force`                   | Recreate the graph backend and run a full re-index.                   |
 | `--config <path>`           | Config file path. Mutually exclusive with `--path`.                   |
 | `--path <path>`             | Repository root bootstrap path. Ignores any discovered config.        |
 | `--exclude-path <pattern>`  | Gitignore-syntax pattern to exclude (repeatable; merges with config). |
@@ -742,6 +742,14 @@ CLI `--exclude-path` flags merge (append) on top of the effective exclusion list
 specd graph index --exclude-path "packages/generated/*" --exclude-path "tmp/"
 ```
 
+#### Shared indexing lock
+
+`graph index` is the writer-side owner of a shared graph CLI lock stored under `{configPath}/graph/index.lock`.
+
+- while this lock is held, `graph search`, `graph hotspots`, `graph stats`, and `graph impact` fail fast before opening the provider
+- the user-facing message is: `The code graph is currently being indexed. Try again in a few seconds.`
+- the lock is removed when `graph index` exits normally and is also cleaned up on termination signals
+
 ---
 
 ### graph search
@@ -751,6 +759,8 @@ specd graph search <query> [options]
 ```
 
 Search for symbols or specs in the code graph. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
+
+If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
 
 | Option                       | Description                                                                     |
 | ---------------------------- | ------------------------------------------------------------------------------- |
@@ -776,6 +786,8 @@ specd graph hotspots [options]
 ```
 
 List the most connected symbols in the graph ranked by coupling risk. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
+
+If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
 
 | Option                       | Description                                                                                                 |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -808,6 +820,8 @@ specd graph stats [options]
 
 Print summary statistics for the current code graph. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
+If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
+
 | Option                      | Description                                                    |
 | --------------------------- | -------------------------------------------------------------- |
 | `--config <path>`           | Config file path. Mutually exclusive with `--path`.            |
@@ -823,6 +837,8 @@ specd graph impact [options]
 ```
 
 Analyze the downstream or upstream impact of a symbol or file. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
+
+If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
 
 | Option                                   | Description                                                    |
 | ---------------------------------------- | -------------------------------------------------------------- |

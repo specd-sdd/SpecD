@@ -207,6 +207,25 @@ All four sub-keys (`changes`, `drafts`, `discarded`, `archive`) are required. `a
 
 **`archive` index** — the archive directory contains a `.specd-index.jsonl` file that caches metadata from individual manifests for fast listing. This file is a **derived cache**, not a source of truth — the manifests inside each archived change directory are authoritative. `specd init` gitignores `.specd-index.jsonl` inside the archive directory (via a local `.gitignore`), so the index is never committed. When the index is missing (e.g. after a fresh clone) or stale (e.g. after pulling new archives from other developers), it is automatically rebuilt from the manifest files on disk. Staleness is detected by comparing manifest paths on disk against paths recorded in the index.
 
+### Requirement: Graph config path
+
+`specd.yaml` MAY declare a top-level `configPath` field for derived graph persistence and temporary graph artifacts.
+
+```yaml
+configPath: .specd/config
+```
+
+When omitted, `configPath` defaults to `.specd/config` relative to the directory containing `specd.yaml`.
+
+`configPath` is project-level only. It MUST resolve inside the project repo root and is used for tool-owned graph artifacts rather than authored project content.
+
+The following derived directories are defined from it:
+
+- **`{configPath}/graph`** — graph persistence root used by code-graph backends
+- **`{configPath}/tmp`** — temporary scratch directory for graph/indexing artifacts
+
+`configPath` does not replace the `storage` section for changes, drafts, discarded changes, or archives. Those remain governed by `storage.*`.
+
 ### Requirement: Template variables
 
 Some configuration values support template variables that specd expands at use time. The following sets of variables are defined:

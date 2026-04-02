@@ -1,0 +1,207 @@
+{
+  "title": "Ladybug Graph Store",
+  "description": "`GraphStore` is the storage contract for the code graph, but the concrete Ladybug-backed implementation has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements that are specific to `LadybugGraphStore`: its physical schema, persistence layout, full-text indexing behavior, and bulk-load mechanics.",
+  "dependsOn": ["code-graph:code-graph/graph-store", "core:core/config"],
+  "context": [
+    "`GraphStore` is the storage contract for the code graph, but the concrete Ladybug-backed implementation has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements that are specific to `LadybugGraphStore`: its physical schema, persistence layout, full-text indexing behavior, and bulk-load mechanics."
+  ],
+  "rules": [
+    {
+      "requirement": "Ladybug-backed implementation",
+      "rules": [
+        "`LadybugGraphStore` SHALL implement the `GraphStore` contract using LadybugDB as the storage engine. It is an infrastructure adapter and owns all backend-specific concerns that are not part of the abstract `GraphStore` port.\n\nThe adapter MUST:\n\n- open and close a Ladybug database connection safely\n- execute the Ladybug-specific schema DDL on first use\n- keep backend-specific schema version state\n- translate the abstract graph-store operations into Ladybug queries and bulk-load operations"
+      ]
+    },
+    {
+      "requirement": "Config-derived persistence layout",
+      "rules": [
+        "`LadybugGraphStore` SHALL use the project-level `configPath` as the root for its persisted and temporary filesystem artifacts.\n\nThe adapter MUST derive:\n\n- a graph persistence directory at `{configPath}/graph`\n- a temporary scratch directory at `{configPath}/tmp`\n\nThe concrete database files, lock files, WAL files, and CSV scratch files owned by the Ladybug adapter SHALL live only under those derived directories. The adapter MUST create the required directories on demand."
+      ]
+    },
+    {
+      "requirement": "Destructive recreation",
+      "rules": [
+        "`LadybugGraphStore` SHALL implement the abstract `GraphStore.recreate()` capability using Ladybug-specific persistence cleanup under the configured graph root.\n\nWhen `recreate()` is invoked, the adapter MUST ensure that the next indexing run starts from an empty Ladybug backend without requiring callers to know any Ladybug-specific filenames. The implementation MAY close and reopen connections as needed, but the observable effect MUST be that:\n\n- all persisted Ladybug graph data under `{configPath}/graph` is discarded\n- any backend-owned companion artifacts such as lock or WAL files are also discarded when they belong to the same graph persistence root\n- the backend is ready to be opened again and rebuilt from scratch\n\nCallers such as `graph index --force` MUST depend on this abstract recreation behavior rather than deleting `.lbug`, `.wal`, `.lock`, or any other backend-specific artifacts directly."
+      ]
+    },
+    {
+      "requirement": "Ladybug schema ownership",
+      "rules": [
+        "`LadybugGraphStore` SHALL own the Ladybug-specific persisted schema for files, symbols, specs, relations, and store metadata.\n\nThat schema MUST define:\n\n- node tables for `File`, `Symbol`, `Spec`, and `Meta`\n- relationship tables matching the persisted `RelationType` values used by the code graph, including `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`\n- any derived or backend-specific storage columns required by the implementation, such as `searchName`\n\nThe physical schema is an implementation concern of the Ladybug adapter. Storage-agnostic consumers MUST depend on `code-graph:code-graph/graph-store` instead of this spec."
+      ]
+    },
+    {
+      "requirement": "Node tables",
+      "rules": [
+        "The Ladybug schema SHALL define the following node tables:\n\n**File** — source files indexed from workspace code roots.\n\n| Column      | Type   | Notes                                      |\n| ----------- | ------ | ------------------------------------------ |\n| path        | STRING | Primary key. `{workspace}:{relativePath}`. |\n| language    | STRING | Language identifier (e.g. `typescript`).   |\n| contentHash | STRING | SHA-256 hash of file content.              |\n| workspace   | STRING | Workspace name (e.g. `core`, `cli`).       |\n\n**Symbol** — code symbols extracted from files.\n\n| Column     | Type   | Notes                                                                    |\n| ---------- | ------ | ------------------------------------------------------------------------ |\n| id         | STRING | Primary key. `{filePath}:{kind}:{name}:{line}`.                          |\n| name       | STRING | Symbol's declared name.                                                  |\n| searchName | STRING | Expanded name for backend search. camelCase/snake\\_case/kebab-case split + original. |\n| kind       | STRING | `SymbolKind` value.                                                      |\n| filePath   | STRING | References `File.path`.                                                  |\n| line       | INT64  | 1-based line number.                                                     |\n| col        | INT64  | 0-based column offset.                                                   |\n| comment    | STRING | Raw preceding comment text, stored as empty string when absent.          |\n\n**Spec** — specification documents from workspace spec directories.\n\n| Column      | Type   | Notes                                                                                                                                                         |\n| ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |\n| specId      | STRING | Primary key. `{workspace}:{specPath}`.                                                                                                                        |\n| path        | STRING | Spec path within the workspace.                                                                                                                               |\n| title       | STRING | From spec metadata or fallback title policy.                                                                                                                  |\n| description | STRING | From spec metadata.                                                                                                                                            |\n| contentHash | STRING | SHA-256 hash of concatenated artifacts (excluding metadata artifact content when that is not part of searchable spec content).                               |\n| content     | STRING | Concatenated artifact text for full-text search.                                                                                                              |\n| workspace   | STRING | Workspace name.                                                                                                                                               |\n\n**Meta** — key-value metadata for the database itself.\n\n| Column | Type   | Notes                                      |\n| ------ | ------ | ------------------------------------------ |\n| key    | STRING | Primary key (e.g. `lastIndexedAt`).        |\n| value  | STRING | Metadata value.                            |"
+      ]
+    },
+    {
+      "requirement": "Relationship tables",
+      "rules": [
+        "The Ladybug schema SHALL define relationship tables for the persisted relation types used by the code graph.\n\nAt minimum, the schema MUST persist:\n\n| Relationship | From   | To     | Populated by                  |\n| ------------ | ------ | ------ | ----------------------------- |\n| IMPORTS      | File   | File   | Indexer analysis              |\n| DEFINES      | File   | Symbol | Indexer analysis              |\n| CALLS        | Symbol | Symbol | Indexer analysis              |\n| EXPORTS      | File   | Symbol | Indexer analysis              |\n| DEPENDS\\_ON   | Spec   | Spec   | Spec indexing                 |\n| COVERS       | Spec   | File   | Reserved for spec-to-code linkage |\n| EXTENDS      | Symbol | Symbol | Indexer analysis              |\n| IMPLEMENTS   | Symbol | Symbol | Indexer analysis              |\n| OVERRIDES    | Symbol | Symbol | Indexer analysis              |\n\nThe schema MUST provide a persisted `COVERS` relation family so the backend can support spec-to-code linkage when the package activates that behavior. The existence of the relation family is part of the abstract graph model; the Ladybug-specific concern here is only how it is materialized physically.\n\nRelationship tables have no persisted edge properties unless a future implementation-specific requirement adds them explicitly."
+      ]
+    },
+    {
+      "requirement": "Full-text search implementation",
+      "rules": [
+        "`LadybugGraphStore` SHALL implement symbol and spec search using Ladybug's full-text search facilities.\n\nThe adapter MUST:\n\n- create the Ladybug FTS indexes needed to satisfy the abstract `GraphStore.searchSymbols()` and `GraphStore.searchSpecs()` contract\n- index symbols using both the stored symbol name and the backend-specific expanded search text used for compound-name matching\n- index spec title, description, and full content for spec search\n- rebuild or recreate FTS indexes when required by the backend after bulk data changes\n\nThe relevance scores returned through the abstract store contract MAY be backend-specific, but results SHALL be ordered from highest to lowest relevance.\n\nThe Ladybug FTS schema MUST include:\n\n- **`symbol_fts`** — covering `Symbol.searchName` and `Symbol.comment`\n- **`spec_fts`** — covering `Spec.title`, `Spec.description`, and `Spec.content`\n\nThe implementation MAY use stemming or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied."
+      ]
+    },
+    {
+      "requirement": "Schema versioning",
+      "rules": [
+        "`LadybugGraphStore` SHALL track a backend-specific schema version for its persisted Ladybug schema.\n\nWhen the adapter opens a database:\n\n1. it executes the current Ladybug schema definition\n2. it verifies or records the current schema version in persisted metadata\n3. it prepares any required FTS indexes\n\nIf the persisted Ladybug schema version is incompatible with the expected version, the implementation MAY require a destructive rebuild rather than attempting incremental migration.\n\nThere is no requirement that Ladybug schema upgrades be incremental. A force rebuild is an acceptable recovery strategy when the implementation cannot migrate safely."
+      ]
+    },
+    {
+      "requirement": "Bulk loading and scratch files",
+      "rules": [
+        "`LadybugGraphStore` SHALL support efficient bulk loading for large indexing runs.\n\nThe adapter MAY materialize bulk-load scratch artifacts such as CSV files under `{configPath}/tmp`. When it does:\n\n- scratch files MUST be scoped to the current indexing run\n- scratch files MUST be cleaned up after successful completion\n- scratch files SHOULD be cleaned up after failure when the process remains alive long enough to do so\n\nThe adapter MAY use backend-specific import flags or batching strategies to keep Ladybug bulk-load operations stable, provided the observable `GraphStore` contract is preserved."
+      ]
+    },
+    {
+      "requirement": "Concrete database files",
+      "rules": [
+        "The Ladybug-backed graph persistence under `{configPath}/graph` SHALL own the concrete Ladybug database files required by the implementation.\n\nThe adapter MAY create backend-specific companion files such as lock or WAL files next to the primary database file. Those files are part of the Ladybug implementation detail and are not part of the abstract `GraphStore` contract."
+      ]
+    },
+    {
+      "requirement": "Persisted metadata keys",
+      "rules": [
+        "`LadybugGraphStore` SHALL persist store-level metadata needed by the abstract graph-store contract, including the values surfaced through `GraphStatistics` such as `lastIndexedAt` and `lastIndexedRef`.\n\nBackend-specific metadata storage details remain internal to the adapter."
+      ]
+    }
+  ],
+  "constraints": [
+    "LadybugGraphStore is an infrastructure adapter, not part of the abstract graph-store contract",
+    "Ladybug-specific file layout, FTS behavior, schema shape, and schema-version handling are defined here, not in code-graph:code-graph/graph-store",
+    "All Ladybug scratch files and persisted database artifacts are rooted under configPath",
+    "Node table layout, relationship tables, and FTS index shape defined here are Ladybug-specific and MUST NOT be treated as a portable graph-store schema",
+    "Storage-agnostic use cases and CLI commands MUST NOT depend on this spec unless they truly require Ladybug-specific behavior"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Ladybug-backed implementation",
+      "name": "Backend initialization stays inside the adapter",
+      "when": ["LadybugGraphStore.open() is called through the abstract GraphStore lifecycle"],
+      "then": [
+        "the adapter initializes its Ladybug-specific connection and schema state before serving queries",
+        "AND storage-agnostic callers do not need to know any Ladybug DDL or query details"
+      ]
+    },
+    {
+      "requirement": "Config-derived persistence layout",
+      "name": "Graph and tmp directories are derived from configPath",
+      "given": ["project config resolves configPath to /repo/.specd/config"],
+      "when": ["LadybugGraphStore.open() or a bulk-loading operation needs filesystem storage"],
+      "then": [
+        "persistent Ladybug files are created only under /repo/.specd/config/graph",
+        "AND scratch artifacts are created only under /repo/.specd/config/tmp"
+      ]
+    },
+    {
+      "requirement": "Destructive recreation",
+      "name": "Recreate discards Ladybug-owned graph files under the graph root",
+      "given": ["Ladybug persistence already exists under {configPath}/graph"],
+      "when": ["LadybugGraphStore.recreate() is invoked through the abstract force-reset path"],
+      "then": [
+        "the previously persisted Ladybug graph state is discarded",
+        "AND any Ladybug-owned companion artifacts in the same graph root are discarded with it",
+        "AND callers do not target .lbug, .wal, or .lock files directly"
+      ]
+    },
+    {
+      "requirement": "Ladybug schema ownership",
+      "name": "Physical schema remains backend-specific",
+      "when": ["storage-agnostic use cases depend on GraphStore"],
+      "then": [
+        "they rely only on abstract node and relation semantics",
+        "AND Ladybug table names, storage columns, and index shape remain internal to LadybugGraphStore"
+      ]
+    },
+    {
+      "requirement": "Node tables",
+      "name": "SearchName remains a backend column",
+      "given": ["a symbol named handleUserLogin"],
+      "when": ["the symbol is persisted by LadybugGraphStore"],
+      "then": [
+        "the physical Symbol table includes both the declared name and the backend-specific searchName",
+        "AND storage-agnostic consumers still observe the symbol through the abstract SymbolNode"
+      ]
+    },
+    {
+      "requirement": "Relationship tables",
+      "name": "COVERS is materialized even before population is activated",
+      "when": ["the Ladybug schema is initialized for a fresh graph database"],
+      "then": [
+        "a persisted COVERS relation family exists alongside the active code-graph relation families",
+        "AND the backend is ready to store Spec -> File links when spec-to-code indexing is introduced"
+      ]
+    },
+    {
+      "requirement": "Full-text search implementation",
+      "name": "Search indexes are rebuilt after bulk data changes",
+      "given": ["the backend has inserted symbols and specs through bulk-loading operations"],
+      "when": ["rebuildFtsIndexes() is invoked"],
+      "then": [
+        "Ladybug search indexes are recreated so subsequent abstract search queries see the new data"
+      ]
+    },
+    {
+      "requirement": "Schema versioning",
+      "name": "Incompatible schema version permits rebuild strategy",
+      "given": [
+        "the persisted Ladybug metadata records a schema version older than the adapter expects"
+      ],
+      "when": ["the adapter opens the database and determines it cannot migrate safely"],
+      "then": ["it may require a destructive rebuild instead of applying an incremental migration"]
+    },
+    {
+      "requirement": "Bulk loading and scratch files",
+      "name": "Run-scoped scratch files are cleaned after success",
+      "given": ["a bulk load materializes CSV scratch files under {configPath}/tmp"],
+      "when": ["the bulk load completes successfully"],
+      "then": [
+        "the run-scoped scratch files are removed",
+        "AND unrelated files in the same temp root are left untouched"
+      ]
+    },
+    {
+      "requirement": "Bulk loading and scratch files",
+      "name": "Failure leaves cleanup as best effort",
+      "given": ["a bulk load process crashes after creating run-scoped scratch files"],
+      "when": ["the process cannot reach normal cleanup logic"],
+      "then": [
+        "leftover scratch files are tolerated as backend-owned temporary artifacts",
+        "AND the next run may clean or replace them without affecting the abstract store contract"
+      ]
+    },
+    {
+      "requirement": "Concrete database files",
+      "name": "Backend companion files stay under graph persistence root",
+      "when": ["Ladybug creates a primary database file together with lock or WAL companions"],
+      "then": [
+        "all of those files live under {configPath}/graph",
+        "AND callers do not configure or address those files individually through the abstract port"
+      ]
+    },
+    {
+      "requirement": "Persisted metadata keys",
+      "name": "Store statistics read metadata from backend storage",
+      "given": [
+        "the adapter has persisted lastIndexedAt and lastIndexedRef in its metadata storage"
+      ],
+      "when": ["GraphStore.getStatistics() is called through the abstract port"],
+      "then": [
+        "the returned GraphStatistics reflects those persisted values",
+        "AND callers do not depend on how Ladybug stores them physically"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:6611daa5d456c07c2ef82392e872a4d779f8ecd79b0b8d11167473fcf4d7298a",
+    "verify.md": "sha256:36c57a1b8d7b7dc81bed8ec3336b6b43c6bfcfb79c10b66661d455509f0958ec"
+  },
+  "generatedBy": "core"
+}

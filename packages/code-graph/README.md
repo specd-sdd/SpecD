@@ -14,7 +14,7 @@ a persistent graph database for impact analysis, traversal, and full-text search
 - **Hotspot detection** — ranks symbols by how many dependents they have
 - **Change detection** — given a list of changed files, returns all transitively affected symbols
 - **Full-text search** — BM25-ranked search across symbols and spec documents
-- **Persistent storage** — backed by LadybugDB (embedded SQLite via `lbug`)
+- **Persistent storage** — backed by `LadybugGraphStore`, with backend files rooted under the configured specd config path
 - **Workspace-aware** — paths and IDs are prefixed with workspace name for cross-workspace uniqueness
 
 ## Domain model
@@ -76,7 +76,12 @@ await graph.close()
 ```
 
 Pass a `SpecdConfig` (the standard specd configuration object) to
-`createCodeGraphProvider` and it derives the storage path from `config.projectRoot`.
+`createCodeGraphProvider` and it derives the storage path from `config.configPath`.
+
+For the default project layout this means:
+
+- graph backend files under `.specd/config/graph`
+- graph staging and scratch files under `.specd/config/tmp`
 
 ## Role in specd
 

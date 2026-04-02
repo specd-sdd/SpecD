@@ -187,6 +187,22 @@
 - **WHEN** `storage.changes.adapter` is set to an unrecognised value (e.g. `"s3"`)
 - **THEN** specd exits with a validation error listing supported adapters
 
+### Requirement: Graph config path
+
+#### Scenario: configPath defaults to repo-local graph config directory
+
+- **GIVEN** `specd.yaml` omits `configPath`
+- **WHEN** the config is loaded
+- **THEN** `configPath` resolves to `.specd/config` relative to the config file
+- **AND** the derived graph directories are `.specd/config/graph` and `.specd/config/tmp`
+
+#### Scenario: Explicit configPath stays project-level
+
+- **GIVEN** `specd.yaml` declares `configPath: .specd/state`
+- **WHEN** the config is loaded
+- **THEN** the derived graph directories are `.specd/state/graph` and `.specd/state/tmp`
+- **AND** `storage.changes`, `storage.drafts`, `storage.discarded`, and `storage.archive` remain governed by the separate `storage` section
+
 ### Requirement: Template variables
 
 #### Scenario: Archive pattern with year prefix

@@ -4,6 +4,7 @@ import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
+import { assertGraphIndexUnlocked } from './graph-index-lock.js'
 
 /**
  * Registers the `graph stats` command.
@@ -49,6 +50,7 @@ JSON/TOON output schema:
           1,
         ),
       )
+      assertGraphIndexUnlocked(config)
 
       await withProvider(config, opts.format, async (provider) => {
         const stats = await provider.getStatistics()

@@ -103,6 +103,8 @@ export interface SpecdStorageConfig {
 export interface SpecdConfig {
   /** Absolute path to the directory containing the active `specd.yaml`. */
   readonly projectRoot: string
+  /** Absolute path to the specd-owned config root. */
+  readonly configPath: string
   /** Schema reference string as declared in `specd.yaml` (e.g. `'@specd/schema-std'`). */
   readonly schemaRef: string
   /** All configured workspaces. Must contain exactly one `name === 'default'` entry. */
@@ -145,6 +147,7 @@ export interface SpecdConfig {
 /** Minimal shape check for {@link isSpecdConfig} — validates the structural signature. */
 const specdConfigShape = z.object({
   projectRoot: z.string(),
+  configPath: z.string(),
   schemaRef: z.string(),
   workspaces: z.array(z.object({ name: z.string() })),
   storage: z.object({ changesPath: z.string() }),

@@ -51,6 +51,23 @@ Every other field covered in this guide is optional. Start here and add what you
 
 ---
 
+## Runtime-owned config root
+
+Beyond `storage`, SpecD also keeps backend-owned runtime files under `configPath`. This root is for project-local operational state rather than workflow artifacts.
+
+```yaml
+configPath: .specd/config
+```
+
+When omitted, this is the default. Today the code graph uses it like this:
+
+- `{configPath}/graph` for persisted graph backend files
+- `{configPath}/tmp` for graph staging and scratch files
+
+This keeps graph runtime state separate from lifecycle directories such as `changes/`, `drafts/`, and `archive/`.
+
+---
+
 ## Local overrides
 
 Alongside `specd.yaml` you can create a `specd.local.yaml`. When this file is present, SpecD uses it exclusively and ignores `specd.yaml` entirely — it is not merged or layered on top. The local file must be a valid, self-contained configuration on its own.

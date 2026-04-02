@@ -58,6 +58,7 @@ export function mockProcessExit(): void {
 export function makeMockConfig(overrides: Partial<SpecdConfig> = {}): SpecdConfig {
   return {
     projectRoot: '/project',
+    configPath: '/project/.specd/config',
     schemaRef: '@specd/schema-std',
     workspaces: [
       {

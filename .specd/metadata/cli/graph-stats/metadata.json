@@ -1,7 +1,12 @@
 {
   "title": "Graph Stats",
   "description": "Without a quick overview of the code graph's contents, users and agents cannot tell whether the graph is populated, how large it is, or when it was last updated. The `specd graph stats` command displays summary statistics from the code graph so users can assess coverage and freshness at a glance.",
-  "dependsOn": ["core:core/config"],
+  "dependsOn": [
+    "cli:cli/entrypoint",
+    "core:core/config",
+    "code-graph:code-graph/composition",
+    "code-graph:code-graph/staleness-detection"
+  ],
   "context": [
     "Without a quick overview of the code graph's contents, users and agents cannot tell whether the graph is populated, how large it is, or when it was last updated. The `specd graph stats` command displays summary statistics from the code graph so users can assess coverage and freshness at a glance."
   ],
@@ -19,6 +24,12 @@
       ]
     },
     {
+      "requirement": "Concurrent indexing guard",
+      "rules": [
+        "Before attempting to open the provider, `graph stats` SHALL check the shared graph indexing lock used by `graph index`.\n\nIf indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.\n\nThis guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph."
+      ]
+    },
+    {
       "requirement": "Output format",
       "rules": [
         "In `text` mode (default), the output is a labelled summary:\n\n```\nFiles:     459\nSymbols:   1497\nSpecs:     122\nLanguages: javascript, typescript\nRelations:\n  IMPORTS: 1227\n  DEFINES: 1497\nLast indexed: 2026-03-14T10:38:30.178Z\n```\n\n- `Files`, `Symbols`, `Specs` show `fileCount`, `symbolCount`, `specCount`\n- `Languages` shows the `languages` array joined by `, `\n- `Relations` shows only non-zero relation counts from `relationCounts`, each on its own indented line\n- `Last indexed` shows `lastIndexedAt` as an ISO 8601 timestamp\n\nIf the graph is stale, a warning line SHALL be appended after `Last indexed`:\n\n```\n⚠ Graph is stale (indexed at <short-ref>, current: <short-ref>)\n```\n\nWhere `<short-ref>` is the first 7 characters of the ref. If `lastIndexedRef` is `null`, no staleness line is shown.\n\nIn `json` or `toon` mode, the full `GraphStatistics` object is output as-is, with two additional fields:\n\n- `stale: boolean | null` — `true` if stale, `false` if fresh, `null` if unknown\n- `currentRef: string | null` — the current VCS ref, or `null` if unavailable"
@@ -27,7 +38,7 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "If the provider cannot be opened or statistics retrieval fails due to an infrastructure error, the command exits with code 3."
+        "If the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.\n\nIf the provider cannot be opened or statistics retrieval fails due to an infrastructure error, the command exits with code 3."
       ]
     }
   ],
@@ -35,7 +46,8 @@
     "The CLI does not compute statistics — it delegates entirely to @specd/code-graph",
     "process.exit(0) is called explicitly after closing the provider",
     "Zero-value relation counts are omitted from text output for readability",
-    "Context resolution SHALL use the shared graph CLI model rather than command-local path semantics"
+    "Context resolution SHALL use the shared graph CLI model rather than command-local path semantics",
+    "The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress"
   ],
   "scenarios": [
     {
@@ -84,6 +96,16 @@
       "given": ["the project has no VCS (e.g. no .git/ directory)"],
       "when": ["graph stats is executed"],
       "then": ["currentRef SHALL be null", "AND the command SHALL proceed without error"]
+    },
+    {
+      "requirement": "Concurrent indexing guard",
+      "name": "Stats fail fast while the indexing lock is present",
+      "given": ["a graph index process currently holds the shared graph indexing lock"],
+      "when": ["specd graph stats is run"],
+      "then": [
+        "the command exits with code 3 before opening the provider",
+        "AND it prints a short retry-later message explaining that the graph is currently being indexed"
+      ]
     },
     {
       "requirement": "Output format",
@@ -135,8 +157,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:7541397dd428048909225fcac7c7bd6f0b73b46b126001e8b26d9437723050c7",
-    "verify.md": "sha256:ea7c43de140dcd142525770f33fe6f1730390193a26e5f180cd801e57726301d"
+    "spec.md": "sha256:e06e6bf437fdfde36af6a0314e8ae851e7b54d5caa570204d9a692772b0912ba",
+    "verify.md": "sha256:b992734c13d9485d94e3d4afa36af79423cc18ea81f75f23a717fb068e5da6c8"
   },
   "generatedBy": "core"
 }

@@ -4,6 +4,7 @@ import { cliError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
+import { assertGraphIndexUnlocked } from './graph-index-lock.js'
 
 /**
  * Formats an impact result as text lines.
@@ -155,6 +156,7 @@ JSON/TOON output schema:
             1,
           ),
         )
+        assertGraphIndexUnlocked(config)
 
         await withProvider(config, opts.format, async (provider) => {
           if (opts.symbol) {

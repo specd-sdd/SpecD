@@ -14,11 +14,16 @@ type Provider = ReturnType<typeof createCodeGraphProvider>
  * @param config - The specd configuration.
  * @param format - The output format string (for error reporting).
  * @param fn - The async callback receiving the opened provider.
+ * @param options - Optional lifecycle hooks around provider open.
+ * @param options.beforeOpen - Optional callback invoked after provider creation but before open().
  */
 export async function withProvider(
   config: SpecdConfig,
   format: string,
   fn: (provider: Provider) => Promise<void>,
+  options?: {
+    readonly beforeOpen?: (provider: Provider) => Promise<void>
+  },
 ): Promise<void> {
   const provider = createCodeGraphProvider(config)
 
@@ -30,6 +35,7 @@ export async function withProvider(
   process.on('SIGTERM', forceExit)
 
   try {
+    await options?.beforeOpen?.(provider)
     await provider.open()
     await fn(provider)
   } catch (err) {

@@ -23,7 +23,7 @@ export interface CodeGraphOptions {
  *
  * Accepts either a `SpecdConfig` (primary, workspace-aware) or a `CodeGraphOptions`
  * (legacy, standalone). When given `SpecdConfig`, derives the storage path from
- * `config.projectRoot`.
+ * `config.configPath`.
  *
  * @param options - SpecdConfig or CodeGraphOptions.
  * @returns A fully configured {@link CodeGraphProvider} instance.
@@ -31,7 +31,7 @@ export interface CodeGraphOptions {
 export function createCodeGraphProvider(
   options: SpecdConfig | CodeGraphOptions,
 ): CodeGraphProvider {
-  const storagePath = isSpecdConfig(options) ? options.projectRoot : options.storagePath
+  const storagePath = isSpecdConfig(options) ? options.configPath : options.storagePath
 
   const store = new LadybugGraphStore(storagePath)
 
