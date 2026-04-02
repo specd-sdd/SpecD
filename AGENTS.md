@@ -11,6 +11,10 @@ You are working on **specd**, a spec-driven development platform built in TypeSc
 specd is now the primary workflow entry point for this repository. Do not treat the
 repo as a generic codebase where you can inspect files and make edits directly first.
 
+Only skip this if the user are not asking for changes in code, you can skip if the user
+is investigating, but you MUST go throught `specd` in the moment something is going to be
+modified.
+
 - Start by using the `specd` skill, when you need to orient yourself, inspect active changes, or decide the next workflow step
 - Use the CLI via `node packages/cli/dist/index.js ...` for specd commands; do not use bare `specd`
 - Every meaningful change must go through a specd change workflow; there is no "code-only" path
@@ -55,6 +59,26 @@ current turn when the active skill says to stop or let the user decide:
 - run `change transition`
 - run `change approve`
 - run `change archive`
+
+## Explicit User Override: Escape Hatch
+
+A direct, explicit user instruction in the current turn may authorize a one-off code or repo edit outside the normal `specd` change workflow when all of the following are true:
+
+- the user clearly requests to bypass the workflow for this specific task
+- the requested work is narrow, local, and immediately actionable
+- the agent restates that it is proceeding outside the normal `specd` workflow
+- the agent does not use this escape hatch to perform lifecycle operations on behalf of the user
+
+This escape hatch is limited to direct repository edits and investigation work. It does NOT authorize the agent to autonomously perform any `specd` workflow or lifecycle action that would normally require explicit user choice or approval.
+
+Even when this override is used:
+
+- prefer the smallest possible change
+- do not create, transition, approve, validate, archive, or discard changes unless the user explicitly asks for that exact workflow command
+- do not treat the override as persistent; it applies only to the current task and current turn context
+- still obey all other safety, filesystem, and non-destructive editing rules
+
+If there is ambiguity about whether the user intends to bypass the workflow, default to the normal `specd` path.
 
 ## Mandatory: specd Skill Stop Rule
 
