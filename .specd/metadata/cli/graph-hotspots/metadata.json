@@ -31,6 +31,12 @@
       ]
     },
     {
+      "requirement": "Concurrent indexing guard",
+      "rules": [
+        "Before attempting to open the provider, `graph hotspots` SHALL check the shared graph indexing lock used by `graph index`.\n\nIf indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.\n\nThis guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph."
+      ]
+    },
+    {
       "requirement": "Output format",
       "rules": [
         "In `text` mode, the command SHALL print a ranked table with:\n\n- total returned entries and total symbol count\n- per-entry score\n- per-entry risk level\n- per-entry cross-workspace caller count\n- per-entry kind\n- per-entry symbol name\n- workspace-qualified file location\n\nIf no entries match, the command SHALL output `No hotspots found.`\n\nIn `json` or `toon` mode, the command SHALL output an object containing `totalSymbols` and `entries`. Each entry SHALL include the symbol payload, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, and the derived `workspace` field."
@@ -39,7 +45,7 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "If both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting any graph access.\n\nIf the provider cannot be opened or hotspot retrieval fails due to an infrastructure error, the command SHALL exit with code 3."
+        "If both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting any graph access.\n\nIf the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.\n\nIf the provider cannot be opened or hotspot retrieval fails due to an infrastructure error, the command SHALL exit with code 3."
       ]
     },
     {
@@ -52,7 +58,8 @@
   "constraints": [
     "The CLI SHALL delegate hotspot computation to @specd/code-graph",
     "--kind validation SHALL use the same allowed kind set as the code graph symbol model",
-    "Bootstrap mode SHALL not reinterpret --config; it is selected only by --path or by missing config"
+    "Bootstrap mode SHALL not reinterpret --config; it is selected only by --path or by missing config",
+    "The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress"
   ],
   "scenarios": [
     {
@@ -171,6 +178,16 @@
       ]
     },
     {
+      "requirement": "Concurrent indexing guard",
+      "name": "Hotspots fail fast while the indexing lock is present",
+      "given": ["a graph index process currently holds the shared graph indexing lock"],
+      "when": ["specd graph hotspots is run"],
+      "then": [
+        "the command exits with code 3 before opening the provider",
+        "AND it prints a short retry-later message explaining that the graph is currently being indexed"
+      ]
+    },
+    {
       "requirement": "Output format",
       "name": "Text output shows ranked hotspot table",
       "given": ["hotspot results exist"],
@@ -241,8 +258,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8ba5e4c8143616210020a50ddc0215ee8b30658b91f6ecacd8163051470fe92e",
-    "verify.md": "sha256:310937a97ffd930b567f83479b19e446ae2559582f9d3e1fd53316bdb179195d"
+    "spec.md": "sha256:133868cdd5684629c39f65a9a3cabb64701ef82ab0cf8ecfb213bec9dd27fb1e",
+    "verify.md": "sha256:1083d80664da28dbb3615dc315c50f95e9f97e96e5b542828f72f259f85fded6"
   },
   "generatedBy": "core"
 }

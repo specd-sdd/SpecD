@@ -42,6 +42,15 @@
 - **THEN** `currentRef` SHALL be `null`
 - **AND** the command SHALL proceed without error
 
+### Requirement: Concurrent indexing guard
+
+#### Scenario: Stats fail fast while the indexing lock is present
+
+- **GIVEN** a `graph index` process currently holds the shared graph indexing lock
+- **WHEN** `specd graph stats` is run
+- **THEN** the command exits with code 3 before opening the provider
+- **AND** it prints a short retry-later message explaining that the graph is currently being indexed
+
 ### Requirement: Output format
 
 #### Scenario: Text output with fresh graph

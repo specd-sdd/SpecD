@@ -61,6 +61,14 @@ When `--changes` is provided:
 2. Calls `detectChanges(files)` with the list of file paths
 3. Outputs the summary and affected files
 
+### Requirement: Concurrent indexing guard
+
+Before attempting to open the provider or execute graph-backed analysis, `graph impact` SHALL check the shared graph indexing lock used by `graph index`.
+
+If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.
+
+This guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph.
+
 ### Requirement: Output format
 
 **File impact** in `text` mode:
@@ -113,6 +121,8 @@ Exactly one of `--file`, `--symbol`, or `--changes` must be provided. If none or
 
 If both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting graph access.
 
+If the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.
+
 If the provider cannot be opened, the command exits with code 3.
 
 ## Constraints
@@ -124,6 +134,7 @@ If the provider cannot be opened, the command exits with code 3.
 - `--depth` applies to all selectors (`--file`, `--symbol`, `--changes`)
 - `--depth` must be a positive integer; invalid values exit with code 1
 - Context resolution SHALL use the shared graph CLI model rather than command-local path semantics
+- The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress
 
 ## Examples
 

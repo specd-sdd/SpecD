@@ -15,6 +15,10 @@ vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
+vi.mock('../../src/commands/graph/graph-index-lock.js', () => ({
+  assertGraphIndexUnlocked: vi.fn(),
+}))
+
 vi.mock('@specd/core', async () => {
   const actual = await vi.importActual<typeof import('@specd/core')>('@specd/core')
   return {
@@ -27,6 +31,7 @@ vi.mock('@specd/core', async () => {
 
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
+import { assertGraphIndexUnlocked } from '../../src/commands/graph/graph-index-lock.js'
 import { registerGraphStats } from '../../src/commands/graph/stats.js'
 
 function setup(mode: 'configured' | 'bootstrap' = 'configured') {
@@ -112,6 +117,17 @@ describe('graph stats', () => {
       configPath: undefined,
       repoPath: undefined,
     })
+  })
+
+  it('checks the shared index lock before opening the provider', async () => {
+    setup()
+
+    const program = makeStatsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'stats'])
+
+    expect(assertGraphIndexUnlocked).toHaveBeenCalledWith(
+      expect.objectContaining({ configPath: '/project/.specd/config' }),
+    )
   })
 
   it('rejects --config and --path together', async () => {

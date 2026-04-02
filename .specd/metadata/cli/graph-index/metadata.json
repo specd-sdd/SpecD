@@ -1,7 +1,7 @@
 {
   "title": "Graph Index",
   "description": "Without an up-to-date code graph, all graph-based queries return stale or empty results. The `specd graph index` command indexes the current workspace into the code graph, reporting what was discovered, indexed, skipped, and removed so users and agents can verify completeness.",
-  "dependsOn": ["core:core/config"],
+  "dependsOn": ["code-graph:code-graph/graph-store"],
   "context": [
     "Without an up-to-date code graph, all graph-based queries return stale or empty results. The `specd graph index` command indexes the current workspace into the code graph, reporting what was discovered, indexed, skipped, and removed so users and agents can verify completeness."
   ],
@@ -15,7 +15,7 @@
     {
       "requirement": "Indexing behaviour",
       "rules": [
-        "The command uses the shared graph CLI context model together with `withProvider`, which manages the `CodeGraphProvider` lifecycle and registers `SIGINT`/`SIGTERM` signal handlers for graceful shutdown.\n\nThe command:\n\n1. Validates that `--config` and `--path` are not both present\n2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n3. In configured mode, derives `WorkspaceIndexTarget[]` from `SpecdConfig.workspaces` and uses `kernel.specs.repos` to provide spec sources\n4. In bootstrap mode, indexes the resolved repository root as a synthetic single `default` workspace whose `codeRoot` is the VCS root\n5. If `--force` is passed, deletes the `.lbug`, `.lbug.wal`, and `.lbug.lock` files before opening (rather than calling `clear()`)\n6. If `--workspace` is specified, filters to only that workspace\n7. For each workspace target, populates `excludePaths` and `respectGitignore` from `SpecdWorkspaceConfig.graph`. If `--exclude-path` flags are present, those patterns are **appended** to the config's `excludePaths` (or to the built-in defaults when no config `excludePaths` is set). `--exclude-path` never replaces config values — it always adds on top.\n8. Calls `index({ workspaces, projectRoot })` to perform the indexing\n9. Outputs the `IndexResult` with per-workspace breakdown\n10. Closes the provider\n11. Exits with `process.exit(0)` — this explicit exit is required because the LadybugDB native threads keep the Node process alive\n\nWhen output is a TTY and format is `text`, progress is displayed on stderr using `\\r\\x1b[K` for in-place updates (overwriting the current line)."
+        "The command uses the shared graph CLI context model together with `withProvider`, which manages the `CodeGraphProvider` lifecycle and registers `SIGINT`/`SIGTERM` signal handlers for graceful shutdown.\n\nThe command:\n\n1. Validates that `--config` and `--path` are not both present\n2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n3. In configured mode, derives `WorkspaceIndexTarget[]` from `SpecdConfig.workspaces` and uses `kernel.specs.repos` to provide spec sources\n4. In bootstrap mode, indexes the resolved repository root as a synthetic single `default` workspace whose `codeRoot` is the VCS root\n5. Acquires the shared graph indexing lock before opening the provider for mutation work\n6. If `--force` is passed, invokes the graph-store recreation capability before indexing so the backend starts from empty persisted state without the CLI knowing backend-specific files or directories\n7. If `--workspace` is specified, filters to only that workspace\n8. For each workspace target, populates `excludePaths` and `respectGitignore` from `SpecdWorkspaceConfig.graph`. If `--exclude-path` flags are present, those patterns are **appended** to the config's `excludePaths` (or to the built-in defaults when no config `excludePaths` is set). `--exclude-path` never replaces config values — it always adds on top.\n9. Calls `index({ workspaces, projectRoot })` to perform the indexing\n10. Outputs the `IndexResult` with per-workspace breakdown\n11. Releases the shared graph indexing lock during normal shutdown and signal-driven shutdown paths\n12. Closes the provider\n13. Exits with `process.exit(0)` — this explicit exit is required because the LadybugDB native threads keep the Node process alive\n\nWhen output is a TTY and format is `text`, progress is displayed on stderr using `\\r\\x1b[K` for in-place updates (overwriting the current line).\n\nThe indexing lock is a CLI-level coordination mechanism that prevents overlapping graph commands from reaching backend lock failures first. If another indexing run already holds the lock, `graph index` fails fast with a user-facing retry-later message instead of attempting to mutate the backend concurrently."
       ]
     },
     {
@@ -40,7 +40,8 @@
   "constraints": [
     "The CLI does not contain indexing logic — it delegates entirely to @specd/code-graph",
     "process.exit(0) is called explicitly after closing the provider to prevent LadybugDB native threads from keeping the process alive",
-    "--force deletes the database files (.lbug, .lbug.wal, .lbug.lock) before opening; without it, indexing is incremental",
+    "--force delegates destructive backend recreation to the graph-store contract; the CLI does not delete backend-specific files directly",
+    "graph index owns the shared graph indexing lock and must release it on normal exit and signal-driven shutdown",
     "The withProvider helper manages lifecycle and registers SIGINT/SIGTERM signal handlers",
     "Workspace targets and spec sources are derived from SpecdConfig and Kernel, not from CLI arguments"
   ],
@@ -85,12 +86,37 @@
     },
     {
       "requirement": "Indexing behaviour",
-      "name": "Force flag clears existing data",
+      "name": "Force flag recreates backend state through the graph-store contract",
       "given": ["the workspace has been previously indexed"],
       "when": ["specd graph index --force is run"],
       "then": [
-        "the .lbug, .lbug.wal, and .lbug.lock files are deleted before opening the provider",
-        "AND filesRemoved in the output reflects the previously indexed files"
+        "the command invokes the graph-store recreation capability before indexing",
+        "AND the CLI does not delete backend-specific database files directly"
+      ]
+    },
+    {
+      "requirement": "Indexing behaviour",
+      "name": "Indexing acquires the shared graph lock before mutation work",
+      "when": ["specd graph index starts an indexing run"],
+      "then": [
+        "it acquires the shared graph indexing lock before opening the provider for mutation work"
+      ]
+    },
+    {
+      "requirement": "Indexing behaviour",
+      "name": "Indexing releases the shared graph lock on shutdown",
+      "given": ["specd graph index acquired the shared graph indexing lock"],
+      "when": ["the command finishes normally or handles shutdown via signal"],
+      "then": ["the lock is released before the process exits"]
+    },
+    {
+      "requirement": "Indexing behaviour",
+      "name": "Competing indexing run fails fast while the lock is held",
+      "given": ["another graph index process already holds the shared graph indexing lock"],
+      "when": ["a second specd graph index is started"],
+      "then": [
+        "it exits with code 3",
+        "AND it prints a short retry-later message explaining that the graph is currently being indexed"
       ]
     },
     {
@@ -198,8 +224,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:37a4aaa4376ecefba56a77a15e1fe4aa9959d0c92d9348343e8cc3aba2ca3636",
-    "verify.md": "sha256:8ba97d337ee2b0db3c25d2b30ab4b92c8fccd52a8809255e4a1ed9a83bac70cf"
+    "spec.md": "sha256:9fb6cd8626846a55e5b9667f1a9dc678919fb43af8dcc202db565b540de2ff3f",
+    "verify.md": "sha256:70c783563ffb4a0ae1f7e95f99f1f07dee0fd454446b5d60452b6448edfecc25"
   },
   "generatedBy": "core"
 }

@@ -1,21 +1,37 @@
 {
   "title": "Graph Store",
-  "description": "The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. The graph store defines the persistence port and its LadybugDB adapter, providing the storage backbone for indexing, querying, and traversal operations.",
-  "dependsOn": ["code-graph:code-graph/symbol-model"],
+  "description": "The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. This spec defines the abstract `GraphStore` contract that indexing, traversal, and CLI features depend on, without prescribing any particular storage engine or physical schema.",
+  "dependsOn": [
+    "code-graph:code-graph/symbol-model",
+    "default:_global/architecture",
+    "code-graph:code-graph/staleness-detection"
+  ],
   "context": [
-    "The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. The graph store defines the persistence port and its LadybugDB adapter, providing the storage backbone for indexing, querying, and traversal operations."
+    "The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. This spec defines the abstract `GraphStore` contract that indexing, traversal, and CLI features depend on, without prescribing any particular storage engine or physical schema."
   ],
   "rules": [
     {
       "requirement": "GraphStore port",
       "rules": [
-        "`GraphStore` SHALL be an abstract class with a `storagePath` constructor parameter specifying where the graph database is stored on disk. It defines the contract for all graph persistence operations. Concrete implementations provide the storage engine.\n\nThe port follows the project's hexagonal architecture: it is defined in `domain/ports/` (or `application/ports/` if it requires async operations), and adapters live in `infrastructure/`."
+        "`GraphStore` SHALL be an abstract class with a `storagePath` constructor parameter specifying the filesystem root allocated to the concrete graph-store implementation. It defines the contract for all graph persistence operations. Concrete implementations own the physical schema, file layout, and backend-specific storage details.\n\nThe port follows the project's hexagonal architecture: it is defined in `domain/ports/`, and concrete adapters live in `infrastructure/`."
+      ]
+    },
+    {
+      "requirement": "Minimum graph semantics",
+      "rules": [
+        "Every `GraphStore` implementation SHALL support the code-graph package's minimum persisted semantics, regardless of its backend-specific physical schema or file layout.\n\nAt minimum, the abstract store contract MUST support:\n\n- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries\n- symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries\n- spec nodes carrying the `SpecNode` data needed by spec indexing and search\n- persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`, `DEPENDS_ON`, `COVERS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`\n- store-level metadata sufficient to satisfy abstract statistics and staleness-facing fields such as `lastIndexedAt` and `lastIndexedRef`\n\n`COVERS` is the abstract relation family reserved for linking specs to code artifacts. A backend MAY leave it unpopulated until the package introduces the corresponding indexing and query behavior, but the relation family itself belongs to the abstract graph model rather than to any one backend.\n\nBackends MAY represent those concepts differently internally, but they MUST preserve the observable semantics exposed by the `GraphStore` API. Storage-agnostic consumers MUST rely on these abstract semantics rather than any backend-specific table, label, or index shape."
       ]
     },
     {
       "requirement": "Connection lifecycle",
       "rules": [
-        "`GraphStore` SHALL expose explicit `open(): Promise<void>` and `close(): Promise<void>` methods. All query and mutation methods MUST throw `StoreNotOpenError` (extending `CodeGraphError`) if called before `open()` or after `close()`. The `open()` method initializes the database connection and runs any pending schema migrations. The `close()` method flushes pending writes and releases resources."
+        "`GraphStore` SHALL expose explicit `open(): Promise<void>` and `close(): Promise<void>` methods. All query and mutation methods MUST throw `StoreNotOpenError` (extending `CodeGraphError`) if called before `open()` or after `close()`.\n\nThe `open()` method prepares the concrete backend for read/write operations. The `close()` method flushes pending writes and releases resources. Any backend-specific schema initialization, migrations, or index preparation remain implementation concerns."
+      ]
+    },
+    {
+      "requirement": "Store recreation",
+      "rules": [
+        "`GraphStore` SHALL provide `recreate(): Promise<void>` as the abstract destructive reset operation for backends that need to drop and rebuild their persisted graph state.\n\n`recreate()` is stronger than `clear()`: it resets the backend's persisted storage layout rather than merely deleting graph rows from an already-open store. Callers such as `graph index --force` MUST use this abstract capability instead of deleting backend-specific files or directories directly.\n\nThe concrete backend owns how recreation is performed. A backend MAY delete files, recreate directories, rebuild schemas, reopen connections, or combine those steps, provided the observable result is the same:\n\n- all previously indexed graph data is gone\n- the persisted backend state is ready for a fresh indexing run\n- callers do not need to know backend-specific filenames, lockfiles, WAL files, or schema artifacts"
       ]
     },
     {
@@ -49,21 +65,15 @@
       ]
     },
     {
-      "requirement": "LadybugDB adapter",
-      "rules": [
-        "The concrete `LadybugGraphStore` adapter SHALL use LadybugDB as the storage engine. It stores the graph in a single file at `{storagePath}/.specd/code-graph.lbug`. LadybugDB provides a Cypher-compatible query interface over a local file-based graph database.\n\nThe adapter MUST:\n\n- Create the `.specd/` directory and database file on first `open()` if they do not exist\n- Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`, including `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text and a `searchName STRING` column for FTS-optimized name search (computed from the symbol name using `expandSymbolName`).\n- Use parameterized Cypher queries for all operations (no string interpolation of user data)\n- Support schema migration: if the database schema version does not match the expected version, migrate on `open()`\n\nThe adapter uses CSV-based bulk loading (`COPY FROM`) for large datasets via the `bulkLoad()` method. Relations are loaded in batches of 500 to prevent LadybugDB from blocking. The `IGNORE_ERRORS=true` flag is used for relation COPY operations to silently skip rows referencing non-existent nodes (dangling imports to external files)."
-      ]
-    },
-    {
       "requirement": "Spec upsert and removal",
       "rules": [
-        "`GraphStore` SHALL provide:\n\n- **`upsertSpec(spec: SpecNode, relations: Relation[]): Promise<void>`** — atomically replaces all data for a spec node. Removes existing `DEPENDS_ON` relations where this spec is the source and replaces them with the provided relations.\n- **`removeSpec(specId: string): Promise<void>`** — removes the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target.\n\nThese follow the same atomic pattern as `upsertFile` / `removeFile`.\n\nThe Spec node table includes:\n\n- `specId STRING` — primary key\n- `path STRING`\n- `title STRING`\n- `description STRING` — from `.specd-metadata.yaml`\n- `contentHash STRING` — hash of concatenated artifacts (excluding `.specd-metadata.yaml`)\n- `content STRING` — concatenated artifact text for full-text search\n- `workspace STRING`"
+        "`GraphStore` SHALL provide:\n\n- **`upsertSpec(spec: SpecNode, relations: Relation[]): Promise<void>`** — atomically replaces all data for a spec node. Removes existing `DEPENDS_ON` relations where this spec is the source and replaces them with the provided relations.\n- **`removeSpec(specId: string): Promise<void>`** — removes the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target.\n\nThese follow the same atomic pattern as `upsertFile()` and `removeFile()`."
       ]
     },
     {
       "requirement": "Full-text search",
       "rules": [
-        "`GraphStore` SHALL provide:\n\n- **`searchSymbols(options: SearchOptions): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.searchName` and `Symbol.comment`. The `searchName` column contains the original symbol name plus camelCase/snake\\_case/kebab-case tokenized parts (e.g. `handleError` is indexed as `\"handleError handle error\"`), so searches for individual words within compound names match correctly. Returns results ranked by BM25 score descending.\n- **`searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>`** — full-text search across `Spec.title`, `Spec.description`, and `Spec.content`. Returns results ranked by BM25 score descending.\n- **`rebuildFtsIndexes(): Promise<void>`** — drops and recreates FTS indexes. Must be called after bulk data changes because LadybugDB FTS indexes are not automatically updated on insert.\n\n`SearchOptions` is a value object with:\n\n- **query** — the search query string (required)\n- **limit** — maximum results to return (default 20)\n- **kind** — filter symbols by `SymbolKind` (symbols only)\n- **filePattern** — filter symbols by file path glob (supports `*` wildcards, case-insensitive; symbols only)\n- **workspace** — filter results to a single workspace\n- **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)\n- **excludeWorkspaces** — array of workspace names to exclude\n\nAll filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied **before** LIMIT in the query — not as post-query filters. The `LadybugGraphStore` implementation adds WHERE clauses between the FTS CALL and RETURN. The `InMemoryGraphStore` test helper applies filters before slicing to limit."
+        "`GraphStore` SHALL provide:\n\n- **`searchSymbols(options: SearchOptions): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — search symbols using normalized search text and symbol comments, returning results ranked by relevance in descending order\n- **`searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>`** — search spec title, description, and content, returning results ranked by relevance in descending order\n- **`rebuildFtsIndexes(): Promise<void>`** — a store-maintenance hook used by implementations whose search indexes require explicit rebuilding after bulk data changes\n\n`SearchOptions` is a value object with:\n\n- **query** — the search query string (required)\n- **limit** — maximum results to return (default 20)\n- **kind** — filter symbols by `SymbolKind` (symbols only)\n- **filePattern** — filter symbols by file path glob (supports `*` wildcards, case-insensitive; symbols only)\n- **workspace** — filter results to a single workspace\n- **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)\n- **excludeWorkspaces** — array of workspace names to exclude\n\nAll filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied before the result limit. Score calculation and index-maintenance strategy are implementation concerns."
       ]
     },
     {
@@ -77,7 +87,8 @@
     "GraphStore is an abstract class, not an interface — following the project's port convention",
     "All mutations are atomic at the file level — no partial updates",
     "StoreNotOpenError is thrown on any operation when the store is not open",
-    "The LadybugDB file path is always {storagePath}/.specd/code-graph.lbug — not configurable separately",
+    "The abstract store contract does not prescribe a specific backend, physical schema, or filesystem layout",
+    "Destructive force-reset behavior is modeled through recreate(), not through caller-managed backend file deletion",
     "No dependency on @specd/core — error types extend CodeGraphError"
   ],
   "scenarios": [
@@ -96,13 +107,48 @@
     },
     {
       "requirement": "Connection lifecycle",
-      "name": "Open runs schema migration",
-      "given": [
-        "an existing database file with schema version 1",
-        "AND the adapter expects schema version 2"
-      ],
-      "when": ["open() is called"],
-      "then": ["the schema is migrated to version 2 before the method resolves"]
+      "name": "Open prepares the concrete backend before queries run",
+      "when": ["open() resolves for a concrete GraphStore implementation"],
+      "then": [
+        "subsequent reads and writes can proceed through the abstract contract",
+        "AND any schema initialization, index preparation, or migration work remains hidden behind the backend"
+      ]
+    },
+    {
+      "requirement": "Minimum graph semantics",
+      "name": "Backend preserves the core node families",
+      "when": ["indexing and query features use the abstract GraphStore"],
+      "then": [
+        "they can persist and retrieve file, symbol, and spec nodes without depending on backend-specific table or label names"
+      ]
+    },
+    {
+      "requirement": "Minimum graph semantics",
+      "name": "COVERS belongs to the abstract graph model",
+      "when": ["a backend advertises conformance to GraphStore"],
+      "then": [
+        "its persisted relation model includes a COVERS family reserved for spec-to-code linkage",
+        "AND the relation family may remain unpopulated until higher-level indexing behavior starts emitting it"
+      ]
+    },
+    {
+      "requirement": "Store recreation",
+      "name": "Recreate drops prior persisted graph state",
+      "given": ["a backend with previously indexed files, symbols, specs, and relations"],
+      "when": ["recreate() is called through the abstract GraphStore contract"],
+      "then": [
+        "the prior persisted graph state is discarded",
+        "AND the backend is ready for a fresh indexing run"
+      ]
+    },
+    {
+      "requirement": "Store recreation",
+      "name": "Callers do not manage backend files directly",
+      "when": ["a caller needs a destructive reset before indexing"],
+      "then": [
+        "it uses GraphStore.recreate()",
+        "AND it does not need to know backend-specific database files, lock files, WAL files, or schema artifacts"
+      ]
     },
     {
       "requirement": "Atomic file-level upsert",
@@ -176,6 +222,47 @@
       "then": [
         "the SpecNode and all DEPENDS_ON relations where it appears as source or target are removed"
       ]
+    },
+    {
+      "requirement": "Full-text search",
+      "name": "Symbol search matches normalized compound names",
+      "given": ["symbols createUser, deleteUser, and listOrders are indexed"],
+      "when": ["searchSymbols({ query: 'user' }) is called"],
+      "then": ["createUser and deleteUser are returned ahead of unrelated symbols"]
+    },
+    {
+      "requirement": "Full-text search",
+      "name": "Symbol search includes comments",
+      "given": ["a symbol with comment text containing Validates the user's authentication token"],
+      "when": ["searchSymbols({ query: 'authentication token' }) is called"],
+      "then": ["that symbol is returned"]
+    },
+    {
+      "requirement": "Full-text search",
+      "name": "Spec search matches description and content",
+      "given": [
+        "a spec whose description mentions adapter parsing",
+        "AND another spec whose content contains lifecycle state transition"
+      ],
+      "when": ["the corresponding queries are issued through searchSpecs"],
+      "then": ["the matching spec is returned in each case with a relevance score"]
+    },
+    {
+      "requirement": "Full-text search",
+      "name": "Filters are applied before limiting results",
+      "given": ["more than 20 matching symbols exist across multiple workspaces"],
+      "when": ["searchSymbols({ query: 'hook', workspace: 'core', limit: 5 }) is called"],
+      "then": [
+        "only workspace core contributes candidates",
+        "AND at most 5 filtered results are returned"
+      ]
+    },
+    {
+      "requirement": "Full-text search",
+      "name": "Search indexes can be rebuilt explicitly",
+      "given": ["a backend whose search indexes are not auto-maintained during bulk writes"],
+      "when": ["rebuildFtsIndexes() is called after bulk data changes"],
+      "then": ["subsequent abstract search queries see the new symbols and specs"]
     },
     {
       "requirement": "Query methods",
@@ -270,26 +357,6 @@
       "then": ["relationCounts includes counts for all three hierarchy relation types"]
     },
     {
-      "requirement": "LadybugDB adapter",
-      "name": "Database created on first open",
-      "given": ["no .specd/ directory exists at storagePath"],
-      "when": ["open() is called on LadybugGraphStore"],
-      "then": ["the .specd/ directory and code-graph.lbug file are created"]
-    },
-    {
-      "requirement": "LadybugDB adapter",
-      "name": "Parameterized queries prevent injection",
-      "when": ["findSymbols({ name: \"'; DROP TABLE symbols; --\" }) is called"],
-      "then": ["the query executes safely and returns no results (no injection)"]
-    },
-    {
-      "requirement": "LadybugDB adapter",
-      "name": "LadybugDB adapter persists hierarchy relations",
-      "given": ["hierarchy relations are passed to the store"],
-      "when": ["they are bulk loaded or queried back"],
-      "then": ["EXTENDS, IMPLEMENTS, and OVERRIDES behave like first-class persisted edge types"]
-    },
-    {
       "requirement": "Bulk operations",
       "name": "Clear removes all data",
       "given": ["a store with files, symbols, and relations"],
@@ -312,8 +379,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b67782ce2018200d9b5082fab259452a9b40ebdb130d6f8dded192d672a2fd37",
-    "verify.md": "sha256:564f0425914928d193b52ff4e9b29d128df5920e99a0f1b46b58648cdd5e20c4"
+    "spec.md": "sha256:b523aeb7fea72a0f98badf771e80e37eea45d670b6bc8e12b2fc237bce19147b",
+    "verify.md": "sha256:49a9214dc1c64cfd55257aaf35da0e54736322de6121193a582a9238d60621d4"
   },
   "generatedBy": "core"
 }

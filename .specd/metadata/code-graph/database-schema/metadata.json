@@ -1,153 +1,46 @@
 {
   "title": "Database Schema",
-  "description": "The code graph persists files, symbols, specs, and their relationships in a LadybugDB embedded graph database. The schema defines the exact node tables, relationship tables, full-text search indexes, and versioning strategy. Having the schema specified ensures changes are deliberate and migration-aware.",
-  "dependsOn": [
-    "code-graph:code-graph/symbol-model",
-    "code-graph:code-graph/graph-store",
-    "code-graph:code-graph/workspace-integration"
-  ],
+  "description": "This spec previously described the Ladybug-specific physical schema for the code graph. That backend-specific schema now belongs to `code-graph:code-graph/ladybug-graph-store`, while storage-agnostic behavior belongs to `code-graph:code-graph/graph-store`.\n\nThis spec remains only as a transition marker so existing references can be removed deliberately rather than silently losing context.",
+  "dependsOn": ["code-graph:code-graph/ladybug-graph-store", "code-graph:code-graph/graph-store"],
   "context": [
-    "The code graph persists files, symbols, specs, and their relationships in a LadybugDB embedded graph database. The schema defines the exact node tables, relationship tables, full-text search indexes, and versioning strategy. Having the schema specified ensures changes are deliberate and migration-aware."
+    "This spec previously described the Ladybug-specific physical schema for the code graph. That backend-specific schema now belongs to `code-graph:code-graph/ladybug-graph-store`, while storage-agnostic behavior belongs to `code-graph:code-graph/graph-store`.\n\nThis spec remains only as a transition marker so existing references can be removed deliberately rather than silently losing context."
   ],
   "rules": [
     {
-      "requirement": "Node tables",
+      "requirement": "Spec retirement",
       "rules": [
-        "The database SHALL define the following node tables:\n\n**File** — source files indexed from workspace code roots.\n\n| Column      | Type   | Notes                                      |\n| ----------- | ------ | ------------------------------------------ |\n| path        | STRING | Primary key. `{workspace}:{relativePath}`. |\n| language    | STRING | Language identifier (e.g. `typescript`).   |\n| contentHash | STRING | SHA-256 hash of file content.              |\n| workspace   | STRING | Workspace name (e.g. `core`, `cli`).       |\n\n**Symbol** — code symbols extracted from files.\n\n| Column     | Type   | Notes                                                                    |\n| ---------- | ------ | ------------------------------------------------------------------------ |\n| id         | STRING | Primary key. `{filePath}:{kind}:{name}:{line}`.                          |\n| name       | STRING | Symbol's declared name.                                                  |\n| searchName | STRING | Expanded name for FTS. camelCase/snake\\_case/kebab-case split + original. |\n| kind       | STRING | `SymbolKind` value.                                                      |\n| filePath   | STRING | References `File.path`.                                                  |\n| line       | INT64  | 1-based line number.                                                     |\n| col        | INT64  | 0-based column offset.                                                   |\n| comment    | STRING | Raw preceding comment text, or empty string.                             |\n\n**Spec** — specification documents from workspace spec directories.\n\n| Column      | Type   | Notes                                                                                                                                                         |\n| ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |\n| specId      | STRING | Primary key. `{workspace}:{specPath}`.                                                                                                                        |\n| path        | STRING | Spec path within the workspace.                                                                                                                               |\n| title       | STRING | From `.specd-metadata.yaml` `title` field.                                                                                                                    |\n| description | STRING | From `.specd-metadata.yaml` `description` field.                                                                                                              |\n| contentHash | STRING | SHA-256 hash of concatenated artifacts (excluding `.specd-metadata.yaml`).                                                                                    |\n| content     | STRING | Concatenated artifact text for full-text search. `spec.md` first if present, then remaining artifacts in alphabetical order. Excludes `.specd-metadata.yaml`. |\n| workspace   | STRING | Workspace name.                                                                                                                                               |\n\n**Meta** — key-value metadata for the database itself.\n\n| Column | Type   | Notes                             |\n| ------ | ------ | --------------------------------- |\n| key    | STRING | Primary key (e.g. `lastIndexed`). |\n| value  | STRING | Metadata value.                   |"
-      ]
-    },
-    {
-      "requirement": "Relationship tables",
-      "rules": [
-        "The database SHALL define the following relationship tables:\n\n| Relationship | From   | To     | Populated by        |\n| ------------ | ------ | ------ | ------------------- |\n| IMPORTS      | File   | File   | Indexer Pass 2      |\n| DEFINES      | File   | Symbol | Indexer Pass 1      |\n| CALLS        | Symbol | Symbol | Indexer Pass 2      |\n| EXPORTS      | File   | Symbol | Indexer Pass 1      |\n| DEPENDS\\_ON   | Spec   | Spec   | Spec indexing phase |\n| COVERS       | Spec   | File   | Deferred to v2+     |\n| EXTENDS      | Symbol | Symbol | Indexer Pass 2      |\n| IMPLEMENTS   | Symbol | Symbol | Indexer Pass 2      |\n| OVERRIDES    | Symbol | Symbol | Indexer Pass 2      |\n\nRelationships have no properties — they are pure edges."
-      ]
-    },
-    {
-      "requirement": "Full-text search indexes",
-      "rules": [
-        "The database SHALL create FTS indexes after schema initialization:\n\n**`symbol_fts`** — on the `Symbol` table, covering `searchName` and `comment` columns. Enables keyword search across symbol names (with camelCase/snake\\_case/kebab-case tokenization) and their documentation comments.\n\n**`spec_fts`** — on the `Spec` table, covering `title`, `description`, and `content` columns. Enables keyword search across spec documentation.\n\nBoth indexes use the `porter` stemmer for English-language stemming. Indexes are created using `CREATE_FTS_INDEX` and queried using `QUERY_FTS_INDEX`, which returns results ranked by BM25 score.\n\nFTS queries apply WHERE clauses between the `QUERY_FTS_INDEX` CALL and the RETURN for filtering by kind, file path pattern, workspace inclusion/exclusion, and path exclusion patterns. This ensures filters are applied before `ORDER BY score DESC LIMIT n`, avoiding lossy post-query filtering.\n\nFTS indexes are created once during `open()` after schema DDL. If the index already exists, creation is skipped (idempotent)."
-      ]
-    },
-    {
-      "requirement": "Schema versioning",
-      "rules": [
-        "The schema SHALL be versioned with an integer `SCHEMA_VERSION` constant. The current version is **6**. When the database is opened:\n\n1. Execute the DDL statements (all use `IF NOT EXISTS` — safe to re-run)\n2. Create FTS indexes if they do not exist\n3. Store the schema version in the `Meta` table\n\nSchema version changes require a `--force` re-index to rebuild the database from scratch. There is no incremental migration between versions — the `.lbug` file is deleted and recreated."
-      ]
-    },
-    {
-      "requirement": "Database file location",
-      "rules": [
-        "The database file SHALL be stored at `{storagePath}/.specd/code-graph.lbug`. The `storagePath` is the project root (derived from `SpecdConfig.projectRoot` or passed directly as `CodeGraphOptions.storagePath`). The `.specd/` directory is created automatically on first `open()` if it does not exist."
+        "Ladybug-specific schema requirements SHALL be defined by `code-graph:code-graph/ladybug-graph-store`, not by this standalone spec.\n\nStorage-agnostic code, specs, and commands MUST depend on `code-graph:code-graph/graph-store` rather than this spec.\n\nThis spec introduces no new runtime requirements of its own and exists only to support the migration away from a backend-specific standalone schema spec."
       ]
     }
   ],
   "constraints": [
-    "All node table primary keys are STRING — no auto-increment",
-    "comment on Symbol is stored as empty string (not NULL) when no comment exists, to enable FTS indexing",
-    "searchName on Symbol is computed at insert time by expandSymbolName(name) — it is a derived column, never set directly by callers",
-    "content on Spec may be large (full spec text) — no size limit enforced",
-    "FTS indexes are rebuilt on --force re-index (dropped with the database)",
-    "Relationship tables have no properties — metadata is not persisted on edges",
-    "The COVERS relationship table exists in the schema but is not populated until v2+",
-    "EXTENDS, IMPLEMENTS, and OVERRIDES are first-class persisted relationship tables in schema version 6"
+    "This spec is deprecated and scheduled for removal once remaining references are updated",
+    "New storage-agnostic specs MUST NOT depend on this spec",
+    "Ladybug-specific schema requirements belong in code-graph:code-graph/ladybug-graph-store"
   ],
   "scenarios": [
     {
-      "requirement": "Node tables",
-      "name": "File node stored and retrieved",
-      "given": ["a FileNode with path core:src/index.ts and workspace core"],
-      "when": ["it is upserted and then retrieved by path"],
-      "then": ["all fields (path, language, contentHash, workspace) are preserved"]
-    },
-    {
-      "requirement": "Node tables",
-      "name": "Spec node stores description and content",
-      "given": ["a SpecNode with title, description, content, and contentHash"],
-      "when": ["it is upserted and then retrieved by specId"],
-      "then": ["all fields including description and content are preserved"]
-    },
-    {
-      "requirement": "Node tables",
-      "name": "Symbol comment stored as empty string when absent",
-      "given": ["a symbol with no preceding comment"],
-      "when": ["it is stored"],
-      "then": ["the comment column contains an empty string, not NULL"]
-    },
-    {
-      "requirement": "Full-text search indexes",
-      "name": "Symbol FTS search by name",
-      "given": ["symbols createUser, deleteUser, listOrders are indexed"],
-      "when": ["QUERY_FTS_INDEX('Symbol', 'symbol_fts', 'user') is called"],
+      "requirement": "Spec retirement",
+      "name": "Existing readers are redirected to replacement specs",
+      "when": ["a contributor needs the Ladybug-specific physical schema requirements"],
       "then": [
-        "createUser and deleteUser are returned with BM25 scores",
-        "AND listOrders is not returned"
+        "they are directed to code-graph:code-graph/ladybug-graph-store",
+        "AND storage-agnostic behavior is read from code-graph:code-graph/graph-store"
       ]
     },
     {
-      "requirement": "Full-text search indexes",
-      "name": "Symbol FTS search by comment",
-      "given": ["a symbol with comment /** Validates the user's authentication token */"],
-      "when": ["QUERY_FTS_INDEX('Symbol', 'symbol_fts', 'authentication token') is called"],
-      "then": ["the symbol is returned"]
-    },
-    {
-      "requirement": "Full-text search indexes",
-      "name": "Spec FTS search by content",
-      "given": ["a spec with content containing \"lifecycle state transition\""],
-      "when": ["QUERY_FTS_INDEX('Spec', 'spec_fts', 'lifecycle transition') is called"],
-      "then": ["the spec is returned with a BM25 score"]
-    },
-    {
-      "requirement": "Full-text search indexes",
-      "name": "Spec FTS search by description",
-      "given": [
-        "a spec with description \"Defines the adapter interface for language-specific parsing\""
-      ],
-      "when": ["QUERY_FTS_INDEX('Spec', 'spec_fts', 'adapter parsing') is called"],
-      "then": ["the spec is returned"]
-    },
-    {
-      "requirement": "Full-text search indexes",
-      "name": "FTS indexes are idempotent",
-      "when": ["open() is called twice on the same database"],
-      "then": ["no error occurs — FTS index creation is skipped if already exists"]
-    },
-    {
-      "requirement": "Schema versioning",
-      "name": "Schema version 6",
-      "when": ["a fresh database is opened"],
-      "then": ["the schema version stored in the Meta table is 6"]
-    },
-    {
-      "requirement": "Schema versioning",
-      "name": "Old schema requires force re-index",
-      "given": ["a database created with schema version 5"],
-      "when": ["the application opens it expecting version 6"],
-      "then": ["a --force re-index is required to rebuild"]
-    },
-    {
-      "requirement": "Relationship tables",
-      "name": "DEPENDS_ON connects specs",
-      "given": ["spec A depends on spec B"],
-      "when": ["a DEPENDS_ON relation is created"],
-      "then": ["querying spec A's dependencies returns spec B"]
-    },
-    {
-      "requirement": "Relationship tables",
-      "name": "COVERS table exists but is empty",
-      "when": ["the database schema is initialized"],
-      "then": ["the COVERS relationship table exists", "AND it contains no rows (v2+ feature)"]
-    },
-    {
-      "requirement": "Relationship tables",
-      "name": "Hierarchy relationship tables exist",
-      "when": ["the database schema is initialized"],
-      "then": ["EXTENDS, IMPLEMENTS, and OVERRIDES relationship tables exist"]
+      "requirement": "Spec retirement",
+      "name": "Deprecated spec adds no new runtime behavior",
+      "when": ["this deprecated spec remains present during the migration"],
+      "then": [
+        "it serves only as a transition marker",
+        "AND it does not introduce additional runtime requirements beyond the replacement specs"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:61bea83d6172188237869ac5854bf864a064137f824d309f9be30970d39b11ce",
-    "verify.md": "sha256:fc562e724cd325d39763156565589b07e8678d2ae3d9f84bc3194c187ca8b688"
+    "spec.md": "sha256:20f9591ecf5d9101bbb8eb980e7e6f9044fee932e0764d94cc6b9b147945fb9c",
+    "verify.md": "sha256:570f8ac0a566ce0706cab77de19085d03982a5ee612da4f9b1f509ce172c779f"
   },
   "generatedBy": "core"
 }

@@ -11,9 +11,8 @@ import { type SearchOptions } from '../../domain/value-objects/search-options.js
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { SCHEMA_DDL } from './schema.js'
 import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
-import { mkdirSync, existsSync, writeFileSync, unlinkSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { tmpdir } from 'node:os'
+import { mkdirSync, existsSync, writeFileSync, unlinkSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
 
 /**
  * Unwraps a query result (or array of results) into an array of row records.
@@ -70,18 +69,30 @@ export class LadybugGraphStore extends GraphStore {
     }
   }
 
+  /** Returns the backend-owned directory for persisted graph files. */
+  private get graphDir(): string {
+    return join(this.storagePath, 'graph')
+  }
+
   /** Returns the full filesystem path to the Ladybug database file. */
   private get dbPath(): string {
-    return join(this.storagePath, '.specd', 'code-graph.lbug')
+    return join(this.graphDir, 'code-graph.lbug')
+  }
+
+  /** Returns the repository-local directory used for bulk-load CSV scratch files. */
+  private get bulkLoadTmpDir(): string {
+    return join(this.storagePath, 'tmp')
   }
 
   /**
    * Opens the database, initializes the schema, and loads metadata.
    */
   async open(): Promise<void> {
-    const dir = dirname(this.dbPath)
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
+    if (!existsSync(this.graphDir)) {
+      mkdirSync(this.graphDir, { recursive: true })
+    }
+    if (!existsSync(this.bulkLoadTmpDir)) {
+      mkdirSync(this.bulkLoadTmpDir, { recursive: true })
     }
 
     this.db = new Database(this.dbPath)
@@ -284,7 +295,10 @@ export class LadybugGraphStore extends GraphStore {
       byType.set(rel.type, existing)
     }
 
-    const prefix = join(tmpdir(), `codegraph-rel-${Date.now()}-`)
+    if (!existsSync(this.bulkLoadTmpDir)) {
+      mkdirSync(this.bulkLoadTmpDir, { recursive: true })
+    }
+    const prefix = join(this.bulkLoadTmpDir, `codegraph-rel-${Date.now()}-`)
     const csvFiles: string[] = []
 
     try {
@@ -338,9 +352,11 @@ export class LadybugGraphStore extends GraphStore {
     const conn = this.conn!
 
     const report = data.onProgress ?? ((): void => {})
-    const prefix = join(tmpdir(), `codegraph-${Date.now()}-`)
+    if (!existsSync(this.bulkLoadTmpDir)) {
+      mkdirSync(this.bulkLoadTmpDir, { recursive: true })
+    }
+    const prefix = join(this.bulkLoadTmpDir, `codegraph-${Date.now()}-`)
     const csvFiles: string[] = []
-
     await conn.query('BEGIN TRANSACTION')
     try {
       // Write File nodes CSV — batched to avoid native module segfaults on large datasets
@@ -1047,6 +1063,19 @@ export class LadybugGraphStore extends GraphStore {
     await conn.query('MATCH (s:Symbol) DELETE s')
     await conn.query('MATCH (s:Spec) DELETE s')
     await conn.query('MATCH (m:Meta) DELETE m')
+    this._lastIndexedAt = undefined
+    this._lastIndexedRef = null
+  }
+
+  /**
+   * Recreates the backend-owned persisted graph files from scratch.
+   */
+  async recreate(): Promise<void> {
+    if (this._isOpen) {
+      await this.close()
+    }
+
+    rmSync(this.graphDir, { recursive: true, force: true })
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
   }

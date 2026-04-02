@@ -15,12 +15,39 @@
 - **WHEN** `upsertFile()` is called
 - **THEN** `StoreNotOpenError` is thrown
 
-#### Scenario: Open runs schema migration
+#### Scenario: Open prepares the concrete backend before queries run
 
-- **GIVEN** an existing database file with schema version 1
-- **AND** the adapter expects schema version 2
-- **WHEN** `open()` is called
-- **THEN** the schema is migrated to version 2 before the method resolves
+- **WHEN** `open()` resolves for a concrete `GraphStore` implementation
+- **THEN** subsequent reads and writes can proceed through the abstract contract
+- **AND** any schema initialization, index preparation, or migration work remains hidden behind the backend
+
+### Requirement: Minimum graph semantics
+
+#### Scenario: Backend preserves the core node families
+
+- **WHEN** indexing and query features use the abstract `GraphStore`
+- **THEN** they can persist and retrieve file, symbol, and spec nodes without depending on backend-specific table or label names
+
+#### Scenario: COVERS belongs to the abstract graph model
+
+- **WHEN** a backend advertises conformance to `GraphStore`
+- **THEN** its persisted relation model includes a `COVERS` family reserved for spec-to-code linkage
+- **AND** the relation family may remain unpopulated until higher-level indexing behavior starts emitting it
+
+### Requirement: Store recreation
+
+#### Scenario: Recreate drops prior persisted graph state
+
+- **GIVEN** a backend with previously indexed files, symbols, specs, and relations
+- **WHEN** `recreate()` is called through the abstract `GraphStore` contract
+- **THEN** the prior persisted graph state is discarded
+- **AND** the backend is ready for a fresh indexing run
+
+#### Scenario: Callers do not manage backend files directly
+
+- **WHEN** a caller needs a destructive reset before indexing
+- **THEN** it uses `GraphStore.recreate()`
+- **AND** it does not need to know backend-specific database files, lock files, WAL files, or schema artifacts
 
 ### Requirement: Atomic file-level upsert
 
@@ -83,6 +110,40 @@
 - **GIVEN** a spec `core:core/config` that is both a source and target of `DEPENDS_ON` relations
 - **WHEN** `removeSpec('core:core/config')` is called
 - **THEN** the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target are removed
+
+### Requirement: Full-text search
+
+#### Scenario: Symbol search matches normalized compound names
+
+- **GIVEN** symbols `createUser`, `deleteUser`, and `listOrders` are indexed
+- **WHEN** `searchSymbols({ query: 'user' })` is called
+- **THEN** `createUser` and `deleteUser` are returned ahead of unrelated symbols
+
+#### Scenario: Symbol search includes comments
+
+- **GIVEN** a symbol with comment text containing `Validates the user's authentication token`
+- **WHEN** `searchSymbols({ query: 'authentication token' })` is called
+- **THEN** that symbol is returned
+
+#### Scenario: Spec search matches description and content
+
+- **GIVEN** a spec whose description mentions `adapter parsing`
+- **AND** another spec whose content contains `lifecycle state transition`
+- **WHEN** the corresponding queries are issued through `searchSpecs`
+- **THEN** the matching spec is returned in each case with a relevance score
+
+#### Scenario: Filters are applied before limiting results
+
+- **GIVEN** more than 20 matching symbols exist across multiple workspaces
+- **WHEN** `searchSymbols({ query: 'hook', workspace: 'core', limit: 5 })` is called
+- **THEN** only workspace `core` contributes candidates
+- **AND** at most 5 filtered results are returned
+
+#### Scenario: Search indexes can be rebuilt explicitly
+
+- **GIVEN** a backend whose search indexes are not auto-maintained during bulk writes
+- **WHEN** `rebuildFtsIndexes()` is called after bulk data changes
+- **THEN** subsequent abstract search queries see the new symbols and specs
 
 ### Requirement: Query methods
 
@@ -164,25 +225,6 @@
 - **GIVEN** the store contains persisted `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations
 - **WHEN** `getStatistics()` is called
 - **THEN** `relationCounts` includes counts for all three hierarchy relation types
-
-### Requirement: LadybugDB adapter
-
-#### Scenario: Database created on first open
-
-- **GIVEN** no `.specd/` directory exists at `storagePath`
-- **WHEN** `open()` is called on `LadybugGraphStore`
-- **THEN** the `.specd/` directory and `code-graph.lbug` file are created
-
-#### Scenario: Parameterized queries prevent injection
-
-- **WHEN** `findSymbols({ name: "'; DROP TABLE symbols; --" })` is called
-- **THEN** the query executes safely and returns no results (no injection)
-
-#### Scenario: LadybugDB adapter persists hierarchy relations
-
-- **GIVEN** hierarchy relations are passed to the store
-- **WHEN** they are bulk loaded or queried back
-- **THEN** `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` behave like first-class persisted edge types
 
 ### Requirement: Bulk operations
 

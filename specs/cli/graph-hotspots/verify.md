@@ -89,6 +89,15 @@
 - **WHEN** `specd graph hotspots --workspace core --kind class,method --file "src/*" --exclude-path "test/*" --exclude-workspace cli --limit 15 --min-score 3 --min-risk HIGH` is run
 - **THEN** the provider receives the workspace, kind list, file, exclusion filters, limit, score threshold, and risk threshold exactly as requested
 
+### Requirement: Concurrent indexing guard
+
+#### Scenario: Hotspots fail fast while the indexing lock is present
+
+- **GIVEN** a `graph index` process currently holds the shared graph indexing lock
+- **WHEN** `specd graph hotspots` is run
+- **THEN** the command exits with code 3 before opening the provider
+- **AND** it prints a short retry-later message explaining that the graph is currently being indexed
+
 ### Requirement: Output format
 
 #### Scenario: Text output shows ranked hotspot table

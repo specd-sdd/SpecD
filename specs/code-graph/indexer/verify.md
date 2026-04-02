@@ -127,6 +127,13 @@
 - **THEN** cross-workspace relations can be resolved from the in-memory `SymbolIndex`
 - **AND** no store query is needed during extraction
 
+#### Scenario: Combined namespace and symbol extraction uses one adapter fast path
+
+- **GIVEN** a language adapter implements `extractSymbolsWithNamespace()`
+- **WHEN** Pass 1 processes a file from that language
+- **THEN** the indexer may obtain symbols and namespace information from that single adapter call
+- **AND** it does not need a separate namespace-only extraction step for that file
+
 #### Scenario: PHP unresolved qualified name falls back to path resolution
 
 - **GIVEN** a PHP file importing `App\Services\Mailer`
@@ -137,7 +144,7 @@
 
 #### Scenario: PHP import unresolvable via both mechanisms produces no relation
 
-- **GIVEN** a PHP file containing `use Vendor\External\Class`
+- **GIVEN** a PHP file containing `use Vendor\\External\\Class`
 - **AND** the qualified name is not in the symbol index
 - **AND** `resolveQualifiedNameToPath` returns `undefined` for that name
 - **WHEN** Pass 2 runs
@@ -170,6 +177,14 @@
 - **GIVEN** `IndexOptions.chunkBytes` is set to 5 MB
 - **WHEN** indexing runs
 - **THEN** chunks do not exceed 5 MB of source content
+
+#### Scenario: Staged artifacts use the configured graph temp directory
+
+- **GIVEN** the implementation spills intermediate indexing artifacts to disk
+- **AND** project config resolves a graph temp directory from `configPath`
+- **WHEN** indexing runs
+- **THEN** run-scoped staged artifacts are written under that graph temp directory
+- **AND** they are cleaned after a successful run
 
 ### Requirement: Progress reporting
 

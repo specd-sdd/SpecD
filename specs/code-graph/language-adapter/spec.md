@@ -13,10 +13,11 @@ Different programming languages have fundamentally different syntax for function
 - **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)
 - **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.
 - **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found
+- **`extractSymbolsWithNamespace?(filePath: string, content: string): { symbols: SymbolNode[]; namespace: string | undefined }`** — optional fast path for languages that can derive symbols and namespace from the same parse tree
 - **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution
-- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS, DEPENDS_ON, EXTENDS, IMPLEMENTS, OVERRIDES) from the file. The `importMap` maps local import names to resolved symbol IDs (e.g. `"validateUser"` → `"auth:src/auth.ts:function:validateUser:10"`), built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.
+- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS, DEPENDS_ON, EXTENDS, IMPLEMENTS, OVERRIDES) from the file. The `importMap` maps local import names to resolved symbol IDs, built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.
 
-Both extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects.
+All extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects.
 
 ### Requirement: Language detection
 
@@ -239,6 +240,7 @@ The TypeScript adapter MUST be registered by default when the registry is create
 
 - LanguageAdapter is an interface, not an abstract class — adapters are stateless
 - Extraction methods are synchronous and pure — they receive content, not file handles
+- `extractSymbolsWithNamespace()` is optional and, when implemented, follows the same synchronous and pure extraction rules
 - getPackageIdentity and resolveQualifiedNameToPath? are the only methods that perform I/O — both are optional and search for a manifest file on disk
 - Resolution methods (resolvePackageFromSpecifier, resolveRelativeImportPath, buildQualifiedName) are synchronous and pure
 - resolveQualifiedNameToPath? SHOULD cache the parsed autoloader map per codeRoot to avoid repeated disk reads during a single indexing run

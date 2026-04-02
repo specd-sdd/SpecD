@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs'
+import { readFileSync, writeFileSync, statSync, rmSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { type GraphStore } from '../../domain/ports/graph-store.js'
 import { type FileNode, createFileNode } from '../../domain/value-objects/file-node.js'
@@ -98,6 +98,67 @@ interface MethodOwnershipIndex {
 }
 
 /**
+ * Staged chunk containing file and symbol nodes for one pass-1 slice.
+ */
+interface FilesAndSymbolsStageChunk {
+  readonly files: FileNode[]
+  readonly symbols: SymbolNode[]
+}
+
+/**
+ * Staged chunk containing relations for one pass-2 slice.
+ */
+interface RelationsStageChunk {
+  readonly relations: Relation[]
+}
+
+/**
+ * Returns the store-owned staging directory for one indexing run.
+ * @param storagePath - Graph-store-owned config root.
+ * @param runId - Run identifier.
+ * @returns Absolute staging directory path.
+ */
+function makeStageDir(storagePath: string, runId: string): string {
+  return join(storagePath, 'tmp', runId)
+}
+
+/**
+ * Writes a JSON staging chunk to disk.
+ * @param stageDir - Run-local staging directory.
+ * @param filename - Chunk filename.
+ * @param data - Serializable chunk payload.
+ */
+function writeStageChunk(stageDir: string, filename: string, data: unknown): void {
+  if (!existsSync(stageDir)) {
+    mkdirSync(stageDir, { recursive: true })
+  }
+  writeFileSync(join(stageDir, filename), JSON.stringify(data), 'utf-8')
+}
+
+/**
+ * Reads a staged `files + symbols` chunk.
+ * @param stageDir - Run-local staging directory.
+ * @param filename - Chunk filename.
+ * @returns Parsed stage payload.
+ */
+function readFilesAndSymbolsStageChunk(
+  stageDir: string,
+  filename: string,
+): FilesAndSymbolsStageChunk {
+  return JSON.parse(readFileSync(join(stageDir, filename), 'utf-8')) as FilesAndSymbolsStageChunk
+}
+
+/**
+ * Reads a staged relations chunk.
+ * @param stageDir - Run-local staging directory.
+ * @param filename - Chunk filename.
+ * @returns Parsed stage payload.
+ */
+function readRelationsStageChunk(stageDir: string, filename: string): RelationsStageChunk {
+  return JSON.parse(readFileSync(join(stageDir, filename), 'utf-8')) as RelationsStageChunk
+}
+
+/**
  * Groups file paths into chunks where each chunk's total source size
  * does not exceed the byte budget.
  * @param files - Array of [workspace-prefixed path, absolute path] tuples.
@@ -163,452 +224,519 @@ export class IndexCodeGraph {
     const errors: IndexError[] = []
     const onProgress = options.onProgress ?? noop
     const chunkBudget = options.chunkBytes ?? DEFAULT_CHUNK_BYTES
-
-    const progress = (pct: number, phase: string, detail?: string): void => {
-      onProgress(Math.min(pct, 100), detail ? `${phase} — ${detail}` : phase)
-    }
-
-    // ── Discovery (0-5%) — per workspace ──
-    progress(0, 'Discovering files')
-    const existingFiles = await this.store.getAllFiles()
-    const existingMap = new Map(existingFiles.map((f) => [f.path, f]))
-
-    // Per-workspace tracking
-    const wsBreakdowns = new Map<
-      string,
-      {
-        filesDiscovered: number
-        filesIndexed: number
-        filesSkipped: number
-        filesRemoved: number
-        specsDiscovered: number
-        specsIndexed: number
+    const runId = `index-stage-${Date.now()}`
+    const stageDir = makeStageDir(this.store.storagePath, runId)
+    try {
+      const progress = (pct: number, phase: string, detail?: string): void => {
+        onProgress(Math.min(pct, 100), detail ? `${phase} — ${detail}` : phase)
       }
-    >()
 
-    // [workspacePrefixedPath, absolutePath] tuples for all files to process
-    const allDiscoveredPaths: string[] = []
-    const fileHashes = new Map<string, string>()
-    const absolutePaths = new Map<string, string>() // prefixed path -> absolute path
+      // ── Discovery (0-5%) — per workspace ──
+      progress(0, 'Discovering files')
+      const existingFiles = await this.store.getAllFiles()
+      const existingMap = new Map(existingFiles.map((f) => [f.path, f]))
 
-    for (const ws of options.workspaces) {
-      wsBreakdowns.set(ws.name, {
-        filesDiscovered: 0,
-        filesIndexed: 0,
-        filesSkipped: 0,
-        filesRemoved: 0,
-        specsDiscovered: 0,
-        specsIndexed: 0,
-      })
-
-      const relFiles = discoverFiles(
-        ws.codeRoot,
-        (filePath) => this.registry.getAdapterForFile(filePath) !== undefined,
+      // Per-workspace tracking
+      const wsBreakdowns = new Map<
+        string,
         {
-          ...(ws.excludePaths !== undefined ? { excludePaths: ws.excludePaths } : {}),
-          ...(ws.respectGitignore !== undefined ? { respectGitignore: ws.respectGitignore } : {}),
-        },
-      )
+          filesDiscovered: number
+          filesIndexed: number
+          filesSkipped: number
+          filesRemoved: number
+          specsDiscovered: number
+          specsIndexed: number
+        }
+      >()
 
-      const breakdown = wsBreakdowns.get(ws.name)!
-      breakdown.filesDiscovered = relFiles.length
+      // [workspacePrefixedPath, absolutePath] tuples for all files to process
+      const allDiscoveredPaths: string[] = []
+      const fileHashes = new Map<string, string>()
+      const absolutePaths = new Map<string, string>() // prefixed path -> absolute path
 
-      for (const relPath of relFiles) {
-        const prefixedPath = `${ws.name}:${relPath}`
-        allDiscoveredPaths.push(prefixedPath)
-        absolutePaths.set(prefixedPath, join(ws.codeRoot, relPath))
-      }
-    }
+      for (const ws of options.workspaces) {
+        wsBreakdowns.set(ws.name, {
+          filesDiscovered: 0,
+          filesIndexed: 0,
+          filesSkipped: 0,
+          filesRemoved: 0,
+          specsDiscovered: 0,
+          specsIndexed: 0,
+        })
 
-    // Hash all files
-    progress(2, 'Hashing files', `${String(allDiscoveredPaths.length)} files`)
-    for (let i = 0; i < allDiscoveredPaths.length; i++) {
-      const prefixedPath = allDiscoveredPaths[i]!
-      const absPath = absolutePaths.get(prefixedPath)!
-      try {
-        fileHashes.set(prefixedPath, computeContentHash(readFileSync(absPath, 'utf-8')))
-      } catch (err) {
-        errors.push({ filePath: prefixedPath, message: String(err) })
-      }
-      if (i % 200 === 0) {
-        progress(
-          2 + Math.round((i / allDiscoveredPaths.length) * 3),
-          'Hashing files',
-          `${String(i)}/${String(allDiscoveredPaths.length)}`,
+        const relFiles = discoverFiles(
+          ws.codeRoot,
+          (filePath) => this.registry.getAdapterForFile(filePath) !== undefined,
+          {
+            ...(ws.excludePaths !== undefined ? { excludePaths: ws.excludePaths } : {}),
+            ...(ws.respectGitignore !== undefined ? { respectGitignore: ws.respectGitignore } : {}),
+          },
         )
-      }
-    }
 
-    // ── Diff (5-6%) ──
-    progress(5, 'Computing diff')
-    const discoveredSet = new Set(allDiscoveredPaths)
-    const newFiles: string[] = []
-    const changedFiles: string[] = []
-    const deletedFiles: string[] = []
+        const breakdown = wsBreakdowns.get(ws.name)!
+        breakdown.filesDiscovered = relFiles.length
 
-    const skippedFiles: string[] = []
-    for (const prefixedPath of allDiscoveredPaths) {
-      const hash = fileHashes.get(prefixedPath)
-      const existing = existingMap.get(prefixedPath)
-      if (!existing) {
-        newFiles.push(prefixedPath)
-      } else if (hash && existing.contentHash !== hash) {
-        changedFiles.push(prefixedPath)
-      } else if (hash && existing.contentHash === hash) {
-        skippedFiles.push(prefixedPath)
-      }
-      // Files with no hash (hash error) are neither new, changed, nor skipped
-    }
-
-    // Only consider files from the workspaces being indexed as candidates for deletion
-    const indexedWorkspaceNames = new Set(options.workspaces.map((ws) => ws.name))
-    for (const existing of existingFiles) {
-      if (!discoveredSet.has(existing.path) && indexedWorkspaceNames.has(existing.workspace)) {
-        deletedFiles.push(existing.path)
-      }
-    }
-
-    const filesToProcess = [...newFiles, ...changedFiles]
-
-    // ── Cleanup (6%) ──
-    const toRemove = [...deletedFiles, ...changedFiles]
-    const deletedSet = new Set(deletedFiles)
-    progress(6, 'Cleaning up', `${String(toRemove.length)} to remove`)
-    let filesRemoved = 0
-    for (const filePath of toRemove) {
-      try {
-        await this.store.removeFile(filePath)
-        if (deletedSet.has(filePath)) {
-          filesRemoved++
-          const wsName = filePath.substring(0, filePath.indexOf(':'))
-          const breakdown = wsBreakdowns.get(wsName)
-          if (breakdown) breakdown.filesRemoved++
-        }
-      } catch (err) {
-        errors.push({ filePath, message: String(err) })
-      }
-    }
-
-    // ── Pass 1: Extract symbols (7-50%) — all workspaces ──
-    const fileTuples: Array<[string, string]> = filesToProcess.map((p) => [
-      p,
-      absolutePaths.get(p)!,
-    ])
-    const chunks = groupIntoChunks(fileTuples, chunkBudget)
-    const totalToProcess = filesToProcess.length
-    let filesIndexed = 0
-    const qualifiedNames = new Map<string, string>()
-    const symbolIndex = new SymbolIndex()
-
-    // Build package-name → workspace-name map for cross-workspace import resolution.
-    // Each adapter reads its language's manifest (package.json, go.mod, etc.) to
-    // extract the package identity. This is language-agnostic and works for both
-    // monorepo and multirepo setups.
-    const packageToWorkspace = new Map<string, string>()
-    const adapters = this.registry.getAdapters()
-    for (const ws of options.workspaces) {
-      for (const adapter of adapters) {
-        if (adapter.getPackageIdentity) {
-          const identity = adapter.getPackageIdentity(ws.codeRoot, ws.repoRoot)
-          if (identity) {
-            const existingWs = packageToWorkspace.get(identity)
-            if (existingWs && existingWs !== ws.name) {
-              errors.push({
-                filePath: `${ws.name}:<manifest>`,
-                message: `Package identity collision: "${identity}" already mapped to workspace "${existingWs}"`,
-              })
-            } else {
-              packageToWorkspace.set(identity, ws.name)
-            }
-          }
+        for (const relPath of relFiles) {
+          const prefixedPath = `${ws.name}:${relPath}`
+          allDiscoveredPaths.push(prefixedPath)
+          absolutePaths.set(prefixedPath, join(ws.codeRoot, relPath))
         }
       }
-    }
-
-    const allFiles: FileNode[] = []
-    const allSymbols: SymbolNode[] = []
-    const allRelations: Relation[] = []
-    const fileLanguages = new Map(existingFiles.map((file) => [file.path, file.language]))
-
-    let processed = 0
-    for (const chunk of chunks) {
-      for (const [prefixedPath, absPath] of chunk) {
-        processed++
-        if (processed % 50 === 0 || processed === 1) {
+      // Hash all files
+      progress(2, 'Hashing files', `${String(allDiscoveredPaths.length)} files`)
+      for (let i = 0; i < allDiscoveredPaths.length; i++) {
+        const prefixedPath = allDiscoveredPaths[i]!
+        const absPath = absolutePaths.get(prefixedPath)!
+        try {
+          fileHashes.set(prefixedPath, computeContentHash(readFileSync(absPath, 'utf-8')))
+        } catch (err) {
+          errors.push({ filePath: prefixedPath, message: String(err) })
+        }
+        if (i % 200 === 0) {
           progress(
-            7 + Math.round((processed / totalToProcess) * 43),
-            'Parsing symbols',
-            `${String(processed)}/${String(totalToProcess)}`,
+            2 + Math.round((i / allDiscoveredPaths.length) * 3),
+            'Hashing files',
+            `${String(i)}/${String(allDiscoveredPaths.length)}`,
           )
         }
+      }
+      // ── Diff (5-6%) ──
+      progress(5, 'Computing diff')
+      const discoveredSet = new Set(allDiscoveredPaths)
+      const newFiles: string[] = []
+      const changedFiles: string[] = []
+      const deletedFiles: string[] = []
+
+      const skippedFiles: string[] = []
+      for (const prefixedPath of allDiscoveredPaths) {
+        const hash = fileHashes.get(prefixedPath)
+        const existing = existingMap.get(prefixedPath)
+        if (!existing) {
+          newFiles.push(prefixedPath)
+        } else if (hash && existing.contentHash !== hash) {
+          changedFiles.push(prefixedPath)
+        } else if (hash && existing.contentHash === hash) {
+          skippedFiles.push(prefixedPath)
+        }
+        // Files with no hash (hash error) are neither new, changed, nor skipped
+      }
+
+      // Only consider files from the workspaces being indexed as candidates for deletion
+      const indexedWorkspaceNames = new Set(options.workspaces.map((ws) => ws.name))
+      for (const existing of existingFiles) {
+        if (!discoveredSet.has(existing.path) && indexedWorkspaceNames.has(existing.workspace)) {
+          deletedFiles.push(existing.path)
+        }
+      }
+
+      const filesToProcess = [...newFiles, ...changedFiles]
+      // ── Cleanup (6%) ──
+      const toRemove = [...deletedFiles, ...changedFiles]
+      const deletedSet = new Set(deletedFiles)
+      progress(6, 'Cleaning up', `${String(toRemove.length)} to remove`)
+      let filesRemoved = 0
+      for (const filePath of toRemove) {
         try {
-          const content = readFileSync(absPath, 'utf-8')
-          // Use the relative-to-codeRoot path for adapter matching (extension-based)
-          const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
-          const adapter = this.registry.getAdapterForFile(relPath)
-          if (!adapter) continue
+          await this.store.removeFile(filePath)
+          if (deletedSet.has(filePath)) {
+            filesRemoved++
+            const wsName = filePath.substring(0, filePath.indexOf(':'))
+            const breakdown = wsBreakdowns.get(wsName)
+            if (breakdown) breakdown.filesRemoved++
+          }
+        } catch (err) {
+          errors.push({ filePath, message: String(err) })
+        }
+      }
+      // ── Pass 1: Extract symbols (7-50%) — all workspaces ──
+      const fileTuples: Array<[string, string]> = filesToProcess.map((p) => [
+        p,
+        absolutePaths.get(p)!,
+      ])
+      const chunks = groupIntoChunks(fileTuples, chunkBudget)
+      const totalToProcess = filesToProcess.length
+      let filesIndexed = 0
+      const qualifiedNames = new Map<string, string>()
+      const symbolIndex = new SymbolIndex()
 
-          const language = this.registry.getLanguageForFile(relPath) ?? 'unknown'
-          const hash = fileHashes.get(prefixedPath) ?? computeContentHash(content)
-          // Extract symbols with workspace-prefixed path
-          const symbols = adapter.extractSymbols(prefixedPath, content)
-          const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
-
-          if (adapter.extractNamespace && adapter.buildQualifiedName) {
-            const ns = adapter.extractNamespace(content)
-            if (ns) {
-              for (const s of symbols) {
-                qualifiedNames.set(adapter.buildQualifiedName(ns, s.name), s.id)
+      // Build package-name → workspace-name map for cross-workspace import resolution.
+      // Each adapter reads its language's manifest (package.json, go.mod, etc.) to
+      // extract the package identity. This is language-agnostic and works for both
+      // monorepo and multirepo setups.
+      const packageToWorkspace = new Map<string, string>()
+      const adapters = this.registry.getAdapters()
+      for (const ws of options.workspaces) {
+        for (const adapter of adapters) {
+          if (adapter.getPackageIdentity) {
+            const identity = adapter.getPackageIdentity(ws.codeRoot, ws.repoRoot)
+            if (identity) {
+              const existingWs = packageToWorkspace.get(identity)
+              if (existingWs && existingWs !== ws.name) {
+                errors.push({
+                  filePath: `${ws.name}:<manifest>`,
+                  message: `Package identity collision: "${identity}" already mapped to workspace "${existingWs}"`,
+                })
+              } else {
+                packageToWorkspace.set(identity, ws.name)
               }
             }
           }
-
-          symbolIndex.addFile(prefixedPath, symbols)
-          allFiles.push(
-            createFileNode({
-              path: prefixedPath,
-              language,
-              contentHash: hash,
-              workspace: wsName,
-            }),
-          )
-          fileLanguages.set(prefixedPath, language)
-          allSymbols.push(...symbols)
-          filesIndexed++
-
-          // Track per-workspace
-          const breakdown = wsBreakdowns.get(wsName)
-          if (breakdown) breakdown.filesIndexed++
-        } catch (err) {
-          errors.push({ filePath: prefixedPath, message: String(err) })
         }
       }
-    }
 
-    // Populate SymbolIndex with existing symbols from unchanged files so
-    // Pass 2 can resolve imports from changed files to unchanged targets
-    const processedPaths = new Set(filesToProcess)
-    for (const prefixedPath of allDiscoveredPaths) {
-      if (processedPaths.has(prefixedPath)) continue
-      const existing = await this.store.findSymbols({ filePath: prefixedPath })
-      if (existing.length > 0) {
-        symbolIndex.addFile(prefixedPath, existing)
-      }
-    }
+      const fileLanguages = new Map(existingFiles.map((file) => [file.path, file.language]))
+      const pass1ChunkFiles: string[] = []
+      const pass2ChunkFiles: string[] = []
+      let stagedFileCount = 0
+      let stagedSymbolCount = 0
+      let stagedRelationCount = 0
+      const changedTypeIds = new Set<string>()
+      const seenOverrideKeys = new Set<string>()
 
-    const ownershipIndex = this.buildMethodOwnershipIndex(symbolIndex, fileLanguages)
-
-    // ── Pass 2: Resolve imports + extract relations (50-80%) ──
-    const workspaceByName = new Map(options.workspaces.map((ws) => [ws.name, ws]))
-    processed = 0
-    for (const chunk of chunks) {
-      for (const [prefixedPath, absPath] of chunk) {
-        processed++
-        if (processed % 50 === 0 || processed === 1) {
-          progress(
-            50 + Math.round((processed / totalToProcess) * 30),
-            'Resolving imports',
-            `${String(processed)}/${String(totalToProcess)}`,
-          )
-        }
-        try {
-          const content = readFileSync(absPath, 'utf-8')
-          const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
-          const adapter = this.registry.getAdapterForFile(relPath)
-          if (!adapter) continue
-
-          const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
-          const ws = workspaceByName.get(wsName)
-
-          const symbols = symbolIndex.findByFile(prefixedPath)
-          const relationSymbols = adapter.languages().includes('php')
-            ? symbolIndex.findByFilePrefix(`${wsName}:`)
-            : symbols
-          const imports = adapter.extractImportedNames(prefixedPath, content)
-          const { importMap, fileImports } = this.resolveImports(
-            imports,
-            prefixedPath,
-            adapter,
-            symbolIndex,
-            qualifiedNames,
-            packageToWorkspace,
-            ws?.codeRoot,
-            ws?.repoRoot,
-          )
-          const relations = adapter.extractRelations(
-            prefixedPath,
-            content,
-            relationSymbols,
-            importMap,
-          )
-
-          allRelations.push(...relations)
-          for (const targetPath of fileImports) {
-            allRelations.push(
-              createRelation({
-                source: prefixedPath,
-                target: targetPath,
-                type: RelationType.Imports,
-              }),
+      let processed = 0
+      for (const [chunkIndex, chunk] of chunks.entries()) {
+        const chunkFiles: FileNode[] = []
+        const chunkSymbols: SymbolNode[] = []
+        for (const [prefixedPath, absPath] of chunk) {
+          processed++
+          if (processed % 50 === 0 || processed === 1) {
+            progress(
+              7 + Math.round((processed / totalToProcess) * 43),
+              'Parsing symbols',
+              `${String(processed)}/${String(totalToProcess)}`,
             )
           }
-        } catch (err) {
-          errors.push({ filePath: prefixedPath, message: String(err) })
-        }
-      }
-    }
-
-    // ── Specs (80-83%) — per workspace ──
-    progress(80, 'Discovering specs')
-    let totalSpecsDiscovered = 0
-    let specsIndexed = 0
-    const allSpecs: SpecNode[] = []
-
-    const existingSpecs = await this.store.getAllSpecs()
-    const existingSpecMap = new Map(existingSpecs.map((s) => [s.specId, s]))
-
-    // Build a global set of all known specIds (existing + all discovered across workspaces)
-    // so cross-workspace DEPENDS_ON relations resolve correctly.
-    // Pre-prune specs that will be deleted so DEPENDS_ON edges never target stale specs.
-    const allDiscoveredSpecs = new Map<string, { ws: string; specs: DiscoveredSpec[] }>()
-    const discoveredSpecIdsByWorkspace = new Map<string, Set<string>>()
-    const knownSpecIds = new Set(existingSpecs.map((s) => s.specId))
-    for (const ws of options.workspaces) {
-      const discovered = await ws.specs()
-      allDiscoveredSpecs.set(ws.name, { ws: ws.name, specs: discovered })
-      const wsDiscoveredIds = new Set(discovered.map((d) => d.spec.specId))
-      discoveredSpecIdsByWorkspace.set(ws.name, wsDiscoveredIds)
-      for (const { spec } of discovered) {
-        knownSpecIds.add(spec.specId)
-      }
-    }
-
-    // Remove specs that will be deleted from knownSpecIds before any DEPENDS_ON emission
-    for (const existing of existingSpecs) {
-      if (!indexedWorkspaceNames.has(existing.workspace)) continue
-      const discoveredIds = discoveredSpecIdsByWorkspace.get(existing.workspace)
-      if (!discoveredIds?.has(existing.specId)) {
-        knownSpecIds.delete(existing.specId)
-      }
-    }
-
-    for (const ws of options.workspaces) {
-      const { specs: discoveredSpecs } = allDiscoveredSpecs.get(ws.name)!
-
-      const wsBreakdown = wsBreakdowns.get(ws.name)!
-      wsBreakdown.specsDiscovered = discoveredSpecs.length
-      totalSpecsDiscovered += discoveredSpecs.length
-      progress(80, 'Discovering specs', `${String(totalSpecsDiscovered)} found`)
-
-      const discoveredSpecIds = new Set(discoveredSpecs.map((s) => s.spec.specId))
-
-      // Remove deleted specs for this workspace (always runs, even when no specs discovered)
-      for (const existing of existingSpecs) {
-        if (existing.workspace === ws.name && !discoveredSpecIds.has(existing.specId)) {
           try {
-            await this.store.removeSpec(existing.specId)
+            const content = readFileSync(absPath, 'utf-8')
+            // Use the relative-to-codeRoot path for adapter matching (extension-based)
+            const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
+            const adapter = this.registry.getAdapterForFile(relPath)
+            if (!adapter) continue
+
+            const language = this.registry.getLanguageForFile(relPath) ?? 'unknown'
+            const hash = fileHashes.get(prefixedPath) ?? computeContentHash(content)
+            // Extract symbols with workspace-prefixed path. Some adapters can also
+            // return the namespace from the same parse tree to avoid reparsing.
+            const extracted = adapter.extractSymbolsWithNamespace?.(prefixedPath, content) ?? {
+              symbols: adapter.extractSymbols(prefixedPath, content),
+              namespace: adapter.extractNamespace?.(content),
+            }
+            const symbols = extracted.symbols
+            const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+
+            if (adapter.buildQualifiedName && extracted.namespace) {
+              for (const s of symbols) {
+                qualifiedNames.set(adapter.buildQualifiedName(extracted.namespace, s.name), s.id)
+              }
+            }
+
+            symbolIndex.addFile(prefixedPath, symbols)
+            chunkFiles.push(
+              createFileNode({
+                path: prefixedPath,
+                language,
+                contentHash: hash,
+                workspace: wsName,
+              }),
+            )
+            fileLanguages.set(prefixedPath, language)
+            chunkSymbols.push(...symbols)
+            for (const symbol of symbols) {
+              if (symbol.kind === 'class' || symbol.kind === 'interface') {
+                changedTypeIds.add(symbol.id)
+              }
+            }
+            filesIndexed++
+
+            // Track per-workspace
+            const breakdown = wsBreakdowns.get(wsName)
+            if (breakdown) breakdown.filesIndexed++
           } catch (err) {
-            errors.push({ filePath: existing.path, message: String(err) })
+            errors.push({ filePath: prefixedPath, message: String(err) })
           }
+        }
+        const stageFile = `pass1-${String(chunkIndex).padStart(5, '0')}.json`
+        writeStageChunk(stageDir, stageFile, { files: chunkFiles, symbols: chunkSymbols })
+        pass1ChunkFiles.push(stageFile)
+        stagedFileCount += chunkFiles.length
+        stagedSymbolCount += chunkSymbols.length
+      }
+      // Populate SymbolIndex with existing symbols from unchanged files so
+      // Pass 2 can resolve imports from changed files to unchanged targets
+      const processedPaths = new Set(filesToProcess)
+      for (const prefixedPath of allDiscoveredPaths) {
+        if (processedPaths.has(prefixedPath)) continue
+        const existing = await this.store.findSymbols({ filePath: prefixedPath })
+        if (existing.length > 0) {
+          symbolIndex.addFile(prefixedPath, existing)
         }
       }
 
-      for (const { spec } of discoveredSpecs) {
-        try {
-          const existing = existingSpecMap.get(spec.specId)
-          if (existing && existing.contentHash === spec.contentHash) continue
+      const ownershipIndex = this.buildMethodOwnershipIndex(symbolIndex, fileLanguages)
 
-          if (existing) {
-            await this.store.removeSpec(spec.specId)
+      // ── Pass 2: Resolve imports + extract relations (50-80%) ──
+      const workspaceByName = new Map(options.workspaces.map((ws) => [ws.name, ws]))
+      processed = 0
+      for (const [chunkIndex, chunk] of chunks.entries()) {
+        const chunkRelations: Relation[] = []
+        for (const [prefixedPath, absPath] of chunk) {
+          processed++
+          if (processed % 50 === 0 || processed === 1) {
+            progress(
+              50 + Math.round((processed / totalToProcess) * 30),
+              'Resolving imports',
+              `${String(processed)}/${String(totalToProcess)}`,
+            )
           }
+          try {
+            const content = readFileSync(absPath, 'utf-8')
+            const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
+            const adapter = this.registry.getAdapterForFile(relPath)
+            if (!adapter) continue
 
-          for (const depId of spec.dependsOn) {
-            if (knownSpecIds.has(depId)) {
-              allRelations.push(
+            const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+            const ws = workspaceByName.get(wsName)
+
+            const symbols = symbolIndex.findByFile(prefixedPath)
+            const relationSymbols = adapter.languages().includes('php')
+              ? symbolIndex.findByFilePrefix(`${wsName}:`)
+              : symbols
+            const imports = adapter.extractImportedNames(prefixedPath, content)
+            const { importMap, fileImports } = this.resolveImports(
+              imports,
+              prefixedPath,
+              adapter,
+              symbolIndex,
+              qualifiedNames,
+              packageToWorkspace,
+              ws?.codeRoot,
+              ws?.repoRoot,
+            )
+            const relations = adapter.extractRelations(
+              prefixedPath,
+              content,
+              relationSymbols,
+              importMap,
+            )
+
+            chunkRelations.push(...relations)
+            for (const targetPath of fileImports) {
+              chunkRelations.push(
                 createRelation({
-                  source: spec.specId,
-                  target: depId,
-                  type: RelationType.DependsOn,
+                  source: prefixedPath,
+                  target: targetPath,
+                  type: RelationType.Imports,
                 }),
               )
             }
+          } catch (err) {
+            errors.push({ filePath: prefixedPath, message: String(err) })
           }
-          allSpecs.push(spec)
-          specsIndexed++
-          wsBreakdown.specsIndexed++
-        } catch (err) {
-          errors.push({ filePath: spec.path, message: String(err) })
+        }
+        for (const relation of chunkRelations) {
+          if (relation.type === RelationType.Overrides) {
+            seenOverrideKeys.add(`${relation.source}:${relation.type}:${relation.target}`)
+          }
+        }
+        const stageFile = `pass2-${String(chunkIndex).padStart(5, '0')}.json`
+        writeStageChunk(stageDir, stageFile, { relations: chunkRelations })
+        pass2ChunkFiles.push(stageFile)
+        stagedRelationCount += chunkRelations.length
+      }
+
+      // ── Specs (80-83%) — per workspace ──
+      progress(80, 'Discovering specs')
+      let totalSpecsDiscovered = 0
+      let specsIndexed = 0
+      const allSpecs: SpecNode[] = []
+      const specRelations: Relation[] = []
+
+      const existingSpecs = await this.store.getAllSpecs()
+      const existingSpecMap = new Map(existingSpecs.map((s) => [s.specId, s]))
+
+      // Build a global set of all known specIds (existing + all discovered across workspaces)
+      // so cross-workspace DEPENDS_ON relations resolve correctly.
+      // Pre-prune specs that will be deleted so DEPENDS_ON edges never target stale specs.
+      const allDiscoveredSpecs = new Map<string, { ws: string; specs: DiscoveredSpec[] }>()
+      const discoveredSpecIdsByWorkspace = new Map<string, Set<string>>()
+      const knownSpecIds = new Set(existingSpecs.map((s) => s.specId))
+      for (const ws of options.workspaces) {
+        const discovered = await ws.specs()
+        allDiscoveredSpecs.set(ws.name, { ws: ws.name, specs: discovered })
+        const wsDiscoveredIds = new Set(discovered.map((d) => d.spec.specId))
+        discoveredSpecIdsByWorkspace.set(ws.name, wsDiscoveredIds)
+        for (const { spec } of discovered) {
+          knownSpecIds.add(spec.specId)
         }
       }
-    }
 
-    // Compute per-workspace skipped counts from explicitly tracked unchanged files
-    for (const filePath of skippedFiles) {
-      const wsName = filePath.substring(0, filePath.indexOf(':'))
-      const breakdown = wsBreakdowns.get(wsName)
-      if (breakdown) breakdown.filesSkipped++
-    }
+      // Remove specs that will be deleted from knownSpecIds before any DEPENDS_ON emission
+      for (const existing of existingSpecs) {
+        if (!indexedWorkspaceNames.has(existing.workspace)) continue
+        const discoveredIds = discoveredSpecIdsByWorkspace.get(existing.workspace)
+        if (!discoveredIds?.has(existing.specId)) {
+          knownSpecIds.delete(existing.specId)
+        }
+      }
 
-    // ── Bulk load everything (83-95%) ──
-    progress(
-      83,
-      'Bulk loading',
-      `${String(allFiles.length)} files, ${String(allSymbols.length)} symbols, ${String(allRelations.length)} relations`,
-    )
-    if (allFiles.length > 0 || allSpecs.length > 0) {
-      let bulkStep = 0
-      await this.store.bulkLoad({
-        files: allFiles,
-        symbols: allSymbols,
-        specs: allSpecs,
-        relations: allRelations,
-        onProgress: (step) => {
+      for (const ws of options.workspaces) {
+        const { specs: discoveredSpecs } = allDiscoveredSpecs.get(ws.name)!
+
+        const wsBreakdown = wsBreakdowns.get(ws.name)!
+        wsBreakdown.specsDiscovered = discoveredSpecs.length
+        totalSpecsDiscovered += discoveredSpecs.length
+        progress(80, 'Discovering specs', `${String(totalSpecsDiscovered)} found`)
+
+        const discoveredSpecIds = new Set(discoveredSpecs.map((s) => s.spec.specId))
+
+        // Remove deleted specs for this workspace (always runs, even when no specs discovered)
+        for (const existing of existingSpecs) {
+          if (existing.workspace === ws.name && !discoveredSpecIds.has(existing.specId)) {
+            try {
+              await this.store.removeSpec(existing.specId)
+            } catch (err) {
+              errors.push({ filePath: existing.path, message: String(err) })
+            }
+          }
+        }
+
+        for (const { spec } of discoveredSpecs) {
+          try {
+            const existing = existingSpecMap.get(spec.specId)
+            if (existing && existing.contentHash === spec.contentHash) continue
+
+            if (existing) {
+              await this.store.removeSpec(spec.specId)
+            }
+
+            for (const depId of spec.dependsOn) {
+              if (knownSpecIds.has(depId)) {
+                specRelations.push(
+                  createRelation({
+                    source: spec.specId,
+                    target: depId,
+                    type: RelationType.DependsOn,
+                  }),
+                )
+              }
+            }
+            allSpecs.push(spec)
+            specsIndexed++
+            wsBreakdown.specsIndexed++
+          } catch (err) {
+            errors.push({ filePath: spec.path, message: String(err) })
+          }
+        }
+      }
+
+      // Compute per-workspace skipped counts from explicitly tracked unchanged files
+      for (const filePath of skippedFiles) {
+        const wsName = filePath.substring(0, filePath.indexOf(':'))
+        const breakdown = wsBreakdowns.get(wsName)
+        if (breakdown) breakdown.filesSkipped++
+      }
+
+      // ── Bulk load everything (83-95%) ──
+      progress(
+        83,
+        'Bulk loading',
+        `${String(stagedFileCount)} files, ${String(stagedSymbolCount)} symbols, ${String(stagedRelationCount + specRelations.length)} relations`,
+      )
+      if (
+        stagedFileCount > 0 ||
+        allSpecs.length > 0 ||
+        stagedRelationCount > 0 ||
+        specRelations.length > 0
+      ) {
+        let bulkStep = 0
+        const onBulkStep = (step: string): void => {
           bulkStep++
           progress(83 + Math.min(Math.round(bulkStep * 2), 12), 'Bulk loading', step)
-        },
-        ...(options.vcsRef !== undefined ? { vcsRef: options.vcsRef } : {}),
-      })
-    }
-
-    const crossFileOverrides = await this.deriveCrossFileOverrideRelations(
-      allSymbols,
-      ownershipIndex,
-      allRelations,
-    )
-    if (crossFileOverrides.length > 0) {
-      await this.store.addRelations(crossFileOverrides)
-    }
-
-    // Rebuild FTS indexes after data changes
-    progress(96, 'Rebuilding search indexes')
-    await this.store.rebuildFtsIndexes()
-
-    progress(100, 'Done')
-
-    const workspaces: WorkspaceIndexBreakdown[] = options.workspaces.map((ws) => {
-      const breakdown = wsBreakdowns.get(ws.name)!
-      return {
-        name: ws.name,
-        filesDiscovered: breakdown.filesDiscovered,
-        filesIndexed: breakdown.filesIndexed,
-        filesSkipped: breakdown.filesSkipped,
-        filesRemoved: breakdown.filesRemoved,
-        specsDiscovered: breakdown.specsDiscovered,
-        specsIndexed: breakdown.specsIndexed,
+        }
+        for (const chunkFile of pass1ChunkFiles) {
+          const staged = readFilesAndSymbolsStageChunk(stageDir, chunkFile)
+          await this.store.bulkLoad({
+            files: staged.files,
+            symbols: staged.symbols,
+            specs: [],
+            relations: [],
+            onProgress: onBulkStep,
+          })
+        }
+        if (allSpecs.length > 0) {
+          await this.store.bulkLoad({
+            files: [],
+            symbols: [],
+            specs: allSpecs,
+            relations: [],
+            onProgress: onBulkStep,
+          })
+        }
+        for (const chunkFile of pass2ChunkFiles) {
+          const staged = readRelationsStageChunk(stageDir, chunkFile)
+          if (staged.relations.length === 0) continue
+          await this.store.bulkLoad({
+            files: [],
+            symbols: [],
+            specs: [],
+            relations: staged.relations,
+            onProgress: onBulkStep,
+          })
+        }
+        if (specRelations.length > 0 || options.vcsRef !== undefined) {
+          await this.store.bulkLoad({
+            files: [],
+            symbols: [],
+            specs: [],
+            relations: specRelations,
+            onProgress: onBulkStep,
+            ...(options.vcsRef !== undefined ? { vcsRef: options.vcsRef } : {}),
+          })
+        }
       }
-    })
 
-    return {
-      filesDiscovered: allDiscoveredPaths.length,
-      filesIndexed,
-      filesRemoved,
-      filesSkipped: skippedFiles.length,
-      specsDiscovered: totalSpecsDiscovered,
-      specsIndexed,
-      errors,
-      duration: Date.now() - start,
-      workspaces,
-      vcsRef: options.vcsRef ?? null,
+      const crossFileOverrides = await this.deriveCrossFileOverrideRelations(
+        changedTypeIds,
+        ownershipIndex,
+        seenOverrideKeys,
+      )
+      if (crossFileOverrides.length > 0) {
+        await this.store.addRelations(crossFileOverrides)
+      }
+
+      // Rebuild FTS indexes after data changes
+      progress(96, 'Rebuilding search indexes')
+      await this.store.rebuildFtsIndexes()
+
+      progress(100, 'Done')
+
+      const workspaces: WorkspaceIndexBreakdown[] = options.workspaces.map((ws) => {
+        const breakdown = wsBreakdowns.get(ws.name)!
+        return {
+          name: ws.name,
+          filesDiscovered: breakdown.filesDiscovered,
+          filesIndexed: breakdown.filesIndexed,
+          filesSkipped: breakdown.filesSkipped,
+          filesRemoved: breakdown.filesRemoved,
+          specsDiscovered: breakdown.specsDiscovered,
+          specsIndexed: breakdown.specsIndexed,
+        }
+      })
+
+      return {
+        filesDiscovered: allDiscoveredPaths.length,
+        filesIndexed,
+        filesRemoved,
+        filesSkipped: skippedFiles.length,
+        specsDiscovered: totalSpecsDiscovered,
+        specsIndexed,
+        errors,
+        duration: Date.now() - start,
+        workspaces,
+        vcsRef: options.vcsRef ?? null,
+      }
+    } finally {
+      rmSync(stageDir, { recursive: true, force: true })
     }
   }
 
@@ -733,28 +861,19 @@ export class IndexCodeGraph {
 
   /**
    * Derives additive cross-file `OVERRIDES` relations using persisted hierarchy edges.
-   * @param changedSymbols - Symbols from files reprocessed in this indexing run.
+   * @param changedTypeIds - Type identifiers from files reprocessed in this indexing run.
    * @param ownershipIndex - Method ownership information reconstructed from symbols.
-   * @param existingRelations - Relations already emitted by adapters in this run.
+   * @param existingOverrideKeys - Override edges already emitted by adapters in this run.
    * @returns Additional override relations to persist.
    */
   private async deriveCrossFileOverrideRelations(
-    changedSymbols: readonly SymbolNode[],
+    changedTypeIds: ReadonlySet<string>,
     ownershipIndex: MethodOwnershipIndex,
-    existingRelations: readonly Relation[],
+    existingOverrideKeys: ReadonlySet<string>,
   ): Promise<Relation[]> {
-    const changedTypeIds = new Set(
-      changedSymbols
-        .filter((symbol) => symbol.kind === 'class' || symbol.kind === 'interface')
-        .map((symbol) => symbol.id),
-    )
     if (changedTypeIds.size === 0) return []
 
-    const seen = new Set(
-      existingRelations
-        .filter((relation) => relation.type === RelationType.Overrides)
-        .map((relation) => `${relation.source}:${relation.type}:${relation.target}`),
-    )
+    const seen = new Set(existingOverrideKeys)
     const derived: Relation[] = []
 
     for (const typeId of changedTypeIds) {

@@ -15,8 +15,13 @@ vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
+vi.mock('../../src/commands/graph/graph-index-lock.js', () => ({
+  assertGraphIndexUnlocked: vi.fn(),
+}))
+
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
+import { assertGraphIndexUnlocked } from '../../src/commands/graph/graph-index-lock.js'
 import { registerGraphSearch } from '../../src/commands/graph/search.js'
 
 function setup() {
@@ -96,6 +101,17 @@ describe('graph search', () => {
       configPath: undefined,
       repoPath: undefined,
     })
+  })
+
+  it('checks the shared index lock before opening the provider', async () => {
+    setup()
+
+    const program = makeSearchProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'search', 'kernel'])
+
+    expect(assertGraphIndexUnlocked).toHaveBeenCalledWith(
+      expect.objectContaining({ configPath: '/project/.specd/config' }),
+    )
   })
 
   it('passes all parsed kinds to searchSymbols', async () => {

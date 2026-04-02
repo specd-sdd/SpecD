@@ -1,7 +1,10 @@
 import path from 'node:path'
 import { parse } from '@ast-grep/napi'
 import { type SgNode } from '@ast-grep/napi'
-import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
+import {
+  type LanguageAdapter,
+  type ExtractedSymbolsWithNamespace,
+} from '../../domain/value-objects/language-adapter.js'
 import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
@@ -766,6 +769,18 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Extracts PHP symbols and namespace from a single parse tree.
+   * @param filePath - Workspace-prefixed file path.
+   * @param content - PHP source text.
+   * @returns Symbols plus the declared namespace when present.
+   */
+  extractSymbolsWithNamespace(filePath: string, content: string): ExtractedSymbolsWithNamespace {
+    ensureLanguagesRegistered()
+    const root = parse('php', content).root()
+    return this.extractSymbolsAndNamespaceFromRoot(filePath, root)
+  }
+
+  /**
    * Finds the first namespace definition in a parsed PHP tree.
    * @param node - AST node to inspect.
    * @returns The namespace string, or undefined.
@@ -796,6 +811,19 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   extractSymbols(filePath: string, content: string): SymbolNode[] {
     ensureLanguagesRegistered()
     const root = parse('php', content).root()
+    return this.extractSymbolsAndNamespaceFromRoot(filePath, root).symbols
+  }
+
+  /**
+   * Extracts PHP symbols and namespace from an already parsed root node.
+   * @param filePath - Workspace-prefixed file path.
+   * @param root - Parsed PHP root node.
+   * @returns Symbols plus the declared namespace when present.
+   */
+  private extractSymbolsAndNamespaceFromRoot(
+    filePath: string,
+    root: SgNode,
+  ): ExtractedSymbolsWithNamespace {
     const symbols: SymbolNode[] = []
     const seen = new Set<string>()
 
@@ -823,7 +851,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     }
 
     this.walk(root, addSymbol)
-    return symbols
+    return { symbols, namespace: this.findNamespace(root) }
   }
 
   /**
@@ -841,7 +869,6 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     importMap: Map<string, string>,
   ): Relation[] {
     ensureLanguagesRegistered()
-    parse('php', content).root()
 
     const relations: Relation[] = []
     const currentFileSymbols = symbols.filter((symbol) => symbol.filePath === filePath)
@@ -1059,11 +1086,12 @@ export class PhpLanguageAdapter implements LanguageAdapter {
 
   /**
    * Extracts `use` declarations from a PHP file.
-   * @param _filePath - Unused source file path.
+   * @param filePath - Source file path.
    * @param content - PHP source text.
    * @returns Parsed import declarations.
    */
-  extractImportedNames(_filePath: string, content: string): ImportDeclaration[] {
+  extractImportedNames(filePath: string, content: string): ImportDeclaration[] {
+    void filePath
     ensureLanguagesRegistered()
     const root = parse('php', content).root()
     const results: ImportDeclaration[] = []
@@ -1134,33 +1162,35 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     node: SgNode,
     addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
   ): void {
+    const commentFor = (target: SgNode): string | undefined => extractComment(target)
+
     for (const child of node.children()) {
       switch (nodeKind(child)) {
         case 'function_definition': {
           const name = child.field('name')?.text()
-          if (name) addSymbol(name, SymbolKind.Function, child, extractComment(child))
+          if (name) addSymbol(name, SymbolKind.Function, child, commentFor(child))
           break
         }
         case 'class_declaration': {
           const name = child.field('name')?.text()
-          if (name) addSymbol(name, SymbolKind.Class, child, extractComment(child))
+          if (name) addSymbol(name, SymbolKind.Class, child, commentFor(child))
           this.walkClassBody(child, addSymbol)
           break
         }
         case 'interface_declaration': {
           const name = child.field('name')?.text()
-          if (name) addSymbol(name, SymbolKind.Interface, child, extractComment(child))
+          if (name) addSymbol(name, SymbolKind.Interface, child, commentFor(child))
           this.walkClassBody(child, addSymbol)
           break
         }
         case 'enum_declaration': {
           const name = child.field('name')?.text()
-          if (name) addSymbol(name, SymbolKind.Enum, child, extractComment(child))
+          if (name) addSymbol(name, SymbolKind.Enum, child, commentFor(child))
           break
         }
         case 'trait_declaration': {
           const name = child.field('name')?.text()
-          if (name) addSymbol(name, SymbolKind.Type, child, extractComment(child))
+          if (name) addSymbol(name, SymbolKind.Type, child, commentFor(child))
           this.walkClassBody(child, addSymbol)
           break
         }
@@ -1169,7 +1199,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
             if (nodeKind(constChild) !== 'const_element') continue
             const nameNode = constChild.child(0)
             if (nameNode && nodeKind(nameNode) === 'name') {
-              addSymbol(nameNode.text(), SymbolKind.Variable, constChild, extractComment(child))
+              addSymbol(nameNode.text(), SymbolKind.Variable, constChild, commentFor(child))
             }
           }
           break
@@ -1196,19 +1226,21 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     classNode: SgNode,
     addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
   ): void {
+    const commentFor = (target: SgNode): string | undefined => extractComment(target)
+
     for (const child of classNode.children()) {
       if (nodeKind(child) !== 'declaration_list') continue
       for (const member of child.children()) {
         if (nodeKind(member) === 'method_declaration') {
           const name = member.field('name')?.text()
-          if (name) addSymbol(name, SymbolKind.Method, member, extractComment(member))
+          if (name) addSymbol(name, SymbolKind.Method, member, commentFor(member))
         } else if (nodeKind(member) === 'property_declaration') {
           for (const propChild of member.children()) {
             if (nodeKind(propChild) !== 'property_element') continue
             const varName = propChild.field('name')
             if (!varName) continue
             const name = varName.text().replace(/^\$/, '')
-            if (name) addSymbol(name, SymbolKind.Variable, member, extractComment(member))
+            if (name) addSymbol(name, SymbolKind.Variable, member, commentFor(member))
           }
         }
       }

@@ -2,19 +2,49 @@
 
 ## Purpose
 
-The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. The graph store defines the persistence port and its LadybugDB adapter, providing the storage backbone for indexing, querying, and traversal operations.
+The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. This spec defines the abstract `GraphStore` contract that indexing, traversal, and CLI features depend on, without prescribing any particular storage engine or physical schema.
 
 ## Requirements
 
 ### Requirement: GraphStore port
 
-`GraphStore` SHALL be an abstract class with a `storagePath` constructor parameter specifying where the graph database is stored on disk. It defines the contract for all graph persistence operations. Concrete implementations provide the storage engine.
+`GraphStore` SHALL be an abstract class with a `storagePath` constructor parameter specifying the filesystem root allocated to the concrete graph-store implementation. It defines the contract for all graph persistence operations. Concrete implementations own the physical schema, file layout, and backend-specific storage details.
 
-The port follows the project's hexagonal architecture: it is defined in `domain/ports/` (or `application/ports/` if it requires async operations), and adapters live in `infrastructure/`.
+The port follows the project's hexagonal architecture: it is defined in `domain/ports/`, and concrete adapters live in `infrastructure/`.
+
+### Requirement: Minimum graph semantics
+
+Every `GraphStore` implementation SHALL support the code-graph package's minimum persisted semantics, regardless of its backend-specific physical schema or file layout.
+
+At minimum, the abstract store contract MUST support:
+
+- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries
+- symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries
+- spec nodes carrying the `SpecNode` data needed by spec indexing and search
+- persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`, `DEPENDS_ON`, `COVERS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
+- store-level metadata sufficient to satisfy abstract statistics and staleness-facing fields such as `lastIndexedAt` and `lastIndexedRef`
+
+`COVERS` is the abstract relation family reserved for linking specs to code artifacts. A backend MAY leave it unpopulated until the package introduces the corresponding indexing and query behavior, but the relation family itself belongs to the abstract graph model rather than to any one backend.
+
+Backends MAY represent those concepts differently internally, but they MUST preserve the observable semantics exposed by the `GraphStore` API. Storage-agnostic consumers MUST rely on these abstract semantics rather than any backend-specific table, label, or index shape.
 
 ### Requirement: Connection lifecycle
 
-`GraphStore` SHALL expose explicit `open(): Promise<void>` and `close(): Promise<void>` methods. All query and mutation methods MUST throw `StoreNotOpenError` (extending `CodeGraphError`) if called before `open()` or after `close()`. The `open()` method initializes the database connection and runs any pending schema migrations. The `close()` method flushes pending writes and releases resources.
+`GraphStore` SHALL expose explicit `open(): Promise<void>` and `close(): Promise<void>` methods. All query and mutation methods MUST throw `StoreNotOpenError` (extending `CodeGraphError`) if called before `open()` or after `close()`.
+
+The `open()` method prepares the concrete backend for read/write operations. The `close()` method flushes pending writes and releases resources. Any backend-specific schema initialization, migrations, or index preparation remain implementation concerns.
+
+### Requirement: Store recreation
+
+`GraphStore` SHALL provide `recreate(): Promise<void>` as the abstract destructive reset operation for backends that need to drop and rebuild their persisted graph state.
+
+`recreate()` is stronger than `clear()`: it resets the backend's persisted storage layout rather than merely deleting graph rows from an already-open store. Callers such as `graph index --force` MUST use this abstract capability instead of deleting backend-specific files or directories directly.
+
+The concrete backend owns how recreation is performed. A backend MAY delete files, recreate directories, rebuild schemas, reopen connections, or combine those steps, provided the observable result is the same:
+
+- all previously indexed graph data is gone
+- the persisted backend state is ready for a fresh indexing run
+- callers do not need to know backend-specific filenames, lockfiles, WAL files, or schema artifacts
 
 ### Requirement: Atomic file-level upsert
 
@@ -65,19 +95,6 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 - **`lastIndexedAt`** — ISO 8601 timestamp of the most recent `upsertFile` call
 - **`lastIndexedRef`** — VCS ref (commit hash, changeset ID) at the time of the last index, or `null` if no ref was stored. This value is persisted as a meta key alongside `lastIndexedAt` and is read-only from the statistics interface.
 
-### Requirement: LadybugDB adapter
-
-The concrete `LadybugGraphStore` adapter SHALL use LadybugDB as the storage engine. It stores the graph in a single file at `{storagePath}/.specd/code-graph.lbug`. LadybugDB provides a Cypher-compatible query interface over a local file-based graph database.
-
-The adapter MUST:
-
-- Create the `.specd/` directory and database file on first `open()` if they do not exist
-- Define a schema with node labels (`File`, `Symbol`, `Spec`) and relationship types matching `RelationType`, including `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. The `Symbol` node table includes a `comment STRING` column for storing the raw comment text and a `searchName STRING` column for FTS-optimized name search (computed from the symbol name using `expandSymbolName`).
-- Use parameterized Cypher queries for all operations (no string interpolation of user data)
-- Support schema migration: if the database schema version does not match the expected version, migrate on `open()`
-
-The adapter uses CSV-based bulk loading (`COPY FROM`) for large datasets via the `bulkLoad()` method. Relations are loaded in batches of 500 to prevent LadybugDB from blocking. The `IGNORE_ERRORS=true` flag is used for relation COPY operations to silently skip rows referencing non-existent nodes (dangling imports to external files).
-
 ### Requirement: Spec upsert and removal
 
 `GraphStore` SHALL provide:
@@ -85,25 +102,15 @@ The adapter uses CSV-based bulk loading (`COPY FROM`) for large datasets via the
 - **`upsertSpec(spec: SpecNode, relations: Relation[]): Promise<void>`** — atomically replaces all data for a spec node. Removes existing `DEPENDS_ON` relations where this spec is the source and replaces them with the provided relations.
 - **`removeSpec(specId: string): Promise<void>`** — removes the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target.
 
-These follow the same atomic pattern as `upsertFile` / `removeFile`.
-
-The Spec node table includes:
-
-- `specId STRING` — primary key
-- `path STRING`
-- `title STRING`
-- `description STRING` — from `.specd-metadata.yaml`
-- `contentHash STRING` — hash of concatenated artifacts (excluding `.specd-metadata.yaml`)
-- `content STRING` — concatenated artifact text for full-text search
-- `workspace STRING`
+These follow the same atomic pattern as `upsertFile()` and `removeFile()`.
 
 ### Requirement: Full-text search
 
 `GraphStore` SHALL provide:
 
-- **`searchSymbols(options: SearchOptions): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — full-text search across `Symbol.searchName` and `Symbol.comment`. The `searchName` column contains the original symbol name plus camelCase/snake_case/kebab-case tokenized parts (e.g. `handleError` is indexed as `"handleError handle error"`), so searches for individual words within compound names match correctly. Returns results ranked by BM25 score descending.
-- **`searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>`** — full-text search across `Spec.title`, `Spec.description`, and `Spec.content`. Returns results ranked by BM25 score descending.
-- **`rebuildFtsIndexes(): Promise<void>`** — drops and recreates FTS indexes. Must be called after bulk data changes because LadybugDB FTS indexes are not automatically updated on insert.
+- **`searchSymbols(options: SearchOptions): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — search symbols using normalized search text and symbol comments, returning results ranked by relevance in descending order
+- **`searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>`** — search spec title, description, and content, returning results ranked by relevance in descending order
+- **`rebuildFtsIndexes(): Promise<void>`** — a store-maintenance hook used by implementations whose search indexes require explicit rebuilding after bulk data changes
 
 `SearchOptions` is a value object with:
 
@@ -115,7 +122,7 @@ The Spec node table includes:
 - **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)
 - **excludeWorkspaces** — array of workspace names to exclude
 
-All filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied **before** LIMIT in the query — not as post-query filters. The `LadybugGraphStore` implementation adds WHERE clauses between the FTS CALL and RETURN. The `InMemoryGraphStore` test helper applies filters before slicing to limit.
+All filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied before the result limit. Score calculation and index-maintenance strategy are implementation concerns.
 
 ### Requirement: Bulk operations
 
@@ -126,11 +133,12 @@ All filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are 
 - `GraphStore` is an abstract class, not an interface — following the project's port convention
 - All mutations are atomic at the file level — no partial updates
 - `StoreNotOpenError` is thrown on any operation when the store is not open
-- The LadybugDB file path is always `{storagePath}/.specd/code-graph.lbug` — not configurable separately
+- The abstract store contract does not prescribe a specific backend, physical schema, or filesystem layout
+- Destructive force-reset behavior is modeled through `recreate()`, not through caller-managed backend file deletion
 - No dependency on `@specd/core` — error types extend `CodeGraphError`
 
 ## Spec Dependencies
 
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `RelationType`, `CodeGraphError`, hierarchy relation semantics
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — ports as abstract classes, adapters in infrastructure
+- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `RelationType`, and hierarchy relation semantics
+- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — ports as abstract classes and adapters in infrastructure
 - [`specs/code-graph/staleness-detection/spec.md`](../staleness-detection/spec.md) — `lastIndexedRef` field definition and staleness semantics

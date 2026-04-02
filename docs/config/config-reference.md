@@ -33,20 +33,21 @@ Bootstrap mode is intended for initial indexing and exploratory graph queries. I
 
 ## Top-level fields
 
-| Field                 | Type    | Required | Default      | Description                                                                                                    |
-| --------------------- | ------- | -------- | ------------ | -------------------------------------------------------------------------------------------------------------- |
-| `schema`              | string  | yes      | —            | Schema reference. See [`schema`](#schema).                                                                     |
-| `workspaces`          | object  | yes      | —            | Workspace declarations. Must include `default`.                                                                |
-| `storage`             | object  | yes      | —            | Storage paths for changes, drafts, discarded, and archive.                                                     |
-| `context`             | array   | no       | `[]`         | Additional content injected into compiled context before spec content.                                         |
-| `contextIncludeSpecs` | array   | no       | —            | Spec patterns always included in compiled context. When absent, no project-level include patterns are applied. |
-| `contextExcludeSpecs` | array   | no       | —            | Spec patterns always excluded from compiled context.                                                           |
-| `contextMode`         | string  | no       | `'lazy'`     | Context rendering mode: `'lazy'` or `'full'`. See [`contextMode`](#contextmode).                               |
-| `artifactRules`       | object  | no       | `{}`         | Per-artifact constraints added without modifying the schema.                                                   |
-| `approvals`           | object  | no       | both `false` | Approval gate configuration.                                                                                   |
-| `llmOptimizedContext` | boolean | no       | `false`      | Opt in to LLM-enriched context operations.                                                                     |
-| `schemaPlugins`       | array   | no       | `[]`         | Schema plugin references loaded and merged into the active schema.                                             |
-| `schemaOverrides`     | object  | no       | —            | Inline schema override operations applied after plugins. See [`schemaOverrides`](#schemaoverrides).            |
+| Field                 | Type    | Required | Default         | Description                                                                                                    |
+| --------------------- | ------- | -------- | --------------- | -------------------------------------------------------------------------------------------------------------- |
+| `configPath`          | string  | no       | `.specd/config` | Root directory for specd-owned runtime state such as graph backends and graph temp files.                      |
+| `schema`              | string  | yes      | —               | Schema reference. See [`schema`](#schema).                                                                     |
+| `workspaces`          | object  | yes      | —               | Workspace declarations. Must include `default`.                                                                |
+| `storage`             | object  | yes      | —               | Storage paths for changes, drafts, discarded, and archive.                                                     |
+| `context`             | array   | no       | `[]`            | Additional content injected into compiled context before spec content.                                         |
+| `contextIncludeSpecs` | array   | no       | —               | Spec patterns always included in compiled context. When absent, no project-level include patterns are applied. |
+| `contextExcludeSpecs` | array   | no       | —               | Spec patterns always excluded from compiled context.                                                           |
+| `contextMode`         | string  | no       | `'lazy'`        | Context rendering mode: `'lazy'` or `'full'`. See [`contextMode`](#contextmode).                               |
+| `artifactRules`       | object  | no       | `{}`            | Per-artifact constraints added without modifying the schema.                                                   |
+| `approvals`           | object  | no       | both `false`    | Approval gate configuration.                                                                                   |
+| `llmOptimizedContext` | boolean | no       | `false`         | Opt in to LLM-enriched context operations.                                                                     |
+| `schemaPlugins`       | array   | no       | `[]`            | Schema plugin references loaded and merged into the active schema.                                             |
+| `schemaOverrides`     | object  | no       | —               | Inline schema override operations applied after plugins. See [`schemaOverrides`](#schemaoverrides).            |
 
 ## schema
 
@@ -78,6 +79,23 @@ schema: '#billing:billing-schema'
 # direct path
 schema: './schemas/custom/schema.yaml'
 ```
+
+## configPath
+
+`configPath` defines the root directory where SpecD stores runtime-owned project data that does not belong in the workflow `storage` lifecycle directories. The path is resolved relative to the directory containing `specd.yaml`.
+
+When omitted, it defaults to `.specd/config`.
+
+```yaml
+configPath: .specd/config
+```
+
+The code-graph subsystem derives its backend-owned paths from this root:
+
+- graph database files live under `{configPath}/graph`
+- graph scratch and staged files live under `{configPath}/tmp`
+
+`configPath` must remain within the repository root.
 
 ## workspaces
 

@@ -215,6 +215,7 @@ const SchemaOverridesZodSchema = z
 
 const SpecdYamlZodSchema = z.object({
   schema: z.string(),
+  configPath: z.string().optional(),
   workspaces: z.record(WorkspaceRawZodSchema),
   storage: z.object({
     changes: FsAdapterZodSchema,
@@ -407,6 +408,7 @@ export class FsConfigLoader implements ConfigLoader {
     }
 
     const data = parseResult.data
+    const resolvedConfigPath = path.resolve(configDir, data.configPath ?? '.specd/config')
 
     validateContextPatterns(data, configPath)
 
@@ -482,6 +484,10 @@ export class FsConfigLoader implements ConfigLoader {
     }
 
     if (gitRoot !== null) {
+      if (!resolvedConfigPath.startsWith(gitRoot + path.sep) && resolvedConfigPath !== gitRoot) {
+        throw new ConfigValidationError(configPath, 'configPath resolves outside repo root')
+      }
+
       for (const [key, storagePath] of Object.entries(storagePaths)) {
         if (!storagePath.startsWith(gitRoot + path.sep) && storagePath !== gitRoot) {
           throw new ConfigValidationError(
@@ -506,6 +512,7 @@ export class FsConfigLoader implements ConfigLoader {
 
     return {
       projectRoot: configDir,
+      configPath: resolvedConfigPath,
       schemaRef: data.schema,
       workspaces,
       storage,

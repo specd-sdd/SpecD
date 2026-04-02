@@ -14,6 +14,13 @@
 - **WHEN** `extensions()` is called on the TypeScript adapter
 - **THEN** it returns mappings for `.ts`, `.tsx`, `.js`, and `.jsx`
 
+#### Scenario: extractSymbolsWithNamespace is an optional pure fast path
+
+- **GIVEN** a language adapter implements `extractSymbolsWithNamespace()`
+- **WHEN** it is called twice with the same `filePath` and `content`
+- **THEN** it returns the same symbols and namespace information both times
+- **AND** it performs no side effects beyond parsing the provided input
+
 #### Scenario: extractRelations may emit hierarchy relations
 
 - **GIVEN** a file containing resolvable inheritance or implementation declarations

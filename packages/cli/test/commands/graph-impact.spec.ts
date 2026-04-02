@@ -20,8 +20,13 @@ vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
+vi.mock('../../src/commands/graph/graph-index-lock.js', () => ({
+  assertGraphIndexUnlocked: vi.fn(),
+}))
+
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
+import { assertGraphIndexUnlocked } from '../../src/commands/graph/graph-index-lock.js'
 import { registerGraphImpact } from '../../src/commands/graph/impact.js'
 
 function setup() {
@@ -61,6 +66,28 @@ function makeImpactProgram() {
 afterEach(() => vi.restoreAllMocks())
 
 describe('graph impact', () => {
+  it('checks the shared index lock before opening the provider', async () => {
+    const { mockProvider } = setup()
+    mockProvider.analyzeFileImpact.mockResolvedValue({
+      target: 'src/auth.ts',
+      directDependents: 0,
+      indirectDependents: 0,
+      transitiveDependents: 0,
+      riskLevel: 'LOW',
+      affectedFiles: [],
+      affectedSymbols: [],
+      affectedProcesses: [],
+      symbols: [],
+    })
+
+    const program = makeImpactProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'impact', '--file', 'src/auth.ts'])
+
+    expect(assertGraphIndexUnlocked).toHaveBeenCalledWith(
+      expect.objectContaining({ configPath: '/project/.specd/config' }),
+    )
+  })
+
   describe('--depth option', () => {
     it('passes default depth 3 to analyzeFileImpact', async () => {
       const { mockProvider } = setup()

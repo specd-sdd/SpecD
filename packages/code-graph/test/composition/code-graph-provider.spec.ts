@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createCodeGraphProvider } from '../../src/composition/create-code-graph-provider.js'
@@ -101,6 +101,29 @@ describe('CodeGraphProvider', () => {
 
     const hotspots = await provider.getHotspots({ minRisk: 'LOW', minScore: 0 })
     expect(hotspots.entries.some((entry) => entry.symbol.id === contract!.id)).toBe(true)
+
+    await provider.close()
+  })
+
+  it('stages index artifacts under the store-owned tmp root and cleans them up', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-e2e-'))
+    const srcDir = join(tempDir, 'src')
+    mkdirSync(srcDir, { recursive: true })
+
+    writeFileSync(join(srcDir, 'main.ts'), 'export const value = 1\n')
+
+    const provider = createCodeGraphProvider({ storagePath: tempDir })
+    await provider.open()
+
+    await provider.index({
+      workspaces: [{ name: 'test', codeRoot: tempDir, specs: async () => [] }],
+      projectRoot: tempDir,
+    })
+
+    const tmpEntries = readdirSync(join(tempDir, 'tmp'), { withFileTypes: true })
+    expect(
+      tmpEntries.some((entry) => entry.isDirectory() && entry.name.startsWith('index-stage-')),
+    ).toBe(false)
 
     await provider.close()
   })

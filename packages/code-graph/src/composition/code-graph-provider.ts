@@ -180,6 +180,14 @@ export class CodeGraphProvider {
   }
 
   /**
+   * Recreates the underlying persistent graph storage.
+   * @returns A promise that resolves when persisted state has been reset.
+   */
+  async recreate(): Promise<void> {
+    return this.store.recreate()
+  }
+
+  /**
    * Detects the scope of changes given a set of modified files.
    * @param changedFiles - Array of file paths that have changed.
    * @param maxDepth - Maximum traversal depth (default: 3).

@@ -9,7 +9,7 @@
     {
       "requirement": "LanguageAdapter interface",
       "rules": [
-        "`LanguageAdapter` SHALL be an interface (not an abstract class, since adapters are stateless and have no shared state to inherit) with the following methods:\n\n- **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)\n- **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.\n- **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found\n- **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution\n- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS, DEPENDS\\_ON, EXTENDS, IMPLEMENTS, OVERRIDES) from the file. The `importMap` maps local import names to resolved symbol IDs (e.g. `\"validateUser\"` → `\"auth:src/auth.ts:function:validateUser:10\"`), built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.\n\nBoth extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects."
+        "`LanguageAdapter` SHALL be an interface (not an abstract class, since adapters are stateless and have no shared state to inherit) with the following methods:\n\n- **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)\n- **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.\n- **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found\n- **`extractSymbolsWithNamespace?(filePath: string, content: string): { symbols: SymbolNode[]; namespace: string | undefined }`** — optional fast path for languages that can derive symbols and namespace from the same parse tree\n- **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution\n- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, DEFINES, EXPORTS, DEPENDS\\_ON, EXTENDS, IMPLEMENTS, OVERRIDES) from the file. The `importMap` maps local import names to resolved symbol IDs, built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.\n\nAll extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects."
       ]
     },
     {
@@ -94,6 +94,7 @@
   "constraints": [
     "LanguageAdapter is an interface, not an abstract class — adapters are stateless",
     "Extraction methods are synchronous and pure — they receive content, not file handles",
+    "extractSymbolsWithNamespace() is optional and, when implemented, follows the same synchronous and pure extraction rules",
     "getPackageIdentity and resolveQualifiedNameToPath? are the only methods that perform I/O — both are optional and search for a manifest file on disk",
     "Resolution methods (resolvePackageFromSpecifier, resolveRelativeImportPath, buildQualifiedName) are synchronous and pure",
     "resolveQualifiedNameToPath? SHOULD cache the parsed autoloader map per codeRoot to avoid repeated disk reads during a single indexing run",
@@ -121,6 +122,16 @@
       "name": "Adapter declares extension map",
       "when": ["extensions() is called on the TypeScript adapter"],
       "then": ["it returns mappings for .ts, .tsx, .js, and .jsx"]
+    },
+    {
+      "requirement": "LanguageAdapter interface",
+      "name": "extractSymbolsWithNamespace is an optional pure fast path",
+      "given": ["a language adapter implements extractSymbolsWithNamespace()"],
+      "when": ["it is called twice with the same filePath and content"],
+      "then": [
+        "it returns the same symbols and namespace information both times",
+        "AND it performs no side effects beyond parsing the provided input"
+      ]
     },
     {
       "requirement": "LanguageAdapter interface",
@@ -718,8 +729,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:33e954e3d4cf7f44c3c5ce8317c33a4b351baecd4a30a68eddfbd15d4cc98d0c",
-    "verify.md": "sha256:7d09d79242fef77b6d597d052377ba9e01e777b1a8588bc8676f864fdd120627"
+    "spec.md": "sha256:75bb7c4930c046f7b7391c51fc99b3fc1db340f732ff7a6bdffcf47fcf1e8117",
+    "verify.md": "sha256:7ded5babb7a7b55d2dbfa376853cba566c03e68a571220fa7f00b963ac29bec6"
   },
   "generatedBy": "core"
 }

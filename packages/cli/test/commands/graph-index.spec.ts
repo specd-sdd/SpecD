@@ -19,6 +19,10 @@ vi.mock('../../src/commands/graph/build-workspace-targets.js', () => ({
   buildWorkspaceTargets: vi.fn(),
 }))
 
+vi.mock('../../src/commands/graph/graph-index-lock.js', () => ({
+  acquireGraphIndexLock: vi.fn(() => vi.fn()),
+}))
+
 vi.mock('@specd/core', async () => {
   const actual = await vi.importActual<typeof import('@specd/core')>('@specd/core')
   return {
@@ -32,6 +36,7 @@ vi.mock('@specd/core', async () => {
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
 import { buildWorkspaceTargets } from '../../src/commands/graph/build-workspace-targets.js'
+import { acquireGraphIndexLock } from '../../src/commands/graph/graph-index-lock.js'
 import { registerGraphIndex } from '../../src/commands/graph/index-graph.js'
 
 function setup(mode: 'configured' | 'bootstrap' = 'configured') {
@@ -56,6 +61,7 @@ function setup(mode: 'configured' | 'bootstrap' = 'configured') {
   ])
 
   const mockProvider = {
+    recreate: vi.fn().mockResolvedValue(undefined),
     index: vi.fn().mockResolvedValue({
       filesIndexed: 0,
       filesDiscovered: 0,
@@ -67,7 +73,8 @@ function setup(mode: 'configured' | 'bootstrap' = 'configured') {
       workspaces: [],
     }),
   }
-  vi.mocked(withProvider).mockImplementation(async (_config, _format, fn) => {
+  vi.mocked(withProvider).mockImplementation(async (_config, _format, fn, options) => {
+    await options?.beforeOpen?.(mockProvider as never)
     await fn(mockProvider as never)
   })
 
@@ -155,6 +162,27 @@ describe('graph index', () => {
           }),
         ],
       }),
+    )
+  })
+
+  it('delegates --force recreation to the provider before indexing', async () => {
+    const { mockProvider } = setup('bootstrap')
+
+    const program = makeIndexProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'index', '--path', '/tmp/repo', '--force'])
+
+    expect(mockProvider.recreate).toHaveBeenCalledTimes(1)
+    expect(mockProvider.index).toHaveBeenCalledTimes(1)
+  })
+
+  it('acquires the shared graph index lock before indexing', async () => {
+    setup('bootstrap')
+
+    const program = makeIndexProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'index', '--path', '/tmp/repo'])
+
+    expect(acquireGraphIndexLock).toHaveBeenCalledWith(
+      expect.objectContaining({ configPath: '/project/.specd/config' }),
     )
   })
 })

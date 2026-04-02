@@ -3,6 +3,14 @@ import { type Relation } from './relation.js'
 import { type ImportDeclaration } from './import-declaration.js'
 
 /**
+ * Result shape for adapters that can extract symbols and namespace in one pass.
+ */
+export interface ExtractedSymbolsWithNamespace {
+  readonly symbols: SymbolNode[]
+  readonly namespace: string | undefined
+}
+
+/**
  * Adapter for extracting symbols, relations, and imports from source files of a specific language.
  * All methods are synchronous and pure — they receive content as a string, not file handles.
  */
@@ -27,6 +35,15 @@ export interface LanguageAdapter {
    * @returns An array of extracted symbol nodes.
    */
   extractSymbols(filePath: string, content: string): SymbolNode[]
+
+  /**
+   * Extracts symbols and an optional namespace in one pass when the language can
+   * provide both from the same parse tree.
+   * @param filePath - The path of the source file.
+   * @param content - The source file content.
+   * @returns Symbols plus the discovered namespace.
+   */
+  extractSymbolsWithNamespace?(filePath: string, content: string): ExtractedSymbolsWithNamespace
 
   /**
    * Extracts relations between symbols from a source file's content.
