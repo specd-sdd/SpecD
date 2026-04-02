@@ -850,7 +850,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:2ea149efa931c219437562b702b4249c5f1b44b8e68dce86d760fb546daf9e55",
+    "spec.md": "sha256:f754e52dac73245c685b58199ccd87adc47e88fed45820cef647f4637c7a5e5e",
     "verify.md": "sha256:bcdce0c74797af564394ff326d23d63c8eccaa2daf77a2ff7422018e42ebb53c"
   },
   "generatedBy": "core"
