@@ -1,7 +1,18 @@
 {
   "title": "Hook Execution Model",
   "description": "Workflow steps declare hooks via `instruction:` and `run:` entries, but the schema format only defines their YAML structure — not who executes each type, when execution happens, or what failure means in each context. Without a unified execution model, hook behaviour is scattered across use cases and undocumented agent conventions. This spec defines the complete hook execution model: the two hook types and their consumers, hook execution for transitions and archives, failure semantics for each phase, hook ordering rules, the `--skip-hooks` pattern for manual control, and the boundary between compile-time and runtime concerns.",
-  "dependsOn": ["cli:cli/change-archive"],
+  "dependsOn": [
+    "core:core/workflow-model",
+    "core:core/schema-format",
+    "core:core/hook-runner-port",
+    "core:core/transition-change",
+    "core:core/archive-change",
+    "core:core/run-step-hooks",
+    "core:core/get-hook-instructions",
+    "core:core/config",
+    "cli:cli/change-transition",
+    "cli:cli/change-archive"
+  ],
   "context": [
     "Workflow steps declare hooks via `instruction:` and `run:` entries, but the schema format only defines their YAML structure — not who executes each type, when execution happens, or what failure means in each context. Without a unified execution model, hook behaviour is scattered across use cases and undocumented agent conventions. This spec defines the complete hook execution model: the two hook types and their consumers, hook execution for transitions and archives, failure semantics for each phase, hook ordering rules, the `--skip-hooks` pattern for manual control, and the boundary between compile-time and runtime concerns."
   ],
@@ -10,6 +21,18 @@
       "requirement": "Two hook types",
       "rules": [
         "Workflow hooks come in exactly two types, distinguished by their key:\n\n- **`instruction:`** — a text block consumed by `GetHookInstructions` at query time. It is returned as contextual guidance for the agent or external tool. `instruction:` hooks are never executed at runtime — they have no process, exit code, or side effects.\n- **`run:`** — a shell command executed by the `HookRunner` port. It produces an exit code, stdout, and stderr. `run:` hooks are never injected into agent context — they are operational commands.\n\nEvery hook entry declares exactly one of these two keys alongside its `id`. An entry with both keys or neither key is a `SchemaValidationError` (enforced by schema validation, not by this model).\n\nAll workflow steps can declare both `instruction:` and `run:` hooks — there are no restrictions by step type."
+      ]
+    },
+    {
+      "requirement": "External hooks are explicit workflow entries",
+      "rules": [
+        "Workflow hooks SHALL support an explicit external hook entry type in addition to `instruction:` and shell `run:` hooks.\n\nExternal hooks are distinct from shell `run:` hooks:\n\n- `HookRunner` continues to execute shell `run:` hooks only\n- explicit external hook entries are dispatched to external hook runners\n- external hook dispatch is determined by whether a registered external runner declares support for the hook's `external.type`\n\nThe workflow shape for an explicit external hook entry is `external: { type, config }`.\n\nIf no external runner accepts the hook's `external.type`, execution MUST fail with a clear error."
+      ]
+    },
+    {
+      "requirement": "External hooks follow workflow phase semantics",
+      "rules": [
+        "Explicit external hooks SHALL follow the same pre-phase and post-phase workflow semantics as shell `run:` hooks:\n\n- pre-phase failures are fail-fast\n- post-phase failures are reported without rolling back completed work\n\nThe difference is the dispatch backend, not the lifecycle semantics."
       ]
     },
     {
@@ -77,6 +100,49 @@
       "then": [
         "only the lint hook is executed via HookRunner",
         "AND the guidance instruction hook is skipped entirely"
+      ]
+    },
+    {
+      "requirement": "External hooks are explicit workflow entries",
+      "name": "External hook dispatch uses accepted-type declarations",
+      "given": [
+        "a workflow step with an explicit external hook entry whose external.type is docker",
+        "AND a registered external hook runner declares support for docker"
+      ],
+      "when": ["the step's executable hooks are run"],
+      "then": [
+        "the hook is dispatched to that external runner",
+        "AND HookRunner is not used for that entry"
+      ]
+    },
+    {
+      "requirement": "External hooks are explicit workflow entries",
+      "name": "No runner accepts the external hook type",
+      "given": [
+        "a workflow step with an explicit external hook entry whose external.type is webhook",
+        "AND no registered external hook runner declares support for webhook"
+      ],
+      "when": ["the step's executable hooks are run"],
+      "then": ["execution fails with a clear unknown external hook type error"]
+    },
+    {
+      "requirement": "External hooks follow workflow phase semantics",
+      "name": "Pre-phase external hook failure is fail-fast",
+      "given": ["pre-hooks include an explicit external hook that fails"],
+      "when": ["the phase is executed"],
+      "then": [
+        "subsequent hooks in that pre phase are not run",
+        "AND the failure aborts the phase just like a failing shell run: hook"
+      ]
+    },
+    {
+      "requirement": "External hooks follow workflow phase semantics",
+      "name": "Post-phase external hook failure is reported without rollback",
+      "given": ["post-hooks include a failing explicit external hook followed by another hook"],
+      "when": ["the phase is executed"],
+      "then": [
+        "later post-hooks still run",
+        "AND the failure is reported without rolling back completed work"
       ]
     },
     {
@@ -228,8 +294,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:65679e99b1289e78354fb5591f1e522d0f6523682f95823dafc0f107cfaa2553",
-    "verify.md": "sha256:f344ff65a1fd9d9064b4a3d11655cc6ac2945b23d015b6f507ab578728e83e65"
+    "spec.md": "sha256:ba00433cdd0e90d24c365b9a76aeb25cb5a1dc837a97acd2f48183ec75fe9718",
+    "verify.md": "sha256:9a0b785ff33a80696701758328988d8889fb98312efa41ce9ce15ed36e8a88ce"
   },
   "generatedBy": "core"
 }

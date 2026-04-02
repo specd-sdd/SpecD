@@ -8,7 +8,11 @@ import { PlaintextParser } from './plaintext-parser.js'
 import { YamlParser } from './yaml-parser.js'
 
 /**
- * Creates and returns the default {@link ArtifactParserRegistry} with all built-in parsers registered.
+ * Creates and returns the built-in {@link ArtifactParserRegistry} base map.
+ *
+ * The returned registry is intended to be treated as the immutable built-in
+ * layer and merged additively with external parser registrations at kernel
+ * construction time.
  *
  * @returns A map of format name to parser: `'markdown'`, `'yaml'`, `'json'`, and `'plaintext'`
  */

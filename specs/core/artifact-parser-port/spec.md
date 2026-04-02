@@ -24,6 +24,12 @@ The port MUST be declared as a TypeScript `interface` named `ArtifactParser`. It
 
 The `ArtifactParserRegistry` type MUST be declared as `ReadonlyMap<string, ArtifactParser>`, keyed by format name. Standard format names are `'markdown'`, `'json'`, `'yaml'`, and `'plaintext'`.
 
+### Requirement: ArtifactParserRegistry is additively extensible
+
+`ArtifactParserRegistry` SHALL support additive extension through kernel composition. Built-in parsers remain available, and external parser registrations extend the registry by format name.
+
+Referencing a parser format that is not present in the merged registry MUST fail with a clear error.
+
 ### Requirement: Parse contract
 
 The `parse` method MUST accept a `content: string` parameter and return an `ArtifactAST` containing a single `root` node. The AST MUST be a normalised, format-independent tree structure.

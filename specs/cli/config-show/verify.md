@@ -6,12 +6,11 @@
 
 #### Scenario: Text output shows all sections
 
-- **GIVEN** a valid config with one workspace, storage paths, and optional fields set (`contextIncludeSpecs`, `workflow`, `llmOptimizedContext`)
+- **GIVEN** a valid config with one workspace, storage paths, and optional fields set (`contextIncludeSpecs`, `schemaOverrides`, `llmOptimizedContext`)
 - **WHEN** `specd config show` is run
 - **THEN** stdout contains `projectRoot`, `schemaRef`, `approvals`, `workspaces`, and `storage` sections
 - **AND** stdout contains `contextIncludeSpecs` line
 - **AND** stdout contains `llmOptimizedContext` line
-- **AND** stdout contains `workflow` section with step entries
 - **AND** all paths are absolute
 - **AND** the process exits with code 0
 
@@ -21,23 +20,24 @@
 - **WHEN** `specd config show` is run
 - **THEN** stdout shows `spec=true` and `signoff=false`
 
-#### Scenario: JSON output is full SpecdConfig
+#### Scenario: JSON output is full SpecdConfig including adapter bindings
 
-- **GIVEN** a config with `workflow`, `contextIncludeSpecs`, `context`, and `llmOptimizedContext` set
+- **GIVEN** a config with `contextIncludeSpecs`, `context`, `llmOptimizedContext`, workspace adapter bindings, and storage adapter bindings set
 - **WHEN** `specd config show --format json` is run
-- **THEN** stdout is valid JSON containing `projectRoot`, `schemaRef`, `workspaces`, `storage`, `approvals`
-- **AND** JSON contains `workflow` array with step entries
+- **THEN** stdout is valid JSON containing `projectRoot`, `schemaRef`, `workspaces`, `storage`, and `approvals`
 - **AND** JSON contains `contextIncludeSpecs` array
 - **AND** JSON contains `context` array
 - **AND** JSON contains `llmOptimizedContext` boolean
+- **AND** each workspace entry includes `specsAdapter`
+- **AND** the storage entry includes `changesAdapter`, `draftsAdapter`, `discardedAdapter`, and `archiveAdapter`
 - **AND** all path values are absolute strings
 - **AND** the process exits with code 0
 
 #### Scenario: Optional fields omitted when not set
 
-- **GIVEN** a config with no `workflow`, `context`, `schemaOverrides`, or `schemaPlugins` set
+- **GIVEN** a config with no `context`, `schemaOverrides`, or `schemaPlugins` set
 - **WHEN** `specd config show --format json` is run
-- **THEN** the JSON output does not contain `workflow`, `context`, `schemaOverrides`, or `schemaPlugins` keys
+- **THEN** the JSON output does not contain `context`, `schemaOverrides`, or `schemaPlugins` keys
 
 #### Scenario: Multiple workspaces listed
 

@@ -1,0 +1,109 @@
+{
+  "title": "Kernel Builder",
+  "description": "Consumers that need to register kernel extensions conditionally or incrementally should not have to assemble a large `KernelOptions` object manually before every kernel construction. The kernel builder provides a fluent composition surface over the same additive registry model as `createKernel(config, options)`, letting callers accumulate registrations ergonomically while preserving the kernel's existing guarantees around manual dependency injection, additive extension, and post-build immutability.",
+  "dependsOn": ["core:core/kernel", "core:core/composition"],
+  "context": [
+    "Consumers that need to register kernel extensions conditionally or incrementally should not have to assemble a large `KernelOptions` object manually before every kernel construction. The kernel builder provides a fluent composition surface over the same additive registry model as `createKernel(config, options)`, letting callers accumulate registrations ergonomically while preserving the kernel's existing guarantees around manual dependency injection, additive extension, and post-build immutability."
+  ],
+  "rules": [
+    {
+      "requirement": "Builder accumulates additive kernel registrations",
+      "rules": [
+        "A fluent kernel builder SHALL exist as a public composition entry point for `@specd/core`. It SHALL accumulate the same additive registrations supported by `KernelOptions`, including storage factories, parsers, VCS providers, actor providers, and external hook runners, before kernel construction occurs.\n\nThe builder SHALL be a pre-construction composition surface only. It MUST NOT mutate an already-built kernel."
+      ]
+    },
+    {
+      "requirement": "Builder supports fluent registration methods",
+      "rules": [
+        "The builder SHALL expose fluent registration methods for each additive registry category that this change introduces. At minimum, it SHALL support:\n\n- spec storage registration\n- schema storage registration\n- change storage registration\n- archive storage registration\n- parser registration\n- external hook runner registration\n- VCS provider registration\n- actor provider registration\n\nEach registration method SHALL return the builder itself so callers can chain registrations conditionally and ergonomically."
+      ]
+    },
+    {
+      "requirement": "Builder builds kernels with createKernel-equivalent semantics",
+      "rules": [
+        "Calling `build()` on the builder SHALL produce a kernel with the same semantics as calling `createKernel(config, options)` with the equivalent accumulated registrations.\n\nThis equivalence includes:\n\n- built-in capabilities remain available\n- external registrations extend rather than replace built-ins\n- shared adapters are constructed once\n- the resulting kernel is immutable after construction"
+      ]
+    },
+    {
+      "requirement": "Builder rejects conflicting registrations",
+      "rules": [
+        "The builder SHALL reject conflicting registrations instead of silently overwriting them. Attempting to register a capability name that collides with an existing built-in or already-registered external entry for the same registry category MUST fail with an error."
+      ]
+    },
+    {
+      "requirement": "Builder accepts base registration state",
+      "rules": [
+        "The builder SHALL support initialization from a resolved project configuration plus optional base registration state, so callers can start from a partially-prepared additive registry set before applying additional fluent registrations."
+      ]
+    }
+  ],
+  "constraints": [
+    "The builder is part of the composition layer, not the domain or application layers",
+    "The builder is an alternative construction surface over the same additive kernel registration model; it does not define a second extensibility model",
+    "The builder does not mutate built kernels after build()",
+    "Conflicting registration names are errors"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Builder accumulates additive kernel registrations",
+      "name": "Registrations accumulate before build",
+      "given": ["a builder created for a resolved SpecdConfig"],
+      "when": [
+        "storage, parser, VCS, actor, and external hook runner registrations are added before build()"
+      ],
+      "then": [
+        "the builder retains all of them as pending additive registrations",
+        "AND no built kernel is mutated before build() is called"
+      ]
+    },
+    {
+      "requirement": "Builder supports fluent registration methods",
+      "name": "Registration methods are chainable",
+      "when": ["a caller invokes the builder's registration methods in sequence"],
+      "then": [
+        "each registration method returns the builder itself",
+        "AND the caller can continue chaining additional registrations"
+      ]
+    },
+    {
+      "requirement": "Builder builds kernels with createKernel-equivalent semantics",
+      "name": "Equivalent registrations produce equivalent kernels",
+      "given": ["the same resolved config and the same additive registrations"],
+      "when": [
+        "one kernel is produced through the builder and another through createKernel(config, options)"
+      ],
+      "then": [
+        "both kernels preserve the built-in capabilities",
+        "AND both expose the same merged registry contents",
+        "AND both construct shared adapters once before returning an immutable kernel"
+      ]
+    },
+    {
+      "requirement": "Builder rejects conflicting registrations",
+      "name": "Duplicate registration name is rejected",
+      "given": ["a builder with a registration for a parser format named toml"],
+      "when": ["another registration is added for the same category and name"],
+      "then": [
+        "the builder fails with a clear conflict error",
+        "AND the later registration does not overwrite the earlier one"
+      ]
+    },
+    {
+      "requirement": "Builder accepts base registration state",
+      "name": "Builder starts from base registrations and extends them",
+      "given": ["base registration state containing an external VCS provider"],
+      "when": [
+        "the builder is initialised from that base state and another provider is added fluently"
+      ],
+      "then": [
+        "both external providers are present when build() is called",
+        "AND built-in providers remain available"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:c2c5fbe0ca4976936a00e70cb9cf3624f4d44c2f56b7337c2435e9dce54447cb",
+    "verify.md": "sha256:13098af642cc290b1d04487ccde3a77217e1a0cb6b1a7cd25038d1746baad17c"
+  },
+  "generatedBy": "core"
+}

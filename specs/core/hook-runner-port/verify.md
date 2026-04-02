@@ -77,3 +77,12 @@
 - **GIVEN** variables with only `project` and no `change` field
 - **WHEN** `run` is called with a command referencing `{{change.name}}`
 - **THEN** the `{{change.name}}` token is left unexpanded
+
+### Requirement: HookRunner is shell-only
+
+#### Scenario: Explicit external hooks are not passed to HookRunner
+
+- **GIVEN** a workflow step contains an explicit external hook entry
+- **WHEN** hook execution is wired for that step
+- **THEN** the entry is dispatched through the external hook runner abstraction
+- **AND** `HookRunner.run()` is used only for shell `run:` hooks

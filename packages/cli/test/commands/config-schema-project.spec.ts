@@ -111,7 +111,9 @@ describe('config show', () => {
         {
           name: 'default',
           specsPath: '/project/specs',
+          specsAdapter: { adapter: 'fs', config: { path: '/project/specs' } },
           schemasPath: null,
+          schemasAdapter: null,
           codeRoot: '/project',
           ownership: 'owned' as const,
           isExternal: false,
@@ -119,7 +121,9 @@ describe('config show', () => {
         {
           name: 'billing-ws',
           specsPath: '/project/billing/specs',
+          specsAdapter: { adapter: 'fs', config: { path: '/project/billing/specs' } },
           schemasPath: null,
+          schemasAdapter: null,
           codeRoot: '/project/billing',
           ownership: 'shared' as const,
           isExternal: false,

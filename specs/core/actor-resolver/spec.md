@@ -10,6 +10,12 @@ specd needs to identify the current user (for approvals, sign-offs, and audit tr
 
 `createVcsActorResolver` MUST probe for VCS presence in the following order: git, hg, svn. The first probe that succeeds determines the returned resolver. Subsequent probes MUST NOT execute once a match is found.
 
+### Requirement: External providers run before built-in probes
+
+`createVcsActorResolver` SHALL support additive external actor providers. When external providers are registered, they SHALL be probed in registration order before the built-in git, hg, and svn-backed resolver probes.
+
+If no external or built-in provider matches, the factory SHALL continue to fall back to `NullActorResolver`.
+
 ### Requirement: Fallback to NullActorResolver
 
 When no VCS is detected (all probes fail), `createVcsActorResolver` MUST return a `NullActorResolver`. It SHALL NOT throw.

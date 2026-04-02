@@ -26,7 +26,9 @@ export function createBootstrapGraphConfig(params: {
       {
         name: 'default',
         specsPath: join(params.projectRoot, 'specs'),
+        specsAdapter: { adapter: 'fs', config: { path: join(params.projectRoot, 'specs') } },
         schemasPath: join(configPath, 'schemas'),
+        schemasAdapter: { adapter: 'fs', config: { path: join(configPath, 'schemas') } },
         codeRoot: params.vcsRoot,
         ownership: 'owned',
         isExternal: false,
@@ -34,9 +36,25 @@ export function createBootstrapGraphConfig(params: {
     ],
     storage: {
       changesPath: join(params.projectRoot, '.specd', 'changes'),
+      changesAdapter: {
+        adapter: 'fs',
+        config: { path: join(params.projectRoot, '.specd', 'changes') },
+      },
       draftsPath: join(params.projectRoot, '.specd', 'drafts'),
+      draftsAdapter: {
+        adapter: 'fs',
+        config: { path: join(params.projectRoot, '.specd', 'drafts') },
+      },
       discardedPath: join(params.projectRoot, '.specd', 'discarded'),
+      discardedAdapter: {
+        adapter: 'fs',
+        config: { path: join(params.projectRoot, '.specd', 'discarded') },
+      },
       archivePath: join(params.projectRoot, '.specd', 'archive'),
+      archiveAdapter: {
+        adapter: 'fs',
+        config: { path: join(params.projectRoot, '.specd', 'archive') },
+      },
     },
     approvals: { spec: false, signoff: false },
   }

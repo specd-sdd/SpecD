@@ -29,7 +29,7 @@ Artifact status (`missing`, `in-progress`, `complete`, `skipped`) must be derive
 
 `Change.effectiveStatus(type)` must cascade through the artifact dependency graph. An artifact whose own hash matches its `validatedHash` must still be reported as `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`. A `skipped` optional artifact satisfies the dependency — it does not block downstream artifacts.
 
-### Requirement: ValidateArtifacts is the sole path to `complete`
+### Requirement: ValidateArtifacts is the sole path to complete
 
 `Artifact.markComplete(hash)` must only be called by the `ValidateArtifacts` use case. `Artifact.markSkipped()` must only be called by the skip use case (sets `validatedHash` to `"__skipped__"`). No other code path may set these values.
 
@@ -44,6 +44,12 @@ The `fs` archive adapter must support a configurable `pattern` field in `specd.y
 ### Requirement: Archive index
 
 `FsArchiveRepository` must maintain an `index.jsonl` at the archive root. Each line must be a JSON object with `name` and `path` fields. The file must be kept in chronological order (oldest first, newest last) so that git diffs only show lines added at the bottom or lines removed — never reorderings. `archive(change)` must append one line at the end (O(1)). `get(name)` must scan the file from the end without loading it fully into memory; if not found, it must fall back to a recursive glob `**/*-<name>` and append the recovered entry. `reindex()` must be declared on the `ArchiveRepository` port. The `fs` adapter implements it by globbing all `manifest.json` files under the archive root, sorting entries by `archivedAt`, and writing a clean `index.jsonl` in chronological order. Other adapters implement it according to their storage mechanism. `specd storage reindex` calls the port method — it has no knowledge of the underlying implementation.
+
+### Requirement: Named storage factories
+
+Kernel composition SHALL support named storage factories for repository-backed capabilities. A storage factory SHALL be selected by adapter name and SHALL be responsible for creating the repository implementation needed for that storage mode.
+
+When storage selection requires workspace-specific VCS or null-VCS handling, that responsibility SHALL remain within the selected storage factory rather than leaking into unrelated composition paths.
 
 ### Requirement: Archive pattern date variables are zero-padded
 

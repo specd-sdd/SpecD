@@ -42,6 +42,24 @@
 - **THEN** the collection contains only `lint` and `test` in that order
 - **AND** `guidance` is not in the collection
 
+### Requirement: External hook dispatch
+
+#### Scenario: External hook is dispatched to the runner selected by accepted type
+
+- **GIVEN** a workflow phase includes an explicit external hook whose `external.type` is `docker`
+- **AND** one registered external hook runner declares support for `docker`
+- **WHEN** `RunStepHooks.execute(...)` collects and runs hooks for that phase
+- **THEN** the hook is executed through that external runner
+- **AND** the runner receives the hook type, nested opaque config, and template variables for the change
+
+#### Scenario: Unknown external hook type fails clearly
+
+- **GIVEN** a workflow phase includes an explicit external hook whose `external.type` is `docker`
+- **AND** no registered external hook runner declares support for `docker`
+- **WHEN** `RunStepHooks.execute(...)` runs that phase
+- **THEN** it fails with a clear error
+- **AND** the hook is not silently skipped
+
 ### Requirement: Hook filtering with --only
 
 #### Scenario: Single hook selected by ID

@@ -58,12 +58,16 @@ function serializeSchema(
         pre: s.hooks.pre.map((h) =>
           h.type === 'run'
             ? { id: h.id, type: h.type, command: h.command }
-            : { id: h.id, type: h.type, text: h.text },
+            : h.type === 'instruction'
+              ? { id: h.id, type: h.type, text: h.text }
+              : { id: h.id, type: h.type, externalType: h.externalType, config: h.config },
         ),
         post: s.hooks.post.map((h) =>
           h.type === 'run'
             ? { id: h.id, type: h.type, command: h.command }
-            : { id: h.id, type: h.type, text: h.text },
+            : h.type === 'instruction'
+              ? { id: h.id, type: h.type, text: h.text }
+              : { id: h.id, type: h.type, externalType: h.externalType, config: h.config },
         ),
       },
     })),

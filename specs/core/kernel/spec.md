@@ -69,6 +69,30 @@ The kernel must expose the underlying `ChangeRepository` as `changes.repo` and t
 
 `createKernel(config, options?)` accepts an optional `KernelOptions` object. The `extraNodeModulesPaths` option appends additional `node_modules` directories to the schema search path, so that globally-installed schema packages are found even when the project has no local copy.
 
+### Requirement: KernelOptions supports additive registries
+
+`KernelOptions` SHALL support additive registration of external capabilities before kernel construction. At minimum, it SHALL include extension points for:
+
+- storage factories
+- VCS providers
+- actor providers
+- artifact parsers
+- external hook runners
+
+These registrations SHALL extend the built-in capability set rather than replacing it.
+
+### Requirement: Kernel exposes merged registries
+
+The `Kernel` interface SHALL expose the merged built-in plus external registries used during construction. The exposed registry view SHALL let consumers inspect which storages, parsers, providers, and external hook runners are available from the built kernel.
+
+The exposed registries MUST reflect the final additive capability set actually used during construction — not just the raw external registrations supplied by the caller.
+
+### Requirement: Kernel rejects invalid registry references
+
+Kernel composition MUST reject conflicting registrations and unknown registry references with clear errors.
+
+Conflicting registrations include attempts to overwrite an existing built-in or already-registered external entry for the same registry category. Unknown references include configuration or workflow data that names an adapter, parser, provider, or external hook type that is not present in the merged registry set.
+
 ### Requirement: Kernel entry mapping
 
 The following table is the exhaustive mapping between kernel paths and use case classes. Each entry is a binding contract — consumers access use cases exclusively through these paths.

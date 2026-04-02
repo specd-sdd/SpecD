@@ -30,6 +30,24 @@
 - **WHEN** `createVcsAdapter(cwd)` is called
 - **THEN** it returns a `GitVcsAdapter`
 
+### Requirement: External providers run before built-in probes
+
+#### Scenario: Matching external provider preempts built-in probes
+
+- **GIVEN** an external VCS provider is registered ahead of the built-ins
+- **AND** it recognizes the target directory
+- **WHEN** `createVcsAdapter(cwd)` is called
+- **THEN** that external provider returns the adapter
+- **AND** the built-in git, hg, and svn probes are not executed
+
+#### Scenario: Unmatched external providers fall through to built-ins
+
+- **GIVEN** one or more external VCS providers are registered
+- **AND** none recognize the target directory
+- **WHEN** `createVcsAdapter(cwd)` is called
+- **THEN** the built-in git, hg, and svn probes still run in their normal order
+- **AND** `NullVcsAdapter` is still returned when no provider matches
+
 ### Requirement: Fallback to NullVcsAdapter
 
 #### Scenario: No VCS detected

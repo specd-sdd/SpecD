@@ -30,6 +30,24 @@
 - **WHEN** `createVcsActorResolver(cwd)` is called
 - **THEN** it returns a `GitActorResolver`
 
+### Requirement: External providers run before built-in probes
+
+#### Scenario: Matching external provider preempts built-in probes
+
+- **GIVEN** an external actor provider is registered ahead of the built-ins
+- **AND** it recognizes the target directory
+- **WHEN** `createVcsActorResolver(cwd)` is called
+- **THEN** that external provider returns the resolver
+- **AND** the built-in git, hg, and svn-backed probes are not executed
+
+#### Scenario: Unmatched external providers fall through to built-ins
+
+- **GIVEN** one or more external actor providers are registered
+- **AND** none recognize the target directory
+- **WHEN** `createVcsActorResolver(cwd)` is called
+- **THEN** the built-in git, hg, and svn-backed probes still run in their normal order
+- **AND** `NullActorResolver` is still returned when no provider matches
+
 ### Requirement: Fallback to NullActorResolver
 
 #### Scenario: No VCS detected

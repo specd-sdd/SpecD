@@ -37,6 +37,9 @@ storage:
 Optional fields are shown only when present in the config:
 
 ```
+storage:
+  pattern: <archive-pattern>
+
 context:
   file: <path>
   instruction: <text>
@@ -47,10 +50,6 @@ contextExcludeSpecs: <pattern>, <pattern>, ...
 llmOptimizedContext: <true|false>
 schemaPlugins: <ref>, <ref>, ...
 
-workflow:
-  <step>  pre: <count> hooks  post: <count> hooks
-  ...
-
 artifactRules:
   <artifactId>: <count> rules
   ...
@@ -58,9 +57,9 @@ artifactRules:
 schemaOverrides: (present)
 ```
 
-The `schemaOverrides` field, when present, shows `(present)` in text mode — its structure is complex and best inspected via JSON output.
+The text view is intentionally summarized. It shows the resolved workspace and storage paths used by humans for diagnosis, but it does not expand the full adapter-binding structure.
 
-In `json` or `toon` mode, the command MUST serialize the `SpecdConfig` object directly — no manual field selection. The output is the config as-is, encoded in the respective format. This ensures that new fields added to `SpecdConfig` appear automatically without CLI changes. Optional fields that are `undefined` are omitted by the serializer.
+In `json` or `toon` mode, the command MUST serialize the `SpecdConfig` object directly — no manual field selection. The output is the config as-is, encoded in the respective format. This ensures that new fields added to `SpecdConfig`, including named adapter bindings such as `specsAdapter`, `schemasAdapter`, `changesAdapter`, `draftsAdapter`, `discardedAdapter`, and `archiveAdapter`, appear automatically without CLI changes. Optional fields that are `undefined` are omitted by the serializer.
 
 ### Requirement: Sensitive fields
 

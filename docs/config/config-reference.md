@@ -105,20 +105,20 @@ Workspace names must match `/^[a-z][a-z0-9-]*$/`. The name `default` is reserved
 
 ### Workspace fields
 
-| Field                 | Required        | Default   | Description                                                 |
-| --------------------- | --------------- | --------- | ----------------------------------------------------------- |
-| `specs`               | yes             | —         | Where this workspace's spec files live.                     |
-| `specs.adapter`       | yes             | —         | Storage adapter. Only `fs` is supported in v1.              |
-| `specs.fs.path`       | yes (fs)        | —         | Directory containing spec files. Relative to `specd.yaml`.  |
-| `schemas`             | no              | see below | Where named local schemas for this workspace are stored.    |
-| `schemas.adapter`     | yes if declared | —         | Storage adapter for schemas. Only `fs` in v1.               |
-| `schemas.fs.path`     | yes (fs)        | —         | Directory containing schema subdirectories.                 |
-| `codeRoot`            | no / yes        | see below | Directory where implementation code lives.                  |
-| `ownership`           | no              | see below | Relationship this project has with specs in this workspace. |
-| `contextIncludeSpecs` | no              | `['*']`   | Spec patterns included when this workspace is active.       |
-| `contextExcludeSpecs` | no              | `[]`      | Spec patterns excluded when this workspace is active.       |
+| Field                 | Required        | Default   | Description                                                                                                           |
+| --------------------- | --------------- | --------- | --------------------------------------------------------------------------------------------------------------------- |
+| `specs`               | yes             | —         | Where this workspace's spec files live.                                                                               |
+| `specs.adapter`       | yes             | —         | Storage adapter name. Built-in kernels provide `fs`; external adapters may be registered at kernel construction time. |
+| `specs.<adapter>`     | yes             | —         | Adapter-owned config block. For `fs`, this is `fs.path`.                                                              |
+| `schemas`             | no              | see below | Where named local schemas for this workspace are stored.                                                              |
+| `schemas.adapter`     | yes if declared | —         | Storage adapter name for schemas.                                                                                     |
+| `schemas.<adapter>`   | yes if declared | —         | Adapter-owned config block. For `fs`, this is `fs.path`.                                                              |
+| `codeRoot`            | no / yes        | see below | Directory where implementation code lives.                                                                            |
+| `ownership`           | no              | see below | Relationship this project has with specs in this workspace.                                                           |
+| `contextIncludeSpecs` | no              | `['*']`   | Spec patterns included when this workspace is active.                                                                 |
+| `contextExcludeSpecs` | no              | `[]`      | Spec patterns excluded when this workspace is active.                                                                 |
 
-**`schemas`** — for the `default` workspace, if omitted, defaults to `adapter: fs` with `fs.path: specd/schemas`. For non-`default` workspaces, omitting it means no local schemas — schema references targeting that workspace produce an error.
+**`schemas`** — for the `default` workspace, if omitted, defaults to `adapter: fs` with `fs.path: .specd/schemas`. For non-`default` workspaces, omitting it means no local schemas — schema references targeting that workspace produce an error.
 
 **`codeRoot`** — for the `default` workspace, defaults to the project root (the directory containing `specd.yaml`). For non-`default` workspaces, `codeRoot` is required — there is no sensible default.
 
@@ -224,6 +224,17 @@ storage:
 `specd init` adds `specd/drafts/` and `specd/discarded/` to `.gitignore` by default. Teams that want to commit drafts and discarded changes can opt out by removing those entries.
 
 All relative paths resolve from the `specd.yaml` directory. Storage paths must remain within the repo root.
+
+The built-in `fs` adapter resolves `path` values to absolute paths during config loading. Non-`fs` adapter blocks are preserved opaquely in `SpecdConfig` and validated later during kernel construction, because external storage factories are only known once additive kernel registries are available.
+
+### Named adapter bindings
+
+Every workspace and storage declaration preserves two pieces of information into the resolved `SpecdConfig`:
+
+- the selected adapter name
+- the adapter-owned config block
+
+For `fs`, the loader also resolves `path` to an absolute path and keeps the legacy `*Path` fields populated for backward compatibility. For non-`fs` adapters, the opaque config block is passed through unchanged and the kernel validates the adapter name against the merged storage registry when it is constructed.
 
 ### Archive pattern
 
@@ -392,8 +403,8 @@ SpecD validates `specd.yaml` before executing any command that requires a config
 | `codeRoot` is missing in any non-`default` workspace                            | Required for non-default workspaces; no sensible default exists. |
 | `storage` section is missing, or `changes` or `archive` sub-key is absent       | Both are required.                                               |
 | `adapter` is missing in any `specs`, `schemas`, or storage section              | Required in every storage declaration.                           |
-| Unknown `adapter` value in any section                                          | Only `fs` is supported in v1.                                    |
 | Required adapter-specific fields are absent (e.g. `fs.path` when `adapter: fs`) | The adapter cannot function without its required fields.         |
+| An adapter name has no registered factory at kernel construction time           | The kernel rejects unknown named adapters with a clear error.    |
 | Storage path resolves outside the repo root                                     | Paths must stay within the repository.                           |
 | Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax           | e.g. `*` in a disallowed position.                               |
 | `llmOptimizedContext` is not a boolean                                          | Any other type is a startup validation error.                    |

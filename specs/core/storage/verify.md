@@ -88,7 +88,7 @@
 - **WHEN** `Change.effectiveStatus('a')` is called
 - **THEN** it returns A's own derived status — B's `skipped` state does not block A
 
-### Requirement: ValidateArtifacts is the sole path to `complete`
+### Requirement: ValidateArtifacts is the sole path to complete
 
 #### Scenario: Attempt to mark complete outside ValidateArtifacts
 
@@ -135,6 +135,22 @@
 
 - **WHEN** `specd storage reindex` is run after manual filesystem changes
 - **THEN** `index.jsonl` is rewritten in chronological order based on each manifest's `archivedAt`
+
+### Requirement: Named storage factories
+
+#### Scenario: Repository capability selects a factory by adapter name
+
+- **GIVEN** registered storage factories for `fs` and `git`
+- **WHEN** kernel composition resolves a workspace configured with `adapter: git`
+- **THEN** the `git` storage factory is used to create that repository-backed capability
+- **AND** the `fs` factory remains available for workspaces still configured with `fs`
+
+#### Scenario: Workspace-specific VCS handling stays inside the selected factory
+
+- **GIVEN** a storage mode whose repository creation needs VCS detection or null-VCS fallback
+- **WHEN** the named storage factory is invoked
+- **THEN** the factory owns that VCS or null-VCS decision internally
+- **AND** unrelated kernel composition paths do not hardcode storage-specific VCS handling
 
 ### Requirement: Archive pattern date variables are zero-padded
 

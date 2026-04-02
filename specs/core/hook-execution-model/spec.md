@@ -17,6 +17,29 @@ Every hook entry declares exactly one of these two keys alongside its `id`. An e
 
 All workflow steps can declare both `instruction:` and `run:` hooks — there are no restrictions by step type.
 
+### Requirement: External hooks are explicit workflow entries
+
+Workflow hooks SHALL support an explicit external hook entry type in addition to `instruction:` and shell `run:` hooks.
+
+External hooks are distinct from shell `run:` hooks:
+
+- `HookRunner` continues to execute shell `run:` hooks only
+- explicit external hook entries are dispatched to external hook runners
+- external hook dispatch is determined by whether a registered external runner declares support for the hook's `external.type`
+
+The workflow shape for an explicit external hook entry is `external: { type, config }`.
+
+If no external runner accepts the hook's `external.type`, execution MUST fail with a clear error.
+
+### Requirement: External hooks follow workflow phase semantics
+
+Explicit external hooks SHALL follow the same pre-phase and post-phase workflow semantics as shell `run:` hooks:
+
+- pre-phase failures are fail-fast
+- post-phase failures are reported without rolling back completed work
+
+The difference is the dispatch backend, not the lifecycle semantics.
+
 ### Requirement: instruction hooks are passive text
 
 `instruction:` hooks are passive text blocks — they are never executed as processes. They have no exit code, stdout, stderr, or side effects. `TransitionChange`, `ArchiveChange`, and `RunStepHooks` MUST skip `instruction:` entries.

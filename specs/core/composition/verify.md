@@ -65,6 +65,21 @@
 - **WHEN** a caller needs only `CreateChange`
 - **THEN** calling `createCreateChange(config)` directly returns a ready use case without requiring the full kernel
 
+### Requirement: Composition layer exposes a kernel builder
+
+#### Scenario: Builder is a public alternative to createKernel
+
+- **WHEN** the public composition exports are inspected
+- **THEN** a fluent kernel builder entry point is available alongside `createKernel`
+- **AND** using it remains within the composition layer's public surface
+
+#### Scenario: Builder preserves createKernel semantics
+
+- **GIVEN** the same resolved config and the same additive registrations
+- **WHEN** a kernel is built through the builder and through `createKernel(config, options)`
+- **THEN** both kernels expose the same merged capability set
+- **AND** both preserve the same use-case wiring semantics
+
 ### Requirement: ConfigLoader is an application port
 
 #### Scenario: FsConfigLoader reads specd.yaml

@@ -13,6 +13,12 @@
       ]
     },
     {
+      "requirement": "External providers run before built-in probes",
+      "rules": [
+        "`createVcsActorResolver` SHALL support additive external actor providers. When external providers are registered, they SHALL be probed in registration order before the built-in git, hg, and svn-backed resolver probes.\n\nIf no external or built-in provider matches, the factory SHALL continue to fall back to `NullActorResolver`."
+      ]
+    },
+    {
       "requirement": "Fallback to NullActorResolver",
       "rules": [
         "When no VCS is detected (all probes fail), `createVcsActorResolver` MUST return a `NullActorResolver`. It SHALL NOT throw."
@@ -68,6 +74,32 @@
       "then": ["it returns a GitActorResolver"]
     },
     {
+      "requirement": "External providers run before built-in probes",
+      "name": "Matching external provider preempts built-in probes",
+      "given": [
+        "an external actor provider is registered ahead of the built-ins",
+        "AND it recognizes the target directory"
+      ],
+      "when": ["createVcsActorResolver(cwd) is called"],
+      "then": [
+        "that external provider returns the resolver",
+        "AND the built-in git, hg, and svn-backed probes are not executed"
+      ]
+    },
+    {
+      "requirement": "External providers run before built-in probes",
+      "name": "Unmatched external providers fall through to built-ins",
+      "given": [
+        "one or more external actor providers are registered",
+        "AND none recognize the target directory"
+      ],
+      "when": ["createVcsActorResolver(cwd) is called"],
+      "then": [
+        "the built-in git, hg, and svn-backed probes still run in their normal order",
+        "AND NullActorResolver is still returned when no provider matches"
+      ]
+    },
+    {
       "requirement": "Fallback to NullActorResolver",
       "name": "No VCS detected",
       "given": ["the target directory is not inside any VCS repository"],
@@ -94,8 +126,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:387eebed5c4839f419741c051d675fd823f113aaaa0c7b651e23749c4ac4a052",
-    "verify.md": "sha256:420873478065199c01bab497c9d554431afed355706a0115613544e20e6cf558"
+    "spec.md": "sha256:09aae324c1b35f438a194a1980d860997e750626af9054ec422fa83415e0bfe9",
+    "verify.md": "sha256:5a3aa7873df41c85c28ade06325adc7a5305f0c8e2aeb11a04f31e7aed56b91b"
   },
   "generatedBy": "core"
 }

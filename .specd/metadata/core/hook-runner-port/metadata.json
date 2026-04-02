@@ -49,6 +49,12 @@
       ]
     },
     {
+      "requirement": "HookRunner is shell-only",
+      "rules": [
+        "`HookRunner` SHALL remain the internal shell runner for built-in `run:` hooks only. It MUST NOT become the contract for externally dispatched hook backends.\n\nExternal hooks use a separate runner abstraction with its own dispatch rules and accepted-type declaration."
+      ]
+    },
+    {
       "requirement": "Lifecycle execution guarantees",
       "rules": [
         "The port itself does not enforce lifecycle semantics, but callers rely on the following guarantees:\n\n- `pre-*` hooks: a non-zero exit code signals the caller to abort the operation\n- `post-*` CLI-owned operations: the caller runs post hooks before returning\n- `post-*` agent-driven operations: not supported via `run:` hooks (use `instruction:` hooks instead)"
@@ -146,11 +152,21 @@
       "given": ["variables with only project and no change field"],
       "when": ["run is called with a command referencing {{change.name}}"],
       "then": ["the {{change.name}} token is left unexpanded"]
+    },
+    {
+      "requirement": "HookRunner is shell-only",
+      "name": "Explicit external hooks are not passed to HookRunner",
+      "given": ["a workflow step contains an explicit external hook entry"],
+      "when": ["hook execution is wired for that step"],
+      "then": [
+        "the entry is dispatched through the external hook runner abstraction",
+        "AND HookRunner.run() is used only for shell run: hooks"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8ae89ecbfa598b49658dd1a31996e35b6e671c77318ed4586d4d078c1ec21e95",
-    "verify.md": "sha256:f34230bba8ec2521fe5cd36eb88acf006468aa0b9a2d5b76eb7faa5cf91f327a"
+    "spec.md": "sha256:9d482878d64510b35757770d68d9bda2d021529fc52dc4d595250de5da6fbde2",
+    "verify.md": "sha256:8160cfa1fcc65cd5d9789e1bc5fe478cff5cda3fc2eda920741fe6a87cc42b30"
   },
   "generatedBy": "core"
 }

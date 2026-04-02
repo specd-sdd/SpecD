@@ -2,7 +2,11 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createKernelInternals } from '../../src/composition/kernel-internals.js'
+import {
+  createBuiltinKernelRegistry,
+  createKernelInternals,
+} from '../../src/composition/kernel-internals.js'
+import { createKernelRegistryView } from '../../src/composition/kernel-registries.js'
 import { NullActorResolver } from '../../src/infrastructure/null/actor-resolver.js'
 import { NullVcsAdapter } from '../../src/infrastructure/null/vcs-adapter.js'
 import { type SpecdConfig } from '../../src/application/specd-config.js'
@@ -42,7 +46,9 @@ describe('createKernelInternals', () => {
           name: 'default',
           prefix: '_global',
           specsPath,
+          specsAdapter: { adapter: 'fs', config: { path: specsPath } },
           schemasPath: null,
+          schemasAdapter: null,
           codeRoot: tmpDir,
           ownership: 'owned',
           isExternal: false,
@@ -50,9 +56,13 @@ describe('createKernelInternals', () => {
       ],
       storage: {
         changesPath,
+        changesAdapter: { adapter: 'fs', config: { path: changesPath } },
         draftsPath,
+        draftsAdapter: { adapter: 'fs', config: { path: draftsPath } },
         discardedPath,
+        discardedAdapter: { adapter: 'fs', config: { path: discardedPath } },
         archivePath,
+        archiveAdapter: { adapter: 'fs', config: { path: archivePath } },
       },
       approvals: {
         spec: false,
@@ -60,7 +70,10 @@ describe('createKernelInternals', () => {
       },
     }
 
-    const internals = await createKernelInternals(config)
+    const internals = await createKernelInternals(
+      config,
+      createKernelRegistryView(createBuiltinKernelRegistry()),
+    )
 
     expect(internals.actor).toBeInstanceOf(NullActorResolver)
     expect(internals.vcs).toBeInstanceOf(NullVcsAdapter)

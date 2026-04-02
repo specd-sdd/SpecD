@@ -143,6 +143,40 @@
 - **WHEN** `createKernel(config)` is called without options
 - **THEN** the schema registry searches only the project's own `node_modules`
 
+### Requirement: KernelOptions supports additive registries
+
+#### Scenario: External registrations extend built-ins
+
+- **GIVEN** built-in storages, parsers, VCS providers, actor providers, and external hook runners are available
+- **WHEN** `createKernel(config, options)` is called with additional registrations in one or more categories
+- **THEN** the built kernel uses a merged capability set that includes both the built-ins and the newly registered entries
+- **AND** omitting a category from `KernelOptions` leaves that built-in category unchanged
+
+### Requirement: Kernel exposes merged registries
+
+#### Scenario: Exposed registries reflect the merged construction set
+
+- **GIVEN** external registrations were provided during kernel construction
+- **WHEN** the built kernel's registry view is inspected
+- **THEN** it exposes the final merged set of storage factories, parsers, providers, and external hook runners actually used for construction
+- **AND** the view includes built-ins as well as accepted external registrations
+
+### Requirement: Kernel rejects invalid registry references
+
+#### Scenario: Conflicting registration names fail before kernel construction
+
+- **GIVEN** an external registration uses a name already claimed by a built-in or previously-registered external entry in the same registry category
+- **WHEN** `createKernel(config, options)` processes the registrations
+- **THEN** kernel construction fails with a clear conflict error
+- **AND** the conflicting registration does not overwrite the existing entry
+
+#### Scenario: Unknown registry reference in config or workflow fails clearly
+
+- **GIVEN** configuration or workflow data names an adapter, parser, provider, or external hook type that is absent from the merged registry set
+- **WHEN** the kernel resolves that reference
+- **THEN** specd fails with a clear unknown-reference error
+- **AND** the reference is not ignored or deferred silently
+
 ### Requirement: Kernel is a plain object, not a class
 
 #### Scenario: Kernel has no methods or lifecycle

@@ -18,6 +18,22 @@
 - **WHEN** queried with `"markdown"`, `"json"`, `"yaml"`, or `"plaintext"`
 - **THEN** each key returns the corresponding `ArtifactParser` adapter
 
+### Requirement: ArtifactParserRegistry is additively extensible
+
+#### Scenario: External parser registration preserves built-ins
+
+- **GIVEN** built-in parsers for markdown, yaml, json, and plaintext
+- **AND** an external parser is registered for `toml`
+- **WHEN** the parser registry is exposed from the kernel
+- **THEN** `toml` is available alongside the built-ins
+- **AND** existing built-in format lookups continue to work unchanged
+
+#### Scenario: Unknown parser format fails clearly
+
+- **GIVEN** no built-in or external parser is registered for `graphql`
+- **WHEN** a caller requests the parser for `graphql`
+- **THEN** the operation fails with a clear unknown-format error
+
 ### Requirement: Parse contract
 
 #### Scenario: Valid content produces an AST with a root node

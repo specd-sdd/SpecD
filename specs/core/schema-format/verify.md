@@ -413,6 +413,22 @@
 - **WHEN** a `workflow[].hooks.pre` entry omits the `id` field
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
 
+### Requirement: Explicit external hook entries
+
+#### Scenario: External hook entry declares nested type and opaque config
+
+- **GIVEN** a workflow hook entry with `id` and an `external` object containing `type` and `config`
+- **WHEN** schema validation parses the workflow step
+- **THEN** the entry is accepted as an explicit external hook entry
+- **AND** it remains distinct from `instruction:` and shell `run:` entries
+
+#### Scenario: Unknown external hook type is rejected
+
+- **GIVEN** a workflow external hook entry whose type is absent from the merged external hook runner registry
+- **WHEN** the workflow is resolved for execution
+- **THEN** specd fails with a clear unknown external hook type error
+- **AND** the hook is not treated as a no-op
+
 ### Requirement: Artifact definition
 
 #### Scenario: preHashCleanup entry requires id

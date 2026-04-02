@@ -11,6 +11,39 @@
 - **THEN** only the `lint` hook is executed via `HookRunner`
 - **AND** the `guidance` instruction hook is skipped entirely
 
+### Requirement: External hooks are explicit workflow entries
+
+#### Scenario: External hook dispatch uses accepted-type declarations
+
+- **GIVEN** a workflow step with an explicit external hook entry whose `external.type` is `docker`
+- **AND** a registered external hook runner declares support for `docker`
+- **WHEN** the step's executable hooks are run
+- **THEN** the hook is dispatched to that external runner
+- **AND** `HookRunner` is not used for that entry
+
+#### Scenario: No runner accepts the external hook type
+
+- **GIVEN** a workflow step with an explicit external hook entry whose `external.type` is `webhook`
+- **AND** no registered external hook runner declares support for `webhook`
+- **WHEN** the step's executable hooks are run
+- **THEN** execution fails with a clear unknown external hook type error
+
+### Requirement: External hooks follow workflow phase semantics
+
+#### Scenario: Pre-phase external hook failure is fail-fast
+
+- **GIVEN** pre-hooks include an explicit external hook that fails
+- **WHEN** the phase is executed
+- **THEN** subsequent hooks in that pre phase are not run
+- **AND** the failure aborts the phase just like a failing shell `run:` hook
+
+#### Scenario: Post-phase external hook failure is reported without rollback
+
+- **GIVEN** post-hooks include a failing explicit external hook followed by another hook
+- **WHEN** the phase is executed
+- **THEN** later post-hooks still run
+- **AND** the failure is reported without rolling back completed work
+
 ### Requirement: instruction hooks are passive text
 
 #### Scenario: CompileContext does not include instruction hooks

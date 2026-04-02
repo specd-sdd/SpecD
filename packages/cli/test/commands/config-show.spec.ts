@@ -115,7 +115,9 @@ describe('Output format', () => {
         {
           name: 'core',
           specsPath: '/project/specs/core',
+          specsAdapter: { adapter: 'fs', config: { path: '/project/specs/core' } },
           schemasPath: '/project/schemas',
+          schemasAdapter: { adapter: 'fs', config: { path: '/project/schemas' } },
           codeRoot: '/project/packages/core',
           ownership: 'owned' as const,
           isExternal: false,
@@ -144,7 +146,9 @@ describe('Output format', () => {
         {
           name: 'default',
           specsPath: '/project/specs',
+          specsAdapter: { adapter: 'fs', config: { path: '/project/specs' } },
           schemasPath: null,
+          schemasAdapter: null,
           codeRoot: '/project',
           ownership: 'owned' as const,
           isExternal: false,
@@ -152,7 +156,9 @@ describe('Output format', () => {
         {
           name: 'billing-ws',
           specsPath: '/project/billing/specs',
+          specsAdapter: { adapter: 'fs', config: { path: '/project/billing/specs' } },
           schemasPath: null,
+          schemasAdapter: null,
           codeRoot: '/project/billing',
           ownership: 'owned' as const,
           isExternal: false,

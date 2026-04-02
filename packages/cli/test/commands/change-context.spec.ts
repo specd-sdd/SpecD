@@ -47,7 +47,9 @@ function setup() {
       {
         name: 'default',
         specsPath: '/project/specs',
+        specsAdapter: { adapter: 'fs', config: { path: '/project/specs' } },
         schemasPath: null,
+        schemasAdapter: null,
         codeRoot: '/project',
         ownership: 'owned' as const,
         isExternal: false,

@@ -1,5 +1,16 @@
 export * from './use-cases/index.js'
 export { createKernel, type Kernel, type KernelOptions } from './kernel.js'
+export { createKernelBuilder, type KernelBuilder } from './kernel-builder.js'
+export {
+  type ActorProvider,
+  type ArchiveStorageFactory,
+  type ChangeStorageFactory,
+  type KernelRegistryInput,
+  type KernelRegistryView,
+  type SchemaStorageFactory,
+  type SpecStorageFactory,
+  type VcsProvider,
+} from './kernel-registries.js'
 export { createSchemaRegistry } from './schema-registry.js'
 export { createSchemaRepository } from './schema-repository.js'
 export { createConfigLoader, type FsConfigLoaderOptions } from './config-loader.js'

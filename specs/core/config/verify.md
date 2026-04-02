@@ -187,6 +187,23 @@
 - **WHEN** `storage.changes.adapter` is set to an unrecognised value (e.g. `"s3"`)
 - **THEN** specd exits with a validation error listing supported adapters
 
+### Requirement: Named storage adapters
+
+#### Scenario: Workspace selects a registered named adapter
+
+- **GIVEN** a workspace storage config sets `adapter: git`
+- **AND** the merged storage registry contains a `git` storage factory
+- **WHEN** the config is loaded and prepared for kernel composition
+- **THEN** the selected adapter name is preserved as `git`
+- **AND** the adapter-specific `git:` block is passed through as adapter-owned configuration
+
+#### Scenario: Workspace selects an unknown adapter
+
+- **GIVEN** a workspace storage config sets `adapter: custom-remote`
+- **AND** no built-in or external storage registration provides `custom-remote`
+- **WHEN** config validation or kernel composition resolves the workspace storage
+- **THEN** specd fails with a clear unknown-adapter error
+
 ### Requirement: Graph config path
 
 #### Scenario: configPath defaults to repo-local graph config directory

@@ -13,6 +13,12 @@
       ]
     },
     {
+      "requirement": "External providers run before built-in probes",
+      "rules": [
+        "`createVcsAdapter` SHALL support additive external VCS providers. When external providers are registered, they SHALL be probed in registration order before the built-in git, hg, and svn probes.\n\nIf no external or built-in provider matches, the factory SHALL continue to fall back to `NullVcsAdapter`."
+      ]
+    },
+    {
       "requirement": "Fallback to NullVcsAdapter",
       "rules": [
         "When no VCS is detected (all probes fail), `createVcsAdapter` MUST return a `NullVcsAdapter`. It SHALL NOT throw."
@@ -68,6 +74,32 @@
       "then": ["it returns a GitVcsAdapter"]
     },
     {
+      "requirement": "External providers run before built-in probes",
+      "name": "Matching external provider preempts built-in probes",
+      "given": [
+        "an external VCS provider is registered ahead of the built-ins",
+        "AND it recognizes the target directory"
+      ],
+      "when": ["createVcsAdapter(cwd) is called"],
+      "then": [
+        "that external provider returns the adapter",
+        "AND the built-in git, hg, and svn probes are not executed"
+      ]
+    },
+    {
+      "requirement": "External providers run before built-in probes",
+      "name": "Unmatched external providers fall through to built-ins",
+      "given": [
+        "one or more external VCS providers are registered",
+        "AND none recognize the target directory"
+      ],
+      "when": ["createVcsAdapter(cwd) is called"],
+      "then": [
+        "the built-in git, hg, and svn probes still run in their normal order",
+        "AND NullVcsAdapter is still returned when no provider matches"
+      ]
+    },
+    {
       "requirement": "Fallback to NullVcsAdapter",
       "name": "No VCS detected",
       "given": ["the target directory is not inside any VCS repository"],
@@ -94,8 +126,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:df0a114d8cb38add1dff7ef78d77b252f6ca276e45ef5d91a9ae6174069dc4cd",
-    "verify.md": "sha256:d518bbbd98a309f89fce89446683d6c17a1e85b80c6d23ad2d9a9664366fbe4d"
+    "spec.md": "sha256:76f408a7b0150e3e926cb22b12165cefc1f1377be2e54021651d8f0073d36938",
+    "verify.md": "sha256:641505c1cf78dc0a9272be715f4f376753f5352a60da70d61bd6410ebbac54b7"
   },
   "generatedBy": "core"
 }

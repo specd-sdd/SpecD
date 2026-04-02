@@ -52,6 +52,12 @@ kernel.specs.approve // ApproveSpec
 
 The kernel is a convenience — it is not the mandatory entry point. Callers that need a single use case call its factory directly.
 
+### Requirement: Composition layer exposes a kernel builder
+
+The composition layer SHALL expose a fluent kernel builder entry point in addition to `createKernel(config, options)`. The builder SHALL accumulate the same additive registrations supported by `KernelOptions` and SHALL build kernels with behavior equivalent to the lower-level construction path.
+
+The builder is part of the public composition surface. It MUST NOT introduce a second, incompatible extensibility model.
+
 ### Requirement: ConfigLoader is an application port
 
 `ConfigLoader` is defined in `application/ports/config-loader.ts` as an interface. It has a single method `load(): Promise<SpecdConfig>`. The `FsConfigLoader` implementation reads `specd.yaml` and `specd.local.yaml`, with local values taking precedence. Future implementations (`EnvConfigLoader`, `CompositeConfigLoader`) add new config sources without touching the kernel or any delivery layer.

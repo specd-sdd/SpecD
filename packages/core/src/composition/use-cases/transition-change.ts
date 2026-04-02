@@ -145,6 +145,6 @@ export function createTransitionChange(
   const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
   const hooks = new NodeHookRunner(expander)
   const actor = createVcsActorResolver()
-  const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, schemaProvider)
+  const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, new Map(), schemaProvider)
   return new TransitionChange(changeRepo, actor, schemaProvider, runStepHooks)
 }
