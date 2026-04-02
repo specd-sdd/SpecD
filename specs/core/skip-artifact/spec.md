@@ -36,7 +36,11 @@ When the artifact exists and is optional, the use case MUST:
 
 ### Requirement: Persistence and output
 
-After recording and marking, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` entity.
+After recording and marking, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.
+
+Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case records the skip event on that instance, marks the artifact as skipped, and returns the updated change. This ensures skip decisions are serialized with other mutations of the same change.
+
+`SkipArtifact.execute` returns the updated `Change` entity produced by that serialized mutation.
 
 ## Constraints
 

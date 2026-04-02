@@ -30,7 +30,11 @@ The use case MUST call `change.restore(actor)` to append a `restored` event to t
 
 ### Requirement: Persistence
 
-After appending the restored event, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` instance. The repository implementation is responsible for relocating the change directory back to `changes/`.
+After appending the restored event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.
+
+Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.restore(actor)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs any required directory relocation back to `changes/`.
+
+`RestoreChange.execute` returns the updated `Change` instance produced by that serialized mutation.
 
 ### Requirement: Dependencies
 

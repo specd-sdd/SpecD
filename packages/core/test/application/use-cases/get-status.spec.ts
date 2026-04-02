@@ -99,7 +99,7 @@ describe('GetStatus', () => {
 
       const result = await uc.execute({ name: 'add-oauth' })
 
-      expect(result.change).toBe(change)
+      expect(result.change).toStrictEqual(change)
     })
 
     it('returns empty artifact statuses when change has no artifacts', async () => {

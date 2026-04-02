@@ -32,7 +32,11 @@ The use case MUST call `change.draft(actor, reason)` to append a `drafted` event
 
 ### Requirement: Persistence
 
-After appending the drafted event, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` instance. The repository implementation is responsible for relocating the change directory to `drafts/`.
+After appending the drafted event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.
+
+Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.draft(actor, reason)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs any required directory relocation to `drafts/`.
+
+`DraftChange.execute` returns the updated `Change` instance produced by that serialized mutation.
 
 ### Requirement: Dependencies
 

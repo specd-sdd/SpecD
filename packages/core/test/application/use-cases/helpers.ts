@@ -2,7 +2,9 @@ import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-
 import { Change, type ActorIdentity } from '../../../src/domain/entities/change.js'
 import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { type Spec } from '../../../src/domain/entities/spec.js'
+import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
+import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import {
   ArtifactType,
   type ArtifactTypeProps,
@@ -39,6 +41,7 @@ import {
 } from '../../../src/application/use-cases/run-step-hooks.js'
 import { type ActorResolver } from '../../../src/application/ports/actor-resolver.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
+import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 
 /** Default identity for test actors. */
 export const testActor: ActorIdentity = { name: 'Test User', email: 'test@example.com' }
@@ -55,15 +58,16 @@ class StubChangeRepository extends ChangeRepository {
 
   constructor(changes: Change[] = []) {
     super({ workspace: 'default', ownership: 'owned', isExternal: false })
-    this.store = new Map(changes.map((c) => [c.name, c]))
+    this.store = new Map(changes.map((c) => [c.name, cloneChange(c)]))
   }
 
   override async get(name: string): Promise<Change | null> {
-    return this.store.get(name) ?? null
+    const change = this.store.get(name)
+    return change === undefined ? null : cloneChange(change)
   }
 
   override async list(): Promise<Change[]> {
-    return [...this.store.values()]
+    return [...this.store.values()].map((change) => cloneChange(change))
   }
 
   override async listDrafts(): Promise<Change[]> {
@@ -75,7 +79,18 @@ class StubChangeRepository extends ChangeRepository {
   }
 
   override async save(change: Change): Promise<void> {
-    this.store.set(change.name, change)
+    this.store.set(change.name, cloneChange(change))
+  }
+
+  override async mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T> {
+    const change = await this.get(name)
+    if (change === null) {
+      throw new ChangeNotFoundError(name)
+    }
+
+    const result = await fn(change)
+    await this.save(change)
+    return result
   }
 
   override async delete(change: Change): Promise<void> {
@@ -129,6 +144,165 @@ export function makeChangeRepository(
   initial: Change[] = [],
 ): ChangeRepository & { store: Map<string, Change> } {
   return new StubChangeRepository(initial)
+}
+
+/**
+ * Creates a deep copy of a `Change` suitable for in-memory repository tests.
+ *
+ * @param change - The change to clone
+ * @returns A deep-cloned `Change`
+ */
+function cloneChange(change: Change): Change {
+  const artifacts = new Map<string, ChangeArtifact>()
+  for (const [type, artifact] of change.artifacts) {
+    const files = new Map<string, ArtifactFile>()
+    for (const [key, file] of artifact.files) {
+      files.set(
+        key,
+        new ArtifactFile({
+          key: file.key,
+          filename: file.filename,
+          status: file.status,
+          ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+        }),
+      )
+    }
+
+    artifacts.set(
+      type,
+      new ChangeArtifact({
+        type: artifact.type,
+        optional: artifact.optional,
+        requires: artifact.requires,
+        files,
+      }),
+    )
+  }
+
+  const specDependsOn = new Map<string, readonly string[]>()
+  for (const [specId, deps] of change.specDependsOn) {
+    specDependsOn.set(specId, [...deps])
+  }
+
+  return new Change({
+    name: change.name,
+    createdAt: change.createdAt,
+    ...(change.description !== undefined ? { description: change.description } : {}),
+    specIds: change.specIds,
+    history: change.history.map((event) => cloneChangeEvent(event)),
+    artifacts,
+    specDependsOn,
+  })
+}
+
+/**
+ * Clones a change history event, preserving its discriminated-union shape.
+ *
+ * @param event - The history event to clone
+ * @returns A cloned event with copied dates, actors, and nested arrays
+ */
+function cloneChangeEvent(event: Change['history'][number]): Change['history'][number] {
+  switch (event.type) {
+    case 'created':
+      return {
+        type: 'created',
+        at: new Date(event.at),
+        by: { ...event.by },
+        specIds: [...event.specIds],
+        schemaName: event.schemaName,
+        schemaVersion: event.schemaVersion,
+      }
+    case 'transitioned':
+      return {
+        type: 'transitioned',
+        at: new Date(event.at),
+        by: { ...event.by },
+        from: event.from,
+        to: event.to,
+      }
+    case 'spec-approved':
+      return {
+        type: 'spec-approved',
+        at: new Date(event.at),
+        by: { ...event.by },
+        reason: event.reason,
+        artifactHashes: { ...event.artifactHashes },
+      }
+    case 'signed-off':
+      return {
+        type: 'signed-off',
+        at: new Date(event.at),
+        by: { ...event.by },
+        reason: event.reason,
+        artifactHashes: { ...event.artifactHashes },
+      }
+    case 'invalidated':
+      return {
+        type: 'invalidated',
+        at: new Date(event.at),
+        by: { ...event.by },
+        cause: event.cause,
+      }
+    case 'drafted':
+      return event.reason !== undefined
+        ? {
+            type: 'drafted',
+            at: new Date(event.at),
+            by: { ...event.by },
+            reason: event.reason,
+          }
+        : {
+            type: 'drafted',
+            at: new Date(event.at),
+            by: { ...event.by },
+          }
+    case 'restored':
+      return {
+        type: 'restored',
+        at: new Date(event.at),
+        by: { ...event.by },
+      }
+    case 'discarded':
+      return event.supersededBy !== undefined
+        ? {
+            type: 'discarded',
+            at: new Date(event.at),
+            by: { ...event.by },
+            reason: event.reason,
+            supersededBy: [...event.supersededBy],
+          }
+        : {
+            type: 'discarded',
+            at: new Date(event.at),
+            by: { ...event.by },
+            reason: event.reason,
+          }
+    case 'artifact-skipped':
+      return event.reason !== undefined
+        ? {
+            type: 'artifact-skipped',
+            at: new Date(event.at),
+            by: { ...event.by },
+            artifactId: event.artifactId,
+            reason: event.reason,
+          }
+        : {
+            type: 'artifact-skipped',
+            at: new Date(event.at),
+            by: { ...event.by },
+            artifactId: event.artifactId,
+          }
+    case 'artifacts-synced':
+      return {
+        type: 'artifacts-synced',
+        at: new Date(event.at),
+        by: { ...event.by },
+        typesAdded: [...event.typesAdded],
+        typesRemoved: [...event.typesRemoved],
+        filesAdded: event.filesAdded.map((file) => ({ ...file })),
+        filesRemoved: event.filesRemoved.map((file) => ({ ...file })),
+      }
+  }
 }
 
 /**

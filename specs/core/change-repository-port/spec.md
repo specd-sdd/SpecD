@@ -14,6 +14,28 @@ Without an abstraction over change storage, use cases would couple directly to f
 
 `get(name)` MUST accept a change name string and return the `Change` with that name, or `null` if no change with that name exists. The returned `Change` MUST have its artifact statuses derived at load time by comparing the current file hash against the stored `validatedHash` (see `specs/core/change/spec.md` — Requirement: Artifacts). A hash mismatch MUST reset the artifact status to `in-progress`.
 
+`get()` is a snapshot read for callers. It MAY auto-invalidate and persist drifted artifacts before returning (see Requirement: Auto-invalidation on get when artifact files drift), but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing persisted change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot.
+
+### Requirement: mutate serializes persisted change updates
+
+`mutate(name, fn)` MUST provide serialized read-modify-write semantics for one existing persisted change.
+
+For a given change name, the repository MUST:
+
+1. Acquire exclusive mutation access scoped to that persisted change
+2. Reload the freshest persisted `Change` state after the exclusive access is acquired
+3. Invoke `fn(change)` with that fresh `Change`
+4. Persist the updated change manifest if `fn` resolves successfully
+5. Release the exclusive access before returning or throwing
+
+If no change with the given name exists, `mutate()` MUST throw `ChangeNotFoundError`.
+
+If `fn` throws, `mutate()` MUST release the exclusive access and MUST NOT persist a partial manifest update produced by the failed callback.
+
+The serialized section MUST cover the full persisted mutation window — fresh load, callback execution, and manifest persistence. Locking only the final manifest write is insufficient.
+
+Exclusive access is per change, not global. Mutations targeting different change names MAY proceed concurrently.
+
 ### Requirement: Auto-invalidation on get when artifact files drift
 
 The `FsChangeRepository` implementation of `get()` MUST detect artifact file drift and auto-invalidate the change when appropriate. After loading a change and deriving artifact statuses, the repository checks whether any previously-validated artifact file has drifted — that is, the file's `validatedHash` was set (indicating a prior validation) but the derived status is now `missing` or `in-progress` (indicating the file was deleted or modified on disk).
@@ -42,6 +64,8 @@ This ensures that approval drift and state-inconsistent artifact changes are det
 ### Requirement: save persists the change manifest only
 
 `save(change)` MUST persist the change manifest — state, artifact statuses, validated hashes, history events, and approvals. It MUST NOT write artifact file content. Artifact content is written exclusively via `saveArtifact()`. The write MUST be atomic (e.g. temp file + rename) to prevent partial reads.
+
+`save()` is a low-level persistence operation. Atomic manifest writing prevents partial-file corruption, but `save()` alone does not serialize a caller's earlier snapshot read. Use cases that mutate an existing persisted change and need concurrency safety MUST perform that mutation through `mutate(name, fn)`.
 
 ### Requirement: delete removes the entire change directory
 

@@ -21,7 +21,13 @@
     {
       "requirement": "get returns a Change or null",
       "rules": [
-        "`get(name)` MUST accept a change name string and return the `Change` with that name, or `null` if no change with that name exists. The returned `Change` MUST have its artifact statuses derived at load time by comparing the current file hash against the stored `validatedHash` (see `specs/core/change/spec.md` — Requirement: Artifacts). A hash mismatch MUST reset the artifact status to `in-progress`."
+        "`get(name)` MUST accept a change name string and return the `Change` with that name, or `null` if no change with that name exists. The returned `Change` MUST have its artifact statuses derived at load time by comparing the current file hash against the stored `validatedHash` (see `specs/core/change/spec.md` — Requirement: Artifacts). A hash mismatch MUST reset the artifact status to `in-progress`.\n\n`get()` is a snapshot read for callers. It MAY auto-invalidate and persist drifted artifacts before returning (see Requirement: Auto-invalidation on get when artifact files drift), but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing persisted change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot."
+      ]
+    },
+    {
+      "requirement": "mutate serializes persisted change updates",
+      "rules": [
+        "`mutate(name, fn)` MUST provide serialized read-modify-write semantics for one existing persisted change.\n\nFor a given change name, the repository MUST:\n\n1. Acquire exclusive mutation access scoped to that persisted change\n2. Reload the freshest persisted `Change` state after the exclusive access is acquired\n3. Invoke `fn(change)` with that fresh `Change`\n4. Persist the updated change manifest if `fn` resolves successfully\n5. Release the exclusive access before returning or throwing\n\nIf no change with the given name exists, `mutate()` MUST throw `ChangeNotFoundError`.\n\nIf `fn` throws, `mutate()` MUST release the exclusive access and MUST NOT persist a partial manifest update produced by the failed callback.\n\nThe serialized section MUST cover the full persisted mutation window — fresh load, callback execution, and manifest persistence. Locking only the final manifest write is insufficient.\n\nExclusive access is per change, not global. Mutations targeting different change names MAY proceed concurrently."
       ]
     },
     {
@@ -51,7 +57,7 @@
     {
       "requirement": "save persists the change manifest only",
       "rules": [
-        "`save(change)` MUST persist the change manifest — state, artifact statuses, validated hashes, history events, and approvals. It MUST NOT write artifact file content. Artifact content is written exclusively via `saveArtifact()`. The write MUST be atomic (e.g. temp file + rename) to prevent partial reads."
+        "`save(change)` MUST persist the change manifest — state, artifact statuses, validated hashes, history events, and approvals. It MUST NOT write artifact file content. Artifact content is written exclusively via `saveArtifact()`. The write MUST be atomic (e.g. temp file + rename) to prevent partial reads.\n\n`save()` is a low-level persistence operation. Atomic manifest writing prevents partial-file corruption, but `save()` alone does not serialize a caller's earlier snapshot read. Use cases that mutate an existing persisted change and need concurrency safety MUST perform that mutation through `mutate(name, fn)`."
       ]
     },
     {
@@ -144,6 +150,51 @@
       "then": ["the artifact whose hash differs from validatedHash has status in-progress"]
     },
     {
+      "requirement": "get returns a Change or null",
+      "name": "get returns a snapshot, not a serialized mutation context",
+      "given": [
+        "two callers both loaded the same change via get()",
+        "AND one caller later updates that change through mutate()"
+      ],
+      "when": ["the other caller keeps using the previously returned Change"],
+      "then": ["that object remains a stale snapshot until the caller reloads it"]
+    },
+    {
+      "requirement": "mutate serializes persisted change updates",
+      "name": "Missing change is rejected",
+      "when": ["mutate(\"missing-change\", fn) is called and no change with that name exists"],
+      "then": ["ChangeNotFoundError is thrown"]
+    },
+    {
+      "requirement": "mutate serializes persisted change updates",
+      "name": "Second mutation sees the first mutation's persisted result",
+      "given": [
+        "two callers both request mutate() for the same change name",
+        "AND the first callback appends a history event and resolves"
+      ],
+      "when": ["the second callback starts executing"],
+      "then": [
+        "it receives a freshly reloaded Change that already includes the first callback's persisted update"
+      ]
+    },
+    {
+      "requirement": "mutate serializes persisted change updates",
+      "name": "Failing callback does not persist a partial manifest update",
+      "given": ["a mutate() callback modifies the provided Change"],
+      "when": ["the callback throws before returning"],
+      "then": [
+        "the repository does not persist that partial manifest update",
+        "AND a later mutate() call for the same change can proceed normally"
+      ]
+    },
+    {
+      "requirement": "mutate serializes persisted change updates",
+      "name": "Different changes can mutate independently",
+      "given": ["one caller mutates change-a and another mutates change-b"],
+      "when": ["both operations execute at the same time"],
+      "then": ["neither operation waits on a global lock for unrelated change names"]
+    },
+    {
       "requirement": "Auto-invalidation on get when artifact files drift",
       "name": "Single artifact drifts — only it and downstream are reset",
       "given": [
@@ -222,6 +273,16 @@
       "then": [
         "the manifest file is updated with current state, hashes, and history",
         "AND artifact file content on disk is unchanged"
+      ]
+    },
+    {
+      "requirement": "save persists the change manifest only",
+      "name": "Save alone does not serialize an earlier snapshot read",
+      "given": ["a caller holds a Change loaded earlier via get()"],
+      "when": ["another caller persists newer manifest state before save(oldSnapshot) runs"],
+      "then": [
+        "save() still behaves as a low-level manifest write",
+        "AND callers that need concurrency-safe read-modify-write behavior must use mutate()"
       ]
     },
     {
@@ -324,8 +385,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:7c6080d18b5a35651128597ebb815a72f88564c1d8a9f9d2c7032336b2c6db4c",
-    "verify.md": "sha256:f721570d1799a61861c7e182539d4043fc8d8b54cee82c05e34d1d279e4df47f"
+    "spec.md": "sha256:a803583e402982f27f8309aec6fadc502c2256a20f1f40f792b8be46ba6997f5",
+    "verify.md": "sha256:fc7f38f342bc9dd7264b7ca5de6165ae4b6c1e7a12c83b72b1cce79a72d87a16"
   },
   "generatedBy": "core"
 }

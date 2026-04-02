@@ -39,7 +39,7 @@
     {
       "requirement": "Persistence and output",
       "rules": [
-        "After recording and marking, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` entity."
+        "After recording and marking, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case records the skip event on that instance, marks the artifact as skipped, and returns the updated change. This ensures skip decisions are serialized with other mutations of the same change.\n\n`SkipArtifact.execute` returns the updated `Change` entity produced by that serialized mutation."
       ]
     }
   ],
@@ -90,18 +90,19 @@
     },
     {
       "requirement": "Persistence and output",
-      "name": "Change is persisted and returned",
+      "name": "Change is persisted and returned through serialized mutation",
       "given": ["a successful skip operation"],
       "when": ["execute completes"],
       "then": [
-        "ChangeRepository.save is called with the updated change",
+        "ChangeRepository.mutate(input.name, fn) is called with the target change name",
+        "AND the callback records the skip and marks the artifact skipped on the fresh persisted Change",
         "AND the returned value is the Change entity"
       ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:383165ccd84c6e1c89894885c4cd677b25e891ba40377620cd19cb5a44d8c113",
-    "verify.md": "sha256:ce53040f504d139e759c53c5c21caa3e99015b83560f48fc393e76156fb55ac8"
+    "spec.md": "sha256:7c7e8007b3caca65565cca2b69cf6bf66a8ca638f824b089cb97875842015ce0",
+    "verify.md": "sha256:fe3de67e2e86a8a8bd82ccbd1d9e0963a2e9093ea9f98c039ef7d7ec18cbbff0"
   },
   "generatedBy": "core"
 }

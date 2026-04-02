@@ -190,23 +190,6 @@ export class TransitionChange {
       }
     }
 
-    // --- Artifact validation clearing (verifying → implementing) ---
-    if (change.state === 'verifying' && effectiveTarget === 'implementing') {
-      const implementingStep = schema.workflowStep('implementing')
-      if (implementingStep !== null) {
-        change.clearArtifactValidations(implementingStep.requires)
-      }
-    }
-
-    // --- Approval invalidation on transition to designing ---
-    let invalidated = false
-    if (effectiveTarget === 'designing' && change.state !== 'drafting') {
-      if (change.activeSpecApproval !== undefined || change.activeSignoff !== undefined) {
-        change.invalidate('redesign', actor)
-        invalidated = true
-      }
-    }
-
     // --- Hook phase skip resolution ---
     const skip = input.skipHookPhases ?? new Set<HookPhaseSelector>()
     const skipAll = skip.has('all')
@@ -222,14 +205,36 @@ export class TransitionChange {
       await this._executeHooks(input.name, effectiveTarget, 'pre', onProgress)
     }
 
-    // --- State transition (skip if invalidate() already moved to designing) ---
-    if (!invalidated) {
-      change.transition(effectiveTarget, actor)
-    }
-    await this._changes.save(change)
+    const implementingStep = schema.workflowStep('implementing')
+    const persistedChange = await this._changes.mutate(input.name, (freshChange) => {
+      let invalidated = false
+
+      if (freshChange.state === 'verifying' && effectiveTarget === 'implementing') {
+        if (implementingStep !== null) {
+          freshChange.clearArtifactValidations(implementingStep.requires)
+        }
+      }
+
+      if (effectiveTarget === 'designing' && freshChange.state !== 'drafting') {
+        if (
+          freshChange.activeSpecApproval !== undefined ||
+          freshChange.activeSignoff !== undefined
+        ) {
+          freshChange.invalidate('redesign', actor)
+          invalidated = true
+        }
+      }
+
+      if (!invalidated) {
+        freshChange.transition(effectiveTarget, actor)
+      }
+
+      return freshChange
+    })
+
     onProgress?.({ type: 'transitioned', from: fromState, to: effectiveTarget })
 
-    return { change }
+    return { change: persistedChange }
   }
 
   /**

@@ -33,7 +33,7 @@
     {
       "requirement": "Persistence",
       "rules": [
-        "After appending the drafted event, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` instance. The repository implementation is responsible for relocating the change directory to `drafts/`."
+        "After appending the drafted event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.draft(actor, reason)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs any required directory relocation to `drafts/`.\n\n`DraftChange.execute` returns the updated `Change` instance produced by that serialized mutation."
       ]
     },
     {
@@ -87,14 +87,18 @@
     },
     {
       "requirement": "Persistence",
-      "name": "Change is saved to repository",
+      "name": "Change is persisted through serialized mutation",
       "when": ["DraftChange.execute completes successfully"],
-      "then": ["ChangeRepository.save was called with the updated Change instance"]
+      "then": [
+        "ChangeRepository.mutate(input.name, fn) is called",
+        "AND the callback records the drafted event on the fresh persisted Change",
+        "AND the resulting change is relocated to the drafts area by the repository"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:73a5e6930ee44e0b7089f7c6dcb42d2400693494ebad0a4b12822449db3b2f7f",
-    "verify.md": "sha256:8cd6751e58d1e2961758223307496eb2b9a487673186800f856edd73cff68c45"
+    "spec.md": "sha256:36311ccb7422885b1a4437834f820184e699c07e6bc703cc4a55d22d44a732e5",
+    "verify.md": "sha256:340ab3d2663e29266f9f0b7f81e996108cf893b0392a7d15e9cf12b46567f0e7"
   },
   "generatedBy": "core"
 }

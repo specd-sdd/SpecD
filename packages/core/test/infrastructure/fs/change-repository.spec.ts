@@ -134,6 +134,145 @@ describe('FsChangeRepository', () => {
     })
   })
 
+  describe('mutate()', () => {
+    it('given no change with that name, when mutate is called, then ChangeNotFoundError is thrown', async () => {
+      await expect(
+        ctx.repo.mutate('missing', (change) => {
+          change.transition('designing', actor)
+        }),
+      ).rejects.toBeInstanceOf(ChangeNotFoundError)
+    })
+
+    it('given the callback succeeds, when mutate is called, then the callback result is returned and the manifest is persisted', async () => {
+      const change = makeChange('add-auth')
+      await ctx.repo.save(change)
+
+      const result = await ctx.repo.mutate('add-auth', (loaded) => {
+        loaded.transition('designing', actor)
+        return loaded.state
+      })
+
+      expect(result).toBe('designing')
+      expect((await ctx.repo.get('add-auth'))?.state).toBe('designing')
+    })
+
+    it('given the callback throws, when mutate is called, then partial manifest changes are not persisted', async () => {
+      const change = makeChange('add-auth')
+      await ctx.repo.save(change)
+
+      await expect(
+        ctx.repo.mutate('add-auth', (loaded) => {
+          loaded.transition('designing', actor)
+          throw new Error('boom')
+        }),
+      ).rejects.toThrow('boom')
+
+      expect((await ctx.repo.get('add-auth'))?.state).toBe('drafting')
+    })
+
+    it('given two concurrent mutations for the same change, when mutate is called twice, then the second waits and reloads fresh state', async () => {
+      const change = makeChange('add-auth')
+      await ctx.repo.save(change)
+
+      let releaseFirst: (() => void) | undefined
+      const firstCanFinish = new Promise<void>((resolve) => {
+        releaseFirst = resolve
+      })
+      let resolveFirstStarted: (() => void) | undefined
+      const firstStarted = new Promise<void>((resolve) => {
+        resolveFirstStarted = resolve
+      })
+
+      const order: string[] = []
+      let secondEntered = false
+
+      const first = ctx.repo.mutate('add-auth', async (loaded) => {
+        order.push('first-start')
+        loaded.transition('designing', actor)
+        resolveFirstStarted?.()
+        await firstCanFinish
+        order.push('first-end')
+        return loaded.state
+      })
+
+      await firstStarted
+
+      const second = ctx.repo.mutate('add-auth', (loaded) => {
+        secondEntered = true
+        order.push('second-start')
+        expect(loaded.state).toBe('designing')
+        loaded.transition('ready', actor)
+        order.push('second-end')
+        return loaded.state
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 75))
+      expect(secondEntered).toBe(false)
+
+      releaseFirst?.()
+
+      await expect(first).resolves.toBe('designing')
+      await expect(second).resolves.toBe('ready')
+      expect((await ctx.repo.get('add-auth'))?.state).toBe('ready')
+      expect(order).toEqual(['first-start', 'first-end', 'second-start', 'second-end'])
+    })
+
+    it('given concurrent mutations for different changes, when mutate is called, then unrelated changes do not block each other', async () => {
+      const alpha = makeChange('alpha')
+      const beta = makeChange('beta')
+      await ctx.repo.save(alpha)
+      await ctx.repo.save(beta)
+
+      let releaseAlpha: (() => void) | undefined
+      const alphaCanFinish = new Promise<void>((resolve) => {
+        releaseAlpha = resolve
+      })
+      let betaCompleted = false
+
+      const mutateAlpha = ctx.repo.mutate('alpha', async (loaded) => {
+        loaded.transition('designing', actor)
+        await alphaCanFinish
+        return loaded.state
+      })
+
+      const mutateBeta = ctx.repo.mutate('beta', (loaded) => {
+        loaded.transition('designing', actor)
+        betaCompleted = true
+        return loaded.state
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 75))
+      expect(betaCompleted).toBe(true)
+
+      releaseAlpha?.()
+
+      await expect(mutateAlpha).resolves.toBe('designing')
+      await expect(mutateBeta).resolves.toBe('designing')
+      expect((await ctx.repo.get('alpha'))?.state).toBe('designing')
+      expect((await ctx.repo.get('beta'))?.state).toBe('designing')
+    })
+
+    it('given a stale lock owned by a dead pid, when mutate is called, then the lock is reaped and the mutation succeeds', async () => {
+      const change = makeChange('add-auth')
+      await ctx.repo.save(change)
+
+      const lockDir = path.join(ctx.tmpDir, 'change-locks', 'add-auth.lock')
+      await fs.mkdir(lockDir, { recursive: true })
+      await fs.writeFile(
+        path.join(lockDir, 'owner.json'),
+        JSON.stringify({ pid: 999_999, acquiredAt: new Date().toISOString() }),
+        'utf8',
+      )
+
+      await ctx.repo.mutate('add-auth', (loaded) => {
+        loaded.transition('designing', actor)
+      })
+
+      expect((await ctx.repo.get('add-auth'))?.state).toBe('designing')
+      await expect(fs.access(lockDir)).rejects.toThrow()
+    })
+  })
+
   describe('save — directory movement', () => {
     it('given a change in changes/, when drafted and saved, then directory is moved to drafts/', async () => {
       const change = makeChange('add-auth')

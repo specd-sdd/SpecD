@@ -154,6 +154,12 @@ export class ValidateArtifacts {
     const actor: ActorIdentity = await this._actor.identity()
     const failures: ValidationFailure[] = []
     const warnings: ValidationWarning[] = []
+    const completedValidations: Array<{
+      readonly artifactId: string
+      readonly fileKey: string
+      readonly validatedHash: string
+    }> = []
+    const specDependsOnUpdates = new Map<string, readonly string[]>()
 
     const { workspace, capPath: capabilityPath } = parseSpecId(input.specPath)
     const specRepo = this._specs.get(workspace)
@@ -173,8 +179,8 @@ export class ValidateArtifacts {
     // --- Approval invalidation check ---
     const approval: SpecApprovedEvent | undefined = change.activeSpecApproval
     const signoff: SignedOffEvent | undefined = change.activeSignoff
+    const driftedIds = new Set<string>()
     if (approval !== undefined || signoff !== undefined) {
-      const driftedIds = new Set<string>()
       for (const artifactType of schema.artifacts()) {
         const changeArtifact = change.getArtifact(artifactType.id)
         if (
@@ -205,9 +211,6 @@ export class ValidateArtifacts {
             break
           }
         }
-      }
-      if (driftedIds.size > 0) {
-        change.invalidate('artifact-change', actor, driftedIds)
       }
     }
 
@@ -276,7 +279,11 @@ export class ValidateArtifacts {
                 deltaFile.content,
                 artifactType.preHashCleanup,
               )
-              changeArtifact.markComplete(fileKey, this._sha256(cleanedContent))
+              completedValidations.push({
+                artifactId: artifactType.id,
+                fileKey,
+                validatedHash: this._sha256(cleanedContent),
+              })
               continue
             }
           }
@@ -355,7 +362,11 @@ export class ValidateArtifacts {
         const rawFile = await this._changes.artifact(change, file.filename)
         const contentToHash = rawFile !== null ? rawFile.content : validationContent
         const cleanedContent = this._applyCleanup(contentToHash, artifactType.preHashCleanup)
-        changeArtifact.markComplete(fileKey, this._sha256(cleanedContent))
+        completedValidations.push({
+          artifactId: artifactType.id,
+          fileKey,
+          validatedHash: this._sha256(cleanedContent),
+        })
 
         // --- Extract dependsOn from validated content ---
         if (artifactType.scope === 'spec') {
@@ -371,14 +382,30 @@ export class ValidateArtifacts {
               input.specPath,
             )
             if (deps !== undefined && deps.length > 0) {
-              change.setSpecDependsOn(input.specPath, deps)
+              specDependsOnUpdates.set(input.specPath, deps)
             }
           }
         }
       }
     }
 
-    await this._changes.save(change)
+    if (driftedIds.size > 0 || completedValidations.length > 0 || specDependsOnUpdates.size > 0) {
+      await this._changes.mutate(input.name, (freshChange) => {
+        if (driftedIds.size > 0) {
+          freshChange.invalidate('artifact-change', actor, driftedIds)
+        }
+
+        for (const completed of completedValidations) {
+          const artifact = freshChange.getArtifact(completed.artifactId)
+          artifact?.markComplete(completed.fileKey, completed.validatedHash)
+        }
+
+        for (const [specId, deps] of specDependsOnUpdates) {
+          freshChange.setSpecDependsOn(specId, deps)
+        }
+      })
+    }
+
     return { passed: failures.length === 0, failures, warnings }
   }
 

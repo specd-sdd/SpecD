@@ -129,23 +129,25 @@ export class ArchiveChange {
    * @throws {HookFailedError} If a pre-archive `run:` hook exits with a non-zero code
    */
   async execute(input: ArchiveChangeInput): Promise<ArchiveChangeResult> {
-    const change = await this._changes.get(input.name)
-    if (change === null) throw new ChangeNotFoundError(input.name)
+    const loadedChange = await this._changes.get(input.name)
+    if (loadedChange === null) throw new ChangeNotFoundError(input.name)
 
     const schema = await this._schemaProvider.get()
 
     // --- Schema name guard ---
-    if (schema.name() !== change.schemaName) {
-      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
+    if (schema.name() !== loadedChange.schemaName) {
+      throw new SchemaMismatchError(loadedChange.name, loadedChange.schemaName, schema.name())
     }
 
     // --- Archivable guard + transition to archiving ---
-    change.assertArchivable()
     const archivingActor = await this._actor.identity()
-    if (change.state !== 'archiving') {
-      change.transition('archiving', archivingActor)
-      await this._changes.save(change)
-    }
+    const change = await this._changes.mutate(input.name, (freshChange) => {
+      freshChange.assertArchivable()
+      if (freshChange.state !== 'archiving') {
+        freshChange.transition('archiving', archivingActor)
+      }
+      return freshChange
+    })
 
     // --- Overlap guard ---
     if (!(input.allowOverlap ?? false)) {

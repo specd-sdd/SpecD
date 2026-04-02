@@ -57,11 +57,12 @@
 
 ### Requirement: Persistence and return value
 
-#### Scenario: Change is saved and returned
+#### Scenario: Change is saved and returned through serialized mutation
 
 - **GIVEN** a successful signoff
 - **WHEN** `execute()` returns
-- **THEN** `ChangeRepository.save()` has been called with the updated change
+- **THEN** `ChangeRepository.mutate(input.name, fn)` has been called
+- **AND** the callback records the signoff and transitions the fresh persisted change to `signed-off`
 - **AND** the returned `Change` has state `signed-off`
 
 ### Requirement: Input contract

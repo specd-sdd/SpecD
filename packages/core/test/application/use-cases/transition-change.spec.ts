@@ -92,6 +92,23 @@ describe('TransitionChange', () => {
       expect(saved?.state).toBe('designing')
     })
 
+    it('persists the final lifecycle change through ChangeRepository.mutate', async () => {
+      const change = makeChangeInState('my-change', [])
+      const repo = makeChangeRepository([change])
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = makeUseCase(repo)
+
+      await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(mutateSpy).toHaveBeenCalledOnce()
+      expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
+    })
+
     it('returns the updated change on success', async () => {
       const change = makeChangeInState('my-change', [])
       const uc = makeUseCase(makeChangeRepository([change]))
@@ -306,7 +323,8 @@ describe('TransitionChange', () => {
           },
         ],
       })
-      const uc = makeUseCase(makeChangeRepository([change]), { schema })
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo, { schema })
 
       await uc.execute({
         name: 'my-change',
@@ -315,10 +333,13 @@ describe('TransitionChange', () => {
         approvalsSignoff: false,
       })
 
-      expect(spec.getFile('spec')?.validatedHash).toBeUndefined()
-      expect(spec.status).toBe('in-progress')
-      expect(tasks.getFile('tasks')?.validatedHash).toBe('sha256:def')
-      expect(tasks.status).toBe('complete')
+      const saved = repo.store.get('my-change')
+      const savedSpec = saved?.getArtifact('spec')
+      const savedTasks = saved?.getArtifact('tasks')
+      expect(savedSpec?.getFile('spec')?.validatedHash).toBeUndefined()
+      expect(savedSpec?.status).toBe('in-progress')
+      expect(savedTasks?.getFile('tasks')?.validatedHash).toBe('sha256:def')
+      expect(savedTasks?.status).toBe('complete')
     })
 
     it('does not clear hashes when no implementing step exists in schema', async () => {

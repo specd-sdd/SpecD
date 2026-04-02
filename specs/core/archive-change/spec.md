@@ -51,9 +51,13 @@ After obtaining the schema from `SchemaProvider`, `ArchiveChange` must compare `
 
 ### Requirement: Archivable guard
 
-The first step of `ArchiveChange.execute` after the schema name guard must call `change.assertArchivable()`. If the change is not in `archivable` state, this throws `InvalidStateTransitionError` and the archive is aborted without running any hooks or modifying any files.
+The first persisted-state mutation step of `ArchiveChange.execute` after the schema name guard MUST be a call to `ChangeRepository.mutate(name, fn)`.
 
-After the guard passes, `ArchiveChange` MUST transition the change to `archiving` via `change.transition('archiving', actor)` and persist the change via `ChangeRepository.save(change)`. This records the state transition before any hooks execute or files are modified.
+Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`. The use case MUST call `change.assertArchivable()` on that instance. If the change is not in `archivable` state, the callback throws and the archive is aborted without running any hooks or modifying any files.
+
+After the guard passes, the callback MUST transition the change to `archiving` via `change.transition('archiving', actor)` when the fresh change is not already in `archiving`, then return the updated change. When the callback resolves, the repository persists the updated manifest before any hooks execute or files are modified.
+
+The rest of the archive flow operates on the change returned by that serialized mutation step.
 
 ### Requirement: ReadOnly workspace guard
 

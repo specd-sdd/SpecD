@@ -33,7 +33,7 @@
     {
       "requirement": "Persistence",
       "rules": [
-        "After appending the restored event, the use case MUST persist the change via `ChangeRepository.save` and return the updated `Change` instance. The repository implementation is responsible for relocating the change directory back to `changes/`."
+        "After appending the restored event, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.restore(actor)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest and performs any required directory relocation back to `changes/`.\n\n`RestoreChange.execute` returns the updated `Change` instance produced by that serialized mutation."
       ]
     },
     {
@@ -78,14 +78,18 @@
     },
     {
       "requirement": "Persistence",
-      "name": "Change is saved to repository",
+      "name": "Change is persisted through serialized mutation",
       "when": ["RestoreChange.execute completes successfully"],
-      "then": ["ChangeRepository.save was called with the updated Change instance"]
+      "then": [
+        "ChangeRepository.mutate(input.name, fn) is called",
+        "AND the callback records the restored event on the fresh persisted Change",
+        "AND the resulting change is relocated back to the active changes area by the repository"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:34996bb2144c7cb505492d5ecc58ef76bde38a3e86450d98eed6187f9310f3f0",
-    "verify.md": "sha256:29ab2d7a3b008e601eaed6e7bd53477f33053ec698b73b17e40dc7c9a2db07e8"
+    "spec.md": "sha256:394e0e05c2c9a3855f46a16e51e97160db96fa512a9b0acafa34eb2c7af9534a",
+    "verify.md": "sha256:5838d0c7d475328e47b135c9be2479b3473744d3e7dcdd299b991c076d56b7df"
   },
   "generatedBy": "core"
 }

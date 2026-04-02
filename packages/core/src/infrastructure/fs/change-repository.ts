@@ -65,6 +65,19 @@ export interface FsChangeRepositoryConfig extends ChangeRepositoryConfig {
 }
 
 /**
+ * Metadata persisted inside a change lock directory.
+ *
+ * Used to identify the owning process and detect stale locks left behind by
+ * crashed processes.
+ */
+interface LockOwner {
+  /** Process ID that currently owns the lock. */
+  readonly pid: number
+  /** ISO timestamp recording when the lock was acquired. */
+  readonly acquiredAt: string
+}
+
+/**
  * Filesystem implementation of `ChangeRepository`.
  *
  * Each change is stored as a directory named `YYYYMMDD-HHmmss-<name>` under
@@ -80,6 +93,7 @@ export class FsChangeRepository extends ChangeRepository {
   private readonly _changesPath: string
   private readonly _draftsPath: string
   private readonly _discardedPath: string
+  private readonly _locksPath: string
   private _artifactTypes: readonly ArtifactType[]
   private readonly _resolveArtifactTypes: (() => Promise<readonly ArtifactType[]>) | undefined
   private _artifactTypesResolved: boolean
@@ -94,6 +108,7 @@ export class FsChangeRepository extends ChangeRepository {
     this._changesPath = config.changesPath
     this._draftsPath = config.draftsPath
     this._discardedPath = config.discardedPath
+    this._locksPath = path.join(path.dirname(this._changesPath), 'change-locks')
     this._artifactTypes = config.artifactTypes ?? []
     this._resolveArtifactTypes = config.resolveArtifactTypes
     this._artifactTypesResolved =
@@ -112,6 +127,27 @@ export class FsChangeRepository extends ChangeRepository {
       this._artifactTypesResolved = true
     }
     return this._artifactTypes
+  }
+
+  /**
+   * Runs a serialized persisted mutation for one existing change.
+   *
+   * @param name - The change name to mutate
+   * @param fn - Callback that applies the mutation on the fresh persisted change
+   * @returns The callback result after the manifest has been persisted
+   * @throws {ChangeNotFoundError} If no change with the given name exists
+   */
+  override async mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T> {
+    return this._withChangeLock(name, async () => {
+      const change = await this.get(name)
+      if (change === null) {
+        throw new ChangeNotFoundError(name)
+      }
+
+      const result = await fn(change)
+      await this.save(change)
+      return result
+    })
   }
 
   /**
@@ -464,7 +500,168 @@ export class FsChangeRepository extends ChangeRepository {
     }
   }
 
+  /**
+   * Executes `fn` while holding exclusive mutation access for `name`.
+   *
+   * @param name - The change name whose persisted state is being mutated
+   * @param fn - Operation to run while the lock is held
+   * @returns The callback result
+   */
+  private async _withChangeLock<T>(name: string, fn: () => Promise<T>): Promise<T> {
+    const lockDir = this._lockDirPath(name)
+    await this._acquireLock(lockDir)
+    try {
+      return await fn()
+    } finally {
+      await this._releaseLock(lockDir)
+    }
+  }
+
   // ---- Private helpers ----
+
+  /**
+   * Returns the absolute lock directory path for a change name.
+   *
+   * @param name - The change name
+   * @returns Absolute path to the per-change lock directory
+   */
+  private _lockDirPath(name: string): string {
+    return path.join(this._locksPath, `${name}.lock`)
+  }
+
+  /**
+   * Attempts to acquire the given lock directory, waiting until it becomes
+   * available or reaping it when the owning process is dead.
+   *
+   * @param lockDir - Absolute path to the per-change lock directory
+   */
+  private async _acquireLock(lockDir: string): Promise<void> {
+    await fs.mkdir(this._locksPath, { recursive: true })
+
+    while (true) {
+      try {
+        await fs.mkdir(lockDir)
+        try {
+          await this._writeLockOwner(lockDir)
+        } catch (err) {
+          await this._releaseLock(lockDir)
+          throw err
+        }
+        return
+      } catch (err) {
+        if (!isEexist(err)) {
+          throw err
+        }
+      }
+
+      const owner = await this._readLockOwner(lockDir)
+      if (owner !== null && !this._isPidAlive(owner.pid)) {
+        await this._releaseLock(lockDir)
+        continue
+      }
+
+      await wait(25)
+    }
+  }
+
+  /**
+   * Releases a previously acquired lock directory.
+   *
+   * The operation is idempotent to simplify cleanup after partial failures and
+   * stale-lock reaping.
+   *
+   * @param lockDir - Absolute path to the per-change lock directory
+   */
+  private async _releaseLock(lockDir: string): Promise<void> {
+    await fs.rm(lockDir, { recursive: true, force: true })
+  }
+
+  /**
+   * Writes lock owner metadata after the directory has been acquired.
+   *
+   * @param lockDir - Absolute path to the per-change lock directory
+   */
+  private async _writeLockOwner(lockDir: string): Promise<void> {
+    const owner: LockOwner = {
+      pid: process.pid,
+      acquiredAt: new Date().toISOString(),
+    }
+    await writeFileAtomic(this._lockOwnerPath(lockDir), JSON.stringify(owner, null, 2))
+  }
+
+  /**
+   * Reads and validates the owner metadata for an existing lock directory.
+   *
+   * Invalid or partially-written owner files are treated as missing and the
+   * caller will wait for the lock rather than guessing ownership.
+   *
+   * @param lockDir - Absolute path to the per-change lock directory
+   * @returns Lock owner metadata, or `null` when unavailable or invalid
+   */
+  private async _readLockOwner(lockDir: string): Promise<LockOwner | null> {
+    let content: string
+    try {
+      content = await fs.readFile(this._lockOwnerPath(lockDir), 'utf8')
+    } catch (err) {
+      if (isEnoent(err)) return null
+      throw err
+    }
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(content)
+    } catch {
+      return null
+    }
+
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      typeof (parsed as { pid?: unknown }).pid !== 'number' ||
+      typeof (parsed as { acquiredAt?: unknown }).acquiredAt !== 'string'
+    ) {
+      return null
+    }
+
+    return {
+      pid: (parsed as { pid: number }).pid,
+      acquiredAt: (parsed as { acquiredAt: string }).acquiredAt,
+    }
+  }
+
+  /**
+   * Returns whether a process ID is still alive.
+   *
+   * `EPERM` is treated as alive because the process exists but cannot be
+   * signalled by the current user.
+   *
+   * @param pid - Process ID to probe
+   * @returns Whether the process still appears to exist
+   */
+  private _isPidAlive(pid: number): boolean {
+    if (!Number.isInteger(pid) || pid <= 0) {
+      return false
+    }
+
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch (err) {
+      return (
+        typeof err === 'object' && err !== null && (err as NodeJS.ErrnoException).code === 'EPERM'
+      )
+    }
+  }
+
+  /**
+   * Returns the owner metadata file path for a lock directory.
+   *
+   * @param lockDir - Absolute path to the per-change lock directory
+   * @returns Absolute path to the owner metadata file
+   */
+  private _lockOwnerPath(lockDir: string): string {
+    return path.join(lockDir, 'owner.json')
+  }
 
   /**
    * Resolves the on-disk directory for a change by scanning `changes/`,
@@ -1170,4 +1367,16 @@ async function filterDirectories(basePath: string, entries: string[]): Promise<s
     }),
   )
   return checks.filter((c) => c.isDir).map((c) => c.entry)
+}
+
+/**
+ * Waits for a short polling interval while another process holds a change lock.
+ *
+ * @param ms - Delay in milliseconds
+ * @returns A promise that resolves after `ms`
+ */
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
 }

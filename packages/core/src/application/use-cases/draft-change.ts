@@ -1,7 +1,6 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
-import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 
 /** Input for the {@link DraftChange} use case. */
 export interface DraftChangeInput {
@@ -40,14 +39,10 @@ export class DraftChange {
    * @throws {ChangeNotFoundError} If no change with the given name exists
    */
   async execute(input: DraftChangeInput): Promise<Change> {
-    const change = await this._changes.get(input.name)
-    if (change === null) {
-      throw new ChangeNotFoundError(input.name)
-    }
-
     const actor = await this._actor.identity()
-    change.draft(actor, input.reason)
-    await this._changes.save(change)
-    return change
+    return this._changes.mutate(input.name, (change) => {
+      change.draft(actor, input.reason)
+      return change
+    })
   }
 }

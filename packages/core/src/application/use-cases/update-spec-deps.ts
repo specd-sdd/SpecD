@@ -1,4 +1,3 @@
-import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 
@@ -52,16 +51,6 @@ export class UpdateSpecDeps {
    *   or if a `remove` value is not in current deps, or if no operation is specified
    */
   async execute(input: UpdateSpecDepsInput): Promise<UpdateSpecDepsResult> {
-    const change = await this._changes.get(input.name)
-    if (change === null) throw new ChangeNotFoundError(input.name)
-
-    // Validate specId is in the change
-    if (!change.specIds.includes(input.specId)) {
-      throw new Error(
-        `spec '${input.specId}' is not in change '${input.name}' — specIds: [${change.specIds.join(', ')}]`,
-      )
-    }
-
     // Validate mutual exclusivity
     if (input.set !== undefined && (input.add !== undefined || input.remove !== undefined)) {
       throw new Error('--set is mutually exclusive with --add and --remove')
@@ -78,39 +67,45 @@ export class UpdateSpecDeps {
       }
     }
 
-    let result: string[]
-
-    if (input.set !== undefined) {
-      validateDepIds(input.set)
-      result = [...input.set]
-    } else {
-      const current = [...(change.specDependsOn.get(input.specId) ?? [])]
-
-      if (input.remove !== undefined) {
-        for (const id of input.remove) {
-          const idx = current.indexOf(id)
-          if (idx === -1) {
-            throw new Error(`dependency '${id}' not found in current deps for '${input.specId}'`)
-          }
-          current.splice(idx, 1)
-        }
+    return this._changes.mutate(input.name, (change) => {
+      if (!change.specIds.includes(input.specId)) {
+        throw new Error(
+          `spec '${input.specId}' is not in change '${input.name}' — specIds: [${change.specIds.join(', ')}]`,
+        )
       }
 
-      if (input.add !== undefined) {
-        validateDepIds(input.add)
-        for (const id of input.add) {
-          if (!current.includes(id)) {
-            current.push(id)
+      let result: string[]
+
+      if (input.set !== undefined) {
+        validateDepIds(input.set)
+        result = [...input.set]
+      } else {
+        const current = [...(change.specDependsOn.get(input.specId) ?? [])]
+
+        if (input.remove !== undefined) {
+          for (const id of input.remove) {
+            const idx = current.indexOf(id)
+            if (idx === -1) {
+              throw new Error(`dependency '${id}' not found in current deps for '${input.specId}'`)
+            }
+            current.splice(idx, 1)
           }
         }
+
+        if (input.add !== undefined) {
+          validateDepIds(input.add)
+          for (const id of input.add) {
+            if (!current.includes(id)) {
+              current.push(id)
+            }
+          }
+        }
+
+        result = current
       }
 
-      result = current
-    }
-
-    change.setSpecDependsOn(input.specId, result)
-    await this._changes.save(change)
-
-    return { specId: input.specId, dependsOn: result }
+      change.setSpecDependsOn(input.specId, result)
+      return { specId: input.specId, dependsOn: result }
+    })
   }
 }

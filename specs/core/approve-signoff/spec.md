@@ -44,7 +44,11 @@ The `Change` entity enforces that the transition from the current state to `sign
 
 ### Requirement: Persistence and return value
 
-After recording the signoff and transitioning state, the use case MUST persist the change via `ChangeRepository.save()` and return the updated `Change` entity.
+After computing artifact hashes, the use case MUST record the signoff and lifecycle transition through `ChangeRepository.mutate(name, fn)`.
+
+Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case records the signoff on that instance, transitions it to `signed-off`, and returns the updated change. This ensures the signoff event, artifact hashes, and lifecycle transition are persisted atomically with respect to other mutations of the same change.
+
+`ApproveSignoff.execute` returns the updated `Change` entity produced by that serialized mutation.
 
 ### Requirement: Input contract
 

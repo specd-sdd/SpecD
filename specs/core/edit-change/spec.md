@@ -16,7 +16,9 @@ As a change evolves, its spec scope often needs to grow or shrink — but modify
 
 ### Requirement: Change lookup
 
-The use case MUST load the change by `name` via `ChangeRepository.get`. If no change with the given name exists, it MUST throw `ChangeNotFoundError`.
+The use case MUST throw `ChangeNotFoundError` when no change with the given name exists.
+
+Snapshot reads via `ChangeRepository.get(name)` MAY be used for read-only early returns, but any effective update to an existing persisted change's `specIds` MUST be performed through `ChangeRepository.mutate(name, fn)` so the mutation runs against fresh persisted state.
 
 ### Requirement: No-op when no spec changes requested
 
@@ -39,6 +41,12 @@ If a spec ID in `addSpecIds` already exists in the change's `specIds` (after rem
 If the resulting `specIds` list is identical (same length, same order) to the change's current `specIds`, the use case MUST return the unchanged change with `invalidated: false` without persisting.
 
 ### Requirement: Approval invalidation on effective change
+
+When the resulting `specIds` differ from the current set, the use case MUST resolve the current actor identity, then update the change inside `ChangeRepository.mutate(name, fn)`.
+
+Inside the mutation callback, the use case MUST call `change.updateSpecIds(specIds, actor)` on the fresh persisted `Change`. This is the operation that invalidates active approvals and appends the corresponding history events for a spec-scope change.
+
+The repository MUST persist the updated change before `EditChange.execute` returns an `invalidated: true` result.
 
 ### Requirement: Directory cleanup on removal
 

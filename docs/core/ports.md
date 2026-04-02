@@ -136,7 +136,7 @@ export type ResolveFromPathResult =
 
 ## ChangeRepository
 
-Port for reading and writing changes. Changes are persisted as a manifest (state, artifact hashes, approvals) separate from artifact file content. Use cases read and write artifact content via `artifact()` and `saveArtifact()` independently of `save()`.
+Port for reading and writing changes. Changes are persisted as a manifest (state, artifact hashes, approvals) separate from artifact file content. Use cases read and write artifact content via `artifact()` and `saveArtifact()` independently of manifest persistence.
 
 Changes are stored globally — one `changes/` directory — not per-workspace. The inherited `workspace()`, `ownership()`, and `isExternal()` values carry default workspace settings and are not used by any use case.
 
@@ -154,8 +154,23 @@ abstract class ChangeRepository extends Repository {
 
 Returns the change with the given name, or `null` if not found. Loads the manifest and derives each artifact's status by comparing the current file hash against the stored `validatedHash`. A hash mismatch indicates drift and resets the artifact status to `'in-progress'`.
 
+`get()` is a snapshot read. It does not reserve the change for later persistence, so callers must not treat `get() -> mutate entity -> save()` as concurrency-safe.
+
 ```typescript
 const change = await changeRepo.get('add-oauth-login')
+```
+
+#### `mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T>`
+
+Runs a serialized persisted mutation for one existing change. The repository acquires exclusive mutation access for the named change, reloads the fresh persisted state, invokes `fn(change)`, persists the manifest on success, and releases the lock.
+
+This is the concurrency-safe path for read-modify-write operations on an existing change. Use cases that update lifecycle state, approvals, artifact completion, or `specDependsOn` should prefer `mutate()` over `get() -> save()`.
+
+```typescript
+const result = await changeRepo.mutate('add-oauth-login', (change) => {
+  change.draft(actor, 'parking until next week')
+  return change.state
+})
 ```
 
 #### `list(): Promise<Change[]>`
@@ -172,7 +187,9 @@ Lists all discarded changes, sorted by creation order. Returns `Change` objects 
 
 #### `save(change: Change): Promise<void>`
 
-Persists the change manifest — lifecycle state, artifact statuses, validated hashes, and approvals. Does not write artifact file content; use `saveArtifact()` for that.
+Persists the change manifest — lifecycle state, artifact statuses, validated hashes, approvals, and `specDependsOn`. Does not write artifact file content; use `saveArtifact()` for that.
+
+`save()` is a low-level manifest write. It is appropriate for first persistence of a new change or for repositories that already hold exclusive access. For existing persisted changes, use `mutate()` rather than composing `get()` and `save()` in application code.
 
 #### `delete(change: Change): Promise<void>`
 
@@ -188,7 +205,7 @@ const artifact = await changeRepo.artifact(change, 'proposal.md')
 
 #### `saveArtifact(change: Change, artifact: SpecArtifact, options?: { force?: boolean }): Promise<void>`
 
-Writes an artifact file within a change directory. If `artifact.originalHash` is set and does not match the current file on disk, the save is rejected with `ArtifactConflictError`. After a successful write, the artifact's status in the change manifest is reset to `'in-progress'` — call `save(change)` to persist that state change.
+Writes an artifact file within a change directory. If `artifact.originalHash` is set and does not match the current file on disk, the save is rejected with `ArtifactConflictError`. After a successful write, the artifact's status in the in-memory `Change` is reset to `'in-progress'`; callers then persist the manifest separately, usually through `mutate()`.
 
 **Throws:** `ArtifactConflictError` when a concurrent modification is detected and `force` is not set.
 

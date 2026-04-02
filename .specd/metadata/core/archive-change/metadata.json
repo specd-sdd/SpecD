@@ -42,7 +42,7 @@
     {
       "requirement": "Archivable guard",
       "rules": [
-        "The first step of `ArchiveChange.execute` after the schema name guard must call `change.assertArchivable()`. If the change is not in `archivable` state, this throws `InvalidStateTransitionError` and the archive is aborted without running any hooks or modifying any files.\n\nAfter the guard passes, `ArchiveChange` MUST transition the change to `archiving` via `change.transition('archiving', actor)` and persist the change via `ChangeRepository.save(change)`. This records the state transition before any hooks execute or files are modified."
+        "The first persisted-state mutation step of `ArchiveChange.execute` after the schema name guard MUST be a call to `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`. The use case MUST call `change.assertArchivable()` on that instance. If the change is not in `archivable` state, the callback throws and the archive is aborted without running any hooks or modifying any files.\n\nAfter the guard passes, the callback MUST transition the change to `archiving` via `change.transition('archiving', actor)` when the fresh change is not already in `archiving`, then return the updated change. When the callback resolves, the repository persists the updated manifest before any hooks execute or files are modified.\n\nThe rest of the archive flow operates on the change returned by that serialized mutation step."
       ]
     },
     {
@@ -113,7 +113,7 @@
       "given": ["a change that is not in archivable state"],
       "when": ["ArchiveChange.execute is called"],
       "then": [
-        "InvalidStateTransitionError is thrown",
+        "InvalidStateTransitionError is thrown from inside ChangeRepository.mutate(input.name, fn)",
         "AND no hooks are executed and no files are modified"
       ]
     },
@@ -123,10 +123,10 @@
       "given": ["the change is in archivable state"],
       "when": ["ArchiveChange.execute is called"],
       "then": [
-        "the archivable guard passes",
+        "the archivable guard passes inside the serialized mutation callback",
         "AND the change transitions to archiving via change.transition('archiving', actor)",
-        "AND the change is persisted via ChangeRepository.save(change)",
-        "AND execution proceeds to pre-archive hooks"
+        "AND the updated manifest is persisted before pre-archive hooks execute",
+        "AND execution proceeds to pre-archive hooks using the change returned by that mutation"
       ]
     },
     {
@@ -419,8 +419,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:f30d680b937f7ab9cf878add09325ad56dfe860851e447bdd31e1a2f340f4e78",
-    "verify.md": "sha256:a42b98dc2f815f5ebd2ea5f4b56c9ca2946f7a0d201f5c70fc255a70c9a32526"
+    "spec.md": "sha256:9cdba67e91fc151552fc0b9bf2a7917ed6cef3e75c581a83a2cc20466d518873",
+    "verify.md": "sha256:f7e4e41abfda5aedffb84bf4791a731715fae898443237e174a6fa2861562cff"
   },
   "generatedBy": "core"
 }

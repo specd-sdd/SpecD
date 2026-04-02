@@ -50,11 +50,11 @@ When both `remove` and `add` are provided in the same call, removals MUST be pro
 
 ### Requirement: Persistence and output
 
-After computing the new dependency list, the use case MUST:
+After computing the new dependency list, the use case MUST update and persist the change through `ChangeRepository.mutate(name, fn)`.
 
-1. Call `change.setSpecDependsOn(specId, result)` to update the change entity
-2. Persist the change via `ChangeRepository.save`
-3. Return an `UpdateSpecDepsResult` containing `specId` and the resulting `dependsOn` array
+Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case calls `change.setSpecDependsOn(specId, result)` on that instance and returns it. When the callback resolves, the repository persists the updated manifest.
+
+`UpdateSpecDeps.execute` then returns an `UpdateSpecDepsResult` containing `specId` and the resulting `dependsOn` array.
 
 ## Constraints
 

@@ -1,7 +1,6 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
-import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 
 /** Input for the {@link DiscardChange} use case. */
 export interface DiscardChangeInput {
@@ -42,14 +41,10 @@ export class DiscardChange {
    * @throws {ChangeNotFoundError} If no change with the given name exists
    */
   async execute(input: DiscardChangeInput): Promise<Change> {
-    const change = await this._changes.get(input.name)
-    if (change === null) {
-      throw new ChangeNotFoundError(input.name)
-    }
-
     const actor = await this._actor.identity()
-    change.discard(input.reason, actor, input.supersededBy)
-    await this._changes.save(change)
-    return change
+    return this._changes.mutate(input.name, (change) => {
+      change.discard(input.reason, actor, input.supersededBy)
+      return change
+    })
   }
 }

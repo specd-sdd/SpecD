@@ -122,6 +122,28 @@ describe('ApproveSpec', () => {
 
       expect(repo.store.get('my-change')?.state).toBe('spec-approved')
     })
+
+    it('persists through ChangeRepository.mutate', async () => {
+      const change = makePendingSpecApprovalChange('my-change')
+      const repo = makeChangeRepository([change])
+      vi.spyOn(repo, 'artifact').mockResolvedValue(null)
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = new ApproveSpec(
+        repo,
+        makeActorResolver(),
+        makeSchemaProvider(makeSchema()),
+        makeContentHasher(),
+      )
+
+      await uc.execute({
+        name: 'my-change',
+        reason: 'ok',
+        ...defaultInput,
+      })
+
+      expect(mutateSpy).toHaveBeenCalledOnce()
+      expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
+    })
   })
 
   describe('given the spec approval gate is disabled', () => {

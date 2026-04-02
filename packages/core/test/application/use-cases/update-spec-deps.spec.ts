@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { UpdateSpecDeps } from '../../../src/application/use-cases/update-spec-deps.js'
 import { makeChange, makeChangeRepository } from './helpers.js'
 
@@ -20,6 +20,22 @@ describe('UpdateSpecDeps', () => {
     // Verify persisted
     const saved = await repo.get('my-change')
     expect([...saved!.specDependsOn.get('auth/login')!]).toEqual(['auth/shared', 'auth/jwt'])
+  })
+
+  it('persists through ChangeRepository.mutate', async () => {
+    const change = makeChange('my-change', { specIds: ['auth/login'] })
+    const repo = makeChangeRepository([change])
+    const mutateSpy = vi.spyOn(repo, 'mutate')
+    const uc = new UpdateSpecDeps(repo)
+
+    await uc.execute({
+      name: 'my-change',
+      specId: 'auth/login',
+      add: ['auth/shared'],
+    })
+
+    expect(mutateSpy).toHaveBeenCalledOnce()
+    expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
   })
 
   it('removes deps from a spec in the change', async () => {

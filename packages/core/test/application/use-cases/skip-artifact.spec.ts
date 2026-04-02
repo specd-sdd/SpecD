@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { SkipArtifact } from '../../../src/application/use-cases/skip-artifact.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { ArtifactNotFoundError } from '../../../src/application/errors/artifact-not-found-error.js'
@@ -104,6 +104,25 @@ describe('SkipArtifact', () => {
       if (skippedEvent?.type === 'artifact-skipped') {
         expect('reason' in skippedEvent).toBe(false)
       }
+    })
+
+    it('persists through ChangeRepository.mutate', async () => {
+      const artifact = new ChangeArtifact({
+        type: 'proposal',
+        optional: true,
+        files: new Map([
+          ['proposal', new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })],
+        ]),
+      })
+      const change = makeChangeWithArtifact('my-change', artifact)
+      const repo = makeChangeRepository([change])
+      const mutateSpy = vi.spyOn(repo, 'mutate')
+      const uc = new SkipArtifact(repo, makeActorResolver())
+
+      await uc.execute({ name: 'my-change', artifactId: 'proposal' })
+
+      expect(mutateSpy).toHaveBeenCalledOnce()
+      expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
     })
   })
 

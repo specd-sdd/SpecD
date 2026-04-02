@@ -20,6 +20,40 @@
 - **WHEN** `get()` loads that change
 - **THEN** the artifact whose hash differs from `validatedHash` has status `in-progress`
 
+#### Scenario: get returns a snapshot, not a serialized mutation context
+
+- **GIVEN** two callers both loaded the same change via `get()`
+- **AND** one caller later updates that change through `mutate()`
+- **WHEN** the other caller keeps using the previously returned `Change`
+- **THEN** that object remains a stale snapshot until the caller reloads it
+
+### Requirement: mutate serializes persisted change updates
+
+#### Scenario: Missing change is rejected
+
+- **WHEN** `mutate("missing-change", fn)` is called and no change with that name exists
+- **THEN** `ChangeNotFoundError` is thrown
+
+#### Scenario: Second mutation sees the first mutation's persisted result
+
+- **GIVEN** two callers both request `mutate()` for the same change name
+- **AND** the first callback appends a history event and resolves
+- **WHEN** the second callback starts executing
+- **THEN** it receives a freshly reloaded `Change` that already includes the first callback's persisted update
+
+#### Scenario: Failing callback does not persist a partial manifest update
+
+- **GIVEN** a `mutate()` callback modifies the provided `Change`
+- **WHEN** the callback throws before returning
+- **THEN** the repository does not persist that partial manifest update
+- **AND** a later `mutate()` call for the same change can proceed normally
+
+#### Scenario: Different changes can mutate independently
+
+- **GIVEN** one caller mutates `change-a` and another mutates `change-b`
+- **WHEN** both operations execute at the same time
+- **THEN** neither operation waits on a global lock for unrelated change names
+
 ### Requirement: Auto-invalidation on get when artifact files drift
 
 #### Scenario: Single artifact drifts — only it and downstream are reset
@@ -87,6 +121,13 @@
 - **WHEN** `save(change)` is called
 - **THEN** the manifest file is updated with current state, hashes, and history
 - **AND** artifact file content on disk is unchanged
+
+#### Scenario: Save alone does not serialize an earlier snapshot read
+
+- **GIVEN** a caller holds a `Change` loaded earlier via `get()`
+- **WHEN** another caller persists newer manifest state before `save(oldSnapshot)` runs
+- **THEN** `save()` still behaves as a low-level manifest write
+- **AND** callers that need concurrency-safe read-modify-write behavior must use `mutate()`
 
 ### Requirement: artifact loads content with originalHash
 

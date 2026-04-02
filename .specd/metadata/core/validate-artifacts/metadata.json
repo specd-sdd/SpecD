@@ -89,7 +89,7 @@
     {
       "requirement": "Save after validation",
       "rules": [
-        "After all artifacts have been evaluated, `ValidateArtifacts` must call `changeRepository.save(change)` to persist any `markComplete` calls (updated `validatedHash` values) and any invalidation events appended to history. The save must happen even if some artifacts failed — partial progress must be persisted."
+        "After all artifacts have been evaluated, `ValidateArtifacts` MUST persist any `markComplete` calls (updated `validatedHash` values), invalidation events appended to history, and `setSpecDependsOn` updates through `ChangeRepository.mutate(name, fn)` rather than through an unsynchronized `get() -> save()` sequence.\n\nThe mutation callback MUST operate on the fresh persisted `Change` instance provided by `mutate()`. All change-state mutations performed by validation — including approval invalidation, artifact completion, and dependency extraction side effects — MUST happen against that fresh instance before the repository persists it.\n\nThe mutation MUST still persist partial progress when some artifacts fail. Validation returns a result object rather than rolling back successful `markComplete` updates for other artifacts."
       ]
     }
   ],
@@ -412,15 +412,28 @@
     },
     {
       "requirement": "Save after validation",
-      "name": "Save called even when some artifacts fail",
-      "given": ["one artifact passes validation (markComplete called) and one fails"],
+      "name": "Partial progress is persisted through serialized mutation",
+      "given": ["one artifact passes validation (markComplete is called) and one artifact fails"],
       "when": ["ValidateArtifacts.execute completes"],
-      "then": ["changeRepository.save(change) is called — partial progress is persisted"]
+      "then": [
+        "ChangeRepository.mutate(input.name, fn) is used to persist the updated change",
+        "AND the persisted manifest keeps the successful validatedHash updates together with the failure result"
+      ]
+    },
+    {
+      "requirement": "Save after validation",
+      "name": "Validation side effects run against the fresh persisted change",
+      "given": ["another operation updates the same change before validation persistence begins"],
+      "when": ["ValidateArtifacts.execute enters its persistence step"],
+      "then": [
+        "the mutation callback receives a freshly reloaded Change",
+        "AND validation updates are applied on top of that fresh state instead of overwriting it with an older snapshot"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8cf031b74704d2abc06064d0f50b79f3413999e224de4a02bc08bc4adf02b718",
-    "verify.md": "sha256:69272047f3a9cd72599bf654d02b28bc1cc4abf84150ccda2f7feccf233494b1"
+    "spec.md": "sha256:6b336d13bed80392edcba0f74d32b5a73b8e1409d487865c6e25cf3541434adc",
+    "verify.md": "sha256:b8c657c11f8dd22585dd38d77e0fb88a8288f5f5dd0e1ed3e4f9da4c6b160af8"
   },
   "generatedBy": "core"
 }

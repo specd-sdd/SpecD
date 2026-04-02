@@ -8,17 +8,17 @@
 
 - **GIVEN** a change that is not in `archivable` state
 - **WHEN** `ArchiveChange.execute` is called
-- **THEN** `InvalidStateTransitionError` is thrown
+- **THEN** `InvalidStateTransitionError` is thrown from inside `ChangeRepository.mutate(input.name, fn)`
 - **AND** no hooks are executed and no files are modified
 
 #### Scenario: Change in archivable state transitions to archiving
 
 - **GIVEN** the change is in `archivable` state
 - **WHEN** `ArchiveChange.execute` is called
-- **THEN** the archivable guard passes
+- **THEN** the archivable guard passes inside the serialized mutation callback
 - **AND** the change transitions to `archiving` via `change.transition('archiving', actor)`
-- **AND** the change is persisted via `ChangeRepository.save(change)`
-- **AND** execution proceeds to pre-archive hooks
+- **AND** the updated manifest is persisted before pre-archive hooks execute
+- **AND** execution proceeds to pre-archive hooks using the change returned by that mutation
 
 ### Requirement: ReadOnly workspace guard
 
