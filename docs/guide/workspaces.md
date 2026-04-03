@@ -99,7 +99,7 @@ The full set of fields available on any workspace:
 | --------------------- | ------------------ | ----------------------- | ------------------------------------- | ------------------------------------------------------ |
 | `specs`               | always             | —                       | —                                     | Storage adapter and path where spec files live         |
 | `codeRoot`            | non-`default` only | project root            | (must be declared)                    | Directory where implementation code lives              |
-| `schemas`             | no                 | `specd/schemas`         | (none)                                | Storage adapter and path for named local schemas       |
+| `schemas`             | no                 | `.specd/schemas`        | (none)                                | Storage adapter and path for named local schemas       |
 | `ownership`           | no                 | `owned`                 | `readOnly`                            | The project's relationship to these specs              |
 | `prefix`              | no                 | (none)                  | (none)                                | Override the qualifier used in spec IDs                |
 | `contextIncludeSpecs` | no                 | (project-level default) | `['*']` (all specs in this workspace) | Include patterns applied when this workspace is active |
@@ -303,7 +303,7 @@ Schemas can be stored locally inside a workspace's `schemas` directory. The reso
 | `#billing:my-schema`            | `billing` workspace's schemas directory |
 | `@specd/schema-std`             | npm package in `node_modules`           |
 
-The `default` workspace has a schemas directory by default (`specd/schemas`). Non-`default` workspaces have no schemas directory unless you declare one explicitly:
+The `default` workspace has a schemas directory by default (`.specd/schemas`). Non-`default` workspaces have no schemas directory unless you declare one explicitly:
 
 ```yaml
 workspaces:

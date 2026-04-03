@@ -16,6 +16,18 @@ Built kernels expose the final merged registry as `kernel.registry`, so callers 
 
 For incremental setup, `@specd/core` also exports `createKernelBuilder(config, base?)`. The builder accumulates the same additive registrations as `KernelOptions` and delegates `build()` to `createKernel(...)` with equivalent semantics.
 
+```typescript
+import { createKernelBuilder } from '@specd/core'
+
+const kernel = await createKernelBuilder(config)
+  .registerParser('plaintext-plus', parser)
+  .registerExternalHookRunner('http-runner', httpRunner)
+  .build()
+
+console.log(kernel.registry.parsers.has('plaintext-plus')) // true
+console.log(kernel.registry.externalHookRunners.has('http')) // true
+```
+
 ---
 
 ## Repository base class

@@ -8,7 +8,7 @@ For annotated, scenario-based examples see the [`examples/`](examples/) director
 
 Every SpecD project has exactly one active configuration file at a time. Normally that file is `specd.yaml`. Developers can create a `specd.local.yaml` alongside it as a complete local override — when it is present, SpecD uses it exclusively and ignores `specd.yaml` entirely. The local file is never merged or layered; it must be a valid, self-contained config on its own.
 
-`specd init` adds `specd.local.yaml` to `.gitignore` automatically. The file is intentionally not committed — it is for local experimentation and developer-specific overrides only.
+`specd project init` adds `specd.local.yaml` to `.gitignore` automatically. The file is intentionally not committed — it is for local experimentation and developer-specific overrides only.
 
 ## File discovery
 
@@ -64,13 +64,13 @@ The value uses a prefix convention that determines exactly where SpecD looks:
 | `'./schemas/custom/schema.yaml'` | Relative path from the `specd.yaml` directory                                    |
 | `'/absolute/path/schema.yaml'`   | Absolute path                                                                    |
 
-Schema resolution happens at command dispatch time, immediately before the command body executes. Commands that do not require the schema — `--help`, `--version`, `specd init`, `specd config validate`, and `specd plugin` subcommands — skip resolution entirely.
+Schema resolution happens at command dispatch time, immediately before the command body executes. Commands that do not require the schema — `--help`, `--version`, `specd project init`, `specd config validate`, and `specd plugin` subcommands — skip resolution entirely.
 
 ```yaml
 # npm package (most common)
 schema: '@specd/schema-std'
 
-# local schema stored in specd/schemas/my-workflow/schema.yaml
+# local schema stored in .specd/schemas/my-workflow/schema.yaml
 schema: 'my-workflow'
 
 # schema from a specific workspace's schemas directory
@@ -137,10 +137,10 @@ workspaces:
       adapter: fs
       fs:
         path: specs/
-    schemas: # optional — defaults to specd/schemas
+    schemas: # optional — defaults to .specd/schemas
       adapter: fs
       fs:
-        path: specd/schemas
+        path: .specd/schemas
     codeRoot: ./ # optional for default — project root is the default
     ownership: owned # optional for default — owned is the default
 
@@ -195,22 +195,22 @@ storage:
   changes:
     adapter: fs
     fs:
-      path: specd/changes
+      path: .specd/changes
 
   drafts:
     adapter: fs
     fs:
-      path: specd/drafts
+      path: .specd/drafts
 
   discarded:
     adapter: fs
     fs:
-      path: specd/discarded
+      path: .specd/discarded
 
   archive:
     adapter: fs
     fs:
-      path: specd/archive
+      path: .specd/archive
       pattern: '{{change.archivedName}}' # optional; this is the default
 ```
 
@@ -221,7 +221,7 @@ storage:
 | `discarded` | Permanently abandoned changes. Cannot be recovered.                                         |
 | `archive`   | Completed changes after archiving. Permanent record.                                        |
 
-`specd init` adds `specd/drafts/` and `specd/discarded/` to `.gitignore` by default. Teams that want to commit drafts and discarded changes can opt out by removing those entries.
+`specd project init` adds `.specd/drafts/` and `.specd/discarded/` to `.gitignore` by default. Teams that want to commit drafts and discarded changes can opt out by removing those entries.
 
 All relative paths resolve from the `specd.yaml` directory. Storage paths must remain within the repo root.
 
@@ -409,7 +409,7 @@ SpecD validates `specd.yaml` before executing any command that requires a config
 | Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax           | e.g. `*` in a disallowed position.                               |
 | `llmOptimizedContext` is not a boolean                                          | Any other type is a startup validation error.                    |
 
-Commands that skip validation entirely: `--help`, `--version`, `specd init`, `specd config validate`, and `specd plugin` subcommands.
+Commands that skip validation entirely: `--help`, `--version`, `specd project init`, `specd config validate`, and `specd plugin` subcommands.
 
 ### Warnings that allow startup to proceed
 

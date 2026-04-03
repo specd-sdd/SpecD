@@ -23,7 +23,7 @@ The schema controls:
 A schema lives in a named subdirectory alongside its templates:
 
 ```
-specd/schemas/
+.specd/schemas/
 └── my-workflow/
     ├── schema.yaml
     └── templates/
