@@ -47,19 +47,19 @@ storage:
   changes:
     adapter: fs
     fs:
-      path: specd/changes
+      path: .specd/changes
   drafts:
     adapter: fs
     fs:
-      path: specd/drafts
+      path: .specd/drafts
   discarded:
     adapter: fs
     fs:
-      path: specd/discarded
+      path: .specd/discarded
   archive:
     adapter: fs
     fs:
-      path: specd/archive
+      path: .specd/archive
       pattern: '{{year}}/{{change.archivedName}}'
 
 schemaOverrides:
@@ -78,7 +78,7 @@ schemaOverrides:
 
 **Ownership** — `auth` and `payments` are marked `owned`, meaning the coordinator freely proposes changes to their specs. `platform` is `readOnly` — the coordinator can read its specs for context but does not modify them. The `readOnly` designation is enforced by SpecD when a change attempts to create or modify specs under that workspace.
 
-**Archive pattern** — `{{year}}/{{change.archivedName}}` organises archived changes into yearly subdirectories, e.g. `specd/archive/2024/2024-01-15-add-auth-flow/`. This makes the archive easier to browse as it grows.
+**Archive pattern** — `{{year}}/{{change.archivedName}}` organises archived changes into yearly subdirectories, e.g. `.specd/archive/2024/2024-01-15-add-auth-flow/`. This makes the archive easier to browse as it grows.
 
 **Schema overrides** — `schemaOverrides` applies inline changes to the active schema without forking it. `workflow` is a schema-level concept and is not a valid top-level field in `specd.yaml`; use `schemaOverrides` to add project-specific hook entries to schema-defined steps. The `append` operation adds a post-archive hook entry to the `archiving` step; the `id` field is required so the entry can be targeted by future overrides.
 

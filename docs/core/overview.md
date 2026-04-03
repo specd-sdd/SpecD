@@ -152,7 +152,8 @@ Everything exported is a domain type (entity, value object, error, service), an 
 | `ContentHasher`          | abstract class | Port for computing content hashes.                                 |
 | `YamlSerializer`         | abstract class | Port for serialising and deserialising YAML.                       |
 | `SchemaRegistry`         | interface      | Port for discovering and resolving schemas.                        |
-| `HookRunner`             | interface      | Port for executing `run:` hook commands.                           |
+| `HookRunner`             | interface      | Port for executing built-in `run:` hook commands.                  |
+| `ExternalHookRunner`     | interface      | Port for dispatching explicit `external:` workflow hooks by type.  |
 | `ActorResolver`          | interface      | Port for resolving the current actor identity.                     |
 | `VcsAdapter`             | interface      | Port for querying version control system state.                    |
 | `FileReader`             | interface      | Port for reading files by absolute path.                           |
@@ -164,43 +165,43 @@ Everything exported is a domain type (entity, value object, error, service), an 
 
 **From the application layer — use cases:**
 
-| Export                   | Kind | Description                                                               |
-| ------------------------ | ---- | ------------------------------------------------------------------------- |
-| `CreateChange`           | type | Creates a new change.                                                     |
-| `GetStatus`              | type | Reports change state and artifact statuses.                               |
-| `TransitionChange`       | type | Advances the change lifecycle and serializes the final manifest mutation. |
-| `DraftChange`            | type | Shelves a change to `drafts/` via serialized persistence.                 |
-| `RestoreChange`          | type | Recovers a drafted change via serialized persistence.                     |
-| `DiscardChange`          | type | Permanently abandons a change via serialized persistence.                 |
-| `ApproveSpec`            | type | Records a spec approval through a serialized change mutation.             |
-| `ApproveSignoff`         | type | Records a sign-off through a serialized change mutation.                  |
-| `ArchiveChange`          | type | Finalises and archives a completed change after serializing `archiving`.  |
-| `ValidateArtifacts`      | type | Validates artifact files and serializes completion/invalidation.          |
-| `CompileContext`         | type | Assembles the AI instruction block for a lifecycle step.                  |
-| `ListChanges`            | type | Lists all active changes.                                                 |
-| `ListDrafts`             | type | Lists all drafted changes.                                                |
-| `ListDiscarded`          | type | Lists all discarded changes.                                              |
-| `ListArchived`           | type | Lists all archived changes.                                               |
-| `GetArchivedChange`      | type | Retrieves a single archived change.                                       |
-| `EditChange`             | type | Edits change scope while serializing the persisted `specIds` update.      |
-| `SkipArtifact`           | type | Explicitly skips an optional artifact on a change.                        |
-| `UpdateSpecDeps`         | type | Updates declared spec dependencies within a change.                       |
-| `ListSpecs`              | type | Lists all specs across all configured workspaces.                         |
-| `GetSpec`                | type | Loads a spec and its artifact files.                                      |
-| `SaveSpecMetadata`       | type | Writes validated metadata for a spec.                                     |
-| `InvalidateSpecMetadata` | type | Removes content hashes from a spec's metadata.                            |
-| `GetActiveSchema`        | type | Resolves and returns the active schema.                                   |
-| `ValidateSchema`         | type | Validates a schema against structural rules.                              |
-| `ValidateSpecs`          | type | Validates spec artifacts against schema structural rules.                 |
-| `GenerateSpecMetadata`   | type | Generates deterministic metadata from schema extraction rules.            |
-| `GetSpecContext`         | type | Builds structured context entries for a spec.                             |
-| `RunStepHooks`           | type | Executes `run:` hooks for a workflow step and phase.                      |
-| `GetHookInstructions`    | type | Returns `instruction:` hook text for a workflow step and phase.           |
-| `GetArtifactInstruction` | type | Returns artifact-specific instructions, rules, and delta guidance.        |
-| `InitProject`            | type | Initialises a new specd project.                                          |
-| `RecordSkillInstall`     | type | Records that a skill set was installed for an agent.                      |
-| `GetSkillsManifest`      | type | Reads the installed skills manifest from `specd.yaml`.                    |
-| `GetProjectContext`      | type | Compiles project-level context without a specific change or step.         |
+| Export                   | Kind | Description                                                                                  |
+| ------------------------ | ---- | -------------------------------------------------------------------------------------------- |
+| `CreateChange`           | type | Creates a new change.                                                                        |
+| `GetStatus`              | type | Reports change state and artifact statuses.                                                  |
+| `TransitionChange`       | type | Advances the change lifecycle and serializes the final manifest mutation.                    |
+| `DraftChange`            | type | Shelves a change to `drafts/` via serialized persistence.                                    |
+| `RestoreChange`          | type | Recovers a drafted change via serialized persistence.                                        |
+| `DiscardChange`          | type | Permanently abandons a change via serialized persistence.                                    |
+| `ApproveSpec`            | type | Records a spec approval through a serialized change mutation.                                |
+| `ApproveSignoff`         | type | Records a sign-off through a serialized change mutation.                                     |
+| `ArchiveChange`          | type | Finalises and archives a completed change after serializing `archiving`.                     |
+| `ValidateArtifacts`      | type | Validates artifact files and serializes completion/invalidation.                             |
+| `CompileContext`         | type | Assembles the AI instruction block for a lifecycle step.                                     |
+| `ListChanges`            | type | Lists all active changes.                                                                    |
+| `ListDrafts`             | type | Lists all drafted changes.                                                                   |
+| `ListDiscarded`          | type | Lists all discarded changes.                                                                 |
+| `ListArchived`           | type | Lists all archived changes.                                                                  |
+| `GetArchivedChange`      | type | Retrieves a single archived change.                                                          |
+| `EditChange`             | type | Edits change scope while serializing the persisted `specIds` update.                         |
+| `SkipArtifact`           | type | Explicitly skips an optional artifact on a change.                                           |
+| `UpdateSpecDeps`         | type | Updates declared spec dependencies within a change.                                          |
+| `ListSpecs`              | type | Lists all specs across all configured workspaces.                                            |
+| `GetSpec`                | type | Loads a spec and its artifact files.                                                         |
+| `SaveSpecMetadata`       | type | Writes validated metadata for a spec.                                                        |
+| `InvalidateSpecMetadata` | type | Removes content hashes from a spec's metadata.                                               |
+| `GetActiveSchema`        | type | Resolves and returns the active schema.                                                      |
+| `ValidateSchema`         | type | Validates a schema against structural rules.                                                 |
+| `ValidateSpecs`          | type | Validates spec artifacts against schema structural rules.                                    |
+| `GenerateSpecMetadata`   | type | Generates deterministic metadata from schema extraction rules.                               |
+| `GetSpecContext`         | type | Builds structured context entries for a spec.                                                |
+| `RunStepHooks`           | type | Executes built-in `run:` hooks and explicit `external:` hooks for a workflow step and phase. |
+| `GetHookInstructions`    | type | Returns `instruction:` hook text for a workflow step and phase.                              |
+| `GetArtifactInstruction` | type | Returns artifact-specific instructions, rules, and delta guidance.                           |
+| `InitProject`            | type | Initialises a new specd project.                                                             |
+| `RecordSkillInstall`     | type | Records that a skill set was installed for an agent.                                         |
+| `GetSkillsManifest`      | type | Reads the installed skills manifest from `specd.yaml`.                                       |
+| `GetProjectContext`      | type | Compiles project-level context without a specific change or step.                            |
 
 **From the application layer — config types:**
 
@@ -231,20 +232,30 @@ Everything exported is a domain type (entity, value object, error, service), an 
 
 **From the composition layer — kernel:**
 
-| Export          | Kind      | Description                                                                                            |
-| --------------- | --------- | ------------------------------------------------------------------------------------------------------ |
-| `createKernel`  | function  | Constructs all use cases from a `SpecdConfig` and returns them as a grouped `Kernel`.                  |
-| `Kernel`        | interface | The fully-wired set of use cases, grouped as `kernel.changes.*`, `kernel.specs.*`, `kernel.project.*`. |
-| `KernelOptions` | interface | Options for `createKernel`, including extra `node_modules` paths for schema discovery.                 |
+| Export                | Kind      | Description                                                                                            |
+| --------------------- | --------- | ------------------------------------------------------------------------------------------------------ |
+| `createKernel`        | function  | Constructs all use cases from a `SpecdConfig` and returns them as a grouped `Kernel`.                  |
+| `Kernel`              | interface | The fully-wired set of use cases, grouped as `kernel.changes.*`, `kernel.specs.*`, `kernel.project.*`. |
+| `KernelOptions`       | interface | Options for `createKernel`, including extra `node_modules` paths for schema discovery.                 |
+| `createKernelBuilder` | function  | Creates a fluent builder for additive kernel registrations before `build()`.                           |
+| `KernelBuilder`       | interface | Fluent registration surface for parsers, storages, providers, and external hook runners.               |
 
 **From the composition layer — repository and schema factories:**
 
-| Export                         | Kind     | Description                                                                                |
-| ------------------------------ | -------- | ------------------------------------------------------------------------------------------ |
-| `createSchemaRegistry`         | function | Constructs a `SchemaRegistry` for the given adapter type (`'fs'`).                         |
-| `createSchemaRepository`       | function | Constructs a `SchemaRepository` for the given adapter type.                                |
-| `createConfigLoader`           | function | Creates a filesystem-backed `ConfigLoader` that discovers and parses `specd.yaml`.         |
-| `createArtifactParserRegistry` | function | Creates the default `ArtifactParserRegistry` with all built-in format adapters registered. |
+| Export                         | Kind      | Description                                                                                |
+| ------------------------------ | --------- | ------------------------------------------------------------------------------------------ |
+| `createSchemaRegistry`         | function  | Constructs a `SchemaRegistry` for the given adapter type (`'fs'`).                         |
+| `createSchemaRepository`       | function  | Constructs a `SchemaRepository` for the given adapter type.                                |
+| `createConfigLoader`           | function  | Creates a filesystem-backed `ConfigLoader` that discovers and parses `specd.yaml`.         |
+| `createArtifactParserRegistry` | function  | Creates the default `ArtifactParserRegistry` with all built-in format adapters registered. |
+| `KernelRegistryInput`          | type      | Additive registration inputs accepted by `createKernel` and `createKernelBuilder`.         |
+| `KernelRegistryView`           | type      | Final merged registry surface exposed as `kernel.registry`.                                |
+| `SpecStorageFactory`           | interface | Named storage factory for workspace specs repositories.                                    |
+| `SchemaStorageFactory`         | interface | Named storage factory for workspace schema repositories.                                   |
+| `ChangeStorageFactory`         | interface | Named storage factory for active and shelved changes.                                      |
+| `ArchiveStorageFactory`        | interface | Named storage factory for archived changes.                                                |
+| `VcsProvider`                  | interface | External-first VCS detection provider used by the kernel registry.                         |
+| `ActorProvider`                | interface | External-first actor detection provider used by the kernel registry.                       |
 
 **From the composition layer — VCS and actor adapters:**
 

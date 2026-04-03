@@ -233,20 +233,25 @@ Each change is a directory inside `.specd/changes/` containing the artifacts pro
 
 ```
 .specd/changes/
-└── add-oauth-login/
+└── 20260402-173732-add-oauth-login/
+    ├── manifest.json          # Change state, scope, and artifact tracking
     ├── proposal.md            # Initial idea and scope
     ├── specs/
-    │   └── auth/
-    │       └── oauth/
-    │           ├── spec.md    # The new or modified spec
-    │           └── verify.md
+    │   └── default/
+    │       └── auth/
+    │           └── oauth/
+    │               ├── spec.md    # New spec content staged in the change
+    │               └── verify.md
     ├── design.md              # Technical approach
     ├── tasks.md               # Implementation task list
     └── deltas/
-        └── auth_oauth.yaml    # Structured spec change operations
+        └── default/
+            └── auth/
+                └── oauth/
+                    └── spec.md.delta.yaml # Structured delta operations for an existing spec artifact
 ```
 
-The `deltas/` directory contains structured YAML documents that express what changed in a spec — not as a text diff, but as explicit operations (additions, modifications, removals). specd applies these deterministically when archiving the change.
+The timestamped directory name is assigned by SpecD when the change is created. `specs/` contains staged full artifacts for new specs introduced by the change. `deltas/` contains structured YAML documents that express modifications to existing spec artifacts — not as text diffs, but as explicit operations (additions, modifications, removals). specd applies these deterministically when archiving the change.
 
 ---
 

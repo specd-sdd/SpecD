@@ -1160,7 +1160,7 @@ interface GetArtifactInstructionResult {
 
 ### RunStepHooks
 
-Executes `run:` hooks for a given workflow step and phase. Resolves hooks from the schema, builds template variables from the active change, and executes them via `HookRunner`.
+Executes executable hooks for a given workflow step and phase. Resolves hooks from the schema, builds template variables from the active change, executes built-in `run:` hooks via `HookRunner`, and dispatches explicit `external:` hooks through the registered external hook runner index.
 
 Pre-phase hooks use fail-fast semantics (stop on first failure). Post-phase hooks use fail-soft semantics (run all, collect failures).
 
@@ -1173,6 +1173,7 @@ new RunStepHooks(
   changes: ChangeRepository,
   archive: ArchiveRepository,
   hooks: HookRunner,
+  externalHookRunners: ReadonlyMap<string, ExternalHookRunner>,
   schemaProvider: SchemaProvider,
 )
 ```

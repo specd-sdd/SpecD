@@ -87,7 +87,7 @@ SpecD resolves the `schema` value using a prefix convention:
 | Value                            | Where SpecD looks                                                               |
 | -------------------------------- | ------------------------------------------------------------------------------- |
 | `'@specd/schema-std'`            | npm package in `node_modules/@specd/schema-std/schema.yaml`                     |
-| `'my-workflow'`                  | Bare name — `specd/schemas/my-workflow/schema.yaml` in the default workspace    |
+| `'my-workflow'`                  | Bare name — `.specd/schemas/my-workflow/schema.yaml` in the default workspace   |
 | `'#my-workflow'`                 | Hash prefix — equivalent to bare name, explicit about resolving from `default`  |
 | `'#billing:my-schema'`           | Workspace-qualified — resolves from the `billing` workspace's schemas directory |
 | `'./schemas/custom/schema.yaml'` | Relative path from the `specd.yaml` directory                                   |
@@ -188,19 +188,19 @@ storage:
   changes:
     adapter: fs
     fs:
-      path: specd/changes
+      path: .specd/changes
   drafts:
     adapter: fs
     fs:
-      path: specd/drafts
+      path: .specd/drafts
   discarded:
     adapter: fs
     fs:
-      path: specd/discarded
+      path: .specd/discarded
   archive:
     adapter: fs
     fs:
-      path: specd/archive
+      path: .specd/archive
 ```
 
 Each directory holds changes in a different state:
@@ -232,7 +232,7 @@ That split is deliberate:
 
 Use this when you need a custom storage backend without forking the core workflow model.
 
-By default, `specd project init` adds `drafts/` and `discarded/` to `.gitignore`. Teams who want to commit drafts — for example, to share in-progress work across machines — can remove those entries.
+By default, `specd project init` adds `.specd/drafts/` and `.specd/discarded/` to `.gitignore`. Teams who want to commit drafts — for example, to share in-progress work across machines — can remove those entries.
 
 ### Organising the archive
 
@@ -242,7 +242,7 @@ By default, archived changes are stored with the name `{{change.archivedName}}` 
 archive:
   adapter: fs
   fs:
-    path: specd/archive
+    path: .specd/archive
     pattern: '{{year}}/{{change.archivedName}}'
 ```
 

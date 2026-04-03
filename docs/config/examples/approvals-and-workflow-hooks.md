@@ -30,19 +30,19 @@ storage:
   changes:
     adapter: fs
     fs:
-      path: specd/changes
+      path: .specd/changes
   drafts:
     adapter: fs
     fs:
-      path: specd/drafts
+      path: .specd/drafts
   discarded:
     adapter: fs
     fs:
-      path: specd/discarded
+      path: .specd/discarded
   archive:
     adapter: fs
     fs:
-      path: specd/archive
+      path: .specd/archive
       pattern: '{{year}}/{{change.archivedName}}'
 
 approvals:

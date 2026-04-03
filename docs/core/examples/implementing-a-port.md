@@ -1,13 +1,13 @@
 # Example: Implementing a port
 
-This guide walks through implementing three ports from scratch: `ChangeRepository` (an abstract class), `VcsAdapter` (a plain interface), and `ActorResolver` (a plain interface). It shows the full pattern for both kinds of port and how to wire them into a use case.
+This guide walks through implementing several ports from scratch: `ChangeRepository` (an abstract class), `VcsAdapter` (a plain interface), `ActorResolver` (a plain interface), and `ExternalHookRunner` (a plain interface). It shows the full pattern for both kinds of port and how to wire them into a use case or the kernel.
 
 ## The two port shapes
 
 `@specd/core` ports come in two shapes:
 
 - **Abstract classes** (`Repository`, `SpecRepository`, `ChangeRepository`, `ArchiveRepository`) — extend these and implement the abstract methods. The base class constructor sets `workspace`, `ownership`, and `isExternal` for you.
-- **Interfaces** (`SchemaRegistry`, `HookRunner`, `VcsAdapter`, `ActorResolver`, `FileReader`, `ArtifactParser`) — implement these directly. No base class; just satisfy the interface.
+- **Interfaces** (`SchemaRegistry`, `HookRunner`, `ExternalHookRunner`, `VcsAdapter`, `ActorResolver`, `FileReader`, `ArtifactParser`) — implement these directly. No base class; just satisfy the interface.
 
 ---
 
@@ -176,7 +176,7 @@ export class SimpleVcsAdapter implements VcsAdapter {
 
 **Interfaces have no base class.** Just implement all five methods. TypeScript will tell you if you miss one.
 
-**All methods must throw when outside a git repository.** The contracts say so — do not return `null` or an empty string in that case. Let the underlying git error propagate, or wrap it in a descriptive `Error`.
+**Only `rootDir()`, `branch()`, and `isClean()` must throw when VCS cannot be detected.** `ref()` may return `null` when the repository has no commits yet or VCS is unavailable, and `show()` may return `null` when the revision or file path does not exist.
 
 ---
 
@@ -210,6 +210,51 @@ export class GitActorResolver implements ActorResolver {
 ### Key points
 
 **`identity()` must throw when the actor cannot be determined.** The use cases that call it rely on the returned identity being complete. An empty string silently produces broken audit records.
+
+---
+
+## Implementing ExternalHookRunner (interface)
+
+`ExternalHookRunner` handles explicit workflow hooks declared as `external: { type, config }`. Unlike `HookRunner`, which remains shell-only for built-in `run:` hooks, external runners must declare which hook types they accept so the kernel can build an unambiguous dispatch table.
+
+```typescript
+import {
+  type ExternalHookDefinition,
+  type ExternalHookRunner,
+  type HookResult,
+  type TemplateVariables,
+} from '@specd/core'
+
+export class HttpExternalHookRunner implements ExternalHookRunner {
+  readonly acceptedTypes = ['http'] as const
+
+  async run(
+    definition: ExternalHookDefinition,
+    _variables: TemplateVariables,
+  ): Promise<HookResult> {
+    const url = String(definition.config.url ?? '')
+    const method = String(definition.config.method ?? 'POST')
+
+    if (url.length === 0) {
+      throw new Error(`External hook '${definition.id}' is missing config.url`)
+    }
+
+    const response = await fetch(url, { method })
+
+    return {
+      exitCode: response.ok ? 0 : 1,
+      stdout: response.ok ? `HTTP ${response.status}` : '',
+      stderr: response.ok ? '' : `HTTP ${response.status}`,
+    }
+  }
+}
+```
+
+### Key points
+
+**`acceptedTypes` is part of the contract.** The kernel indexes external hook runners by accepted type. If two runners claim the same type, kernel construction fails with a registry conflict.
+
+**Treat `definition.config` as runner-owned input.** The schema only preserves the opaque payload. Validation beyond structural presence of `external.type` belongs to the runner implementation.
 
 ---
 
@@ -349,15 +394,15 @@ export class PlainTextParser implements ArtifactParser {
 
 ---
 
-## Wiring ports into a use case
+## Wiring ports into the kernel
 
-The recommended entry point for delivery mechanisms is `createKernel(config)`. It accepts a fully-resolved `SpecdConfig` and returns all use cases pre-wired with their built-in `fs` adapters, grouped by domain area:
+The recommended entry point for delivery mechanisms is `createKernel(config, options)`. It accepts a fully-resolved `SpecdConfig`, optionally merges additive registries, and returns all use cases pre-wired with their built-in `fs` adapters, grouped by domain area:
 
 ```typescript
 import { createKernel, type SpecdConfig } from '@specd/core'
 
 // config comes from FsConfigLoader (see below)
-const kernel = createKernel(config)
+const kernel = await createKernel(config)
 
 // All use cases are ready to use
 const { change } = await kernel.changes.create.execute({
@@ -372,6 +417,50 @@ console.log(status.change.state) // 'drafting'
 console.log(status.artifactStatuses) // []
 ```
 
+### Registering additive adapters via `createKernel`
+
+Pass custom parsers, storage factories, VCS providers, actor providers, or external hook runners in `KernelOptions`. Built-ins stay available unless you collide with an existing registration name.
+
+```typescript
+import {
+  createKernel,
+  type ExternalHookDefinition,
+  type ExternalHookRunner,
+  type HookResult,
+  type TemplateVariables,
+} from '@specd/core'
+
+class HttpExternalHookRunner implements ExternalHookRunner {
+  readonly acceptedTypes = ['http'] as const
+
+  async run(
+    _definition: ExternalHookDefinition,
+    _variables: TemplateVariables,
+  ): Promise<HookResult> {
+    return { exitCode: 0, stdout: 'ok', stderr: '' }
+  }
+}
+
+const kernel = await createKernel(config, {
+  externalHookRunners: [new HttpExternalHookRunner()],
+})
+
+console.log(kernel.registry.externalHookRunners.has('http')) // true
+```
+
+### Registering additive adapters via `createKernelBuilder`
+
+Use the builder when you want fluent incremental registration before construction.
+
+```typescript
+import { createKernelBuilder } from '@specd/core'
+
+const kernel = await createKernelBuilder(config)
+  .registerParser('plaintext-plus', new PlainTextParser())
+  .registerExternalHookRunner('http-runner', new HttpExternalHookRunner())
+  .build()
+```
+
 ### Loading the config
 
 Use `createConfigLoader` to discover and load `specd.yaml` before calling `createKernel`:
@@ -382,7 +471,7 @@ import { createConfigLoader, createKernel } from '@specd/core'
 // Discovery mode: walks up from CWD, bounded by the git root
 const loader = createConfigLoader({ startDir: process.cwd() })
 const config = await loader.load()
-const kernel = createKernel(config)
+const kernel = await createKernel(config)
 ```
 
 When the CLI is invoked with `--config path/to/specd.yaml`, use forced mode instead:
@@ -419,9 +508,9 @@ const createChange = createCreateChange(
 )
 ```
 
-### Custom adapters
+### Custom adapters without the kernel
 
-If you implement a custom adapter (e.g. database-backed), construct your class directly and pass it to the use case constructor — the factories wire the built-in `fs` adapters only:
+If you do not want the full kernel, construct your adapter class directly and pass it to the use case constructor. The single-use-case factories wire the built-in `fs` adapters only:
 
 ```typescript
 import { CreateChange } from '@specd/core'

@@ -9,7 +9,7 @@ Use this as your starting point and trim or extend it to match your team's conve
 ## File layout
 
 ```
-specd/schemas/spec-driven/
+.specd/schemas/spec-driven/
 ├── schema.yaml
 └── templates/
     ├── proposal.md
