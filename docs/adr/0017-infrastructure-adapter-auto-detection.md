@@ -14,7 +14,7 @@ specd supports multiple version control systems (Git, Mercurial, SVN) and needs 
 
 ## Decision Drivers
 
-- Zero-configuration experience: `specd init` should work without the user specifying which VCS they use
+- Zero-configuration experience: `specd project init` should work without the user specifying which VCS they use
 - Graceful degradation: specd must function (with reduced capabilities) in environments without a VCS — CI pipelines, sandboxed editors, fresh directories
 - Concrete adapter classes must never appear in public exports (ADR-0015)
 - The pattern should be consistent and reusable across all infrastructure adapters that have multiple implementations
@@ -35,27 +35,29 @@ The pattern works as follows:
 
 2. **Immediate construction**: on first match, the factory constructs and returns the concrete adapter. No further probing occurs.
 
-3. **Null adapter fallback**: when no VCS is detected, the factory returns a `Null*Adapter` that implements the port interface with safe no-ops — `currentBranch()` returns `null`, `hasUncommittedChanges()` returns `false`, `resolveActor()` returns an anonymous actor. The null adapter never throws.
+3. **Null adapter fallback**: when no VCS is detected, the factory returns null implementations of the VCS and actor ports. In the current implementation, `NullVcsAdapter.rootDir()` rejects, `branch()` returns `'none'`, `isClean()` returns `true`, `ref()` returns `null`, `show()` returns `null`, and `NullActorResolver.identity()` rejects because there is no identity source available.
 
-4. **No public exposure**: concrete adapter classes (`GitVcsAdapter`, `HgVcsAdapter`, `NullVcsAdapter`) are internal to the composition layer. Callers only see the port interface (`VcsAdapter`, `VcsActorResolver`).
+4. **No public exposure**: the original design intent was that concrete adapter classes (`GitVcsAdapter`, `HgVcsAdapter`, `NullVcsAdapter`) remain internal to the composition layer and callers depend only on the port interfaces.
 
 This pattern is applied identically to both `createVcsAdapter` and `createVcsActorResolver` and can be adopted by future infrastructure adapters with multiple implementations.
 
 ### Consequences
 
-- Good, because `specd init` works without VCS configuration — detection is automatic
+- Good, because `specd project init` works without VCS configuration — detection is automatic
 - Good, because environments without a VCS (CI, sandboxed editors) still function — features that depend on VCS are gracefully disabled rather than crashing
 - Good, because the pattern is reusable — any future adapter with multiple backends (e.g. artifact parsers, hook runners) can follow the same probe-then-fallback approach
-- Good, because concrete adapter classes remain internal to composition — callers depend only on port interfaces
+- Good, because callers can still rely on the auto-detect composition entry points instead of reproducing VCS detection logic themselves
 - Neutral, because the probe order is hardcoded (Git > Hg > SVN) — if a directory has both `.git/` and `.hg/`, Git wins. This is acceptable because dual-VCS setups are rare and Git is the dominant system
 - Bad, because silent degradation via null adapter could mask real misconfiguration — mitigated by logging a warning when the null adapter is selected in environments where a VCS was expected
 
 ### Confirmation
 
-- `NullVcsAdapter` and `NullVcsActorResolver` are not exported from `@specd/core`'s public API
-- `GitVcsAdapter`, `HgVcsAdapter`, `SvnVcsAdapter` are not exported from `@specd/core`'s public API
 - `createVcsAdapter` probes in order and returns `NullVcsAdapter` when no VCS is found
 - Tests cover the null adapter path (no VCS present) and the Git adapter path
+
+### Current implementation note
+
+The public export surface has since evolved. Concrete VCS and actor adapters, including the null implementations, are now exported from `@specd/core` even though this ADR records the earlier intention to keep them internal. The auto-detection decision still stands; the export-surface part should be read as historical context.
 
 ## More Information
 

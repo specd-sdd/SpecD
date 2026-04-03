@@ -31,7 +31,7 @@ Chosen option: "Three levels", because each level serves a distinct consumer pro
 
 **Level 1 — Use-case factories** (lowest level):
 
-Each use case has a factory function (e.g. `createArchiveChange`) that accepts either a `SpecdConfig` or explicit `(context, options)` arguments. The explicit form is designed for tests: the caller provides mock repositories, stub adapters, and in-memory state directly. No filesystem access, no config resolution, no kernel. This is the unit-testing entry point.
+Each use case has a factory function (e.g. `createArchiveChange`) that accepts either a `SpecdConfig` or explicit `(context, options)` arguments. The explicit form is the lowest public composition level and avoids kernel/config loading. In current code it is primarily explicit fs-oriented wiring; tests that need full dependency control may still instantiate use cases directly.
 
 **Level 2 — Kernel** (mid level):
 
@@ -43,26 +43,34 @@ Each use case has a factory function (e.g. `createArchiveChange`) that accepts e
 
 The graduated design means consumers bind at exactly the level they need:
 
-| Consumer         | Level                   | Why                                     |
-| ---------------- | ----------------------- | --------------------------------------- |
-| Unit test        | Factory (explicit args) | Full control, no I/O                    |
-| Integration test | Factory (`SpecdConfig`) | Real wiring, in-memory config           |
-| CLI / MCP        | Kernel + ConfigLoader   | Full convenience, one call              |
-| Plugin / library | Factory (`SpecdConfig`) | Subset of use cases, no kernel overhead |
+| Consumer         | Level                         | Why                                     |
+| ---------------- | ----------------------------- | --------------------------------------- |
+| Unit test        | Factory or direct constructor | Full control, no kernel/config loading  |
+| Integration test | Factory (`SpecdConfig`)       | Real wiring, in-memory config           |
+| CLI / MCP        | Kernel + ConfigLoader         | Full convenience, one call              |
+| Plugin / library | Factory (`SpecdConfig`)       | Subset of use cases, no kernel overhead |
 
 ### Consequences
 
-- Good, because tests call a single factory with explicit mocks — no kernel construction, no config file needed
+- Good, because tests can stay below the kernel level — either through explicit factory wiring or direct constructor injection
 - Good, because delivery mechanisms are reduced to `loadConfig → createKernel → route` — three lines of setup
 - Good, because library consumers can pick individual use cases without building the full kernel
 - Good, because the kernel is a convenience, not a requirement — it can grow without affecting consumers that don't use it
 - Neutral, because the three-level API must be documented clearly so consumers choose the right entry point
 - Neutral, because use-case factories that accept `SpecdConfig` duplicate some extraction logic — but this is trivial field access, not complex logic
 
-### Confirmation
+### Current implementation note
+
+The composition API has grown since this ADR was written:
+
+- `createKernel(...)` is now asynchronous.
+- `@specd/core` also exposes `createKernelBuilder(...)` as a fluent composition surface over the same additive registrations accepted by `createKernel(...)`.
+- Built kernels now expose `kernel.registry`, making the merged registry surface part of the public API for integrators.
+
+### Original confirmation criteria
 
 - Every use-case factory accepts both `(context, options)` and `(config: SpecdConfig)` signatures
-- Tests use the explicit `(context, options)` form exclusively — no `createKernel` calls in unit tests
+- At decision time, tests were expected to prefer the explicit `(context, options)` form rather than `createKernel`
 - CLI and MCP use `createKernel` — no direct factory calls in delivery code
 - `ConfigLoader` is defined as a port in `application/ports/` and implemented in `infrastructure/`
 

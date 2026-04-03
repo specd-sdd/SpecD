@@ -62,7 +62,7 @@ The baseline has no mechanism for injecting existing spec content into AI contex
 
 Schemas are resolved in order: project-local → user-global → npm package (`@specd/schema-<name>`). This allows per-project overrides without forking the schema package. Other tools use a similar pattern (Prettier plugins, ESLint configs).
 
-The project-local path is not hardcoded — it comes from the `schemas.path` field in `specd.yaml` (default: `specd/schemas`). This is consistent with how storage paths are configured and lets teams place schemas wherever fits their repo layout.
+The project-local path is not hardcoded — it comes from the `schemas.path` field in `specd.yaml` (default: `.specd/schemas`). This is consistent with how storage paths are configured and lets teams place schemas wherever fits their repo layout.
 
 ### 6. Schema validation on load
 
@@ -132,12 +132,12 @@ Each artifact may declare `rules: { pre: [], post: [] }` — arrays of `{ id, in
 
 Project-specific rules are expressed as `schemaOverrides.append.artifacts[].rules.post` (or `.pre`), which supports both pre and post positions and all five merge operations.
 
-### 14. `schemaOverrides` replaces `artifactRules` and `workflow` in `specd.yaml`
+### 14. `schemaOverrides` replaces project-level `workflow` additions in `specd.yaml` and subsumes many `artifactRules` use cases
 
-Two former `specd.yaml` fields are replaced by `schemaOverrides`:
+Two former customization patterns are addressed by `schemaOverrides`:
 
-- **`artifactRules`** — replaced by `schemaOverrides` targeting `artifacts[].rules.post` (or `.pre`). The override model subsumes `artifactRules` with more granular control.
-- **`workflow`** (project-level hook additions) — replaced by `schemaOverrides` targeting `workflow[].hooks`. The override model allows not just appending hooks but also removing, prepending, or replacing them.
+- **Project-level `workflow` hook additions** — replaced by `schemaOverrides` targeting `workflow[].hooks`. The override model allows not just appending hooks but also removing, prepending, or replacing them.
+- **`artifactRules`** — not removed from the product, but functionally overlapped by `schemaOverrides` targeting `artifacts[].rules.post` (or `.pre`). `artifactRules` remains a lighter-weight project config mechanism for additive writing constraints, while `schemaOverrides` is the more general schema-layer customization tool.
 
 ### Consequences
 

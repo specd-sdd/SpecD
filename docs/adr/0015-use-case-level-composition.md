@@ -35,7 +35,7 @@ Chosen option: "Use-case-level factories + kernel + config loader port", because
 
 The composition layer is structured in three levels:
 
-**Level 1 — Use-case factories** (`composition/use-cases/`): each factory (e.g. `createArchiveChange`) accepts either a fully resolved `SpecdConfig` or an explicit `(context, options)` pair. Both call signatures are public. Internal ports (`NodeHookRunner`, `GitVcsAdapter`, `FsFileReader`) are constructed inside the factory and never exported. Repository-level factories (`createSpecRepository`, etc.) are also internal to this level.
+**Level 1 — Use-case factories** (`composition/use-cases/`): each factory (e.g. `createArchiveChange`) accepts either a fully resolved `SpecdConfig` or an explicit `(context, options)` pair. Both call signatures are public. The explicit form covers composition without the full kernel; in current code it is primarily used for explicit filesystem-backed wiring rather than arbitrary mock injection. Repository-level factories (`createSpecRepository`, etc.) are also internal to this level.
 
 **Level 2 — Kernel** (`composition/kernel.ts`): `createKernel(config: SpecdConfig)` is a convenience that calls every use-case factory with the same `SpecdConfig` and returns an object with all pre-wired use cases. Delivery mechanisms that need the full set call `createKernel`; those that need a single use case call its factory directly.
 
@@ -44,7 +44,7 @@ The composition layer is structured in three levels:
 ### Consequences
 
 - Good, because delivery mechanisms (CLI, MCP) are reduced to: load config → create kernel → call use case
-- Good, because internal ports (`NodeHookRunner`, `GitVcsAdapter`, `FsFileReader`) are never part of any public API
+- Good, because internal dependency wiring remains hidden behind composition entry points even though the public export surface has since grown
 - Good, because adding a new internal port dependency to a use case requires no changes in delivery layers
 - Good, because config source (YAML, env vars, CI secrets) is fully interchangeable behind the `ConfigLoader` port
 - Good, because the kernel accepts a typed `SpecdConfig` — it is testable without any filesystem access
@@ -52,10 +52,18 @@ The composition layer is structured in three levels:
 - Neutral, because the kernel interface will grow as use cases are added — mitigated by grouping related use cases under namespaced properties (e.g. `kernel.changes.archive`, `kernel.specs.approve`)
 - Neutral, because each use-case factory that accepts `SpecdConfig` must contain logic to extract its required fields from the config — this logic is trivial but must live somewhere
 
-### Confirmation
+### Current implementation note
+
+The composition surface has evolved since this ADR was accepted:
+
+- `createKernel(...)` is now asynchronous.
+- `@specd/core` now also exposes `createKernelBuilder(...)` and additive kernel registries for storage factories, parsers, VCS providers, actor providers, and external hook runners.
+- Some concrete composition-layer adapters are now exported publicly, so the "never exported" language in this ADR should be read as the original design intent, not the exact current export surface.
+
+### Original confirmation criteria
 
 - No file under `src/infrastructure/` is imported from any file outside `src/composition/`
-- `NodeHookRunner`, `GitVcsAdapter`, and `FsFileReader` do not appear in `src/index.ts` or any public export
+- At decision time, `NodeHookRunner`, `GitVcsAdapter`, and `FsFileReader` were expected not to appear in `src/index.ts` or any public export
 - `createSpecRepository`, `createChangeRepository`, and `createArchiveRepository` do not appear in `src/index.ts`
 - The `ConfigLoader` port is defined in `src/application/ports/` and its implementations live in `src/infrastructure/`
 - These are verified by ESLint `no-restricted-imports` rules and by inspecting the public export surface of `@specd/core`
@@ -71,7 +79,7 @@ The composition layer is structured in three levels:
 
 ### Use-case-level factories
 
-- Good, because internal ports are hidden behind use-case factories
+- Good, because port wiring is hidden behind use-case factories
 - Bad, because delivery mechanisms still compose use-case factories manually
 - Bad, because config loading remains in the delivery layer, coupled to the config file format
 
