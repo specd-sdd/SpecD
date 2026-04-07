@@ -42,7 +42,8 @@ JSON/TOON output schema:
           if (opts.all === true && specPath !== undefined) {
             cliError('--all and <specPath> are mutually exclusive', opts.format)
           }
-          if (opts.all !== true && specPath === undefined) {
+          // specPath is required unless --all or --artifact targets a scope: change artifact
+          if (opts.all !== true && specPath === undefined && opts.artifact === undefined) {
             cliError('either <specPath> or --all is required', opts.format)
           }
 
@@ -50,10 +51,33 @@ JSON/TOON output schema:
             configPath: opts.config,
           })
 
+          // If no specPath but --artifact provided, check if it's scope: change
+          let finalSpecPath: string | undefined = specPath
+          if (specPath === undefined && opts.artifact !== undefined) {
+            const schemaResult = await kernel.specs.getActiveSchema.execute()
+            if (schemaResult.raw) {
+              cliError('Cannot validate: schema resolved in raw mode', opts.format)
+            }
+            const schema = schemaResult.schema
+            const artifactType = schema.artifacts().find((a) => a.id === opts.artifact)
+            if (artifactType !== undefined && artifactType.scope === 'change') {
+              // scope: change artifact - specPath is optional
+              // Use first spec in change as placeholder, or let ValidateArtifacts handle it
+              const change = await kernel.changes.list.execute()
+              const targetChange = change.find((c) => c.name === name)
+              if (targetChange !== undefined && targetChange.specIds.length > 0) {
+                finalSpecPath = targetChange.specIds[0]
+              }
+            } else if (artifactType !== undefined && artifactType.scope === 'spec') {
+              // scope: spec artifact - specPath is required
+              cliError('<specPath> is required for scope: spec artifacts', opts.format)
+            }
+          }
+
           if (opts.all === true) {
             await executeBatch(kernel, name, opts)
           } else {
-            await executeSingle(kernel, config, name, specPath!, opts)
+            await executeSingle(kernel, config, name, finalSpecPath!, opts)
           }
         } catch (err) {
           handleError(err, opts.format)
