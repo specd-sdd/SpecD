@@ -1626,5 +1626,73 @@ describe('ValidateArtifacts', () => {
       expect(result.passed).toBe(true)
       expect(result.failures.some((f) => f.artifactId === 'specs')).toBe(false)
     })
+
+    it('reports failure when non-optional artifact file is missing', async () => {
+      const specsType = makeArtifactType('specs', { format: 'markdown' })
+      const schema = makeSchema([specsType])
+
+      const specsArtifact = new ChangeArtifact({
+        type: 'specs',
+        files: new Map([
+          [
+            'default:auth',
+            new ArtifactFile({ key: 'default:auth', filename: 'spec.md', status: 'missing' }),
+          ],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [specsArtifact])
+
+      const repo = makeChangeRepository([change])
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+      })
+
+      expect(result.passed).toBe(false)
+      expect(result.failures.some((f) => f.artifactId === 'specs')).toBe(true)
+      expect(result.failures.find((f) => f.artifactId === 'specs')?.description).toContain(
+        'is missing',
+      )
+    })
+
+    it('does not report failure when optional artifact file is missing', async () => {
+      const designType = makeArtifactType('design', { format: 'markdown', optional: true })
+      const schema = makeSchema([designType])
+
+      const designArtifact = new ChangeArtifact({
+        type: 'design',
+        optional: true,
+        files: new Map([
+          ['design', new ArtifactFile({ key: 'design', filename: 'design.md', status: 'missing' })],
+        ]),
+      })
+      const change = makeChangeWithArtifacts('c', [designArtifact])
+
+      const repo = makeChangeRepository([change])
+      const uc = new ValidateArtifacts(
+        repo,
+        new Map(),
+        makeSchemaProvider(schema),
+        makeParsers(),
+        makeActorResolver(),
+        makeContentHasher(),
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        specPath: 'default:auth',
+      })
+
+      expect(result.failures.some((f) => f.artifactId === 'design')).toBe(false)
+    })
   })
 })

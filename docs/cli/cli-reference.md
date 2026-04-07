@@ -158,6 +158,8 @@ specd change validate <name> [specPath] [options]
 
 Validate the artifacts for a change. When `<specPath>` is given, validates only the artifacts for that spec. When `--all` is given, validates every spec in the change. When `--artifact` is given, validates only that artifact.
 
+For change-scoped artifacts (e.g., `design`, `tasks`), `<specPath>` can be omitted when using `--artifact` — the command will infer the specPath from the change's first spec.
+
 | Option                      | Description                                     |
 | --------------------------- | ----------------------------------------------- |
 | `--all`                     | Validate artifacts for all specs in the change. |
@@ -201,15 +203,16 @@ specd change context <name> <step> [options]
 
 Compile the context block for a specific lifecycle step of the change. The compiled context is what an agent receives when working on that step — it includes specs, rules, constraints, scenarios, artifact instructions, and hook instructions as applicable.
 
-| Option                      | Description                                                        |
-| --------------------------- | ------------------------------------------------------------------ |
-| `--rules`                   | Include rules extracted from spec metadata.                        |
-| `--constraints`             | Include constraints extracted from spec metadata.                  |
-| `--scenarios`               | Include scenarios extracted from spec metadata.                    |
-| `--follow-deps`             | Follow `dependsOn` links and include transitive specs.             |
-| `--depth <n>`               | Maximum depth for dependency traversal. Used with `--follow-deps`. |
-| `--format text\|json\|toon` | Output format.                                                     |
-| `--config <path>`           | Config file path.                                                  |
+| Option                 | Description                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | -------------- |
+| `--rules`              | Include rules extracted from spec metadata.                                                                                                                         |
+| `--constraints`        | Include constraints extracted from spec metadata.                                                                                                                   |
+| `--scenarios`          | Include scenarios extracted from spec metadata.                                                                                                                     |
+| `--follow-deps`        | Follow `dependsOn` links and include transitive specs.                                                                                                              |
+| `--depth <n>`          | Maximum depth for dependency traversal. Used with `--follow-deps`.                                                                                                  |
+| `--fingerprint <hash>` | Provide a fingerprint to skip context return if unchanged. Returns status "unchanged" without full context. Use for caching to avoid re-fetching identical context. |
+| `--format text         | json                                                                                                                                                                | toon` | Output format. |
+| `--config <path>`      | Config file path.                                                                                                                                                   |
 
 ### change artifacts
 

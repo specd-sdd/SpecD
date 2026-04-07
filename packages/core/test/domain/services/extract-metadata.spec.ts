@@ -528,4 +528,54 @@ describe('extractMetadata', () => {
     const result = extractMetadata(extraction, asts, renderers)
     expect(result.context).toEqual(['Overview content.', 'Purpose content.'])
   })
+
+  it('filters extraction by targetArtifactId', () => {
+    const specAst: { root: SelectorNode } = {
+      root: {
+        type: 'document',
+        children: [
+          section('Spec Title', [], 1),
+          section('Overview', [paragraph('Spec description.')]),
+        ],
+      },
+    }
+
+    const verifyAst: { root: SelectorNode } = {
+      root: {
+        type: 'document',
+        children: [
+          section('Verify Title', [], 1),
+          section('Overview', [paragraph('Verify description.')]),
+        ],
+      },
+    }
+
+    const extraction: MetadataExtraction = {
+      title: {
+        artifact: 'specs',
+        extractor: { selector: { type: 'section', level: 1 }, extract: 'label' },
+      },
+      description: {
+        artifact: 'verify',
+        extractor: { selector: { type: 'section', matches: '^Overview$' }, extract: 'content' },
+      },
+    }
+
+    const asts = new Map([
+      ['specs', specAst],
+      ['verify', verifyAst],
+    ])
+    const renderers = new Map([
+      ['specs', renderer],
+      ['verify', renderer],
+    ])
+
+    const resultWithFilter = extractMetadata(extraction, asts, renderers, undefined, 'verify')
+    expect(resultWithFilter.title).toBeUndefined()
+    expect(resultWithFilter.description).toBe('Verify description.')
+
+    const resultWithoutFilter = extractMetadata(extraction, asts, renderers)
+    expect(resultWithoutFilter.title).toBe('Spec Title')
+    expect(resultWithoutFilter.description).toBe('Verify description.')
+  })
 })

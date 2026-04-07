@@ -13,6 +13,7 @@ import {
   type SignedOffEvent,
 } from '../../domain/entities/change.js'
 import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
+import { type MetadataExtractorEntry } from '../../domain/value-objects/metadata-extraction.js'
 import { applyPreHashCleanup } from '../../domain/services/pre-hash-cleanup.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
@@ -352,6 +353,60 @@ export class ValidateArtifacts {
         failures.push(...result.failures)
         warnings.push(...result.warnings)
         if (result.failures.length > 0) artifactFailed = true
+      }
+
+      // --- MetadataExtraction validation ---
+      if (!artifactFailed) {
+        const extraction = schema.metadataExtraction()
+        if (extraction !== undefined) {
+          // Check if this artifact has any extraction rules targeting it
+          const hasExtractionRules = Object.values(extraction).some((entry) => {
+            if (entry === undefined) return false
+            if (Array.isArray(entry)) {
+              return entry.some((e: MetadataExtractorEntry) => e.artifact === artifactType.id)
+            }
+            return (entry as MetadataExtractorEntry).artifact === artifactType.id
+          })
+
+          if (!hasExtractionRules) {
+            // No extraction rules for this artifact, skip
+          } else if (parser !== undefined) {
+            try {
+              const astsByArtifact = new Map<string, { root: SelectorNode }>()
+              const renderers = new Map<string, SubtreeRenderer>()
+              const ast = parser.parse(validationContent)
+              astsByArtifact.set(artifactType.id, ast)
+              renderers.set(artifactType.id, parser as SubtreeRenderer)
+
+              // Extract metadata - this validates extraction rules work
+              const extracted = extractMetadata(
+                extraction,
+                astsByArtifact,
+                renderers,
+                undefined,
+                artifactType.id,
+              )
+
+              // Validate extracted fields against permissive schema
+              const { permissiveSpecMetadataSchema } =
+                await import('../../domain/services/parse-metadata.js')
+              const validationResult = permissiveSpecMetadataSchema.safeParse(extracted)
+              if (!validationResult.success) {
+                failures.push({
+                  artifactId: artifactType.id,
+                  description: `MetadataExtraction validation failed: ${validationResult.error.message}`,
+                })
+                artifactFailed = true
+              }
+            } catch (err) {
+              failures.push({
+                artifactId: artifactType.id,
+                description: `MetadataExtraction validation failed: ${(err as Error).message}`,
+              })
+              artifactFailed = true
+            }
+          }
+        }
       }
 
       // --- Mark complete ---

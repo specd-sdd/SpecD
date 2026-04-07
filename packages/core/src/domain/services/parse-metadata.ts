@@ -103,6 +103,55 @@ export const strictSpecMetadataSchema = z
   })
   .passthrough()
 
+/**
+ * Permissive schema for validation — only validates fields that are actually present.
+ * Used by {@link ValidateArtifacts} to verify extracted metadata is valid (not to enforce completeness).
+ * Manual implementation since .deepPartial() is deprecated in Zod 4.
+ */
+export const permissiveSpecMetadataSchema = z
+  .object({
+    title: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+    keywords: z
+      .array(
+        z
+          .string()
+          .min(1)
+          .regex(/^[a-z][a-z0-9-]*$/, { message: 'must be lowercase with hyphens only' }),
+      )
+      .optional(),
+    dependsOn: z.array(specIdString).optional(),
+    contentHashes: z
+      .record(
+        z.string(),
+        z.string().regex(HASH_RE, { message: 'must match sha256:<64 hex chars>' }),
+      )
+      .optional(),
+    rules: z
+      .array(
+        z.object({
+          requirement: z.string().min(1),
+          rules: z.array(z.string().min(1)),
+        }),
+      )
+      .optional(),
+    constraints: z.array(z.string().min(1)).optional(),
+    scenarios: z
+      .array(
+        z.object({
+          requirement: z.string().min(1).optional(),
+          name: z.string().min(1).optional(),
+          given: z.array(z.string()).optional(),
+          when: z.array(z.string()).optional(),
+          then: z.array(z.string()).optional(),
+        }),
+      )
+      .optional(),
+    context: z.array(z.string().min(1)).optional(),
+    generatedBy: z.enum(['core', 'agent']).optional(),
+  })
+  .passthrough()
+
 /** Parsed `metadata.json` content. */
 export interface SpecMetadata {
   readonly title?: string

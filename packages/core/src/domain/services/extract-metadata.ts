@@ -46,6 +46,7 @@ export interface ExtractedMetadata {
  * @param astsByArtifact - Parsed ASTs keyed by artifact type ID
  * @param renderers - Subtree renderers keyed by artifact type ID
  * @param transforms - Named transform callbacks
+ * @param targetArtifactId - Optional filter: only extract fields where field.artifact === targetArtifactId
  * @returns The extracted metadata with all available fields populated
  */
 export function extractMetadata(
@@ -53,69 +54,83 @@ export function extractMetadata(
   astsByArtifact: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
   transforms?: ReadonlyMap<string, (values: string[]) => string[]>,
+  targetArtifactId?: string,
 ): ExtractedMetadata {
   const result: Record<string, unknown> = {}
 
+  // Helper to check if field should be extracted
+  const shouldExtract = (artifact: string | undefined): boolean => {
+    if (targetArtifactId === undefined) return true
+    return artifact === targetArtifactId
+  }
+
   // Single-value fields
-  if (extraction.title !== undefined) {
+  if (extraction.title !== undefined && shouldExtract(extraction.title.artifact)) {
     const val = extractSingle(extraction.title, astsByArtifact, renderers, transforms)
     if (val !== undefined) result['title'] = val
   }
 
-  if (extraction.description !== undefined) {
+  if (extraction.description !== undefined && shouldExtract(extraction.description.artifact)) {
     const val = extractSingle(extraction.description, astsByArtifact, renderers, transforms)
     if (val !== undefined) result['description'] = val
   }
 
   // Array-value fields
-  if (extraction.dependsOn !== undefined) {
+  if (extraction.dependsOn !== undefined && shouldExtract(extraction.dependsOn.artifact)) {
     const val = extractArray(extraction.dependsOn, astsByArtifact, renderers, transforms)
     if (val.length > 0) result['dependsOn'] = val
   }
 
-  if (extraction.keywords !== undefined) {
+  if (extraction.keywords !== undefined && shouldExtract(extraction.keywords.artifact)) {
     const val = extractArray(extraction.keywords, astsByArtifact, renderers, transforms)
     if (val.length > 0) result['keywords'] = val
   }
 
   // Multi-entry array fields
   if (extraction.context !== undefined) {
-    const val = extractMultiEntryArray(extraction.context, astsByArtifact, renderers, transforms)
-    if (val.length > 0) result['context'] = val
+    const filtered = extraction.context.filter((e) => shouldExtract(e.artifact))
+    if (filtered.length > 0) {
+      const val = extractMultiEntryArray(filtered, astsByArtifact, renderers, transforms)
+      if (val.length > 0) result['context'] = val
+    }
   }
 
   if (extraction.rules !== undefined) {
-    const groups = extractMultiEntryGrouped(extraction.rules, astsByArtifact, renderers, transforms)
-    if (groups.length > 0) {
-      result['rules'] = groups.map((g) => ({ requirement: g.label, rules: [...g.items] }))
+    const filtered = extraction.rules.filter((e) => shouldExtract(e.artifact))
+    if (filtered.length > 0) {
+      const groups = extractMultiEntryGrouped(filtered, astsByArtifact, renderers, transforms)
+      if (groups.length > 0) {
+        result['rules'] = groups.map((g) => ({ requirement: g.label, rules: [...g.items] }))
+      }
     }
   }
 
   if (extraction.constraints !== undefined) {
-    const val = extractMultiEntryArray(
-      extraction.constraints,
-      astsByArtifact,
-      renderers,
-      transforms,
-    )
-    if (val.length > 0) result['constraints'] = val
+    const filtered = extraction.constraints.filter((e) => shouldExtract(e.artifact))
+    if (filtered.length > 0) {
+      const val = extractMultiEntryArray(filtered, astsByArtifact, renderers, transforms)
+      if (val.length > 0) result['constraints'] = val
+    }
   }
 
   if (extraction.scenarios !== undefined) {
-    const structured = extractMultiEntryStructured(
-      extraction.scenarios,
-      astsByArtifact,
-      renderers,
-      transforms,
-    )
-    if (structured.length > 0) {
-      result['scenarios'] = structured.map((s) => ({
-        requirement: (s['requirement'] as string) ?? '',
-        name: (s['name'] as string) ?? '',
-        ...(s['given'] !== undefined ? { given: s['given'] } : {}),
-        ...(s['when'] !== undefined ? { when: s['when'] } : {}),
-        ...(s['then'] !== undefined ? { then: s['then'] } : {}),
-      }))
+    const filtered = extraction.scenarios.filter((e) => shouldExtract(e.artifact))
+    if (filtered.length > 0) {
+      const structured = extractMultiEntryStructured(
+        filtered,
+        astsByArtifact,
+        renderers,
+        transforms,
+      )
+      if (structured.length > 0) {
+        result['scenarios'] = structured.map((s) => ({
+          requirement: (s['requirement'] as string) ?? '',
+          name: (s['name'] as string) ?? '',
+          ...(s['given'] !== undefined ? { given: s['given'] } : {}),
+          ...(s['when'] !== undefined ? { when: s['when'] } : {}),
+          ...(s['then'] !== undefined ? { then: s['then'] } : {}),
+        }))
+      }
     }
   }
 

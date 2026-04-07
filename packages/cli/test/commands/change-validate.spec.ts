@@ -287,4 +287,63 @@ describe('change validate', () => {
     expect(parsed.results[0].spec).toBe('default:auth/login')
     expect(parsed.results[0].passed).toBe(true)
   })
+
+  it('allows --artifact without specPath for change-scoped artifacts', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.list.execute.mockResolvedValue([
+      { name: 'feat', specIds: ['default:auth/login'] },
+    ])
+    kernel.specs.getActiveSchema.execute.mockResolvedValue({
+      raw: false,
+      schema: {
+        name: () => 'test-schema',
+        version: () => 1,
+        artifacts: () => [{ id: 'design', scope: 'change', output: 'design.md' }],
+      },
+    })
+    kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [] })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'validate',
+      'feat',
+      '--artifact',
+      'design',
+    ])
+
+    expect(kernel.changes.validate.execute).toHaveBeenCalledWith({
+      name: 'feat',
+      specPath: 'default:auth/login',
+      artifactId: 'design',
+    })
+    expect(stdout()).toContain('validated feat/default:auth/login: all artifacts pass')
+  })
+
+  it('requires specPath for scope:spec artifacts even with --artifact', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.list.execute.mockResolvedValue([
+      { name: 'feat', specIds: ['default:auth/login'] },
+    ])
+    kernel.specs.getActiveSchema.execute.mockResolvedValue({
+      raw: false,
+      schema: {
+        name: () => 'test-schema',
+        version: () => 1,
+        artifacts: () => [{ id: 'specs', scope: 'spec', output: 'spec.md' }],
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'validate', 'feat', '--artifact', 'specs'])
+      .catch(() => {})
+
+    expect(stderr()).toContain('<specPath> is required for scope: spec artifacts')
+    expect(process.exit).toHaveBeenCalledWith(1)
+  })
 })
