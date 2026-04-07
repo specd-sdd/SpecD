@@ -142,6 +142,24 @@ export class TransitionChange {
     const fromState = change.state
     const effectiveTarget = this._resolveTarget(change.state, input)
 
+    if (
+      fromState === 'ready' &&
+      effectiveTarget === 'pending-spec-approval' &&
+      !input.approvalsSpec
+    ) {
+      throw new InvalidStateTransitionError(fromState, effectiveTarget, {
+        type: 'gate-not-required',
+        gate: 'spec',
+      })
+    }
+
+    if (fromState === 'done' && effectiveTarget === 'pending-signoff' && !input.approvalsSignoff) {
+      throw new InvalidStateTransitionError(fromState, effectiveTarget, {
+        type: 'gate-not-required',
+        gate: 'signoff',
+      })
+    }
+
     if (fromState === 'pending-spec-approval' && effectiveTarget !== 'designing') {
       throw new InvalidStateTransitionError(fromState, effectiveTarget, {
         type: 'approval-required',
