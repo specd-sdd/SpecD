@@ -15,6 +15,10 @@ export type TransitionFailureReason =
       readonly type: 'approval-required'
       readonly gate: 'spec' | 'signoff'
     }
+  | {
+      readonly type: 'gate-not-required'
+      readonly gate: 'spec' | 'signoff'
+    }
 
 /**
  * Thrown when a state transition is attempted that is not permitted
@@ -61,6 +65,8 @@ function buildMessage(from: string, to: string, reason?: TransitionFailureReason
   switch (reason.type) {
     case 'approval-required':
       return `${base}: ${approvalRequiredMessage(reason.gate)}`
+    case 'gate-not-required':
+      return `${base}: ${gateNotRequiredMessage(reason.gate)}`
     case 'incomplete-artifact':
       return `${base}: artifact '${reason.artifactId}' is not complete`
     case 'incomplete-tasks':
@@ -84,4 +90,16 @@ function approvalRequiredMessage(gate: 'spec' | 'signoff'): string {
   return gate === 'spec'
     ? 'change is waiting for human spec approval'
     : 'change is waiting for human signoff'
+}
+
+/**
+ * Builds the human-readable message for approval-gates failures.
+ *
+ * @param gate - The active approval gate that blocks the transition
+ * @returns The approval-specific explanation
+ */
+function gateNotRequiredMessage(gate: 'spec' | 'signoff'): string {
+  return gate === 'spec'
+    ? 'change does not require spec approval'
+    : 'change does not require signoff'
 }
