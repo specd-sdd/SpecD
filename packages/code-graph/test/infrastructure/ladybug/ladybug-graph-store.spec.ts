@@ -128,6 +128,45 @@ describe('LadybugGraphStore hierarchy persistence', () => {
     await reopenedStore.close()
   })
 
+  it('refreshes fts search results after bulk load and file removal', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-test-'))
+
+    const file = createFileNode({
+      path: 'src/kernel.ts',
+      language: 'typescript',
+      contentHash: 'sha256:kernel',
+      workspace: '/project',
+    })
+    const symbol = createSymbolNode({
+      name: 'createKernel',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+      comment: 'Create the project kernel',
+    })
+
+    const store = new LadybugGraphStore(tempDir)
+    await store.open()
+    await store.bulkLoad({
+      files: [file],
+      symbols: [symbol],
+      specs: [],
+      relations: [],
+    })
+
+    const hitsAfterLoad = await store.searchSymbols({ query: 'createKernel' })
+    expect(hitsAfterLoad).toHaveLength(1)
+    expect(hitsAfterLoad[0]?.symbol.id).toBe(symbol.id)
+
+    await store.removeFile(file.path)
+
+    const hitsAfterRemove = await store.searchSymbols({ query: 'createKernel' })
+    expect(hitsAfterRemove).toHaveLength(0)
+
+    await store.close()
+  })
+
   it('exposes schema version 6 hierarchy tables in the ddl', () => {
     expect(SCHEMA_VERSION).toBe(6)
     expect(SCHEMA_DDL).toContain('CREATE REL TABLE IF NOT EXISTS EXTENDS')

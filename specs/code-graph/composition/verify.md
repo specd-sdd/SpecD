@@ -27,7 +27,7 @@
 #### Scenario: Primary factory with SpecdConfig
 
 - **WHEN** `createCodeGraphProvider(config)` is called with a `SpecdConfig`
-- **THEN** the storage path is derived from `config.projectRoot`
+- **THEN** the graph storage root is derived from `config.configPath`
 - **AND** the returned provider can be opened, used for indexing and queries, and closed without error
 
 #### Scenario: Legacy factory with CodeGraphOptions
@@ -40,10 +40,34 @@
 - **GIVEN** an object with `projectRoot` property
 - **WHEN** passed to `createCodeGraphProvider`
 - **THEN** it is treated as `SpecdConfig`
-
 - **GIVEN** an object with `storagePath` property
 - **WHEN** passed to `createCodeGraphProvider`
 - **THEN** it is treated as `CodeGraphOptions`
+
+#### Scenario: Default backend is sqlite
+
+- **GIVEN** no explicit `graphStoreId`
+- **WHEN** a provider is created from either factory overload
+- **THEN** the built-in backend id `sqlite` is selected
+
+#### Scenario: Explicit backend id overrides the default
+
+- **GIVEN** a provider factory call with `graphStoreId: 'ladybug'`
+- **WHEN** the provider is constructed
+- **THEN** the Ladybug-backed store is used as the single active backend for that provider
+
+#### Scenario: Additive graph-store registrations extend the built-ins
+
+- **GIVEN** a custom graph-store factory registered through `graphStoreFactories`
+- **WHEN** `graphStoreId` selects that custom backend id
+- **THEN** the provider uses the custom backend
+- **AND** the built-in `sqlite` and `ladybug` backends remain available
+
+#### Scenario: Unknown graph-store id fails clearly
+
+- **GIVEN** a provider factory call with `graphStoreId: 'missing-backend'`
+- **WHEN** the graph-store registry is resolved
+- **THEN** provider construction fails with a clear unknown-backend error
 
 #### Scenario: Custom adapters registered (legacy)
 
@@ -62,12 +86,17 @@
 #### Scenario: Internal components not exported
 
 - **WHEN** a consumer imports from `@specd/code-graph`
-- **THEN** `LadybugGraphStore`, `AdapterRegistry`, `TypeScriptLanguageAdapter`, and `IndexCodeGraph` are not available as imports
+- **THEN** `LadybugGraphStore`, `SQLiteGraphStore`, `AdapterRegistry`, built-in language adapters, and `IndexCodeGraph` are not available as imports
 
 #### Scenario: LanguageAdapter interface is exported
 
 - **WHEN** a consumer wants to write a custom language adapter
 - **THEN** they can import the `LanguageAdapter` interface from `@specd/code-graph`
+
+#### Scenario: Graph-store composition types are exported
+
+- **WHEN** a consumer wants to register or select a backend explicitly
+- **THEN** `GraphStoreFactory`, `CodeGraphOptions`, and `CodeGraphFactoryOptions` are available as imports
 
 #### Scenario: Model types are exported
 

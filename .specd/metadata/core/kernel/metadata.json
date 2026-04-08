@@ -90,25 +90,25 @@
     {
       "requirement": "createKernel accepts optional KernelOptions",
       "rules": [
-        "`createKernel(config, options?)` accepts an optional `KernelOptions` object. The `extraNodeModulesPaths` option appends additional `node_modules` directories to the schema search path, so that globally-installed schema packages are found even when the project has no local copy."
+        "`createKernel(config, options?)` accepts an optional `KernelOptions` object. The `extraNodeModulesPaths` option appends additional `node_modules` directories to the schema search path, so that globally-installed schema packages are found even when the project has no local copy.\n\n`KernelOptions` SHALL also support graph-store composition inputs:\n\n- **`graphStoreId`** (`string`, optional) — the backend id selected from the merged graph-store registry for this kernel construction path\n- additive graph-store factory registrations that extend the built-in graph-store registry without replacing it\n\nWhen `graphStoreId` is omitted, the kernel uses the current built-in default graph-store id exposed by the code-graph composition layer."
       ]
     },
     {
       "requirement": "KernelOptions supports additive registries",
       "rules": [
-        "`KernelOptions` SHALL support additive registration of external capabilities before kernel construction. At minimum, it SHALL include extension points for:\n\n- storage factories\n- VCS providers\n- actor providers\n- artifact parsers\n- external hook runners\n\nThese registrations SHALL extend the built-in capability set rather than replacing it."
+        "`KernelOptions` SHALL support additive registration of external capabilities before kernel construction. At minimum, it SHALL include extension points for:\n\n- storage factories\n- graph-store factories\n- VCS providers\n- actor providers\n- artifact parsers\n- external hook runners\n\nThese registrations SHALL extend the built-in capability set rather than replacing it."
       ]
     },
     {
       "requirement": "Kernel exposes merged registries",
       "rules": [
-        "The `Kernel` interface SHALL expose the merged built-in plus external registries used during construction. The exposed registry view SHALL let consumers inspect which storages, parsers, providers, and external hook runners are available from the built kernel.\n\nThe exposed registries MUST reflect the final additive capability set actually used during construction — not just the raw external registrations supplied by the caller."
+        "The `Kernel` interface SHALL expose the merged built-in plus external registries used during construction. The exposed registry view SHALL let consumers inspect which storages, graph stores, parsers, providers, and external hook runners are available from the built kernel.\n\nThe exposed registries MUST reflect the final additive capability set actually used during construction — not just the raw external registrations supplied by the caller."
       ]
     },
     {
       "requirement": "Kernel rejects invalid registry references",
       "rules": [
-        "Kernel composition MUST reject conflicting registrations and unknown registry references with clear errors.\n\nConflicting registrations include attempts to overwrite an existing built-in or already-registered external entry for the same registry category. Unknown references include configuration or workflow data that names an adapter, parser, provider, or external hook type that is not present in the merged registry set."
+        "Kernel composition MUST reject conflicting registrations and unknown registry references with clear errors.\n\nConflicting registrations include attempts to overwrite an existing built-in or already-registered external entry for the same registry category. Unknown references include configuration or workflow data that names an adapter, parser, provider, external hook type, or graph-store id that is not present in the merged registry set."
       ]
     },
     {
@@ -305,15 +305,27 @@
     },
     {
       "requirement": "createKernel accepts optional KernelOptions",
+      "name": "Graph-store id can be selected in KernelOptions",
+      "given": ["a KernelOptions with graphStoreId: 'ladybug'"],
+      "when": ["createKernel(config, options) is called"],
+      "then": [
+        "the built kernel carries that backend selection through the merged registry view and downstream graph composition"
+      ]
+    },
+    {
+      "requirement": "createKernel accepts optional KernelOptions",
       "name": "No options provided",
       "when": ["createKernel(config) is called without options"],
-      "then": ["the schema registry searches only the project's own node_modules"]
+      "then": [
+        "the schema registry searches only the project's own node_modules",
+        "AND the current built-in default graph-store id is used"
+      ]
     },
     {
       "requirement": "KernelOptions supports additive registries",
       "name": "External registrations extend built-ins",
       "given": [
-        "built-in storages, parsers, VCS providers, actor providers, and external hook runners are available"
+        "built-in storages, graph stores, parsers, VCS providers, actor providers, and external hook runners are available"
       ],
       "when": [
         "createKernel(config, options) is called with additional registrations in one or more categories"
@@ -329,7 +341,7 @@
       "given": ["external registrations were provided during kernel construction"],
       "when": ["the built kernel's registry view is inspected"],
       "then": [
-        "it exposes the final merged set of storage factories, parsers, providers, and external hook runners actually used for construction",
+        "it exposes the final merged set of storage factories, graph-store factories, parsers, providers, and external hook runners actually used for construction",
         "AND the view includes built-ins as well as accepted external registrations"
       ]
     },
@@ -358,6 +370,22 @@
       ]
     },
     {
+      "requirement": "Kernel rejects invalid registry references",
+      "name": "Unknown graphStoreId fails clearly",
+      "given": ["KernelOptions selects graphStoreId: 'missing-backend'"],
+      "when": ["createKernel(config, options) resolves the merged graph-store registry"],
+      "then": ["kernel construction fails with a clear unknown-backend error"]
+    },
+    {
+      "requirement": "Kernel rejects invalid registry references",
+      "name": "Conflicting graph-store registrations fail clearly",
+      "given": [
+        "external graph-store registrations include a duplicate id that collides with a built-in or previously registered backend"
+      ],
+      "when": ["createKernel(config, options) processes those registrations"],
+      "then": ["kernel construction fails with a clear conflict error"]
+    },
+    {
       "requirement": "Kernel is a plain object, not a class",
       "name": "Kernel has no methods or lifecycle",
       "when": ["the kernel object is inspected"],
@@ -376,8 +404,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:5457dd9a528039b4144b617b4b09f26857fc45c186abe3f3b5dc7353cbd1578a",
-    "verify.md": "sha256:26f50943cc354052f0954314f0461d7fe77ec38277a67bc46e427273c91061ae"
+    "spec.md": "sha256:4f8b75ad5e69f7a9118a7074712cf640d60ae810eeccf1ff9ba252582f8ee24a",
+    "verify.md": "sha256:29306ad72338d68a12dcde41cf139ca50516e7818b5f19899f1620d264cc7f81"
   },
   "generatedBy": "core"
 }

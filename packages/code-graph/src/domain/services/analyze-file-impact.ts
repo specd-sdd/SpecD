@@ -22,14 +22,16 @@ export async function analyzeFileImpact(
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth = 3,
 ): Promise<FileImpactResult> {
+  const cachedStore = createMemoizedReadStore(store)
+
   // Symbol-level impact via CALLS
-  const symbols = await store.findSymbols({ filePath })
+  const symbols = await cachedStore.findSymbols({ filePath })
   const symbolResults = await Promise.all(
-    symbols.map((s) => analyzeImpact(store, s.id, direction, maxDepth)),
+    symbols.map((s) => analyzeImpact(cachedStore, s.id, direction, maxDepth)),
   )
 
   // File-level impact via IMPORTS (BFS)
-  const fileImpact = await analyzeFileImportImpact(store, filePath, direction, maxDepth)
+  const fileImpact = await analyzeFileImportImpact(cachedStore, filePath, direction, maxDepth)
 
   // Merge file-level and symbol-level affected files into a deduped set
   const affectedFileSet = new Set<string>()
@@ -167,4 +169,65 @@ function deduplicateSymbols(symbols: readonly AffectedSymbol[]): AffectedSymbol[
     }
   }
   return [...map.values()]
+}
+
+/**
+ * Memoizes read-only graph-store calls for the lifetime of a single file-impact analysis.
+ * This preserves behaviour while avoiding repeated traversal and lookup queries across
+ * multiple symbol-level impact calculations within the same file.
+ *
+ * @param store - The underlying graph store.
+ * @returns A read-through memoized view over the same store.
+ */
+function createMemoizedReadStore(store: GraphStore): GraphStore {
+  const cache = new Map<string, Promise<unknown>>()
+  const memoizedStore = Object.create(store) as GraphStore
+
+  const memoize = <T>(methodName: string, call: (...args: readonly unknown[]) => Promise<T>) => {
+    return async (...args: readonly unknown[]): Promise<T> => {
+      const key = `${methodName}:${JSON.stringify(args)}`
+      const cached = cache.get(key)
+      if (cached !== undefined) {
+        return cached as Promise<T>
+      }
+
+      const pending = call(...args)
+      cache.set(key, pending as Promise<unknown>)
+      return pending
+    }
+  }
+
+  memoizedStore.getFile = memoize('getFile', (path) => store.getFile(path as string))
+  memoizedStore.getSymbol = memoize('getSymbol', (id) => store.getSymbol(id as string))
+  memoizedStore.getSpec = memoize('getSpec', (specId) => store.getSpec(specId as string))
+  memoizedStore.getCallers = memoize('getCallers', (id) => store.getCallers(id as string))
+  memoizedStore.getCallees = memoize('getCallees', (id) => store.getCallees(id as string))
+  memoizedStore.getImporters = memoize('getImporters', (path) => store.getImporters(path as string))
+  memoizedStore.getImportees = memoize('getImportees', (path) => store.getImportees(path as string))
+  memoizedStore.getExtenders = memoize('getExtenders', (id) => store.getExtenders(id as string))
+  memoizedStore.getExtendedTargets = memoize('getExtendedTargets', (id) =>
+    store.getExtendedTargets(id as string),
+  )
+  memoizedStore.getImplementors = memoize('getImplementors', (id) =>
+    store.getImplementors(id as string),
+  )
+  memoizedStore.getImplementedTargets = memoize('getImplementedTargets', (id) =>
+    store.getImplementedTargets(id as string),
+  )
+  memoizedStore.getOverriders = memoize('getOverriders', (id) => store.getOverriders(id as string))
+  memoizedStore.getOverriddenTargets = memoize('getOverriddenTargets', (id) =>
+    store.getOverriddenTargets(id as string),
+  )
+  memoizedStore.getSpecDependencies = memoize('getSpecDependencies', (specId) =>
+    store.getSpecDependencies(specId as string),
+  )
+  memoizedStore.getSpecDependents = memoize('getSpecDependents', (specId) =>
+    store.getSpecDependents(specId as string),
+  )
+  memoizedStore.getExportedSymbols = memoize('getExportedSymbols', (path) =>
+    store.getExportedSymbols(path as string),
+  )
+  memoizedStore.findSymbols = memoize('findSymbols', (query) => store.findSymbols(query as never))
+
+  return memoizedStore
 }

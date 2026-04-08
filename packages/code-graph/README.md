@@ -14,7 +14,7 @@ a persistent graph database for impact analysis, traversal, and full-text search
 - **Hotspot detection** — ranks symbols by how many dependents they have
 - **Change detection** — given a list of changed files, returns all transitively affected symbols
 - **Full-text search** — BM25-ranked search across symbols and spec documents
-- **Persistent storage** — backed by `LadybugGraphStore`, with backend files rooted under the configured specd config path
+- **Persistent storage** — backed by a registry-selected `GraphStore`, with `sqlite` as the built-in default and `ladybug` still available by explicit backend id
 - **Workspace-aware** — paths and IDs are prefixed with workspace name for cross-workspace uniqueness
 
 ## Domain model
@@ -42,7 +42,7 @@ createCodeGraphProvider(config)
        │    │    ├─ GoLanguageAdapter
        │    │    ├─ PythonLanguageAdapter
        │    │    └─ PhpLanguageAdapter
-       │    └─ GraphStore (port) ← implemented by LadybugGraphStore
+       │    └─ GraphStore (port) ← implemented by SQLiteGraphStore or LadybugGraphStore
        └─ domain services        ← getUpstream, getDownstream, analyzeImpact, computeHotspots, …
 ```
 
@@ -75,6 +75,14 @@ const hotspots = await graph.getHotspots({ limit: 10 })
 await graph.close()
 ```
 
+To force the legacy backend explicitly:
+
+```ts
+const legacyGraph = createCodeGraphProvider(specdConfig, {
+  graphStoreId: 'ladybug',
+})
+```
+
 Pass a `SpecdConfig` (the standard specd configuration object) to
 `createCodeGraphProvider` and it derives the storage path from `config.configPath`.
 
@@ -82,6 +90,12 @@ For the default project layout this means:
 
 - graph backend files under `.specd/config/graph`
 - graph staging and scratch files under `.specd/config/tmp`
+
+Backends are selected internally by id at composition time:
+
+- default built-in backend: `sqlite`
+- alternate built-in backend: `ladybug`
+- additive custom backends can be registered with `graphStoreFactories`
 
 ## Role in specd
 

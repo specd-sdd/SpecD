@@ -81,6 +81,23 @@ export interface ArchiveStorageFactory {
 }
 
 /**
+ * Opaque graph-store factory registration carried by the kernel registry.
+ *
+ * `@specd/core` does not construct code-graph backends directly, so the return type
+ * remains intentionally opaque at this layer while preserving the same registry shape
+ * used by other extension points.
+ */
+export interface GraphStoreFactory {
+  /**
+   * Creates a concrete graph-store backend.
+   *
+   * @param options - Adapter-owned resolved options
+   * @returns The constructed backend instance
+   */
+  create(options: Readonly<Record<string, unknown>>): unknown
+}
+
+/**
  * Named VCS detection provider.
  */
 export interface VcsProvider {
@@ -124,6 +141,8 @@ export interface KernelRegistryInput {
   readonly changeStorageFactories?: Readonly<Record<string, ChangeStorageFactory>>
   /** Additional named archive storage factories. */
   readonly archiveStorageFactories?: Readonly<Record<string, ArchiveStorageFactory>>
+  /** Additional named graph-store factories. */
+  readonly graphStoreFactories?: Readonly<Record<string, GraphStoreFactory>>
   /** Additional artifact parsers keyed by format name. */
   readonly parsers?: Readonly<Record<string, ArtifactParser>> | ArtifactParserRegistry
   /** Additional VCS providers tried before built-in probes. */
@@ -149,6 +168,8 @@ export interface KernelRegistryView {
     /** Named archive storage factories available to the kernel. */
     readonly archive: ReadonlyMap<string, ArchiveStorageFactory>
   }
+  /** Artifact parsers keyed by format name. */
+  readonly graphStores: ReadonlyMap<string, GraphStoreFactory>
   /** Artifact parsers keyed by format name. */
   readonly parsers: ArtifactParserRegistry
   /** External-first VCS providers in dispatch order. */
@@ -240,6 +261,11 @@ export function createKernelRegistryView(
         extra?.archiveStorageFactories,
       ),
     },
+    graphStores: mergeNamedRegistry(
+      'graphStoreFactories',
+      base.graphStoreFactories ?? {},
+      extra?.graphStoreFactories,
+    ),
     parsers: mergeNamedRegistry('parsers', base.parsers ?? new Map(), extra?.parsers),
     vcsProviders: [...(extra?.vcsProviders ?? []), ...(base.vcsProviders ?? [])],
     actorProviders: [...(extra?.actorProviders ?? []), ...(base.actorProviders ?? [])],

@@ -160,6 +160,8 @@ export interface KernelOptions extends KernelRegistryInput {
    * even when the project has no local copy.
    */
   readonly extraNodeModulesPaths?: readonly string[]
+  /** Selected graph-store backend id for code-graph composition. */
+  readonly graphStoreId?: string
 }
 
 /**
@@ -176,6 +178,9 @@ export interface KernelOptions extends KernelRegistryInput {
  */
 export async function createKernel(config: SpecdConfig, options?: KernelOptions): Promise<Kernel> {
   const registry = createKernelRegistryView(createBuiltinKernelRegistry(), options)
+  if (options?.graphStoreId !== undefined && !registry.graphStores.has(options.graphStoreId)) {
+    throw new Error(`graph store '${options.graphStoreId}' is not registered`)
+  }
   const i = await createKernelInternals(config, registry, options)
 
   // Shared ResolveSchema + LazySchemaProvider — resolves once with plugins and overrides
