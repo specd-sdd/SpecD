@@ -35,12 +35,15 @@
 
 ### Requirement: Input — artifactId filter
 
-#### Scenario: Unknown artifact ID returns failure
+#### Scenario: Validating one spec does not fail on missing artifacts from other specs
 
-- **GIVEN** `artifactId` is `"nonexistent"` and the schema has no artifact with that ID
-- **WHEN** `ValidateArtifacts.execute` is called
-- **THEN** `result.passed` is `false` and `result.failures` includes a descriptive error for the unknown ID
-- **AND** no validation, delta check, or `markComplete` is performed
+- **GIVEN** a change with two specs: `specA` and `specB`
+- **AND** `specA` has all its artifact files present
+- **AND** `specB` does not have its artifact files yet (not yet created)
+- **WHEN** `ValidateArtifacts.execute` is called with `specPath: 'specA'`
+- **THEN** only `specA`'s artifacts are validated
+- **AND** missing artifacts from `specB` do NOT cause validation failure
+- **AND** `result.passed` is `true` if `specA`'s artifacts pass validation
 
 #### Scenario: Only the specified artifact is validated
 
@@ -160,6 +163,23 @@
 - **GIVEN** an artifact with `delta: true` but no delta file present in the change directory
 - **WHEN** `ValidateArtifacts.execute` is called
 - **THEN** `validations[]` run against the artifact file content directly, with no application preview step
+
+#### Scenario: Missing non-optional artifact file causes failure
+
+- **GIVEN** an artifact that is NOT optional (`optional: false` in schema)
+- **AND** the artifact file does not exist in the change directory
+- **AND** the artifact belongs to the spec being validated
+- **WHEN** `ValidateArtifacts.execute` processes the artifact
+- **THEN** validation fails with a failure indicating the missing file
+- **AND** the artifact is NOT marked complete
+
+#### Scenario: Missing optional artifact file is silently skipped
+
+- **GIVEN** an artifact that IS optional (`optional: true` in schema)
+- **AND** the artifact file does not exist in the change directory
+- **WHEN** `ValidateArtifacts.execute` processes the artifact
+- **THEN** validation continues without failure
+- **AND** no failure is recorded for the missing file
 
 #### Scenario: Non-delta artifact validated directly
 

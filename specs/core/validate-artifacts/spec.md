@@ -26,21 +26,11 @@ class ValidateArtifacts {
 
 ### Requirement: Input
 
-`ValidateArtifacts.execute` receives:
+`ValidateArtifactsInput.specPath` is optional when validating `scope: change` artifacts. For `scope: change` artifacts (like `design`, `tasks`), the artifact is uniquely identified by its artifact ID alone — there is no ambiguity about which spec it belongs to.
 
-- `name` — the change name to validate
-- `specPath` — the spec ID to validate (one spec per execution); must be one of the IDs in `change.specIds`
-- `artifactId` — optional; when provided, only the artifact with this ID is validated. All other artifacts are skipped. The required-artifacts check is also skipped.
+For `scope: spec` artifacts, `specPath` is still required because the same artifact type (e.g., `specs`) exists for multiple specs.
 
-Validating all specs in a change requires calling `execute` once per spec ID. Use cases that need to validate all specs call `execute` in a loop.
-
-When `artifactId` is provided:
-
-1. If the artifact ID does not exist in the schema, `execute` SHALL return a failure result with a descriptive error — it SHALL NOT throw.
-2. The required-artifacts check (Requirement: Required artifacts check) is skipped entirely.
-3. Only the specified artifact is evaluated through the dependency order check, delta validation, structural validation, and hash computation steps.
-4. All other artifacts are ignored — they are not checked, not reported as missing, and not included in the result.
-5. The dependency order check still applies to the specified artifact: if its `requires` are not satisfied, it is reported as dependency-blocked.
+When `specPath` is provided and the artifact is `scope: change`, the specPath is ignored — the artifact ID is sufficient.
 
 ### Requirement: Schema name guard
 
@@ -68,9 +58,7 @@ A single invalidation call is made per `execute` invocation even if multiple art
 
 ### Requirement: Per-file validation
 
-Validation operates per-file within each artifact type. For `scope: change` artifacts, the single file is keyed by the artifact type id. For `scope: spec` artifacts, validation targets the file keyed by the `specPath` input parameter. If the tracked file's filename ends with `.delta.yaml`, the file is read as a delta directly (no separate delta lookup). Otherwise, standard delta detection applies.
-
-The raw file content (not merged) is hashed for `markComplete` — this is the content that was actually written by the user/agent.
+If the artifact file does not exist in the change directory and the artifact is not optional, validation MUST record a failure before skipping. Only optional artifacts may be silently skipped when their file is missing.
 
 ### Requirement: Delta validation
 
@@ -120,6 +108,17 @@ After a successful delta application preview (or for non-delta artifacts), `Vali
 
 **No-op bypass:** When the delta contains only `no-op` entries, structural validation is skipped. The `no-op` operation declares that the existing artifact content is already valid, so re-validating the base content against `validations[]` is not required.
 
+### Requirement: MetadataExtraction validation
+
+After building the merged preview, `ValidateArtifacts` MUST also validate the extracted metadata:
+
+1. Get `schema.metadataExtraction()`
+2. If defined, call `extractMetadata(extraction, astsByArtifact, renderers, transforms, artifactType.id)`
+3. Validate result against `strictSpecMetadataSchema`
+4. If validation fails, record as validation failure
+
+The extracted metadata is validated ONLY for the artifact being validated — not all artifacts.
+
 ### Requirement: Hash computation and markComplete
 
 If all delta validations, conflict detection, and structural validations pass for a file within an artifact, `ValidateArtifacts` must:
@@ -146,6 +145,10 @@ After all artifacts have been evaluated, `ValidateArtifacts` MUST persist any `m
 The mutation callback MUST operate on the fresh persisted `Change` instance provided by `mutate()`. All change-state mutations performed by validation — including approval invalidation, artifact completion, and dependency extraction side effects — MUST happen against that fresh instance before the repository persists it.
 
 The mutation MUST still persist partial progress when some artifacts fail. Validation returns a result object rather than rolling back successful `markComplete` updates for other artifacts.
+
+### Requirement: MetadataExtraction validation failures are validation failures
+
+If metadataExtraction validation fails, `ValidateArtifacts` MUST record the failure in `result.failures` with the artifact ID. The artifact is NOT marked complete.
 
 ## Constraints
 
