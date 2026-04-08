@@ -7,6 +7,9 @@ export default tseslint.config(
   {
     ignores: [
       '**/dist/**',
+      '**/build/**',
+      '**/.docusaurus/**',
+      '**/.generated/**',
       '**/node_modules/**',
       '**/*.config.*',
       '**/*.mjs',
@@ -32,7 +35,7 @@ export default tseslint.config(
 
   // Source files — full rule set
   {
-    files: ['packages/*/src/**/*.ts'],
+    files: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts', 'apps/*/src/**/*.tsx'],
     plugins: { unicorn, jsdoc },
     settings: {
       jsdoc: { mode: 'typescript' },
@@ -60,7 +63,7 @@ export default tseslint.config(
 
   // All source files — kebab-case filenames and JSDoc (eslint/spec.md, docs/spec.md)
   {
-    files: ['packages/*/src/**/*.ts'],
+    files: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.ts', 'apps/*/src/**/*.tsx'],
     rules: {
       // Kebab-case filenames for source files
       'unicorn/filename-case': ['error', { case: 'kebabCase' }],
@@ -86,6 +89,21 @@ export default tseslint.config(
       'jsdoc/require-throws': 'error',
       'jsdoc/check-param-names': 'error',
       'jsdoc/check-tag-names': ['error', { definedTags: ['remarks', 'internal'] }],
+    },
+  },
+
+  // Framework-owned page entrypoints may require default exports
+  {
+    files: ['apps/public-web/src/pages/**/*.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'PropertyDefinition:not([accessibility="private"]):not([accessibility="protected"])',
+          message: 'Classes must not expose public fields. Use methods or getters instead.',
+        },
+      ],
     },
   },
 
@@ -147,7 +165,11 @@ export default tseslint.config(
 
   // Test files (specs and helpers) — relax all quality rules
   {
-    files: ['packages/*/test/**/*.ts'],
+    files: [
+      'packages/*/test/**/*.ts',
+      'apps/*/test/**/*.ts',
+      'apps/*/test/**/*.tsx',
+    ],
     rules: {
       'jsdoc/require-jsdoc': 'off',
       'jsdoc/require-description': 'off',

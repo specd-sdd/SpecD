@@ -1,0 +1,9 @@
+{
+  "label": "Core",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "title": "Core Concepts and API",
+    "description": "Domain model, ports, services, use cases, and core examples for specd."
+  }
+}

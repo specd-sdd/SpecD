@@ -1,0 +1,9 @@
+{
+  "label": "Config Examples",
+  "position": 99,
+  "link": {
+    "type": "generated-index",
+    "title": "Configuration Examples",
+    "description": "Annotated specd.yaml examples for single-repo, coordinator, and approval-hook setups."
+  }
+}

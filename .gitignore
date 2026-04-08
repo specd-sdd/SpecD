@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 .turbo/
+apps/public-web/build/
+apps/public-web/.docusaurus/
+apps/public-web/.generated/
 
 # Runtime state (specd tool — plans, plugins, hooks state)
 .specd/*

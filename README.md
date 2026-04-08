@@ -127,6 +127,28 @@ pnpm --filter @specd/cli build
 node packages/cli/dist/index.js --help
 ```
 
+Preview the public website locally:
+
+```sh
+pnpm web:dev
+```
+
+This starts the Docusaurus app in `apps/public-web` and serves the site locally, typically at `http://localhost:3000`.
+Development mode intentionally skips the generated API reference so the dev server does not watch hundreds of generated Markdown files.
+
+Useful routes to check:
+
+- `/` — presentation landing page
+- `/docs` — public guides and reference docs
+- `/api` — generated API reference for `@specd/core` in production preview builds
+
+To preview the production output instead of the dev server:
+
+```sh
+pnpm web:build
+pnpm web:serve
+```
+
 Example command groups currently wired:
 
 - `specd change ...`

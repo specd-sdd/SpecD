@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>SpecD</title>
+  <defs>
+    <linearGradient id="panel" x1="12" y1="10" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#14213a" />
+      <stop offset="1" stop-color="#0a1120" />
+    </linearGradient>
+    <linearGradient id="signal" x1="18" y1="32" x2="50" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4dd0a8" />
+      <stop offset="1" stop-color="#63b3ff" />
+    </linearGradient>
+    <radialGradient id="core" cx="0" cy="0" r="1" gradientTransform="translate(46 32) rotate(90) scale(12)">
+      <stop offset="0" stop-color="#fdf0b8" />
+      <stop offset=".22" stop-color="#f4b860" />
+      <stop offset=".5" stop-color="#63b3ff" />
+      <stop offset="1" stop-color="#0a1120" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#panel)" />
+  <path d="M0 20h64" stroke="#203454" stroke-opacity=".5" />
+  <g stroke="url(#signal)" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M16 32h15.5" stroke-width="2.5" />
+    <path d="M31.5 32c4 0 6 0 8.8-2.8 2.8-2.8 4.8-4.2 7.7-4.2" stroke-width="2" opacity=".9" />
+    <path d="M31.5 32c4 0 6 0 8.8 2.8 2.8 2.8 4.8 4.2 7.7 4.2" stroke-width="2" opacity=".8" />
+    <path d="M31.5 32h14" stroke-width="2.5" opacity=".95" />
+  </g>
+  <g fill="#dbe7ff" fill-opacity=".9">
+    <rect x="14" y="24" width="8" height="3" rx="1.5" />
+    <rect x="14" y="30.5" width="10.5" height="3" rx="1.5" />
+    <rect x="14" y="37" width="7" height="3" rx="1.5" />
+  </g>
+  <circle cx="46" cy="32" r="12" fill="url(#core)" />
+  <circle cx="46" cy="32" r="7" fill="none" stroke="#63b3ff" stroke-opacity=".75" />
+  <circle cx="46" cy="32" r="3.6" fill="#fff1c4" />
+  <circle cx="46" cy="32" r="1.6" fill="#ffffff" />
+</svg>
