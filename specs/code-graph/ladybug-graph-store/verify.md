@@ -10,6 +10,13 @@
 - **THEN** the adapter initializes its Ladybug-specific connection and schema state before serving queries
 - **AND** storage-agnostic callers do not need to know any Ladybug DDL or query details
 
+#### Scenario: Ladybug remains available by backend id
+
+- **GIVEN** a graph-store registry containing both `ladybug` and `sqlite`
+- **WHEN** composition selects the backend id `ladybug`
+- **THEN** `LadybugGraphStore` is constructed as the single active backend for that provider or kernel path
+- **AND** callers do not need to know any Ladybug class name or constructor details
+
 ### Requirement: Config-derived persistence layout
 
 #### Scenario: Graph and tmp directories are derived from configPath

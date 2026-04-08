@@ -3,8 +3,10 @@ import { mkdtempSync, readdirSync, rmSync, writeFileSync, mkdirSync } from 'node
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createCodeGraphProvider } from '../../src/composition/create-code-graph-provider.js'
+import { type GraphStoreFactory } from '../../src/composition/graph-store-factory.js'
 import { SymbolKind } from '../../src/domain/value-objects/symbol-kind.js'
 import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.js'
+import { InMemoryGraphStore } from '../helpers/in-memory-graph-store.js'
 
 describe('CodeGraphProvider', () => {
   let tempDir: string
@@ -46,6 +48,51 @@ describe('CodeGraphProvider', () => {
     expect(stats.fileCount).toBeGreaterThanOrEqual(2)
 
     await provider.close()
+  })
+
+  it('uses sqlite as the built-in default backend', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-e2e-'))
+    const provider = createCodeGraphProvider({ storagePath: tempDir })
+
+    await provider.open()
+    await provider.close()
+
+    expect(readdirSync(join(tempDir, 'graph'))).toContain('code-graph.sqlite')
+  })
+
+  it('allows explicit selection of the ladybug backend', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-e2e-'))
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      graphStoreId: 'ladybug',
+    })
+
+    await provider.open()
+    await provider.close()
+
+    expect(readdirSync(join(tempDir, 'graph'))).toContain('code-graph.lbug')
+  })
+
+  it('allows additive registration of a custom graph-store factory', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-e2e-'))
+    let receivedStoragePath: string | undefined
+    const customFactory: GraphStoreFactory = {
+      create(options) {
+        receivedStoragePath = options.storagePath
+        return new InMemoryGraphStore()
+      },
+    }
+
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      graphStoreId: 'custom',
+      graphStoreFactories: { custom: customFactory },
+    })
+
+    await provider.open()
+    await provider.close()
+
+    expect(receivedStoragePath).toBe(tempDir)
   })
 
   it('throws StoreNotOpenError before open', async () => {

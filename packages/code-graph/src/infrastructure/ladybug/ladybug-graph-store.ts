@@ -150,6 +150,44 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Deletes a file node, its symbols, and adjacent relations without rebuilding FTS.
+   * @param conn - The active Ladybug connection.
+   * @param filePath - Path of the file to remove.
+   */
+  private async deleteFileLocalState(conn: Connection, filePath: string): Promise<void> {
+    const escaped = this.escape(filePath)
+
+    const symbolRows = await exec(
+      conn,
+      `MATCH (s:Symbol {filePath: '${escaped}'}) RETURN s.id AS id`,
+    )
+
+    for (const row of symbolRows) {
+      const symbolId = row['id'] as string
+      await conn.query(`MATCH (s:Symbol {id: '${this.escape(symbolId)}'})-[r]->() DELETE r`)
+      await conn.query(`MATCH ()-[r]->(s:Symbol {id: '${this.escape(symbolId)}'}) DELETE r`)
+      await conn.query(`MATCH (s:Symbol {id: '${this.escape(symbolId)}'}) DELETE s`)
+    }
+
+    await conn.query(`MATCH (f:File {path: '${escaped}'})-[r]->() DELETE r`)
+    await conn.query(`MATCH ()-[r]->(f:File {path: '${escaped}'}) DELETE r`)
+    await conn.query(`MATCH (f:File {path: '${escaped}'}) DELETE f`)
+  }
+
+  /**
+   * Deletes a spec node and adjacent relations without rebuilding FTS.
+   * @param conn - The active Ladybug connection.
+   * @param specId - Identifier of the spec to remove.
+   */
+  private async deleteSpecLocalState(conn: Connection, specId: string): Promise<void> {
+    const escaped = this.escape(specId)
+
+    await conn.query(`MATCH (s:Spec {specId: '${escaped}'})-[r]->() DELETE r`)
+    await conn.query(`MATCH ()-[r]->(s:Spec {specId: '${escaped}'}) DELETE r`)
+    await conn.query(`MATCH (s:Spec {specId: '${escaped}'}) DELETE s`)
+  }
+
+  /**
    * Drops and recreates all FTS indexes. Must be called after bulk data changes
    * because LadybugDB FTS indexes are not automatically updated on insert.
    */
@@ -214,7 +252,7 @@ export class LadybugGraphStore extends GraphStore {
 
     await conn.query('BEGIN TRANSACTION')
     try {
-      await this.removeFile(file.path)
+      await this.deleteFileLocalState(conn, file.path)
 
       const escapedPath = this.escape(file.path)
       const escapedLang = this.escape(file.language)
@@ -243,6 +281,7 @@ export class LadybugGraphStore extends GraphStore {
       await conn.query('ROLLBACK').catch(() => {})
       throw err
     }
+    await this.rebuildFtsIndexes()
   }
 
   /**
@@ -252,23 +291,8 @@ export class LadybugGraphStore extends GraphStore {
   async removeFile(filePath: string): Promise<void> {
     this.ensureOpen()
     const conn = this.conn!
-    const escaped = this.escape(filePath)
-
-    const symbolRows = await exec(
-      conn,
-      `MATCH (s:Symbol {filePath: '${escaped}'}) RETURN s.id AS id`,
-    )
-
-    for (const row of symbolRows) {
-      const symbolId = row['id'] as string
-      await conn.query(`MATCH (s:Symbol {id: '${this.escape(symbolId)}'})-[r]->() DELETE r`)
-      await conn.query(`MATCH ()-[r]->(s:Symbol {id: '${this.escape(symbolId)}'}) DELETE r`)
-      await conn.query(`MATCH (s:Symbol {id: '${this.escape(symbolId)}'}) DELETE s`)
-    }
-
-    await conn.query(`MATCH (f:File {path: '${escaped}'})-[r]->() DELETE r`)
-    await conn.query(`MATCH ()-[r]->(f:File {path: '${escaped}'}) DELETE r`)
-    await conn.query(`MATCH (f:File {path: '${escaped}'}) DELETE f`)
+    await this.deleteFileLocalState(conn, filePath)
+    await this.rebuildFtsIndexes()
   }
 
   /**
@@ -468,6 +492,7 @@ export class LadybugGraphStore extends GraphStore {
         }
       }
     }
+    await this.rebuildFtsIndexes()
   }
 
   /**
@@ -481,7 +506,7 @@ export class LadybugGraphStore extends GraphStore {
 
     await conn.query('BEGIN TRANSACTION')
     try {
-      await this.removeSpec(spec.specId)
+      await this.deleteSpecLocalState(conn, spec.specId)
 
       await conn.query(
         `CREATE (s:Spec {specId: '${this.escape(spec.specId)}', path: '${this.escape(spec.path)}', title: '${this.escape(spec.title)}', description: '${this.escape(spec.description)}', contentHash: '${this.escape(spec.contentHash)}', content: '${this.escape(spec.content)}', workspace: '${this.escape(spec.workspace)}'})`,
@@ -496,6 +521,7 @@ export class LadybugGraphStore extends GraphStore {
       await conn.query('ROLLBACK').catch(() => {})
       throw err
     }
+    await this.rebuildFtsIndexes()
   }
 
   /**
@@ -505,11 +531,8 @@ export class LadybugGraphStore extends GraphStore {
   async removeSpec(specId: string): Promise<void> {
     this.ensureOpen()
     const conn = this.conn!
-    const escaped = this.escape(specId)
-
-    await conn.query(`MATCH (s:Spec {specId: '${escaped}'})-[r]->() DELETE r`)
-    await conn.query(`MATCH ()-[r]->(s:Spec {specId: '${escaped}'}) DELETE r`)
-    await conn.query(`MATCH (s:Spec {specId: '${escaped}'}) DELETE s`)
+    await this.deleteSpecLocalState(conn, specId)
+    await this.rebuildFtsIndexes()
   }
 
   /**
@@ -821,7 +844,10 @@ export class LadybugGraphStore extends GraphStore {
     const relationCounts: Record<string, number> = {}
     for (const type of Object.values(RT)) {
       try {
-        const rows = await exec(conn, `MATCH ()-[r:${type}]->() RETURN count(r) AS c`)
+        const rows = await exec(
+          conn,
+          `MATCH (a)-[r:${type}]->(b) RETURN count(DISTINCT [id(a), id(b)]) AS c`,
+        )
         relationCounts[type] = Number(rows[0]?.['c'] ?? 0)
       } catch {
         relationCounts[type] = 0
@@ -1024,7 +1050,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      `MATCH (imp:File)-[:IMPORTS]->(f:File) RETURN f.path AS path, count(imp) AS importerCount`,
+      `MATCH (imp:File)-[:IMPORTS]->(f:File) RETURN f.path AS path, count(DISTINCT imp.path) AS importerCount`,
     )
     const result = new Map<string, number>()
     for (const row of rows) {
@@ -1063,6 +1089,7 @@ export class LadybugGraphStore extends GraphStore {
     await conn.query('MATCH (s:Symbol) DELETE s')
     await conn.query('MATCH (s:Spec) DELETE s')
     await conn.query('MATCH (m:Meta) DELETE m')
+    await this.rebuildFtsIndexes()
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
   }

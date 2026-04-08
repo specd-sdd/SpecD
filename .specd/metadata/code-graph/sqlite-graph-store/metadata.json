@@ -1,0 +1,221 @@
+{
+  "title": "SQLite Graph Store",
+  "description": "`GraphStore` is the storage contract for the code graph, but SQLite has backend-specific\nbehavior that should not leak into the abstract port spec. This spec defines the\nrequirements that are specific to `SQLiteGraphStore`: its physical schema, persistence\nlayout, full-text search behavior, transaction model, and operational role as the\nbuilt-in default graph-store backend once it satisfies the full Ladybug feature set.",
+  "dependsOn": [
+    "code-graph:code-graph/graph-store",
+    "core:core/config",
+    "code-graph:code-graph/symbol-model",
+    "code-graph:code-graph/workspace-integration"
+  ],
+  "context": [
+    "`GraphStore` is the storage contract for the code graph, but SQLite has backend-specific\nbehavior that should not leak into the abstract port spec. This spec defines the\nrequirements that are specific to `SQLiteGraphStore`: its physical schema, persistence\nlayout, full-text search behavior, transaction model, and operational role as the\nbuilt-in default graph-store backend once it satisfies the full Ladybug feature set."
+  ],
+  "rules": [
+    {
+      "requirement": "SQLite-backed implementation",
+      "rules": [
+        "`SQLiteGraphStore` SHALL implement the `GraphStore` contract using SQLite as the\nstorage engine. It is an infrastructure adapter and owns all backend-specific concerns\nthat are not part of the abstract `GraphStore` port.\n\nWithin a composition that supports multiple registered graph-store backends, the\nSQLite adapter is identified by the backend id `sqlite`.\n\nThe adapter MUST:\n\n- open and close a SQLite database connection safely\n- execute the SQLite-specific schema DDL on first use\n- keep backend-specific schema version state\n- translate the abstract graph-store operations into SQLite queries, transactions, and\n  full-text search operations"
+      ]
+    },
+    {
+      "requirement": "Config-derived persistence layout",
+      "rules": [
+        "`SQLiteGraphStore` SHALL use the project-level `configPath` as the root for its\npersisted and temporary filesystem artifacts.\n\nThe adapter MUST derive:\n\n- a graph persistence directory at `{configPath}/graph`\n- a temporary scratch directory at `{configPath}/tmp`\n\nThe concrete SQLite database file and any backend-owned companion artifacts such as\nWAL or shared-memory files SHALL live only under those derived directories. The adapter\nMUST create the required directories on demand."
+      ]
+    },
+    {
+      "requirement": "Default backend role",
+      "rules": [
+        "The built-in code-graph composition SHALL treat `sqlite` as the default backend id\nwhen no explicit `graphStoreId` is selected.\n\nThe SQLite backend therefore MUST preserve the full set of currently supported graph\nbehaviors that Ladybug previously backed, including:\n\n- durable persistence of file, symbol, spec, relation, and metadata state\n- atomic mutation semantics required by the abstract `GraphStore` contract\n- full-text search for symbols and specs\n- bulk indexing and full re-index operations\n- query support for traversal-, impact-, hotspot-, search-, and stats-facing flows"
+      ]
+    },
+    {
+      "requirement": "Destructive recreation",
+      "rules": [
+        "`SQLiteGraphStore` SHALL implement the abstract `GraphStore.recreate()` capability\nusing SQLite-specific persistence cleanup under the configured graph root.\n\nWhen `recreate()` is invoked, the adapter MUST ensure that the next indexing run starts\nfrom an empty SQLite backend without requiring callers to know any SQLite-specific\nfilenames. The implementation MAY close and reopen connections as needed, but the\nobservable effect MUST be that:\n\n- all persisted SQLite graph data under `{configPath}/graph` is discarded\n- any backend-owned companion artifacts such as WAL or shared-memory files are also\n  discarded when they belong to the same graph persistence root\n- the backend is ready to be opened again and rebuilt from scratch"
+      ]
+    },
+    {
+      "requirement": "SQLite schema ownership",
+      "rules": [
+        "`SQLiteGraphStore` SHALL own the SQLite-specific persisted schema for files, symbols,\nspecs, relations, full-text indexes, and store metadata.\n\nThat schema MUST define:\n\n- persisted records for `File`, `Symbol`, `Spec`, and `Meta`\n- persisted relation storage matching the `RelationType` values used by the code graph,\n  including `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`\n- any derived or backend-specific storage columns required by the implementation, such\n  as normalized search text\n\nThe physical schema is an implementation concern of the SQLite adapter. Storage-agnostic\nconsumers MUST depend on `code-graph:code-graph/graph-store` instead of this spec."
+      ]
+    },
+    {
+      "requirement": "Persisted node storage",
+      "rules": [
+        "The SQLite schema SHALL persist the logical node kinds required by the abstract graph\nmodel:\n\n- `File` nodes for indexed source files\n- `Symbol` nodes for extracted code symbols\n- `Spec` nodes for indexed specification documents\n- `Meta` records for store-level metadata such as `lastIndexedAt`, `lastIndexedRef`,\n  and backend schema version state\n\nThe adapter MAY represent those records as one table per logical node kind or another\nSQLite-appropriate layout, provided the observable `GraphStore` semantics remain\npreserved."
+      ]
+    },
+    {
+      "requirement": "Persisted relation storage",
+      "rules": [
+        "The SQLite schema SHALL persist the relation families required by the abstract graph\nmodel:\n\n- `IMPORTS`\n- `DEFINES`\n- `CALLS`\n- `EXPORTS`\n- `DEPENDS_ON`\n- `COVERS`\n- `EXTENDS`\n- `IMPLEMENTS`\n- `OVERRIDES`\n\nThe adapter MAY represent relation storage with a single relation table, per-type\ntables, or another SQLite-appropriate layout, provided the observable `GraphStore`\nquery semantics remain preserved."
+      ]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "rules": [
+        "`SQLiteGraphStore` SHALL implement symbol and spec search using SQLite full-text search\ncapabilities.\n\nThe adapter MUST:\n\n- provide full-text search over symbol search text and symbol comments for\n  `GraphStore.searchSymbols()`\n- provide full-text search over spec title, description, and searchable content for\n  `GraphStore.searchSpecs()`\n- return results ordered by descending relevance score\n- rebuild or refresh backend-specific FTS structures when required after bulk data\n  changes\n\nThe implementation MAY use SQLite FTS5 virtual tables or another SQLite-native full-text\nsearch mechanism, provided the abstract graph-store search contract remains satisfied."
+      ]
+    },
+    {
+      "requirement": "Transactional mutation model",
+      "rules": [
+        "`SQLiteGraphStore` SHALL use SQLite transactions to preserve the atomic mutation\nsemantics required by the abstract `GraphStore` contract.\n\nAt minimum:\n\n- `upsertFile()` MUST replace file-local graph state atomically\n- `removeFile()` MUST remove file-local graph state atomically\n- `upsertSpec()` MUST replace spec-local graph state atomically\n- `removeSpec()` MUST remove spec-local graph state atomically\n- bulk indexing operations MUST commit all-or-nothing backend state for the batch they\n  claim to have persisted\n\nIf a transaction fails, the backend MUST leave previously committed graph state intact."
+      ]
+    },
+    {
+      "requirement": "Bulk indexing support",
+      "rules": [
+        "`SQLiteGraphStore` SHALL support efficient bulk indexing for large repositories.\n\nThe adapter MAY use batching, prepared statements, temporary tables, or other\nSQLite-appropriate techniques to keep large indexing runs stable, provided the\nobservable `GraphStore` contract is preserved.\n\nIf the implementation materializes backend-owned scratch artifacts outside the primary\ndatabase file, those artifacts MUST be scoped to `{configPath}/tmp` and cleaned up\nafter successful completion."
+      ]
+    },
+    {
+      "requirement": "Schema versioning",
+      "rules": [
+        "`SQLiteGraphStore` SHALL track a backend-specific schema version for its persisted\nSQLite schema.\n\nWhen the adapter opens a database:\n\n1. it executes the current SQLite schema definition\n2. it verifies or records the current schema version in persisted metadata\n3. it prepares any required FTS structures\n\nIf the persisted SQLite schema version is incompatible with the expected version, the\nimplementation MAY require a destructive rebuild rather than attempting incremental\nmigration."
+      ]
+    },
+    {
+      "requirement": "Backend-specific companion files",
+      "rules": [
+        "The SQLite-backed graph persistence under `{configPath}/graph` MAY create backend-specific\ncompanion files such as WAL or shared-memory files next to the primary database file.\n\nThose files are part of the SQLite implementation detail and are not part of the\nabstract `GraphStore` contract."
+      ]
+    }
+  ],
+  "constraints": [
+    "SQLiteGraphStore is an infrastructure adapter, not part of the abstract\ngraph-store contract",
+    "sqlite is the stable backend id used to select this adapter from a multi-backend\ngraph-store registry",
+    "SQLite-specific file layout, FTS behavior, schema shape, and schema-version handling\nare defined here, not in code-graph:code-graph/graph-store",
+    "All SQLite scratch files and persisted database artifacts are rooted under\nconfigPath",
+    "Storage-agnostic use cases and CLI commands MUST NOT depend on this spec unless they\ntruly require SQLite-specific behavior"
+  ],
+  "scenarios": [
+    {
+      "requirement": "SQLite-backed implementation",
+      "name": "Backend initialization stays inside the adapter",
+      "when": ["SQLiteGraphStore.open() is called through the abstract GraphStore"],
+      "then": [
+        "the adapter initializes its SQLite-specific connection and schema state",
+        "AND storage-agnostic callers do not need to know any SQLite DDL or query details"
+      ]
+    },
+    {
+      "requirement": "Config-derived persistence layout",
+      "name": "Graph and tmp directories are derived from configPath",
+      "given": ["project config resolves configPath to /repo/.specd/config"],
+      "when": ["SQLiteGraphStore.open() or a backend-owned indexing operation needs"],
+      "then": [
+        "persistent SQLite files are created only under /repo/.specd/config/graph",
+        "AND scratch artifacts are created only under /repo/.specd/config/tmp"
+      ]
+    },
+    {
+      "requirement": "Default backend role",
+      "name": "SQLite is the built-in default backend id",
+      "given": ["the built-in graph-store registry contains both sqlite and ladybug"],
+      "when": ["no explicit graphStoreId is supplied during provider or kernel"],
+      "then": ["the backend id sqlite is selected"]
+    },
+    {
+      "requirement": "Default backend role",
+      "name": "Default backend preserves Ladybug-era capabilities",
+      "when": ["graph indexing, search, stats, traversal, impact, and hotspot flows run"],
+      "then": ["they succeed through SQLiteGraphStore without requiring a fallback to"]
+    },
+    {
+      "requirement": "Destructive recreation",
+      "name": "Recreate discards SQLite-owned graph files under the graph root",
+      "given": ["SQLite persistence already exists under {configPath}/graph"],
+      "when": ["SQLiteGraphStore.recreate() is invoked through the abstract force-reset"],
+      "then": [
+        "the previously persisted SQLite graph state is discarded",
+        "AND any SQLite-owned companion artifacts in the same graph root are discarded\nwith it",
+        "AND callers do not target SQLite filenames directly"
+      ]
+    },
+    {
+      "requirement": "SQLite schema ownership",
+      "name": "Physical schema remains backend-specific",
+      "when": ["storage-agnostic use cases depend on GraphStore"],
+      "then": [
+        "they rely only on abstract node and relation semantics",
+        "AND SQLite table names, virtual tables, indexes, and storage columns remain\ninternal to SQLiteGraphStore"
+      ]
+    },
+    {
+      "requirement": "Persisted node storage",
+      "name": "Logical node kinds survive backend-specific layout choices",
+      "when": ["files, symbols, specs, and metadata are persisted by SQLiteGraphStore"],
+      "then": [
+        "the abstract graph-store queries can retrieve the expected logical node",
+        "AND callers do not need to know whether SQLite uses one table per kind or\nanother internal layout"
+      ]
+    },
+    {
+      "requirement": "Persisted relation storage",
+      "name": "All required relation families are stored",
+      "when": ["the SQLite schema is initialized for a fresh graph database"],
+      "then": ["persisted storage exists for IMPORTS, DEFINES, CALLS, EXPORTS,"]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "Symbol and spec search use SQLite full-text search",
+      "given": ["symbols and specs have been indexed into SQLite"],
+      "when": ["abstract search methods are called"],
+      "then": ["results come back in descending relevance order from SQLite-backed full-text"]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "FTS structures can be refreshed after bulk writes",
+      "given": ["the backend has inserted symbols and specs through bulk-loading operations"],
+      "when": ["rebuildFtsIndexes() is invoked"],
+      "then": ["subsequent abstract search queries see the newly indexed data"]
+    },
+    {
+      "requirement": "Transactional mutation model",
+      "name": "File upsert is all-or-nothing",
+      "given": ["a file already has persisted graph state in SQLite"],
+      "when": ["upsertFile() fails during its transaction"],
+      "then": ["the previous committed state for that file remains intact"]
+    },
+    {
+      "requirement": "Transactional mutation model",
+      "name": "Bulk indexing batch is all-or-nothing",
+      "given": ["a bulk indexing operation is persisting a batch of graph data"],
+      "when": ["the SQLite transaction for that batch fails"],
+      "then": ["the backend does not expose a partially committed batch"]
+    },
+    {
+      "requirement": "Bulk indexing support",
+      "name": "Large indexing runs use backend-specific batching safely",
+      "when": ["a large repository is indexed through SQLiteGraphStore"],
+      "then": [
+        "the backend may batch writes, use prepared statements, or use temporary",
+        "AND the observable GraphStore contract remains unchanged"
+      ]
+    },
+    {
+      "requirement": "Schema versioning",
+      "name": "Incompatible schema version permits rebuild strategy",
+      "given": ["the persisted SQLite metadata records a schema version older than the"],
+      "when": ["the adapter opens the database and determines it cannot migrate safely"],
+      "then": ["it may require a destructive rebuild instead of applying an incremental"]
+    },
+    {
+      "requirement": "Backend-specific companion files",
+      "name": "SQLite companion files stay under graph persistence root",
+      "when": ["SQLite creates a primary database file together with WAL or shared-memory"],
+      "then": [
+        "all of those files live under {configPath}/graph",
+        "AND callers do not configure or address those files individually through the\nabstract port"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:06b0ff2002bf5656fb95a0f53b2111936f4b394a7b4f33564fcaa604d6018127",
+    "verify.md": "sha256:65e4928ea29b2c0b2b39ad8c890198e16a80259c96b7a6d8d43cd83526142f50"
+  },
+  "generatedBy": "core"
+}

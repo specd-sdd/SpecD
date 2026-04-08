@@ -112,6 +112,7 @@ describe('createKernelBuilder', () => {
   it('builds kernels with createKernel-equivalent registry contents', async () => {
     const config = await makeConfig()
     const remoteSpecFactory = { create: vi.fn() }
+    const remoteGraphStoreFactory = { create: vi.fn() }
     const vcsProvider = { name: 'custom-vcs', detect: vi.fn(async () => null) }
     const actorProvider = { name: 'custom-actor', detect: vi.fn(async () => null) }
     const runner = {
@@ -121,6 +122,8 @@ describe('createKernelBuilder', () => {
 
     const direct = await createKernel(config, {
       specStorageFactories: { remote: remoteSpecFactory },
+      graphStoreFactories: { remote: remoteGraphStoreFactory },
+      graphStoreId: 'sqlite',
       parsers: { toml: TOML_PARSER },
       vcsProviders: [vcsProvider],
       actorProviders: [actorProvider],
@@ -129,6 +132,8 @@ describe('createKernelBuilder', () => {
 
     const built = await createKernelBuilder(config)
       .registerSpecStorage('remote', remoteSpecFactory)
+      .registerGraphStore('remote', remoteGraphStoreFactory)
+      .useGraphStore('sqlite')
       .registerParser('toml', TOML_PARSER)
       .registerVcsProvider(vcsProvider)
       .registerActorProvider(actorProvider)
@@ -138,6 +143,7 @@ describe('createKernelBuilder', () => {
     expect([...built.registry.storages.specs.keys()]).toEqual([
       ...direct.registry.storages.specs.keys(),
     ])
+    expect([...built.registry.graphStores.keys()]).toEqual([...direct.registry.graphStores.keys()])
     expect([...built.registry.parsers.keys()]).toEqual([...direct.registry.parsers.keys()])
     expect(built.registry.vcsProviders.map((p) => p.name)).toEqual(
       direct.registry.vcsProviders.map((p) => p.name),
@@ -159,6 +165,12 @@ describe('createKernelBuilder', () => {
 
     const builder = createKernelBuilder(config).registerParser('toml', TOML_PARSER)
     expect(() => builder.registerParser('toml', TOML_PARSER)).toThrow(RegistryConflictError)
+    expect(() =>
+      createKernelBuilder(config).registerGraphStore('sqlite', { create: vi.fn() }),
+    ).toThrow(RegistryConflictError)
+    expect(() => createKernelBuilder(config).useGraphStore('missing')).toThrow(
+      "graph store 'missing' is not registered",
+    )
   })
 
   it('accepts base registration state and extends it', async () => {

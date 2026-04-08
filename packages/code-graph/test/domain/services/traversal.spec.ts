@@ -389,6 +389,36 @@ describe('Traversal services', () => {
       expect(result.affectedFiles).toContain('user.ts')
       expect(result.affectedSymbols.map((symbol) => symbol.name)).toContain('UserService')
     })
+
+    it('resolves imported-file symbols deterministically from the connected call subgraph', async () => {
+      const target = sym('target', 'core.ts', 1)
+      const facade = sym('facade', 'consumer.ts', 1)
+      const helper = sym('helper', 'consumer.ts', 2)
+      const helperTwo = sym('helperTwo', 'consumer.ts', 3)
+
+      await store.upsertFile(file('core.ts'), [target], [])
+      await store.upsertFile(
+        file('consumer.ts'),
+        [facade, helper, helperTwo],
+        [
+          createRelation({
+            source: 'consumer.ts',
+            target: 'core.ts',
+            type: RelationType.Imports,
+          }),
+          createRelation({ source: facade.id, target: target.id, type: RelationType.Calls }),
+          createRelation({ source: helper.id, target: facade.id, type: RelationType.Calls }),
+          createRelation({ source: helperTwo.id, target: helper.id, type: RelationType.Calls }),
+        ],
+      )
+
+      const result = await analyzeImpact(store, target.id, 'upstream')
+      const affectedNames = result.affectedSymbols.map((symbol) => symbol.name).sort()
+
+      expect(affectedNames).toEqual(['facade', 'helper', 'helperTwo'])
+      expect(result.affectedFiles).toContain('consumer.ts')
+      expect(result.directDependents).toBe(1)
+    })
   })
 
   describe('analyzeFileImpact', () => {

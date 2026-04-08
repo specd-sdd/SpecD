@@ -78,4 +78,10 @@ describe('createKernelInternals', () => {
     expect(internals.actor).toBeInstanceOf(NullActorResolver)
     expect(internals.vcs).toBeInstanceOf(NullVcsAdapter)
   })
+
+  it('exposes built-in graph-store ids in the merged registry view', async () => {
+    const registry = createKernelRegistryView(createBuiltinKernelRegistry())
+
+    expect([...registry.graphStores.keys()]).toEqual(expect.arrayContaining(['ladybug', 'sqlite']))
+  })
 })

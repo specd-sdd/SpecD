@@ -1,7 +1,7 @@
 {
   "title": "Kernel Builder",
   "description": "Consumers that need to register kernel extensions conditionally or incrementally should not have to assemble a large `KernelOptions` object manually before every kernel construction. The kernel builder provides a fluent composition surface over the same additive registry model as `createKernel(config, options)`, letting callers accumulate registrations ergonomically while preserving the kernel's existing guarantees around manual dependency injection, additive extension, and post-build immutability.",
-  "dependsOn": ["core:core/kernel", "core:core/composition"],
+  "dependsOn": ["core:core/kernel"],
   "context": [
     "Consumers that need to register kernel extensions conditionally or incrementally should not have to assemble a large `KernelOptions` object manually before every kernel construction. The kernel builder provides a fluent composition surface over the same additive registry model as `createKernel(config, options)`, letting callers accumulate registrations ergonomically while preserving the kernel's existing guarantees around manual dependency injection, additive extension, and post-build immutability."
   ],
@@ -9,25 +9,25 @@
     {
       "requirement": "Builder accumulates additive kernel registrations",
       "rules": [
-        "A fluent kernel builder SHALL exist as a public composition entry point for `@specd/core`. It SHALL accumulate the same additive registrations supported by `KernelOptions`, including storage factories, parsers, VCS providers, actor providers, and external hook runners, before kernel construction occurs.\n\nThe builder SHALL be a pre-construction composition surface only. It MUST NOT mutate an already-built kernel."
+        "A fluent kernel builder SHALL exist as a public composition entry point for `@specd/core`. It SHALL accumulate the same additive registrations supported by `KernelOptions`, including storage factories, graph-store factories, parsers, VCS providers, actor providers, and external hook runners, before kernel construction occurs.\n\nThe builder SHALL be a pre-construction composition surface only. It MUST NOT mutate an already-built kernel."
       ]
     },
     {
       "requirement": "Builder supports fluent registration methods",
       "rules": [
-        "The builder SHALL expose fluent registration methods for each additive registry category that this change introduces. At minimum, it SHALL support:\n\n- spec storage registration\n- schema storage registration\n- change storage registration\n- archive storage registration\n- parser registration\n- external hook runner registration\n- VCS provider registration\n- actor provider registration\n\nEach registration method SHALL return the builder itself so callers can chain registrations conditionally and ergonomically."
+        "The builder SHALL expose fluent registration methods for each additive registry category that this change introduces. At minimum, it SHALL support:\n\n- spec storage registration\n- schema storage registration\n- change storage registration\n- archive storage registration\n- graph-store registration via `registerGraphStore(id, factory)`\n- graph-store selection via `useGraphStore(id)`\n- parser registration\n- external hook runner registration\n- VCS provider registration\n- actor provider registration\n\nEach registration method SHALL return the builder itself so callers can chain registrations conditionally and ergonomically.\n\n`useGraphStore(id)` selects the single active graph-store backend for the kernel being built. It does not register a backend by itself."
       ]
     },
     {
       "requirement": "Builder builds kernels with createKernel-equivalent semantics",
       "rules": [
-        "Calling `build()` on the builder SHALL produce a kernel with the same semantics as calling `createKernel(config, options)` with the equivalent accumulated registrations.\n\nThis equivalence includes:\n\n- built-in capabilities remain available\n- external registrations extend rather than replace built-ins\n- shared adapters are constructed once\n- the resulting kernel is immutable after construction"
+        "Calling `build()` on the builder SHALL produce a kernel with the same semantics as calling `createKernel(config, options)` with the equivalent accumulated registrations and selected `graphStoreId`.\n\nThis equivalence includes:\n\n- built-in capabilities remain available\n- external registrations extend rather than replace built-ins\n- the selected graph-store backend id is passed through exactly as if it had been supplied in `KernelOptions`\n- shared adapters are constructed once\n- the resulting kernel is immutable after construction"
       ]
     },
     {
       "requirement": "Builder rejects conflicting registrations",
       "rules": [
-        "The builder SHALL reject conflicting registrations instead of silently overwriting them. Attempting to register a capability name that collides with an existing built-in or already-registered external entry for the same registry category MUST fail with an error."
+        "The builder SHALL reject conflicting registrations instead of silently overwriting them. Attempting to register a capability name that collides with an existing built-in or already-registered external entry for the same registry category MUST fail with an error.\n\nThe builder SHALL also reject `useGraphStore(id)` when `id` is not present in the merged built-in plus externally-registered graph-store registry available at build time."
       ]
     },
     {
@@ -49,7 +49,7 @@
       "name": "Registrations accumulate before build",
       "given": ["a builder created for a resolved SpecdConfig"],
       "when": [
-        "storage, parser, VCS, actor, and external hook runner registrations are added before build()"
+        "storage, graph-store, parser, VCS, actor, and external hook runner registrations are added before build()"
       ],
       "then": [
         "the builder retains all of them as pending additive registrations",
@@ -66,15 +66,27 @@
       ]
     },
     {
+      "requirement": "Builder supports fluent registration methods",
+      "name": "useGraphStore selects the active backend id",
+      "given": ["a builder with both sqlite and ladybug available in its graph-store registry"],
+      "when": ["useGraphStore('ladybug') is called before build()"],
+      "then": [
+        "the built kernel uses ladybug as the selected backend id for downstream graph composition"
+      ]
+    },
+    {
       "requirement": "Builder builds kernels with createKernel-equivalent semantics",
       "name": "Equivalent registrations produce equivalent kernels",
-      "given": ["the same resolved config and the same additive registrations"],
+      "given": [
+        "the same resolved config, the same additive registrations, and the same selected graph-store id"
+      ],
       "when": [
         "one kernel is produced through the builder and another through createKernel(config, options)"
       ],
       "then": [
         "both kernels preserve the built-in capabilities",
         "AND both expose the same merged registry contents",
+        "AND both carry the same effective graphStoreId",
         "AND both construct shared adapters once before returning an immutable kernel"
       ]
     },
@@ -87,6 +99,13 @@
         "the builder fails with a clear conflict error",
         "AND the later registration does not overwrite the earlier one"
       ]
+    },
+    {
+      "requirement": "Builder rejects conflicting registrations",
+      "name": "Unknown graph-store id is rejected",
+      "given": ["a builder whose merged graph-store registry does not contain missing-backend"],
+      "when": ["useGraphStore('missing-backend') is called"],
+      "then": ["the builder fails with a clear unknown-backend error"]
     },
     {
       "requirement": "Builder accepts base registration state",
@@ -102,8 +121,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:c2c5fbe0ca4976936a00e70cb9cf3624f4d44c2f56b7337c2435e9dce54447cb",
-    "verify.md": "sha256:13098af642cc290b1d04487ccde3a77217e1a0cb6b1a7cd25038d1746baad17c"
+    "spec.md": "sha256:8e60c796c78746edd911c3120e6046b2e29689f874a1aee44023f726d08e5fe8",
+    "verify.md": "sha256:cae80bd9a2013c73d1624cdaadc6d891ba46e6184d2cabd2f9d297bde6e7385a"
   },
   "generatedBy": "core"
 }

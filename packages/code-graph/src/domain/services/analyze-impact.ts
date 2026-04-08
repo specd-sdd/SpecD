@@ -86,52 +86,27 @@ export async function analyzeImpact(
               filesByDepth.set(depth, new Set())
             }
             filesByDepth.get(depth)!.add(file)
-
-            // Resolve which symbols in this file are actually affected.
-            // First try: symbols with CALLS edges to/from already-affected symbols.
-            const fileSymbols = await store.findSymbols({ filePath: file })
-            let foundViaCall = false
-            for (const fs of fileSymbols) {
-              const callerRels = await store.getCallers(fs.id)
-              const calleeRels = await store.getCallees(fs.id)
-              const isAffected =
-                callerRels.some((r) => affectedSymbolMap.has(r.source)) ||
-                calleeRels.some((r) => affectedSymbolMap.has(r.target))
-              if (isAffected && !affectedSymbolMap.has(fs.id)) {
-                affectedSymbolMap.set(fs.id, {
-                  id: fs.id,
-                  name: fs.name,
-                  filePath: fs.filePath,
-                  line: fs.line,
-                  depth,
-                })
-                foundViaCall = true
-              }
-            }
-
-            // Fallback: if no CALLS edges found, use exported symbols.
-            // The file imports an affected file, so its exports that re-expose
-            // or delegate to the imported code are the affected surface.
-            if (!foundViaCall) {
-              const exported = await store.getExportedSymbols(file)
-              for (const es of exported) {
-                if (!affectedSymbolMap.has(es.id)) {
-                  affectedSymbolMap.set(es.id, {
-                    id: es.id,
-                    name: es.name,
-                    filePath: es.filePath,
-                    line: es.line,
-                    depth,
-                  })
-                }
-              }
-            }
           }
         }
       }
 
       if (nextFiles.length === 0) break
       currentFiles = nextFiles
+    }
+  }
+
+  for (let depth = 1; depth <= maxDepth; depth++) {
+    const files = [...(filesByDepth.get(depth) ?? new Set<string>())].sort()
+    if (files.length === 0) continue
+
+    const baselineAffectedIds = new Set(affectedSymbolMap.keys())
+    const nextSymbols = await collectImportedFileSymbols(store, files, baselineAffectedIds, depth)
+
+    for (const symbol of nextSymbols) {
+      const existing = affectedSymbolMap.get(symbol.id)
+      if (!existing || symbol.depth < existing.depth) {
+        affectedSymbolMap.set(symbol.id, symbol)
+      }
     }
   }
 
@@ -156,6 +131,8 @@ export async function analyzeImpact(
   const totalDependents = directDependents + indirectDependents + transitiveDependents
   // TODO: wire affectedProcesses count once execution flow tracking is implemented
   const riskLevel = computeRiskLevel(directDependents, totalDependents, 0)
+  const affectedFiles = [...affectedFileSet].sort()
+  const affectedSymbols = [...affectedSymbolMap.values()].sort(compareAffectedSymbols)
 
   return {
     target,
@@ -163,8 +140,130 @@ export async function analyzeImpact(
     indirectDependents,
     transitiveDependents,
     riskLevel,
-    affectedFiles: [...affectedFileSet],
-    affectedSymbols: [...affectedSymbolMap.values()],
+    affectedFiles,
+    affectedSymbols,
     affectedProcesses: [],
   }
+}
+
+/**
+ * Resolves affected symbols for imported files deterministically, using the
+ * already-affected symbol set as a fixed seed for the current depth.
+ *
+ * When a file contains symbols directly connected to the seed set via `CALLS`,
+ * the entire connected call subgraph inside that file is treated as affected.
+ * If no such seed is found, the file falls back to its exported symbols.
+ *
+ * @param store - The graph store to query.
+ * @param files - Imported files reached at the current depth.
+ * @param affectedIds - Symbols already known to be affected before this depth.
+ * @param depth - The import-traversal depth being processed.
+ * @returns Deterministically resolved affected symbols for the current depth.
+ */
+async function collectImportedFileSymbols(
+  store: GraphStore,
+  files: readonly string[],
+  affectedIds: ReadonlySet<string>,
+  depth: number,
+): Promise<AffectedSymbol[]> {
+  const results: AffectedSymbol[] = []
+
+  for (const file of files) {
+    const fileSymbols = await store.findSymbols({ filePath: file })
+    if (fileSymbols.length === 0) continue
+
+    const fileSymbolIds = new Set(fileSymbols.map((symbol) => symbol.id))
+    const adjacency = new Map<string, Set<string>>()
+    const directSeeds = new Set<string>()
+
+    for (const symbol of fileSymbols) {
+      const [callers, callees] = await Promise.all([
+        store.getCallers(symbol.id),
+        store.getCallees(symbol.id),
+      ])
+
+      const neighbors = new Set<string>()
+
+      for (const relation of callers) {
+        if (affectedIds.has(relation.source)) {
+          directSeeds.add(symbol.id)
+        }
+        if (fileSymbolIds.has(relation.source)) {
+          neighbors.add(relation.source)
+        }
+      }
+
+      for (const relation of callees) {
+        if (affectedIds.has(relation.target)) {
+          directSeeds.add(symbol.id)
+        }
+        if (fileSymbolIds.has(relation.target)) {
+          neighbors.add(relation.target)
+        }
+      }
+
+      adjacency.set(symbol.id, neighbors)
+    }
+
+    if (directSeeds.size === 0) {
+      const exported = await store.getExportedSymbols(file)
+      for (const symbol of exported) {
+        results.push({
+          id: symbol.id,
+          name: symbol.name,
+          filePath: symbol.filePath,
+          line: symbol.line,
+          depth,
+        })
+      }
+      continue
+    }
+
+    const byId = new Map(fileSymbols.map((symbol) => [symbol.id, symbol]))
+    const queue = [...directSeeds].sort()
+    const visited = new Set<string>()
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()
+      if (currentId === undefined || visited.has(currentId)) continue
+      visited.add(currentId)
+
+      const symbol = byId.get(currentId)
+      if (symbol !== undefined) {
+        results.push({
+          id: symbol.id,
+          name: symbol.name,
+          filePath: symbol.filePath,
+          line: symbol.line,
+          depth,
+        })
+      }
+
+      const neighbors = adjacency.get(currentId)
+      if (neighbors === undefined) continue
+      for (const neighborId of [...neighbors].sort()) {
+        if (!visited.has(neighborId)) {
+          queue.push(neighborId)
+        }
+      }
+    }
+  }
+
+  return results
+}
+
+/**
+ * Provides a stable ordering for affected symbols across graph-store backends.
+ * @param left - First affected symbol to compare.
+ * @param right - Second affected symbol to compare.
+ * @returns Negative when `left` sorts before `right`, positive when after, or 0 when equal.
+ */
+function compareAffectedSymbols(left: AffectedSymbol, right: AffectedSymbol): number {
+  return (
+    left.depth - right.depth ||
+    left.filePath.localeCompare(right.filePath) ||
+    left.line - right.line ||
+    left.name.localeCompare(right.name) ||
+    left.id.localeCompare(right.id)
+  )
 }

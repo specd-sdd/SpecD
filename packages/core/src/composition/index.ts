@@ -5,6 +5,7 @@ export {
   type ActorProvider,
   type ArchiveStorageFactory,
   type ChangeStorageFactory,
+  type GraphStoreFactory,
   type KernelRegistryInput,
   type KernelRegistryView,
   type SchemaStorageFactory,

@@ -33,6 +33,7 @@ import { type KernelOptions } from './kernel.js'
 import {
   type ArchiveStorageFactory,
   type ChangeStorageFactory,
+  type GraphStoreFactory,
   type KernelRegistryInput,
   type KernelRegistryView,
   type SchemaStorageFactory,
@@ -164,6 +165,20 @@ const FS_ARCHIVE_STORAGE_FACTORY: ArchiveStorageFactory = {
   },
 }
 
+/** Opaque built-in registration marker for the Ladybug graph-store backend id. */
+const LADYBUG_GRAPH_STORE_FACTORY: GraphStoreFactory = {
+  create(): unknown {
+    return undefined
+  },
+}
+
+/** Opaque built-in registration marker for the SQLite graph-store backend id. */
+const SQLITE_GRAPH_STORE_FACTORY: GraphStoreFactory = {
+  create(): unknown {
+    return undefined
+  },
+}
+
 /**
  * Returns the built-in kernel registry set before additive extension.
  *
@@ -175,6 +190,10 @@ export function createBuiltinKernelRegistry(): KernelRegistryInput {
     schemaStorageFactories: { fs: FS_SCHEMA_STORAGE_FACTORY },
     changeStorageFactories: { fs: FS_CHANGE_STORAGE_FACTORY },
     archiveStorageFactories: { fs: FS_ARCHIVE_STORAGE_FACTORY },
+    graphStoreFactories: {
+      ladybug: LADYBUG_GRAPH_STORE_FACTORY,
+      sqlite: SQLITE_GRAPH_STORE_FACTORY,
+    },
     parsers: createArtifactParserRegistry(),
     vcsProviders: BUILTIN_VCS_PROVIDERS,
     actorProviders: BUILTIN_ACTOR_PROVIDERS,

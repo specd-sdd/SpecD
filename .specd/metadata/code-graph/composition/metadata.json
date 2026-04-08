@@ -1,14 +1,7 @@
 {
   "title": "Composition",
   "description": "Consumers of `@specd/code-graph` should not need to know how the store, indexer, adapters, and traversal functions are wired together. The composition layer provides a single facade and factory function that assembles all internal components, manages lifecycle, and defines the package's public API surface.",
-  "dependsOn": [
-    "code-graph:code-graph/symbol-model",
-    "code-graph:code-graph/graph-store",
-    "code-graph:code-graph/language-adapter",
-    "code-graph:code-graph/indexer",
-    "code-graph:code-graph/traversal",
-    "default:_global/architecture"
-  ],
+  "dependsOn": ["code-graph:code-graph/graph-store"],
   "context": [
     "Consumers of `@specd/code-graph` should not need to know how the store, indexer, adapters, and traversal functions are wired together. The composition layer provides a single facade and factory function that assembles all internal components, manages lifecycle, and defines the package's public API surface."
   ],
@@ -22,13 +15,13 @@
     {
       "requirement": "Factory function",
       "rules": [
-        "Two factory signatures are provided:\n\n**Primary (workspace-aware):**\n\n`createCodeGraphProvider(config: SpecdConfig): CodeGraphProvider` accepts a `SpecdConfig` from `@specd/core` and:\n\n1. Derives `storagePath` from `config.projectRoot` (locates `.specd/code-graph.lbug`)\n2. Creates `LadybugGraphStore` with the storage path\n3. Creates `AdapterRegistry` and registers the built-in adapters (TypeScript, Python, Go, PHP)\n4. Creates `IndexCodeGraph` with the store and registry\n5. Returns a `CodeGraphProvider` wired to all components\n\n**Legacy (standalone):**\n\n`createCodeGraphProvider(options: CodeGraphOptions): CodeGraphProvider` accepts:\n\n- **`storagePath`** (`string`, required) — workspace root path, used to locate the `.specd/code-graph.lbug` file\n- **`adapters`** (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the 4 built-in adapters\n\nThe factory detects which overload is being used by checking for the `projectRoot` property (present on `SpecdConfig`) vs the `storagePath` property (present on `CodeGraphOptions`).\n\nCallers MUST NOT construct `CodeGraphProvider` directly — the constructor is not part of the public API."
+        "Two factory signatures are provided:\n\n**Primary (workspace-aware):**\n\n`createCodeGraphProvider(config: SpecdConfig, options?: CodeGraphFactoryOptions): CodeGraphProvider` accepts a `SpecdConfig` from `@specd/core` plus optional internal composition overrides and:\n\n1. Derives the graph storage root from `config.configPath`\n2. Resolves the active graph-store backend id using `options.graphStoreId` when provided, otherwise the built-in default backend id\n3. Builds a merged graph-store registry from the built-in backends plus any additive `options.graphStoreFactories`\n4. Creates the selected concrete `GraphStore` from that registry using the derived storage root\n5. Creates `AdapterRegistry` and registers the built-in adapters (TypeScript, Python, Go, PHP)\n6. Registers any additive language adapters from `options.adapters`\n7. Creates `IndexCodeGraph` with the selected store and adapter registry\n8. Returns a `CodeGraphProvider` wired to all components\n\n**Legacy (standalone):**\n\n`createCodeGraphProvider(options: CodeGraphOptions): CodeGraphProvider` accepts:\n\n- **`storagePath`** (`string`, required) — filesystem root allocated to the selected concrete graph-store backend\n- **`graphStoreId`** (`string`, optional) — selected backend id; when omitted, uses the built-in default backend id\n- **`graphStoreFactories`** (optional additive registrations) — external graph-store factories merged with the built-in graph-store registry before backend selection\n- **`adapters`** (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the 4 built-in adapters\n\n`CodeGraphFactoryOptions` SHALL support the same additive graph-store selection model as `CodeGraphOptions`, except that the storage root is derived from `SpecdConfig`.\n\nThe factory detects which overload is being used by checking for the `projectRoot` property (present on `SpecdConfig`) vs the `storagePath` property (present on `CodeGraphOptions`).\n\nThe built-in graph-store registry SHALL include at least:\n\n- `ladybug` — the Ladybug-backed implementation\n- `sqlite` — the SQLite-backed implementation\n\nThe built-in default graph-store id SHALL be `sqlite`. `ladybug` remains available only by explicit selection.\n\nCallers MUST NOT construct `CodeGraphProvider` directly — the constructor is not part of the public API."
       ]
     },
     {
       "requirement": "Package exports",
       "rules": [
-        "The `@specd/code-graph` package SHALL export only:\n\n- `createCodeGraphProvider` — factory function\n- `CodeGraphProvider` — type only (for type annotations, not construction)\n- `CodeGraphOptions` — options type for the factory\n- `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, `DiscoveredSpec` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).\n- `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult` — traversal/impact types\n- `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType` — model types\n- `SymbolQuery`, `GraphStatistics` — query types\n- `LanguageAdapter` — interface for custom adapters\n- `CodeGraphError` and subclasses — error types\n\nInternal components (`LadybugGraphStore`, `AdapterRegistry`, `TypeScriptLanguageAdapter`, `IndexCodeGraph`, traversal functions) MUST NOT be exported from the package entry point."
+        "The `@specd/code-graph` package SHALL export only:\n\n- `createCodeGraphProvider` — factory function\n- `CodeGraphProvider` — type only (for type annotations, not construction)\n- `CodeGraphOptions` — options type for the legacy factory overload\n- `CodeGraphFactoryOptions` — options type for the `SpecdConfig` overload, including additive graph-store registrations and optional `graphStoreId`\n- `GraphStoreFactory` — factory contract used by additive graph-store registrations\n- `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, `DiscoveredSpec` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).\n- `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult` — traversal/impact types\n- `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType` — model types\n- `SymbolQuery`, `GraphStatistics` — query types\n- `LanguageAdapter` — interface for custom adapters\n- `CodeGraphError` and subclasses — error types\n\nInternal components (`LadybugGraphStore`, `SQLiteGraphStore`, `AdapterRegistry`, built-in language adapters, `IndexCodeGraph`, traversal functions) MUST NOT be exported from the package entry point."
       ]
     },
     {
@@ -48,6 +41,8 @@
     "createCodeGraphProvider is the only construction path — CodeGraphProvider constructor is not exported",
     "Internal components are not re-exported from the package",
     "The LanguageAdapter interface is exported so consumers can write custom adapters",
+    "Graph-store backend selection is registry-driven and internal to composition; it is not a specd.yaml setting",
+    "The provider builds exactly one active GraphStore per construction path, selected by backend id from the merged graph-store registry",
     "CodeGraphProvider holds no domain logic — it only delegates",
     "Lifecycle is explicit — no auto-open, no auto-close",
     "Depends on @specd/core for SpecdConfig type"
@@ -81,7 +76,7 @@
       "name": "Primary factory with SpecdConfig",
       "when": ["createCodeGraphProvider(config) is called with a SpecdConfig"],
       "then": [
-        "the storage path is derived from config.projectRoot",
+        "the graph storage root is derived from config.configPath",
         "AND the returned provider can be opened, used for indexing and queries, and closed without error"
       ]
     },
@@ -99,6 +94,37 @@
       "given": ["an object with projectRoot property", "an object with storagePath property"],
       "when": ["passed to createCodeGraphProvider", "passed to createCodeGraphProvider"],
       "then": ["it is treated as SpecdConfig", "it is treated as CodeGraphOptions"]
+    },
+    {
+      "requirement": "Factory function",
+      "name": "Default backend is sqlite",
+      "given": ["no explicit graphStoreId"],
+      "when": ["a provider is created from either factory overload"],
+      "then": ["the built-in backend id sqlite is selected"]
+    },
+    {
+      "requirement": "Factory function",
+      "name": "Explicit backend id overrides the default",
+      "given": ["a provider factory call with graphStoreId: 'ladybug'"],
+      "when": ["the provider is constructed"],
+      "then": ["the Ladybug-backed store is used as the single active backend for that provider"]
+    },
+    {
+      "requirement": "Factory function",
+      "name": "Additive graph-store registrations extend the built-ins",
+      "given": ["a custom graph-store factory registered through graphStoreFactories"],
+      "when": ["graphStoreId selects that custom backend id"],
+      "then": [
+        "the provider uses the custom backend",
+        "AND the built-in sqlite and ladybug backends remain available"
+      ]
+    },
+    {
+      "requirement": "Factory function",
+      "name": "Unknown graph-store id fails clearly",
+      "given": ["a provider factory call with graphStoreId: 'missing-backend'"],
+      "when": ["the graph-store registry is resolved"],
+      "then": ["provider construction fails with a clear unknown-backend error"]
     },
     {
       "requirement": "Factory function",
@@ -125,7 +151,7 @@
       "name": "Internal components not exported",
       "when": ["a consumer imports from @specd/code-graph"],
       "then": [
-        "LadybugGraphStore, AdapterRegistry, TypeScriptLanguageAdapter, and IndexCodeGraph are not available as imports"
+        "LadybugGraphStore, SQLiteGraphStore, AdapterRegistry, built-in language adapters, and IndexCodeGraph are not available as imports"
       ]
     },
     {
@@ -133,6 +159,14 @@
       "name": "LanguageAdapter interface is exported",
       "when": ["a consumer wants to write a custom language adapter"],
       "then": ["they can import the LanguageAdapter interface from @specd/code-graph"]
+    },
+    {
+      "requirement": "Package exports",
+      "name": "Graph-store composition types are exported",
+      "when": ["a consumer wants to register or select a backend explicitly"],
+      "then": [
+        "GraphStoreFactory, CodeGraphOptions, and CodeGraphFactoryOptions are available as imports"
+      ]
     },
     {
       "requirement": "Package exports",
@@ -182,8 +216,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:c02becfb1f182a2a5de1bccc78990d244798a6049701b543aa73f8a76cdedf5d",
-    "verify.md": "sha256:231ddedff29ba7b306d23cf054327cceb1facca60fb419f0c48d71fdee0e760f"
+    "spec.md": "sha256:607bb5caf9862e6d8069bda9cfae06666dd59e99ac7da77d76a2217684fcfd2f",
+    "verify.md": "sha256:5210c358a109cfd5e49fe7f4f95fde9641fb5c830222a82df769c61c77239429"
   },
   "generatedBy": "core"
 }

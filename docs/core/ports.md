@@ -10,9 +10,16 @@ All ports are exported from `@specd/core`.
 
 ## Kernel composition surface
 
-The primary composition entrypoint remains `createKernel(config, options)`. `options` now supports additive registrations for storage factories, artifact parsers, VCS providers, actor providers, and external hook runners.
+The primary composition entrypoint remains `createKernel(config, options)`. `options` now supports additive registrations for storage factories, graph-store factories, artifact parsers, VCS providers, actor providers, and external hook runners.
 
 Built kernels expose the final merged registry as `kernel.registry`, so callers can inspect which built-in and additive capabilities are available after construction.
+
+Graph-store selection follows the same additive pattern, but with a separate active-id choice:
+
+- `graphStoreFactories` extends the set of available backends
+- `graphStoreId` selects the single backend id that downstream code-graph composition should use for this kernel construction path
+
+This is an internal composition concern. It is not a `specd.yaml` setting.
 
 For incremental setup, `@specd/core` also exports `createKernelBuilder(config, base?)`. The builder accumulates the same additive registrations as `KernelOptions` and delegates `build()` to `createKernel(...)` with equivalent semantics.
 
@@ -20,10 +27,13 @@ For incremental setup, `@specd/core` also exports `createKernelBuilder(config, b
 import { createKernelBuilder } from '@specd/core'
 
 const kernel = await createKernelBuilder(config)
+  .registerGraphStore('custom-sqlite', customSqliteFactory)
+  .useGraphStore('sqlite')
   .registerParser('plaintext-plus', parser)
   .registerExternalHookRunner('http-runner', httpRunner)
   .build()
 
+console.log(kernel.registry.graphStores.has('sqlite')) // true
 console.log(kernel.registry.parsers.has('plaintext-plus')) // true
 console.log(kernel.registry.externalHookRunners.has('http')) // true
 ```

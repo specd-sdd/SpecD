@@ -2,13 +2,15 @@
 
 ## Purpose
 
-`GraphStore` is the storage contract for the code graph, but the concrete Ladybug-backed implementation has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements that are specific to `LadybugGraphStore`: its physical schema, persistence layout, full-text indexing behavior, and bulk-load mechanics.
+`GraphStore` is the storage contract for the code graph, but the concrete Ladybug-backed implementation has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements that are specific to `LadybugGraphStore`: its physical schema, persistence layout, full-text indexing behavior, and bulk-load mechanics, while allowing it to coexist with other concrete graph-store backends behind the same abstract contract.
 
 ## Requirements
 
 ### Requirement: Ladybug-backed implementation
 
 `LadybugGraphStore` SHALL implement the `GraphStore` contract using LadybugDB as the storage engine. It is an infrastructure adapter and owns all backend-specific concerns that are not part of the abstract `GraphStore` port.
+
+Within a composition that supports multiple registered graph-store backends, the Ladybug adapter is identified by the backend id `ladybug`. It remains available as an explicitly selectable concrete backend even when another backend becomes the default.
 
 The adapter MUST:
 
@@ -180,6 +182,7 @@ Backend-specific metadata storage details remain internal to the adapter.
 ## Constraints
 
 - `LadybugGraphStore` is an infrastructure adapter, not part of the abstract graph-store contract
+- `ladybug` is the stable backend id used to select this adapter from a multi-backend graph-store registry
 - Ladybug-specific file layout, FTS behavior, schema shape, and schema-version handling are defined here, not in `code-graph:code-graph/graph-store`
 - All Ladybug scratch files and persisted database artifacts are rooted under `configPath`
 - Node table layout, relationship tables, and FTS index shape defined here are Ladybug-specific and MUST NOT be treated as a portable graph-store schema

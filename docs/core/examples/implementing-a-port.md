@@ -2,6 +2,13 @@
 
 This guide walks through implementing several ports from scratch: `ChangeRepository` (an abstract class), `VcsAdapter` (a plain interface), `ActorResolver` (a plain interface), and `ExternalHookRunner` (a plain interface). It shows the full pattern for both kinds of port and how to wire them into a use case or the kernel.
 
+When the extension point is registry-driven rather than a direct application-layer port, follow the same pattern used by `createKernel(config, options)`:
+
+- register the capability under a stable id
+- select the active id separately when the caller needs exactly one active backend
+
+The code-graph backend selection surface follows this model with `graphStoreFactories` plus `graphStoreId`, and the builder mirrors it with `registerGraphStore(id, factory)` plus `useGraphStore(id)`.
+
 ## The two port shapes
 
 `@specd/core` ports come in two shapes:

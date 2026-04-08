@@ -69,11 +69,19 @@ The kernel must expose the underlying `ChangeRepository` as `changes.repo` and t
 
 `createKernel(config, options?)` accepts an optional `KernelOptions` object. The `extraNodeModulesPaths` option appends additional `node_modules` directories to the schema search path, so that globally-installed schema packages are found even when the project has no local copy.
 
+`KernelOptions` SHALL also support graph-store composition inputs:
+
+- **`graphStoreId`** (`string`, optional) — the backend id selected from the merged graph-store registry for this kernel construction path
+- additive graph-store factory registrations that extend the built-in graph-store registry without replacing it
+
+When `graphStoreId` is omitted, the kernel uses the current built-in default graph-store id exposed by the code-graph composition layer.
+
 ### Requirement: KernelOptions supports additive registries
 
 `KernelOptions` SHALL support additive registration of external capabilities before kernel construction. At minimum, it SHALL include extension points for:
 
 - storage factories
+- graph-store factories
 - VCS providers
 - actor providers
 - artifact parsers
@@ -83,7 +91,7 @@ These registrations SHALL extend the built-in capability set rather than replaci
 
 ### Requirement: Kernel exposes merged registries
 
-The `Kernel` interface SHALL expose the merged built-in plus external registries used during construction. The exposed registry view SHALL let consumers inspect which storages, parsers, providers, and external hook runners are available from the built kernel.
+The `Kernel` interface SHALL expose the merged built-in plus external registries used during construction. The exposed registry view SHALL let consumers inspect which storages, graph stores, parsers, providers, and external hook runners are available from the built kernel.
 
 The exposed registries MUST reflect the final additive capability set actually used during construction — not just the raw external registrations supplied by the caller.
 
@@ -91,7 +99,7 @@ The exposed registries MUST reflect the final additive capability set actually u
 
 Kernel composition MUST reject conflicting registrations and unknown registry references with clear errors.
 
-Conflicting registrations include attempts to overwrite an existing built-in or already-registered external entry for the same registry category. Unknown references include configuration or workflow data that names an adapter, parser, provider, or external hook type that is not present in the merged registry set.
+Conflicting registrations include attempts to overwrite an existing built-in or already-registered external entry for the same registry category. Unknown references include configuration or workflow data that names an adapter, parser, provider, external hook type, or graph-store id that is not present in the merged registry set.
 
 ### Requirement: Kernel entry mapping
 

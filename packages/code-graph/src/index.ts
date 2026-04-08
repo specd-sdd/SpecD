@@ -1,8 +1,11 @@
 // Composition
+export { createCodeGraphProvider } from './composition/create-code-graph-provider.js'
 export {
-  createCodeGraphProvider,
+  type CodeGraphFactoryOptions,
   type CodeGraphOptions,
-} from './composition/create-code-graph-provider.js'
+  type GraphStoreFactory,
+  type GraphStoreFactoryOptions,
+} from './composition/graph-store-factory.js'
 export { CodeGraphProvider } from './composition/code-graph-provider.js'
 
 // Value objects

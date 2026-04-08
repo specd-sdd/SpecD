@@ -1,20 +1,15 @@
 {
   "title": "Ladybug Graph Store",
-  "description": "`GraphStore` is the storage contract for the code graph, but the concrete Ladybug-backed implementation has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements that are specific to `LadybugGraphStore`: its physical schema, persistence layout, full-text indexing behavior, and bulk-load mechanics.",
-  "dependsOn": [
-    "code-graph:code-graph/graph-store",
-    "core:core/config",
-    "code-graph:code-graph/symbol-model",
-    "code-graph:code-graph/workspace-integration"
-  ],
+  "description": "`GraphStore` is the storage contract for the code graph, but the concrete Ladybug-backed implementation has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements that are specific to `LadybugGraphStore`: its physical schema, persistence layout, full-text indexing behavior, and bulk-load mechanics, while allowing it to coexist with other concrete graph-store backends behind the same abstract contract.",
+  "dependsOn": ["code-graph:code-graph/graph-store"],
   "context": [
-    "`GraphStore` is the storage contract for the code graph, but the concrete Ladybug-backed implementation has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements that are specific to `LadybugGraphStore`: its physical schema, persistence layout, full-text indexing behavior, and bulk-load mechanics."
+    "`GraphStore` is the storage contract for the code graph, but the concrete Ladybug-backed implementation has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements that are specific to `LadybugGraphStore`: its physical schema, persistence layout, full-text indexing behavior, and bulk-load mechanics, while allowing it to coexist with other concrete graph-store backends behind the same abstract contract."
   ],
   "rules": [
     {
       "requirement": "Ladybug-backed implementation",
       "rules": [
-        "`LadybugGraphStore` SHALL implement the `GraphStore` contract using LadybugDB as the storage engine. It is an infrastructure adapter and owns all backend-specific concerns that are not part of the abstract `GraphStore` port.\n\nThe adapter MUST:\n\n- open and close a Ladybug database connection safely\n- execute the Ladybug-specific schema DDL on first use\n- keep backend-specific schema version state\n- translate the abstract graph-store operations into Ladybug queries and bulk-load operations"
+        "`LadybugGraphStore` SHALL implement the `GraphStore` contract using LadybugDB as the storage engine. It is an infrastructure adapter and owns all backend-specific concerns that are not part of the abstract `GraphStore` port.\n\nWithin a composition that supports multiple registered graph-store backends, the Ladybug adapter is identified by the backend id `ladybug`. It remains available as an explicitly selectable concrete backend even when another backend becomes the default.\n\nThe adapter MUST:\n\n- open and close a Ladybug database connection safely\n- execute the Ladybug-specific schema DDL on first use\n- keep backend-specific schema version state\n- translate the abstract graph-store operations into Ladybug queries and bulk-load operations"
       ]
     },
     {
@@ -80,6 +75,7 @@
   ],
   "constraints": [
     "LadybugGraphStore is an infrastructure adapter, not part of the abstract graph-store contract",
+    "ladybug is the stable backend id used to select this adapter from a multi-backend graph-store registry",
     "Ladybug-specific file layout, FTS behavior, schema shape, and schema-version handling are defined here, not in code-graph:code-graph/graph-store",
     "All Ladybug scratch files and persisted database artifacts are rooted under configPath",
     "Node table layout, relationship tables, and FTS index shape defined here are Ladybug-specific and MUST NOT be treated as a portable graph-store schema",
@@ -93,6 +89,16 @@
       "then": [
         "the adapter initializes its Ladybug-specific connection and schema state before serving queries",
         "AND storage-agnostic callers do not need to know any Ladybug DDL or query details"
+      ]
+    },
+    {
+      "requirement": "Ladybug-backed implementation",
+      "name": "Ladybug remains available by backend id",
+      "given": ["a graph-store registry containing both ladybug and sqlite"],
+      "when": ["composition selects the backend id ladybug"],
+      "then": [
+        "LadybugGraphStore is constructed as the single active backend for that provider or kernel path",
+        "AND callers do not need to know any Ladybug class name or constructor details"
       ]
     },
     {
@@ -205,8 +211,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:6d546729150534f13d38f581112799f518ad7228a9b652dc720450fe1b7cc24d",
-    "verify.md": "sha256:36c57a1b8d7b7dc81bed8ec3336b6b43c6bfcfb79c10b66661d455509f0958ec"
+    "spec.md": "sha256:e634ba105acca75118704434d0fe0700edc0117633918441d8efd964dc56b364",
+    "verify.md": "sha256:112024164e31ead6bbf1c9adb89f3336c7b205b6e20a52445314d69d68f4a6fb"
   },
   "generatedBy": "core"
 }
