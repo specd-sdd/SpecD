@@ -26,17 +26,24 @@ export function registerChangeContext(parent: Command): void {
       parseInt,
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .option('--fingerprint <hash>', 'skip if context unchanged')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(
       'after',
       `
 JSON/TOON output schema:
   {
-    contextBlock: string
+    contextFingerprint: string
+    status: 'changed' | 'unchanged'
     stepAvailable: boolean
     blockingArtifacts: string[]
+    projectContext: ProjectContextEntry[]
+    specs: ContextSpecEntry[]
+    availableSteps: AvailableStep[]
     warnings: string[]
   }
+
+When status is 'unchanged', only contextFingerprint and status are returned.
 `,
     )
     .action(
@@ -50,6 +57,7 @@ JSON/TOON output schema:
           followDeps?: boolean
           depth?: number
           format: string
+          fingerprint?: string
           config?: string
         },
       ) => {
@@ -107,6 +115,7 @@ JSON/TOON output schema:
             ...(opts.followDeps ? { followDeps: true } : {}),
             ...(opts.depth !== undefined ? { depth: opts.depth } : {}),
             ...(sectionFlags.length > 0 ? { sections: sectionFlags } : {}),
+            ...(opts.fingerprint !== undefined ? { fingerprint: opts.fingerprint } : {}),
           })
 
           if (!result.stepAvailable && result.blockingArtifacts.length > 0) {
@@ -120,6 +129,25 @@ JSON/TOON output schema:
           }
 
           const fmt = parseFormat(opts.format)
+          if (result.status === 'unchanged') {
+            if (fmt === 'text') {
+              output('Context unchanged since last call.', 'text')
+            } else {
+              output(
+                {
+                  contextFingerprint: result.contextFingerprint,
+                  status: result.status,
+                  stepAvailable: result.stepAvailable,
+                  blockingArtifacts: result.blockingArtifacts,
+                  availableSteps: result.availableSteps,
+                  warnings: result.warnings.map((w) => w.message),
+                },
+                fmt,
+              )
+            }
+            return
+          }
+
           if (fmt === 'text') {
             const parts: string[] = []
 
@@ -190,6 +218,8 @@ JSON/TOON output schema:
           } else {
             output(
               {
+                contextFingerprint: result.contextFingerprint,
+                status: result.status,
                 stepAvailable: result.stepAvailable,
                 blockingArtifacts: result.blockingArtifacts,
                 projectContext: result.projectContext,

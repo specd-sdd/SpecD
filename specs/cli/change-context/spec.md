@@ -12,6 +12,7 @@ AI agents need a single command to retrieve all relevant context — spec conten
 specd change context <name> <step>
   [--rules] [--constraints] [--scenarios]
   [--follow-deps [--depth <n>]]
+  [--fingerprint <hash>]
   [--format text|json|toon]
 ```
 
@@ -22,13 +23,16 @@ specd change context <name> <step>
 - `--scenarios` — when present, includes only the scenarios sections of spec content in the output
 - `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs. By default (without this flag) `dependsOn` traversal is **not** performed.
 - `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`
+- `--fingerprint <hash>` — optional; when provided, the CLI compares this value against the current context fingerprint. If the fingerprint matches, returns `status: "unchanged"` without the full context. If omitted or the fingerprint does not match, returns the full context with the new fingerprint.
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block.
 
 ### Requirement: Behaviour
 
-The command invokes the `CompileContext` use case. The `CompileContextConfig`, `followDeps`, `depth`, and `sections` fields are populated from the loaded `SpecdConfig` and the corresponding CLI flags.
+The command invokes the `CompileContext` use case. The `CompileContextConfig`, `followDeps`, `depth`, `sections`, and `fingerprint` fields are populated from the loaded `SpecdConfig` and the corresponding CLI flags.
+
+When `--fingerprint` is provided, the CLI first checks whether the provided fingerprint matches the current context fingerprint calculated by `CompileContext`. If they match, the CLI returns a minimal response indicating unchanged status without the full context. If they do not match (or `--fingerprint` is omitted), the CLI returns the full context with the new fingerprint.
 
 ### Requirement: Output
 
@@ -43,12 +47,16 @@ The CLI MUST assemble the final output from the structured `CompileContextResult
    - Within each group, specs from `dependsOnTraversal` source MUST be visually distinguished from `includePattern` specs — rendered under a `### Via dependencies` sub-heading within the available context specs section.
 3. Available steps are rendered last, each annotated with availability status.
 
+When `--fingerprint` is provided and matches the current fingerprint, text mode outputs only a brief message: `Context unchanged since last call.` The full context is not printed.
+
 No additional framing or headers are added beyond those listed above.
 
 **In `json` mode**, the output is the structured result directly:
 
 ```json
 {
+  "contextFingerprint": "sha256:abc123...",
+  "status": "changed",
   "stepAvailable": true,
   "blockingArtifacts": [],
   "projectContext": [
@@ -77,6 +85,24 @@ No additional framing or headers are added beyond those listed above.
 }
 ```
 
+When `--fingerprint` is provided and matches, the JSON output still includes metadata fields but omits context content:
+
+```json
+{
+  "contextFingerprint": "sha256:abc123...",
+  "status": "unchanged",
+  "stepAvailable": true,
+  "blockingArtifacts": [],
+  "availableSteps": [
+    { "step": "designing", "available": true, "blockingArtifacts": [] },
+    { "step": "ready", "available": true, "blockingArtifacts": [] }
+  ],
+  "warnings": []
+}
+```
+
+The `projectContext` and `specs` arrays are omitted when `status` is `'unchanged'` — the agent uses its cached values. The `stepAvailable`, `blockingArtifacts`, `availableSteps`, and `warnings` fields are always included so the agent can still determine step availability without fetching the full context.
+
 ### Requirement: Step availability warning
 
 If the requested step is not currently available (i.e. `stepAvailable: false`), the command prints a warning to stderr listing the blocking artifacts and still prints the context block to stdout. The process exits with code 0.
@@ -99,6 +125,7 @@ Any warnings from the `CompileContext` use case (stale metadata, missing specs, 
 - `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed
 - `--depth` without `--follow-deps` is a CLI usage error (exit code 1)
 - Section flags (`--rules`, `--constraints`, `--scenarios`) only filter full-mode spec content; summary-mode specs and available steps are unaffected
+- The fingerprint is calculated from all inputs that affect the logical context content: change specIds, project context entries, context include/exclude patterns, step, schema version, and the flags `--rules`, `--constraints`, `--scenarios`, `--follow-deps`, `--depth`. The `--format` flag does not affect the fingerprint.
 
 ## Examples
 

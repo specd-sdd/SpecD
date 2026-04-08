@@ -112,13 +112,29 @@ Every skill that runs CLI instructions, hooks, or artifact instructions MUST loa
 context first. No exceptions — the context contains binding directives that govern
 how all subsequent work is performed.
 
-- **Change exists** → `change context <name> <step> --format text`
+- **Change exists** → `change context <name> <step> --format text [--fingerprint <value>]`
 - **No change yet** → `project context --format text`
 
 Load context before the first hook or instruction call in the skill, **and reload it
 every time the change transitions to a new state**. A state transition may change which
 specs are relevant, which hooks fire, and what instructions apply. Stale context from
 a previous state can lead to wrong decisions.
+
+### Fingerprint mechanism
+
+To avoid re-reading unchanged context, the agent stores a `contextFingerprint` from
+the first `change context` call and passes it to subsequent calls:
+
+1. **First call** (no fingerprint stored): `change context <name> <step> --format text`
+   - Parse the `contextFingerprint` from the JSON response
+   - Store it in the conversation window
+2. **Subsequent calls**: `change context <name> <step> --format text --fingerprint <value>`
+   - If `status: "unchanged"`: use the context already in memory, no re-processing needed
+   - If `status: "changed"`: update stored context and fingerprint with the new response
+
+The fingerprint represents the logical context state. When unchanged, the agent still
+receives `stepAvailable`, `blockingArtifacts`, `availableSteps`, and `warnings` — only
+`projectContext` and `specs` content are omitted.
 
 Follow the processing rules below ("Processing `change context` output").
 

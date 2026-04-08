@@ -34,6 +34,7 @@ class CompileContext {
 - `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1–4 are included.
 - `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.
 - `sections` (optional) — when present, restricts the metadata content rendered for each spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, all available sections are rendered (description + rules + constraints + scenarios). `sections` applies only to full-mode spec content — it does not affect summary-mode specs, project context entries, or available steps.
+- `fingerprint` (optional) — when provided, `CompileContext` compares this value against the fingerprint it calculates from the current context inputs. If they match, the result's `status` field is set to `'unchanged'` and the full context is not assembled. If omitted or the fingerprint does not match, `status` is `'changed'` and the full context is returned with the new fingerprint.
 
 ### Requirement: Schema name guard
 
@@ -155,12 +156,16 @@ If the step is not available (one or more required artifacts are neither `comple
 
 `CompileContext.execute` MUST return a `CompileContextResult` object with:
 
+- `contextFingerprint: string` — the calculated fingerprint for the current context state (SHA-256 hash)
+- `status: 'changed' | 'unchanged'` — `'changed'` when the full context is returned, `'unchanged'` when the provided fingerprint matched and context was skipped
 - `stepAvailable: boolean` — whether the requested step is currently available
 - `blockingArtifacts: string[]` — artifact IDs blocking the step (empty if available)
-- `projectContext: ProjectContextEntry[]` — rendered project context entries
-- `specs: ContextSpecEntry[]` — spec entries with tier classification, source, and content
+- `projectContext: ProjectContextEntry[]` — rendered project context entries (empty when `status` is `'unchanged'`)
+- `specs: ContextSpecEntry[]` — spec entries with tier classification, source, and content (empty when `status` is `'unchanged'`)
 - `availableSteps: AvailableStep[]` — all workflow steps with availability status
 - `warnings: ContextWarning[]` — stale metadata warnings and any other advisory conditions
+
+When `status` is `'unchanged'`, the `projectContext` and `specs` arrays are empty (the client uses its cached values). The `stepAvailable`, `blockingArtifacts`, `availableSteps`, and `warnings` fields are always populated — this allows the client to determine step availability without fetching the full context. When `status` is `'changed'`, all fields are populated as described.
 
 `CompileContext` MUST NOT throw on availability failures. It MUST throw on `ChangeNotFoundError` (change not found) and on schema resolution errors.
 
@@ -171,6 +176,24 @@ If a spec ID from an include pattern or `dependsOn` reference does not exist in 
 ### Requirement: Unknown workspace qualifiers emit a warning
 
 If a pattern or `dependsOn` entry references a workspace name that has no corresponding `SpecRepository` in the `specs` map (e.g. `billing:auth/*` when `billing` was not wired at bootstrap), `CompileContext` must emit a warning and skip the path. It must not throw.
+
+### Requirement: Context fingerprint
+
+`CompileContext` calculates a fingerprint that uniquely identifies the current context state. The fingerprint is a SHA-256 hash of a canonicalized string representation of all inputs that affect the logical context content:
+
+1. Change specIds (sorted alphabetically)
+2. Project context entries (instruction values verbatim, file content hashed)
+3. Context include/exclude patterns from config
+4. The step being queried
+5. Schema version
+6. All flags that affect output: `followDeps`, `depth`, `sections`
+
+When `fingerprint` is provided to `execute()`:
+
+- If `fingerprint` matches the calculated fingerprint, `status` is `'unchanged'` and the context is not assembled (early return).
+- If `fingerprint` does not match or is omitted, `status` is `'changed'` and the full context is assembled and returned.
+
+The fingerprint enables clients to skip re-fetching unchanged context without comparing the full output themselves.
 
 ## Constraints
 

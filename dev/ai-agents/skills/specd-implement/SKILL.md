@@ -99,8 +99,10 @@ Find artifacts with `hasTaskCompletionCheck: true` — those have trackable chec
 ### 4. Load context
 
 ```bash
-node packages/cli/dist/index.js change context <name> implementing --follow-deps --depth 1 --rules --constraints --format text
+node packages/cli/dist/index.js change context <name> implementing --follow-deps --depth 1 --rules --constraints --format json
 ```
+
+Extract and store the `contextFingerprint` from the response. If the response is `status: "changed"`, use the full context. If `status: "unchanged"`, you already have the context from a previous call.
 
 **MUST follow** — project context entries are binding directives. If lazy mode returns
 summary specs, evaluate each one and load any that are relevant to the code you're

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
@@ -18,6 +19,7 @@ import { extractMetadata, type SubtreeRenderer } from '../../domain/services/ext
 import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
 import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
+import { compileContextFingerprint } from './_shared/compile-context-fingerprint.js'
 
 export { type ContextWarning } from './_shared/context-warning.js'
 
@@ -78,6 +80,12 @@ export interface CompileContextInput {
    * Does not affect summary-mode specs, project context entries, or available steps.
    */
   readonly sections?: ReadonlyArray<SpecSection>
+  /**
+   * When provided, the use case compares this value against the calculated context fingerprint.
+   * If they match, the result's `status` is `'unchanged'` and context content is omitted.
+   * If omitted or the fingerprint does not match, `status` is `'changed'` and full context is returned.
+   */
+  readonly fingerprint?: string
 }
 
 /** A structured project context entry in the result. */
@@ -125,6 +133,10 @@ export interface AvailableStep {
 
 /** Result returned by a successful {@link CompileContext} execution. */
 export interface CompileContextResult {
+  /** The calculated fingerprint for the current context state. */
+  readonly contextFingerprint: string
+  /** Whether the full context was returned (`'changed'`) or fingerprint matched (`'unchanged'`). */
+  readonly status: 'changed' | 'unchanged'
   /** Whether the requested step is currently available. */
   readonly stepAvailable: boolean
   /** Artifact IDs blocking the step; empty when `stepAvailable` is `true`. */
@@ -371,6 +383,7 @@ export class CompileContext {
 
     // --- Part 1: Project context entries ---
     const projectContext: ProjectContextEntry[] = []
+    const fileHashes = new Map<string, string>()
     for (const entry of input.config.context ?? []) {
       if ('instruction' in entry) {
         projectContext.push({ source: 'instruction', content: entry.instruction })
@@ -384,6 +397,7 @@ export class CompileContext {
           })
         } else {
           projectContext.push({ source: 'file', path: entry.file, content })
+          fileHashes.set(entry.file, this._hashContent(content))
         }
       }
     }
@@ -535,7 +549,39 @@ export class CompileContext {
       })
     }
 
+    // --- Calculate fingerprint (after all fields are ready) ---
+    const fingerprintInput = {
+      specIds: change.specIds,
+      contextEntries: input.config.context ?? [],
+      contextIncludeSpecs: input.config.contextIncludeSpecs ?? [],
+      contextExcludeSpecs: input.config.contextExcludeSpecs ?? [],
+      workspaces: input.config.workspaces ?? {},
+      step: input.step,
+      schemaVersion: schema.version(),
+      followDeps: input.followDeps ?? false,
+      depth: input.depth,
+      sections: input.sections,
+      fileHashes,
+    }
+    const currentFingerprint = compileContextFingerprint(fingerprintInput)
+
+    // If fingerprint matches, omit context content but keep everything else
+    if (input.fingerprint !== undefined && input.fingerprint === currentFingerprint) {
+      return {
+        contextFingerprint: currentFingerprint,
+        status: 'unchanged',
+        stepAvailable,
+        blockingArtifacts,
+        projectContext: [],
+        specs: [],
+        availableSteps,
+        warnings,
+      }
+    }
+
     return {
+      contextFingerprint: currentFingerprint,
+      status: 'changed',
       stepAvailable,
       blockingArtifacts,
       projectContext,
@@ -718,5 +764,15 @@ export class CompileContext {
       (c) => this._hasher.hash(c),
     )
     return result.allFresh
+  }
+
+  /**
+   * Hashes content using SHA-256 for fingerprint calculation.
+   *
+   * @param content - The content string to hash
+   * @returns The SHA-256 hash of the content
+   */
+  private _hashContent(content: string): string {
+    return createHash('sha256').update(content).digest('hex')
   }
 }

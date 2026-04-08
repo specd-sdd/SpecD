@@ -14,32 +14,47 @@
 - **WHEN** `specd change context my-change designing --depth 2` is run without `--follow-deps`
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
+#### Scenario: --fingerprint flag accepted
+
+- **WHEN** `specd change context my-change designing --fingerprint sha256:abc123...` is run
+- **THEN** the command proceeds normally
+
 ### Requirement: Output
 
-#### Scenario: Text output — full specs rendered with content
+#### Scenario: JSON output includes fingerprint and status on first call
 
-- **GIVEN** `CompileContext` returns specs with `mode: 'full'`
-- **WHEN** `specd change context <name> <step>` is called with `--format text`
-- **THEN** full-mode specs are rendered under `### Spec: <specId>` headings with their content
+- **GIVEN** no `--fingerprint` flag is provided
+- **WHEN** `specd change context my-change designing --format json` is called
+- **THEN** the JSON output includes `contextFingerprint` with a SHA-256 hash
+- **AND** `status` is `"changed"`
+- **AND** the full context is returned
 
-#### Scenario: Text output — summary specs rendered as catalogue
+#### Scenario: JSON output returns unchanged when fingerprint matches
 
-- **GIVEN** `config.contextMode: 'lazy'`
-- **AND** `CompileContext` returns specs with `mode: 'summary'` from `includePattern` source
-- **WHEN** `specd change context <name> <step>` is called with `--format text`
-- **THEN** summary-mode specs appear under `## Available context specs` with spec ID, title, and description
-- **AND** the section includes the instruction `Use \`specd spec show <spec-id>\` to load the full content of any spec you need.\`
+- **GIVEN** the current context fingerprint is `sha256:abc123...`
+- **WHEN** `specd change context my-change designing --fingerprint sha256:abc123... --format json` is called
+- **THEN** the JSON output contains `contextFingerprint`, `status: "unchanged"`, `stepAvailable`, `blockingArtifacts`, `availableSteps`, and `warnings`
+- **AND** `projectContext` and `specs` are absent (the agent uses its cached values)
 
-#### Scenario: Text output — dependsOn traversal specs distinguished
+#### Scenario: JSON output returns full context when fingerprint does not match
 
-- **GIVEN** `config.contextMode: 'lazy'`
-- **AND** some summary specs have `source: 'dependsOnTraversal'`
-- **WHEN** `specd change context <name> <step>` is called with `--format text`
-- **THEN** `dependsOnTraversal` specs appear under a `### Via dependencies` sub-heading within `## Available context specs`
+- **GIVEN** the current context fingerprint is `sha256:xyz789...`
+- **AND** the provided fingerprint is `sha256:abc123...`
+- **WHEN** `specd change context my-change designing --fingerprint sha256:abc123... --format json` is called
+- **THEN** the full context is returned
+- **AND** `contextFingerprint` is `sha256:xyz789...`
+- **AND** `status` is `"changed"`
+
+#### Scenario: Text output shows unchanged message when fingerprint matches
+
+- **GIVEN** the current context fingerprint is `sha256:abc123...`
+- **WHEN** `specd change context my-change designing --fingerprint sha256:abc123... --format text` is called
+- **THEN** the output is `Context unchanged since last call.`
+- **AND** no spec content is printed
 
 #### Scenario: JSON output — structured result with mode and source
 
-- **GIVEN** `CompileContext` returns structured result
+- **GIVEN** `CompileContext` returns specs with `mode: 'full'`
 - **WHEN** `specd change context <name> <step>` is called with `--format json`
 - **THEN** the JSON output includes `projectContext`, `specs` (with `specId`, `mode`, `source` fields), `availableSteps`, and `warnings`
 
