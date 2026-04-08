@@ -4,9 +4,18 @@
 
 ### Requirement: Command signature
 
-#### Scenario: Missing arguments
+#### Scenario: Missing arguments — but artifact targets change-scoped
 
-- **WHEN** `specd change validate my-change` is run without the spec ID
+- **WHEN** `specd change validate my-change --artifact design` is run (no spec ID)
+- **AND** `design` is a `scope: change` artifact in the schema
+- **THEN** the command proceeds with validation using artifact ID only
+- **AND** it does NOT require specPath because design is change-scoped
+- **AND** the process exits with code 0 if design passes validation
+
+#### Scenario: Missing arguments with scope: spec artifact
+
+- **WHEN** `specd change validate my-change --artifact specs` is run (no spec ID)
+- **AND** `specs` is a `scope: spec` artifact in the schema
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
 #### Scenario: Artifact flag accepted

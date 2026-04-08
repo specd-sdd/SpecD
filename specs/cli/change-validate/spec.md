@@ -13,9 +13,9 @@ specd change validate <name> [workspace:capability-path] [--all] [--artifact <ar
 ```
 
 - `<name>` — required positional; the name of the change to validate
-- `[workspace:capability-path]` — optional positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`. Required unless `--all` is used.
+- `[workspace:capability-path]` — optional positional; the spec ID to validate against (e.g. `default:auth/oauth`). Must be one of the change's declared `specIds`. Required unless `--all` is used OR `--artifact` targets a `scope: change` artifact.
 - `--all` — validate all `specIds` declared in the change. Mutually exclusive with `<workspace:capability-path>`.
-- `--artifact <artifactId>` — optional; when provided, only the specified artifact is validated instead of all artifacts for the spec. Works with both single-spec and `--all` modes.
+- `--artifact <artifactId>` — optional; when provided, only the specified artifact is validated instead of all artifacts for the spec. Works with both single-spec and `--all` modes. When the artifact is `scope: change`, `specPath` is not required.
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 ### Requirement: Behaviour

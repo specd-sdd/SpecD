@@ -547,7 +547,7 @@ workflow:
             constraints while writing code — they are as binding as the change specs.
 
   - step: verifying
-    requires: [verify, tasks]
+    requires: [proposal, specs, verify, design, tasks]
     requiresTaskCompletion: [tasks]
     hooks:
       pre:
@@ -558,7 +558,7 @@ workflow:
             fails, return to implementing — do not mark verifying complete until all scenarios pass.
 
   - step: archiving
-    requires: [specs, tasks]
+    requires: [proposal, specs, verify, design, tasks]
     requiresTaskCompletion: [tasks]
     hooks:
       pre:
