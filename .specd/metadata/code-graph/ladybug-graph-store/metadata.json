@@ -1,7 +1,12 @@
 {
   "title": "Ladybug Graph Store",
   "description": "`GraphStore` is the storage contract for the code graph, but the concrete Ladybug-backed implementation has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements that are specific to `LadybugGraphStore`: its physical schema, persistence layout, full-text indexing behavior, and bulk-load mechanics, while allowing it to coexist with other concrete graph-store backends behind the same abstract contract.",
-  "dependsOn": ["code-graph:code-graph/graph-store"],
+  "dependsOn": [
+    "code-graph:code-graph/graph-store",
+    "core:core/config",
+    "code-graph:code-graph/symbol-model",
+    "code-graph:code-graph/workspace-integration"
+  ],
   "context": [
     "`GraphStore` is the storage contract for the code graph, but the concrete Ladybug-backed implementation has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements that are specific to `LadybugGraphStore`: its physical schema, persistence layout, full-text indexing behavior, and bulk-load mechanics, while allowing it to coexist with other concrete graph-store backends behind the same abstract contract."
   ],
@@ -211,7 +216,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:e634ba105acca75118704434d0fe0700edc0117633918441d8efd964dc56b364",
+    "spec.md": "sha256:2165cbd5bbf9714e1479119c3c3a1d9c242de4d7206e732189037d5b53b1d805",
     "verify.md": "sha256:112024164e31ead6bbf1c9adb89f3336c7b205b6e20a52445314d69d68f4a6fb"
   },
   "generatedBy": "core"
