@@ -8,12 +8,17 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
-    "test": "turbo test --filter=@specd/core --filter=@specd/cli --filter=@specd/code-graph",
+    "test": "turbo test --filter=@specd/core --filter=@specd/cli --filter=@specd/code-graph --filter=@specd/public-web",
     "typecheck": "turbo typecheck",
     "lint": "eslint . && turbo typecheck",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "web:dev": "pnpm --filter @specd/public-web dev",
+    "web:build": "pnpm --filter @specd/public-web build",
+    "web:serve": "pnpm --filter @specd/public-web serve",
+    "web:test": "pnpm --filter @specd/public-web test",
+    "web:typecheck": "pnpm --filter @specd/public-web typecheck",
     "prepare": "husky"
   },
   "devDependencies": {

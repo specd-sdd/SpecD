@@ -1,0 +1,9 @@
+{
+  "label": "Schema Examples",
+  "position": 99,
+  "link": {
+    "type": "generated-index",
+    "title": "Schema Examples",
+    "description": "Example schema files, delta formats, and validation patterns for specd workflows."
+  }
+}

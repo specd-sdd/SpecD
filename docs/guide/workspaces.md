@@ -71,7 +71,7 @@ Bare paths (without a colon) are shorthand for `default:path`. So `auth/login` a
 
 ### The prefix field
 
-By default, the workspace name is the qualifier in spec IDs. The optional `prefix` field lets you use a different string as that qualifier, without changing the workspace name:
+By default, the capability path starts directly at the first directory inside the workspace's specs root. The optional `prefix` field prepends an additional leading path segment to that capability path, without changing the workspace name:
 
 ```yaml
 workspaces:
@@ -83,11 +83,22 @@ workspaces:
         path: specs/_global
 ```
 
-With this configuration, specs under `specs/_global/` are addressed as `_global:architecture` — not `default:architecture`. The workspace is still named `default` (you still write `default:` in patterns when referring to it by workspace name), but the spec IDs visible in context output and change metadata use the prefix.
+With this configuration, specs under `specs/_global/` are addressed as `default:_global/architecture` — not `_global:architecture`.
+
+The workspace is still named `default`, and the workspace name still appears before the colon in spec IDs. The prefix only affects the capability-path portion after the colon.
+
+Concrete example:
+
+- workspace name: `default`
+- `specsPath`: `specs/_global`
+- spec directory on disk: `specs/_global/architecture`
+- relative path inside that workspace root: `architecture`
+
+Without `prefix`, the spec ID would be `default:architecture`, because `_global` is part of the workspace root and is no longer present in the relative path. `prefix: _global` exists to add that lost leading segment back into the capability-path, producing `default:_global/architecture`.
 
 **When to use a prefix:** when the workspace name and the logical label for your specs diverge — for example, when the `default` workspace holds global constraints that live under a `_global/` directory and should be addressed as such for clarity.
 
-This is exactly how specd's own project uses it: the `default` workspace has `prefix: _global`, so architecture and conventions specs are referenced as `_global:architecture` and `_global:conventions`.
+This is exactly how specd's own project uses it: the `default` workspace has `prefix: _global`, so architecture and conventions specs are referenced as `default:_global/architecture` and `default:_global/conventions`.
 
 ---
 
@@ -131,7 +142,7 @@ Context compilation — assembling the spec content the agent sees at each lifec
 
 ### Workspace activation
 
-A workspace is considered active in the context of a change when at least one of the change's specs belongs to that workspace. A change touching `core:compile-context` activates the `core` workspace. A change touching both `_global:architecture` and `core:schema-format` activates both `default` (where `_global:*` specs live) and `core` simultaneously.
+A workspace is considered active in the context of a change when at least one of the change's specs belongs to that workspace. A change touching `core:compile-context` activates the `core` workspace. A change touching both `default:_global/architecture` and `core:schema-format` activates both `default` (where `_global/*` specs live) and `core` simultaneously.
 
 ### Project-level vs workspace-level patterns
 
@@ -214,9 +225,9 @@ workspaces:
     ownership: owned
 ```
 
-This is specd's own configuration. Three workspaces, all `owned`, each pointing to a subdirectory of `specs/` and a matching package directory. The prefixes — `_global`, `core`, `cli` — become the qualifiers in spec IDs:
+This is specd's own configuration. Three workspaces, all `owned`, each pointing to a subdirectory of `specs/` and a matching package directory. The `default` workspace uses `prefix: _global`, so those specs gain `_global/` as the leading path segment inside their spec IDs:
 
-- `_global:architecture` — an architecture spec
+- `default:_global/architecture` — an architecture spec
 - `core:schema-format` — a schema format spec in the core package
 - `cli:config` — a config spec for the CLI package
 
@@ -225,7 +236,7 @@ Changes that span packages simply list specs from multiple workspaces:
 ```yaml
 # A change that touches both global and core specs
 specIds:
-  - _global:architecture
+  - default:_global/architecture
   - core:compile-context
 ```
 

@@ -163,7 +163,7 @@ The `ownership` field describes the project's relationship with each workspace's
 
 ### Workspace prefixes
 
-Workspace names map directly to spec IDs. A spec in the `payments` workspace at `specs/checkout.md` has the ID `payments:checkout`. If you want a different prefix — for example to mirror a directory structure — you can declare one:
+Spec IDs always use the form `workspace:capability-path`. A spec in the `payments` workspace at `specs/checkout.md` has the ID `payments:checkout`. If you want every spec in a workspace to live under a leading path segment — for example to mirror a directory structure — you can declare `prefix`:
 
 ```yaml
 workspaces:
@@ -175,7 +175,21 @@ workspaces:
         path: specs/_global
 ```
 
-With this configuration, specs under `specs/_global/` are addressed as `_global:architecture` rather than `default:architecture`.
+With this configuration, specs under `specs/_global/` are addressed as `default:_global/architecture`.
+
+`prefix` does not replace the workspace name in the spec ID. It prepends a path segment to the capability-path portion. In other words:
+
+- workspace name: `default`
+- prefix: `_global`
+- resulting spec ID: `default:_global/architecture`
+
+Concrete example:
+
+- `specsPath` is `specs/_global`
+- the spec lives on disk at `specs/_global/architecture`
+- relative to the workspace root, the spec path is just `architecture`
+
+Without `prefix`, the spec ID would therefore be `default:architecture`. `prefix: _global` exists precisely to add that lost leading path segment back into the capability-path, producing `default:_global/architecture`.
 
 ---
 

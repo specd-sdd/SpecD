@@ -223,7 +223,7 @@ These are thrown by entities and domain services. Use cases may propagate them t
 
 **Code:** `'INVALID_STATE_TRANSITION'`
 
-Thrown when a lifecycle transition is attempted that is not permitted from the current state. See [`VALID_TRANSITIONS`](domain-model.md#changestate-and-valid_transitions) for the complete transition graph.
+Thrown when a lifecycle transition is attempted that is not permitted from the current state. See [`VALID_TRANSITIONS`](domain-model.md#changestate-and-the-lifecycle-graph) for the complete transition graph.
 
 Carries an optional `reason` property with a structured `TransitionFailureReason`:
 

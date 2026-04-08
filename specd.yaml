@@ -36,6 +36,7 @@ workspaces:
         - .next/
         - .nuxt/
         - packages/
+        - apps/
 
   core:
     prefix: core
@@ -62,6 +63,15 @@ workspaces:
       fs:
         path: specs/code-graph
     codeRoot: packages/code-graph
+    ownership: owned
+
+  public-web:
+    prefix: public-web
+    specs:
+      adapter: fs
+      fs:
+        path: specs/public-web
+    codeRoot: apps/public-web
     ownership: owned
 
 storage:

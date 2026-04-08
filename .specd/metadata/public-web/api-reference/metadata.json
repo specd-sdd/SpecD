@@ -1,0 +1,78 @@
+{
+  "title": "API Reference",
+  "description": "Public consumers of `specd` need a technical reference that explains the exported API surface without reading source code directly. This spec defines how API reference content is generated and exposed inside the public site so that technical documentation lives alongside the rest of the public web experience.",
+  "context": [
+    "Public consumers of `specd` need a technical reference that explains the exported API surface without reading source code directly. This spec defines how API reference content is generated and exposed inside the public site so that technical documentation lives alongside the rest of the public web experience."
+  ],
+  "rules": [
+    {
+      "requirement": "Public API reference section",
+      "rules": [
+        "The public site MUST provide a dedicated API reference section under a stable public route. The API reference MUST be part of the same website experience as the landing page and public documentation rather than a disconnected external site."
+      ]
+    },
+    {
+      "requirement": "Generated API content",
+      "rules": [
+        "The API reference MUST be generated from package source or exported package surfaces rather than maintained as fully handwritten duplicate documentation. Generation inputs and output structure may be adapted for the public site, but the rendered reference must remain derived from the implementation-facing API source."
+      ]
+    },
+    {
+      "requirement": "Initial API coverage",
+      "rules": [
+        "The initial API reference scope MUST cover the public surfaces selected for the first public website release. That initial scope MUST include the APIs exposed by `@specd/core`, and it MAY exclude packages whose public surface is not yet intended for public consumption."
+      ]
+    },
+    {
+      "requirement": "Public-site integration",
+      "rules": [
+        "The generated API reference MUST integrate with the public site's navigation, styling, and information architecture. Users must be able to move between the landing page, public docs, and API reference without leaving the site."
+      ]
+    }
+  ],
+  "constraints": [
+    "API reference content must be generated, not maintained as a separate handwritten duplicate of the exported API",
+    "Initial coverage must include @specd/core",
+    "API reference must be served inside the public site"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Public API reference section",
+      "name": "API reference is published under a stable site route",
+      "when": ["a user navigates to the API reference section"],
+      "then": [
+        "the site serves the API reference from a dedicated public route",
+        "AND the reference appears as part of the same website rather than as an external disconnected destination"
+      ]
+    },
+    {
+      "requirement": "Generated API content",
+      "name": "API reference is derived from package API source",
+      "when": ["API reference content is produced for the public site"],
+      "then": [
+        "that content is generated from package source or exported API surfaces",
+        "AND the project does not maintain a separate fully handwritten duplicate of the same API reference"
+      ]
+    },
+    {
+      "requirement": "Initial API coverage",
+      "name": "First release includes the core API surface",
+      "when": ["the initial public API reference scope is assembled"],
+      "then": ["it includes the public surfaces of @specd/core"]
+    },
+    {
+      "requirement": "Public-site integration",
+      "name": "API reference participates in the public site experience",
+      "when": ["a user moves between the landing page, public docs, and API reference"],
+      "then": [
+        "the API reference shares the public site's navigation and visual structure",
+        "AND the user can reach it without leaving the public site"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:feb6cfaee3f68259d81f0a564c9956e55ba2fa734dc820e435bbe36248462223",
+    "verify.md": "sha256:b24db3bfb15160aa755471cfc5bb70424879546b4e04d84cb2d82db2e2296b0b"
+  },
+  "generatedBy": "core"
+}

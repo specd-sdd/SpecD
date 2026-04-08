@@ -1,0 +1,15 @@
+{
+  "extends": "@docusaurus/tsconfig",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node", "vitest/globals", "@testing-library/jest-dom"]
+  },
+  "include": [
+    "src",
+    "test",
+    "docusaurus.config.ts",
+    "api-sidebars.ts",
+    "sidebars.ts",
+    "vitest.config.ts"
+  ]
+}
