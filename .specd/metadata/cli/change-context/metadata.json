@@ -15,19 +15,19 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change context <name> <step>\n  [--rules] [--constraints] [--scenarios]\n  [--follow-deps [--depth <n>]]\n  [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to compile context for\n- `<step>` — required positional; the lifecycle step being entered (e.g. `designing`, `implementing`, `verifying`)\n- `--rules` — when present, includes only the rules sections of spec content in the output\n- `--constraints` — when present, includes only the constraints sections of spec content in the output\n- `--scenarios` — when present, includes only the scenarios sections of spec content in the output\n- `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs. By default (without this flag) `dependsOn` traversal is **not** performed.\n- `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block."
+        "```\nspecd change context <name> <step>\n  [--rules] [--constraints] [--scenarios]\n  [--follow-deps [--depth <n>]]\n  [--fingerprint <hash>]\n  [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to compile context for\n- `<step>` — required positional; the lifecycle step being entered (e.g. `designing`, `implementing`, `verifying`)\n- `--rules` — when present, includes only the rules sections of spec content in the output\n- `--constraints` — when present, includes only the constraints sections of spec content in the output\n- `--scenarios` — when present, includes only the scenarios sections of spec content in the output\n- `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs. By default (without this flag) `dependsOn` traversal is **not** performed.\n- `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`\n- `--fingerprint <hash>` — optional; when provided, the CLI compares this value against the current context fingerprint. If the fingerprint matches, returns `status: \"unchanged\"` without the full context. If omitted or the fingerprint does not match, returns the full context with the new fingerprint.\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block."
       ]
     },
     {
       "requirement": "Behaviour",
       "rules": [
-        "The command invokes the `CompileContext` use case. The `CompileContextConfig`, `followDeps`, `depth`, and `sections` fields are populated from the loaded `SpecdConfig` and the corresponding CLI flags."
+        "The command invokes the `CompileContext` use case. The `CompileContextConfig`, `followDeps`, `depth`, `sections`, and `fingerprint` fields are populated from the loaded `SpecdConfig` and the corresponding CLI flags.\n\nWhen `--fingerprint` is provided, the CLI first checks whether the provided fingerprint matches the current context fingerprint calculated by `CompileContext`. If they match, the CLI returns a minimal response indicating unchanged status without the full context. If they do not match (or `--fingerprint` is omitted), the CLI returns the full context with the new fingerprint."
       ]
     },
     {
       "requirement": "Output",
       "rules": [
-        "The CLI MUST assemble the final output from the structured `CompileContextResult` returned by the use case.\n\n**In `text` or `toon` mode** (default `text`):\n\n1. Project context entries are rendered first, each preceded by its source label (e.g. `**Source: <path>**` for file entries, `**Source: instruction**` for instruction entries). Entries are separated by `---`.\n2. Spec content follows under a `## Spec content` header:\n   - **Full-mode specs** (`mode: 'full'`) are rendered with their content under a `### Spec: <specId>` heading, as today.\n   - **Summary-mode specs** (`mode: 'summary'`) are rendered in a separate section under a `## Available context specs` heading. Each summary spec is listed with its spec ID, title, and description. The section includes an instruction: `Use \\`specd spec show <spec-id>\\` to load the full content of any spec you need.\\`\n   - Within each group, specs from `dependsOnTraversal` source MUST be visually distinguished from `includePattern` specs — rendered under a `### Via dependencies` sub-heading within the available context specs section.\n3. Available steps are rendered last, each annotated with availability status.\n\nNo additional framing or headers are added beyond those listed above.\n\n**In `json` mode**, the output is the structured result directly:\n\n```json\n{\n  \"stepAvailable\": true,\n  \"blockingArtifacts\": [],\n  \"projectContext\": [\n    { \"source\": \"file\", \"path\": \"specd-bootstrap.md\", \"content\": \"...\" },\n    { \"source\": \"instruction\", \"content\": \"...\" }\n  ],\n  \"specs\": [\n    {\n      \"specId\": \"core:core/compile-context\",\n      \"title\": \"CompileContext\",\n      \"description\": \"...\",\n      \"source\": \"specIds\",\n      \"mode\": \"full\",\n      \"content\": \"...\"\n    },\n    {\n      \"specId\": \"default:_global/architecture\",\n      \"title\": \"Architecture\",\n      \"description\": \"...\",\n      \"source\": \"includePattern\",\n      \"mode\": \"summary\"\n    }\n  ],\n  \"availableSteps\": [{ \"step\": \"designing\", \"available\": true, \"blockingArtifacts\": [] }],\n  \"warnings\": []\n}\n```"
+        "The CLI MUST assemble the final output from the structured `CompileContextResult` returned by the use case.\n\n**In `text` or `toon` mode** (default `text`):\n\n1. Project context entries are rendered first, each preceded by its source label (e.g. `**Source: <path>**` for file entries, `**Source: instruction**` for instruction entries). Entries are separated by `---`.\n2. Spec content follows under a `## Spec content` header:\n   - **Full-mode specs** (`mode: 'full'`) are rendered with their content under a `### Spec: <specId>` heading, as today.\n   - **Summary-mode specs** (`mode: 'summary'`) are rendered in a separate section under a `## Available context specs` heading. Each summary spec is listed with its spec ID, title, and description. The section includes an instruction: `Use \\`specd spec show <spec-id>\\` to load the full content of any spec you need.\\`\n   - Within each group, specs from `dependsOnTraversal` source MUST be visually distinguished from `includePattern` specs — rendered under a `### Via dependencies` sub-heading within the available context specs section.\n3. Available steps are rendered last, each annotated with availability status.\n\nWhen `--fingerprint` is provided and matches the current fingerprint, text mode outputs only a brief message: `Context unchanged since last call.` The full context is not printed.\n\nNo additional framing or headers are added beyond those listed above.\n\n**In `json` mode**, the output is the structured result directly:\n\n```json\n{\n  \"contextFingerprint\": \"sha256:abc123...\",\n  \"status\": \"changed\",\n  \"stepAvailable\": true,\n  \"blockingArtifacts\": [],\n  \"projectContext\": [\n    { \"source\": \"file\", \"path\": \"specd-bootstrap.md\", \"content\": \"...\" },\n    { \"source\": \"instruction\", \"content\": \"...\" }\n  ],\n  \"specs\": [\n    {\n      \"specId\": \"core:core/compile-context\",\n      \"title\": \"CompileContext\",\n      \"description\": \"...\",\n      \"source\": \"specIds\",\n      \"mode\": \"full\",\n      \"content\": \"...\"\n    },\n    {\n      \"specId\": \"default:_global/architecture\",\n      \"title\": \"Architecture\",\n      \"description\": \"...\",\n      \"source\": \"includePattern\",\n      \"mode\": \"summary\"\n    }\n  ],\n  \"availableSteps\": [{ \"step\": \"designing\", \"available\": true, \"blockingArtifacts\": [] }],\n  \"warnings\": []\n}\n```\n\nWhen `--fingerprint` is provided and matches, the JSON output still includes metadata fields but omits context content:\n\n```json\n{\n  \"contextFingerprint\": \"sha256:abc123...\",\n  \"status\": \"unchanged\",\n  \"stepAvailable\": true,\n  \"blockingArtifacts\": [],\n  \"availableSteps\": [\n    { \"step\": \"designing\", \"available\": true, \"blockingArtifacts\": [] },\n    { \"step\": \"ready\", \"available\": true, \"blockingArtifacts\": [] }\n  ],\n  \"warnings\": []\n}\n```\n\nThe `projectContext` and `specs` arrays are omitted when `status` is `'unchanged'` — the agent uses its cached values. The `stepAvailable`, `blockingArtifacts`, `availableSteps`, and `warnings` fields are always included so the agent can still determine step availability without fetching the full context."
       ]
     },
     {
@@ -56,7 +56,8 @@
     "All warnings go to stderr; the assembled output goes to stdout",
     "dependsOn traversal is opt-in via --follow-deps; without the flag, deps are not followed",
     "--depth without --follow-deps is a CLI usage error (exit code 1)",
-    "Section flags (--rules, --constraints, --scenarios) only filter full-mode spec content; summary-mode specs and available steps are unaffected"
+    "Section flags (--rules, --constraints, --scenarios) only filter full-mode spec content; summary-mode specs and available steps are unaffected",
+    "The fingerprint is calculated from all inputs that affect the logical context content: change specIds, project context entries, context include/exclude patterns, step, schema version, and the flags --rules, --constraints, --scenarios, --follow-deps, --depth. The --format flag does not affect the fingerprint."
   ],
   "scenarios": [
     {
@@ -72,41 +73,63 @@
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
     },
     {
-      "requirement": "Output",
-      "name": "Text output — full specs rendered with content",
-      "given": ["CompileContext returns specs with mode: 'full'"],
-      "when": ["specd change context <name> <step> is called with --format text"],
-      "then": ["full-mode specs are rendered under ### Spec: <specId> headings with their content"]
+      "requirement": "Command signature",
+      "name": "--fingerprint flag accepted",
+      "when": ["specd change context my-change designing --fingerprint sha256:abc123... is run"],
+      "then": ["the command proceeds normally"]
     },
     {
       "requirement": "Output",
-      "name": "Text output — summary specs rendered as catalogue",
-      "given": [
-        "config.contextMode: 'lazy'",
-        "AND CompileContext returns specs with mode: 'summary' from includePattern source"
-      ],
-      "when": ["specd change context <name> <step> is called with --format text"],
+      "name": "JSON output includes fingerprint and status on first call",
+      "given": ["no --fingerprint flag is provided"],
+      "when": ["specd change context my-change designing --format json is called"],
       "then": [
-        "summary-mode specs appear under ## Available context specs with spec ID, title, and description",
-        "AND the section includes the instruction Use \\specd spec show <spec-id>` to load the full content of any spec you need.`"
+        "the JSON output includes contextFingerprint with a SHA-256 hash",
+        "AND status is \"changed\"",
+        "AND the full context is returned"
       ]
     },
     {
       "requirement": "Output",
-      "name": "Text output — dependsOn traversal specs distinguished",
-      "given": [
-        "config.contextMode: 'lazy'",
-        "AND some summary specs have source: 'dependsOnTraversal'"
+      "name": "JSON output returns unchanged when fingerprint matches",
+      "given": ["the current context fingerprint is sha256:abc123..."],
+      "when": [
+        "specd change context my-change designing --fingerprint sha256:abc123... --format json is called"
       ],
-      "when": ["specd change context <name> <step> is called with --format text"],
       "then": [
-        "dependsOnTraversal specs appear under a ### Via dependencies sub-heading within ## Available context specs"
+        "the JSON output contains contextFingerprint, status: \"unchanged\", stepAvailable, blockingArtifacts, availableSteps, and warnings",
+        "AND projectContext and specs are absent (the agent uses its cached values)"
       ]
+    },
+    {
+      "requirement": "Output",
+      "name": "JSON output returns full context when fingerprint does not match",
+      "given": [
+        "the current context fingerprint is sha256:xyz789...",
+        "AND the provided fingerprint is sha256:abc123..."
+      ],
+      "when": [
+        "specd change context my-change designing --fingerprint sha256:abc123... --format json is called"
+      ],
+      "then": [
+        "the full context is returned",
+        "AND contextFingerprint is sha256:xyz789...",
+        "AND status is \"changed\""
+      ]
+    },
+    {
+      "requirement": "Output",
+      "name": "Text output shows unchanged message when fingerprint matches",
+      "given": ["the current context fingerprint is sha256:abc123..."],
+      "when": [
+        "specd change context my-change designing --fingerprint sha256:abc123... --format text is called"
+      ],
+      "then": ["the output is Context unchanged since last call.", "AND no spec content is printed"]
     },
     {
       "requirement": "Output",
       "name": "JSON output — structured result with mode and source",
-      "given": ["CompileContext returns structured result"],
+      "given": ["CompileContext returns specs with mode: 'full'"],
       "when": ["specd change context <name> <step> is called with --format json"],
       "then": [
         "the JSON output includes projectContext, specs (with specId, mode, source fields), availableSteps, and warnings"
@@ -202,8 +225,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:746e2f244dab49f4abd1e32a260b5d73a15378f60e28b6797d96f8d68458e796",
-    "verify.md": "sha256:aff9d7b75046386b9cac69aa20f90148ab95a54da9a4e188bfa2db14344ad445"
+    "spec.md": "sha256:e21cbdb4b0d466949aaa2a9c8939694365494eeedc7d65d000bac14d03db2dd1",
+    "verify.md": "sha256:47b1c08606d19748d828072443b8bcf3f62de8560267d0c9624bf224b16a6aa3"
   },
   "generatedBy": "core"
 }

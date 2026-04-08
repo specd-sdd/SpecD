@@ -74,20 +74,47 @@ Continue to step 3.
 ### 3. Load verification context
 
 ```bash
-node packages/cli/dist/index.js change context <name> verifying --follow-deps --depth 1 --scenarios --format text
+node packages/cli/dist/index.js change context <name> verifying --follow-deps --depth 1 --scenarios --format json
 ```
+
+Extract and store the `contextFingerprint` from the response. If the response is `status: "changed"`, use the full context. If `status: "unchanged"`, you already have the context from a previous call.
 
 **MUST follow** — project context entries are binding directives. If lazy mode returns
 summary specs, evaluate each one and load any that are relevant to the scenarios you're
 about to verify (see `shared.md` — "Processing `change context` output").
 
+### 3b. Get merged specs with deltas applied
+
+For each spec in the change, use `spec-preview` to get the final merged spec content
+with deltas applied. This shows the spec exactly as it will be after archiving:
+
+```bash
+node packages/cli/dist/index.js change spec-preview <name> <specId> --format json
+```
+
+For each spec in `specIds`, run this command and store the result. The merged content
+includes:
+
+- All requirements from the original spec
+- Modifications from the change's deltas
+- New requirements added by the change
+
+This merged view is what you should verify against — not the raw spec files, since
+the deltas change what the final spec will contain.
+
 ### 4. Verify each scenario
 
-For each spec in the change, read its verification scenarios. For each scenario:
+For each spec in the change, read the merged spec content from step 3b. Then verify
+each scenario against:
+
+1. The **merged spec** (from `spec-preview`) — this shows the final requirements after deltas
+2. The **verification scenarios** in the merged `verify.md` — these define the pass/fail conditions
+
+For each scenario:
 
 - Inspect the implementation code
 - Run relevant tests if applicable
-- Confirm GIVEN/WHEN/THEN conditions are satisfied
+- Confirm GIVEN/WHEN/THEN conditions are satisfied using the merged spec content
 
 ### 4b. Check blast radius with code graph
 

@@ -40,8 +40,10 @@ If state is not `archivable`, this is the wrong skill. Suggest based on state:
 ### 2. Load context
 
 ```bash
-node packages/cli/dist/index.js change context <name> archiving --follow-deps --depth 1 --format text
+node packages/cli/dist/index.js change context <name> archiving --follow-deps --depth 1 --format json
 ```
+
+Extract and store the `contextFingerprint` from the response. If the response is `status: "changed"`, use the full context. If `status: "unchanged"`, you already have the context from a previous call.
 
 **MUST follow** — project context entries are binding directives. If lazy mode returns
 summary specs, evaluate and load any that are relevant to the archiving work

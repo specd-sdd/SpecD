@@ -272,6 +272,44 @@
 - **THEN** `result.warnings` includes a warning about the unknown qualifier
 - **AND** no exception is thrown
 
+### Requirement: Context fingerprint
+
+#### Scenario: Fingerprint calculated from specIds, context, and flags
+
+- **GIVEN** a change with specIds, project context entries, and include/exclude patterns
+- **WHEN** `CompileContext.execute` is called without a fingerprint
+- **THEN** a fingerprint is calculated and included in the result
+
+#### Scenario: Unchanged status returned when fingerprint matches
+
+- **GIVEN** the current context fingerprint is `sha256:abc123...`
+- **WHEN** `CompileContext.execute` is called with `fingerprint: 'sha256:abc123...'`
+- **THEN** the result `status` is `'unchanged'`
+- **AND** `projectContext` and `specs` are empty arrays
+- **AND** the full context is not assembled
+
+#### Scenario: Changed status returned when fingerprint does not match
+
+- **GIVEN** the current context fingerprint is `sha256:xyz789...`
+- **WHEN** `CompileContext.execute` is called with `fingerprint: 'sha256:abc123...'`
+- **THEN** the result `status` is `'changed'`
+- **AND** the full context is assembled and returned
+- **AND** `contextFingerprint` is `sha256:xyz789...`
+
+#### Scenario: Fingerprint changes when flags change
+
+- **GIVEN** `CompileContext` was called without `--follow-deps`
+- **WHEN** `CompileContext` is called with `followDeps: true`
+- **THEN** the fingerprint is different from the previous call
+- **AND** the result `status` is `'changed'`
+
+#### Scenario: --format flag does not affect fingerprint
+
+- **GIVEN** the fingerprint was calculated from a call with `--format text`
+- **WHEN** the same context is requested with `--format json`
+- **THEN** the fingerprint matches the previous call
+- **AND** `status` is `'unchanged'`
+
 ### Requirement: Materialized delta view
 
 #### Scenario: Spec with validated delta returns merged content

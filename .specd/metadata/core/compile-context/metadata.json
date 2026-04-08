@@ -2,8 +2,16 @@
   "title": "CompileContext",
   "description": "AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata via `SpecRepository.metadata()`, evaluates step availability, and combines project context entries, spec content, and available steps into a single structured output. Artifact instructions and step hooks are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively.",
   "dependsOn": [
+    "core:core/change",
+    "core:core/config",
+    "core:core/spec-metadata",
+    "core:core/schema-format",
     "core:core/delta-format",
-    "core:core/artifact-parser-port",
+    "core:core/selector-model",
+    "core:core/spec-id-format",
+    "core:core/workspace",
+    "core:core/get-artifact-instruction",
+    "core:core/get-hook-instructions",
     "core:core/preview-spec"
   ],
   "context": [
@@ -19,7 +27,7 @@
     {
       "requirement": "Input",
       "rules": [
-        "`CompileContext.execute` receives:\n\n- `name` — the change name to compile context for\n- `step` — the lifecycle step name being entered (e.g. `'designing'`, `'implementing'`, `'verifying'`, `'archiving'`)\n- `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`, and `contextMode`\n- `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1–4 are included.\n- `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.\n- `sections` (optional) — when present, restricts the metadata content rendered for each spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, all available sections are rendered (description + rules + constraints + scenarios). `sections` applies only to full-mode spec content — it does not affect summary-mode specs, project context entries, or available steps."
+        "`CompileContext.execute` receives:\n\n- `name` — the change name to compile context for\n- `step` — the lifecycle step name being entered (e.g. `'designing'`, `'implementing'`, `'verifying'`, `'archiving'`)\n- `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`, and `contextMode`\n- `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1–4 are included.\n- `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.\n- `sections` (optional) — when present, restricts the metadata content rendered for each spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, all available sections are rendered (description + rules + constraints + scenarios). `sections` applies only to full-mode spec content — it does not affect summary-mode specs, project context entries, or available steps.\n- `fingerprint` (optional) — when provided, `CompileContext` compares this value against the fingerprint it calculates from the current context inputs. If they match, the result's `status` field is set to `'unchanged'` and the full context is not assembled. If omitted or the fingerprint does not match, `status` is `'changed'` and the full context is returned with the new fingerprint."
       ]
     },
     {
@@ -85,7 +93,7 @@
     {
       "requirement": "Result shape",
       "rules": [
-        "`CompileContext.execute` MUST return a `CompileContextResult` object with:\n\n- `stepAvailable: boolean` — whether the requested step is currently available\n- `blockingArtifacts: string[]` — artifact IDs blocking the step (empty if available)\n- `projectContext: ProjectContextEntry[]` — rendered project context entries\n- `specs: ContextSpecEntry[]` — spec entries with tier classification, source, and content\n- `availableSteps: AvailableStep[]` — all workflow steps with availability status\n- `warnings: ContextWarning[]` — stale metadata warnings and any other advisory conditions\n\n`CompileContext` MUST NOT throw on availability failures. It MUST throw on `ChangeNotFoundError` (change not found) and on schema resolution errors."
+        "`CompileContext.execute` MUST return a `CompileContextResult` object with:\n\n- `contextFingerprint: string` — the calculated fingerprint for the current context state (SHA-256 hash)\n- `status: 'changed' | 'unchanged'` — `'changed'` when the full context is returned, `'unchanged'` when the provided fingerprint matched and context was skipped\n- `stepAvailable: boolean` — whether the requested step is currently available\n- `blockingArtifacts: string[]` — artifact IDs blocking the step (empty if available)\n- `projectContext: ProjectContextEntry[]` — rendered project context entries (empty when `status` is `'unchanged'`)\n- `specs: ContextSpecEntry[]` — spec entries with tier classification, source, and content (empty when `status` is `'unchanged'`)\n- `availableSteps: AvailableStep[]` — all workflow steps with availability status\n- `warnings: ContextWarning[]` — stale metadata warnings and any other advisory conditions\n\nWhen `status` is `'unchanged'`, the `projectContext` and `specs` arrays are empty (the client uses its cached values). The `stepAvailable`, `blockingArtifacts`, `availableSteps`, and `warnings` fields are always populated — this allows the client to determine step availability without fetching the full context. When `status` is `'changed'`, all fields are populated as described.\n\n`CompileContext` MUST NOT throw on availability failures. It MUST throw on `ChangeNotFoundError` (change not found) and on schema resolution errors."
       ]
     },
     {
@@ -98,6 +106,12 @@
       "requirement": "Unknown workspace qualifiers emit a warning",
       "rules": [
         "If a pattern or `dependsOn` entry references a workspace name that has no corresponding `SpecRepository` in the `specs` map (e.g. `billing:auth/*` when `billing` was not wired at bootstrap), `CompileContext` must emit a warning and skip the path. It must not throw."
+      ]
+    },
+    {
+      "requirement": "Context fingerprint",
+      "rules": [
+        "`CompileContext` calculates a fingerprint that uniquely identifies the current context state. The fingerprint is a SHA-256 hash of a canonicalized string representation of all inputs that affect the logical context content:\n\n1. Change specIds (sorted alphabetically)\n2. Project context entries (instruction values verbatim, file content hashed)\n3. Context include/exclude patterns from config\n4. The step being queried\n5. Schema version\n6. All flags that affect output: `followDeps`, `depth`, `sections`\n\nWhen `fingerprint` is provided to `execute()`:\n\n- If `fingerprint` matches the calculated fingerprint, `status` is `'unchanged'` and the context is not assembled (early return).\n- If `fingerprint` does not match or is omitted, `status` is `'changed'` and the full context is assembled and returned.\n\nThe fingerprint enables clients to skip re-fetching unchanged context without comparing the full output themselves."
       ]
     }
   ],
@@ -499,6 +513,52 @@
       ]
     },
     {
+      "requirement": "Context fingerprint",
+      "name": "Fingerprint calculated from specIds, context, and flags",
+      "given": ["a change with specIds, project context entries, and include/exclude patterns"],
+      "when": ["CompileContext.execute is called without a fingerprint"],
+      "then": ["a fingerprint is calculated and included in the result"]
+    },
+    {
+      "requirement": "Context fingerprint",
+      "name": "Unchanged status returned when fingerprint matches",
+      "given": ["the current context fingerprint is sha256:abc123..."],
+      "when": ["CompileContext.execute is called with fingerprint: 'sha256:abc123...'"],
+      "then": [
+        "the result status is 'unchanged'",
+        "AND projectContext and specs are empty arrays",
+        "AND the full context is not assembled"
+      ]
+    },
+    {
+      "requirement": "Context fingerprint",
+      "name": "Changed status returned when fingerprint does not match",
+      "given": ["the current context fingerprint is sha256:xyz789..."],
+      "when": ["CompileContext.execute is called with fingerprint: 'sha256:abc123...'"],
+      "then": [
+        "the result status is 'changed'",
+        "AND the full context is assembled and returned",
+        "AND contextFingerprint is sha256:xyz789..."
+      ]
+    },
+    {
+      "requirement": "Context fingerprint",
+      "name": "Fingerprint changes when flags change",
+      "given": ["CompileContext was called without --follow-deps"],
+      "when": ["CompileContext is called with followDeps: true"],
+      "then": [
+        "the fingerprint is different from the previous call",
+        "AND the result status is 'changed'"
+      ]
+    },
+    {
+      "requirement": "Context fingerprint",
+      "name": "--format flag does not affect fingerprint",
+      "given": ["the fingerprint was calculated from a call with --format text"],
+      "when": ["the same context is requested with --format json"],
+      "then": ["the fingerprint matches the previous call", "AND status is 'unchanged'"]
+    },
+    {
       "requirement": "Materialized delta view",
       "name": "Spec with validated delta returns merged content",
       "given": [
@@ -555,8 +615,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:90da9f5215733fdbc03ce11b115236b3cf407ec22c78bb86c9d139c594528615",
-    "verify.md": "sha256:6642cfea021f53a8d673f0cd0e0d9e75f9c91508310285b72f458d9e95d89d43"
+    "spec.md": "sha256:6c99d557b28c0a07522ea9798e07be229dc02a17dd6e522b07d2412b6e3a5393",
+    "verify.md": "sha256:d876dac5d04c4937d55a7b119be5121792bd771522a74cf78453a984a0e0338e"
   },
   "generatedBy": "core"
 }
