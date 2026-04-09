@@ -309,12 +309,18 @@ artifacts:
       without needing to make design decisions of their own.
 
       Before writing, analyse the codebase to understand impact:
+      - **Affected files discovery**: use the impact analysis to find every existing
+        file, module, symbol, document, or resource that will also need modification
+        or removal because of this change — not just the initially obvious target.
       - **Symbol-level impact**: for each symbol being modified, identify its direct and
         transitive callers/dependents. Assess risk — symbols with many cross-workspace
         callers are high-risk and need careful handling.
       - **Spec ripple effect**: when the change modifies existing specs, trace their
         dependents (direct and transitive). Assess whether dependent specs' requirements
-        are still satisfied or need updating.
+        are still satisfied or need updating. If this analysis reveals additional specs
+        that also need requirement changes, treat them as part of the change's scope:
+        add them to the affected specs set before proceeding so they get the required
+        delta or artifact files.
       - **Dependency map**: for non-trivial changes, visualise the key relationships
         (symbols → callers, specs → dependents) to make the blast radius explicit.
 
