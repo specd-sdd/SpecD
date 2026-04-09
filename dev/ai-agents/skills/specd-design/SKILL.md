@@ -39,20 +39,20 @@ schema or lifecycle semantics.
 ### 1. Load change state
 
 ```bash
-node packages/cli/dist/index.js change status <name> --format json
+specd change status <name> --format json
 ```
 
 If state is `drafting` or `designing`, transition to `designing`:
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> designing --phase pre
-node packages/cli/dist/index.js change hook-instruction <name> designing --phase pre --format text
+specd change run-hooks <name> designing --phase pre
+specd change hook-instruction <name> designing --phase pre --format text
 ```
 
 Follow guidance.
 
 ```bash
-node packages/cli/dist/index.js change transition <name> designing --skip-hooks all
+specd change transition <name> designing --skip-hooks all
 ```
 
 If state is not `drafting` or `designing`, this is the wrong skill. Suggest based on state:
@@ -74,7 +74,7 @@ Check `artifacts` array — if some are already `complete`, you're resuming mid-
 ### 2. Check workspace ownership
 
 ```bash
-node packages/cli/dist/index.js config show --format json
+specd config show --format json
 ```
 
 From the JSON output, build a map of each workspace's `codeRoot` and `ownership`.
@@ -105,10 +105,19 @@ code or specs, **stop and surface it to the user** — do not write the artifact
 those changes can be made. The user must either change the ownership in `specd.yaml` or
 adjust the design to work within owned/shared boundaries.
 
+External workspaces remain valid read targets during design:
+
+- Read **specs** through specd CLI commands only. Do NOT inspect specs directly from
+  `specsPath`, whether the workspace is local or external.
+- Read **code** directly from a workspace's `codeRoot` when you need implementation
+  context, architecture evidence, or impact analysis, even if that `codeRoot` is
+  outside the current git root.
+- `isExternal` changes location only. `ownership` still governs writes.
+
 ### 3. Load schema
 
 ```bash
-node packages/cli/dist/index.js schema show --format json
+specd schema show --format json
 ```
 
 Note the artifact DAG from the `artifacts` array.
@@ -116,7 +125,7 @@ Note the artifact DAG from the `artifacts` array.
 ### 4. Load context
 
 ```bash
-node packages/cli/dist/index.js change context <name> designing --follow-deps --depth 1 --rules --constraints --format json
+specd change context <name> designing --follow-deps --depth 1 --rules --constraints --format json
 ```
 
 Extract and store the `contextFingerprint` from the response. If the response is `status: "changed"`, use the full context. If `status: "unchanged"`, you already have the context from a previous call.
@@ -131,8 +140,8 @@ When the change targets specific code areas, use the graph to find related symbo
 assess complexity — this is mandatory, not optional:
 
 ```bash
-node packages/cli/dist/index.js graph search "<keyword from spec>" --specs --format json
-node packages/cli/dist/index.js graph hotspots --min-risk MEDIUM --format json
+specd graph search "<keyword from spec>" --specs --format json
+specd graph hotspots --min-risk MEDIUM --format json
 ```
 
 Graph search helps you discover specs you might need to load as context. Hotspots help
@@ -143,7 +152,7 @@ When writing the **design** or **tasks** artifact, if you know specific files or
 that will be modified, check their impact:
 
 ```bash
-node packages/cli/dist/index.js graph impact --symbol "<name>" --direction downstream --format json
+specd graph impact --symbol "<name>" --direction downstream --format json
 ```
 
 Include impact findings in the design artifact so the implementer knows what's at stake.
@@ -224,7 +233,7 @@ as done immediately. Otherwise:
 ### 7. Get next artifact
 
 ```bash
-node packages/cli/dist/index.js change artifact-instruction <name> --format json
+specd change artifact-instruction <name> --format json
 ```
 
 Returns `artifactId`, `instruction`, `template`, `delta`, `rulesPre`, `rulesPost`.
@@ -242,7 +251,7 @@ Key rules:
 - **Optional artifact** (`optional: true`): ask the user if needed. If not, skip:
 
   ```bash
-  node packages/cli/dist/index.js change skip-artifact <name> <artifactId>
+  specd change skip-artifact <name> <artifactId>
   ```
 
 - **Delta** (`delta` is not null and `delta.outlines` has entries): the spec already
@@ -255,7 +264,7 @@ Key rules:
 After writing, check if the artifact implies scope changes:
 
 ```bash
-node packages/cli/dist/index.js spec list --format text --summary
+specd spec list --format text --summary
 ```
 
 If new specs should be added or existing ones removed, surface to the user.
@@ -278,14 +287,14 @@ Check the artifact's `scope` (from the schema JSON loaded in step 3):
   the artifact is not spec-specific.
 
   ```bash
-  node packages/cli/dist/index.js change validate <name> <anySpecId> --artifact <artifactId>
+  specd change validate <name> <anySpecId> --artifact <artifactId>
   ```
 
 - **`scope: spec`** (e.g. specs, verify): validate ONCE PER specId, because each spec
   has its own artifact file.
 
   ```bash
-  node packages/cli/dist/index.js change validate <name> <specId> --artifact <artifactId>
+  specd change validate <name> <specId> --artifact <artifactId>
   ```
 
 If validation fails: fix and re-validate. Do not proceed until it passes.
@@ -306,23 +315,93 @@ hooks. Do NOT wait, do NOT ask the user anything first — the hooks fire on com
 of all design artifacts, before any review conversation.
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> designing --phase post
-node packages/cli/dist/index.js change hook-instruction <name> designing --phase post --format text
+specd change run-hooks <name> designing --phase post
+specd change hook-instruction <name> designing --phase post --format text
 ```
 
 Follow guidance. If hooks fail, fix and re-run.
 
+### 10b. Implementation scope guard — mandatory before `ready`
+
+Before entering `ready`, verify that the implementation described by the design
+stays inside the change's writable workspace code roots. This is the enforcement
+point for implementation scope: if the planned code changes fall outside the
+allowed roots, the design is not ready.
+
+Reload workspace config:
+
+```bash
+specd config show --format json
+```
+
+Build the set of **allowed implementation roots** from the workspaces targeted by
+the change:
+
+- Include the `codeRoot` of each active workspace whose ownership is `owned` or `shared`
+- Exclude `readOnly` roots entirely; they are never valid implementation targets
+- Do NOT treat the whole repository as implicitly writable just because a path does
+  not belong to another workspace
+
+Then inspect the written change artifacts that describe or constrain the planned
+implementation scope for concrete implementation targets. Use the active schema
+and the artifacts written in this change; do not assume specific filenames:
+
+- Repository-relative file paths
+- Paths in code fences, bullet lists, checklists, or inline code
+- Explicitly named files the tasks say to create, modify, move, or delete
+- Concrete code locations surfaced by graph analysis and called out in the design
+
+Normalize those candidate paths against the project root and classify each one:
+
+- **Allowed** — falls within one of the active writable `codeRoot` directories
+- **Blocked (readOnly)** — falls within a `readOnly` workspace `codeRoot`
+- **Out of scope** — falls outside every active writable `codeRoot`, even if it is
+  not inside another workspace
+
+Classification precedence is strict:
+
+- If **any** target is `Blocked (readOnly)`, the entire change is blocked before
+  `ready`, even if other targets are merely `Out of scope`
+- Only when there are **no** `Blocked (readOnly)` targets may `Out of scope`
+  targets be surfaced for user decision
+
+If any target is **Blocked (readOnly)**, do NOT transition to `ready`. Show the
+user a concise table like:
+
+> **Blocked before `ready`.** The current design includes implementation targets
+> outside the change's writable workspace roots.
+>
+> | Path | Classification          | Allowed roots |
+> | ---- | ----------------------- | ------------- |
+> | ...  | out of scope / readOnly | ...           |
+>
+> Adjust the design/tasks, add the correct workspace/spec scope, or change
+> workspace ownership in `specd.yaml` before continuing.
+
+If any target is **Out of scope** (but not `readOnly`), do NOT transition to
+`ready` autonomously. Show the user the out-of-scope paths and ask whether to:
+
+1. update the change scope/workspaces first, or
+2. continue with the current design anyway
+
+Stop and wait for the user's decision. Do not assume out-of-scope paths are okay,
+but do not hard-fail them without user confirmation.
+
+Do not "mentally waive" a path because it seems harmless. If the design says to
+touch a concrete file outside the active writable `codeRoot` set, surface it
+explicitly before `ready`.
+
 Run ready pre-hooks, then transition:
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> ready --phase pre
-node packages/cli/dist/index.js change hook-instruction <name> ready --phase pre --format text
+specd change run-hooks <name> ready --phase pre
+specd change hook-instruction <name> ready --phase pre --format text
 ```
 
 Follow guidance.
 
 ```bash
-node packages/cli/dist/index.js change transition <name> ready --skip-hooks all
+specd change transition <name> ready --skip-hooks all
 ```
 
 ### 11. Mandatory review stop
@@ -342,14 +421,14 @@ Show summary of all artifacts and specs in the change.
 Run ready post hooks:
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> ready --phase post
-node packages/cli/dist/index.js change hook-instruction <name> ready --phase post --format text
+specd change run-hooks <name> ready --phase post
+specd change hook-instruction <name> ready --phase post --format text
 ```
 
 ### 12. Handle approval gate
 
 ```bash
-node packages/cli/dist/index.js change status <name> --format json
+specd change status <name> --format json
 ```
 
 Check `lifecycle.approvals.spec`:
@@ -414,7 +493,7 @@ use `change deps` (see shared.md — "Spec scope vs spec dependencies" for the d
 with `change edit --add-spec`):
 
 ```bash
-node packages/cli/dist/index.js change deps <name> <specId> --add <depId> --add <depId>
+specd change deps <name> <specId> --add <depId> --add <depId>
 ```
 
 This typically happens after writing the proposal (the schema's `register-spec-deps`

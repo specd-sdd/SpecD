@@ -44,7 +44,7 @@ When this skill is invoked:
    colons yourself. Run:
 
    ```bash
-   node packages/cli/dist/index.js spec resolve-path <input> --format json
+   specd spec resolve-path <input> --format json
    ```
 
    The command returns `{ workspace, specPath, specId }`. Use the returned `specId` as
@@ -52,14 +52,14 @@ When this skill is invoked:
    c. **Capture existing `dependsOn` before regeneration** (see "dependsOn preservation" below):
 
    ```bash
-   node packages/cli/dist/index.js spec metadata <spec-id> --format json
+   specd spec metadata <spec-id> --format json
    ```
 
    Save the current `dependsOn` array (if any) for comparison after generation.
    d. Run deterministic generation (without `--force`):
 
    ```bash
-   node packages/cli/dist/index.js spec generate-metadata <spec-id> --write
+   specd spec generate-metadata <spec-id> --write
    ```
 
    **Error handling:**
@@ -79,7 +79,7 @@ When this skill is invoked:
    a. Run:
 
    ```bash
-   node packages/cli/dist/index.js spec list --metadata-status stale,missing,invalid --format json
+   specd spec list --metadata-status stale,missing,invalid --format json
    ```
 
    b. Parse the JSON. For each workspace, collect the spec IDs.
@@ -87,14 +87,14 @@ When this skill is invoked:
    c. **Capture existing `dependsOn` for each spec** before regeneration:
 
    ```bash
-   node packages/cli/dist/index.js spec metadata <spec-id> --format json
+   specd spec metadata <spec-id> --format json
    ```
 
    Save each spec's current `dependsOn` array (if any).
    d. Run deterministic generation for all stale/missing/invalid specs at once:
 
    ```bash
-   node packages/cli/dist/index.js spec generate-metadata --all --write --status stale,missing,invalid
+   specd spec generate-metadata --all --write --status stale,missing,invalid
    ```
 
    The `--all` flag processes every matching spec in a single invocation. If any spec
@@ -168,8 +168,8 @@ When a subagent returns:
 cat > /tmp/specd-metadata-<safe-name>.json << 'JSONEOF'
 <json content from subagent>
 JSONEOF
-node packages/cli/dist/index.js spec write-metadata <spec-id> --input /tmp/specd-metadata-<safe-name>.json
-node packages/cli/dist/index.js spec metadata <spec-id> --format json
+specd spec write-metadata <spec-id> --input /tmp/specd-metadata-<safe-name>.json
+specd spec metadata <spec-id> --format json
 rm /tmp/specd-metadata-<safe-name>.json
 ```
 
@@ -187,7 +187,7 @@ a baseline from the spec's AST. Your job is to read the generated metadata, opti
 fields for quality without losing content, add keywords, and return the complete JSON as your
 final message. Do NOT write any files.
 
-IMPORTANT: Use `node packages/cli/dist/index.js` instead of `specd` for all CLI commands.
+IMPORTANT: Use `specd` for all CLI commands.
 All Bash commands must run from the project root directory.
 
 Follow these steps exactly:
@@ -200,7 +200,7 @@ Skip — treat as needing optimization.
 **Otherwise:**
 Run:
 ```bash
-node packages/cli/dist/index.js spec metadata <spec-id> --format json
+specd spec metadata <spec-id> --format json
 ```
 
 If `fresh` is `true`, evaluate existing metadata quality from command output:
@@ -216,8 +216,8 @@ If the command fails (no metadata yet), treat all files as stale.
 ### Step 2 — Read the generated metadata and spec content
 
 ```bash
-node packages/cli/dist/index.js spec metadata <spec-id> --format json
-node packages/cli/dist/index.js spec show <spec-id> --format json
+specd spec metadata <spec-id> --format json
+specd spec show <spec-id> --format json
 ```
 
 The metadata JSON is your primary source — it already contains `title`, `description`,
@@ -342,7 +342,7 @@ subagent prompt as above, except:
 - The subagent must compute `contentHashes` itself:
 
 ```bash
-node packages/cli/dist/index.js spec show <spec-id> --format json | node -e "
+specd spec show <spec-id> --format json | node -e "
 const crypto = require('crypto');
 let input = '';
 process.stdin.on('data', d => input += d);
@@ -359,5 +359,5 @@ process.stdin.on('end', () => {
 - The subagent must resolve dependencies from `## Spec Dependencies`:
 
 ```bash
-node packages/cli/dist/index.js spec resolve-path <path> --format json
+specd spec resolve-path <path> --format json
 ```

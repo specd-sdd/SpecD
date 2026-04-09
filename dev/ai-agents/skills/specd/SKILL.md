@@ -25,18 +25,33 @@ Read .specd/skills/shared.md
 Then gather project info and load project context:
 
 ```bash
-node packages/cli/dist/index.js config show --format json
-node packages/cli/dist/index.js spec list --format json --summary
-node packages/cli/dist/index.js change list --format json
-node packages/cli/dist/index.js drafts list --format json
-node packages/cli/dist/index.js project context --format text
-node packages/cli/dist/index.js graph stats --format json
+specd config show --format json
+specd spec list --format json --summary
+specd change list --format json
+specd drafts list --format json
+specd project context --format text
+specd graph stats --format json
 ```
 
 **MUST follow** — the project context output contains binding directives (instructions
 and file content). Read and absorb them before continuing. If lazy mode returns summary
 specs, evaluate and load any that are relevant (see `shared.md` — "Processing `change
 context` output").
+
+**Workspace locality rule — mandatory.** Workspaces marked external (`isExternal: true`)
+still belong to the project's workspace model even when their code lives outside the
+current git root. Treat them as valid investigation targets.
+
+- Read **specs** through specd CLI commands only (`project context`, `change context`,
+  `spec list`, `spec show`, `change spec-preview`, etc.). Do NOT inspect specs directly from
+  `specsPath`, whether local or external.
+- Read **code** directly from a workspace's `codeRoot` when you need implementation
+  context, impact analysis, or architecture understanding, even if that `codeRoot`
+  is outside the current git root.
+- `isExternal` affects location, not permissions. It does not block reads and does
+  not grant writes.
+- `ownership` governs writes. `readOnly` means no writes; `owned` and `shared` may
+  be writable depending on the active workflow and scope.
 
 From the results, **print a welcome block** to the user with this structure:
 
@@ -61,7 +76,7 @@ print this yourself.
 If the code graph is stale or not indexed, re-index it in the background:
 
 ```bash
-node packages/cli/dist/index.js graph index --format json
+specd graph index --format json
 ```
 
 Do not wait for completion before continuing — indexing can take a few seconds and
@@ -71,20 +86,20 @@ never indexed), run `graph index` to bootstrap it.
 ### 2. Check for existing changes
 
 ```bash
-node packages/cli/dist/index.js change list --format json
-node packages/cli/dist/index.js drafts list --format json
+specd change list --format json
+specd drafts list --format json
 ```
 
 - If changes or drafts exist: show them with their states and ask the user
   what they want to do — continue one, start something new, or just talk.
-- If a draft is selected: `node packages/cli/dist/index.js drafts restore <name>`
+- If a draft is selected: `specd drafts restore <name>`
 
 ### 3. Route based on state
 
 If the user provided a change name, or selected one from the list:
 
 ```bash
-node packages/cli/dist/index.js change status <name> --format json
+specd change status <name> --format json
 ```
 
 Read `state` and suggest the next skill:

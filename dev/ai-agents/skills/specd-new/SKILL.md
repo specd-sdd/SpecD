@@ -19,12 +19,25 @@ change when the picture is clear. Does NOT write any artifacts — that's `/spec
 ### 1. Load project context
 
 ```bash
-node packages/cli/dist/index.js project context --format text
+specd project context --format text
 ```
 
 **MUST follow** — project context entries are binding directives. If lazy mode returns
 summary specs, evaluate and load any that are relevant to the work ahead
 (see `shared.md` — "Processing `change context` output").
+
+**Workspace locality rule — mandatory.** External workspaces are still part of the
+project for discovery work.
+
+- Read **specs** through specd CLI commands only. Do NOT inspect specs directly from
+  `specsPath`, whether the workspace is local or external.
+- Read **code** directly from a workspace's `codeRoot` when you need to understand
+  current behavior, dependencies, or likely impact, even if that `codeRoot` lives
+  outside the current git root.
+- `isExternal` does not change permissions; it only tells you the workspace lives
+  outside the current repository root.
+- `ownership` controls writes, not reads. `readOnly` workspaces may still be inspected
+  for context.
 
 ### 2. Understand intent
 
@@ -39,24 +52,28 @@ summary specs, evaluate and load any that are relevant to the work ahead
 Investigate the codebase if relevant:
 
 ```bash
-node packages/cli/dist/index.js spec list --format text --summary
+specd spec list --format text --summary
 ```
 
 Surface existing specs that might be affected. Let the conversation develop naturally.
+
+When a likely affected workspace is external, inspect its code via `codeRoot` the same
+way you would inspect local workspace code. Do not skip it just because it lives in a
+different repository directory.
 
 #### Use code graph for deeper investigation
 
 When the user describes affected areas, use graph search to find related symbols and specs:
 
 ```bash
-node packages/cli/dist/index.js graph search "<keyword>" --format json
+specd graph search "<keyword>" --format json
 ```
 
 If the user mentions specific files or symbols, check their impact to understand scope:
 
 ```bash
-node packages/cli/dist/index.js graph impact --file "<path>" --direction both --format json
-node packages/cli/dist/index.js graph impact --symbol "<name>" --direction both --format json
+specd graph impact --file "<path>" --direction both --format json
+specd graph impact --symbol "<name>" --direction both --format json
 ```
 
 This helps you surface specs and code areas the user may not have considered. If `riskLevel`
@@ -67,7 +84,7 @@ is HIGH or CRITICAL, mention it — it affects how many specs should be in scope
 When the picture is clear enough, first check workspace ownership:
 
 ```bash
-node packages/cli/dist/index.js config show --format json
+specd config show --format json
 ```
 
 From the JSON output, build a map of each workspace's `ownership`. For each spec you're
@@ -94,7 +111,7 @@ Wait for confirmation.
 ### 4. Create
 
 ```bash
-node packages/cli/dist/index.js change create <name> --spec <workspace:path> --description "<desc>" --format json
+specd change create <name> --spec <workspace:path> --description "<desc>" --format json
 ```
 
 The response includes `changePath` — the directory where artifacts will be written.
@@ -103,7 +120,7 @@ If `change create` fails with `Change '<name>' already exists`, the change is al
 in progress. Load its status and redirect:
 
 ```bash
-node packages/cli/dist/index.js change status <name> --format json
+specd change status <name> --format json
 ```
 
 Suggest based on state:
@@ -124,8 +141,8 @@ Suggest based on state:
 ### 5. Run entry hooks
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> drafting --phase pre
-node packages/cli/dist/index.js change hook-instruction <name> drafting --phase pre --format text
+specd change run-hooks <name> drafting --phase pre
+specd change hook-instruction <name> drafting --phase pre --format text
 ```
 
 Follow guidance if any.
@@ -136,7 +153,7 @@ If during the discovery conversation you identified dependencies between the spe
 change (or between them and existing specs), register them now:
 
 ```bash
-node packages/cli/dist/index.js change deps <name> <specId> --add <depId> --add <depId>
+specd change deps <name> <specId> --add <depId> --add <depId>
 ```
 
 This is optional at this stage — dependencies can also be registered later during
@@ -198,8 +215,8 @@ about whether to include something: include it.
 ### 8. Run exit hooks
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> drafting --phase post
-node packages/cli/dist/index.js change hook-instruction <name> drafting --phase post --format text
+specd change run-hooks <name> drafting --phase post
+specd change hook-instruction <name> drafting --phase post --format text
 ```
 
 Follow guidance if any.
@@ -207,7 +224,7 @@ Follow guidance if any.
 ### 9. Show status and stop
 
 ```bash
-node packages/cli/dist/index.js change status <name> --format json
+specd change status <name> --format json
 ```
 
 Show the change state and suggest next step:
