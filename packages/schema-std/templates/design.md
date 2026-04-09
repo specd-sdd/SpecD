@@ -26,7 +26,8 @@
 
 <!-- List every EXISTING file, module, symbol, document, or resource that will be
      modified or removed. Use the codebase and tooling to discover these — do not
-     guess. For each area, explain what changes and why.
+     guess. This analysis is how you find additional files that must be touched
+     beyond the initially obvious target. For each area, explain what changes and why.
 
      For code changes, go beyond file-level analysis. Identify specific symbols
      (functions, classes, types, interfaces) being modified and assess their impact:
@@ -84,6 +85,9 @@
      - For each dependent, assess whether its requirements are still satisfied or
        need updating. Flag any requirement in a dependent spec that references
        concepts, types, or behaviours being changed.
+     - If this reveals additional specs that need requirement changes, they must be
+       added to the change scope and handled with their own delta or artifact files;
+       do not leave them as untracked ripple effects.
 
      This section prevents silent breakage: modifying a spec without understanding
      its dependents can invalidate downstream requirements. If no existing specs
