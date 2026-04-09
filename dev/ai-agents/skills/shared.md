@@ -20,7 +20,7 @@ defines the behaviour and the change implements the code for it. Use `op: no-op`
 
 ## CLI
 
-Use `node packages/cli/dist/index.js` for ALL commands. Never use bare `specd`.
+Use `specd` for ALL commands.
 
 ## Command sequencing — no write-then-read parallelism
 
@@ -58,7 +58,7 @@ live there. Never guess the path.
 To find the correct ID:
 
 ```bash
-node packages/cli/dist/index.js spec list --format text --summary
+specd spec list --format text --summary
 ```
 
 Use the IDs from the PATH column. For new specs that don't exist yet, **ask the user**
@@ -70,7 +70,7 @@ which workspace they belong to.
 If a spec needs to be part of the change, first add it:
 
 ```bash
-node packages/cli/dist/index.js change edit <name> --add-spec <workspace:path>
+specd change edit <name> --add-spec <workspace:path>
 ```
 
 Only after `--add-spec` succeeds should you write the delta or artifact file in the
@@ -145,8 +145,8 @@ are exclusively human actions. When a change reaches `pending-spec-approval` or
 `pending-signoff`, your only job is to tell the user what command to run:
 
 ```bash
-node packages/cli/dist/index.js change approve spec <name> --reason "..."
-node packages/cli/dist/index.js change approve signoff <name> --reason "..."
+specd change approve spec <name> --reason "..."
+specd change approve signoff <name> --reason "..."
 ```
 
 Do not attempt to approve, do not offer to approve, do not auto-approve. Stop and wait.
@@ -189,7 +189,7 @@ You MUST NOT ignore the summary catalogue. Before proceeding with your task:
 3. **Load** each relevant spec in full:
 
    ```bash
-   node packages/cli/dist/index.js spec show <spec-id> --format text
+   specd spec show <spec-id> --format text
    ```
 
 4. **Follow** the loaded spec content with the same weight as full-mode specs
@@ -248,13 +248,13 @@ been indexed yet, index it before proceeding. Only fall back to manual file expl
 Before using graph queries, check freshness:
 
 ```bash
-node packages/cli/dist/index.js graph stats --format json
+specd graph stats --format json
 ```
 
 If `stale` is `true` (or the graph has never been indexed), re-index before querying:
 
 ```bash
-node packages/cli/dist/index.js graph index --format json
+specd graph index --format json
 ```
 
 Incremental indexing is fast (only changed files are re-processed). Use `--force` only
@@ -267,17 +267,17 @@ fresh graph.
 **Search** — find symbols or specs by keyword (BM25 scoring):
 
 ```bash
-node packages/cli/dist/index.js graph search "<query>" --format json
-node packages/cli/dist/index.js graph search "<query>" --symbols --kind function --format json
-node packages/cli/dist/index.js graph search "<query>" --specs --spec-content --format json
+specd graph search "<query>" --format json
+specd graph search "<query>" --symbols --kind function --format json
+specd graph search "<query>" --specs --spec-content --format json
 ```
 
 **Impact analysis** — understand blast radius before making changes:
 
 ```bash
-node packages/cli/dist/index.js graph impact --symbol "<name>" --direction both --format json
-node packages/cli/dist/index.js graph impact --file "<path>" --format json
-node packages/cli/dist/index.js graph impact --changes <file1> <file2> --format json
+specd graph impact --symbol "<name>" --direction both --format json
+specd graph impact --file "<path>" --format json
+specd graph impact --changes <file1> <file2> --format json
 ```
 
 Returns `riskLevel` (LOW/MEDIUM/HIGH/CRITICAL), affected files, and affected symbols.
@@ -285,8 +285,8 @@ Returns `riskLevel` (LOW/MEDIUM/HIGH/CRITICAL), affected files, and affected sym
 **Hotspots** — find high-coupling symbols that need careful handling:
 
 ```bash
-node packages/cli/dist/index.js graph hotspots --format json
-node packages/cli/dist/index.js graph hotspots --min-risk HIGH --format json
+specd graph hotspots --format json
+specd graph hotspots --min-risk HIGH --format json
 ```
 
 Score = `(sameWsCallers × 3) + (crossWsCallers × 5) + fileImporters`.

@@ -20,7 +20,7 @@ gate is handled by `/specd-verify`, not by this skill.
 ### 1. Load change state
 
 ```bash
-node packages/cli/dist/index.js change status <name> --format json
+specd change status <name> --format json
 ```
 
 Store `lifecycle.changePath` and `specIds` from the response.
@@ -40,7 +40,7 @@ If state is not `archivable`, this is the wrong skill. Suggest based on state:
 ### 2. Load context
 
 ```bash
-node packages/cli/dist/index.js change context <name> archiving --follow-deps --depth 1 --format json
+specd change context <name> archiving --follow-deps --depth 1 --format json
 ```
 
 Extract and store the `contextFingerprint` from the response. If the response is `status: "changed"`, use the full context. If `status: "unchanged"`, you already have the context from a previous call.
@@ -61,8 +61,8 @@ summary specs, evaluate and load any that are relevant to the archiving work
 ### 4. Pre-archive hooks
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> archiving --phase pre
-node packages/cli/dist/index.js change hook-instruction <name> archiving --phase pre --format text
+specd change run-hooks <name> archiving --phase pre
+specd change hook-instruction <name> archiving --phase pre --format text
 ```
 
 Follow guidance — review deltas to ensure specs match what was built.
@@ -70,7 +70,7 @@ Follow guidance — review deltas to ensure specs match what was built.
 ### 5. Archive
 
 ```bash
-node packages/cli/dist/index.js change archive <name> --skip-hooks all --format json
+specd change archive <name> --skip-hooks all --format json
 ```
 
 If the command fails with a `SpecOverlapError` (spec overlap detected), other active
@@ -86,14 +86,14 @@ specs those changes are working against. When this happens:
 If the user confirms, re-run the command with `--allow-overlap`:
 
 ```bash
-node packages/cli/dist/index.js change archive <name> --skip-hooks all --allow-overlap --format json
+specd change archive <name> --skip-hooks all --allow-overlap --format json
 ```
 
 ### 6. Post-archive hooks
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> archiving --phase post
-node packages/cli/dist/index.js change hook-instruction <name> archiving --phase post --format text
+specd change run-hooks <name> archiving --phase post
+specd change hook-instruction <name> archiving --phase post --format text
 ```
 
 Follow guidance (typically: summarize what changed for commit message).
@@ -101,13 +101,13 @@ Follow guidance (typically: summarize what changed for commit message).
 ### 7. Regenerate metadata
 
 ```bash
-node packages/cli/dist/index.js spec generate-metadata --all --write --status stale,missing
+specd spec generate-metadata --all --write --status stale,missing
 ```
 
 ### 8. Check LLM optimization
 
 ```bash
-node packages/cli/dist/index.js config show --format json
+specd config show --format json
 ```
 
 If `llmOptimizedContext` is `true`, suggest running `/specd-spec-metadata` for each
@@ -159,7 +159,7 @@ what was built and the divergence is significant, do not archive incorrect specs
 Surface the issue to the user, and if they agree:
 
 ```bash
-node packages/cli/dist/index.js change transition <name> designing --skip-hooks all
+specd change transition <name> designing --skip-hooks all
 ```
 
 > Specs need revision before archiving. Run `/specd-design <name>` to update them.

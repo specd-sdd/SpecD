@@ -19,7 +19,7 @@ Works through tasks one by one and marks them done.
 ### 1. Load change state
 
 ```bash
-node packages/cli/dist/index.js change status <name> --format json
+specd change status <name> --format json
 ```
 
 If not in `ready` or `implementing` or `spec-approved`, this is the wrong skill. Suggest based on state:
@@ -39,27 +39,27 @@ Store `lifecycle.changePath` and `specIds` from the response.
 If in `ready` or `spec-approved`, run pre-hooks and transition:
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> implementing --phase pre
-node packages/cli/dist/index.js change hook-instruction <name> implementing --phase pre --format text
+specd change run-hooks <name> implementing --phase pre
+specd change hook-instruction <name> implementing --phase pre --format text
 ```
 
 Follow guidance — it tells you which change artifacts to read.
 
 ```bash
-node packages/cli/dist/index.js change transition <name> implementing --skip-hooks all
+specd change transition <name> implementing --skip-hooks all
 ```
 
 If already in `implementing` (resuming), run pre-hooks but skip the transition:
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> implementing --phase pre
-node packages/cli/dist/index.js change hook-instruction <name> implementing --phase pre --format text
+specd change run-hooks <name> implementing --phase pre
+specd change hook-instruction <name> implementing --phase pre --format text
 ```
 
 ### 2. Check workspace ownership
 
 ```bash
-node packages/cli/dist/index.js config show --format json
+specd config show --format json
 ```
 
 From the JSON output, build a map of each workspace's `codeRoot` and `ownership`.
@@ -91,7 +91,7 @@ in `specd.yaml` before you can proceed.
 ### 3. Load schema and find task file
 
 ```bash
-node packages/cli/dist/index.js schema show --format json
+specd schema show --format json
 ```
 
 Find artifacts with `hasTaskCompletionCheck: true` — those have trackable checkboxes.
@@ -99,7 +99,7 @@ Find artifacts with `hasTaskCompletionCheck: true` — those have trackable chec
 ### 4. Load context
 
 ```bash
-node packages/cli/dist/index.js change context <name> implementing --follow-deps --depth 1 --rules --constraints --format json
+specd change context <name> implementing --follow-deps --depth 1 --rules --constraints --format json
 ```
 
 Extract and store the `contextFingerprint` from the response. If the response is `status: "changed"`, use the full context. If `status: "unchanged"`, you already have the context from a previous call.
@@ -114,14 +114,14 @@ Before reading artifacts, use the code graph to understand the blast radius of t
 files and symbols you'll be modifying:
 
 ```bash
-node packages/cli/dist/index.js graph hotspots --min-risk MEDIUM --format json
+specd graph hotspots --min-risk MEDIUM --format json
 ```
 
 If the tasks (from the design artifact) mention specific symbols or files, check their
 downstream dependents:
 
 ```bash
-node packages/cli/dist/index.js graph impact --symbol "<name>" --direction downstream --format json
+specd graph impact --symbol "<name>" --direction downstream --format json
 ```
 
 Surface HIGH or CRITICAL risk findings to the user before starting implementation.
@@ -244,8 +244,8 @@ For each task in order:
 first — the hooks fire on completion of the implementation work, before any conversation.
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> implementing --phase post
-node packages/cli/dist/index.js change hook-instruction <name> implementing --phase post --format text
+specd change run-hooks <name> implementing --phase post
+specd change hook-instruction <name> implementing --phase post --format text
 ```
 
 Follow guidance. If hooks fail (tests, lint), fix and re-run until they pass.
@@ -296,7 +296,7 @@ If during implementation you discover that the specs, design, or tasks need chan
 it. Stop, explain the issue to the user, and if they agree:
 
 ```bash
-node packages/cli/dist/index.js change transition <name> designing --skip-hooks all
+specd change transition <name> designing --skip-hooks all
 ```
 
 > Artifacts need revision. Run `/specd-design <name>` to update them.

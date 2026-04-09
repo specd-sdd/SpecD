@@ -19,7 +19,7 @@ transitions to `done`. If any fail, loops back to implementing.
 ### 1. Load change state
 
 ```bash
-node packages/cli/dist/index.js change status <name> --format json
+specd change status <name> --format json
 ```
 
 If not in `implementing`, `verifying`, or `done`, this is the wrong skill. Suggest based on state:
@@ -43,14 +43,14 @@ Store `lifecycle.changePath` and `specIds` from the response.
 Run pre-hooks and transition:
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> verifying --phase pre
-node packages/cli/dist/index.js change hook-instruction <name> verifying --phase pre --format text
+specd change run-hooks <name> verifying --phase pre
+specd change hook-instruction <name> verifying --phase pre --format text
 ```
 
 Follow guidance.
 
 ```bash
-node packages/cli/dist/index.js change transition <name> verifying --skip-hooks all
+specd change transition <name> verifying --skip-hooks all
 ```
 
 If it fails (incomplete tasks), show which items are still `- [ ]` and **stop**, tell the user:
@@ -63,8 +63,8 @@ If it fails (incomplete tasks), show which items are still `- [ ]` and **stop**,
 **If in `verifying`** (resuming): run pre-hooks but skip the transition:
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> verifying --phase pre
-node packages/cli/dist/index.js change hook-instruction <name> verifying --phase pre --format text
+specd change run-hooks <name> verifying --phase pre
+specd change hook-instruction <name> verifying --phase pre --format text
 ```
 
 **If in `done`**: skip directly to step 6a (transition to archivable path).
@@ -74,7 +74,7 @@ Continue to step 3.
 ### 3. Load verification context
 
 ```bash
-node packages/cli/dist/index.js change context <name> verifying --follow-deps --depth 1 --scenarios --format json
+specd change context <name> verifying --follow-deps --depth 1 --scenarios --format json
 ```
 
 Extract and store the `contextFingerprint` from the response. If the response is `status: "changed"`, use the full context. If `status: "unchanged"`, you already have the context from a previous call.
@@ -89,7 +89,7 @@ For each spec in the change, use `spec-preview` to get the final merged spec con
 with deltas applied. This shows the spec exactly as it will be after archiving:
 
 ```bash
-node packages/cli/dist/index.js change spec-preview <name> <specId> --format json
+specd change spec-preview <name> <specId> --format json
 ```
 
 For each spec in `specIds`, run this command and store the result. The merged content
@@ -122,7 +122,7 @@ After verifying scenarios, use the code graph to check whether the implementatio
 touched high-risk areas that might need extra scrutiny:
 
 ```bash
-node packages/cli/dist/index.js graph impact --changes <file1> <file2> ... --format json
+specd graph impact --changes <file1> <file2> ... --format json
 ```
 
 Pass the files that were modified during implementation (from `git diff` or the task
@@ -139,8 +139,8 @@ The moment all scenarios have been evaluated, run the post-verifying hooks befor
 presenting anything to the user or transitioning:
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> verifying --phase post
-node packages/cli/dist/index.js change hook-instruction <name> verifying --phase post --format text
+specd change run-hooks <name> verifying --phase post
+specd change hook-instruction <name> verifying --phase post --format text
 ```
 
 Follow guidance. If hooks fail, fix and re-run.
@@ -160,7 +160,7 @@ Present findings to the user:
 **If any fail:**
 
 ```bash
-node packages/cli/dist/index.js change transition <name> implementing --skip-hooks all
+specd change transition <name> implementing --skip-hooks all
 ```
 
 Tell the user which scenarios failed and suggest:
@@ -176,27 +176,27 @@ Tell the user which scenarios failed and suggest:
 Run done pre-hooks, then transition:
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> done --phase pre
-node packages/cli/dist/index.js change hook-instruction <name> done --phase pre --format text
+specd change run-hooks <name> done --phase pre
+specd change hook-instruction <name> done --phase pre --format text
 ```
 
 Follow guidance.
 
 ```bash
-node packages/cli/dist/index.js change transition <name> done --skip-hooks all
+specd change transition <name> done --skip-hooks all
 ```
 
 Run done post-hooks:
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> done --phase post
-node packages/cli/dist/index.js change hook-instruction <name> done --phase post --format text
+specd change run-hooks <name> done --phase post
+specd change hook-instruction <name> done --phase post --format text
 ```
 
 #### 6b. Handle signoff gate
 
 ```bash
-node packages/cli/dist/index.js change status <name> --format json
+specd change status <name> --format json
 ```
 
 Check `lifecycle.approvals.signoff`:
@@ -204,19 +204,19 @@ Check `lifecycle.approvals.signoff`:
 **If `false`:** no signoff needed — run archivable hooks and transition:
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> archivable --phase pre
-node packages/cli/dist/index.js change hook-instruction <name> archivable --phase pre --format text
+specd change run-hooks <name> archivable --phase pre
+specd change hook-instruction <name> archivable --phase pre --format text
 ```
 
 Follow guidance.
 
 ```bash
-node packages/cli/dist/index.js change transition <name> archivable --skip-hooks all
+specd change transition <name> archivable --skip-hooks all
 ```
 
 ```bash
-node packages/cli/dist/index.js change run-hooks <name> archivable --phase post
-node packages/cli/dist/index.js change hook-instruction <name> archivable --phase post --format text
+specd change run-hooks <name> archivable --phase post
+specd change hook-instruction <name> archivable --phase post --format text
 ```
 
 Follow guidance.
@@ -274,7 +274,7 @@ implementation), do not just fail scenarios — surface the root cause to the us
 the artifacts themselves need revision and the user agrees:
 
 ```bash
-node packages/cli/dist/index.js change transition <name> designing --skip-hooks all
+specd change transition <name> designing --skip-hooks all
 ```
 
 > Artifacts need revision. Run `/specd-design <name>` to update them.
