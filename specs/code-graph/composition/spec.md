@@ -129,11 +129,11 @@ await provider.close()
 
 ## Spec Dependencies
 
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — model types exported from package
-- [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — abstract graph-store contract and backend-neutral query semantics
-- [`specs/code-graph/ladybug-graph-store/spec.md`](../ladybug-graph-store/spec.md) — Ladybug backend available by explicit backend id selection
-- [`specs/code-graph/sqlite-graph-store/spec.md`](../sqlite-graph-store/spec.md) — SQLite backend used by the built-in default composition path
-- [`specs/code-graph/language-adapter/spec.md`](../language-adapter/spec.md) — `LanguageAdapter` (exported), `AdapterRegistry` (internal)
-- [`specs/code-graph/indexer/spec.md`](../indexer/spec.md) — `IndexCodeGraph` (internal), `IndexResult` (exported)
-- [`specs/code-graph/traversal/spec.md`](../traversal/spec.md) — traversal/impact types (exported), functions (internal)
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — composition layer pattern
+- [`code-graph:code-graph/symbol-model`](../symbol-model/spec.md) — model types exported from package
+- [`code-graph:code-graph/graph-store`](../graph-store/spec.md) — abstract graph-store contract and backend-neutral query semantics
+- [`code-graph:code-graph/ladybug-graph-store`](../ladybug-graph-store/spec.md) — Ladybug backend available by explicit backend id selection
+- [`code-graph:code-graph/sqlite-graph-store`](../sqlite-graph-store/spec.md) — SQLite backend used by the built-in default composition path
+- [`code-graph:code-graph/language-adapter`](../language-adapter/spec.md) — `LanguageAdapter` (exported), `AdapterRegistry` (internal)
+- [`code-graph:code-graph/indexer`](../indexer/spec.md) — `IndexCodeGraph` (internal), `IndexResult` (exported)
+- [`code-graph:code-graph/traversal`](../traversal/spec.md) — traversal/impact types (exported), functions (internal)
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — composition layer pattern

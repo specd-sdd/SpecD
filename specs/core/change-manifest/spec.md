@@ -138,8 +138,8 @@ The manifest must be written atomically — by writing to a temporary file and t
 
 ## Spec Dependencies
 
-- [`specs/core/change/spec.md`](../change/spec.md) — Change domain model; defines event types, lifecycle states, and derivation rules serialized in the manifest
-- [`specs/core/storage/spec.md`](../storage/spec.md) — `FsChangeRepository` reads and writes the manifest; atomic write constraint
-- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format
-- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
-- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace list serialization in manifest
+- [`core:core/change`](../change/spec.md) — Change domain model; defines event types, lifecycle states, and derivation rules serialized in the manifest
+- [`core:core/storage`](../storage/spec.md) — `FsChangeRepository` reads and writes the manifest; atomic write constraint
+- [`core:core/spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format
+- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
+- [`core:core/workspace`](../workspace/spec.md) — workspace list serialization in manifest

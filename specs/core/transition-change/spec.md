@@ -159,8 +159,8 @@ The previous `postHookFailures` field is removed because both hook phases are no
 
 ## Spec Dependencies
 
-- [`specs/core/change/spec.md`](../change/spec.md)
-- [`specs/core/run-step-hooks/spec.md`](../run-step-hooks/spec.md)
-- [`specs/core/hook-execution-model/spec.md`](../hook-execution-model/spec.md)
-- [`specs/core/workflow-model/spec.md`](../workflow-model/spec.md)
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md)
+- [`core:core/change`](../change/spec.md)
+- [`core:core/run-step-hooks`](../run-step-hooks/spec.md)
+- [`core:core/hook-execution-model`](../hook-execution-model/spec.md)
+- [`core:core/workflow-model`](../workflow-model/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)

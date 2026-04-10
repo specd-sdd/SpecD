@@ -192,4 +192,4 @@ const specRelation: Relation = {
 
 ## Spec Dependencies
 
-- [`specs/_global/conventions/spec.md`](../../_global/conventions/spec.md) — naming conventions, immutability patterns
+- [`default:_global/conventions`](../../_global/conventions/spec.md) — naming conventions, immutability patterns

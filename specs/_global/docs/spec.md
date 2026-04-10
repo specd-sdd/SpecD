@@ -163,4 +163,4 @@ export function mergeSpecs(
 
 ## Spec Dependencies
 
-- [`specs/_global/conventions/spec.md`](../conventions/spec.md) — file naming and Markdown formatting apply to docs too
+- [`default:_global/conventions`](../conventions/spec.md) — file naming and Markdown formatting apply to docs too

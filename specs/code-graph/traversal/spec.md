@@ -126,5 +126,5 @@ All traversal operations SHALL be stateless pure functions defined in `domain/se
 
 ## Spec Dependencies
 
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `SymbolNode`, `Relation`, `RelationType`, hierarchy relations
-- [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — `GraphStore` query methods
+- [`code-graph:code-graph/symbol-model`](../symbol-model/spec.md) — `SymbolNode`, `Relation`, `RelationType`, hierarchy relations
+- [`code-graph:code-graph/graph-store`](../graph-store/spec.md) — `GraphStore` query methods

@@ -127,5 +127,5 @@ parseSchemaYaml('#incomplete', 'name: test\nversion: 1\n')
 
 ## Spec Dependencies
 
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — layer constraints and YAML validation at infrastructure boundary
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — defines the schema.yaml structure that this module validates
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — layer constraints and YAML validation at infrastructure boundary
+- [`core:core/schema-format`](../schema-format/spec.md) — defines the schema.yaml structure that this module validates

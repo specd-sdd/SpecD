@@ -100,5 +100,5 @@ workflow:
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/core/config/spec.md`](../../core/config/spec.md) — SpecdConfig shape
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:core/config`](../../core/config/spec.md) — SpecdConfig shape

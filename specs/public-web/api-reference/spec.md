@@ -30,5 +30,5 @@ The generated API reference MUST integrate with the public site's navigation, st
 
 ## Spec Dependencies
 
-- `public-web:public-site` — the API reference is a section within the public website
+- `public-web:public-web/public-site` — the API reference is a section within the public website
 - `default:_global/docs` — generated reference content is part of the public documentation experience

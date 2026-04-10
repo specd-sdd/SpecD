@@ -707,12 +707,12 @@ schemaOverrides:
 
 ## Spec Dependencies
 
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — schema structure, `kind`, `extends`, and resolution order
-- [`specs/core/schema-merge/spec.md`](../schema-merge/spec.md) — merge engine operations used by `schemaOverrides`
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port and adapter design
-- [`specs/core/storage/spec.md`](../storage/spec.md) — storage adapter behavior
-- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal in step 5
-- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace identity, properties, ownership, and prefix semantics
+- [`core:core/schema-format`](../schema-format/spec.md) — schema structure, `kind`, `extends`, and resolution order
+- [`core:core/schema-merge`](../schema-merge/spec.md) — merge engine operations used by `schemaOverrides`
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — port and adapter design
+- [`core:core/storage`](../storage/spec.md) — storage adapter behavior
+- [`core:core/spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal in step 5
+- [`core:core/workspace`](../workspace/spec.md) — workspace identity, properties, ownership, and prefix semantics
 
 ## ADRs
 

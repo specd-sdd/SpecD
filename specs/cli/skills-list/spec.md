@@ -67,4 +67,4 @@ $ specd skills list --format json --agent claude
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — exit codes, output conventions
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — exit codes, output conventions

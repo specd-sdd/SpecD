@@ -88,11 +88,11 @@ A workflow step's `requires` array contains **artifact IDs** (e.g. `specs`, `tas
 
 ## Spec Dependencies
 
-- [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `effectiveStatus()`, lifecycle states
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `workflow[]` array structure, `step`, `requires`, `hooks`
-- [`specs/core/build-schema/spec.md`](../build-schema/spec.md) — artifact DAG cycle detection at schema build time
-- [`specs/core/compile-context/spec.md`](../compile-context/spec.md) — step availability evaluation, context compilation per step
-- [`specs/core/get-status/spec.md`](../get-status/spec.md) — reports current change state (= active workflow step)
-- [`specs/core/transition-change/spec.md`](../transition-change/spec.md) — requires enforcement and hook execution at transitions
-- [`specs/core/archive-change/spec.md`](../archive-change/spec.md) — deterministic execution of the archiving step
-- [`specs/core/hook-execution-model/spec.md`](../hook-execution-model/spec.md) — hook types, execution semantics
+- [`core:core/change`](../change/spec.md) — Change entity, `effectiveStatus()`, lifecycle states
+- [`core:core/schema-format`](../schema-format/spec.md) — `workflow[]` array structure, `step`, `requires`, `hooks`
+- [`core:core/build-schema`](../build-schema/spec.md) — artifact DAG cycle detection at schema build time
+- [`core:core/compile-context`](../compile-context/spec.md) — step availability evaluation, context compilation per step
+- [`core:core/get-status`](../get-status/spec.md) — reports current change state (= active workflow step)
+- [`core:core/transition-change`](../transition-change/spec.md) — requires enforcement and hook execution at transitions
+- [`core:core/archive-change`](../archive-change/spec.md) — deterministic execution of the archiving step
+- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook types, execution semantics

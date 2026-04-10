@@ -65,7 +65,7 @@ Warnings MUST be collected in the result's `warnings` array and MUST NOT interru
 
 ## Spec Dependencies
 
-- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — metadata structure, `dependsOn`, and `contentHashes`
-- [`specs/core/storage/spec.md`](../storage/spec.md) — `SpecRepository` contract
-- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace resolution
-- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — `parseSpecId` behaviour and default workspace
+- [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata structure, `dependsOn`, and `contentHashes`
+- [`core:core/storage`](../storage/spec.md) — `SpecRepository` contract
+- [`core:core/workspace`](../workspace/spec.md) — workspace resolution
+- [`core:core/spec-id-format`](../spec-id-format/spec.md) — `parseSpecId` behaviour and default workspace

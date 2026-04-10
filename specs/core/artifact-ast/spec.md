@@ -162,5 +162,5 @@ Each adapter must be able to serialize a normalized AST back to the artifact's n
 
 ## Spec Dependencies
 
-- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta application, ArtifactParser port
-- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector model that operates over this AST format
+- [`core:core/delta-format`](../delta-format/spec.md) — delta application, ArtifactParser port
+- [`core:core/selector-model`](../selector-model/spec.md) — selector model that operates over this AST format

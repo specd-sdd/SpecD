@@ -1,7 +1,16 @@
 {
   "title": "RunStepHooks",
   "description": "Agent-driven workflow steps declare `run:` hooks that need to be executed at step boundaries, but the agent cannot call `HookRunner` directly — it interacts with specd through CLI commands. `RunStepHooks` is the use case that bridges this gap: given a change name, step name, and phase, it resolves the relevant `run:` hooks from the schema and project configuration, executes them via `HookRunner` with the correct failure semantics, and returns per-hook results for the CLI to report. It also serves as a shared hook execution engine for other use cases (`TransitionChange`, `ArchiveChange`) that need to run workflow hooks.",
-  "dependsOn": ["core:core/external-hook-runner-port"],
+  "dependsOn": [
+    "core:core/hook-execution-model",
+    "core:core/hook-runner-port",
+    "core:core/external-hook-runner-port",
+    "core:core/schema-format",
+    "core:core/config",
+    "core:core/change",
+    "core:core/template-variables",
+    "core:core/archive-repository-port"
+  ],
   "context": [
     "Agent-driven workflow steps declare `run:` hooks that need to be executed at step boundaries, but the agent cannot call `HookRunner` directly — it interacts with specd through CLI commands. `RunStepHooks` is the use case that bridges this gap: given a change name, step name, and phase, it resolves the relevant `run:` hooks from the schema and project configuration, executes them via `HookRunner` with the correct failure semantics, and returns per-hook results for the CLI to report. It also serves as a shared hook execution engine for other use cases (`TransitionChange`, `ArchiveChange`) that need to run workflow hooks."
   ],
@@ -311,7 +320,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:396ff2e9e4cfd0eabbef4d5257c84a7bd60ceefc3f1a563201543cba841a197a",
+    "spec.md": "sha256:4ecf157a3e2534bbe9feef53c0aab1d737d106241e631b88e7233da66ac9e7de",
     "verify.md": "sha256:dd06a6dc5801df14f7900c1f7327c4e3b7524c58f48b532fe9a555884101c3c8"
   },
   "generatedBy": "core"

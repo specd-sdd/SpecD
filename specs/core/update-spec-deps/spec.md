@@ -64,7 +64,7 @@ Inside the mutation callback, the repository supplies the fresh persisted `Chang
 
 ## Spec Dependencies
 
-- [`specs/core/change/spec.md`](../change/spec.md) — `Change` entity, `specDependsOn`, `setSpecDependsOn`
-- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — spec ID parsing via `parseSpecId`
-- [`specs/core/compile-context/spec.md`](../compile-context/spec.md) — consumer of `specDependsOn` for dependency resolution
-- [`specs/core/composition/spec.md`](../composition/spec.md) — wiring and port injection
+- [`core:core/change`](../change/spec.md) — `Change` entity, `specDependsOn`, `setSpecDependsOn`
+- [`core:core/spec-id-format`](../spec-id-format/spec.md) — spec ID parsing via `parseSpecId`
+- [`core:core/compile-context`](../compile-context/spec.md) — consumer of `specDependsOn` for dependency resolution
+- [`core:core/composition`](../composition/spec.md) — wiring and port injection

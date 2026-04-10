@@ -170,13 +170,13 @@ Unknown variable paths are left unexpanded (the original `{{key.path}}` token is
 
 ## Spec Dependencies
 
-- [`specs/core/workflow-model/spec.md`](../workflow-model/spec.md) — step semantics, step availability
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `workflow[].hooks` structure, `instruction:` and `run:` entries
-- [`specs/core/hook-runner-port/spec.md`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`, template expansion
-- [`specs/core/transition-change/spec.md`](../transition-change/spec.md) — hook execution during transitions
-- [`specs/core/archive-change/spec.md`](../archive-change/spec.md) — hook execution during archiving
-- [`specs/core/run-step-hooks/spec.md`](../run-step-hooks/spec.md) — shared hook execution engine
-- [`specs/core/get-hook-instructions/spec.md`](../get-hook-instructions/spec.md) — `instruction:` hook query
-- [`specs/core/config/spec.md`](../config/spec.md) — project-level hooks via `schemaOverrides`
-- [`specs/cli/change-transition/spec.md`](../../cli/change-transition/spec.md) — transition `--skip-hooks` selectors
-- [`specs/cli/change-archive/spec.md`](../../cli/change-archive/spec.md) — archive `--skip-hooks` selectors
+- [`core:core/workflow-model`](../workflow-model/spec.md) — step semantics, step availability
+- [`core:core/schema-format`](../schema-format/spec.md) — `workflow[].hooks` structure, `instruction:` and `run:` entries
+- [`core:core/hook-runner-port`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`, template expansion
+- [`core:core/transition-change`](../transition-change/spec.md) — hook execution during transitions
+- [`core:core/archive-change`](../archive-change/spec.md) — hook execution during archiving
+- [`core:core/run-step-hooks`](../run-step-hooks/spec.md) — shared hook execution engine
+- [`core:core/get-hook-instructions`](../get-hook-instructions/spec.md) — `instruction:` hook query
+- [`core:core/config`](../config/spec.md) — project-level hooks via `schemaOverrides`
+- [`cli:cli/change-transition`](../../cli/change-transition/spec.md) — transition `--skip-hooks` selectors
+- [`cli:cli/change-archive`](../../cli/change-archive/spec.md) — archive `--skip-hooks` selectors

@@ -217,12 +217,12 @@ A change may be moved between storage locations without affecting its lifecycle 
 
 ## Spec Dependencies
 
-- [`specs/core/config/spec.md`](../config/spec.md) — workspace IDs, active workspace semantics, approval gates config, storage locations
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — artifact type declarations, dependency graph, `preHashCleanup`, `taskCompletionCheck`
-- [`specs/core/workflow-model/spec.md`](../workflow-model/spec.md) — task completion gating rule, requires-based gating semantics
-- [`specs/core/change-manifest/spec.md`](../change-manifest/spec.md) — manifest format and JSON serialization of events
-- [`specs/core/storage/spec.md`](../storage/spec.md) — persistence mechanics, directory naming
-- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta operations, `ArtifactParser` port
-- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal
-- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
-- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace identity, primary workspace, active workspace semantics
+- [`core:core/config`](../config/spec.md) — workspace IDs, active workspace semantics, approval gates config, storage locations
+- [`core:core/schema-format`](../schema-format/spec.md) — artifact type declarations, dependency graph, `preHashCleanup`, `taskCompletionCheck`
+- [`core:core/workflow-model`](../workflow-model/spec.md) — task completion gating rule, requires-based gating semantics
+- [`core:core/change-manifest`](../change-manifest/spec.md) — manifest format and JSON serialization of events
+- [`core:core/storage`](../storage/spec.md) — persistence mechanics, directory naming
+- [`core:core/delta-format`](../delta-format/spec.md) — delta operations, `ArtifactParser` port
+- [`core:core/spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal
+- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
+- [`core:core/workspace`](../workspace/spec.md) — workspace identity, primary workspace, active workspace semantics

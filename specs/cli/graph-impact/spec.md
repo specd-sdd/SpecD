@@ -168,7 +168,7 @@ $ specd graph impact --file src/auth.ts --format json
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/core/config/spec.md`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
-- [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — CodeGraphProvider facade
-- [`specs/code-graph/traversal/spec.md`](../../code-graph/traversal/spec.md) — impact analysis semantics
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:core/config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+- [`code-graph:code-graph/composition`](../../code-graph/composition/spec.md) — CodeGraphProvider facade
+- [`code-graph:code-graph/traversal`](../../code-graph/traversal/spec.md) — impact analysis semantics

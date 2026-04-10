@@ -61,6 +61,6 @@ The `graph stats` command SHALL resolve the current VCS ref and compare it again
 
 ## Spec Dependencies
 
-- [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — `GraphStore` meta storage, `GraphStatistics`
-- [`specs/code-graph/indexer/spec.md`](../indexer/spec.md) — `IndexOptions`, `IndexCodeGraph`
-- [`specs/cli/graph-stats/spec.md`](../../cli/graph-stats/spec.md) — `graph stats` command output
+- [`code-graph:code-graph/graph-store`](../graph-store/spec.md) — `GraphStore` meta storage, `GraphStatistics`
+- [`code-graph:code-graph/indexer`](../indexer/spec.md) — `IndexOptions`, `IndexCodeGraph`
+- [`cli:cli/graph-stats`](../../cli/graph-stats/spec.md) — `graph stats` command output

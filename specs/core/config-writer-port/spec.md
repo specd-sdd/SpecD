@@ -87,5 +87,5 @@ When the config file contains invalid YAML or the `skills` key does not match th
 
 ## Spec Dependencies
 
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — hexagonal architecture and port placement rules
-- [`specs/core/config/spec.md`](../config/spec.md) — `specd.yaml` configuration structure
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal architecture and port placement rules
+- [`core:core/config`](../config/spec.md) — `specd.yaml` configuration structure

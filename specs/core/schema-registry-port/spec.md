@@ -84,7 +84,7 @@ The port module MUST re-export the `Schema` type from `domain/value-objects/sche
 
 ## Spec Dependencies
 
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — hexagonal architecture and port placement rules
-- [`specs/core/parse-schema-yaml/spec.md`](../parse-schema-yaml/spec.md) — `SchemaYamlData` type returned by `resolveRaw`
-- [`specs/core/resolve-schema/spec.md`](../resolve-schema/spec.md) — consumer of `resolveRaw` for the merge pipeline
-- [`specs/core/schema-repository-port/spec.md`](../schema-repository-port/spec.md) — `SchemaRepository` port for workspace schema access, delegated to by the registry
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal architecture and port placement rules
+- [`core:core/parse-schema-yaml`](../parse-schema-yaml/spec.md) — `SchemaYamlData` type returned by `resolveRaw`
+- [`core:core/resolve-schema`](../resolve-schema/spec.md) — consumer of `resolveRaw` for the merge pipeline
+- [`core:core/schema-repository-port`](../schema-repository-port/spec.md) — `SchemaRepository` port for workspace schema access, delegated to by the registry

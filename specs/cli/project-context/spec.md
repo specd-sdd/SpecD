@@ -122,7 +122,7 @@ $ specd project context --format json
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/core/get-project-context/spec.md`](../../core/get-project-context/spec.md) — `GetProjectContext` use case, `GetProjectContextResult` structured shape
-- [`specs/core/compile-context/spec.md`](../../core/compile-context/spec.md) — `ContextSpecEntry` type definition
-- [`specs/core/config/spec.md`](../../core/config/spec.md) — `contextMode` field
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:core/get-project-context`](../../core/get-project-context/spec.md) — `GetProjectContext` use case, `GetProjectContextResult` structured shape
+- [`core:core/compile-context`](../../core/compile-context/spec.md) — `ContextSpecEntry` type definition
+- [`core:core/config`](../../core/config/spec.md) — `contextMode` field

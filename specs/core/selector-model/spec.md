@@ -102,4 +102,4 @@ selector:
 
 ## Spec Dependencies
 
-- [`specs/core/artifact-ast/spec.md`](../artifact-ast/spec.md) — normalized AST format; defines node types, `label`/`value` semantics
+- [`core:core/artifact-ast`](../artifact-ast/spec.md) — normalized AST format; defines node types, `label`/`value` semantics

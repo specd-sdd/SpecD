@@ -40,6 +40,6 @@ The use case SHALL return a `GetSpecResult` containing:
 
 ## Spec Dependencies
 
-- [`specs/core/storage/spec.md`](../storage/spec.md) — `SpecRepository` and `SpecArtifact` contracts
-- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace resolution
-- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — qualified spec identifier format
+- [`core:core/storage`](../storage/spec.md) — `SpecRepository` and `SpecArtifact` contracts
+- [`core:core/workspace`](../workspace/spec.md) — workspace resolution
+- [`core:core/spec-id-format`](../spec-id-format/spec.md) — qualified spec identifier format

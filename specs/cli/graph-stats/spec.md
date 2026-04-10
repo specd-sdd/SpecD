@@ -121,7 +121,7 @@ Last indexed: 2026-03-13T09:00:00.000Z
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/core/config/spec.md`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
-- [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — CodeGraphProvider, GraphStatistics
-- [`specs/code-graph/staleness-detection/spec.md`](../../code-graph/staleness-detection/spec.md) — staleness semantics, warn-not-block policy
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:core/config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+- [`code-graph:code-graph/composition`](../../code-graph/composition/spec.md) — CodeGraphProvider, GraphStatistics
+- [`code-graph:code-graph/staleness-detection`](../../code-graph/staleness-detection/spec.md) — staleness semantics, warn-not-block policy

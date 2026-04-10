@@ -38,4 +38,4 @@ Implementations MUST be pure with respect to their input — calling `hash` SHAL
 
 ## Spec Dependencies
 
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — hexagonal architecture and port placement rules
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal architecture and port placement rules

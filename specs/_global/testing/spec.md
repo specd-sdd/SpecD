@@ -42,5 +42,5 @@ Snapshot tests are forbidden. Assertions must be explicit and readable without a
 
 ## Spec Dependencies
 
-- [`specs/_global/architecture/spec.md`](../architecture/spec.md) — layer boundaries determine what is unit-testable vs integration-testable
-- [`specs/_global/conventions/spec.md`](../conventions/spec.md) — ESM-only constraint is the reason Vitest is used over Jest
+- [`default:_global/architecture`](../architecture/spec.md) — layer boundaries determine what is unit-testable vs integration-testable
+- [`default:_global/conventions`](../conventions/spec.md) — ESM-only constraint is the reason Vitest is used over Jest
