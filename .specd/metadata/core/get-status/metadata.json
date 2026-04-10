@@ -233,7 +233,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:90e1867c5c3edb72da5112bc584bf3a9e5a25d47620bc20d74a0564e32498707",
+    "spec.md": "sha256:ec7180c8b81df4288727118610650d0862791f52747b34a92642dbe4b2953d90",
     "verify.md": "sha256:d15aad4583072ee0c611464f8794e67cf5588b571f47a0e145a73acd8e121146"
   },
   "generatedBy": "core"

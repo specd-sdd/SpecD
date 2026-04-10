@@ -110,6 +110,6 @@ Each `HotspotEntry` contains:
 
 ## Spec Dependencies
 
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `SymbolNode`, `SymbolKind`, hierarchy relations
-- [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — `GraphStore` query methods
-- [`specs/code-graph/traversal/spec.md`](../traversal/spec.md) — `computeRiskLevel`, `RiskLevel`, hierarchy-aware impact semantics
+- [`code-graph:code-graph/symbol-model`](../symbol-model/spec.md) — `SymbolNode`, `SymbolKind`, hierarchy relations
+- [`code-graph:code-graph/graph-store`](../graph-store/spec.md) — `GraphStore` query methods
+- [`code-graph:code-graph/traversal`](../traversal/spec.md) — `computeRiskLevel`, `RiskLevel`, hierarchy-aware impact semantics

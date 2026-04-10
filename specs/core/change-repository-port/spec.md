@@ -137,8 +137,8 @@ ports with shared construction are abstract classes.
 
 ## Spec Dependencies
 
-- [`specs/core/repository-port/spec.md`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
-- [`specs/core/change/spec.md`](../change/spec.md) — Change entity, artifact status derivation, history events
-- [`specs/core/storage/spec.md`](../storage/spec.md) — change directory naming, manifest format, atomic writes
-- [`specs/core/change-manifest/spec.md`](../change-manifest/spec.md) — manifest structure persisted by `save()`
+- [`core:core/repository-port`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
+- [`core:core/change`](../change/spec.md) — Change entity, artifact status derivation, history events
+- [`core:core/storage`](../storage/spec.md) — change directory naming, manifest format, atomic writes
+- [`core:core/change-manifest`](../change-manifest/spec.md) — manifest structure persisted by `save()`

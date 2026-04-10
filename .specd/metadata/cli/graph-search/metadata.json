@@ -1,7 +1,12 @@
 {
   "title": "Graph Search",
   "description": "The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides relevance-ranked search across both through the abstract code-graph search capabilities.",
-  "dependsOn": ["code-graph:code-graph/graph-store"],
+  "dependsOn": [
+    "cli:cli/entrypoint",
+    "core:core/config",
+    "code-graph:code-graph/composition",
+    "code-graph:code-graph/graph-store"
+  ],
   "context": [
     "The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides relevance-ranked search across both through the abstract code-graph search capabilities."
   ],
@@ -212,7 +217,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b6ca96e5dc3b404d0b195aca62f1ab685656094ebe862ffa97f2507716bb8ac1",
+    "spec.md": "sha256:a98d03679b7d0367a1049b6bd3269f8414917934ac483b98df32ab9bde4606bb",
     "verify.md": "sha256:6c7d7c85e4fb25ff0f38353e3aa41c5867b0b959d12c0da45368fc2caef477a2"
   },
   "generatedBy": "core"

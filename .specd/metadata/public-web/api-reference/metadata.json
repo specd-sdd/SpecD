@@ -1,6 +1,7 @@
 {
   "title": "API Reference",
   "description": "Public consumers of `specd` need a technical reference that explains the exported API surface without reading source code directly. This spec defines how API reference content is generated and exposed inside the public site so that technical documentation lives alongside the rest of the public web experience.",
+  "dependsOn": ["public-web:public-web/public-site", "default:_global/docs"],
   "context": [
     "Public consumers of `specd` need a technical reference that explains the exported API surface without reading source code directly. This spec defines how API reference content is generated and exposed inside the public site so that technical documentation lives alongside the rest of the public web experience."
   ],
@@ -71,7 +72,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:feb6cfaee3f68259d81f0a564c9956e55ba2fa734dc820e435bbe36248462223",
+    "spec.md": "sha256:4eadc1c41b33455b92202e80c5cb29ed49380476d8ab45aa5268ee25f3f0e14f",
     "verify.md": "sha256:b24db3bfb15160aa755471cfc5bb70424879546b4e04d84cb2d82db2e2296b0b"
   },
   "generatedBy": "core"

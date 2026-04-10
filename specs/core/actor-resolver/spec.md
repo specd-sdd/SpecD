@@ -36,6 +36,6 @@ When no VCS is detected (all probes fail), `createVcsActorResolver` MUST return 
 
 ## Spec Dependencies
 
-- [`specs/core/vcs-adapter/spec.md`](../vcs-adapter/spec.md)
-- [`specs/core/composition/spec.md`](../composition/spec.md)
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md)
+- [`core:core/vcs-adapter`](../vcs-adapter/spec.md)
+- [`core:core/composition`](../composition/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)

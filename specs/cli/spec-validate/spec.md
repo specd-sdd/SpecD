@@ -69,5 +69,5 @@ If `--workspace <name>` references an unknown workspace, write error to stderr, 
 
 ## Spec Dependencies
 
-- specs/\_global/architecture/spec.md — adapter packages contain no business logic
-- specs/\_global/conventions/spec.md — error types, named exports
+- `default:_global/architecture` — adapter packages contain no business logic
+- `default:_global/conventions` — error types, named exports

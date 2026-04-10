@@ -89,5 +89,5 @@ is silently skipped.
 
 ## Spec Dependencies
 
-- [`specs/core/change/spec.md`](../change/spec.md) — `Change` entity, `updateSpecIds`, approval invalidation semantics
-- [`specs/core/composition/spec.md`](../composition/spec.md) — wiring and port injection
+- [`core:core/change`](../change/spec.md) — `Change` entity, `updateSpecIds`, approval invalidation semantics
+- [`core:core/composition`](../composition/spec.md) — wiring and port injection

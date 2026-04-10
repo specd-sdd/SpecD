@@ -70,4 +70,4 @@ The port itself does not enforce lifecycle semantics, but callers rely on the fo
 
 ## Spec Dependencies
 
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — hexagonal architecture and port placement rules
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal architecture and port placement rules

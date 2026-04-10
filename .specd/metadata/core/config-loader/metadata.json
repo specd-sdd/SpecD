@@ -481,7 +481,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8729dbb7b6e8854352566c1209633a70046415cbc4470344a18a2815f8c85078",
+    "spec.md": "sha256:5ae05d86be0af4477937081a2ce4fc150662bc2e848afe11c1957308e1d28da1",
     "verify.md": "sha256:955e6dfb8d2c7520973acdc3dc8b202bcf2b957e84c263d1fc1756f9bc466b8c"
   },
   "generatedBy": "core"

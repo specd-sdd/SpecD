@@ -96,9 +96,9 @@ A change that only creates new specs has no `deltas/` subtree. A change that onl
 
 ## Spec Dependencies
 
-- [`specs/core/storage/spec.md`](../storage/spec.md) — change directory naming (`YYYYMMDD-HHmmss-<name>`), storage paths
-- [`specs/core/change-manifest/spec.md`](../change-manifest/spec.md) — `manifest.json` format and fields
-- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — delta file format and application
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `artifact.scope`, `artifact.output`, `artifact.delta`
-- [`specs/core/archive-change/spec.md`](../archive-change/spec.md) — how files in `specs/` and `deltas/` are consumed at archive time
-- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace directory segment in change artifact paths
+- [`core:core/storage`](../storage/spec.md) — change directory naming (`YYYYMMDD-HHmmss-<name>`), storage paths
+- [`core:core/change-manifest`](../change-manifest/spec.md) — `manifest.json` format and fields
+- [`core:core/delta-format`](../delta-format/spec.md) — delta file format and application
+- [`core:core/schema-format`](../schema-format/spec.md) — `artifact.scope`, `artifact.output`, `artifact.delta`
+- [`core:core/archive-change`](../archive-change/spec.md) — how files in `specs/` and `deltas/` are consumed at archive time
+- [`core:core/workspace`](../workspace/spec.md) — workspace directory segment in change artifact paths

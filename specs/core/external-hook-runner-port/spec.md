@@ -39,6 +39,6 @@ External hook execution SHALL produce results compatible with workflow hook exec
 
 ## Spec Dependencies
 
-- [`specs/core/hook-execution-model/spec.md`](../hook-execution-model/spec.md) — execution semantics for explicit external hooks
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — workflow representation of explicit external hook entries
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — application-port placement and composition boundaries
+- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — execution semantics for explicit external hooks
+- [`core:core/schema-format`](../schema-format/spec.md) — workflow representation of explicit external hook entries
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — application-port placement and composition boundaries

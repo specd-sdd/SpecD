@@ -86,8 +86,8 @@ The use case MUST NOT throw when schema resolution fails — it degrades the lif
 
 ## Spec Dependencies
 
-- [`specs/core/change/spec.md`](../change/spec.md) — Change entity, artifact status derivation, `VALID_TRANSITIONS` map
-- [`specs/core/kernel/spec.md`](../kernel/spec.md) — Kernel wiring for `GetStatus` constructor
-- [`specs/core/transition-change/spec.md`](../transition-change/spec.md) — `VALID_TRANSITIONS` map, workflow requires enforcement pattern
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `SchemaProvider`, `workflowStep()`, `artifacts()` API
-- [`specs/core/config/spec.md`](../config/spec.md) — approvals configuration
+- [`core:core/change`](../change/spec.md) — Change entity, artifact status derivation, `VALID_TRANSITIONS` map
+- [`core:core/kernel`](../kernel/spec.md) — Kernel wiring for `GetStatus` constructor
+- [`core:core/transition-change`](../transition-change/spec.md) — `VALID_TRANSITIONS` map, workflow requires enforcement pattern
+- [`core:core/schema-format`](../schema-format/spec.md) — `SchemaProvider`, `workflowStep()`, `artifacts()` API
+- [`core:core/config`](../config/spec.md) — approvals configuration

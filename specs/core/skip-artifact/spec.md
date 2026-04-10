@@ -49,5 +49,5 @@ Inside the mutation callback, the repository supplies the fresh persisted `Chang
 
 ## Spec Dependencies
 
-- [`specs/core/change/spec.md`](../change/spec.md) — `Change` entity, `getArtifact`, `recordArtifactSkipped`
-- [`specs/core/composition/spec.md`](../composition/spec.md) — wiring and port injection
+- [`core:core/change`](../change/spec.md) — `Change` entity, `getArtifact`, `recordArtifactSkipped`
+- [`core:core/composition`](../composition/spec.md) — wiring and port injection

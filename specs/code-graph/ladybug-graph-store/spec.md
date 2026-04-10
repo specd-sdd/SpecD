@@ -190,7 +190,7 @@ Backend-specific metadata storage details remain internal to the adapter.
 
 ## Spec Dependencies
 
-- [`specs/code-graph/graph-store/spec.md`](../graph-store/spec.md) — abstract graph-store contract implemented by this adapter
-- [`specs/core/config/spec.md`](../../../core/config/spec.md) — `configPath` and derived graph/temp directories
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — persisted node and relation concepts
-- [`specs/code-graph/workspace-integration/spec.md`](../workspace-integration/spec.md) — workspace-prefixed file and spec identity rules
+- [`code-graph:code-graph/graph-store`](../graph-store/spec.md) — abstract graph-store contract implemented by this adapter
+- [`core:core/config`](../../../core/config/spec.md) — `configPath` and derived graph/temp directories
+- [`code-graph:code-graph/symbol-model`](../symbol-model/spec.md) — persisted node and relation concepts
+- [`code-graph:code-graph/workspace-integration`](../workspace-integration/spec.md) — workspace-prefixed file and spec identity rules

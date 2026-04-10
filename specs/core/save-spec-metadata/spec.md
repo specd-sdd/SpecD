@@ -71,5 +71,5 @@ The `YamlSerializer` dependency is no longer needed — metadata content is JSON
 
 ## Spec Dependencies
 
-- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — defines the `.specd-metadata.yaml` format, the strict and lenient schemas, and the `dependsOn` overwrite protection rules
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — use case layer conventions and dependency injection rules
+- [`core:core/spec-metadata`](../spec-metadata/spec.md) — defines the `.specd-metadata.yaml` format, the strict and lenient schemas, and the `dependsOn` overwrite protection rules
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — use case layer conventions and dependency injection rules

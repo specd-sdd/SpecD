@@ -177,4 +177,4 @@ $ specd spec list --metadata-status --format json
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions

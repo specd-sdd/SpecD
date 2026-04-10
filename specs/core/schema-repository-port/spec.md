@@ -52,8 +52,8 @@ The port module MUST re-export the `SchemaRawResult` and `SchemaEntry` types so 
 
 ## Spec Dependencies
 
-- [`specs/core/repository-port/spec.md`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
-- [`specs/core/schema-registry-port/spec.md`](../schema-registry-port/spec.md) — `SchemaRawResult`, `SchemaEntry` types; `SchemaRegistry` delegates workspace operations to this port
-- [`specs/core/parse-schema-yaml/spec.md`](../parse-schema-yaml/spec.md) — `SchemaYamlData` type returned within `SchemaRawResult`
-- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace identity and scoping semantics
+- [`core:core/repository-port`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
+- [`core:core/schema-registry-port`](../schema-registry-port/spec.md) — `SchemaRawResult`, `SchemaEntry` types; `SchemaRegistry` delegates workspace operations to this port
+- [`core:core/parse-schema-yaml`](../parse-schema-yaml/spec.md) — `SchemaYamlData` type returned within `SchemaRawResult`
+- [`core:core/workspace`](../workspace/spec.md) — workspace identity and scoping semantics

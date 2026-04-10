@@ -76,9 +76,9 @@ All lower-level dependencies (schema ref, plugins, overrides) are provided to `R
 
 ## Spec Dependencies
 
-- [`specs/core/resolve-schema/spec.md`](../resolve-schema/spec.md) — full schema resolution pipeline (project mode)
-- [`specs/core/config/spec.md`](../config/spec.md) — schema reference field and resolution semantics
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `Schema` value object structure
-- [`specs/core/schema-registry-port/spec.md`](../schema-registry-port/spec.md) — `SchemaRegistry` port for ref and file resolution
-- [`specs/core/build-schema/spec.md`](../build-schema/spec.md) — `buildSchema` domain service for Schema construction
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port/adapter design constraints
+- [`core:core/resolve-schema`](../resolve-schema/spec.md) — full schema resolution pipeline (project mode)
+- [`core:core/config`](../config/spec.md) — schema reference field and resolution semantics
+- [`core:core/schema-format`](../schema-format/spec.md) — `Schema` value object structure
+- [`core:core/schema-registry-port`](../schema-registry-port/spec.md) — `SchemaRegistry` port for ref and file resolution
+- [`core:core/build-schema`](../build-schema/spec.md) — `buildSchema` domain service for Schema construction
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — port/adapter design constraints

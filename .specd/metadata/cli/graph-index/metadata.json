@@ -1,7 +1,12 @@
 {
   "title": "Graph Index",
   "description": "Without an up-to-date code graph, all graph-based queries return stale or empty results. The `specd graph index` command indexes the current workspace into the code graph, reporting what was discovered, indexed, skipped, and removed so users and agents can verify completeness.",
-  "dependsOn": ["code-graph:code-graph/graph-store"],
+  "dependsOn": [
+    "cli:cli/entrypoint",
+    "core:core/config",
+    "code-graph:code-graph/composition",
+    "code-graph:code-graph/graph-store"
+  ],
   "context": [
     "Without an up-to-date code graph, all graph-based queries return stale or empty results. The `specd graph index` command indexes the current workspace into the code graph, reporting what was discovered, indexed, skipped, and removed so users and agents can verify completeness."
   ],
@@ -224,7 +229,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9fb6cd8626846a55e5b9667f1a9dc678919fb43af8dcc202db565b540de2ff3f",
+    "spec.md": "sha256:dc4a5859bfbdaa606b2ffc388a5224753d4c3e29da54bea0d0b293e20611af61",
     "verify.md": "sha256:70c783563ffb4a0ae1f7e95f99f1f07dee0fd454446b5d60452b6448edfecc25"
   },
   "generatedBy": "core"

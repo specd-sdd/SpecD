@@ -60,7 +60,7 @@ Optional fields (`summary`, `metadataStatus`) MUST only be present when explicit
 
 ## Spec Dependencies
 
-- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — metadata structure and `contentHashes`
-- [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — `extractSpecSummary` behaviour
-- [`specs/core/storage/spec.md`](../storage/spec.md) — `SpecRepository` contract
-- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace ordering semantics
+- [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata structure and `contentHashes`
+- [`core:core/content-extraction`](../content-extraction/spec.md) — `extractSpecSummary` behaviour
+- [`core:core/storage`](../storage/spec.md) — `SpecRepository` contract
+- [`core:core/workspace`](../workspace/spec.md) — workspace ordering semantics

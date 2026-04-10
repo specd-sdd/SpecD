@@ -1,7 +1,11 @@
 {
   "title": "External Hook Runner Port",
   "description": "Workflow hooks that dispatch to external execution backends such as Docker or HTTP cannot be forced through the internal shell-oriented `HookRunner` without conflating two different execution models. `ExternalHookRunner` defines the application-layer contract for runners that execute explicit external hook entries, declare which external hook types they accept, and return deterministic hook results for the workflow runtime.",
-  "dependsOn": ["core:core/hook-execution-model", "core:core/schema-format"],
+  "dependsOn": [
+    "core:core/hook-execution-model",
+    "core:core/schema-format",
+    "default:_global/architecture"
+  ],
   "context": [
     "Workflow hooks that dispatch to external execution backends such as Docker or HTTP cannot be forced through the internal shell-oriented `HookRunner` without conflating two different execution models. `ExternalHookRunner` defines the application-layer contract for runners that execute explicit external hook entries, declare which external hook types they accept, and return deterministic hook results for the workflow runtime."
   ],
@@ -86,7 +90,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:6a83e99a0b00e4c2eca53b374596c640e0818d12fa3b5f80d3217c256d54b96e",
+    "spec.md": "sha256:ea4430c4fc970c8a7f54e5d98e1d3eca945c54029ebee164eaec798a1ffdd7f9",
     "verify.md": "sha256:9a0c211e0f2e4768e700c8a502c547b6e12a48bfd226db2c439c9437e78fd701"
   },
   "generatedBy": "core"

@@ -62,9 +62,9 @@ This may require extending `SchemaRegistry.resolve()` to return a richer result 
 
 ## Spec Dependencies
 
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `kind`, `extends`, schema structure
-- [`specs/core/schema-merge/spec.md`](../schema-merge/spec.md) — `mergeSchemaLayers`, `SchemaLayer`
-- [`specs/core/build-schema/spec.md`](../build-schema/spec.md) — `buildSchema`, `SchemaYamlData`
-- [`specs/core/schema-registry-port/spec.md`](../schema-registry-port/spec.md) — `SchemaRegistry` port
-- [`specs/core/config/spec.md`](../config/spec.md) — `schemaPlugins`, `schemaOverrides` fields
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — use case design
+- [`core:core/schema-format`](../schema-format/spec.md) — `kind`, `extends`, schema structure
+- [`core:core/schema-merge`](../schema-merge/spec.md) — `mergeSchemaLayers`, `SchemaLayer`
+- [`core:core/build-schema`](../build-schema/spec.md) — `buildSchema`, `SchemaYamlData`
+- [`core:core/schema-registry-port`](../schema-registry-port/spec.md) — `SchemaRegistry` port
+- [`core:core/config`](../config/spec.md) — `schemaPlugins`, `schemaOverrides` fields
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — use case design

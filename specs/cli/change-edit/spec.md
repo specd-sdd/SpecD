@@ -91,7 +91,7 @@ specd change edit add-oauth-login --description "Add OAuth2 login via Google and
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/core/change/spec.md`](../../core/change/spec.md) — mutable fields, approval invalidation rules
-- [`specs/cli/change-create/spec.md`](../change-create/spec.md) — spec id format and workspace derivation logic
-- [`specs/core/spec-id-format/spec.md`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:core/change`](../../core/change/spec.md) — mutable fields, approval invalidation rules
+- [`cli:cli/change-create`](../change-create/spec.md) — spec id format and workspace derivation logic
+- [`core:core/spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format

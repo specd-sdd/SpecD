@@ -67,9 +67,9 @@ The format of `manifest.json` — its fields, event shapes, and schema version b
 
 ## Spec Dependencies
 
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — infrastructure layer constraints
-- [`specs/core/change/spec.md`](../change/spec.md) — Change domain model; defines event types, lifecycle states, and derivation rules serialized in the manifest
-- [`specs/core/change-manifest/spec.md`](../change-manifest/spec.md) — manifest format, event shapes, and schema version behavior
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — infrastructure layer constraints
+- [`core:core/change`](../change/spec.md) — Change domain model; defines event types, lifecycle states, and derivation rules serialized in the manifest
+- [`core:core/change-manifest`](../change-manifest/spec.md) — manifest format, event shapes, and schema version behavior
 
 ## ADRs
 

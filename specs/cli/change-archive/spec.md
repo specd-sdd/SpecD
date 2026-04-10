@@ -70,7 +70,7 @@ specd change archive add-oauth-login --skip-hooks pre
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../../cli/entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/core/change/spec.md`](../../core/change/spec.md) — archivable state, archive semantics
-- [`specs/core/archive-change/spec.md`](../../core/archive-change/spec.md) — archive hook phase selectors and hook delegation
-- [`specs/core/hook-execution-model/spec.md`](../../core/hook-execution-model/spec.md) — `--skip-hooks` manual-control pattern
+- [`cli:cli/entrypoint`](../../cli/entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:core/change`](../../core/change/spec.md) — archivable state, archive semantics
+- [`core:core/archive-change`](../../core/archive-change/spec.md) — archive hook phase selectors and hook delegation
+- [`core:core/hook-execution-model`](../../core/hook-execution-model/spec.md) — `--skip-hooks` manual-control pattern

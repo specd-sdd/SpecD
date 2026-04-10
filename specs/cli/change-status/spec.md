@@ -125,6 +125,6 @@ blockers:
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/core/change/spec.md`](../../core/change/spec.md) — Change entity, artifact status derivation
-- [`specs/core/get-status/spec.md`](../../core/get-status/spec.md) — `GetStatusResult` with lifecycle context
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:core/change`](../../core/change/spec.md) — Change entity, artifact status derivation
+- [`core:core/get-status`](../../core/get-status/spec.md) — `GetStatusResult` with lifecycle context

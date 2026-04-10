@@ -34,4 +34,4 @@ A file with empty string content is hashed normally — the SHA-256 of an empty 
 
 ## Spec Dependencies
 
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — pure function requirement for domain services
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — pure function requirement for domain services

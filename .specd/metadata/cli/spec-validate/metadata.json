@@ -1,6 +1,7 @@
 {
   "title": "Spec Validate",
   "description": "Specs that violate the schema's structural rules can break downstream tooling and confuse agents. The `specd spec validate` command validates spec artifacts against the active schema's structural rules, supporting a single spec, all specs in a workspace, or all specs across all workspaces.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
   "context": [
     "Specs that violate the schema's structural rules can break downstream tooling and confuse agents. The `specd spec validate` command validates spec artifacts against the active schema's structural rules, supporting a single spec, all specs in a workspace, or all specs across all workspaces."
   ],
@@ -161,7 +162,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:aecc591baf96f7be5c457239744b010955d045eaea040163981780ee5843dfb0",
+    "spec.md": "sha256:29c92c4a1920d0a2ff79a832743b3490ec76469cd68af28769557299c85f2dab",
     "verify.md": "sha256:da52f6c42b913130352afd7082e766d4de70dc99ad0eb094da5459ef45e89989"
   },
   "generatedBy": "core"

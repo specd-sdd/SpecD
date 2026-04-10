@@ -68,6 +68,6 @@ Forked #billing:billing-schema → specd/schemas/local-billing/
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`specs/core/schema-format/spec.md`](../../core/schema-format/spec.md) — schema structure, `kind`, `extends`
-- [`specs/core/schema-registry-port/spec.md`](../../core/schema-registry-port/spec.md) — schema resolution
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:core/schema-format`](../../core/schema-format/spec.md) — schema structure, `kind`, `extends`
+- [`core:core/schema-registry-port`](../../core/schema-registry-port/spec.md) — schema resolution

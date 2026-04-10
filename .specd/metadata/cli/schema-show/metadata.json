@@ -245,7 +245,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:f9732d3b201cab5c6b59f08ebb58699ec8784ba1fbdc1029cda51c827fbaf1ff",
+    "spec.md": "sha256:16989bb1ecbb701ad0f4f516e993b2cf374b1c3bfc36b16383ce16d7a2f2be1e",
     "verify.md": "sha256:666d88fe1628be7141f847fba46be45a539d0a172fb7d9cc9df8306ecf87635a"
   },
   "generatedBy": "core"

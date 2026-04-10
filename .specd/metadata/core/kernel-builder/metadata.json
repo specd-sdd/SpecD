@@ -1,7 +1,7 @@
 {
   "title": "Kernel Builder",
   "description": "Consumers that need to register kernel extensions conditionally or incrementally should not have to assemble a large `KernelOptions` object manually before every kernel construction. The kernel builder provides a fluent composition surface over the same additive registry model as `createKernel(config, options)`, letting callers accumulate registrations ergonomically while preserving the kernel's existing guarantees around manual dependency injection, additive extension, and post-build immutability.",
-  "dependsOn": ["core:core/kernel"],
+  "dependsOn": ["core:core/kernel", "core:core/composition", "default:_global/architecture"],
   "context": [
     "Consumers that need to register kernel extensions conditionally or incrementally should not have to assemble a large `KernelOptions` object manually before every kernel construction. The kernel builder provides a fluent composition surface over the same additive registry model as `createKernel(config, options)`, letting callers accumulate registrations ergonomically while preserving the kernel's existing guarantees around manual dependency injection, additive extension, and post-build immutability."
   ],
@@ -121,7 +121,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:8e60c796c78746edd911c3120e6046b2e29689f874a1aee44023f726d08e5fe8",
+    "spec.md": "sha256:6ceef5e4ba62bd0edaf41b602b7f1f0940c57e852365ed3e3c4888d9f0b25713",
     "verify.md": "sha256:cae80bd9a2013c73d1624cdaadc6d891ba46e6184d2cabd2f9d297bde6e7385a"
   },
   "generatedBy": "core"

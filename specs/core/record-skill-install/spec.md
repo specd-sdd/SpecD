@@ -39,5 +39,5 @@ The `ConfigWriter` adapter MUST preserve comments and key order in `specd.yaml` 
 
 ## Spec Dependencies
 
-- [`specs/core/config/spec.md`](../config/spec.md) — defines `ConfigWriter` port contract and skills manifest structure
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port/adapter design constraints
+- [`core:core/config`](../config/spec.md) — defines `ConfigWriter` port contract and skills manifest structure
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — port/adapter design constraints

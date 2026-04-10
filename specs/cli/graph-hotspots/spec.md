@@ -127,6 +127,6 @@ The CLI help text for `specd graph hotspots` and the existing reference document
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — shared CLI error handling, output conventions, and explicit config flag semantics
-- [`specs/core/config/spec.md`](../../core/config/spec.md) — config discovery contract and bootstrap-mode relationship to configured operation
-- [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — CodeGraphProvider facade used by the command
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — shared CLI error handling, output conventions, and explicit config flag semantics
+- [`core:core/config`](../../core/config/spec.md) — config discovery contract and bootstrap-mode relationship to configured operation
+- [`code-graph:code-graph/composition`](../../code-graph/composition/spec.md) — CodeGraphProvider facade used by the command

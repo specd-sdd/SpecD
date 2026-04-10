@@ -1,7 +1,12 @@
 {
   "title": "Change Archive",
   "description": "Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd change archive <name>` finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive.",
-  "dependsOn": ["core:core/change", "core:core/archive-change", "core:core/hook-execution-model"],
+  "dependsOn": [
+    "cli:cli/entrypoint",
+    "core:core/change",
+    "core:core/archive-change",
+    "core:core/hook-execution-model"
+  ],
   "context": [
     "Once a change is fully approved, its spec deltas need to be promoted into the permanent spec tree so they become the source of truth. `specd change archive <name>` finalises a change by merging its deltas into the permanent spec directories and moving the change to the archive."
   ],
@@ -144,7 +149,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:9aa25641f0b7a7749f67ea22176e3d8a84780314804dc17011d384c0728b21cd",
+    "spec.md": "sha256:ab4e87388fea1b6a2df552b92c9a792efc2f2f63d65f7ed4f216bb1cf301c3a7",
     "verify.md": "sha256:59ece8d04b620fc2a42ac449881362ef5e8fe85e1130e620b2261baaf2497051"
   },
   "generatedBy": "core"

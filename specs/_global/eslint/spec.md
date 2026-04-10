@@ -52,4 +52,4 @@ These rules make layer boundary violations a lint error, not a convention violat
 
 ## Spec Dependencies
 
-- [`specs/_global/conventions/spec.md`](../conventions/spec.md) — the rules being enforced
+- [`default:_global/conventions`](../conventions/spec.md) — the rules being enforced

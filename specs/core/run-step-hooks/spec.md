@@ -130,11 +130,11 @@ When no hooks match (empty `run:` hook list for the step+phase, or the step has 
 
 ## Spec Dependencies
 
-- [`specs/core/hook-execution-model/spec.md`](../hook-execution-model/spec.md) — hook types, execution modes, failure semantics, ordering
-- [`specs/core/hook-runner-port/spec.md`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`
-- [`specs/core/external-hook-runner-port/spec.md`](../external-hook-runner-port/spec.md) — external hook runner contract and accepted-type dispatch
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `workflow[].hooks` structure, `run:`, `instruction:`, and explicit external entries
-- [`specs/core/config/spec.md`](../config/spec.md) — project-level workflow hooks from `specd.yaml`
-- [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `schemaName`, `workspaces`
-- [`specs/core/template-variables/spec.md`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
-- [`specs/core/archive-repository-port/spec.md`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`
+- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook types, execution modes, failure semantics, ordering
+- [`core:core/hook-runner-port`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`
+- [`core:core/external-hook-runner-port`](../external-hook-runner-port/spec.md) — external hook runner contract and accepted-type dispatch
+- [`core:core/schema-format`](../schema-format/spec.md) — `workflow[].hooks` structure, `run:`, `instruction:`, and explicit external entries
+- [`core:core/config`](../config/spec.md) — project-level workflow hooks from `specd.yaml`
+- [`core:core/change`](../change/spec.md) — Change entity, `schemaName`, `workspaces`
+- [`core:core/template-variables`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
+- [`core:core/archive-repository-port`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`

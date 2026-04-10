@@ -77,5 +77,5 @@ specd change artifact-instruction add-auth tasks
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions, `--format` flag
-- [`specs/core/get-artifact-instruction/spec.md`](../../core/get-artifact-instruction/spec.md) — `GetArtifactInstruction` use case, result shape
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions, `--format` flag
+- [`core:core/get-artifact-instruction`](../../core/get-artifact-instruction/spec.md) — `GetArtifactInstruction` use case, result shape

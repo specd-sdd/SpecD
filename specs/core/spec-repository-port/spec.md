@@ -75,10 +75,10 @@ If the ownership is `owned` or `shared`, `saveMetadata` proceeds normally: it MU
 
 ## Spec Dependencies
 
-- [`specs/core/repository-port/spec.md`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
-- [`specs/core/change/spec.md`](../change/spec.md) — Change entity references specIds that resolve to specs managed by this port
-- [`specs/core/storage/spec.md`](../storage/spec.md) — storage layer design, filesystem adapter constraints
-- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace identity and scoping semantics
-- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical spec ID format used in `resolveFromPath` results
-- [`specs/core/spec-metadata/spec.md`](../spec-metadata/spec.md) — metadata file format and structure returned by `metadata()`
+- [`core:core/repository-port`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
+- [`core:core/change`](../change/spec.md) — Change entity references specIds that resolve to specs managed by this port
+- [`core:core/storage`](../storage/spec.md) — storage layer design, filesystem adapter constraints
+- [`core:core/workspace`](../workspace/spec.md) — workspace identity and scoping semantics
+- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical spec ID format used in `resolveFromPath` results
+- [`core:core/spec-metadata`](../spec-metadata/spec.md) — metadata file format and structure returned by `metadata()`

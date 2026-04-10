@@ -82,6 +82,6 @@ specd change hook-instruction add-auth verifying --phase pre --format json
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, output conventions, `--format` flag
-- [`specs/core/get-hook-instructions/spec.md`](../../core/get-hook-instructions/spec.md) — `GetHookInstructions` use case, result shape
-- [`specs/core/hook-execution-model/spec.md`](../../core/hook-execution-model/spec.md) — instruction hooks as passive text, individual query mode
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions, `--format` flag
+- [`core:core/get-hook-instructions`](../../core/get-hook-instructions/spec.md) — `GetHookInstructions` use case, result shape
+- [`core:core/hook-execution-model`](../../core/hook-execution-model/spec.md) — instruction hooks as passive text, individual query mode

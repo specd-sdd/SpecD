@@ -159,7 +159,7 @@ Symbols (10):
 
 ## Spec Dependencies
 
-- [`specs/cli/entrypoint/spec.md`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
-- [`specs/core/config/spec.md`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
-- [`specs/code-graph/composition/spec.md`](../../code-graph/composition/spec.md) — `CodeGraphProvider` facade
-- [`specs/code-graph/graph-store/spec.md`](../../code-graph/graph-store/spec.md) — abstract graph-store search capabilities
+- [`cli:cli/entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
+- [`core:core/config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+- [`code-graph:code-graph/composition`](../../code-graph/composition/spec.md) — `CodeGraphProvider` facade
+- [`code-graph:code-graph/graph-store`](../../code-graph/graph-store/spec.md) — abstract graph-store search capabilities

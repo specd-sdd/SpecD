@@ -145,8 +145,8 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 
 ## Spec Dependencies
 
-- [`specs/core/config/spec.md`](../config/spec.md) — context spec selection and resolution order
-- [`specs/core/change/spec.md`](../change/spec.md) — `specDependsOn` in the change manifest, per-spec declared dependencies
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `requiredSpecArtifacts`, used to determine which files to hash for staleness detection
-- [`specs/core/content-extraction/spec.md`](../content-extraction/spec.md) — the extraction engine used as CompileContext fallback when metadata is stale
-- [`specs/core/spec-repository-port/spec.md`](../spec-repository-port/spec.md) — `metadata()` and `saveMetadata()` methods used for all metadata access
+- [`core:core/config`](../config/spec.md) — context spec selection and resolution order
+- [`core:core/change`](../change/spec.md) — `specDependsOn` in the change manifest, per-spec declared dependencies
+- [`core:core/schema-format`](../schema-format/spec.md) — `requiredSpecArtifacts`, used to determine which files to hash for staleness detection
+- [`core:core/content-extraction`](../content-extraction/spec.md) — the extraction engine used as CompileContext fallback when metadata is stale
+- [`core:core/spec-repository-port`](../spec-repository-port/spec.md) — `metadata()` and `saveMetadata()` methods used for all metadata access

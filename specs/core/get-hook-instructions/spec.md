@@ -80,9 +80,9 @@ When no `instruction:` hooks exist for the step+phase, the result is `{ phase, i
 
 ## Spec Dependencies
 
-- [`specs/core/hook-execution-model/spec.md`](../hook-execution-model/spec.md) — hook types, instruction hooks as passive text, ordering
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — `workflow[].hooks` structure, `instruction:` entries
-- [`specs/core/config/spec.md`](../config/spec.md) — project-level hooks via `schemaOverrides`
-- [`specs/core/change/spec.md`](../change/spec.md) — Change entity, `schemaName`
-- [`specs/core/template-variables/spec.md`](../template-variables/spec.md) — `TemplateExpander`, `TemplateVariables`, expansion semantics
-- [`specs/core/archive-repository-port/spec.md`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`
+- [`core:core/hook-execution-model`](../hook-execution-model/spec.md) — hook types, instruction hooks as passive text, ordering
+- [`core:core/schema-format`](../schema-format/spec.md) — `workflow[].hooks` structure, `instruction:` entries
+- [`core:core/config`](../config/spec.md) — project-level hooks via `schemaOverrides`
+- [`core:core/change`](../change/spec.md) — Change entity, `schemaName`
+- [`core:core/template-variables`](../template-variables/spec.md) — `TemplateExpander`, `TemplateVariables`, expansion semantics
+- [`core:core/archive-repository-port`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`

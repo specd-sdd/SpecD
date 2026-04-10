@@ -1,7 +1,16 @@
 {
   "title": "Composition",
   "description": "Consumers of `@specd/code-graph` should not need to know how the store, indexer, adapters, and traversal functions are wired together. The composition layer provides a single facade and factory function that assembles all internal components, manages lifecycle, and defines the package's public API surface.",
-  "dependsOn": ["code-graph:code-graph/graph-store"],
+  "dependsOn": [
+    "code-graph:code-graph/symbol-model",
+    "code-graph:code-graph/graph-store",
+    "code-graph:code-graph/ladybug-graph-store",
+    "code-graph:code-graph/sqlite-graph-store",
+    "code-graph:code-graph/language-adapter",
+    "code-graph:code-graph/indexer",
+    "code-graph:code-graph/traversal",
+    "default:_global/architecture"
+  ],
   "context": [
     "Consumers of `@specd/code-graph` should not need to know how the store, indexer, adapters, and traversal functions are wired together. The composition layer provides a single facade and factory function that assembles all internal components, manages lifecycle, and defines the package's public API surface."
   ],
@@ -216,7 +225,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:607bb5caf9862e6d8069bda9cfae06666dd59e99ac7da77d76a2217684fcfd2f",
+    "spec.md": "sha256:007becf01761b60f873d7b226acf6bbfe64342c0828e3b95bbf5045f631157fa",
     "verify.md": "sha256:5210c358a109cfd5e49fe7f4f95fde9641fb5c830222a82df769c61c77239429"
   },
   "generatedBy": "core"

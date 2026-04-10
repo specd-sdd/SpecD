@@ -74,8 +74,8 @@ When an artifact type does not specify an explicit `format`, the use case SHALL 
 
 ## Spec Dependencies
 
-- [`specs/core/validate-artifacts/spec.md`](../validate-artifacts/spec.md) — shared `ValidationFailure` and `ValidationWarning` types, `evaluateRules` behaviour
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — schema structure, artifact types, and scope semantics
-- [`specs/core/storage/spec.md`](../storage/spec.md) — `SpecRepository` contract
-- [`specs/core/workspace/spec.md`](../workspace/spec.md) — workspace resolution
-- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — `parseSpecId` behaviour
+- [`core:core/validate-artifacts`](../validate-artifacts/spec.md) — shared `ValidationFailure` and `ValidationWarning` types, `evaluateRules` behaviour
+- [`core:core/schema-format`](../schema-format/spec.md) — schema structure, artifact types, and scope semantics
+- [`core:core/storage`](../storage/spec.md) — `SpecRepository` contract
+- [`core:core/workspace`](../workspace/spec.md) — workspace resolution
+- [`core:core/spec-id-format`](../spec-id-format/spec.md) — `parseSpecId` behaviour

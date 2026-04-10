@@ -122,7 +122,7 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:0d2f55b755577acf2b9dd2b93607b0cac4f2436401828bbaeb9b66f2b4f67ec0",
+    "spec.md": "sha256:dcebceeee8c5e42e5641949ea30f5741b99e4d3aa9b7c7f3aa11e598dbde62ec",
     "verify.md": "sha256:7a8aa76a30716adb13e7f1fec9197f9b65357bea00f7a71a0ef05b5750c51294"
   },
   "generatedBy": "core"

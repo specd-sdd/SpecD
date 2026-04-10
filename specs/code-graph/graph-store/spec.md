@@ -139,6 +139,6 @@ All filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are 
 
 ## Spec Dependencies
 
-- [`specs/code-graph/symbol-model/spec.md`](../symbol-model/spec.md) — `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `RelationType`, and hierarchy relation semantics
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — ports as abstract classes and adapters in infrastructure
-- [`specs/code-graph/staleness-detection/spec.md`](../staleness-detection/spec.md) — `lastIndexedRef` field definition and staleness semantics
+- [`code-graph:code-graph/symbol-model`](../symbol-model/spec.md) — `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `RelationType`, and hierarchy relation semantics
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — ports as abstract classes and adapters in infrastructure
+- [`code-graph:code-graph/staleness-detection`](../staleness-detection/spec.md) — `lastIndexedRef` field definition and staleness semantics

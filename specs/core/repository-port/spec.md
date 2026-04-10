@@ -61,4 +61,4 @@ The constructor MUST accept a `message` string. Callers construct the message wi
 
 ## Spec Dependencies
 
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — ports with shared construction are abstract classes; all port methods are explicit methods
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — ports with shared construction are abstract classes; all port methods are explicit methods
