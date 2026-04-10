@@ -17,7 +17,7 @@
     {
       "requirement": "Ports and constructor",
       "rules": [
-        "`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, and `VcsAdapter`.\n\n```typescript\nclass ValidateArtifacts {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    parsers: ArtifactParserRegistry,\n    vcs: VcsAdapter,\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation."
+        "`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, `ActorResolver`, and `ContentHasher`.\n\n```typescript\nclass ValidateArtifacts {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    parsers: ArtifactParserRegistry,\n    actor: ActorResolver,\n    hasher: ContentHasher,\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.\n\n`ActorResolver` supplies the identity recorded on approval invalidation events. `ContentHasher` is used both for approval drift detection and for the cleaned hashes persisted when validation succeeds."
       ]
     },
     {
@@ -77,7 +77,7 @@
     {
       "requirement": "MetadataExtraction validation",
       "rules": [
-        "After building the merged preview, `ValidateArtifacts` MUST also validate the extracted metadata:\n\n1. Get `schema.metadataExtraction()`\n2. If defined, call `extractMetadata(extraction, astsByArtifact, renderers, transforms, artifactType.id)`\n3. Validate result against `strictSpecMetadataSchema`\n4. If validation fails, record as validation failure\n\nThe extracted metadata is validated ONLY for the artifact being validated — not all artifacts."
+        "After building the merged preview, `ValidateArtifacts` MUST also validate the extracted metadata:\n\n1. Get `schema.metadataExtraction()`\n2. If defined, call `extractMetadata(extraction, astsByArtifact, renderers, transforms, transformContext, artifactType.id)`\n3. Validate the result against `strictSpecMetadataSchema`\n4. If validation fails, record it as a validation failure\n\n`transforms` is the shared extractor-transform registry assembled by kernel composition. `transformContext` is the caller-owned origin context bag for the artifact being validated. If a declared transform is unknown, or if a registered transform fails because its required context is absent or invalid, that failure is a validation failure for this artifact.\n\nThe extracted metadata is validated only for the artifact being validated — not for all artifacts."
       ]
     },
     {
@@ -426,6 +426,25 @@
       ]
     },
     {
+      "requirement": "MetadataExtraction validation",
+      "name": "Metadata validation uses shared transform registry and origin context",
+      "given": [
+        "the schema declares a metadata extractor with transform: resolveSpecPath",
+        "AND the artifact being validated has origin context for that transform"
+      ],
+      "when": ["ValidateArtifacts.execute performs metadataExtraction validation"],
+      "then": [
+        "it calls the extraction engine with the shared extractor-transform registry and the artifact origin context bag"
+      ]
+    },
+    {
+      "requirement": "MetadataExtraction validation",
+      "name": "Unknown transform causes validation failure",
+      "given": ["the schema declares a transform name that is not registered"],
+      "when": ["ValidateArtifacts.execute performs metadataExtraction validation"],
+      "then": ["the artifact records a validation failure instead of ignoring the transform"]
+    },
+    {
       "requirement": "Hash computation and markComplete",
       "name": "All validations pass — markComplete called with cleaned hash",
       "given": [
@@ -473,11 +492,44 @@
         "the mutation callback receives a freshly reloaded Change",
         "AND validation updates are applied on top of that fresh state instead of overwriting it with an older snapshot"
       ]
+    },
+    {
+      "requirement": "Automatic dependsOn extraction",
+      "name": "Transformed dependsOn values are persisted on the change",
+      "given": [
+        "a validated scope: spec artifact whose metadata extraction declares transform: resolveSpecPath",
+        "AND extraction against the validated content returns canonical spec IDs"
+      ],
+      "when": ["ValidateArtifacts.execute completes successfully"],
+      "then": [
+        "change.setSpecDependsOn(specId, deps) is called with those already-transformed spec IDs",
+        "AND no separate SpecRepository.resolveFromPath(...) repair step is run afterward"
+      ]
+    },
+    {
+      "requirement": "Automatic dependsOn extraction",
+      "name": "Transform failure blocks dependsOn extraction persistence",
+      "given": ["a declared transform throws because required origin context is absent"],
+      "when": ["ValidateArtifacts.execute attempts automatic dependsOn extraction"],
+      "then": [
+        "validation fails for the artifact",
+        "AND dependency updates are not persisted for that artifact"
+      ]
+    },
+    {
+      "requirement": "Automatic dependsOn extraction",
+      "name": "Found dependency values may not be silently discarded by transform execution",
+      "given": [
+        "extraction finds dependency values in the validated artifact content",
+        "AND the configured transform receives those values but cannot normalize them"
+      ],
+      "when": ["ValidateArtifacts.execute completes dependency extraction"],
+      "then": ["validation fails for the artifact instead of treating dependsOn as absent"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:b5d3add2445dc227a4ed535de94e0970577091178a6c4e3141fb15f63a3bd28b",
-    "verify.md": "sha256:75fc17343eb39e078aea204a11f0adb870370563f32a6c6c6c8995567c36eefb"
+    "spec.md": "sha256:9127ac8de74259eb7a009b83d3e348205ae5ad8a7123a68c56b915e328c0edf6",
+    "verify.md": "sha256:93f48aa50fda15f8da07d1f0fbd57a03a457c497cb9154e503fcb95b01b99a5b"
   },
   "generatedBy": "core"
 }

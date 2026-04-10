@@ -21,7 +21,7 @@
     {
       "requirement": "Ports and constructor",
       "rules": [
-        "`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, and `ArtifactParserRegistry`.\n\n```typescript\nclass CompileContext {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    files: FileReader,\n    parsers: ArtifactParserRegistry,\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation."
+        "`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, and `PreviewSpec`.\n\n```typescript\nclass CompileContext {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    files: FileReader,\n    parsers: ArtifactParserRegistry,\n    hasher: ContentHasher,\n    previewSpec: PreviewSpec,\n  )\n}\n```\n\n`SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.\n\n`PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs."
       ]
     },
     {
@@ -57,7 +57,7 @@
     {
       "requirement": "dependsOn resolution order",
       "rules": [
-        "For each spec in Step 5, `dependsOn` is resolved using a three-tier fallback:\n\n1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority)\n2. Metadata `dependsOn` field — the persisted metadata loaded via `SpecRepository.metadata()`\n3. Schema `metadataExtraction` engine — extracts `dependsOn` from spec content when metadata is absent\n\nThe first tier that returns a non-empty result is used. If all tiers return empty, the spec is treated as having no dependencies."
+        "For each spec in Step 5, `dependsOn` is resolved using a three-tier fallback:\n\n1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority)\n2. Metadata `dependsOn` field — the persisted metadata loaded via `SpecRepository.metadata()`\n3. Schema `metadataExtraction` engine — extracts `dependsOn` from spec content when metadata is absent or stale, using the shared extractor-transform registry and caller-owned origin context bag\n\nThe first tier that returns a non-empty result is used. If all tiers return empty, the spec is treated as having no dependencies."
       ]
     },
     {
@@ -69,13 +69,7 @@
     {
       "requirement": "Staleness detection and content fallback",
       "rules": [
-        "For every spec in the collected context set, `CompileContext` must check whether the spec's metadata exists (via `SpecRepository.metadata()`) and whether its `contentHashes` are fresh (all required artifact file hashes match the recorded values).\n\n- **Fresh metadata** — use the structured content from metadata (`rules`, `constraints`, `scenarios`, `description`).\n- **Stale or absent metadata** — fall back to the full raw content of the spec's artifact files. Emit a warning identifying the spec path so the caller knows metadata should be regenerated.\n\nStaleness is advisory — it never blocks context compilation. The fallback ensures the context is always assembled, even for specs whose metadata has not yet been generated."
-      ]
-    },
-    {
-      "requirement": "Ports and constructor — PreviewSpec",
-      "rules": [
-        "`CompileContext` MUST receive a `PreviewSpec` instance at construction time, in addition to its existing ports. This is the use case it delegates to for merging deltas into spec content.\n\n```typescript\nclass CompileContext {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    files: FileReader,\n    parsers: ArtifactParserRegistry,\n    hasher: ContentHasher,\n    previewSpec: PreviewSpec,\n  )\n}\n```"
+        "For every spec in the collected context set, `CompileContext` must check whether the spec's metadata exists (via `SpecRepository.metadata()`) and whether its `contentHashes` are fresh (all required artifact file hashes match the recorded values).\n\n- **Fresh metadata** — use the structured content from metadata (`rules`, `constraints`, `scenarios`, `description`).\n- **Stale or absent metadata** — fall back to live extraction from the spec's artifact files using the schema's `metadataExtraction` declarations, the shared extractor-transform registry, and caller-owned origin context for each artifact. Emit a warning identifying the spec path so the caller knows metadata should be regenerated.\n\nStaleness is advisory — it never blocks context compilation. The fallback ensures the context is always assembled, even for specs whose metadata has not yet been generated."
       ]
     },
     {
@@ -307,7 +301,7 @@
       ]
     },
     {
-      "requirement": "Staleness warning",
+      "requirement": "Staleness detection and content fallback",
       "name": "Stale metadata emits warning",
       "given": [
         "auth/jwt metadata has contentHashes.spec.md: 'sha256:old'",
@@ -317,11 +311,34 @@
       "then": ["the result warnings includes a staleness warning for auth/jwt"]
     },
     {
-      "requirement": "Staleness warning",
+      "requirement": "Staleness detection and content fallback",
       "name": "Fresh metadata emits no staleness warning",
       "given": ["all contentHashes in metadata match the current file hashes"],
       "when": ["CompileContext.execute is called"],
       "then": ["no staleness warnings are emitted"]
+    },
+    {
+      "requirement": "Staleness detection and content fallback",
+      "name": "Fallback rendering uses shared transform registry",
+      "given": [
+        "a spec has stale metadata",
+        "AND the schema declares transforms in its metadata extraction rules"
+      ],
+      "when": ["CompileContext.execute falls back to live extraction for rendered content"],
+      "then": [
+        "that fallback uses the shared extractor-transform registry and origin context for the spec artifacts"
+      ]
+    },
+    {
+      "requirement": "Staleness detection and content fallback",
+      "name": "Fallback rendering fails explicitly when transform cannot normalize a found value",
+      "given": [
+        "stale metadata triggers live extraction fallback",
+        "AND the fallback extraction finds a value for a transformed field",
+        "AND the transform cannot normalize that value"
+      ],
+      "when": ["CompileContext.execute renders fallback content"],
+      "then": ["the fallback path fails explicitly instead of silently dropping the found value"]
     },
     {
       "requirement": "Step availability",
@@ -475,7 +492,7 @@
     },
     {
       "requirement": "dependsOn resolution order",
-      "name": "Fallback to content extraction when metadata absent in dependsOn traversal",
+      "name": "Fallback to transform-backed extraction when metadata absent in dependsOn traversal",
       "given": [
         "the schema declares metadataExtraction.dependsOn",
         "AND a spec in the dependsOn traversal has no metadata",
@@ -483,8 +500,21 @@
       ],
       "when": ["CompileContext.execute is called with followDeps: true"],
       "then": [
-        "dependencies are extracted from the spec content via the metadataExtraction engine",
+        "dependencies are extracted from the spec content via the metadataExtraction engine using the shared transform registry and origin context",
         "AND a missing-metadata warning is still emitted"
+      ]
+    },
+    {
+      "requirement": "dependsOn resolution order",
+      "name": "Fallback dependency extraction does not silently drop found values",
+      "given": [
+        "a spec in the dependsOn traversal has no metadata",
+        "AND its artifact content contains dependency references that are extracted",
+        "AND transform execution cannot normalize those found values"
+      ],
+      "when": ["CompileContext.execute is called with followDeps: true"],
+      "then": [
+        "the fallback extraction fails explicitly instead of treating the spec as having no dependencies"
       ]
     },
     {
@@ -496,7 +526,7 @@
       ],
       "when": ["CompileContext.execute is called with followDeps: true"],
       "then": [
-        "auth/shared is used as the dependency (from manifest), not auth/jwt (from metadata)"
+        "auth/shared is used as the dependency from the manifest, not auth/jwt from metadata"
       ]
     },
     {
@@ -615,8 +645,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:6c99d557b28c0a07522ea9798e07be229dc02a17dd6e522b07d2412b6e3a5393",
-    "verify.md": "sha256:d876dac5d04c4937d55a7b119be5121792bd771522a74cf78453a984a0e0338e"
+    "spec.md": "sha256:a38d19d49c2f52473951ca7bc49ad5fd009e82e8c2bea50824e28b6b509f2192",
+    "verify.md": "sha256:613faff66e803eeb8f85ddab162d9b659519ae14cad3e62e1e815ee50894ceb1"
   },
   "generatedBy": "core"
 }

@@ -123,7 +123,7 @@
 - **AND** no infinite loop occurs
 - **AND** a cycle warning is emitted
 
-### Requirement: Staleness warning
+### Requirement: Staleness detection and content fallback
 
 #### Scenario: Stale metadata emits warning
 
@@ -137,6 +137,21 @@
 - **GIVEN** all `contentHashes` in metadata match the current file hashes
 - **WHEN** `CompileContext.execute` is called
 - **THEN** no staleness warnings are emitted
+
+#### Scenario: Fallback rendering uses shared transform registry
+
+- **GIVEN** a spec has stale metadata
+- **AND** the schema declares transforms in its metadata extraction rules
+- **WHEN** `CompileContext.execute` falls back to live extraction for rendered content
+- **THEN** that fallback uses the shared extractor-transform registry and origin context for the spec artifacts
+
+#### Scenario: Fallback rendering fails explicitly when transform cannot normalize a found value
+
+- **GIVEN** stale metadata triggers live extraction fallback
+- **AND** the fallback extraction finds a value for a transformed field
+- **AND** the transform cannot normalize that value
+- **WHEN** `CompileContext.execute` renders fallback content
+- **THEN** the fallback path fails explicitly instead of silently dropping the found value
 
 ### Requirement: Step availability
 
@@ -246,21 +261,29 @@
 - **WHEN** `CompileContext.execute` is called with `followDeps: true`
 - **THEN** `result.warnings` includes a `missing-metadata` warning for `auth/login`
 
-#### Scenario: Fallback to content extraction when metadata absent in dependsOn traversal
+#### Scenario: Fallback to transform-backed extraction when metadata absent in dependsOn traversal
 
 - **GIVEN** the schema declares `metadataExtraction.dependsOn`
 - **AND** a spec in the `dependsOn` traversal has no metadata
 - **AND** the spec's artifact content contains extractable dependency references
 - **WHEN** `CompileContext.execute` is called with `followDeps: true`
-- **THEN** dependencies are extracted from the spec content via the `metadataExtraction` engine
+- **THEN** dependencies are extracted from the spec content via the `metadataExtraction` engine using the shared transform registry and origin context
 - **AND** a `missing-metadata` warning is still emitted
+
+#### Scenario: Fallback dependency extraction does not silently drop found values
+
+- **GIVEN** a spec in the `dependsOn` traversal has no metadata
+- **AND** its artifact content contains dependency references that are extracted
+- **AND** transform execution cannot normalize those found values
+- **WHEN** `CompileContext.execute` is called with `followDeps: true`
+- **THEN** the fallback extraction fails explicitly instead of treating the spec as having no dependencies
 
 #### Scenario: Manifest specDependsOn used as primary source for dependencies
 
 - **GIVEN** `change.specDependsOn` has an entry for `auth/login` with `['auth/shared']`
 - **AND** `auth/login` metadata declares `dependsOn: ['auth/jwt']`
 - **WHEN** `CompileContext.execute` is called with `followDeps: true`
-- **THEN** `auth/shared` is used as the dependency (from manifest), not `auth/jwt` (from metadata)
+- **THEN** `auth/shared` is used as the dependency from the manifest, not `auth/jwt` from metadata
 
 ### Requirement: Unknown workspace qualifiers emit a warning
 

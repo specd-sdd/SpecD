@@ -110,11 +110,19 @@
 - **WHEN** `execute` is called with `followDeps: true` and `depth: 1`
 - **THEN** `specs` contains A and B but not C
 
-#### Scenario: DependsOn traversal skipped when followDeps is false
+#### Scenario: DependsOn traversal falls back to transform-backed extraction
 
-- **GIVEN** spec A's metadata has `dependsOn: ["default:B"]`
-- **WHEN** `execute` is called with `followDeps` absent
-- **THEN** spec B is not included unless it matches an include pattern independently
+- **GIVEN** a spec has no fresh metadata
+- **AND** the schema declares `metadataExtraction.dependsOn` with a transform such as `resolveSpecPath`
+- **WHEN** `execute` is called with `followDeps: true`
+- **THEN** traversal uses live extraction with the shared transform registry and origin context to discover additional specs
+
+#### Scenario: DependsOn traversal does not silently drop found dependency values
+
+- **GIVEN** live fallback extraction finds dependency values for a spec
+- **AND** transform execution cannot normalize those found values
+- **WHEN** `execute` is called with `followDeps: true`
+- **THEN** traversal fails explicitly instead of treating the spec as having no dependencies
 
 ### Requirement: Renders spec content from metadata when fresh
 
@@ -145,6 +153,19 @@
 - **WHEN** `execute` is called
 - **THEN** `warnings` contains a `stale-metadata` warning indicating no metadata exists
 - **AND** the spec's `content` is rendered via live extraction if the schema supports it
+
+#### Scenario: Fallback extraction uses shared transform registry
+
+- **GIVEN** the schema declares transforms inside `metadataExtraction`
+- **WHEN** `GetProjectContext` falls back to live extraction for stale or absent metadata
+- **THEN** it uses the shared extractor-transform registry and origin context for the artifact being rendered
+
+#### Scenario: Fallback extraction does not silently drop found transformed values
+
+- **GIVEN** live fallback extraction finds a value for a transformed field
+- **AND** the transform cannot normalize that value
+- **WHEN** `GetProjectContext` renders fallback content
+- **THEN** the fallback path fails explicitly instead of silently omitting the found value
 
 #### Scenario: No metadataExtraction in schema yields empty content
 

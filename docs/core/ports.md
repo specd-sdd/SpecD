@@ -10,7 +10,7 @@ All ports are exported from `@specd/core`.
 
 ## Kernel composition surface
 
-The primary composition entrypoint remains `createKernel(config, options)`. `options` now supports additive registrations for storage factories, graph-store factories, artifact parsers, VCS providers, actor providers, and external hook runners.
+The primary composition entrypoint remains `createKernel(config, options)`. `options` now supports additive registrations for storage factories, graph-store factories, artifact parsers, extractor transforms, VCS providers, actor providers, and external hook runners.
 
 Built kernels expose the final merged registry as `kernel.registry`, so callers can inspect which built-in and additive capabilities are available after construction.
 
@@ -30,13 +30,22 @@ const kernel = await createKernelBuilder(config)
   .registerGraphStore('custom-sqlite', customSqliteFactory)
   .useGraphStore('sqlite')
   .registerParser('plaintext-plus', parser)
+  .registerExtractorTransform('trim', (value) => value.trim())
   .registerExternalHookRunner('http-runner', httpRunner)
   .build()
 
 console.log(kernel.registry.graphStores.has('sqlite')) // true
 console.log(kernel.registry.parsers.has('plaintext-plus')) // true
+console.log(kernel.registry.extractorTransforms.has('trim')) // true
 console.log(kernel.registry.externalHookRunners.has('http')) // true
 ```
+
+Extractor transforms use the same additive merge rules as other kernel registries:
+
+- built-ins such as `resolveSpecPath` are always registered first
+- `createKernel(..., { extractorTransforms })` adds external transforms
+- `createKernelBuilder(...).registerExtractorTransform(name, fn)` offers the fluent equivalent
+- duplicate names fail kernel construction with `RegistryConflictError`
 
 ---
 

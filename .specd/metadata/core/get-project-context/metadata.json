@@ -51,7 +51,7 @@
     {
       "requirement": "Supports dependsOn traversal when followDeps is true",
       "rules": [
-        "When `input.followDeps` is `true`, the use case MUST traverse `dependsOn` links starting from each included spec, using the schema's `metadataExtraction` declarations as a fallback when `.specd-metadata.yaml` is absent. Newly discovered specs MUST be added to the included set. Traversal MUST respect `input.depth` when provided."
+        "When `input.followDeps` is `true`, the use case MUST traverse `dependsOn` links starting from each included spec, using persisted metadata when it is fresh and the schema's `metadataExtraction` declarations as a fallback when metadata is absent or stale.\n\nThat fallback extraction MUST use the same shared extractor-transform registry and caller-owned origin context bag used by the other metadata-extraction consumers. Newly discovered specs MUST be added to the included set. Traversal MUST respect `input.depth` when provided.\n\nIf fallback extraction finds dependency values but transform execution cannot normalize them, the use case MUST fail explicitly rather than silently treating those dependencies as absent."
       ]
     },
     {
@@ -63,7 +63,7 @@
     {
       "requirement": "Falls back to extraction when metadata is stale or absent",
       "rules": [
-        "When metadata is stale or absent, the use case MUST:\n\n1. Emit a `stale-metadata` warning identifying the spec.\n2. Attempt live extraction using the schema's `metadataExtraction` engine and `ArtifactParserRegistry`.\n3. If extraction yields content, render it with the same section filtering as fresh metadata.\n4. If the schema has no `metadataExtraction` declarations, render an empty spec heading."
+        "When metadata is stale or absent, the use case MUST:\n\n1. Emit a `stale-metadata` warning identifying the spec.\n2. Attempt live extraction using the schema's `metadataExtraction` engine, the shared extractor-transform registry, and caller-owned origin context for each artifact.\n3. If extraction yields content, render it with the same section filtering as fresh metadata.\n4. If the schema has no `metadataExtraction` declarations, render an empty spec heading.\n\nIf extraction finds values for transformed fields but transform execution cannot normalize them, the use case MUST fail explicitly instead of silently omitting those found values from the rendered fallback content."
       ]
     },
     {
@@ -215,10 +215,25 @@
     },
     {
       "requirement": "Supports dependsOn traversal when followDeps is true",
-      "name": "DependsOn traversal skipped when followDeps is false",
-      "given": ["spec A's metadata has dependsOn: [\"default:B\"]"],
-      "when": ["execute is called with followDeps absent"],
-      "then": ["spec B is not included unless it matches an include pattern independently"]
+      "name": "DependsOn traversal falls back to transform-backed extraction",
+      "given": [
+        "a spec has no fresh metadata",
+        "AND the schema declares metadataExtraction.dependsOn with a transform such as resolveSpecPath"
+      ],
+      "when": ["execute is called with followDeps: true"],
+      "then": [
+        "traversal uses live extraction with the shared transform registry and origin context to discover additional specs"
+      ]
+    },
+    {
+      "requirement": "Supports dependsOn traversal when followDeps is true",
+      "name": "DependsOn traversal does not silently drop found dependency values",
+      "given": [
+        "live fallback extraction finds dependency values for a spec",
+        "AND transform execution cannot normalize those found values"
+      ],
+      "when": ["execute is called with followDeps: true"],
+      "then": ["traversal fails explicitly instead of treating the spec as having no dependencies"]
     },
     {
       "requirement": "Renders spec content from metadata when fresh",
@@ -260,6 +275,25 @@
     },
     {
       "requirement": "Falls back to extraction when metadata is stale or absent",
+      "name": "Fallback extraction uses shared transform registry",
+      "given": ["the schema declares transforms inside metadataExtraction"],
+      "when": ["GetProjectContext falls back to live extraction for stale or absent metadata"],
+      "then": [
+        "it uses the shared extractor-transform registry and origin context for the artifact being rendered"
+      ]
+    },
+    {
+      "requirement": "Falls back to extraction when metadata is stale or absent",
+      "name": "Fallback extraction does not silently drop found transformed values",
+      "given": [
+        "live fallback extraction finds a value for a transformed field",
+        "AND the transform cannot normalize that value"
+      ],
+      "when": ["GetProjectContext renders fallback content"],
+      "then": ["the fallback path fails explicitly instead of silently omitting the found value"]
+    },
+    {
+      "requirement": "Falls back to extraction when metadata is stale or absent",
       "name": "No metadataExtraction in schema yields empty content",
       "given": ["a spec has no metadata and the schema has no metadataExtraction declarations"],
       "when": ["execute is called"],
@@ -267,8 +301,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:5d56c93fd70de6100e622eefc341b23b2179e637e5abfd202d9be0299f0ff9e4",
-    "verify.md": "sha256:60b7f9aa1633e5a7113301ff54bd1c436e4b25ac0a496baee6a2ea5bdee8be16"
+    "spec.md": "sha256:256f556efe6e3fcb1bc69e23f060c58f243e0d00d245012c5b083aea9783019f",
+    "verify.md": "sha256:3c60957a7b86e62ce0bf97814cdfafeab7837a95a8bbd414f4b0e579b93dd1c7"
   },
   "generatedBy": "core"
 }

@@ -9,13 +9,13 @@
     {
       "requirement": "Extractor value object",
       "rules": [
-        "An `Extractor` is a first-class domain value object that declares how to extract content from an AST. It combines a `Selector` (which nodes to find) with post-processing directives (what to do with the matched nodes):\n\n- `selector` (Selector, required) — identifies the AST node(s) to extract from, using the full selector model\n- `extract` (`'content' | 'label' | 'both'`, optional, defaults to `'content'`) — what to pull from each matched node\n- `capture` (string, optional) — regex with capture group applied to the extracted text; all matches are collected\n- `strip` (string, optional) — regex removed from labels/values before output\n- `groupBy` (`'label'`, optional) — groups matched nodes by their label\n- `transform` (string, optional) — named post-processing callback injected by the caller (e.g. `'resolveSpecPath'`)\n- `fields` (record of string to `FieldMapping`, optional) — structured field mapping; when present, each matched node produces one object with the declared fields"
+        "An `Extractor` is a first-class domain value object that declares how to extract content from an AST. It combines a `Selector` (which nodes to find) with post-processing directives (what to do with the matched nodes):\n\n- `selector` (Selector, required) — identifies the AST node(s) to extract from, using the full selector model\n- `extract` (`'content' | 'label' | 'both'`, optional, defaults to `'content'`) — what to pull from each matched node\n- `capture` (string, optional) — regex applied to the extracted text; when present, the main extracted `value` becomes the first capture group (`$1`) and placeholder interpolation also exposes `$0` for the full regex match plus `$2`, `$3`, and higher groups when present\n- `strip` (string, optional) — regex removed from labels/values\n- `groupBy` (`'label'`, optional) — groups matched nodes by their label\n- `transform` (string or object, optional) — named post-processing callback injected by the caller. The shorthand string form is the transform name (for example `'resolveSpecPath'`). The object form is `{ name: string, args?: string[] }`, where args are declarative string parameters that may reference capture placeholders such as `$0`, `$1`, `$2`, and so on.\n- `fields` (record of string to `FieldMapping`, optional) — structured field mapping; when present, each matched node produces one object with the declared fields\n\n`transform` is part of the generic extractor model. It is not limited to metadata generation and may be used by any feature that executes extractors."
       ]
     },
     {
       "requirement": "FieldMapping value object",
       "rules": [
-        "A `FieldMapping` declares how to extract a single field from within a matched AST node:\n\n- `from` (`'label' | 'parentLabel' | 'content'`, optional, defaults to `'content'`) — source of the field value relative to the matched node\n- `childSelector` (Selector, optional) — selector applied within the matched node to find child values\n- `capture` (string, optional) — regex with capture group applied to the extracted text\n- `strip` (string, optional) — regex removed from the extracted text\n- `followSiblings` (string, optional) — regex matching sibling nodes that follow a `childSelector` match; matched siblings are appended to the active field's result array until a non-matching sibling or another field's `childSelector` match is encountered; if the pattern contains a capture group, the captured text is used; otherwise the full node text is returned as-is\n\n`from` and `childSelector` are mutually exclusive modes. When `childSelector` is present, `from` is ignored."
+        "A `FieldMapping` declares how to extract a single field from within a matched AST node:\n\n- `from` (`'label' | 'parentLabel' | 'content'`, optional, defaults to `'content'`) — source of the field value relative to the matched node\n- `childSelector` (Selector, optional) — selector applied within the matched node to find child values\n- `capture` (string, optional) — regex applied to the extracted text; when present, the main extracted field value becomes the first capture group (`$1`) and placeholder interpolation also exposes `$0` for the full regex match plus any higher groups\n- `strip` (string, optional) — regex removed from the extracted text\n- `followSiblings` (string, optional) — regex matching sibling nodes that follow a `childSelector` match; matched siblings are appended to the active field's result array until a non-matching sibling or another field's `childSelector` match is encountered\n- `transform` (string or object, optional) — named post-processing callback applied to each extracted field value. It uses the same shorthand and object declaration forms as `Extractor.transform`.\n\n`from` and `childSelector` are mutually exclusive modes. When `childSelector` is present, `from` is ignored."
       ]
     },
     {
@@ -27,7 +27,7 @@
     {
       "requirement": "Simple extraction",
       "rules": [
-        "When an extractor has no `fields` and no `groupBy`, `extractContent` operates in simple mode:\n\n1. Find all nodes matching `selector`\n2. For each match, extract text according to `extract` mode\n3. Apply `strip` if present\n4. Apply `capture` if present — when capture is global, all capture group matches are collected\n5. Apply `transform` if present — the named callback is looked up from an injected transform map and called with the full result array\n6. Return the result as `string[]`"
+        "When an extractor has no `fields` and no `groupBy`, `extractContent` operates in simple mode:\n\n1. Find all nodes matching `selector`.\n2. For each match, extract text according to `extract` mode.\n3. Apply `strip` if present.\n4. If `capture` is absent, emit one extracted value from the text. If `capture` is present, emit one extracted value per regex match, where the emitted `value` is the first capture group (`$1`) and placeholder interpolation also exposes `$0` for the full match plus any higher groups.\n5. Apply `transform` if present — the named callback is looked up from an injected transform registry and called once per emitted extracted value with the current `value`, interpolated args, and caller-provided context bag.\n6. A transform that receives an emitted extracted value must return a non-null string. If it cannot normalize that value, it must fail with an extraction error instead of silently omitting the value.\n7. Return the result as `string[]`."
       ]
     },
     {
@@ -39,13 +39,13 @@
     {
       "requirement": "Structured extraction",
       "rules": [
-        "When `fields` is present, each matched node produces one `StructuredExtraction` object (a record of field name to string or string array). For each field entry:\n\n- `from: 'label'` — takes `node.label`\n- `from: 'parentLabel'` — walks the ancestor chain in reverse and takes the nearest ancestor's label\n- `from: 'content'` — renders the matched node's subtree\n- `childSelector` — finds children within the matched node matching the selector; applies `capture` to each child's text\n\nAncestor tracking is required for `parentLabel` — the engine uses `findNodesWithAncestors` to obtain ancestor chains alongside matched nodes."
+        "When `fields` is present, each matched node produces one `StructuredExtraction` object (a record of field name to string or string array). For each field entry:\n\n- `from: 'label'` — takes `node.label`\n- `from: 'parentLabel'` — walks the ancestor chain in reverse and takes the nearest ancestor's label\n- `from: 'content'` — renders the matched node's subtree\n- `childSelector` — finds children within the matched node matching the selector\n- `capture` — when present, the field's main extracted value becomes the first capture group (`$1`) and placeholder interpolation also exposes `$0` plus higher groups\n- `transform` — when present, applies to each extracted field value using the registered transform runtime\n\nAncestor tracking is required for `parentLabel` — the engine uses `findNodesWithAncestors` to obtain ancestor chains alongside matched nodes."
       ]
     },
     {
       "requirement": "Follow siblings",
       "rules": [
-        "When a `FieldMapping` declares `followSiblings`, the extraction engine switches to sequential sibling walk mode for all `childSelector` fields in that extractor. The walk processes the matched node's children in document order:\n\n1. For each child, check if it matches any field's `childSelector`. If so, that field becomes the **active field** and the child's text (after `capture`) is added to it.\n2. If the child does not match any field's `childSelector` but matches the active field's `followSiblings` pattern, it is appended to the active field's result array.\n3. If the `followSiblings` pattern contains a capture group, the captured text is used. Otherwise the full node text is returned as-is.\n\nThis enables sequential grouping of continuation items (e.g. AND/OR items after GIVEN/WHEN/THEN in BDD scenarios) without requiring the continuation keyword to be part of any field's primary `childSelector`.\n\nFields without `childSelector` (e.g. `from: 'label'`) are extracted normally, outside the sequential walk."
+        "When a `FieldMapping` declares `followSiblings`, the extraction engine switches to sequential sibling walk mode for all `childSelector` fields in that extractor. The walk processes the matched node's children in document order:\n\n1. For each child, check if it matches any field's `childSelector`. If so, that field becomes the **active field** and the child's extracted value is added to it.\n2. If the child does not match any field's `childSelector` but matches the active field's `followSiblings` pattern, it is appended to the active field's result array.\n3. When `followSiblings` includes capture groups, the appended sibling value becomes the first capture group (`$1`). `$0` remains the full match, and higher groups remain available for any transform arg interpolation on that field. When `followSiblings` has no capture groups, the full node text is appended as-is.\n\nThis enables sequential grouping of continuation items (e.g. AND/OR items after GIVEN/WHEN/THEN in BDD scenarios) without requiring the continuation keyword to be part of any field's primary `childSelector`.\n\nFields without `childSelector` (e.g. `from: 'label'`) are extracted normally, outside the sequential walk."
       ]
     },
     {
@@ -57,7 +57,7 @@
     {
       "requirement": "Transform callbacks",
       "rules": [
-        "Named transforms (e.g. `'resolveSpecPath'`) are injected by the caller via a `ReadonlyMap<string, (values: string[]) => string[]>`. The extraction engine does not define any transforms — it only invokes them by name. This keeps the engine pure and domain-level while allowing application-layer logic (like resolving relative spec paths to spec IDs) to be composed in."
+        "Named transforms (for example `'resolveSpecPath'`) are injected by the caller through a shared extractor-transform registry keyed by transform name. The extraction engine does not define any concrete transforms — it resolves them from the registry at runtime.\n\nEach registered transform has a fixed callable contract:\n\n- `value` (`string`) — the main extracted string value for this invocation\n- `args` (`readonly (string | undefined)[]`) — declarative transform args after placeholder interpolation (`$0`, `$1`, `$2`, ...)\n- `context` (`ReadonlyMap<string, unknown>`) — opaque caller-provided key/value data describing the origin of the extraction\n\nThe extraction engine treats `context` as opaque. It does not validate or interpret context keys. Each transform documents the minimum keys it requires, and each caller is responsible for supplying them.\n\nUnknown transform names are runtime extraction errors — they are not ignored silently. A registered transform may also fail or throw when its required context keys are absent or invalid. Once a transform receives a value, it must return a non-null string; inability to normalize the value is also an `ExtractorTransformError` extraction failure rather than a silent omission.\n\n`ExtractorTransformError` is the contract error for transform resolution and execution failures. It is thrown when:\n\n- the requested transform name is not registered in the runtime registry\n- transform execution fails for an extractor-level transform\n- transform execution fails for a field-level transform\n\nThe error identifies the transform name and whether the failure happened on an extractor-level or field-level transform. When the failure comes from a field-level transform, the error also identifies the field name.\n\nThe kernel owns the built-in transform registry and also allows external callers to register additional extractor transforms through the same additive composition model used for other kernel registries.\n\nBuilt-in transforms may interpret declarative string args for behavior variants. `resolveSpecPath` specifically tries the primary extracted `value` first and then each interpolated arg in order, returning the first candidate that resolves to a canonical spec ID. This allows one extractor to support canonical dependency labels, relative `href` values, and plain canonical dependency entries without introducing multiple extractors for `dependsOn`."
       ]
     }
   ],
@@ -66,22 +66,25 @@
     "from and childSelector on FieldMapping are mutually exclusive; when childSelector is present, from is ignored",
     "followSiblings is only meaningful when childSelector is also present; it has no effect on from-based field mappings",
     "When followSiblings is declared on any field in an extractor's fields, all childSelector fields in that extractor are processed via sequential walk — not independently",
-    "transform callbacks are optional and looked up by name; an unknown transform name is silently ignored (no error)",
+    "Transform args are declarative strings; placeholder interpolation may resolve individual args to undefined",
+    "The extraction engine does not validate or interpret transform context keys",
+    "Unknown transform names, transform execution failures, and any attempt to return a null value after receiving an extracted value are ExtractorTransformError extraction errors",
     "The engine operates on SelectorNode — the generic node interface from selector matching — not on ArtifactNode directly"
   ],
   "scenarios": [
     {
       "requirement": "Extractor value object",
-      "name": "Extractor with all fields",
+      "name": "Extractor with shorthand and object transform declarations",
       "when": [
-        "an extractor declares selector, extract, capture, strip, groupBy, transform, and fields"
+        "an extractor declares transform: resolveSpecPath",
+        "AND another extractor declares transform: { name: \"join\", args: [\"$2\", \"/\", \"$1\"] }"
       ],
-      "then": ["the schema registry parses and validates all fields without error"]
+      "then": ["the schema registry parses and validates both declarations without error"]
     },
     {
       "requirement": "FieldMapping value object",
-      "name": "FieldMapping with followSiblings",
-      "when": ["a field mapping declares childSelector, capture, and followSiblings"],
+      "name": "FieldMapping with followSiblings and transform",
+      "when": ["a field mapping declares childSelector, capture, followSiblings, and transform"],
       "then": ["the schema registry parses and validates all fields without error"]
     },
     {
@@ -110,23 +113,31 @@
       "name": "Extract with capture group",
       "given": ["a section containing [dep1](../dep1/spec.md) and [dep2](../dep2/spec.md)"],
       "when": ["extractContent runs with capture: '\\[.*?\\]\\(([^)]+)\\)'"],
-      "then": ["the result is [\"../dep1/spec.md\", \"../dep2/spec.md\"]"]
+      "then": [
+        "the result is [\"../dep1/spec.md\", \"../dep2/spec.md\"]",
+        "AND each emitted value corresponds to the first capture group for its regex match"
+      ]
     },
     {
       "requirement": "Simple extraction",
       "name": "Extract with strip",
-      "given": ["a section with label \"Requirement: User Login\""],
+      "given": ["a section with label Requirement: User Login"],
       "when": ["extractContent runs with extract: 'label' and strip: '^Requirement:\\s*'"],
       "then": ["the result is [\"User Login\"]"]
     },
     {
       "requirement": "Simple extraction",
-      "name": "Extract with named transform",
+      "name": "Extract with named transform and interpolated args",
       "given": [
-        "extracted values [\"../a/spec.md\"] and a transform resolveSpecPath that strips the relative path"
+        "extracted text v2026-04-09",
+        "AND capture groups expose $0 = v2026-04-09, $1 = 2026, $2 = 04, $3 = 09",
+        "AND a transform joinDate is registered with args [\"$3\", \"/\", \"$2\", \"/\", \"$1\"]"
       ],
-      "when": ["extractContent runs with transform: 'resolveSpecPath'"],
-      "then": ["the transform is applied to the result array"]
+      "when": ["extractContent runs with that transform declaration"],
+      "then": [
+        "the transform is called with value = \"2026\" when the first capture group is the semantic value for that match",
+        "AND the interpolated args are [\"09\", \"/\", \"04\", \"/\", \"2026\"]"
+      ]
     },
     {
       "requirement": "Simple extraction",
@@ -155,9 +166,7 @@
     {
       "requirement": "Structured extraction",
       "name": "Fields produce structured objects",
-      "given": [
-        "a \"Scenario: Token Valid\" section with list-item children for GIVEN, WHEN, THEN"
-      ],
+      "given": ["a Scenario: Token Valid section with list-item children for GIVEN, WHEN, THEN"],
       "when": [
         "extractContent runs with fields mapping name from label and given/when/then via childSelector"
       ],
@@ -168,9 +177,21 @@
     {
       "requirement": "Structured extraction",
       "name": "parentLabel walks ancestor chain",
-      "given": ["a \"Scenario: X\" section nested under \"Requirement: Auth\""],
+      "given": ["a Scenario: X section nested under Requirement: Auth"],
       "when": ["a field declares from: 'parentLabel' with strip: '^Requirement:\\s*'"],
-      "then": ["the field value is \"Auth\""]
+      "then": ["the field value is Auth"]
+    },
+    {
+      "requirement": "Structured extraction",
+      "name": "Field transform runs per extracted field value",
+      "given": [
+        "a field mapping extracts ../shared/spec.md",
+        "AND that field declares transform: resolveSpecPath"
+      ],
+      "when": ["structured extraction runs with a registry containing resolveSpecPath"],
+      "then": [
+        "the transform is applied to that field value before the structured result is returned"
+      ]
     },
     {
       "requirement": "Follow siblings",
@@ -184,7 +205,9 @@
       "name": "followSiblings with capture group strips prefix",
       "given": ["list items in order: GIVEN a, AND b, THEN c"],
       "when": ["followSiblings is '^AND\\s+(.+)' (with capture group)"],
-      "then": ["given is [\"a\", \"b\"] — the AND prefix is captured away"]
+      "then": [
+        "the appended sibling value is \"b\" because $1 is used as the semantic value for that follow-sibling match"
+      ]
     },
     {
       "requirement": "Follow siblings",
@@ -219,18 +242,85 @@
     },
     {
       "requirement": "Transform callbacks",
-      "name": "Unknown transform silently ignored",
+      "name": "Unknown transform fails with ExtractorTransformError",
       "given": [
         "an extractor with transform: 'unknownTransform'",
-        "AND no transform by that name in the transforms map"
+        "AND no transform by that name exists in the registry"
       ],
       "when": ["extractContent runs"],
-      "then": ["the result is returned without transformation — no error is thrown"]
+      "then": [
+        "extraction fails with ExtractorTransformError",
+        "AND the error identifies unknownTransform as the missing transform name"
+      ]
+    },
+    {
+      "requirement": "Transform callbacks",
+      "name": "Field transform failure identifies the field",
+      "given": [
+        "a structured extractor with a field dependsOn that declares transform: resolveSpecPath",
+        "AND the registered transform throws while processing that field"
+      ],
+      "when": ["extractContent runs"],
+      "then": [
+        "extraction fails with ExtractorTransformError",
+        "AND the error identifies resolveSpecPath as the transform name",
+        "AND the error identifies dependsOn as the failing field"
+      ]
+    },
+    {
+      "requirement": "Transform callbacks",
+      "name": "Transform may fail when required context is absent",
+      "given": [
+        "a registered transform requires originSpecPath in the context bag",
+        "AND the caller omits that key"
+      ],
+      "when": ["extractContent runs and invokes the transform"],
+      "then": [
+        "extraction fails with ExtractorTransformError",
+        "AND that failure propagates to the caller without being ignored"
+      ]
+    },
+    {
+      "requirement": "Transform callbacks",
+      "name": "Transform may not silently drop an extracted value",
+      "given": ["an extractor emits a value and a registered transform receives it"],
+      "when": ["that transform attempts to return a null value instead of a normalized string"],
+      "then": [
+        "extraction fails with ExtractorTransformError",
+        "AND the value is not silently omitted from the final result"
+      ]
+    },
+    {
+      "requirement": "Transform callbacks",
+      "name": "resolveSpecPath accepts a canonical spec ID directly",
+      "given": [
+        "an extractor captures the dependency label as value",
+        "AND the extracted value is already the canonical spec ID core:core/storage"
+      ],
+      "when": ["extractContent runs with a registry containing resolveSpecPath"],
+      "then": [
+        "the transform returns core:core/storage as-is instead of failing or discarding the value"
+      ]
+    },
+    {
+      "requirement": "Transform callbacks",
+      "name": "resolveSpecPath falls back from value to captured href args",
+      "given": [
+        "an extractor captures the dependency label as value",
+        "AND the extracted value is the legacy label specs/core/storage/spec.md",
+        "AND the transform args resolve to [\"../storage/spec.md\"]"
+      ],
+      "when": ["extractContent runs with a registry containing resolveSpecPath"],
+      "then": [
+        "the transform first attempts to resolve value",
+        "AND when value is not resolvable as a canonical spec ID it attempts the href args in order",
+        "AND the transform returns core:core/storage from the first resolvable fallback candidate"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:27602d6cf0f1f7081846580acd2f6e5e7e2e62a1d12a8cb1c1934cde07d6fd10",
-    "verify.md": "sha256:43cbcac5b37f298dc7121ae7ff7c436ed79813c0c672d830d1e86b15c045d37e"
+    "spec.md": "sha256:5caa14f1d2f3effcbf86ef128ea35bca155968414609a33a77fda1abda042720",
+    "verify.md": "sha256:c1753e1a6a9f4db24af6492173f4f2d14e0b37570c1f7218afd0293dd4c399be"
   },
   "generatedBy": "core"
 }

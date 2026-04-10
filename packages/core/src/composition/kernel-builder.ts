@@ -2,6 +2,7 @@ import { type ArtifactParser } from '../application/ports/artifact-parser.js'
 import { RegistryConflictError } from '../application/errors/registry-conflict-error.js'
 import { type ExternalHookRunner } from '../application/ports/external-hook-runner.js'
 import { type SpecdConfig } from '../application/specd-config.js'
+import { type ExtractorTransform } from '../domain/services/content-extraction.js'
 import { createBuiltinKernelRegistry } from './kernel-internals.js'
 import {
   createKernelRegistryView,
@@ -27,6 +28,7 @@ interface KernelBuilderState {
   readonly archiveStorageFactories: Record<string, ArchiveStorageFactory>
   readonly graphStoreFactories: Record<string, GraphStoreFactory>
   readonly parsers: Record<string, ArtifactParser>
+  readonly extractorTransforms: Record<string, ExtractorTransform>
   readonly vcsProviders: VcsProvider[]
   readonly actorProviders: ActorProvider[]
   readonly externalHookRunners: ExternalHookRunner[]
@@ -106,6 +108,16 @@ export interface KernelBuilder {
   registerParser(format: string, parser: ArtifactParser): this
 
   /**
+   * Registers an extractor transform under a stable name.
+   *
+   * @param name - Registered transform name
+   * @param transform - Transform callback implementation
+   * @returns The same builder for fluent chaining
+   * @throws {@link RegistryConflictError} When the name already exists
+   */
+  registerExtractorTransform(name: string, transform: ExtractorTransform): this
+
+  /**
    * Registers an additional VCS detection provider.
    *
    * @param provider - Provider to append ahead of built-ins
@@ -153,6 +165,21 @@ function normalizeParsers(parsers: KernelOptions['parsers']): Record<string, Art
 }
 
 /**
+ * Normalizes extractor transform inputs into a mutable record.
+ *
+ * @param transforms - Extractor transform registry input from base options
+ * @returns A mutable record keyed by transform name
+ */
+function normalizeExtractorTransforms(
+  transforms: KernelOptions['extractorTransforms'],
+): Record<string, ExtractorTransform> {
+  if (transforms === undefined) return {}
+  return transforms instanceof Map
+    ? (Object.fromEntries(transforms) as Record<string, ExtractorTransform>)
+    : ({ ...transforms } as Record<string, ExtractorTransform>)
+}
+
+/**
  * Clones additive kernel options into the builder's mutable working state.
  *
  * @param base - Optional base registration state
@@ -170,6 +197,7 @@ function cloneOptions(base?: Partial<KernelOptions>): KernelBuilderState {
     archiveStorageFactories: { ...(base?.archiveStorageFactories ?? {}) },
     graphStoreFactories: { ...(base?.graphStoreFactories ?? {}) },
     parsers: normalizeParsers(base?.parsers),
+    extractorTransforms: normalizeExtractorTransforms(base?.extractorTransforms),
     vcsProviders: [...(base?.vcsProviders ?? [])],
     actorProviders: [...(base?.actorProviders ?? [])],
     externalHookRunners: [...(base?.externalHookRunners ?? [])],
@@ -204,6 +232,9 @@ function toKernelOptions(state: KernelBuilderState): KernelOptions {
       ? { graphStoreFactories: { ...state.graphStoreFactories } }
       : {}),
     ...(Object.keys(state.parsers).length > 0 ? { parsers: { ...state.parsers } } : {}),
+    ...(Object.keys(state.extractorTransforms).length > 0
+      ? { extractorTransforms: { ...state.extractorTransforms } }
+      : {}),
     ...(state.vcsProviders.length > 0 ? { vcsProviders: [...state.vcsProviders] } : {}),
     ...(state.actorProviders.length > 0 ? { actorProviders: [...state.actorProviders] } : {}),
     ...(state.externalHookRunners.length > 0
@@ -289,6 +320,14 @@ export function createKernelBuilder(
         throw new RegistryConflictError('parsers', format)
       }
       options.parsers[format] = parser
+      return builder
+    },
+
+    registerExtractorTransform(name: string, transform: ExtractorTransform): KernelBuilder {
+      if (currentRegistry(options).extractorTransforms.has(name)) {
+        throw new RegistryConflictError('extractorTransforms', name)
+      }
+      options.extractorTransforms[name] = transform
       return builder
     },
 

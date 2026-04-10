@@ -1,4 +1,8 @@
-import { extractMetadata, type SubtreeRenderer } from '../../domain/services/extract-metadata.js'
+import {
+  extractMetadata,
+  type ExtractorTransformRegistry,
+  type SubtreeRenderer,
+} from '../../domain/services/extract-metadata.js'
 import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
@@ -10,6 +14,7 @@ import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
 
 /** Input for the {@link GenerateSpecMetadata} use case. */
 export interface GenerateSpecMetadataInput {
@@ -33,16 +38,16 @@ export interface GenerateSpecMetadataResult {
  * 1. Resolve schema; bail if no `metadataExtraction`
  * 2. For each `scope: 'spec'` artifact, load content from `SpecRepository`
  * 3. Parse each into AST via `ArtifactParserRegistry`
- * 4. Call `extractMetadata()` (no transforms — raw values pass through)
- * 5. Resolve `dependsOn` entries via `SpecRepository.resolveFromPath()`
- * 6. Compute `contentHashes` (SHA-256 per artifact file)
- * 7. Merge extracted + hashes + `generatedBy: 'core'`
+ * 4. Call `extractMetadata()` with the shared extractor transform registry
+ * 5. Compute `contentHashes` (SHA-256 per artifact file)
+ * 6. Merge extracted + hashes + `generatedBy: 'core'`
  */
 export class GenerateSpecMetadata {
   private readonly _specs: ReadonlyMap<string, SpecRepository>
   private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
+  private readonly _extractorTransforms: ExtractorTransformRegistry
 
   /**
    * Creates a new GenerateSpecMetadata use case instance.
@@ -51,17 +56,20 @@ export class GenerateSpecMetadata {
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hashing service
+   * @param extractorTransforms - Shared extractor transform registry
    */
   constructor(
     specs: ReadonlyMap<string, SpecRepository>,
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
+    extractorTransforms: ExtractorTransformRegistry,
   ) {
     this._specs = specs
     this._schemaProvider = schemaProvider
     this._parsers = parsers
     this._hasher = hasher
+    this._extractorTransforms = extractorTransforms
   }
 
   /**
@@ -95,6 +103,7 @@ export class GenerateSpecMetadata {
     const astsByArtifact = new Map<string, { root: SelectorNode }>()
     const renderers = new Map<string, SubtreeRenderer>()
     const contentsByFilename = new Map<string, string>()
+    const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
 
     for (const artifactType of schema.artifacts()) {
       if (artifactType.scope !== 'spec') continue
@@ -112,41 +121,19 @@ export class GenerateSpecMetadata {
       const ast = parser.parse(artifact.content)
       astsByArtifact.set(artifactType.id, ast)
       renderers.set(artifactType.id, parser as SubtreeRenderer)
+      transformContexts.set(
+        artifactType.id,
+        createExtractorTransformContext(workspace, capPath, artifactType.id, filename),
+      )
     }
 
-    // Extract metadata (no transforms — raw captured values pass through)
-    const extracted = extractMetadata(extraction, astsByArtifact, renderers)
-
-    // Resolve dependsOn entries via the repository
-    let resolvedDeps: string[] | undefined
-    if (extracted.dependsOn !== undefined) {
-      resolvedDeps = []
-      for (const raw of extracted.dependsOn) {
-        const result = await specRepo.resolveFromPath(raw, specPath)
-        if (result === null) continue
-
-        if ('specId' in result) {
-          resolvedDeps.push(result.specId)
-        } else {
-          // Cross-workspace: try other repos
-          const hint = result.crossWorkspaceHint.join('/')
-          const matches: string[] = []
-          for (const [, otherRepo] of this._specs) {
-            if (otherRepo === specRepo) continue
-            const found = await otherRepo.get(SpecPath.parse(hint))
-            if (found !== null) {
-              matches.push(otherRepo.workspace() + ':' + hint)
-            }
-          }
-          if (matches.length === 1) {
-            resolvedDeps.push(matches[0]!)
-          } else if (matches.length > 1) {
-            // Ambiguous — add all and let the user decide
-            resolvedDeps.push(...matches)
-          }
-        }
-      }
-    }
+    const extracted = extractMetadata(
+      extraction,
+      astsByArtifact,
+      renderers,
+      this._extractorTransforms,
+      transformContexts,
+    )
 
     // Compute content hashes
     const contentHashes: Record<string, string> = {}
@@ -157,7 +144,6 @@ export class GenerateSpecMetadata {
     // Assemble final metadata
     const metadata: SpecMetadata = {
       ...extracted,
-      ...(resolvedDeps !== undefined ? { dependsOn: resolvedDeps } : {}),
       contentHashes,
       generatedBy: 'core',
     }

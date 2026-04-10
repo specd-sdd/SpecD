@@ -91,6 +91,7 @@ describe('createKernelBuilder', () => {
     const remoteArchiveFactory = { create: vi.fn() }
     const vcsProvider = { name: 'custom-vcs', detect: vi.fn(async () => null) }
     const actorProvider = { name: 'custom-actor', detect: vi.fn(async () => null) }
+    const trimTransform = vi.fn((value: string) => value.trim())
     const runner = {
       acceptedTypes: ['docker'],
       run: vi.fn(async () => new HookResult(0, '', '')),
@@ -103,6 +104,7 @@ describe('createKernelBuilder', () => {
         .registerChangeStorage('remote-changes', remoteChangeFactory)
         .registerArchiveStorage('remote-archive', remoteArchiveFactory)
         .registerParser('toml', TOML_PARSER)
+        .registerExtractorTransform('trim', trimTransform)
         .registerVcsProvider(vcsProvider)
         .registerActorProvider(actorProvider)
         .registerExternalHookRunner('docker-runner', runner),
@@ -115,6 +117,7 @@ describe('createKernelBuilder', () => {
     const remoteGraphStoreFactory = { create: vi.fn() }
     const vcsProvider = { name: 'custom-vcs', detect: vi.fn(async () => null) }
     const actorProvider = { name: 'custom-actor', detect: vi.fn(async () => null) }
+    const trimTransform = (value: string) => value.trim()
     const runner = {
       acceptedTypes: ['docker'],
       run: vi.fn(async () => new HookResult(0, '', '')),
@@ -125,6 +128,7 @@ describe('createKernelBuilder', () => {
       graphStoreFactories: { remote: remoteGraphStoreFactory },
       graphStoreId: 'sqlite',
       parsers: { toml: TOML_PARSER },
+      extractorTransforms: { trim: trimTransform },
       vcsProviders: [vcsProvider],
       actorProviders: [actorProvider],
       externalHookRunners: [runner],
@@ -135,6 +139,7 @@ describe('createKernelBuilder', () => {
       .registerGraphStore('remote', remoteGraphStoreFactory)
       .useGraphStore('sqlite')
       .registerParser('toml', TOML_PARSER)
+      .registerExtractorTransform('trim', trimTransform)
       .registerVcsProvider(vcsProvider)
       .registerActorProvider(actorProvider)
       .registerExternalHookRunner('docker-runner', runner)
@@ -145,6 +150,9 @@ describe('createKernelBuilder', () => {
     ])
     expect([...built.registry.graphStores.keys()]).toEqual([...direct.registry.graphStores.keys()])
     expect([...built.registry.parsers.keys()]).toEqual([...direct.registry.parsers.keys()])
+    expect([...built.registry.extractorTransforms.keys()]).toEqual([
+      ...direct.registry.extractorTransforms.keys(),
+    ])
     expect(built.registry.vcsProviders.map((p) => p.name)).toEqual(
       direct.registry.vcsProviders.map((p) => p.name),
     )
@@ -165,6 +173,14 @@ describe('createKernelBuilder', () => {
 
     const builder = createKernelBuilder(config).registerParser('toml', TOML_PARSER)
     expect(() => builder.registerParser('toml', TOML_PARSER)).toThrow(RegistryConflictError)
+    expect(() =>
+      createKernelBuilder(config).registerExtractorTransform('resolveSpecPath', (value) => value),
+    ).toThrow(RegistryConflictError)
+    expect(() =>
+      createKernelBuilder(config)
+        .registerExtractorTransform('trim', (value) => value)
+        .registerExtractorTransform('trim', (value) => value),
+    ).toThrow(RegistryConflictError)
     expect(() =>
       createKernelBuilder(config).registerGraphStore('sqlite', { create: vi.fn() }),
     ).toThrow(RegistryConflictError)

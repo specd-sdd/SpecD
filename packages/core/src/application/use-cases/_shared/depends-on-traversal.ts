@@ -3,13 +3,18 @@ import { type ArtifactParserRegistry } from '../../ports/artifact-parser.js'
 import { type ArtifactType } from '../../../domain/value-objects/artifact-type.js'
 import { type MetadataExtraction } from '../../../domain/value-objects/metadata-extraction.js'
 import { Spec } from '../../../domain/entities/spec.js'
-import { SpecPath } from '../../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../../domain/services/parse-spec-id.js'
 import { inferFormat } from '../../../domain/services/format-inference.js'
-import { extractMetadata, type SubtreeRenderer } from '../../../domain/services/extract-metadata.js'
+import { SpecPath } from '../../../domain/value-objects/spec-path.js'
+import {
+  extractMetadata,
+  type ExtractorTransformRegistry,
+  type SubtreeRenderer,
+} from '../../../domain/services/extract-metadata.js'
 import { type SelectorNode } from '../../../domain/services/selector-matching.js'
 import { type ContextWarning } from './context-warning.js'
 import { type ResolvedSpec } from './spec-pattern-matching.js'
+import { createExtractorTransformContext } from './extractor-transform-context.js'
 
 /**
  * Optional fallback configuration for extracting `dependsOn` from spec content
@@ -22,6 +27,8 @@ export interface DependsOnFallback {
   readonly schemaArtifacts: readonly ArtifactType[]
   /** Registry of format parsers. */
   readonly parsers: ArtifactParserRegistry
+  /** Shared extractor transform registry. */
+  readonly extractorTransforms?: ExtractorTransformRegistry
 }
 
 /**
@@ -150,6 +157,7 @@ async function extractDependsOnFromContent(
 ): Promise<string[] | undefined> {
   const astsByArtifact = new Map<string, { root: SelectorNode }>()
   const renderers = new Map<string, SubtreeRenderer>()
+  const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
 
   for (const artifactType of fallback.schemaArtifacts) {
     if (artifactType.scope !== 'spec') continue
@@ -164,10 +172,25 @@ async function extractDependsOnFromContent(
     const ast = parser.parse(artifactFile.content)
     astsByArtifact.set(artifactType.id, ast)
     renderers.set(artifactType.id, parser as SubtreeRenderer)
+    transformContexts.set(
+      artifactType.id,
+      createExtractorTransformContext(
+        spec.workspace,
+        spec.name.toString(),
+        artifactType.id,
+        filename,
+      ),
+    )
   }
 
   if (astsByArtifact.size === 0) return undefined
 
-  const extracted = extractMetadata(fallback.extraction, astsByArtifact, renderers)
+  const extracted = extractMetadata(
+    fallback.extraction,
+    astsByArtifact,
+    renderers,
+    fallback.extractorTransforms,
+    transformContexts,
+  )
   return extracted.dependsOn
 }

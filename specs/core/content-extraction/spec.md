@@ -12,11 +12,13 @@ An `Extractor` is a first-class domain value object that declares how to extract
 
 - `selector` (Selector, required) — identifies the AST node(s) to extract from, using the full selector model
 - `extract` (`'content' | 'label' | 'both'`, optional, defaults to `'content'`) — what to pull from each matched node
-- `capture` (string, optional) — regex with capture group applied to the extracted text; all matches are collected
-- `strip` (string, optional) — regex removed from labels/values before output
+- `capture` (string, optional) — regex applied to the extracted text; when present, the main extracted `value` becomes the first capture group (`$1`) and placeholder interpolation also exposes `$0` for the full regex match plus `$2`, `$3`, and higher groups when present
+- `strip` (string, optional) — regex removed from labels/values
 - `groupBy` (`'label'`, optional) — groups matched nodes by their label
-- `transform` (string, optional) — named post-processing callback injected by the caller (e.g. `'resolveSpecPath'`)
+- `transform` (string or object, optional) — named post-processing callback injected by the caller. The shorthand string form is the transform name (for example `'resolveSpecPath'`). The object form is `{ name: string, args?: string[] }`, where args are declarative string parameters that may reference capture placeholders such as `$0`, `$1`, `$2`, and so on.
 - `fields` (record of string to `FieldMapping`, optional) — structured field mapping; when present, each matched node produces one object with the declared fields
+
+`transform` is part of the generic extractor model. It is not limited to metadata generation and may be used by any feature that executes extractors.
 
 ### Requirement: FieldMapping value object
 
@@ -24,9 +26,10 @@ A `FieldMapping` declares how to extract a single field from within a matched AS
 
 - `from` (`'label' | 'parentLabel' | 'content'`, optional, defaults to `'content'`) — source of the field value relative to the matched node
 - `childSelector` (Selector, optional) — selector applied within the matched node to find child values
-- `capture` (string, optional) — regex with capture group applied to the extracted text
+- `capture` (string, optional) — regex applied to the extracted text; when present, the main extracted field value becomes the first capture group (`$1`) and placeholder interpolation also exposes `$0` for the full regex match plus any higher groups
 - `strip` (string, optional) — regex removed from the extracted text
-- `followSiblings` (string, optional) — regex matching sibling nodes that follow a `childSelector` match; matched siblings are appended to the active field's result array until a non-matching sibling or another field's `childSelector` match is encountered; if the pattern contains a capture group, the captured text is used; otherwise the full node text is returned as-is
+- `followSiblings` (string, optional) — regex matching sibling nodes that follow a `childSelector` match; matched siblings are appended to the active field's result array until a non-matching sibling or another field's `childSelector` match is encountered
+- `transform` (string or object, optional) — named post-processing callback applied to each extracted field value. It uses the same shorthand and object declaration forms as `Extractor.transform`.
 
 `from` and `childSelector` are mutually exclusive modes. When `childSelector` is present, `from` is ignored.
 
@@ -42,12 +45,13 @@ The `extract` field on an `Extractor` controls what text is pulled from each mat
 
 When an extractor has no `fields` and no `groupBy`, `extractContent` operates in simple mode:
 
-1. Find all nodes matching `selector`
-2. For each match, extract text according to `extract` mode
-3. Apply `strip` if present
-4. Apply `capture` if present — when capture is global, all capture group matches are collected
-5. Apply `transform` if present — the named callback is looked up from an injected transform map and called with the full result array
-6. Return the result as `string[]`
+1. Find all nodes matching `selector`.
+2. For each match, extract text according to `extract` mode.
+3. Apply `strip` if present.
+4. If `capture` is absent, emit one extracted value from the text. If `capture` is present, emit one extracted value per regex match, where the emitted `value` is the first capture group (`$1`) and placeholder interpolation also exposes `$0` for the full match plus any higher groups.
+5. Apply `transform` if present — the named callback is looked up from an injected transform registry and called once per emitted extracted value with the current `value`, interpolated args, and caller-provided context bag.
+6. A transform that receives an emitted extracted value must return a non-null string. If it cannot normalize that value, it must fail with an extraction error instead of silently omitting the value.
+7. Return the result as `string[]`.
 
 ### Requirement: Grouped extraction
 
@@ -63,7 +67,9 @@ When `fields` is present, each matched node produces one `StructuredExtraction` 
 - `from: 'label'` — takes `node.label`
 - `from: 'parentLabel'` — walks the ancestor chain in reverse and takes the nearest ancestor's label
 - `from: 'content'` — renders the matched node's subtree
-- `childSelector` — finds children within the matched node matching the selector; applies `capture` to each child's text
+- `childSelector` — finds children within the matched node matching the selector
+- `capture` — when present, the field's main extracted value becomes the first capture group (`$1`) and placeholder interpolation also exposes `$0` plus higher groups
+- `transform` — when present, applies to each extracted field value using the registered transform runtime
 
 Ancestor tracking is required for `parentLabel` — the engine uses `findNodesWithAncestors` to obtain ancestor chains alongside matched nodes.
 
@@ -71,9 +77,9 @@ Ancestor tracking is required for `parentLabel` — the engine uses `findNodesWi
 
 When a `FieldMapping` declares `followSiblings`, the extraction engine switches to sequential sibling walk mode for all `childSelector` fields in that extractor. The walk processes the matched node's children in document order:
 
-1. For each child, check if it matches any field's `childSelector`. If so, that field becomes the **active field** and the child's text (after `capture`) is added to it.
+1. For each child, check if it matches any field's `childSelector`. If so, that field becomes the **active field** and the child's extracted value is added to it.
 2. If the child does not match any field's `childSelector` but matches the active field's `followSiblings` pattern, it is appended to the active field's result array.
-3. If the `followSiblings` pattern contains a capture group, the captured text is used. Otherwise the full node text is returned as-is.
+3. When `followSiblings` includes capture groups, the appended sibling value becomes the first capture group (`$1`). `$0` remains the full match, and higher groups remain available for any transform arg interpolation on that field. When `followSiblings` has no capture groups, the full node text is appended as-is.
 
 This enables sequential grouping of continuation items (e.g. AND/OR items after GIVEN/WHEN/THEN in BDD scenarios) without requiring the continuation keyword to be part of any field's primary `childSelector`.
 
@@ -93,7 +99,29 @@ This is satisfied by any `ArtifactParser` implementation. The engine never calls
 
 ### Requirement: Transform callbacks
 
-Named transforms (e.g. `'resolveSpecPath'`) are injected by the caller via a `ReadonlyMap<string, (values: string[]) => string[]>`. The extraction engine does not define any transforms — it only invokes them by name. This keeps the engine pure and domain-level while allowing application-layer logic (like resolving relative spec paths to spec IDs) to be composed in.
+Named transforms (for example `'resolveSpecPath'`) are injected by the caller through a shared extractor-transform registry keyed by transform name. The extraction engine does not define any concrete transforms — it resolves them from the registry at runtime.
+
+Each registered transform has a fixed callable contract:
+
+- `value` (`string`) — the main extracted string value for this invocation
+- `args` (`readonly (string | undefined)[]`) — declarative transform args after placeholder interpolation (`$0`, `$1`, `$2`, ...)
+- `context` (`ReadonlyMap<string, unknown>`) — opaque caller-provided key/value data describing the origin of the extraction
+
+The extraction engine treats `context` as opaque. It does not validate or interpret context keys. Each transform documents the minimum keys it requires, and each caller is responsible for supplying them.
+
+Unknown transform names are runtime extraction errors — they are not ignored silently. A registered transform may also fail or throw when its required context keys are absent or invalid. Once a transform receives a value, it must return a non-null string; inability to normalize the value is also an `ExtractorTransformError` extraction failure rather than a silent omission.
+
+`ExtractorTransformError` is the contract error for transform resolution and execution failures. It is thrown when:
+
+- the requested transform name is not registered in the runtime registry
+- transform execution fails for an extractor-level transform
+- transform execution fails for a field-level transform
+
+The error identifies the transform name and whether the failure happened on an extractor-level or field-level transform. When the failure comes from a field-level transform, the error also identifies the field name.
+
+The kernel owns the built-in transform registry and also allows external callers to register additional extractor transforms through the same additive composition model used for other kernel registries.
+
+Built-in transforms may interpret declarative string args for behavior variants. `resolveSpecPath` specifically tries the primary extracted `value` first and then each interpolated arg in order, returning the first candidate that resolves to a canonical spec ID. This allows one extractor to support canonical dependency labels, relative `href` values, and plain canonical dependency entries without introducing multiple extractors for `dependsOn`.
 
 ## Constraints
 
@@ -101,7 +129,9 @@ Named transforms (e.g. `'resolveSpecPath'`) are injected by the caller via a `Re
 - `from` and `childSelector` on `FieldMapping` are mutually exclusive; when `childSelector` is present, `from` is ignored
 - `followSiblings` is only meaningful when `childSelector` is also present; it has no effect on `from`-based field mappings
 - When `followSiblings` is declared on any field in an extractor's `fields`, all `childSelector` fields in that extractor are processed via sequential walk — not independently
-- `transform` callbacks are optional and looked up by name; an unknown transform name is silently ignored (no error)
+- Transform args are declarative strings; placeholder interpolation may resolve individual args to `undefined`
+- The extraction engine does not validate or interpret transform context keys
+- Unknown transform names, transform execution failures, and any attempt to return a null value after receiving an extracted value are `ExtractorTransformError` extraction errors
 - The engine operates on `SelectorNode` — the generic node interface from selector matching — not on `ArtifactNode` directly
 
 ## Examples
@@ -150,5 +180,5 @@ fields:
 
 ## Spec Dependencies
 
-- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — the selector model used by extractors to identify AST nodes
-- [`specs/core/artifact-ast/spec.md`](../artifact-ast/spec.md) — the normalized AST format that extractors operate on
+- [`core:core/selector-model`](../selector-model/spec.md) — the selector model used by extractors to identify AST nodes
+- [`core:core/artifact-ast`](../artifact-ast/spec.md) — the normalized AST format that extractors operate on

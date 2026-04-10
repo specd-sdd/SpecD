@@ -102,9 +102,22 @@ artifacts:
       open question affects the spec you are writing, ask the user to resolve it before
       proceeding — do not make assumptions about unresolved decisions.
 
+      Every spec MUST include a `## Spec Dependencies` section.
+
       If the spec depends on other specs (uses their types, calls their APIs, or
-      builds on their requirements), add a `## Spec Dependencies` section listing
-      each dependency as `- <workspace>:<capability-path>` with a brief reason.
+      builds on their requirements), list each dependency with a brief reason.
+
+      Preferred format:
+      - `- [\`<workspace>:<capability-path>\`](../relative/path/spec.md) — <reason>`
+
+      Compatible fallback when there is no link:
+      - `- \`<workspace>:<capability-path>\` — <reason>`
+
+      If there are no dependencies, write `_none_`. Global constraint specs with no
+      dependencies use `_none — this is a global constraint spec_`.
+
+      The visible label MUST be the canonical spec ID. When a link is present,
+      the href SHOULD be the relative path to the dependency's `spec.md`.
       This section is used by tooling to discover transitive context.
 
       Common pitfalls:
@@ -149,8 +162,13 @@ artifacts:
 
       If the change introduces new dependencies on other specs, add or update the
       `## Spec Dependencies` section using an `added` or `modified` operation targeting
-      that section. List each dependency as `- <workspace>:<capability-path>` with a
-      brief reason.
+      that section. Use the canonical visible label plus a brief reason.
+
+      Preferred format:
+      - `- [\`<workspace>:<capability-path>\`](../relative/path/spec.md) — <reason>`
+
+      Compatible fallback when there is no link:
+      - `- \`<workspace>:<capability-path>\` — <reason>`
 
       If a spec listed in the proposal does not need changes to its spec.md (e.g. only
       other artifacts change), create a no-op delta instead of skipping the file:
@@ -381,6 +399,14 @@ artifacts:
         design decision or code pattern from design.md so the implementer does not need
         to cross-reference. A developer reading a single task should know exactly
         where to go, what to do, and how to do it.
+      - When revising an existing `tasks.md` after review, regression discovery, or a
+        return from a later lifecycle state, preserve the existing task history. Do not
+        rewrite the task list in a way that makes previously completed work look like it
+        was always part of the final plan.
+      - Follow-up work discovered after the original task list was written must be added
+        as new tasks or new task groups. Prefer a clearly labeled review/follow-up group
+        so readers can distinguish original implementation tasks from work added after
+        later findings.
       - Order tasks by dependency — what must be done first?
       - Tasks should be small enough to complete in a single session.
 
@@ -451,8 +477,10 @@ metadataExtraction:
     extractor:
       selector: { type: section, matches: '^Spec Dependencies$' }
       extract: content
-      capture: '\[.*?\]\(([^)]+)\)'
-      transform: resolveSpecPath
+      capture: '(?:^|\n)\s*-\s+(?:\[`?|`)?([^`\]\n]+?)(?:(?:`?\]\(([^)]+)\)|`)|(?=\s*(?:—|$)))'
+      transform:
+        name: resolveSpecPath
+        args: ['$2']
   rules:
     - id: spec-requirements
       artifact: specs

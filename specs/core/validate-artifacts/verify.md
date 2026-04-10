@@ -223,6 +223,21 @@
 - **THEN** `validations[]` rules are not evaluated against the base content
 - **AND** `markComplete` is called with the hash of the raw delta file content
 
+### Requirement: MetadataExtraction validation
+
+#### Scenario: Metadata validation uses shared transform registry and origin context
+
+- **GIVEN** the schema declares a metadata extractor with `transform: resolveSpecPath`
+- **AND** the artifact being validated has origin context for that transform
+- **WHEN** `ValidateArtifacts.execute` performs metadataExtraction validation
+- **THEN** it calls the extraction engine with the shared extractor-transform registry and the artifact origin context bag
+
+#### Scenario: Unknown transform causes validation failure
+
+- **GIVEN** the schema declares a transform name that is not registered
+- **WHEN** `ValidateArtifacts.execute` performs metadataExtraction validation
+- **THEN** the artifact records a validation failure instead of ignoring the transform
+
 ### Requirement: Hash computation and markComplete
 
 #### Scenario: All validations pass — markComplete called with cleaned hash
@@ -265,3 +280,27 @@
 - **WHEN** `ValidateArtifacts.execute` enters its persistence step
 - **THEN** the mutation callback receives a freshly reloaded `Change`
 - **AND** validation updates are applied on top of that fresh state instead of overwriting it with an older snapshot
+
+### Requirement: Automatic dependsOn extraction
+
+#### Scenario: Transformed dependsOn values are persisted on the change
+
+- **GIVEN** a validated `scope: spec` artifact whose metadata extraction declares `transform: resolveSpecPath`
+- **AND** extraction against the validated content returns canonical spec IDs
+- **WHEN** `ValidateArtifacts.execute` completes successfully
+- **THEN** `change.setSpecDependsOn(specId, deps)` is called with those already-transformed spec IDs
+- **AND** no separate `SpecRepository.resolveFromPath(...)` repair step is run afterward
+
+#### Scenario: Transform failure blocks dependsOn extraction persistence
+
+- **GIVEN** a declared transform throws because required origin context is absent
+- **WHEN** `ValidateArtifacts.execute` attempts automatic dependsOn extraction
+- **THEN** validation fails for the artifact
+- **AND** dependency updates are not persisted for that artifact
+
+#### Scenario: Found dependency values may not be silently discarded by transform execution
+
+- **GIVEN** extraction finds dependency values in the validated artifact content
+- **AND** the configured transform receives those values but cannot normalize them
+- **WHEN** `ValidateArtifacts.execute` completes dependency extraction
+- **THEN** validation fails for the artifact instead of treating `dependsOn` as absent

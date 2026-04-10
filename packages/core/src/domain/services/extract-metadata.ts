@@ -5,6 +5,8 @@ import {
 import { type SelectorNode } from './selector-matching.js'
 import {
   extractContent,
+  type ExtractorTransformContext,
+  type ExtractorTransformRegistry,
   type SubtreeRenderer,
   type GroupedExtraction,
   type StructuredExtraction,
@@ -13,6 +15,9 @@ import {
 // Re-export generic types so existing consumers don't break
 export {
   extractContent,
+  type ExtractorTransform,
+  type ExtractorTransformContext,
+  type ExtractorTransformRegistry,
   type SubtreeRenderer,
   type GroupedExtraction,
   type StructuredExtraction,
@@ -46,6 +51,7 @@ export interface ExtractedMetadata {
  * @param astsByArtifact - Parsed ASTs keyed by artifact type ID
  * @param renderers - Subtree renderers keyed by artifact type ID
  * @param transforms - Named transform callbacks
+ * @param transformContextsOrTargetArtifactId - Opaque caller-owned transform contexts keyed by artifact id, or the legacy target artifact id shortcut
  * @param targetArtifactId - Optional filter: only extract fields where field.artifact === targetArtifactId
  * @returns The extracted metadata with all available fields populated
  */
@@ -53,36 +59,69 @@ export function extractMetadata(
   extraction: MetadataExtraction,
   astsByArtifact: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
-  transforms?: ReadonlyMap<string, (values: string[]) => string[]>,
+  transforms?: ExtractorTransformRegistry,
+  transformContextsOrTargetArtifactId?: ReadonlyMap<string, ExtractorTransformContext> | string,
   targetArtifactId?: string,
 ): ExtractedMetadata {
   const result: Record<string, unknown> = {}
+  const transformContexts =
+    typeof transformContextsOrTargetArtifactId === 'string'
+      ? undefined
+      : transformContextsOrTargetArtifactId
+  const effectiveTargetArtifactId =
+    typeof transformContextsOrTargetArtifactId === 'string'
+      ? transformContextsOrTargetArtifactId
+      : targetArtifactId
 
   // Helper to check if field should be extracted
   const shouldExtract = (artifact: string | undefined): boolean => {
-    if (targetArtifactId === undefined) return true
-    return artifact === targetArtifactId
+    if (effectiveTargetArtifactId === undefined) return true
+    return artifact === effectiveTargetArtifactId
   }
 
   // Single-value fields
   if (extraction.title !== undefined && shouldExtract(extraction.title.artifact)) {
-    const val = extractSingle(extraction.title, astsByArtifact, renderers, transforms)
+    const val = extractSingle(
+      extraction.title,
+      astsByArtifact,
+      renderers,
+      transforms,
+      transformContexts,
+    )
     if (val !== undefined) result['title'] = val
   }
 
   if (extraction.description !== undefined && shouldExtract(extraction.description.artifact)) {
-    const val = extractSingle(extraction.description, astsByArtifact, renderers, transforms)
+    const val = extractSingle(
+      extraction.description,
+      astsByArtifact,
+      renderers,
+      transforms,
+      transformContexts,
+    )
     if (val !== undefined) result['description'] = val
   }
 
   // Array-value fields
   if (extraction.dependsOn !== undefined && shouldExtract(extraction.dependsOn.artifact)) {
-    const val = extractArray(extraction.dependsOn, astsByArtifact, renderers, transforms)
+    const val = extractArray(
+      extraction.dependsOn,
+      astsByArtifact,
+      renderers,
+      transforms,
+      transformContexts,
+    )
     if (val.length > 0) result['dependsOn'] = val
   }
 
   if (extraction.keywords !== undefined && shouldExtract(extraction.keywords.artifact)) {
-    const val = extractArray(extraction.keywords, astsByArtifact, renderers, transforms)
+    const val = extractArray(
+      extraction.keywords,
+      astsByArtifact,
+      renderers,
+      transforms,
+      transformContexts,
+    )
     if (val.length > 0) result['keywords'] = val
   }
 
@@ -90,7 +129,13 @@ export function extractMetadata(
   if (extraction.context !== undefined) {
     const filtered = extraction.context.filter((e) => shouldExtract(e.artifact))
     if (filtered.length > 0) {
-      const val = extractMultiEntryArray(filtered, astsByArtifact, renderers, transforms)
+      const val = extractMultiEntryArray(
+        filtered,
+        astsByArtifact,
+        renderers,
+        transforms,
+        transformContexts,
+      )
       if (val.length > 0) result['context'] = val
     }
   }
@@ -98,7 +143,13 @@ export function extractMetadata(
   if (extraction.rules !== undefined) {
     const filtered = extraction.rules.filter((e) => shouldExtract(e.artifact))
     if (filtered.length > 0) {
-      const groups = extractMultiEntryGrouped(filtered, astsByArtifact, renderers, transforms)
+      const groups = extractMultiEntryGrouped(
+        filtered,
+        astsByArtifact,
+        renderers,
+        transforms,
+        transformContexts,
+      )
       if (groups.length > 0) {
         result['rules'] = groups.map((g) => ({ requirement: g.label, rules: [...g.items] }))
       }
@@ -108,7 +159,13 @@ export function extractMetadata(
   if (extraction.constraints !== undefined) {
     const filtered = extraction.constraints.filter((e) => shouldExtract(e.artifact))
     if (filtered.length > 0) {
-      const val = extractMultiEntryArray(filtered, astsByArtifact, renderers, transforms)
+      const val = extractMultiEntryArray(
+        filtered,
+        astsByArtifact,
+        renderers,
+        transforms,
+        transformContexts,
+      )
       if (val.length > 0) result['constraints'] = val
     }
   }
@@ -121,6 +178,7 @@ export function extractMetadata(
         astsByArtifact,
         renderers,
         transforms,
+        transformContexts,
       )
       if (structured.length > 0) {
         result['scenarios'] = structured.map((s) => ({
@@ -148,19 +206,27 @@ export function extractMetadata(
  * @param asts - Parsed ASTs keyed by artifact type ID
  * @param renderers - Subtree renderers keyed by artifact type ID
  * @param transforms - Named transform callbacks
+ * @param transformContexts - Opaque caller-owned transform context bags keyed by artifact id
  * @returns First matched string or undefined
  */
 function extractSingle(
   entry: MetadataExtractorEntry,
   asts: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
-  transforms?: ReadonlyMap<string, (values: string[]) => string[]>,
+  transforms?: ExtractorTransformRegistry,
+  transformContexts?: ReadonlyMap<string, ExtractorTransformContext>,
 ): string | undefined {
   const ast = asts.get(entry.artifact)
   const renderer = renderers.get(entry.artifact)
   if (ast === undefined || renderer === undefined) return undefined
 
-  const values = extractContent(ast.root, entry.extractor, renderer, transforms)
+  const values = extractContent(
+    ast.root,
+    entry.extractor,
+    renderer,
+    transforms,
+    transformContexts?.get(entry.artifact),
+  )
   if (values.length === 0) return undefined
 
   const first = values[0]
@@ -175,19 +241,27 @@ function extractSingle(
  * @param asts - Parsed ASTs keyed by artifact type ID
  * @param renderers - Subtree renderers keyed by artifact type ID
  * @param transforms - Named transform callbacks
+ * @param transformContexts - Opaque caller-owned transform context bags keyed by artifact id
  * @returns All matched strings
  */
 function extractArray(
   entry: MetadataExtractorEntry,
   asts: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
-  transforms?: ReadonlyMap<string, (values: string[]) => string[]>,
+  transforms?: ExtractorTransformRegistry,
+  transformContexts?: ReadonlyMap<string, ExtractorTransformContext>,
 ): string[] {
   const ast = asts.get(entry.artifact)
   const renderer = renderers.get(entry.artifact)
   if (ast === undefined || renderer === undefined) return []
 
-  const values = extractContent(ast.root, entry.extractor, renderer, transforms)
+  const values = extractContent(
+    ast.root,
+    entry.extractor,
+    renderer,
+    transforms,
+    transformContexts?.get(entry.artifact),
+  )
   return values.filter((v): v is string => typeof v === 'string')
 }
 
@@ -198,17 +272,19 @@ function extractArray(
  * @param asts - Parsed ASTs keyed by artifact type ID
  * @param renderers - Subtree renderers keyed by artifact type ID
  * @param transforms - Named transform callbacks
+ * @param transformContexts - Opaque caller-owned transform context bags keyed by artifact id
  * @returns Concatenated string results from all entries
  */
 function extractMultiEntryArray(
   entries: readonly MetadataExtractorEntry[],
   asts: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
-  transforms?: ReadonlyMap<string, (values: string[]) => string[]>,
+  transforms?: ExtractorTransformRegistry,
+  transformContexts?: ReadonlyMap<string, ExtractorTransformContext>,
 ): string[] {
   const results: string[] = []
   for (const entry of entries) {
-    results.push(...extractArray(entry, asts, renderers, transforms))
+    results.push(...extractArray(entry, asts, renderers, transforms, transformContexts))
   }
   return results
 }
@@ -220,13 +296,15 @@ function extractMultiEntryArray(
  * @param asts - Parsed ASTs keyed by artifact type ID
  * @param renderers - Subtree renderers keyed by artifact type ID
  * @param transforms - Named transform callbacks
+ * @param transformContexts - Opaque caller-owned transform context bags keyed by artifact id
  * @returns Grouped extraction results with label and items
  */
 function extractMultiEntryGrouped(
   entries: readonly MetadataExtractorEntry[],
   asts: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
-  transforms?: ReadonlyMap<string, (values: string[]) => string[]>,
+  transforms?: ExtractorTransformRegistry,
+  transformContexts?: ReadonlyMap<string, ExtractorTransformContext>,
 ): GroupedExtraction[] {
   const results: GroupedExtraction[] = []
   for (const entry of entries) {
@@ -234,7 +312,13 @@ function extractMultiEntryGrouped(
     const renderer = renderers.get(entry.artifact)
     if (ast === undefined || renderer === undefined) continue
 
-    const values = extractContent(ast.root, entry.extractor, renderer, transforms)
+    const values = extractContent(
+      ast.root,
+      entry.extractor,
+      renderer,
+      transforms,
+      transformContexts?.get(entry.artifact),
+    )
     for (const val of values) {
       if (typeof val === 'object' && 'label' in val) {
         results.push(val as GroupedExtraction)
@@ -251,13 +335,15 @@ function extractMultiEntryGrouped(
  * @param asts - Parsed ASTs keyed by artifact type ID
  * @param renderers - Subtree renderers keyed by artifact type ID
  * @param transforms - Named transform callbacks
+ * @param transformContexts - Opaque caller-owned transform context bags keyed by artifact id
  * @returns Structured extraction results as record objects
  */
 function extractMultiEntryStructured(
   entries: readonly MetadataExtractorEntry[],
   asts: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
-  transforms?: ReadonlyMap<string, (values: string[]) => string[]>,
+  transforms?: ExtractorTransformRegistry,
+  transformContexts?: ReadonlyMap<string, ExtractorTransformContext>,
 ): StructuredExtraction[] {
   const results: StructuredExtraction[] = []
   for (const entry of entries) {
@@ -265,7 +351,13 @@ function extractMultiEntryStructured(
     const renderer = renderers.get(entry.artifact)
     if (ast === undefined || renderer === undefined) continue
 
-    const values = extractContent(ast.root, entry.extractor, renderer, transforms)
+    const values = extractContent(
+      ast.root,
+      entry.extractor,
+      renderer,
+      transforms,
+      transformContexts?.get(entry.artifact),
+    )
     for (const val of values) {
       if (typeof val === 'object' && !('label' in val)) {
         results.push(val)

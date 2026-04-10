@@ -1,6 +1,11 @@
 {
   "title": "Spec Layout",
   "description": "Without a consistent layout, specs become hard to discover and tooling cannot locate them reliably. specd specs are organised by scope under `specs/` at the monorepo root — global constraints in `specs/_global/`, package-internal specs in `specs/<package>/`. Every spec subdirectory contains two files: `spec.md` (requirements and design) and `verify.md` (WHEN/THEN scenarios).",
+  "dependsOn": [
+    "core:core/schema-format",
+    "core:core/content-extraction",
+    "core:core/spec-id-format"
+  ],
   "context": [
     "Without a consistent layout, specs become hard to discover and tooling cannot locate them reliably. specd specs are organised by scope under `specs/` at the monorepo root — global constraints in `specs/_global/`, package-internal specs in `specs/<package>/`. Every spec subdirectory contains two files: `spec.md` (requirements and design) and `verify.md` (WHEN/THEN scenarios)."
   ],
@@ -38,7 +43,7 @@
     {
       "requirement": "Spec Dependencies section",
       "rules": [
-        "Every `spec.md` must include a `## Spec Dependencies` section listing other specs it depends on or that provide context for it. If there are none, the section must say `_none_`. Global specs with no dependencies use the form `_none — this is a global constraint spec_`."
+        "Every `spec.md` must include a `## Spec Dependencies` section listing other specs it depends on or that provide context for it. If there are none, the section must say `_none_`. Global specs with no dependencies use the form `_none — this is a global constraint spec_`.\n\nThe canonical dependency entry format is:\n\n- ``[`<workspace>:<capability-path>`](../relative/path/spec.md)`` when the dependency can be linked through a relative path\n- `` `<workspace>:<capability-path>` `` when the dependency should be listed without a link\n\nThe visible dependency label is the canonical spec ID. When a link is present, the `href` is a relative path to the depended-on spec artifact. Specs MAY continue to include older dependency labels while the repo is migrating, but new and modified specs SHOULD use the canonical spec-ID label format."
       ]
     }
   ],
@@ -112,14 +117,31 @@
     },
     {
       "requirement": "Spec Dependencies section",
-      "name": "Package spec referencing global constraints",
+      "name": "Package spec uses canonical dependency label with relative link",
+      "when": ["a package spec depends on core:core/config"],
+      "then": [
+        "it may list the dependency as [`core:core/config`](../config/spec.md)",
+        "AND the visible label is the canonical spec ID while the href is the relative path to spec.md"
+      ]
+    },
+    {
+      "requirement": "Spec Dependencies section",
+      "name": "Package spec may list a canonical dependency without a link",
+      "when": ["a package spec needs to declare a dependency but no link is present"],
+      "then": ["it may list the dependency as `core:core/config`"]
+    },
+    {
+      "requirement": "Spec Dependencies section",
+      "name": "Package spec referencing global constraints uses canonical global label",
       "when": ["a spec in specs/core/ is constrained by global architecture rules"],
-      "then": ["it lists specs/_global/architecture/spec.md in its ## Spec Dependencies section"]
+      "then": [
+        "it lists [`default:_global/architecture`](../../_global/architecture/spec.md) in its ## Spec Dependencies section"
+      ]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:c18a7d3a4b61c2e3814e8e05ed6a7b784d6d11025ec350a224431f580df911b2",
-    "verify.md": "sha256:b036d36b26f4db43932ee10bf097a1170bea7ce9779b16abc9324de4c5496878"
+    "spec.md": "sha256:4c7a4c4be788795137800970a738d0c31c91ecf58c495dc87e35ea235877e98c",
+    "verify.md": "sha256:4e3f613bfc55584afcb370a13de35d0a14d85a54ba261aee879db4745a21d30d"
   },
   "generatedBy": "core"
 }

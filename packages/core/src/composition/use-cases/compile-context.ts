@@ -14,6 +14,7 @@ import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
+import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
 
 /**
  * Domain context for the primary (default) workspace used by `CompileContext`.
@@ -162,5 +163,6 @@ export function createCompileContext(
     parsers,
     hasher,
     previewSpec,
+    createBuiltinExtractorTransforms(),
   )
 }

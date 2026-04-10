@@ -45,12 +45,24 @@ const ValidationRuleZodSchema: z.ZodType<ValidationRuleRaw> = z.lazy(() =>
   }),
 )
 
+const ExtractorTransformDeclarationZodSchema = z.union([
+  z
+    .string()
+    .min(1)
+    .transform((name) => ({ name })),
+  z.object({
+    name: z.string().min(1),
+    args: z.array(z.string()).optional(),
+  }),
+])
+
 const FieldMappingZodSchema = z.object({
   from: z.enum(['label', 'parentLabel', 'content']).optional(),
   childSelector: SelectorZodSchema.optional(),
   capture: z.string().optional(),
   strip: z.string().optional(),
   followSiblings: z.string().optional(),
+  transform: ExtractorTransformDeclarationZodSchema.optional(),
 })
 
 const ExtractorZodSchema = z.object({
@@ -59,7 +71,7 @@ const ExtractorZodSchema = z.object({
   capture: z.string().optional(),
   strip: z.string().optional(),
   groupBy: z.literal('label').optional(),
-  transform: z.string().optional(),
+  transform: ExtractorTransformDeclarationZodSchema.optional(),
   fields: z.record(FieldMappingZodSchema).optional(),
 })
 

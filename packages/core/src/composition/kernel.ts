@@ -226,7 +226,13 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.actor,
         i.parsers,
         schemaProvider,
-        new GenerateSpecMetadata(i.specs, schemaProvider, i.parsers, i.hasher),
+        new GenerateSpecMetadata(
+          i.specs,
+          schemaProvider,
+          i.parsers,
+          i.hasher,
+          i.registry.extractorTransforms,
+        ),
         new SaveSpecMetadata(i.specs),
       ),
       validate: new ValidateArtifacts(
@@ -236,6 +242,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.parsers,
         i.actor,
         i.hasher,
+        i.registry.extractorTransforms,
       ),
       compile: new CompileContext(
         i.changes,
@@ -245,6 +252,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.parsers,
         i.hasher,
         previewSpec,
+        i.registry.extractorTransforms,
       ),
       list: new ListChanges(i.changes),
       listDrafts: new ListDrafts(i.changes),
@@ -282,7 +290,13 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       getActiveSchema: new GetActiveSchema(resolveSchema, i.schemas, buildSchema, i.schemaRef),
       validateSchema: new ValidateSchema(i.schemas, i.schemaRef, buildSchema, resolveSchema),
       validate: new ValidateSpecs(i.specs, schemaProvider, i.parsers),
-      generateMetadata: new GenerateSpecMetadata(i.specs, schemaProvider, i.parsers, i.hasher),
+      generateMetadata: new GenerateSpecMetadata(
+        i.specs,
+        schemaProvider,
+        i.parsers,
+        i.hasher,
+        i.registry.extractorTransforms,
+      ),
       getContext: new GetSpecContext(i.specs, i.hasher),
     },
     project: {
@@ -295,6 +309,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.files,
         i.parsers,
         i.hasher,
+        i.registry.extractorTransforms,
       ),
     },
   }

@@ -4,6 +4,7 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type FileReader } from '../ports/file-reader.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
+import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
@@ -19,6 +20,7 @@ import { extractMetadata, type SubtreeRenderer } from '../../domain/services/ext
 import { type SelectorNode } from '../../domain/services/selector-matching.js'
 import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
 import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
+import { createExtractorTransformContext } from './_shared/extractor-transform-context.js'
 
 /** Input for the {@link GetProjectContext} use case. */
 export interface GetProjectContextInput {
@@ -67,6 +69,7 @@ export class GetProjectContext {
   private readonly _files: FileReader
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
+  private readonly _extractorTransforms: ExtractorTransformRegistry
 
   /**
    * Creates a new `GetProjectContext` use case instance.
@@ -76,6 +79,7 @@ export class GetProjectContext {
    * @param files - Reader for project-level context file entries
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hasher for metadata freshness checks
+   * @param extractorTransforms - Shared extractor transform registry
    */
   constructor(
     specs: ReadonlyMap<string, SpecRepository>,
@@ -83,12 +87,14 @@ export class GetProjectContext {
     files: FileReader,
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
+    extractorTransforms: ExtractorTransformRegistry = new Map(),
   ) {
     this._specs = specs
     this._schemaProvider = schemaProvider
     this._files = files
     this._parsers = parsers
     this._hasher = hasher
+    this._extractorTransforms = extractorTransforms
   }
 
   /**
@@ -149,12 +155,16 @@ export class GetProjectContext {
       const extraction = schema.metadataExtraction()
       const depFallback: DependsOnFallback | undefined =
         extraction !== undefined
-          ? { extraction, schemaArtifacts: schema.artifacts(), parsers: this._parsers }
+          ? {
+              extraction,
+              schemaArtifacts: schema.artifacts(),
+              parsers: this._parsers,
+              extractorTransforms: this._extractorTransforms,
+            }
           : undefined
 
       const dependsOnAdded = new Map<string, ResolvedSpec>()
       const depSeen = new Set<string>()
-      for (const [key] of includedSpecs) depSeen.add(key)
       for (const { workspace, capPath } of includedSpecs.values()) {
         await traverseDependsOn(
           workspace,
@@ -295,6 +305,7 @@ export class GetProjectContext {
   ): Promise<string[]> {
     const astsByArtifact = new Map<string, { root: SelectorNode }>()
     const renderers = new Map<string, SubtreeRenderer>()
+    const transformContexts = new Map<string, ReturnType<typeof createExtractorTransformContext>>()
 
     for (const artifactType of schema.artifacts()) {
       if (artifactType.scope !== 'spec') continue
@@ -309,9 +320,24 @@ export class GetProjectContext {
       const ast = parser.parse(artifactFile.content)
       astsByArtifact.set(artifactType.id, ast)
       renderers.set(artifactType.id, parser as SubtreeRenderer)
+      transformContexts.set(
+        artifactType.id,
+        createExtractorTransformContext(
+          spec.workspace,
+          spec.name.toString(),
+          artifactType.id,
+          filename,
+        ),
+      )
     }
 
-    const extracted = extractMetadata(extraction, astsByArtifact, renderers)
+    const extracted = extractMetadata(
+      extraction,
+      astsByArtifact,
+      renderers,
+      this._extractorTransforms,
+      transformContexts,
+    )
     const metaParts: string[] = []
 
     if (showAll && extracted.description !== undefined) {

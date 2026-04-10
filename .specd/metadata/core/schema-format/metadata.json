@@ -68,7 +68,7 @@
     {
       "requirement": "Metadata extraction",
       "rules": [
-        "`metadataExtraction` is a top-level schema field that declares how to extract metadata fields from artifact content using selectors and the existing parser infrastructure. It enables deterministic metadata generation without LLM involvement. `CompileContext` and `GetProjectContext` use these declarations as a fallback when `.specd-metadata.yaml` is absent or stale.\n\nEach metadata field maps to one or more `MetadataExtractorEntry` objects with:\n\n- `artifact` (string, required) — the artifact ID whose content to extract from (e.g. `specs`, `verify`)\n- `extractor` (object, required) — an `Extractor` declaring how to extract content:\n  - `selector` (selector, required) — identifies which node(s) to extract, using the selector model defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md)\n  - `extract` (`content` | `label` | `both`, optional, default `content`) — what to extract for each matched node\n  - `capture` (string, optional) — regex with capture group applied to extracted text\n  - `strip` (string, optional) — regex removed from labels/values\n  - `groupBy` (`label`, optional) — group matched nodes by their label\n  - `transform` (string, optional) — named post-processing callback (e.g. `resolveSpecPath`)\n  - `fields` (object, optional) — structured field mapping for complex objects (e.g. scenarios)\n\nSupported metadata fields: `title`, `description`, `dependsOn`, `keywords` (single-entry), `rules`, `constraints`, `scenarios`, `context` (array-entry)."
+        "`metadataExtraction` is a top-level schema field that declares how to extract metadata fields from artifact content using selectors and the existing parser infrastructure. It enables deterministic metadata generation without LLM involvement. `CompileContext` and `GetProjectContext` use these declarations as a fallback when `.specd-metadata.yaml` is absent or stale.\n\nEach metadata field maps to one or more `MetadataExtractorEntry` objects with:\n\n- `artifact` (string, required) — the artifact ID whose content to extract from (for example `specs`, `verify`)\n- `extractor` (object, required) — an `Extractor` declaring how to extract content:\n  - `selector` (selector, required) — identifies which node(s) to extract, using the selector model defined in [`specs/core/selector-model/spec.md`](../selector-model/spec.md)\n  - `extract` (`content` | `label` | `both`, optional, default `content`) — what to extract for each matched node\n  - `capture` (string, optional) — regex applied to the extracted text. When present, the main extracted `value` becomes the first capture group (`$1`), while `$0` remains available as the full match and higher groups remain available for placeholder interpolation. This allows one extractor to capture a canonical dependency label as `value` while also exposing an optional relative `href` as an arg.\n  - `strip` (string, optional) — regex removed from labels or values\n  - `groupBy` (`label`, optional) — group matched nodes by their label\n  - `transform` (string or object, optional) — named extractor transform declaration. The shorthand string form is the transform name. The object form is `{ name: string, args?: string[] }`, where args are declarative strings that may reference placeholders such as `$0`, `$1`, `$2`, and so on.\n  - `fields` (object, optional) — structured field mapping for complex objects (for example scenarios). Each `FieldMapping` may also declare its own `transform` using the same shorthand and object forms as `Extractor.transform`.\n\nTransform execution uses a runtime registry assembled during kernel composition. Schemas declare only the transform name and optional args; callers provide the runtime context bag required by the registered transform implementation.\n\nFor `dependsOn`, schemas SHOULD use one extractor that captures the visible dependency label as `value` and any optional link target as an interpolated arg. The standard runtime transform then tries the captured `value` first and falls back to interpolated args in order, so the same extractor supports:\n\n- linked canonical entries such as ``[`core:core/config`](../config/spec.md)``\n- unlinked canonical entries such as `` `core:core/config` ``\n- legacy labels where only the `href` is resolvable\n\nOnce a transform receives an extracted value, it must return a non-null normalized string. A transform that cannot normalize the value must fail explicitly instead of silently omitting the metadata field entry.\n\nSupported metadata fields: `title`, `description`, `dependsOn`, `keywords` (single-entry), `rules`, `constraints`, `scenarios`, and `context` (array-entry)."
       ]
     },
     {
@@ -611,12 +611,44 @@
     },
     {
       "requirement": "Metadata extraction",
-      "name": "Extractor selector matches no node",
+      "name": "Extractor transform shorthand accepted",
+      "given": ["a metadata extractor declares transform: resolveSpecPath"],
+      "when": ["SchemaRegistry.resolve() loads the schema"],
+      "then": [
+        "the schema is accepted and the transform declaration is preserved in the resolved extractor"
+      ]
+    },
+    {
+      "requirement": "Metadata extraction",
+      "name": "FieldMapping transform object with args accepted",
       "given": [
-        "a metadataExtraction entry declares a selector that matches no node in the artifact"
+        "a metadata extractor field mapping declares transform: { name: \"join\", args: [\"$2\", \"/\", \"$1\"] }"
       ],
-      "when": ["the extraction engine processes that entry"],
-      "then": ["no content is produced for that field — no error is thrown"]
+      "when": ["SchemaRegistry.resolve() loads the schema"],
+      "then": [
+        "the schema is accepted and the transform declaration is preserved in the resolved field mapping"
+      ]
+    },
+    {
+      "requirement": "Metadata extraction",
+      "name": "Transform declarations do not imply silent omission semantics",
+      "given": ["a metadata extractor declares a transform on an extracted field"],
+      "when": ["the schema is resolved"],
+      "then": [
+        "the declaration means the runtime transform must either return a non-null normalized value or fail explicitly"
+      ]
+    },
+    {
+      "requirement": "Metadata extraction",
+      "name": "dependsOn extractor supports canonical labels with or without links",
+      "given": [
+        "a metadata extractor for dependsOn captures a canonical dependency label as value",
+        "AND the same capture also preserves an optional relative href as a transform arg when a link exists"
+      ],
+      "when": ["SchemaRegistry.resolve() loads the schema"],
+      "then": [
+        "the schema is accepted for both linked entries like [`core:core/config`](../config/spec.md) and unlinked entries like `core:core/config`"
+      ]
     },
     {
       "requirement": "Metadata extraction",
@@ -805,8 +837,8 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:2fe96d887b64b36d5eb472735c9383560b950ec8d492e31ef775a7bfe7bd6063",
-    "verify.md": "sha256:3ecc790c8855dd834c7dd7bcfe2c8112995cd5221a58948667ec2e9792180735"
+    "spec.md": "sha256:89351edf8e828fd5db7f5a19fc2b6a402f2eca2ca1ddcd53ab5094aebf146b4d",
+    "verify.md": "sha256:31ea057346da14dc5ee7b1694f081f2aca71a5d700053957add08bea820a6fbb"
   },
   "generatedBy": "core"
 }

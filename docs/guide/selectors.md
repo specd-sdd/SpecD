@@ -307,11 +307,13 @@ extractor:
     type: section
     matches: '^Spec Dependencies$'
   extract: content
-  capture: '\[.*?\]\(([^)]+)\)'
-  transform: resolveSpecPath
+  capture: '(?:^|\n)\s*-\s+(?:\[`?|`)?([^`\]\n]+?)(?:(?:`?\]\(([^)]+)\)|`)|(?=\s*(?:—|$)))'
+  transform:
+    name: resolveSpecPath
+    args: ['$2']
 ```
 
-This extracts the content of the `Spec Dependencies` section, then uses a regex to capture only the link targets from Markdown links like `[auth/login](auth/login)`. The `transform: resolveSpecPath` callback then normalises each path into a fully-qualified spec ID.
+This extracts dependency entries from the `Spec Dependencies` section, capturing the visible label as the primary `value` and the optional `href` as `$2`. `resolveSpecPath` first tries the label itself (for canonical entries like ``[`core:core/config`](../config/spec.md)`` or `` `core:core/config` ``), then falls back to the captured `href` when the label is legacy text.
 
 ### Grouping results by label
 
@@ -570,8 +572,10 @@ metadataExtraction:
     extractor:
       selector: { type: section, matches: '^Spec Dependencies$' }
       extract: content
-      capture: '\[.*?\]\(([^)]+)\)'
-      transform: resolveSpecPath
+      capture: '(?:^|\n)\s*-\s+(?:\[`?|`)?([^`\]\n]+?)(?:(?:`?\]\(([^)]+)\)|`)|(?=\s*(?:—|$)))'
+      transform:
+        name: resolveSpecPath
+        args: ['$2']
 
   # Extract all Requirement sections, keyed by requirement name
   # strip removes the "Requirement: " prefix from each key

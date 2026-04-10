@@ -1,6 +1,19 @@
 import { type Selector } from './selector.js'
 
 /**
+ * Normalized transform declaration shared by `Extractor` and `FieldMapping`.
+ *
+ * The YAML boundary may accept shorthand syntax, but runtime code only sees
+ * this normalized object shape.
+ */
+export interface ExtractorTransformDeclaration {
+  /** Registered transform name. */
+  readonly name: string
+  /** Optional declarative args resolved by the extractor runtime. */
+  readonly args?: readonly string[] | undefined
+}
+
+/**
  * Declares how to extract a single field from a nested structure within a
  * matched AST node. Used by structured extractors (e.g. scenarios) where each
  * matched node produces an object with multiple fields.
@@ -23,6 +36,8 @@ export interface FieldMapping {
    * Enables sequential grouping (e.g. AND/OR items after GIVEN/WHEN/THEN).
    */
   readonly followSiblings?: string
+  /** Named post-processing callback applied to each extracted field value. */
+  readonly transform?: ExtractorTransformDeclaration
 }
 
 /**
@@ -48,7 +63,7 @@ export interface Extractor {
   /** Group matched nodes by their label (after `strip`). */
   readonly groupBy?: 'label'
   /** Named post-processing callback (e.g. `'resolveSpecPath'`). */
-  readonly transform?: string
+  readonly transform?: ExtractorTransformDeclaration
   /**
    * Structured field mapping for complex objects. When present, each matched
    * node produces one object with the declared fields.

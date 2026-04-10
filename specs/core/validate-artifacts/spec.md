@@ -8,7 +8,7 @@ Artifacts must be structurally valid and conflict-free before a change can progr
 
 ### Requirement: Ports and constructor
 
-`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, and `VcsAdapter`.
+`ValidateArtifacts` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, `ActorResolver`, and `ContentHasher`.
 
 ```typescript
 class ValidateArtifacts {
@@ -17,12 +17,15 @@ class ValidateArtifacts {
     specs: ReadonlyMap<string, SpecRepository>,
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
-    vcs: VcsAdapter,
+    actor: ActorResolver,
+    hasher: ContentHasher,
   )
 }
 ```
 
 `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
+
+`ActorResolver` supplies the identity recorded on approval invalidation events. `ContentHasher` is used both for approval drift detection and for the cleaned hashes persisted when validation succeeds.
 
 ### Requirement: Input
 
@@ -113,11 +116,13 @@ After a successful delta application preview (or for non-delta artifacts), `Vali
 After building the merged preview, `ValidateArtifacts` MUST also validate the extracted metadata:
 
 1. Get `schema.metadataExtraction()`
-2. If defined, call `extractMetadata(extraction, astsByArtifact, renderers, transforms, artifactType.id)`
-3. Validate result against `strictSpecMetadataSchema`
-4. If validation fails, record as validation failure
+2. If defined, call `extractMetadata(extraction, astsByArtifact, renderers, transforms, transformContext, artifactType.id)`
+3. Validate the result against `strictSpecMetadataSchema`
+4. If validation fails, record it as a validation failure
 
-The extracted metadata is validated ONLY for the artifact being validated — not all artifacts.
+`transforms` is the shared extractor-transform registry assembled by kernel composition. `transformContext` is the caller-owned origin context bag for the artifact being validated. If a declared transform is unknown, or if a registered transform fails because its required context is absent or invalid, that failure is a validation failure for this artifact.
+
+The extracted metadata is validated only for the artifact being validated — not for all artifacts.
 
 ### Requirement: Hash computation and markComplete
 
@@ -164,24 +169,22 @@ If metadataExtraction validation fails, `ValidateArtifacts` MUST record the fail
 
 ### Requirement: Automatic dependsOn extraction
 
-After successfully validating a `scope: spec` artifact, the use case extracts `dependsOn` from the validated content using the schema's `metadataExtraction` declarations. For delta artifacts, the extraction runs against the **merged** content (base + delta), ensuring dependencies added via deltas are captured.
+After successfully validating a `scope: spec` artifact, the use case extracts `dependsOn` from the validated content using the schema's `metadataExtraction` declarations. For delta artifacts, the extraction runs against the merged content (base + delta), ensuring dependencies added via deltas are captured.
 
-The extraction uses `extractMetadata` with the artifact's AST, then resolves raw paths to full spec IDs via `SpecRepository.resolveFromPath`. If dependencies are found, they are registered on the change via `change.setSpecDependsOn(specId, deps)`.
+That extraction uses the same shared extractor-transform registry and caller-owned origin context bag as metadata validation. If the schema declares a transform such as `resolveSpecPath`, the extracted dependency values are already normalized by the time they are returned from `extractMetadata()`.
 
-This removes the need for agents or users to manually call `change deps --add` — the system extracts dependencies from the artifact content that was already written.
+`ValidateArtifacts` does not perform a separate field-specific `dependsOn` repair step after extraction. If dependencies are found, the already-transformed spec IDs are registered on the change via `change.setSpecDependsOn(specId, deps)`.
 
-Extraction only runs when:
+If extraction finds dependency values but transform execution cannot normalize them, validation fails for that artifact. It must not silently drop those found values and continue as if the artifact had no dependencies.
 
-- The artifact is `scope: spec`
-- The schema declares `metadataExtraction.dependsOn` targeting this artifact type
-- The artifact passed validation (no failures)
+This removes the need for agents or users to manually call `change deps --add` and also removes the prior hardcoded `dependsOn` normalization path.
 
 ## Spec Dependencies
 
-- [`specs/core/change/spec.md`](../change/spec.md) — Change entity, artifact model, approval invalidation, `effectiveStatus`
-- [`specs/core/schema-format/spec.md`](../schema-format/spec.md) — artifact definition, `validations[]`, `deltaValidations[]`, `delta`, `format`, `preHashCleanup`
-- [`specs/core/delta-format/spec.md`](../delta-format/spec.md) — `ArtifactParser` port, `apply()`, `DeltaApplicationError`, delta file location
-- [`specs/core/selector-model/spec.md`](../selector-model/spec.md) — selector fields used in `validations[]` and `deltaValidations[]`
-- [`specs/core/storage/spec.md`](../storage/spec.md) — `ValidateArtifacts` is the sole path to `complete`; artifact status derivation
-- [`specs/_global/architecture/spec.md`](../../_global/architecture/spec.md) — port-per-workspace pattern; manual DI at entry points
-- [`specs/core/spec-id-format/spec.md`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for spec IDs
+- [`core:core/change`](../change/spec.md) — Change entity, artifact model, approval invalidation, `effectiveStatus`
+- [`core:core/schema-format`](../schema-format/spec.md) — artifact definition, `validations[]`, `deltaValidations[]`, `delta`, `format`, `preHashCleanup`
+- [`core:core/delta-format`](../delta-format/spec.md) — `ArtifactParser` port, `apply()`, `DeltaApplicationError`, delta file location
+- [`core:core/selector-model`](../selector-model/spec.md) — selector fields used in `validations[]` and `deltaValidations[]`
+- [`core:core/storage`](../storage/spec.md) — `ValidateArtifacts` is the sole path to `complete`; artifact status derivation
+- `default:_global/architecture` — port-per-workspace pattern; manual DI at entry points
+- [`core:core/spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for spec IDs

@@ -242,15 +242,48 @@ The structure is a **keyed object**, not a flat array. Each key is a metadata ca
 
 **Extractor fields** (under the `extractor` key of each entry):
 
-| Field       | Description                                                                                                                                                      |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `selector`  | Selector identifying the AST node(s) to extract from. See [Selector model](#selector-model).                                                                     |
-| `extract`   | What to extract: `'content'` (full subtree text), `'label'` (node heading/key only), or `'both'`. Defaults to `'content'`.                                       |
-| `capture`   | Regex with a capture group applied to the extracted text. Only the captured portion is retained.                                                                 |
-| `strip`     | Regex removed from labels or values before output.                                                                                                               |
-| `groupBy`   | Group matched nodes by their label (after `strip`). Only `'label'` is supported.                                                                                 |
-| `transform` | Named post-processing callback (e.g. `'resolveSpecPath'`).                                                                                                       |
-| `fields`    | Structured field mapping. When present, each matched node produces one object with the declared fields. Used for complex structured extraction (e.g. scenarios). |
+| Field       | Description                                                                                                                                                                                          |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `selector`  | Selector identifying the AST node(s) to extract from. See [Selector model](#selector-model).                                                                                                         |
+| `extract`   | What to extract: `'content'` (full subtree text), `'label'` (node heading/key only), or `'both'`. Defaults to `'content'`.                                                                           |
+| `capture`   | Regex applied to the extracted text. When it matches, the semantic extractor value becomes capture group `$1`, while `$0`, `$2`, and higher groups remain available for transform-arg interpolation. |
+| `strip`     | Regex removed from labels or values before output.                                                                                                                                                   |
+| `groupBy`   | Group matched nodes by their label (after `strip`). Only `'label'` is supported.                                                                                                                     |
+| `transform` | Post-processing callback declaration. Supports shorthand `transform: resolveSpecPath` and object syntax `transform: { name: join, args: ['$2', '/', '$1'] }`.                                        |
+| `fields`    | Structured field mapping. When present, each matched node produces one object with the declared fields. Used for complex structured extraction (e.g. scenarios).                                     |
+
+Structured field mappings use the same `capture`, `strip`, and `transform` semantics. A `FieldMapping.transform` runs per emitted field value after capture has established the semantic field value.
+
+#### Transform declarations
+
+Transforms are registered in the runtime, not defined in schema code. Schema authors only reference them by name.
+
+- Use shorthand when no args are needed: `transform: resolveSpecPath`
+- Use object syntax when the transform needs declarative args:
+
+```yaml
+transform:
+  name: join
+  args: ['$3', '/', '$2', '/', '$1']
+```
+
+Args are interpolated before the callback runs:
+
+- `$0` = the full regex match
+- `$1` = the first capture group and the semantic extractor `value`
+- `$2`, `$3`, ... = additional capture groups
+- unresolved placeholders are passed as `undefined`
+
+The extractor runtime never interprets transform names or args beyond placeholder interpolation. Unknown names and callback failures surface as `ExtractorTransformError` at runtime.
+
+Once a transform is invoked for an extracted value, it must return a normalized string. Returning `null`, `undefined`, or any other non-string value is treated as a transform failure. Use a thrown error when the extracted value is invalid for that transform.
+
+`resolveSpecPath` resolves the first candidate that normalizes to a canonical spec id:
+
+- first it tries the extracted `value`
+- then it tries interpolated args in order
+
+This makes it suitable for `Spec Dependencies` entries where the visible label is the canonical spec ID and the optional `href` is a fallback candidate.
 
 ```yaml
 metadataExtraction:
@@ -271,8 +304,10 @@ metadataExtraction:
     extractor:
       selector: { type: section, matches: '^Spec Dependencies$' }
       extract: content
-      capture: '\[.*?\]\(([^)]+)\)'
-      transform: resolveSpecPath
+      capture: '(?:^|\n)\s*-\s+(?:\[`?|`)?([^`\]\n]+?)(?:(?:`?\]\(([^)]+)\)|`)|(?=\s*(?:—|$)))'
+      transform:
+        name: resolveSpecPath
+        args: ['$2']
 
   rules:
     - id: spec-requirements

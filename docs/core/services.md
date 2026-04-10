@@ -235,18 +235,22 @@ function extractMetadata(
   extraction: MetadataExtraction,
   astsByArtifact: ReadonlyMap<string, { root: SelectorNode }>,
   renderers: ReadonlyMap<string, SubtreeRenderer>,
-  transforms?: ReadonlyMap<string, (values: string[]) => string[]>,
+  transforms?: ExtractorTransformRegistry,
+  transformContexts?: ReadonlyMap<string, ExtractorTransformContext>,
+  targetArtifactId?: string,
 ): ExtractedMetadata
 ```
 
 Orchestrates metadata extraction across multiple artifact ASTs. For each declared field in the schema's `metadataExtraction` block, looks up the corresponding artifact AST, runs the configured extractor, and assembles the result into an `ExtractedMetadata` object.
 
-| Parameter        | Type                                                             | Description                                           |
-| ---------------- | ---------------------------------------------------------------- | ----------------------------------------------------- |
-| `extraction`     | `MetadataExtraction`                                             | The schema's metadata extraction declarations.        |
-| `astsByArtifact` | `ReadonlyMap<string, { root: SelectorNode }>`                    | Parsed ASTs keyed by artifact type ID.                |
-| `renderers`      | `ReadonlyMap<string, SubtreeRenderer>`                           | Subtree renderers keyed by artifact type ID.          |
-| `transforms`     | `ReadonlyMap<string, (values: string[]) => string[]>` (optional) | Named transform callbacks, e.g. spec-path resolution. |
+| Parameter           | Type                                                        | Description                                           |
+| ------------------- | ----------------------------------------------------------- | ----------------------------------------------------- |
+| `extraction`        | `MetadataExtraction`                                        | The schema's metadata extraction declarations.        |
+| `astsByArtifact`    | `ReadonlyMap<string, { root: SelectorNode }>`               | Parsed ASTs keyed by artifact type ID.                |
+| `renderers`         | `ReadonlyMap<string, SubtreeRenderer>`                      | Subtree renderers keyed by artifact type ID.          |
+| `transforms`        | `ExtractorTransformRegistry` (optional)                     | Registered extractor transforms keyed by stable name. |
+| `transformContexts` | `ReadonlyMap<string, ExtractorTransformContext>` (optional) | Opaque context bags keyed by artifact id.             |
+| `targetArtifactId`  | `string` (optional)                                         | Restricts extraction to one artifact id.              |
 
 **Returns:** `ExtractedMetadata` — all available metadata fields populated.
 
@@ -261,11 +265,38 @@ function extractContent(
   root: SelectorNode,
   extractor: Extractor,
   renderer: SubtreeRenderer,
-  transforms?: ReadonlyMap<string, (values: string[]) => string[]>,
+  transforms?: ExtractorTransformRegistry,
+  transformContext?: ExtractorTransformContext,
 ): string[] | GroupedExtraction[] | StructuredExtraction[]
 ```
 
 Generic extraction engine — runs a single extractor configuration against an AST root. Supports simple string extraction, grouped extraction (nodes grouped by label), and structured extraction (field-mapped objects). Used internally by `extractMetadata` and available for custom extraction when building a port.
+
+`capture` and `transform` are now first-class runtime features:
+
+- without `capture`, the transform `value` is the extracted text after `strip`
+- with `capture`, the transform `value` becomes `$1`
+- `$0`, `$1`, `$2`, and higher groups can be interpolated into transform args before invocation
+- extractor-level transforms run per emitted value
+- field-level transforms run per emitted field value
+- once a transform receives a value, it must return a normalized string or throw
+
+The transform callback contract is:
+
+```typescript
+type ExtractorTransform = (
+  value: string,
+  args: readonly (string | undefined)[],
+  context: ReadonlyMap<string, unknown>,
+) => string
+```
+
+Transforms are registered through the kernel:
+
+- `createKernel(config, { extractorTransforms: { myTransform } })`
+- `createKernelBuilder(config).registerExtractorTransform('myTransform', myTransform)`
+
+Built-ins are registered under the same mechanism. `resolveSpecPath` is the standard transform for dependency extraction: it tries the extracted `value` first, then any interpolated args in order, returning the first candidate that normalizes to a canonical spec id. This supports canonical dependency labels, optional relative `href` fallbacks, and legacy labels during migration.
 
 ---
 
