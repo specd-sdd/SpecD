@@ -6,7 +6,6 @@ import { LandingPage } from '../components/landing-page'
 import {
   publicHomePageTitle,
   publicSiteDescription,
-  publicSiteTagline,
   publicSiteTitle,
   publicSiteUrl,
   publicSocialImageHref,
